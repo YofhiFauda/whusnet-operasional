@@ -15,11 +15,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(PonorogoRegionSeeder::class);
+        $this->call(MadiunRegionSeeder::class);
+        $this->call(SubscriptionStatusSeeder::class);
+        $this->call(InternetPackageSeeder::class);
+        $this->call(RoleSeeder::class);
+        $this->call(PermissionSeeder::class);
+        $this->call(RolePermissionSeeder::class);
+        $this->call(CustomerSeeder::class);
+
         // User::factory(10)->create();
 
+        $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
+
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Owner Whusnet',
+            'email' => 'owner@whusnet.net',
+            'phone' => '081234567890',
+            'password' => bcrypt('password'),
+            'status' => 'active',
+            'role_id' => $ownerRole ? $ownerRole->id : null,
         ]);
     }
 }

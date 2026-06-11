@@ -25,11 +25,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      APP_NAME: Whusnet
+      APP_NAME: Whusnet-Operasional
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: 3306
-      DB_DATABASE: landing_page
+      DB_DATABASE: whusnet_operasional
       DB_USERNAME: root
       DB_PASSWORD: root
       SESSION_DRIVER: file
@@ -67,7 +67,7 @@ services:
     container_name: whusnet-db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: landing_page
+      MYSQL_DATABASE: whusnet_operasional
       MYSQL_ROOT_PASSWORD: root
       MYSQL_PASSWORD: root
       MYSQL_USER: admin
@@ -99,20 +99,20 @@ services:
     networks:
       - app_network
 
-  ngrok:
-    image: ngrok/ngrok:alpine
-    container_name: whusnet-ngrok
-    restart: unless-stopped
-    command: ["http", "nginx:80"]
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-    ports:
-      - "4040:4040"
-    depends_on:
-      nginx:
-        condition: service_started
-    networks:
-      - app_network
+  # ngrok:
+  #   image: ngrok/ngrok:alpine
+  #   container_name: whusnet-ngrok
+  #   restart: unless-stopped
+  #   command: ["http", "nginx:80"]
+  #   environment:
+  #     NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+  #   ports:
+  #     - "4040:4040"
+  #   depends_on:
+  #     nginx:
+  #       condition: service_started
+  #   networks:
+  #     - app_network
 
 networks:
   app_network:

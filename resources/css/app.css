@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -5,7 +7,137 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+:root {
+  /* Colors */
+  --color-primary: #0284C7;
+  --color-primary-hover: #0369A1;
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-text-main: #0F172A;
+  --color-text-muted: #64748B;
+
+  /* Semantic Colors */
+  --color-success: #16A34A;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
+
+  /* Typography */
+  --font-ui: 'Inter', sans-serif;
+  --font-data: 'JetBrains Mono', monospace;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+
+  /* Radius */
+  --border-radius: 6px;
 }
+
+@theme {
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-data);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-border-color: var(--color-border);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+}
+
+/* Custom base styles to respect typography requirements */
+body {
+  font-family: var(--font-ui);
+  background-color: var(--color-background);
+  color: var(--color-text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+.data-text {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sidebar Collapse Styles */
+@media (min-width: 768px) {
+  #sidebar {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  #sidebar.collapsed {
+    width: 5rem !important;
+  }
+  
+  .sidebar-text {
+    transition: opacity 0.2s ease-in-out, max-width 0.2s ease-in-out;
+    opacity: 1;
+    max-width: 200px;
+    display: inline-block;
+    vertical-align: middle;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  
+  #sidebar.collapsed .sidebar-text {
+    opacity: 0 !important;
+    max-width: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  .chevron-icon {
+    transition: opacity 0.2s ease-in-out, width 0.2s ease-in-out;
+    opacity: 1;
+  }
+  
+  #sidebar.collapsed .chevron-icon {
+    opacity: 0 !important;
+    width: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  #sidebar.collapsed .submenu-container {
+    display: none !important;
+  }
+  
+  #sidebar.collapsed .brand-container {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  #sidebar.collapsed .brand-link {
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+  
+  #sidebar.collapsed nav {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  #sidebar.collapsed nav a, 
+  #sidebar.collapsed nav button {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    gap: 0 !important;
+  }
+  
+  #sidebar.collapsed .sidebar-footer {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  #sidebar.collapsed .sidebar-footer-info {
+    display: none !important;
+  }
+}
+
+

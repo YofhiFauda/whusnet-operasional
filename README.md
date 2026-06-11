@@ -1,58 +1,227 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# WHUSNET Operasional
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+WHUSNET Operasional adalah aplikasi web berbasis Laravel untuk membantu proses administrasi dan monitoring operasional ISP. Project ini berfokus pada pengelolaan data pelanggan, master data layanan, master wilayah, status langganan, dashboard operasional, dan proses import pelanggan.
 
-## About Laravel
+Dokumentasi detail setiap fitur tersedia di folder [docs](docs/README.md).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Gambaran Umum
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Aplikasi ini dibuat sebagai fondasi sistem operasional ISP dengan modul utama:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. Dashboard operasional untuk melihat ringkasan pelanggan.
+2. Data Pelanggan untuk registrasi, daftar, edit, detail, dan import pelanggan.
+3. Master Wilayah untuk referensi kota, kecamatan, dan desa.
+4. Master Paket Layanan untuk referensi paket internet WHUSNET.
+5. Master Status Langganan untuk workflow status pelanggan.
+6. API penunjang untuk dependent dropdown wilayah dan validasi import pelanggan.
 
-## Learning Laravel
+## Teknologi
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| Komponen | Teknologi |
+| --- | --- |
+| Backend | Laravel 13, PHP 8.3 |
+| Frontend | Blade, Vite, Tailwind CSS |
+| Database | MySQL atau database Laravel yang dikonfigurasi di `.env` |
+| Testing | PHPUnit |
+| Container | Docker, Nginx, PHP-FPM, MySQL, phpMyAdmin |
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Menu Aplikasi
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| Menu | Route | Fungsi | Dokumentasi |
+| --- | --- | --- | --- |
+| Dashboard | `/` | Ringkasan total pelanggan, pelanggan aktif, pending, suspend, distribusi status, kategori paket, dan tren registrasi. | [Dashboard](docs/dashboard/README.md) |
+| Data Pelanggan | `/customers` | Daftar pelanggan dengan search, filter status, filter kecamatan, filter paket, indikator kelengkapan data, dan progress workflow. | [Data Pelanggan](docs/data-pelanggan/README.md) |
+| Tambah Pelanggan | `/customers/create` | Form registrasi pelanggan baru beserta data diri, wilayah, layanan, referral, teknis, dan dokumen. | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Import Pelanggan | `/customers/import` | Import batch pelanggan melalui validasi row, warning, error, dan simpan massal. | [Import Pelanggan](docs/penunjang/import-pelanggan.md) |
+| Detail Pelanggan | `/customers/{customer}` | Detail pelanggan dengan timeline, survey, FOP, pemasangan, aktivasi, teknis, uji layanan, invoice awal, referral, dan timelog. | [Flowchart Data Pelanggan](docs/data-pelanggan/flowchart.md) |
+| Edit Pelanggan | `/customers/{customer}/edit` | Perubahan data pelanggan dan pengelolaan dokumen upload. | [Schema Data Pelanggan](docs/data-pelanggan/database-schema.md) |
+| Master Wilayah | `/master/wilayah` | Referensi kota, kecamatan, desa, dan pencarian wilayah. | [Master Wilayah](docs/master/wilayah.md) |
+| Master Internet Package | `/master/paket` | Daftar paket internet aktif yang dikelompokkan berdasarkan kategori. | [Master Internet Package](docs/master/internet-package.md) |
+| Master Status Langganan | `/master/status-langganan` | Daftar status workflow pelanggan beserta jumlah pelanggan per status. | [Master Status Langganan](docs/master/status-langganan.md) |
+| API Kecamatan | `/api/cities/{city}/districts` | Mengambil daftar kecamatan berdasarkan kota. | [API Wilayah](docs/penunjang/api-wilayah.md) |
+| API Desa | `/api/districts/{district}/villages` | Mengambil daftar desa berdasarkan kecamatan. | [API Wilayah](docs/penunjang/api-wilayah.md) |
 
-## Agentic Development
+## Alur Sistem Singkat
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```mermaid
+flowchart TD
+    A[Dashboard] --> B[Data Pelanggan]
+    A --> C[Master]
+    B --> D[Registrasi Pelanggan]
+    B --> E[Import Pelanggan]
+    B --> F[Detail Pelanggan]
+    F --> G[Edit Pelanggan]
+    C --> H[Master Wilayah]
+    C --> I[Master Paket Layanan]
+    C --> J[Master Status Langganan]
+    H --> B
+    I --> B
+    J --> B
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Dokumentasi flowchart lengkap tersedia di [Flowchart System](docs/flowchart-system.md).
 
-## Contributing
+## Struktur Dokumentasi
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| File / Folder | Isi |
+| --- | --- |
+| [docs/README.md](docs/README.md) | Indeks dokumentasi project. |
+| [docs/database-schema.md](docs/database-schema.md) | Database schema utama berdasarkan migration aktual. |
+| [docs/flowchart-system.md](docs/flowchart-system.md) | Flowchart sistem secara umum. |
+| [docs/data-pelanggan](docs/data-pelanggan/README.md) | Dokumentasi fitur pelanggan. |
+| [docs/master](docs/master/README.md) | Dokumentasi fitur master. |
+| [docs/dashboard](docs/dashboard/README.md) | Dokumentasi dashboard. |
+| [docs/penunjang](docs/penunjang/README.md) | Dokumentasi fitur penunjang. |
 
-## Code of Conduct
+## Struktur Project Penting
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Path | Keterangan |
+| --- | --- |
+| `routes/web.php` | Definisi route halaman dan API sederhana. |
+| `app/Http/Controllers` | Controller utama aplikasi. |
+| `app/Http/Controllers/Master` | Controller untuk menu master. |
+| `app/Models` | Model Eloquent. |
+| `database/migrations` | Struktur tabel database. |
+| `database/seeders` | Seeder master wilayah, paket layanan, status langganan, dan pelanggan dummy. |
+| `resources/views` | Blade view aplikasi. |
+| `resources/views/customers` | View fitur pelanggan. |
+| `resources/views/master` | View fitur master. |
+| `docs` | Dokumentasi project. |
 
-## Security Vulnerabilities
+## Database Utama
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Tabel utama yang digunakan:
 
-## License
+| Tabel | Fungsi |
+| --- | --- |
+| `customers` | Data utama pelanggan. |
+| `cities` | Master kota/kabupaten. |
+| `districts` | Master kecamatan. |
+| `villages` | Master desa/kelurahan. |
+| `internet_packages` | Master paket layanan internet. |
+| `subscription_statuses` | Master status workflow langganan. |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Detail schema tersedia di [Database Schema](docs/database-schema.md).
+
+## Instalasi Lokal
+
+Salin file environment:
+
+```bash
+cp .env.example .env
+```
+
+Install dependency backend dan frontend:
+
+```bash
+composer install
+npm install
+```
+
+Generate key dan jalankan migration:
+
+```bash
+php artisan key:generate
+php artisan migrate --seed
+```
+
+Jalankan aplikasi:
+
+```bash
+composer run dev
+```
+
+Atau jalankan frontend dan backend terpisah:
+
+```bash
+php artisan serve
+npm run dev
+```
+
+## Menjalankan dengan Docker
+
+Jalankan container:
+
+```bash
+docker compose up -d --build
+```
+
+Akses aplikasi:
+
+| Service | URL |
+| --- | --- |
+| Aplikasi | `http://localhost:8000` |
+| phpMyAdmin | `http://localhost:8080` |
+
+## Testing
+
+Jalankan test:
+
+```bash
+php artisan test
+```
+
+Atau melalui Composer:
+
+```bash
+composer test
+```
+
+## Catatan Implementasi
+
+Project ini sudah menyediakan fondasi fitur operasional ISP. Namun beberapa data detail seperti survey, FOP, pemasangan, aktivasi, uji layanan, dan invoice awal masih disusun secara simulatif dari data pelanggan, tanggal registrasi, dan status. Untuk operasional produksi, bagian tersebut perlu dikembangkan menjadi tabel transaksi dan workflow backend tersendiri.
+
+## Menu Dokumentasi Fitur
+
+Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu sesuai fitur yang ingin dipelajari, lalu buka dokumentasi detailnya.
+
+### Dashboard
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Memahami fungsi dashboard | [Overview Dashboard](docs/dashboard/README.md) |
+| Melihat alur data dashboard | [Flow Dashboard](docs/dashboard/flow.md) |
+| Melihat flowchart dashboard | [Flowchart Dashboard](docs/dashboard/flowchart.md) |
+| Melihat tabel sumber dashboard | [Schema Dashboard](docs/dashboard/database-schema.md) |
+
+### Data Pelanggan
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Memahami fitur Data Pelanggan secara umum | [Overview Data Pelanggan](docs/data-pelanggan/README.md) |
+| Melihat alur daftar pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Melihat alur registrasi pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Melihat alur edit pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Melihat alur detail pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Melihat alur import pelanggan | [Flow Data Pelanggan](docs/data-pelanggan/flow.md) |
+| Melihat flowchart registrasi, detail, dan import | [Flowchart Data Pelanggan](docs/data-pelanggan/flowchart.md) |
+| Melihat tabel dan field pelanggan | [Schema Data Pelanggan](docs/data-pelanggan/database-schema.md) |
+
+### Master
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Memahami fitur master secara umum | [Overview Master](docs/master/README.md) |
+| Melihat master wilayah | [Master Wilayah](docs/master/wilayah.md) |
+| Melihat master internet package | [Master Internet Package](docs/master/internet-package.md) |
+| Melihat master status langganan | [Master Status Langganan](docs/master/status-langganan.md) |
+| Melihat flowchart master | [Flowchart Master](docs/master/flowchart.md) |
+| Melihat schema master | [Schema Master](docs/master/database-schema.md) |
+
+### Penunjang
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Memahami fitur penunjang secara umum | [Overview Penunjang](docs/penunjang/README.md) |
+| Melihat alur import pelanggan batch | [Import Pelanggan](docs/penunjang/import-pelanggan.md) |
+| Melihat API dependent dropdown wilayah | [API Wilayah](docs/penunjang/api-wilayah.md) |
+| Melihat flowchart fitur penunjang | [Flowchart Penunjang](docs/penunjang/flowchart.md) |
+| Melihat schema fitur penunjang | [Schema Penunjang](docs/penunjang/database-schema.md) |
+
+### Sistem dan Database
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Melihat indeks semua dokumentasi | [Indeks Dokumentasi](docs/README.md) |
+| Melihat flowchart sistem keseluruhan | [Flowchart System](docs/flowchart-system.md) |
+| Melihat database schema utama | [Database Schema](docs/database-schema.md) |
