@@ -32,31 +32,33 @@ class CustomerDetailTest extends TestCase
         $response->assertSee($customer->phone);
         $response->assertSee($customer->email);
 
-        // 6. Verify 12 Tab existence in layout
+        // 6. Verify 10 Tab existence in layout
         $tabs = [
             'Ringkasan',
-            'Data Diri',
+            'Identitas',
+            'Alamat',
+            'POP/Cabang',
+            'Paket & Layanan',
+            'Billing',
+            'Tagihan',
+            'Pembayaran',
             'Dokumen',
-            'Layanan',
-            'Referral',
-            'Survey',
-            'FOP',
-            'Pemasangan',
-            'Aktivasi',
-            'Teknis',
-            'Uji Layanan',
-            'Pembayaran Awal'
+            'Riwayat Perubahan'
         ];
 
         foreach ($tabs as $tab) {
-            $response->assertSee($tab);
+            if ($tab === 'Paket & Layanan') {
+                $response->assertSee($tab, false);
+            } else {
+                $response->assertSee($tab);
+            }
         }
 
-        // 7. Verify new process logs
-        $response->assertSee('RIWAYAT PROSES');
+        // 7. Verify process timeline
+        $response->assertSee('TIMELINE PROSES');
         $response->assertSee('Tanggal Registrasi');
-        $response->assertSee('Nama Pengguna A');
-        $response->assertSee('Nama Pengguna E');
+        $response->assertSee('Pendaftaran Pelanggan');
+        $response->assertSee('Survey Lokasi & Kelayakan');
 
         // 8. Verify Data Completeness Card
         $response->assertSee('Kelengkapan Data Profil Pelanggan');

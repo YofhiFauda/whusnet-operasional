@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\Village;
 use App\Models\InternetPackage;
+use App\Models\Pop;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -38,6 +39,15 @@ class CustomerEditTest extends TestCase
         $this->loginAsAdmin();
 
         $customer = Customer::query()->firstOrFail();
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -47,9 +57,11 @@ class CustomerEditTest extends TestCase
             'full_name' => 'Updated Name',
             'identity_number' => '3502181010900003',
             'gender' => 'Perempuan',
-            'phone' => '08987654321',
+            'primary_phone' => '08987654321',
+            'alternative_phone' => '089988776655',
             'email' => 'updated@gmail.com',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Updated Address',
             'latitude' => '-7.12345',
             'longitude' => '111.12345',
@@ -80,8 +92,23 @@ class CustomerEditTest extends TestCase
             'id' => $customer->id,
             'full_name' => 'Updated Name',
             'identity_number' => '3502181010900003',
+            'pop_id' => $pop->id,
             'status' => 'active',
             'ont_sn' => 'ONT-UPD',
+        ]);
+
+        // Assert address updated in normalized table
+        $this->assertDatabaseHas('customer_addresses', [
+            'customer_id' => $customer->id,
+            'full_address' => 'Updated Address',
+            'city_id' => $city->id,
+        ]);
+
+        // Assert service updated in normalized table
+        $this->assertDatabaseHas('customer_services', [
+            'customer_id' => $customer->id,
+            'internet_package_id' => $package->id,
+            'total_monthly_bill' => max(0, (float)$package->monthly_price - 15000) * 1.11,
         ]);
     }
 
@@ -93,6 +120,15 @@ class CustomerEditTest extends TestCase
         \Illuminate\Support\Facades\Storage::fake('public');
 
         $customer = Customer::query()->firstOrFail();
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -102,9 +138,10 @@ class CustomerEditTest extends TestCase
             'full_name' => 'Updated Upload Name',
             'identity_number' => '3502181010900003',
             'gender' => 'Perempuan',
-            'phone' => '08987654321',
+            'primary_phone' => '08987654321',
             'email' => 'updated@gmail.com',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Updated Address',
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -144,6 +181,15 @@ class CustomerEditTest extends TestCase
         \Illuminate\Support\Facades\Storage::fake('public');
 
         $customer = Customer::query()->firstOrFail();
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -154,8 +200,9 @@ class CustomerEditTest extends TestCase
             'full_name' => 'Initial Name',
             'identity_number' => '3502181010900003',
             'gender' => 'Perempuan',
-            'phone' => '08987654321',
+            'primary_phone' => '08987654321',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Initial Address',
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -194,6 +241,15 @@ class CustomerEditTest extends TestCase
         \Illuminate\Support\Facades\Storage::fake('public');
 
         $customer = Customer::query()->firstOrFail();
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -204,8 +260,9 @@ class CustomerEditTest extends TestCase
             'full_name' => 'Initial Name',
             'identity_number' => '3502181010900003',
             'gender' => 'Perempuan',
-            'phone' => '08987654321',
+            'primary_phone' => '08987654321',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Initial Address',
             'city_id' => $city->id,
             'district_id' => $district->id,

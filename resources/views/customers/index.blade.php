@@ -39,11 +39,22 @@
 
 <!-- Filter & Search Panel -->
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
-    <form action="/customers" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+    <form action="/customers" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
         <!-- Search -->
         <div>
             <label for="search" class="block text-xs font-semibold text-slate-500 mb-2">CARI PELANGGAN</label>
-            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Nama, kode, email, telepon..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Nama, NIK, kode, email, telepon..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+        </div>
+
+        <!-- POP Filter -->
+        <div>
+            <label for="pop_id" class="block text-xs font-semibold text-slate-500 mb-2">POP / CABANG</label>
+            <select name="pop_id" id="pop_id" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                <option value="">Semua POP</option>
+                @foreach($pops as $pop)
+                    <option value="{{ $pop->id }}" {{ $popId == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
+                @endforeach
+            </select>
         </div>
 
         <!-- Kecamatan Filter -->
@@ -65,6 +76,18 @@
                 @foreach($packages as $package)
                     <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->category }}</option>
                 @endforeach
+            </select>
+        </div>
+
+        <!-- Status Kelengkapan Filter -->
+        <div>
+            <label for="completeness_status" class="block text-xs font-semibold text-slate-500 mb-2">STATUS KELENGKAPAN</label>
+            <select name="completeness_status" id="completeness_status" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                <option value="">Semua Kelengkapan</option>
+                <option value="draft" {{ $completenessStatus === 'draft' ? 'selected' : '' }}>Draft</option>
+                <option value="perlu_dilengkapi" {{ $completenessStatus === 'perlu_dilengkapi' ? 'selected' : '' }}>Perlu Dilengkapi</option>
+                <option value="lengkap" {{ $completenessStatus === 'lengkap' ? 'selected' : '' }}>Lengkap</option>
+                <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
             </select>
         </div>
 
@@ -104,10 +127,12 @@
                     <th class="px-6 py-3.5 w-12 text-center">NO</th>
                     <th class="px-6 py-3.5">ID</th>
                     <th class="px-6 py-3.5">NAMA</th>
+                    <th class="px-6 py-3.5">POP</th>
                     <th class="px-6 py-3.5">DESA</th>
                     <th class="px-6 py-3.5">PAKET</th>
                     <th class="px-6 py-3.5">HP</th>
                     <th class="px-6 py-3.5 text-center">KELENGKAPAN</th>
+                    <th class="px-6 py-3.5 text-center">STATUS</th>
                     <th class="px-6 py-3.5 text-center">KONEKSI</th>
                     <th class="px-6 py-3.5 text-right">ACTION</th>
                 </tr>
@@ -116,7 +141,7 @@
                 @forelse($customers as $customer)
                 @php
                     $isCustomer = $customer->status === 'active';
-                    $displayId = $isCustomer ? str_replace('WHUS-', 'CID-', $customer->customer_code) : str_replace('WHUS-', 'REQ-', $customer->customer_code);
+                    $displayId = $customer->cid ?? $customer->customer_code;
                     $completeness = $customer->dataCompleteness();
                     $stages = $customer->workflowProgress();
                 @endphp
@@ -126,12 +151,16 @@
                         {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
                     </td>
                     <!-- ID (CID / REQ) -->
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
                         {{ $displayId }}
                     </td>
                     <!-- Nama -->
                     <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
                         {{ $customer->full_name }}
+                    </td>
+                    <!-- POP -->
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                        {{ $customer->pop->name ?? '-' }}
                     </td>
                     <!-- Desa -->
                     <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
@@ -142,8 +171,8 @@
                         {{ $customer->internetPackage->package_code ?? '-' }}
                     </td>
                     <!-- HP -->
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
-                        {{ $customer->phone }}
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
+                        {{ $customer->primary_phone ?? $customer->phone }}
                     </td>
                     <!-- Kelengkapan (Progress & Lifecycle Stage Indicator) -->
                     <td class="px-6 py-3.5 whitespace-nowrap">
@@ -167,6 +196,23 @@
                                 @endforeach
                             </div>
                         </div>
+                    </td>
+                    <!-- Status Layanan -->
+                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
+                        @php
+                            $statusLabel = $customer->subscriptionStatus->name ?? ucfirst($customer->status);
+                            $badgeClass = match($customer->status) {
+                                'active' => 'bg-green-50 text-green-700 border border-green-100',
+                                'suspended' => 'bg-amber-50 text-amber-700 border border-amber-100',
+                                'terminated', 'rejected' => 'bg-red-50 text-red-700 border border-red-100',
+                                'waiting_survey', 'surveyed' => 'bg-yellow-50 text-yellow-800 border border-yellow-100',
+                                'waiting_installation', 'installed' => 'bg-blue-50 text-blue-700 border border-blue-100',
+                                default => 'bg-slate-50 text-slate-700 border border-slate-100'
+                            };
+                        @endphp
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
+                            {{ $statusLabel }}
+                        </span>
                     </td>
                     <!-- Koneksi with Toggle On Off -->
                     <td class="px-6 py-3.5 text-center whitespace-nowrap">
@@ -200,7 +246,7 @@
                                 data-code="{{ $displayId }}"
                                 data-raw-code="{{ $customer->customer_code }}"
                                 data-name="{{ $customer->full_name }}"
-                                data-phone="{{ $customer->phone }}"
+                                data-phone="{{ $customer->primary_phone ?? $customer->phone }}"
                                 data-email="{{ $customer->email }}"
                                 data-status="{{ $customer->subscriptionStatus->name ?? Str::headline($customer->status) }}"
                                 data-reg="{{ \App\Support\IndonesianDate::date($customer->registration_date) }}"
@@ -216,7 +262,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-8 text-center text-slate-400">
+                    <td colspan="11" class="px-6 py-8 text-center text-slate-400">
                         Tidak ada data pelanggan yang cocok dengan pencarian Anda.
                     </td>
                 </tr>

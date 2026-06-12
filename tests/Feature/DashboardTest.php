@@ -62,7 +62,7 @@ class DashboardTest extends TestCase
         $response->assertSee('Import Pelanggan');
         $response->assertSee('Master Data');
         $response->assertSee('Master Data Wilayah');
-        $response->assertSee('Master Data Layanan Internet');
+        $response->assertSee('Master Paket Internet');
         $response->assertSee('Master Status Pelanggan');
     }
 
@@ -86,7 +86,7 @@ class DashboardTest extends TestCase
 
         $response->assertSee('Master Data');
         $response->assertSee('Master Data Wilayah'); // view_pop
-        $response->assertSee('Master Data Layanan Internet'); // view_packages
+        $response->assertSee('Master Paket Internet'); // view_packages
         $response->assertSee('Master Status Pelanggan'); // view_packages
     }
 

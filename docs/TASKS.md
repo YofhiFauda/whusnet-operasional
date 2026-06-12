@@ -1,224 +1,13 @@
-# FILE: docs/TASKS.md
-
 # Current Tasks
 # Website Billing ISP Berbasis Master Data Pelanggan
 
 ## Status Project Saat Ini
-Current Sprint: Sprint 3 - Master Data Pelanggan Manual
-Current Module: Migration dan Model Customer
-Current Task: S3-T001 - Migration dan Model Customer
+Current Sprint: Sprint 4 — Import Excel/CSV
+Current Module: Template Import Pelanggan
+Current Task: S4-T001 — Template Import Pelanggan
 
 ---
 
-# Sprint 3 - Master Data Pelanggan Manual
-
-## Tujuan Sprint 3
-Membuat master data pelanggan lengkap dengan input manual dan status kelengkapan data.
-
----
-
-### S3-T001 - Migration dan Model Customer
-Status: In Progress
-
-Tujuan:
-Membuat struktur utama master pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customers`.
-- [ ] Tambahkan ID pelanggan baru / registration number.
-- [ ] Tambahkan ID pelanggan lama.
-- [ ] Tambahkan CID.
-- [ ] Tambahkan nama lengkap.
-- [ ] Tambahkan NIK/nomor identitas.
-- [ ] Tambahkan jenis kelamin.
-- [ ] Tambahkan nomor HP utama.
-- [ ] Tambahkan nomor HP alternatif.
-- [ ] Tambahkan email.
-- [ ] Tambahkan tanggal registrasi.
-- [ ] Tambahkan status kelengkapan data.
-- [ ] Tambahkan status pelanggan.
-- [ ] Tambahkan relasi ke POP.
-- [ ] Tambahkan created_by dan updated_by.
-
-Acceptance Criteria:
-- [ ] Customer dapat disimpan.
-- [ ] Customer memiliki relasi POP.
-- [ ] Customer memiliki status kelengkapan.
-- [ ] Customer memiliki status pelanggan.
-- [ ] Customer dapat menyimpan ID lama.
-- [ ] Customer dapat menyimpan ID Request dan CID.
-
----
-
-### S3-T002 — Migration dan Model Customer Address
-Status: Todo
-
-Tujuan:
-Membuat data alamat pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customer_addresses`.
-- [ ] Tambahkan customer_id.
-- [ ] Tambahkan alamat lengkap.
-- [ ] Tambahkan desa/kelurahan.
-- [ ] Tambahkan kecamatan.
-- [ ] Tambahkan kota/kabupaten.
-- [ ] Tambahkan provinsi.
-- [ ] Tambahkan latitude.
-- [ ] Tambahkan longitude.
-- [ ] Tambahkan foto rumah.
-- [ ] Tambahkan foto KTP.
-- [ ] Tambahkan foto kontrak.
-
-Acceptance Criteria:
-- [ ] Customer memiliki alamat.
-- [ ] Alamat dapat disimpan.
-- [ ] Field wajib alamat dapat divalidasi.
-- [ ] Foto bersifat opsional untuk MVP.
-
----
-
-### S3-T003 — Migration dan Model Customer Service
-Status: Todo
-
-Tujuan:
-Membuat data paket/layanan pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customer_services`.
-- [ ] Tambahkan customer_id.
-- [ ] Tambahkan internet_package_id.
-- [ ] Tambahkan snapshot nama paket.
-- [ ] Tambahkan snapshot kecepatan download.
-- [ ] Tambahkan snapshot kecepatan upload.
-- [ ] Tambahkan harga bulanan.
-- [ ] Tambahkan diskon.
-- [ ] Tambahkan PPN.
-- [ ] Tambahkan total tagihan bulanan.
-- [ ] Tambahkan tanggal aktivasi.
-- [ ] Tambahkan tanggal jatuh tempo.
-- [ ] Tambahkan siklus tagihan.
-- [ ] Tambahkan status layanan.
-- [ ] Tambahkan status billing.
-
-Acceptance Criteria:
-- [ ] Customer memiliki data layanan.
-- [ ] Layanan mengambil data dari master paket.
-- [ ] Harga paket disimpan sebagai snapshot.
-- [ ] Data layanan menjadi dasar invoice.
-
----
-
-### S3-T004 — Form Input Manual Pelanggan
-Status: Todo
-
-Tujuan:
-Membuat form input pelanggan manual.
-
-Checklist:
-- [ ] Buat halaman tambah pelanggan.
-- [ ] Buat form data identitas.
-- [ ] Buat form data alamat.
-- [ ] Buat form pilihan POP/Cabang.
-- [ ] Buat form pilihan paket internet.
-- [ ] Buat form billing dasar.
-- [ ] Simpan data pelanggan walaupun belum lengkap.
-- [ ] Generate ID Request berdasarkan POP.
-- [ ] Validasi field wajib.
-- [ ] Tampilkan pesan field yang belum lengkap.
-
-Acceptance Criteria:
-- [ ] Admin dapat input pelanggan manual.
-- [ ] Pelanggan belum lengkap tetap bisa disimpan.
-- [ ] Sistem membuat ID Request otomatis.
-- [ ] Sistem menandai data lengkap/belum lengkap.
-- [ ] Pelanggan belum lengkap tidak bisa masuk billing aktif.
-
----
-
-### S3-T005 — Daftar Pelanggan
-Status: Todo
-
-Tujuan:
-Membuat halaman daftar pelanggan.
-
-Checklist:
-- [ ] Buat tabel daftar pelanggan.
-- [ ] Tampilkan ID Request.
-- [ ] Tampilkan CID jika ada.
-- [ ] Tampilkan nama pelanggan.
-- [ ] Tampilkan nomor HP.
-- [ ] Tampilkan POP.
-- [ ] Tampilkan paket.
-- [ ] Tampilkan status kelengkapan.
-- [ ] Tampilkan status layanan.
-- [ ] Buat search nama/ID/nomor HP.
-- [ ] Buat filter POP.
-- [ ] Buat filter status kelengkapan.
-- [ ] Buat filter status layanan.
-
-Acceptance Criteria:
-- [ ] Pelanggan dapat dicari.
-- [ ] Pelanggan dapat difilter berdasarkan POP.
-- [ ] Pelanggan dapat difilter berdasarkan status kelengkapan.
-- [ ] Pelanggan dapat difilter berdasarkan status layanan.
-- [ ] Admin Cabang hanya melihat pelanggan POP yang ditugaskan.
-
----
-
-### S3-T006 — Detail Pelanggan dengan Tab
-Status: Todo
-
-Tujuan:
-Membuat halaman detail pelanggan lengkap.
-
-Checklist:
-- [ ] Buat tab Ringkasan.
-- [ ] Buat tab Identitas.
-- [ ] Buat tab Alamat.
-- [ ] Buat tab POP/Cabang.
-- [ ] Buat tab Paket & Layanan.
-- [ ] Buat tab Billing.
-- [ ] Buat tab Tagihan.
-- [ ] Buat tab Pembayaran.
-- [ ] Buat tab Dokumen.
-- [ ] Buat tab Riwayat Perubahan.
-
-Acceptance Criteria:
-- [ ] Detail pelanggan menampilkan semua data utama.
-- [ ] Data pelanggan dapat diedit sesuai permission.
-- [ ] Field yang belum lengkap terlihat.
-- [ ] Status kelengkapan terlihat jelas.
-
----
-
-### S3-T007 — Validasi Kelengkapan Data Pelanggan
-Status: Todo
-
-Tujuan:
-Membuat sistem validasi kelengkapan data pelanggan.
-
-Checklist:
-- [ ] Buat service/helper validasi kelengkapan.
-- [ ] Cek field wajib identitas.
-- [ ] Cek field wajib alamat.
-- [ ] Cek POP/Cabang.
-- [ ] Cek paket internet.
-- [ ] Cek harga bulanan.
-- [ ] Cek tanggal aktivasi.
-- [ ] Cek tanggal jatuh tempo.
-- [ ] Cek status layanan.
-- [ ] Hitung persentase kelengkapan.
-- [ ] Tampilkan daftar field yang belum lengkap.
-- [ ] Update status kelengkapan otomatis.
-
-Acceptance Criteria:
-- [ ] Sistem menampilkan persentase kelengkapan data.
-- [ ] Sistem menampilkan field yang belum lengkap.
-- [ ] Pelanggan belum lengkap tidak bisa masuk billing aktif.
-- [ ] Admin dapat melihat daftar pelanggan yang perlu dilengkapi.
-
----
 
 # Sprint 4 — Import Excel/CSV
 
@@ -228,7 +17,7 @@ Membuat modul import pelanggan lama ke master pelanggan baru.
 ---
 
 ### S4-T001 — Template Import Pelanggan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat template Excel/CSV untuk import pelanggan lama.
@@ -257,6 +46,124 @@ Acceptance Criteria:
 
 ### S4-T002 — Upload dan Preview Import
 Status: Todo
+
+Tujuan:
+Membuat upload file dan preview data sebelum import.
+
+Checklist:
+- [ ] Buat halaman import pelanggan.
+- [ ] Buat upload Excel/CSV.
+- [ ] Baca isi file.
+- [ ] Tampilkan preview data.
+- [ ] Tampilkan jumlah baris.
+- [ ] Tampilkan data valid dan invalid.
+
+Acceptance Criteria:
+- [ ] Admin dapat upload file.
+- [ ] Sistem membaca data.
+- [ ] Sistem menampilkan preview sebelum import.
+- [ ] Sistem belum menyimpan data sebelum admin konfirmasi.
+
+---
+
+### S4-T003 — Validasi Import
+Status: Todo
+
+Tujuan:
+Memvalidasi data import sebelum masuk master pelanggan.
+
+Checklist:
+- [ ] Cek ID pelanggan lama tidak duplikat.
+- [ ] Cek nama pelanggan tidak kosong.
+- [ ] Cek nomor HP tidak kosong.
+- [ ] Cek POP tersedia di master POP.
+- [ ] Cek paket tersedia di master paket.
+- [ ] Cek harga paket berupa angka.
+- [ ] Cek tanggal valid.
+- [ ] Cek status layanan sesuai pilihan sistem.
+- [ ] Tandai data teknis kosong sebagai belum lengkap.
+
+Acceptance Criteria:
+- [ ] Data invalid ditolak.
+- [ ] Alasan error ditampilkan.
+- [ ] Data duplikat ditandai.
+- [ ] Data valid siap dikonfirmasi import.
+
+---
+
+### S4-T004 — Import Batch dan Import Error
+Status: Todo
+
+Tujuan:
+Menyimpan log import dan error import.
+
+Checklist:
+- [ ] Buat tabel `import_batches`.
+- [ ] Buat tabel `import_errors`.
+- [ ] Simpan nama file.
+- [ ] Simpan user pengupload.
+- [ ] Simpan total rows.
+- [ ] Simpan valid rows.
+- [ ] Simpan invalid rows.
+- [ ] Simpan imported rows.
+- [ ] Simpan error per baris.
+- [ ] Simpan raw data error.
+
+Acceptance Criteria:
+- [ ] Setiap import memiliki batch log.
+- [ ] Error import tersimpan.
+- [ ] Admin dapat melihat riwayat import.
+- [ ] Admin dapat melihat alasan data gagal.
+
+---
+
+### S4-T005 — Konfirmasi Import ke Master Pelanggan
+Status: Todo
+
+Tujuan:
+Menyimpan data valid hasil import ke master pelanggan.
+
+Checklist:
+- [ ] Buat tombol konfirmasi import.
+- [ ] Simpan data valid ke customers.
+- [ ] Simpan alamat ke customer_addresses.
+- [ ] Simpan layanan ke customer_services.
+- [ ] Simpan ID pelanggan lama.
+- [ ] Generate ID Request berdasarkan POP.
+- [ ] Jangan generate CID jika pelanggan belum aktif/siap billing.
+- [ ] Update status kelengkapan data.
+- [ ] Simpan log audit import.
+
+Acceptance Criteria:
+- [ ] Data valid masuk master pelanggan.
+- [ ] Data invalid tidak masuk master pelanggan.
+- [ ] Data hasil import bisa diedit manual.
+- [ ] ID pelanggan lama tersimpan.
+- [ ] ID Request sistem baru dibuat.
+- [ ] Log import tersimpan.
+
+---
+
+# Sprint 5 — Billing Dasar
+
+## Tujuan Sprint 5
+Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
+
+---
+
+### S5-T001 — Aktivasi Layanan Pelanggan
+Status: Todo
+
+Tujuan:
+Mengubah pelanggan lengkap menjadi aktif/siap billing.
+
+Checklist:
+- [ ] Buat tombol aktivasi layanan.
+- [ ] Cek kelengkapan data pelanggan.
+- [ ] Cek paket aktif.
+- [ ] Cek nominal tagihan.
+- [ ] Cek tanggal aktivasi.
+- [ ] Cek tanggal jatuh tempo.
 
 Tujuan:
 Membuat upload file dan preview data sebelum import.
@@ -1172,12 +1079,325 @@ Acceptance Criteria:
 - [x] Sistem dapat membuat ID Request otomatis.
 - [x] Sistem dapat membuat CID otomatis.
 - [x] ID tidak boleh duplikat.
+- [x] Tambahkan nama paket.
+- [x] Tambahkan kategori paket.
+- [x] Tambahkan kecepatan download.
+- [x] Tambahkan kecepatan upload.
+- [x] Tambahkan harga bulanan.
+- [x] Tambahkan PPN.
+- [x] Tambahkan diskon default.
+- [x] Tambahkan total harga.
+- [x] Tambahkan profile teknis.
+- [x] Tambahkan deskripsi.
+- [x] Tambahkan status aktif/nonaktif.
+
+Acceptance Criteria:
+- [x] Paket dapat disimpan di database.
+- [x] Paket memiliki harga bulanan.
+- [x] Paket memiliki kecepatan download dan upload.
+- [x] Paket memiliki status aktif/nonaktif.
+
+---
+
+### S2-T005 — CRUD Master Paket Internet
+Status: Done
+
+Tujuan:
+Membuat halaman CRUD paket internet.
+
+Checklist:
+- [x] Buat halaman daftar paket.
+- [x] Buat halaman tambah paket.
+- [x] Buat halaman edit paket.
+- [x] Buat validasi field wajib.
+- [x] Buat fitur aktif/nonaktif paket.
+- [x] Pastikan paket aktif dapat dipilih di modul pelanggan nantinya.
+- [x] Pastikan paket nonaktif tidak dipilih untuk pelanggan baru.
+
+Acceptance Criteria:
+- [x] Paket dapat dibuat.
+- [x] Paket dapat diedit.
+- [x] Paket dapat dinonaktifkan.
+- [x] Harga paket dapat menjadi dasar tagihan.
+- [x] Paket aktif siap digunakan pada input pelanggan.
+
+---
+
+### S2-T006 - POP Identifier Setting
+Status: Done
+
+Tujuan:
+Menambahkan aturan ID khusus berdasarkan POP.
+
+Checklist:
+- [x] Tambahkan field `pop_code` pada POP.
+- [x] Tambahkan field `registration_prefix` pada POP.
+- [x] Tambahkan field `cid_prefix` pada POP.
+- [x] Buat tabel sequence nomor per POP.
+- [x] Buat sequence untuk registration number.
+- [x] Buat sequence untuk CID.
+- [x] Pastikan nomor urut berjalan per POP.
+- [x] Pastikan nomor urut berjalan per jenis ID.
+- [x] Pastikan format ID sesuai aturan.
+
+Format:
+- ID Request: `{registration_prefix}-{pop_code}-{running_number}`
+- CID: `{cid_prefix}-{pop_code}-{running_number}`
+
+Contoh:
+- ID Request: `C-SMN-000001`
+- CID: `D-SMN-000001`
+
+Acceptance Criteria:
+- [x] Setiap POP memiliki kode POP.
+- [x] Setiap POP memiliki prefix ID Request.
+- [x] Setiap POP memiliki prefix CID.
+- [x] Sistem dapat membuat ID Request otomatis.
+- [x] Sistem dapat membuat CID otomatis.
+- [x] ID tidak boleh duplikat.
 - [x] CID tidak dibuat sebelum pelanggan aktif/siap billing.
 
 Catatan Test:
 - `php artisan test --filter=Pop` lulus: 14 tests, 80 assertions.
 
 ---
+
+# Sprint 3 - Master Data Pelanggan Manual
+
+## Tujuan Sprint 3
+Membuat master data pelanggan lengkap dengan input manual dan status kelengkapan data. (Sprint Selesai)
+
+---
+### S3-T001 - Migration dan Model Customer
+Status: Done
+
+Tujuan:
+Membuat struktur utama master pelanggan.
+
+Checklist:
+- [x] Buat tabel `customers`.
+- [x] Tambahkan ID pelanggan baru / registration number.
+- [x] Tambahkan ID pelanggan lama.
+- [x] Tambahkan CID.
+- [x] Tambahkan nama lengkap.
+- [x] Tambahkan NIK/nomor identitas.
+- [x] Tambahkan jenis kelamin.
+- [x] Tambahkan nomor HP utama.
+- [x] Tambahkan nomor HP alternatif.
+- [x] Tambahkan email.
+- [x] Tambahkan tanggal registrasi.
+- [x] Tambahkan status kelengkapan data.
+- [x] Tambahkan status pelanggan.
+- [x] Tambahkan relasi ke POP.
+- [x] Tambahkan created_by dan updated_by.
+
+Acceptance Criteria:
+- [x] Customer dapat disimpan.
+- [x] Customer memiliki relasi POP.
+- [x] Customer memiliki status kelengkapan.
+- [x] Customer memiliki status pelanggan.
+- [x] Customer dapat menyimpan ID lama.
+- [x] Customer dapat menyimpan ID Request dan CID.
+
+Catatan Test:
+- `php artisan test --filter=CustomerModelTest` lulus: 1 test, 11 assertions.
+- Seluruh test suite `php artisan test` lulus: 66 tests, 355 assertions.
+
+---
+
+### S3-T002 — Migration dan Model Customer Address
+Status: Done
+
+Tujuan:
+Membuat data alamat pelanggan.
+
+Checklist:
+- [x] Buat tabel `customer_addresses`.
+- [x] Tambahkan customer_id.
+- [x] Tambahkan alamat lengkap.
+- [x] Tambahkan desa/kelurahan.
+- [x] Tambahkan kecamatan.
+- [x] Tambahkan kota/kabupaten.
+- [x] Tambahkan provinsi.
+- [x] Tambahkan latitude.
+- [x] Tambahkan longitude.
+- [x] Tambahkan foto rumah.
+- [x] Tambahkan foto KTP.
+- [x] Tambahkan foto kontrak.
+
+Acceptance Criteria:
+- [x] Customer memiliki alamat.
+- [x] Alamat dapat disimpan.
+- [x] Field wajib alamat dapat divalidasi.
+- [x] Foto bersifat opsional untuk MVP.
+
+Catatan Test:
+- `php artisan test --filter=CustomerAddressModelTest` lulus: 2 tests, 12 assertions.
+- Seluruh test suite `php artisan test` lulus: 68 tests, 367 assertions.
+
+---
+
+### S3-T003 — Migration dan Model Customer Service
+Status: Done
+
+Tujuan:
+Membuat data paket/layanan pelanggan.
+
+Checklist:
+- [x] Buat tabel `customer_services`.
+- [x] Tambahkan customer_id.
+- [x] Tambahkan internet_package_id.
+- [x] Tambahkan snapshot nama paket.
+- [x] Tambahkan snapshot kecepatan download.
+- [x] Tambahkan snapshot kecepatan upload.
+- [x] Tambahkan harga bulanan.
+- [x] Tambahkan diskon.
+- [x] Tambahkan PPN.
+- [x] Tambahkan total tagihan bulanan.
+- [x] Tambahkan tanggal aktivasi.
+- [x] Tambahkan tanggal jatuh tempo.
+- [x] Tambahkan siklus tagihan.
+- [x] Tambahkan status layanan.
+- [x] Tambahkan status billing.
+
+Acceptance Criteria:
+- [x] Customer memiliki data layanan.
+- [x] Layanan mengambil data dari master paket.
+- [x] Harga paket disimpan sebagai snapshot.
+- [x] Data layanan menjadi dasar invoice.
+
+Catatan Test:
+- `php artisan test --filter=CustomerServiceModelTest` lulus: 2 tests, 8 assertions.
+- Seluruh test suite `php artisan test` lulus: 70 tests, 375 assertions.
+
+---
+
+### S3-T004 — Form Input Manual Pelanggan
+Status: Done
+
+Tujuan:
+Membuat form input pelanggan manual.
+
+Checklist:
+- [x] Buat halaman tambah pelanggan.
+- [x] Buat form data identitas.
+- [x] Buat form data alamat.
+- [x] Buat form pilihan POP/Cabang.
+- [x] Buat form pilihan paket internet.
+- [x] Buat form billing dasar.
+- [x] Simpan data pelanggan walaupun belum lengkap.
+- [x] Generate ID Request berdasarkan POP.
+- [x] Validasi field wajib.
+- [x] Tampilkan pesan field yang belum lengkap.
+
+Acceptance Criteria:
+- [x] Admin dapat input pelanggan manual.
+- [x] Pelanggan belum lengkap tetap bisa disimpan.
+- [x] Sistem membuat ID Request otomatis.
+- [x] Sistem menandai data lengkap/belum lengkap.
+- [x] Pelanggan belum lengkap tidak bisa masuk billing aktif.
+
+Catatan Test:
+- Seluruh test suite `php artisan test` lulus: 70 tests, 373 assertions.
+
+---
+
+### S3-T005 — Daftar Pelanggan
+Status: Done
+
+Tujuan:
+Membuat halaman daftar pelanggan.
+
+Checklist:
+- [x] Buat tabel daftar pelanggan.
+- [x] Tampilkan ID Request.
+- [x] Tampilkan CID jika ada.
+- [x] Tampilkan nama pelanggan.
+- [x] Tampilkan nomor HP.
+- [x] Tampilkan POP.
+- [x] Tampilkan paket.
+- [x] Tampilkan status kelengkapan.
+- [x] Tampilkan status layanan.
+- [x] Buat search nama/ID/nomor HP.
+- [x] Buat filter POP.
+- [x] Buat filter status kelengkapan.
+- [x] Buat filter status layanan.
+
+Acceptance Criteria:
+- [x] Pelanggan dapat dicari.
+- [x] Pelanggan dapat difilter berdasarkan POP.
+- [x] Pelanggan dapat difilter berdasarkan status kelengkapan.
+- [x] Pelanggan dapat difilter berdasarkan status layanan.
+- [x] Admin Cabang hanya melihat pelanggan POP yang ditugaskan.
+
+Catatan Test:
+- Seluruh test suite `php artisan test` lulus: 75 tests, 395 assertions (termasuk unit/feature test filter, search, & POP restriction).
+
+---
+
+### S3-T006 — Detail Pelanggan dengan Tab
+Status: Done
+
+Tujuan:
+Membuat halaman detail pelanggan lengkap.
+
+Checklist:
+- [x] Buat tab Ringkasan.
+- [x] Buat tab Identitas.
+- [x] Buat tab Alamat.
+- [x] Buat tab POP/Cabang.
+- [x] Buat tab Paket & Layanan.
+- [x] Buat tab Billing.
+- [x] Buat tab Tagihan.
+- [x] Buat tab Pembayaran.
+- [x] Buat tab Dokumen.
+- [x] Buat tab Riwayat Perubahan.
+
+Acceptance Criteria:
+- [x] Detail pelanggan menampilkan semua data utama.
+- [x] Data pelanggan dapat diedit sesuai permission.
+- [x] Field yang belum lengkap terlihat.
+- [x] Status kelengkapan terlihat jelas.
+
+Catatan Test:
+- Halaman detail berhasil memuat data dengan 10 tab interaktif.
+- Tercover dalam `CustomerDetailTest.php`.
+
+---
+
+### S3-T007 — Validasi Kelengkapan Data Pelanggan
+Status: Done
+
+Tujuan:
+Membuat sistem validasi kelengkapan data pelanggan.
+
+Checklist:
+- [x] Buat service/helper validasi kelengkapan.
+- [x] Cek field wajib identitas.
+- [x] Cek field wajib alamat.
+- [x] Cek POP/Cabang.
+- [x] Cek paket internet.
+- [x] Cek harga bulanan.
+- [x] Cek tanggal aktivasi.
+- [x] Cek tanggal jatuh tempo.
+- [x] Cek status layanan.
+- [x] Hitung persentase kelengkapan.
+- [x] Tampilkan daftar field yang belum lengkap.
+- [x] Update status kelengkapan otomatis.
+
+Acceptance Criteria:
+- [x] Sistem menampilkan persentase kelengkapan data.
+- [x] Sistem menampilkan field yang belum lengkap.
+- [x] Pelanggan belum lengkap tidak bisa masuk billing aktif.
+- [x] Admin dapat melihat daftar pelanggan yang perlu dilengkapi.
+
+Catatan Test:
+- `CustomerValidationTest.php` menguji kalkulasi persentase kelengkapan, perubahan status otomatis, dan penolakan transisi status `siap_billing` bila data tidak lengkap.
+- `CustomerListTest.php` disesuaikan agar customer data seeder valid untuk pengujian filter kelengkapan.
+- Seluruh 80 unit/feature test lulus (100% pass rate).
+
+---
+
 
 
 ## Blocked

@@ -163,8 +163,13 @@
                         </div>
 
                         <div>
-                            <label for="phone" class="block mb-2 uppercase tracking-wide">NOMOR HP / TELEPON <span class="text-red-500">*</span></label>
-                            <input type="text" name="phone" id="phone" value="{{ old('phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 082139xxxxxx">
+                            <label for="primary_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP UTAMA <span class="text-red-500">*</span></label>
+                            <input type="text" name="primary_phone" id="primary_phone" value="{{ old('primary_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 082139xxxxxx">
+                        </div>
+
+                        <div>
+                            <label for="alternative_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP ALTERNATIF</label>
+                            <input type="text" name="alternative_phone" id="alternative_phone" value="{{ old('alternative_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 082139xxxxxx">
                         </div>
 
                         <div>
@@ -175,6 +180,16 @@
                         <div>
                             <label for="registration_date" class="block mb-2 uppercase tracking-wide">TANGGAL REGISTRASI <span class="text-red-500">*</span></label>
                             <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', now()->format('Y-m-d')) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                        </div>
+
+                        <div>
+                            <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP / CABANG <span class="text-red-500">*</span></label>
+                            <select name="pop_id" id="pop_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="" disabled selected>Pilih POP / Cabang</option>
+                                @foreach($pops as $pop)
+                                    <option value="{{ $pop->id }}" {{ old('pop_id') == $pop->id ? 'selected' : '' }}>{{ $pop->name }} ({{ strtoupper($pop->type) }})</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         <div class="md:col-span-2">
@@ -506,8 +521,8 @@
     // Define wizard fields configurations
     const formFields = {
         'data-diri': {
-            required: ['full_name', 'identity_number', 'gender', 'phone', 'registration_date', 'address', 'city_id', 'district_id', 'village_id'],
-            optional: ['email', 'latitude', 'longitude']
+            required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
+            optional: ['email', 'alternative_phone', 'latitude', 'longitude']
         },
         'dokumen': {
             required: [],
@@ -848,6 +863,9 @@
             identity_number: 'NIK',
             gender: 'Jenis Kelamin',
             phone: 'Nomor HP',
+            primary_phone: 'Nomor HP Utama',
+            alternative_phone: 'Nomor HP Alternatif',
+            pop_id: 'POP / Cabang',
             email: 'Email',
             registration_date: 'Tgl Registrasi',
             address: 'Alamat',

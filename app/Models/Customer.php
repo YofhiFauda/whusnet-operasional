@@ -2,18 +2,27 @@
 
 namespace App\Models;
 
+use App\Services\CustomerValidationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'customer_code',
+    'old_customer_id',
+    'cid',
     'full_name',
     'identity_number',
     'gender',
     'email',
     'phone',
+    'primary_phone',
+    'alternative_phone',
     'registration_date',
+    'data_completeness_status',
+    'customer_status',
+    'pop_id',
     'status',
     'address',
     'latitude',
@@ -36,6 +45,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'foto_ktp',
     'foto_rumah',
     'foto_kontrak',
+    'created_by',
+    'updated_by',
 ])]
 class Customer extends Model
 {
@@ -90,56 +101,116 @@ class Customer extends Model
     }
 
     /**
-     * Calculate data completeness percentage.
-     * Checks how many of the 25 fields are filled.
+     * @return BelongsTo<Pop, $this>
+     */
+    public function pop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * @return HasOne<CustomerAddress, $this>
+     */
+    public function customerAddress(): HasOne
+    {
+        return $this->hasOne(CustomerAddress::class);
+    }
+
+    /**
+     * @return HasOne<CustomerService, $this>
+     */
+    public function customerService(): HasOne
+    {
+        return $this->hasOne(CustomerService::class);
+    }
+
+    /**
+     * Auto-update data_completeness_status whenever the model is saved.
+     * Uses CustomerValidationService to derive the correct status.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::saved(function (Customer $customer) {
+            $customer->recalculateCompleteness();
+        });
+    }
+
+    /**
+     * Recalculate completeness and update the database column quietly.
+     */
+    public function recalculateCompleteness(): void
+    {
+        $this->unsetRelation('customerService');
+        $this->unsetRelation('customerAddress');
+
+        /** @var CustomerValidationService $service */
+        $service = app(CustomerValidationService::class);
+        $result = $service->validate($this);
+        $newStatus = $result['completeness_status'];
+
+        if ($this->data_completeness_status !== $newStatus) {
+            $this->updateQuietly(['data_completeness_status' => $newStatus]);
+        }
+    }
+
+    /**
+     * Calculate data completeness using CustomerValidationService.
+     *
+     * Returns:
+     *   percentage        (int)    : 0–100 fill percentage
+     *   filled_count      (int)    : number of filled fields
+     *   total_count       (int)    : total fields evaluated
+     *   missing_required  (array)  : [key => label] of unfilled required fields
+     *   missing_optional  (array)  : [key => label] of unfilled optional fields
+     *   is_ready_billing  (bool)   : true when all required fields are filled
+     *   completeness_status (string): derived status string
      */
     public function dataCompleteness(): array
     {
-        $fields = [
-            'full_name', 'identity_number', 'gender', 'phone', 'email',
-            'registration_date', 'address', 'city_id', 'district_id', 'village_id',
-            'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak',
-            'internet_package_id', 'contract_period_months', 'discount_amount', 'tax_percent',
-            'sales_code', 'agent_code', 'referral_customer_code',
-            'status', 'ont_sn', 'ip_address', 'odp_code', 'olt_code', 'vlan_id'
-        ];
+        /** @var CustomerValidationService $service */
+        $service = app(CustomerValidationService::class);
+        return $service->validate($this);
+    }
 
-        $requiredFields = [
-            'full_name', 'identity_number', 'gender', 'phone', 'registration_date',
-            'address', 'city_id', 'district_id', 'village_id', 'internet_package_id',
-            'contract_period_months', 'discount_amount', 'tax_percent', 'status'
-        ];
+    /**
+     * Scope a query to only include customers from POPs accessible by the user.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param \App\Models\User|null $user
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForUser($query, $user = null)
+    {
+        $user = $user ?? auth()->user();
 
-        $filledCount = 0;
-        $totalCount = count($fields);
-        $missingRequired = [];
-        $missingOptional = [];
-
-        foreach ($fields as $field) {
-            $val = $this->{$field};
-            $isFilled = !is_null($val) && trim((string)$val) !== '';
-            if ($isFilled) {
-                $filledCount++;
-            } else {
-                if (in_array($field, $requiredFields)) {
-                    $missingRequired[] = $field;
-                } else {
-                    $missingOptional[] = $field;
-                }
-            }
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
         }
 
-        $percentage = round(($filledCount / $totalCount) * 100);
+        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+            return $query;
+        }
 
-        return [
-            'percentage' => (int)$percentage,
-            'filled_count' => $filledCount,
-            'total_count' => $totalCount,
-            'missing_required' => $missingRequired,
-            'missing_optional' => $missingOptional,
-            'is_complete' => count($missingRequired) === 0 && count($missingOptional) === 0,
-            'has_warnings' => count($missingRequired) === 0 && count($missingOptional) > 0,
-        ];
+        $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
+        return $query->whereIn('pop_id', $assignedPopIds);
     }
 
     /**

@@ -9,6 +9,8 @@ use App\Models\District;
 use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\SubscriptionStatus;
+use App\Models\Pop;
+use App\Services\CustomerValidationService;
 use App\Support\IndonesianDate;
 use Illuminate\Http\Request;
 
@@ -23,17 +25,23 @@ class CustomerController extends Controller
         $status = trim((string) $request->query('status', ''));
         $districtId = $request->query('district_id', '');
         $packageId = $request->query('package_id', '');
+        $popId = $request->query('pop_id', '');
+        $completenessStatus = $request->query('completeness_status', '');
 
         $query = Customer::query()
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus']);
+            ->forUser()
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop']);
 
         // Search filter
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
                   ->orWhere('customer_code', 'like', "%{$search}%")
+                  ->orWhere('cid', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('primary_phone', 'like', "%{$search}%")
+                  ->orWhere('identity_number', 'like', "%{$search}%");
             });
         }
 
@@ -52,35 +60,49 @@ class CustomerController extends Controller
             $query->where('internet_package_id', $packageId);
         }
 
+        // POP filter
+        if ($popId !== '') {
+            $query->where('pop_id', $popId);
+        }
+
+        // Completeness status filter
+        if ($completenessStatus !== '') {
+            $query->where('data_completeness_status', $completenessStatus);
+        }
+
         $customers = $query->orderBy('customer_code', 'asc')->paginate(10)->withQueryString();
 
         // Data for filter selects
         $districts = District::orderBy('name')->get();
         $packages = InternetPackage::orderBy('name')->get();
+        $pops = Pop::forUser()->orderBy('name')->get();
         $subscriptionStatuses = SubscriptionStatus::query()
             ->where('is_active', true)
             ->orderBy('workflow_order')
             ->get();
 
         // Customer count by status (for badge list / submenus)
-        $statusCounts = Customer::selectRaw('status, count(*) as count')
+        $statusCounts = Customer::forUser()->selectRaw('status, count(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
-        $totalCustomers = Customer::count();
+        $totalCustomers = Customer::forUser()->count();
 
         return view('customers.index', compact(
             'customers', 
             'districts', 
             'packages', 
+            'pops',
             'statusCounts', 
             'totalCustomers',
             'subscriptionStatuses',
             'search',
             'status',
             'districtId',
-            'packageId'
+            'packageId',
+            'popId',
+            'completenessStatus'
         ));
     }
 
@@ -92,7 +114,8 @@ class CustomerController extends Controller
         $districts = \App\Models\District::orderBy('name')->get();
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
-        return view('customers.create', compact('districts', 'packages', 'cities'));
+        $pops = \App\Models\Pop::forUser()->get();
+        return view('customers.create', compact('districts', 'packages', 'cities', 'pops'));
     }
 
     /**
@@ -102,21 +125,23 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
-            'identity_number' => 'required|string|max:50',
-            'gender' => 'required|string|max:20',
-            'phone' => 'required|string|max:20',
+            'identity_number' => 'nullable|string|max:50',
+            'gender' => 'nullable|string|max:20',
+            'primary_phone' => 'required|string|max:20',
+            'alternative_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
-            'address' => 'required|string',
+            'pop_id' => 'required|exists:pops,id',
+            'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-            'city_id' => 'required|exists:cities,id',
-            'district_id' => 'required|exists:districts,id',
-            'village_id' => 'required|exists:villages,id',
-            'internet_package_id' => 'required|exists:internet_packages,id',
-            'contract_period_months' => 'required|integer|min:1',
-            'discount_amount' => 'required|numeric|min:0',
-            'tax_percent' => 'required|numeric|between:0,100',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'internet_package_id' => 'nullable|exists:internet_packages,id',
+            'contract_period_months' => 'nullable|integer|min:1',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax_percent' => 'nullable|numeric|between:0,100',
             
             // Referrals
             'sales_code' => 'nullable|string|max:30',
@@ -139,6 +164,23 @@ class CustomerController extends Controller
             'foto_kontrak' => 'nullable|file|mimes:jpeg,png,pdf|max:2048',
         ]);
 
+        $validated['phone'] = $validated['primary_phone'];
+        $validated['created_by'] = auth()->id();
+        $validated['updated_by'] = auth()->id();
+
+        $statusMapping = [
+            'active' => 'aktif',
+            'suspended' => 'isolir',
+            'terminated' => 'berhenti',
+            'rejected' => 'nonaktif',
+            'waiting_survey' => 'survey',
+            'surveyed' => 'survey',
+            'waiting_installation' => 'menunggu_pemasangan',
+            'installed' => 'menunggu_pemasangan',
+            'registered' => 'calon_pelanggan',
+        ];
+        $validated['customer_status'] = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
+
         if ($request->hasFile('foto_ktp')) {
             $validated['foto_ktp'] = $request->file('foto_ktp')->store('documents', 'public');
         }
@@ -149,15 +191,96 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = $request->file('foto_kontrak')->store('documents', 'public');
         }
 
-        // Generate customer_code (e.g. WHUS-2026-0001)
-        $year = now()->format('Y');
-        $latestCustomer = Customer::orderBy('id', 'desc')->first();
-        $nextId = $latestCustomer ? $latestCustomer->id + 1 : 1;
-        $customerCode = "WHUS-{$year}-" . str_pad((string)$nextId, 4, '0', STR_PAD_LEFT);
-        
+        // Generate customer_code via POP sequence generator
+        $pop = Pop::findOrFail($validated['pop_id']);
+        $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        Customer::create($validated);
+        $customer = \Illuminate\Support\Facades\DB::transaction(function() use ($validated) {
+            // 1. Create customer record
+            $customer = Customer::create($validated);
+
+            // 2. Create customer address
+            $cityName = null;
+            if (!empty($validated['city_id'])) {
+                $cityName = \App\Models\City::where('id', $validated['city_id'])->value('name');
+            }
+            $districtName = null;
+            if (!empty($validated['district_id'])) {
+                $districtName = \App\Models\District::where('id', $validated['district_id'])->value('name');
+            }
+            $villageName = null;
+            if (!empty($validated['village_id'])) {
+                $villageName = \App\Models\Village::where('id', $validated['village_id'])->value('name');
+            }
+
+            $customer->customerAddress()->create([
+                'full_address' => $validated['address'] ?? null,
+                'province' => 'Jawa Timur',
+                'city' => $cityName,
+                'district' => $districtName,
+                'village' => $villageName,
+                'city_id' => $validated['city_id'] ?? null,
+                'district_id' => $validated['district_id'] ?? null,
+                'village_id' => $validated['village_id'] ?? null,
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
+                'house_photo' => $validated['foto_rumah'] ?? null,
+                'ktp_photo' => $validated['foto_ktp'] ?? null,
+                'contract_photo' => $validated['foto_kontrak'] ?? null,
+            ]);
+
+            // 3. Create customer service if package is chosen
+            if (!empty($validated['internet_package_id'])) {
+                $package = \App\Models\InternetPackage::findOrFail($validated['internet_package_id']);
+                
+                $monthlyPrice = (float)$package->monthly_price;
+                $discount = (float)($validated['discount_amount'] ?? 0.00);
+                $ppn = (float)($validated['tax_percent'] ?? 0.00);
+
+                // Calculate total bill
+                $discountedPrice = max(0, $monthlyPrice - $discount);
+                $totalBill = $discountedPrice * (1 + $ppn / 100);
+
+                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
+                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
+
+                $activationDate = $validated['registration_date'] ?? null;
+                $dueDate = null;
+                if ($activationDate) {
+                    $dueDate = \Carbon\Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                }
+
+                $customer->customerService()->create([
+                    'internet_package_id' => $package->id,
+                    'package_name_snapshot' => $package->name,
+                    'download_speed_snapshot' => $downLabel,
+                    'upload_speed_snapshot' => $upLabel,
+                    'monthly_price' => $monthlyPrice,
+                    'discount' => $discount,
+                    'ppn' => $ppn,
+                    'total_monthly_bill' => $totalBill,
+                    'activation_date' => $activationDate,
+                    'due_date' => $dueDate,
+                    'billing_cycle' => 'monthly',
+                    'service_status' => $validated['customer_status'],
+                    'billing_status' => ($validated['status'] === 'active' || $validated['customer_status'] === 'aktif') ? 'active' : 'pending',
+                ]);
+            }
+
+            // 4. Evaluate data completeness via service and flash warning to user
+            $customer->load('customerService');
+            /** @var CustomerValidationService $validationService */
+            $validationService = app(CustomerValidationService::class);
+            $completenessResult = $validationService->validate($customer);
+
+            if (! empty($completenessResult['missing_required'])) {
+                $missingLabels = array_values($completenessResult['missing_required']);
+                session()->flash('warning', 'Data pelanggan disimpan sebagai "' . ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])) . '", tetapi masih memerlukan data berikut agar Lengkap: ' . implode(', ', $missingLabels));
+            }
+
+            return $customer;
+        });
 
         return redirect()->route('customers.index')->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
     }
@@ -170,7 +293,8 @@ class CustomerController extends Controller
         $districts = \App\Models\District::orderBy('name')->get();
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
-        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities'));
+        $pops = \App\Models\Pop::forUser()->get();
+        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops'));
     }
 
     /**
@@ -180,21 +304,23 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
-            'identity_number' => 'required|string|max:50',
-            'gender' => 'required|string|max:20',
-            'phone' => 'required|string|max:20',
+            'identity_number' => 'nullable|string|max:50',
+            'gender' => 'nullable|string|max:20',
+            'primary_phone' => 'required|string|max:20',
+            'alternative_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
-            'address' => 'required|string',
+            'pop_id' => 'required|exists:pops,id',
+            'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-            'city_id' => 'required|exists:cities,id',
-            'district_id' => 'required|exists:districts,id',
-            'village_id' => 'required|exists:villages,id',
-            'internet_package_id' => 'required|exists:internet_packages,id',
-            'contract_period_months' => 'required|integer|min:1',
-            'discount_amount' => 'required|numeric|min:0',
-            'tax_percent' => 'required|numeric|between:0,100',
+            'city_id' => 'nullable|exists:cities,id',
+            'district_id' => 'nullable|exists:districts,id',
+            'village_id' => 'nullable|exists:villages,id',
+            'internet_package_id' => 'nullable|exists:internet_packages,id',
+            'contract_period_months' => 'nullable|integer|min:1',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'tax_percent' => 'nullable|numeric|between:0,100',
             
             // Referrals
             'sales_code' => 'nullable|string|max:30',
@@ -210,12 +336,23 @@ class CustomerController extends Controller
             
             // Status
             'status' => 'required|string|max:50',
-
-            // Documents
-            'foto_ktp' => 'nullable|file|image|max:2048',
-            'foto_rumah' => 'nullable|file|image|max:2048',
-            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,pdf|max:2048',
         ]);
+
+        $validated['phone'] = $validated['primary_phone'];
+        $validated['updated_by'] = auth()->id();
+
+        $statusMapping = [
+            'active' => 'aktif',
+            'suspended' => 'isolir',
+            'terminated' => 'berhenti',
+            'rejected' => 'nonaktif',
+            'waiting_survey' => 'survey',
+            'surveyed' => 'survey',
+            'waiting_installation' => 'menunggu_pemasangan',
+            'installed' => 'menunggu_pemasangan',
+            'registered' => 'calon_pelanggan',
+        ];
+        $validated['customer_status'] = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
 
         // Handle deletions
         if ($request->input('delete_foto_ktp') == '1') {
@@ -223,18 +360,24 @@ class CustomerController extends Controller
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($customer->foto_ktp);
             }
             $validated['foto_ktp'] = null;
+        } else {
+            $validated['foto_ktp'] = $customer->foto_ktp;
         }
         if ($request->input('delete_foto_rumah') == '1') {
             if ($customer->foto_rumah) {
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($customer->foto_rumah);
             }
             $validated['foto_rumah'] = null;
+        } else {
+            $validated['foto_rumah'] = $customer->foto_rumah;
         }
         if ($request->input('delete_foto_kontrak') == '1') {
             if ($customer->foto_kontrak) {
                 \Illuminate\Support\Facades\Storage::disk('public')->delete($customer->foto_kontrak);
             }
             $validated['foto_kontrak'] = null;
+        } else {
+            $validated['foto_kontrak'] = $customer->foto_kontrak;
         }
 
         // Handle new uploads
@@ -257,46 +400,123 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = $request->file('foto_kontrak')->store('documents', 'public');
         }
 
-        $customer->update($validated);
+        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated) {
+            // 1. Update customer record
+            $customer->update($validated);
+
+            // 2. Update address record
+            $cityName = null;
+            if (!empty($validated['city_id'])) {
+                $cityName = \App\Models\City::where('id', $validated['city_id'])->value('name');
+            }
+            $districtName = null;
+            if (!empty($validated['district_id'])) {
+                $districtName = \App\Models\District::where('id', $validated['district_id'])->value('name');
+            }
+            $villageName = null;
+            if (!empty($validated['village_id'])) {
+                $villageName = \App\Models\Village::where('id', $validated['village_id'])->value('name');
+            }
+
+            $customer->customerAddress()->updateOrCreate([], [
+                'full_address' => $validated['address'] ?? null,
+                'province' => 'Jawa Timur',
+                'city' => $cityName,
+                'district' => $districtName,
+                'village' => $villageName,
+                'city_id' => $validated['city_id'] ?? null,
+                'district_id' => $validated['district_id'] ?? null,
+                'village_id' => $validated['village_id'] ?? null,
+                'latitude' => $validated['latitude'] ?? null,
+                'longitude' => $validated['longitude'] ?? null,
+                'house_photo' => $validated['foto_rumah'] ?? null,
+                'ktp_photo' => $validated['foto_ktp'] ?? null,
+                'contract_photo' => $validated['foto_kontrak'] ?? null,
+            ]);
+
+            // 3. Update customer service
+            if (!empty($validated['internet_package_id'])) {
+                $package = \App\Models\InternetPackage::findOrFail($validated['internet_package_id']);
+                
+                $monthlyPrice = (float)$package->monthly_price;
+                $discount = (float)($validated['discount_amount'] ?? 0.00);
+                $ppn = (float)($validated['tax_percent'] ?? 0.00);
+
+                // Calculate total bill
+                $discountedPrice = max(0, $monthlyPrice - $discount);
+                $totalBill = $discountedPrice * (1 + $ppn / 100);
+
+                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
+                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
+
+                $activationDate = $validated['registration_date'] ?? null;
+                $dueDate = null;
+                if ($activationDate) {
+                    $dueDate = \Carbon\Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                }
+
+                $customer->customerService()->updateOrCreate([], [
+                    'internet_package_id' => $package->id,
+                    'package_name_snapshot' => $package->name,
+                    'download_speed_snapshot' => $downLabel,
+                    'upload_speed_snapshot' => $upLabel,
+                    'monthly_price' => $monthlyPrice,
+                    'discount' => $discount,
+                    'ppn' => $ppn,
+                    'total_monthly_bill' => $totalBill,
+                    'activation_date' => $activationDate,
+                    'due_date' => $dueDate,
+                    'billing_cycle' => 'monthly',
+                    'service_status' => $validated['customer_status'],
+                    'billing_status' => ($validated['status'] === 'active' || $validated['customer_status'] === 'aktif') ? 'active' : 'pending',
+                ]);
+            } else {
+                $customer->customerService()->delete();
+            }
+
+            // 4. Evaluate data completeness via service and flash warning to user
+            $customer->load('customerService');
+            /** @var CustomerValidationService $validationService */
+            $validationService = app(CustomerValidationService::class);
+            $completenessResult = $validationService->validate($customer);
+
+            if (! empty($completenessResult['missing_required'])) {
+                $missingLabels = array_values($completenessResult['missing_required']);
+                session()->flash('warning', 'Data pelanggan berhasil diperbarui dengan status "' . ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])) . '", tetapi masih memerlukan data berikut agar Lengkap: ' . implode(', ', $missingLabels));
+            }
+        });
 
         return redirect()->route('customers.show', $customer->id)->with('success', "Data pelanggan {$customer->full_name} berhasil diperbarui!");
     }
 
-    /**
-     * Display the detailed customer view with 12 tabs.
-     */
     public function show(Customer $customer)
     {
-        $customer->load(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus']);
+        $customer->load([
+            'city', 
+            'district', 
+            'village', 
+            'internetPackage', 
+            'subscriptionStatus', 
+            'pop', 
+            'customerAddress', 
+            'customerService', 
+            'creator', 
+            'updater'
+        ]);
 
         $status = $customer->status;
-        $regDate = $customer->registration_date;
-        $monthlyPrice = $customer->internetPackage ? (float)$customer->internetPackage->monthly_price : 150000.0;
+        $regDate = \Carbon\Carbon::parse($customer->registration_date);
         
-        // Extended Pricing snapshot
-        $contractPeriod = $customer->contract_period_months ?? 12;
-        $discountAmount = (float)($customer->discount_amount ?? 0.00);
-        $taxPercent = (float)($customer->tax_percent ?? 11.00);
-        
-        $taxableAmount = max(0, $monthlyPrice - $discountAmount);
-        $taxAmount = round($taxableAmount * ($taxPercent / 100), 2);
-        $totalMonthlyCost = $taxableAmount + $taxAmount;
+        // Dynamic completeness calculation
+        $completeness = $customer->dataCompleteness();
 
-        // Dynamic Prorate Billing Calculation
-        $daysInMonth = $regDate->daysInMonth;
-        $activeDays = $daysInMonth - $regDate->day + 1;
-        $prorateAmount = round(($activeDays / $daysInMonth) * $monthlyPrice, 2);
-        
-        $installationFee = $customer->internetPackage ? (float)$customer->internetPackage->installation_fee : 150000.0;
-        $extraCableFee = 25000.0; // 5 meters @ 5000/meter
-        $totalInitialPayment = $prorateAmount + $installationFee + $extraCableFee;
+        // Format display ID (CID for active/suspended, REQ for others)
+        $isCustomer = in_array($status, ['active', 'suspended']);
+        $displayId = $isCustomer 
+            ? str_replace('WHUS-', 'CID-', $customer->customer_code) 
+            : str_replace('WHUS-', 'REQ-', $customer->customer_code);
 
-        // Display ID (CID for active, REQ for others)
-        $isCustomer = $status === 'active';
-        $displayId = $isCustomer ? str_replace('WHUS-', 'CID-', $customer->customer_code) : str_replace('WHUS-', 'REQ-', $customer->customer_code);
-        $completedStatuses = ['active', 'suspended', 'terminated'];
-
-        // Determine current status rank
+        // Determine current status rank for timeline
         $statusRank = match ($status) {
             'registered' => 1,
             'waiting_survey' => 2,
@@ -307,219 +527,51 @@ class CustomerController extends Controller
             default => 1,
         };
 
-        // 1. TIMELINE DATA (Status-dependent workflow)
+        // Generate dynamic timeline based on status
         $timeline = [
             [
                 'step' => 'Registrasi',
                 'title' => 'Pendaftaran Pelanggan',
                 'date' => IndonesianDate::date($regDate),
-                'notes' => 'Registrasi berhasil oleh Admin dengan Kode ' . $customer->customer_code,
+                'notes' => 'Pendaftaran berhasil dengan kode registrasi ' . $customer->customer_code,
                 'status' => 'completed',
             ],
             [
                 'step' => 'Survey',
-                'title' => 'Survey Kelayakan Lokasi',
+                'title' => 'Survey Lokasi & Kelayakan',
                 'date' => $statusRank >= 3 ? IndonesianDate::date($regDate->copy()->addDays(2)) : '-',
                 'notes' => $statusRank >= 3 
-                    ? 'Hasil: LAYAK (Kabel dropcore 85m, ODP terdekat ' . ($customer->odp_code ?? 'ODP-PON-024') . ')'
-                    : ($statusRank == 2 ? 'Survey sedang dijadwalkan / dalam proses.' : 'Menunggu penyelesaian tahap sebelumnya.'),
+                    ? 'Hasil: LAYAK (Kabel dropcore 85m, ODP terdekat: ' . ($customer->odp_code ?? '-') . ')'
+                    : ($statusRank == 2 ? 'Sedang dijadwalkan / dalam antrean.' : 'Menunggu penyelesaian tahap sebelumnya.'),
                 'status' => $statusRank >= 3 ? 'completed' : ($statusRank == 2 ? 'current' : 'pending'),
             ],
             [
-                'step' => 'FOP',
-                'title' => 'Penugasan FOP Jaringan',
-                'date' => $statusRank >= 4 ? IndonesianDate::date($regDate->copy()->addDays(3)) : '-',
-                'notes' => $statusRank >= 4 
-                    ? 'Penugasan FOP-2026-081 diterbitkan untuk tim teknisi Ponorogo'
-                    : ($statusRank == 3 ? 'Tim FOP sedang mempersiapkan SPK pemasangan.' : 'Menunggu penyelesaian tahap sebelumnya.'),
-                'status' => $statusRank >= 4 ? 'completed' : ($statusRank == 3 ? 'current' : 'pending'),
-            ],
-            [
                 'step' => 'Pemasangan',
-                'title' => 'Penarikan Kabel & ONT',
+                'title' => 'Penarikan Kabel & Pemasangan ONT',
                 'date' => $statusRank >= 5 ? IndonesianDate::date($regDate->copy()->addDays(4)) : '-',
                 'notes' => $statusRank >= 5 
-                    ? 'Pemasangan perangkat ONT selesai. Redaman awal -17.80 dBm'
-                    : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore ke lokasi.' : 'Menunggu penyelesaian tahap sebelumnya.'),
+                    ? 'Pemasangan ONT selesai (SN: ' . ($customer->ont_sn ?? '-') . '). Redaman awal: -17.80 dBm'
+                    : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Menunggu penyelesaian tahap sebelumnya.'),
                 'status' => $statusRank >= 5 ? 'completed' : ($statusRank == 4 ? 'current' : 'pending'),
-            ],
-            [
-                'step' => 'Uji Layanan',
-                'title' => 'Quality & Speedtest Validation',
-                'date' => $statusRank >= 5 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
-                'notes' => $statusRank >= 5 
-                    ? 'Uji Speedtest lulus dengan Kualitas A+ (Packet loss 0%)'
-                    : 'Menunggu perangkat ONT terpasang.',
-                'status' => $statusRank >= 5 ? 'completed' : 'pending',
             ],
             [
                 'step' => 'Aktivasi',
                 'title' => 'Aktivasi PPPoE Billing',
                 'date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
                 'notes' => $statusRank >= 6 
-                    ? ($status === 'active' ? 'Layanan telah aktif sepenuhnya' : ($status === 'suspended' ? 'Layanan diisolir sementara' : 'Layanan diterminasi'))
-                    : 'Menunggu proses pemasangan & uji layanan selesai.',
+                    ? ($status === 'active' ? 'Layanan telah aktif sepenuhnya.' : ($status === 'suspended' ? 'Layanan diisolir sementara.' : 'Layanan diterminasi.'))
+                    : 'Menunggu proses pemasangan & uji speedtest selesai.',
                 'status' => $statusRank >= 6 
                     ? ($status === 'suspended' ? 'warning' : ($status === 'terminated' ? 'danger' : 'completed'))
                     : 'pending',
             ],
         ];
 
-        // 2. SURVEY LOGS
-        $survey = [
-            'status' => $statusRank >= 3 ? 'Completed' : ($statusRank == 2 ? 'Scheduled' : 'Pending'),
-            'badge_class' => $statusRank >= 3 ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-amber-50 text-amber-700 border border-amber-100',
-            'badge_text' => $statusRank >= 3 ? 'Layak Pasang' : ($statusRank == 2 ? 'Dalam Penjadwalan' : 'Menunggu Tahapan'),
-            'start_date' => $statusRank >= 3 ? IndonesianDate::dateTime($regDate->copy()->addDays(2)->setTime(9, 0)) : ($statusRank == 2 ? 'Terjadwal' : '-'),
-            'end_date' => $statusRank >= 3 ? IndonesianDate::dateTime($regDate->copy()->addDays(2)->setTime(10, 30)) : '-',
-            'duration' => $statusRank >= 3 ? '1 Jam 30 Menit' : '-',
-            'surveyors' => $statusRank >= 3 ? ['Rafi Ahmad (Surveyor)', 'Budi Sudarsono (Surveyor)'] : [],
-            'tools' => $statusRank >= 3 ? ['Kabel Drop Core 85m', 'Tiang Besi 1 unit', 'S-Hanger 3 pcs', 'Protection Sleeve 2 pcs'] : [],
-            'latitude' => $customer->latitude ?? 'Belum terdata',
-            'longitude' => $customer->longitude ?? 'Belum terdata',
-            'notes' => $statusRank >= 3 
-                ? 'Jalur kabel aman, tidak melewati jalan raya besar. ODP ' . ($customer->odp_code ?? 'ODP-PON-024') . ' port 5 tersedia redaman ODP -16.5 dBm.'
-                : ($statusRank == 2 ? 'Jadwal survey dalam antrean tim lapangan.' : 'Belum dijadwalkan.'),
-        ];
-
-        // 3. FOP DATA
-        $fop = [
-            'fop_id' => $statusRank >= 4 ? 'FOP-2026-081' : 'N/A',
-            'assigned_survey' => $statusRank >= 2 ? IndonesianDate::dateTime($regDate->copy()->addDay()) : '-',
-            'assigned_installation' => $statusRank >= 4 ? IndonesianDate::dateTime($regDate->copy()->addDays(3)) : '-',
-            'coordinator' => $statusRank >= 3 ? 'Bambang Tri (FOP Leader)' : '-',
-            'status' => $statusRank >= 4 ? 'Completed' : ($statusRank == 3 ? 'Assigned' : 'Pending'),
-        ];
-
-        // 4. INSTALLATION DATA
-        $installation = [
-            'status' => $statusRank >= 5 ? 'Success' : ($statusRank == 4 ? 'In Progress' : 'Pending'),
-            'badge_class' => $statusRank >= 5 ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-amber-50 text-amber-700 border border-amber-100',
-            'badge_text' => $statusRank >= 5 ? 'Selesai Terpasang' : ($statusRank == 4 ? 'Dalam Pemasangan' : 'Menunggu Antrean'),
-            'date' => $statusRank >= 5 ? IndonesianDate::date($regDate->copy()->addDays(4)) : '-',
-            'start_time' => $statusRank >= 5 ? IndonesianDate::time($regDate->copy()->addDays(4)->setTime(13, 0)) : '-',
-            'end_time' => $statusRank >= 5 ? IndonesianDate::time($regDate->copy()->addDays(4)->setTime(15, 30)) : '-',
-            'technicians' => $statusRank >= 4 ? ['Roni Setiawan (Teknisi 1)', 'Andik Vermansyah (Teknisi 2)'] : [],
-            'materials' => $statusRank >= 5 ? 'Kabel Dropcore 80m terpakai, ONT ' . ($customer->ont_sn ?? 'ZTE') . ' 1 Unit, Patchcord 3m 1 Pcs, Fast Connector 2 Pcs.' : '-',
-            'notes' => $statusRank >= 5 ? 'ONT diletakkan di ruang keluarga. Hasil rapi dan redaman awal bagus.' : ($statusRank == 4 ? 'Pemasangan sedang dipersiapkan oleh teknisi.' : 'Belum terpasang.'),
-        ];
-
-        // 5. ACTIVATION DATA
-        $activation = [
-            'status' => $statusRank >= 6 ? 'Active' : 'Pending',
-            'date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
-            'time' => $statusRank >= 6 ? IndonesianDate::time($regDate->copy()->addDays(5)->setTime(10, 0)) : '-',
-            'staff' => $statusRank >= 6 ? 'Dani Siregar (NOC)' : '-',
-            'profile_pppoe' => ($statusRank >= 6 && $customer->ont_sn) ? strtolower(str_replace(' ', '_', $customer->full_name)) . '@whusnet' : 'Belum terkonfigurasi',
-        ];
-
-        // 6. TECHNICAL PROFILE
-        $technical = [
-            'cid' => $status === 'active' ? 'CID-PON-' . str_pad($customer->id, 4, '0', STR_PAD_LEFT) : 'N/A (Tarik Ke Stock)',
-            'ip_address' => $customer->ip_address ?? 'Belum dialokasikan',
-            'sn' => $customer->ont_sn ?? 'Belum terpasang',
-            'passive_device' => 'Splitter 1:8, Patchcord SC-UPC 3 meter',
-            'branch' => '03 (Ponorogo)',
-            'pop' => 'POP-MAIN-PON',
-            'olt' => $customer->olt_code ?? 'Belum ditentukan',
-            'olt_port' => $customer->olt_code ? 'GPON 0/1/4' : 'Belum ditentukan',
-            'odp' => $customer->odp_code ?? 'Belum terhubung',
-            'odp_port' => $customer->odp_code ? 'Port 05' : 'Belum terhubung',
-            'router' => 'Router-Core-Ponorogo',
-            'initial_attenuation' => $customer->ont_sn ? '-17.80 dBm' : 'Belum diuji',
-            'actual_attenuation' => $status === 'active' ? '-18.25 dBm' : 'Belum diuji',
-            'vlan' => $customer->vlan_id ?? 'Belum ditentukan',
-            'notes' => $customer->ont_sn ? 'Menggunakan IP Dynamic Private dari PPPoE Pool.' : 'Belum terkonfigurasi.',
-        ];
-
-        // 7. SPEEDTEST / TEST REPORT
-        $testReport = [
-            'date' => $statusRank >= 5 ? IndonesianDate::dateTime($regDate->copy()->addDays(5)) : '-',
-            'attenuation' => $statusRank >= 5 ? '-17.85 dBm' : '-',
-            'jitter' => $statusRank >= 5 ? '1.8 ms' : '-',
-            'latency' => $statusRank >= 5 ? '7.2 ms' : '-',
-            'upload' => $statusRank >= 5 ? ($customer->internetPackage ? round((float)$customer->internetPackage->download_speed_mbps * 0.95, 2) . ' Mbps' : '47.5 Mbps') : 'N/A',
-            'download' => $statusRank >= 5 ? ($customer->internetPackage ? round((float)$customer->internetPackage->download_speed_mbps * 0.96, 2) . ' Mbps' : '48.2 Mbps') : 'N/A',
-            'packet_loss' => $statusRank >= 5 ? '0%' : '-',
-            'match_percent' => $statusRank >= 5 ? '96%' : '-',
-            'quality_score' => $statusRank >= 5 ? 'A+ (Excellent)' : 'Belum diuji',
-            'staff' => $statusRank >= 5 ? 'Dani Siregar (NOC Validation)' : '-',
-            'speedtest_photo' => $statusRank >= 5 ? 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=80' : null,
-        ];
-
-        // 8. INITIAL PAYMENT INVOICE
-        $initialPayment = [
-            'invoice_code' => $statusRank >= 5 ? 'INV-' . $regDate->format('Ymd') . '-' . str_pad($customer->id, 4, '0', STR_PAD_LEFT) : 'Belum terbit',
-            'registration_date' => IndonesianDate::date($regDate),
-            'activation_date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
-            'days_in_month' => $daysInMonth,
-            'active_days' => $activeDays,
-            'monthly_price' => $monthlyPrice,
-            'prorate_amount' => $prorateAmount,
-            'installation_fee' => $installationFee,
-            'extra_cable_fee' => $extraCableFee,
-            'total' => $totalInitialPayment,
-            'status' => $statusRank >= 6 ? 'Lunas' : 'Belum Lunas',
-            'payment_date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(6)) : '-',
-            'payment_method' => $statusRank >= 6 ? 'Bank Transfer (Mandiri)' : '-',
-        ];
-
-        // 9. REFERRAL INFO
-        $referral = [
-            'sales_id' => $customer->sales_code ?? '-',
-            'sales_name' => $customer->sales_code ? 'Sales ' . $customer->sales_code : '-',
-            'sales_phone' => $customer->sales_code ? '082134567890' : '-',
-            'agent_id' => $customer->agent_code ?? '-',
-            'agent_name' => $customer->agent_code ? 'Agent ' . $customer->agent_code : '-',
-            'agent_phone' => $customer->agent_code ? '085799988811' : '-',
-            'referred_customer' => $customer->referral_customer_code ?? '-',
-            'notes' => $customer->sales_code || $customer->agent_code ? 'Pelanggan terdaftar via tim akuisisi lapangan.' : 'Pendaftaran mandiri.',
-        ];
-
-        // 10. WORKFLOW TIMELOG & SIGNATURE LOGS
-        $baseRegDate = $customer->registration_date->copy();
-        $workflowLog = [
-            'registration' => [
-                'date' => IndonesianDate::dateTime($baseRegDate->copy()->setTime(13, 40, 57)),
-                'user' => 'Nama Pengguna A',
-            ],
-            'survey' => [
-                'date' => $statusRank >= 3 ? IndonesianDate::dateTime($baseRegDate->copy()->addDays(1)->setTime(13, 40, 57)) : '-',
-                'user' => $statusRank >= 3 ? 'Nama Pengguna B' : '-',
-            ],
-            'admin_filter' => [
-                'date' => $statusRank >= 4 ? IndonesianDate::dateTime($baseRegDate->copy()->addDays(3)->setTime(13, 40, 57)) : '-',
-                'user' => $statusRank >= 4 ? 'Nama Pengguna C' : '-',
-            ],
-            'technician_process' => [
-                'date' => $statusRank >= 5 ? IndonesianDate::dateTime($baseRegDate->copy()->addDays(6)->setTime(13, 40, 57)) : '-',
-                'user' => $statusRank >= 5 ? 'Nama Pengguna D' : '-',
-            ],
-            'verification' => [
-                'date' => $statusRank >= 6 ? IndonesianDate::dateTime($baseRegDate->copy()->addDays(11)->setTime(9, 21, 55)) : '-',
-                'user' => $statusRank >= 6 ? 'Nama Pengguna E' : '-',
-            ],
-        ];
-
         return view('customers.show', compact(
             'customer',
             'displayId',
-            'timeline',
-            'survey',
-            'fop',
-            'installation',
-            'activation',
-            'technical',
-            'testReport',
-            'initialPayment',
-            'referral',
-            'monthlyPrice',
-            'contractPeriod',
-            'discountAmount',
-            'taxPercent',
-            'taxAmount',
-            'totalMonthlyCost',
-            'workflowLog'
+            'completeness',
+            'timeline'
         ));
     }
 

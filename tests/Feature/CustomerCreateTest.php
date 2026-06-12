@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\Village;
 use App\Models\InternetPackage;
+use App\Models\Pop;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -35,6 +36,16 @@ class CustomerCreateTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
 
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -44,9 +55,11 @@ class CustomerCreateTest extends TestCase
             'full_name' => 'Fajar Pratama',
             'identity_number' => '3502181010900002',
             'gender' => 'Laki-laki',
-            'phone' => '08123456789',
+            'primary_phone' => '08123456789',
+            'alternative_phone' => '089988776655',
             'email' => 'fajar@gmail.com',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Jl. Diponegoro No. 45',
             'latitude' => '-7.8694000',
             'longitude' => '111.4621000',
@@ -78,15 +91,30 @@ class CustomerCreateTest extends TestCase
         $this->assertDatabaseHas('customers', [
             'full_name' => 'Fajar Pratama',
             'identity_number' => '3502181010900002',
-            'phone' => '08123456789',
+            'primary_phone' => '08123456789',
+            'pop_id' => $pop->id,
             'status' => 'registered',
             'sales_code' => 'SLS-099',
             'ont_sn' => 'ONT-ZTE-TEST',
         ]);
 
-        // Assert customer code matches WHUS-YYYY-XXXX
+        // Assert customer code matches WHUS-YYYY-XXXX (actually POP format: C-SMN-000001)
         $customer = Customer::where('full_name', 'Fajar Pratama')->firstOrFail();
-        $this->assertMatchesRegularExpression('/^WHUS-\d{4}-\d{4}$/', $customer->customer_code);
+        $this->assertMatchesRegularExpression('/^C-SMN-\d{6}$/', $customer->customer_code);
+
+        // Assert address record created
+        $this->assertDatabaseHas('customer_addresses', [
+            'customer_id' => $customer->id,
+            'full_address' => 'Jl. Diponegoro No. 45',
+            'city_id' => $city->id,
+        ]);
+
+        // Assert service record created
+        $this->assertDatabaseHas('customer_services', [
+            'customer_id' => $customer->id,
+            'internet_package_id' => $package->id,
+            'package_name_snapshot' => $package->name,
+        ]);
     }
 
     public function test_submitting_invalid_customer_data_fails_validation(): void
@@ -99,15 +127,9 @@ class CustomerCreateTest extends TestCase
 
         $response->assertSessionHasErrors([
             'full_name',
-            'identity_number',
-            'gender',
-            'phone',
+            'primary_phone',
             'registration_date',
-            'address',
-            'city_id',
-            'district_id',
-            'village_id',
-            'internet_package_id',
+            'pop_id',
             'status',
         ]);
     }
@@ -118,6 +140,16 @@ class CustomerCreateTest extends TestCase
         $this->loginAsAdmin();
         \Illuminate\Support\Facades\Storage::fake('public');
 
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
@@ -127,9 +159,10 @@ class CustomerCreateTest extends TestCase
             'full_name' => 'Fajar Pratama Upload',
             'identity_number' => '3502181010900005',
             'gender' => 'Laki-laki',
-            'phone' => '08123456789',
+            'primary_phone' => '08123456789',
             'email' => 'fajar.upload@gmail.com',
             'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
             'address' => 'Jl. Diponegoro No. 45',
             'latitude' => '-7.8694000',
             'longitude' => '111.4621000',
