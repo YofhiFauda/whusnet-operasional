@@ -7,17 +7,13 @@ Format:
 ## YYYY-MM-DD - Judul Keputusan
 
 ### Keputusan
-
 ...
 
 ### Alasan
-
 ...
 
 ### Dampak
-
 ...
 
 ### Diputuskan oleh
-
 User / Gemini CLI / Codex CLI

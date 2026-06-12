@@ -502,7 +502,10 @@ class CustomerController extends Controller
             'customerAddress', 
             'customerService', 
             'creator', 
-            'updater'
+            'updater',
+            'invoices' => function ($query) {
+                $query->orderBy('billing_period', 'desc');
+            }
         ]);
 
         $status = $customer->status;
@@ -1293,6 +1296,119 @@ class CustomerController extends Controller
         ];
 
         return $mapping[$status] ?? 'calon_pelanggan';
+    }
+
+    /**
+     * S5-T003 — Buat Tagihan Manual
+     * Handle POST request to create a manual invoice for a customer.
+     */
+    public function storeManualInvoice(Request $request, Customer $customer)
+    {
+        // 1. Authorization checks
+        if (!auth()->user()->hasPermission('create_invoices')) {
+            abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
+        }
+
+        // Scope check for user's assigned POPs
+        if (!Customer::query()->forUser()->where('id', $customer->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data pelanggan di POP ini.');
+        }
+
+        // 2. Validate request
+        $validated = $request->validate([
+            'billing_period' => 'required|date_format:Y-m',
+            'issue_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:issue_date',
+        ]);
+
+        $billingPeriod = $validated['billing_period'];
+        $issueDate = $validated['issue_date'];
+        $dueDate = $validated['due_date'];
+
+        // 3. Business logic checks
+        // Cek pelanggan aktif/siap billing
+        if (!in_array($customer->status, ['active', 'suspended']) && $customer->data_completeness_status !== 'siap_billing') {
+            return redirect()->back()->withErrors(['error' => 'Tagihan hanya bisa dibuat untuk pelanggan dengan status aktif atau siap billing.']);
+        }
+
+        $service = $customer->customerService;
+        if (!$service) {
+            return redirect()->back()->withErrors(['error' => 'Pelanggan tidak memiliki layanan aktif.']);
+        }
+
+        // Cek invoice dobel untuk periode yang sama
+        $exists = \App\Models\Invoice::where('customer_id', $customer->id)
+            ->where('billing_period', $billingPeriod)
+            ->exists();
+
+        if ($exists) {
+            return redirect()->back()->withErrors(['billing_period' => "Tagihan untuk periode {$billingPeriod} sudah pernah dibuat untuk pelanggan ini."]);
+        }
+
+        // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
+        $periodCode = str_replace('-', '', $billingPeriod);
+        
+        $invoice = \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode) {
+            $lastInvoice = \App\Models\Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
+                ->orderBy('invoice_number', 'desc')
+                ->lockForUpdate()
+                ->first();
+
+            $nextSeq = 1;
+            if ($lastInvoice) {
+                $parts = explode('-', $lastInvoice->invoice_number);
+                if (count($parts) === 3) {
+                    $nextSeq = ((int)$parts[2]) + 1;
+                }
+            }
+            $invoiceNumber = sprintf('INV-%s-%04d', $periodCode, $nextSeq);
+
+            // Fetch pricing details from service snapshot
+            $subtotal = (float)$service->monthly_price;
+            $discount = (float)($service->discount ?? 0.00);
+            $ppnPercent = (float)($service->ppn ?? 0.00);
+            $totalAmount = (float)$service->total_monthly_bill;
+            $paidAmount = 0.00;
+            $remainingAmount = $totalAmount;
+
+            $newInvoice = \App\Models\Invoice::create([
+                'invoice_number' => $invoiceNumber,
+                'customer_id' => $customer->id,
+                'pop_id' => $customer->pop_id,
+                'customer_service_id' => $service->id,
+                'internet_package_id' => $service->internet_package_id,
+                'billing_period' => $billingPeriod,
+                'issue_date' => $issueDate,
+                'due_date' => $dueDate,
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'ppn' => $ppnPercent,
+                'total_amount' => $totalAmount,
+                'paid_amount' => $paidAmount,
+                'remaining_amount' => $remainingAmount,
+                'invoice_status' => 'belum_dibayar',
+                'created_by' => auth()->id(),
+            ]);
+
+            // Save changes to audit log (Sprint 8: audit_logs)
+            \App\Models\AuditLog::create([
+                'user_id' => auth()->id(),
+                'module' => 'Tagihan',
+                'action' => 'create',
+                'auditable_type' => get_class($newInvoice),
+                'auditable_id' => $newInvoice->id,
+                'old_values' => null,
+                'new_values' => $newInvoice->toArray(),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+            ]);
+
+            return $newInvoice;
+        });
+
+        return redirect()->route('customers.show', $customer->id)
+            ->with('success', "Tagihan manual dengan nomor {$invoice->invoice_number} berhasil dibuat!");
     }
 
 }

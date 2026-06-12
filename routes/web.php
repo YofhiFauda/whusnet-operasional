@@ -60,6 +60,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/activate', [CustomerController::class, 'activate'])->name('customers.activate');
     });
 
+    Route::middleware('permission:create_invoices')->group(function () {
+        Route::post('/customers/{customer}/invoices/manual', [CustomerController::class, 'storeManualInvoice'])->name('customers.invoices.manual');
+    });
+
     Route::middleware('permission:view_customers')->group(function () {
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     });

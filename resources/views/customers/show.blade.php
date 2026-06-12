@@ -605,14 +605,180 @@
 
             <!-- Tab 7: Tagihan -->
             <div id="tab-content-tagihan" class="tab-content hidden space-y-6">
-                <div class="py-12 text-center text-slate-400">
-                    <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <h4 class="text-sm font-semibold text-slate-700">Belum ada tagihan terbit</h4>
-                    <p class="text-xs text-slate-500 mt-1">Modul Billing Dasar (Sprint 5) belum aktif pada sistem operasional.</p>
+                <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
+                    </div>
+                    @can('create_invoices')
+                        @if((in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing') && $customer->customerService)
+                            <button onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Buat Tagihan Manual
+                            </button>
+                        @else
+                            <button disabled class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-md text-xs font-semibold cursor-not-allowed focus:outline-none" title="Pelanggan harus berstatus Active atau Siap Billing dengan layanan aktif">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                                Buat Tagihan Manual
+                            </button>
+                        @endif
+                    @endcan
                 </div>
+
+                @if($customer->invoices && $customer->invoices->count() > 0)
+                    <div class="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider text-[10px]">
+                                    <th class="px-4 py-3">No. Tagihan</th>
+                                    <th class="px-4 py-3">Periode</th>
+                                    <th class="px-4 py-3">Tanggal Terbit</th>
+                                    <th class="px-4 py-3">Jatuh Tempo</th>
+                                    <th class="px-4 py-3 text-right">Total Tagihan</th>
+                                    <th class="px-4 py-3 text-center">Status</th>
+                                    <th class="px-4 py-3">Dibuat Oleh</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-700">
+                                @foreach($customer->invoices as $invoice)
+                                    <tr class="hover:bg-slate-50/50 transition-colors">
+                                        <td class="px-4 py-3 font-mono font-bold text-slate-800">{{ $invoice->invoice_number }}</td>
+                                        <td class="px-4 py-3 font-mono">{{ $invoice->billing_period }}</td>
+                                        <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->issue_date) }}</td>
+                                        <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->due_date) }}</td>
+                                        <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format($invoice->total_amount, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-3 text-center">
+                                            @php
+                                                $statusClass = match($invoice->invoice_status) {
+                                                    'lunas' => 'bg-green-50 text-green-700 border-green-200',
+                                                    'sebagian' => 'bg-blue-50 text-blue-700 border-blue-200',
+                                                    'belum_dibayar' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                                    'batal' => 'bg-red-50 text-red-700 border-red-200',
+                                                    default => 'bg-slate-50 text-slate-700 border-slate-200',
+                                                };
+                                                $statusLabel = match($invoice->invoice_status) {
+                                                    'lunas' => 'Lunas',
+                                                    'sebagian' => 'Sebagian',
+                                                    'belum_dibayar' => 'Belum Dibayar',
+                                                    'batal' => 'Batal',
+                                                    default => ucwords(str_replace('_', ' ', $invoice->invoice_status)),
+                                                };
+                                            @endphp
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusClass }}">
+                                                {{ $statusLabel }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-slate-500">{{ $invoice->creator->name ?? 'System' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
+                        <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <h4 class="text-sm font-semibold text-slate-700">Belum ada tagihan terbit</h4>
+                        <p class="text-xs text-slate-500 mt-1">Gunakan tombol "Buat Tagihan Manual" untuk membuat invoice pertama pelanggan.</p>
+                    </div>
+                @endif
             </div>
+
+            <!-- Modal Pembuatan Tagihan Manual -->
+            @can('create_invoices')
+                @if((in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing') && $customer->customerService)
+                    @php
+                        $defaultPeriod = now()->format('Y-m');
+                        $defaultIssueDate = now()->format('Y-m-d');
+                        $defaultDueDate = now()->addDays(14)->format('Y-m-d');
+                        if ($customer->customerService->due_date) {
+                            $dueDay = \Carbon\Carbon::parse($customer->customerService->due_date)->day;
+                            try {
+                                $defaultDueDate = now()->day($dueDay)->format('Y-m-d');
+                            } catch (\Exception $e) {
+                                $defaultDueDate = now()->addDays(14)->format('Y-m-d');
+                            }
+                        }
+                    @endphp
+                    <div id="manual-invoice-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
+                        <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md overflow-hidden transform transition-all">
+                            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Buat Tagihan Manual</h3>
+                                <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <form action="{{ route('customers.invoices.manual', $customer->id) }}" method="POST">
+                                @csrf
+                                <div class="p-6 space-y-4">
+                                    <!-- Snapshot Biaya Info -->
+                                    <div class="p-4 bg-slate-50 border border-slate-100 rounded-lg text-xs">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Rincian Paket & Layanan</span>
+                                        <div class="space-y-1.5 font-medium text-slate-700">
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Paket Internet:</span>
+                                                <span class="font-semibold text-slate-900">{{ $customer->customerService->package_name_snapshot }}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Harga Bulanan:</span>
+                                                <span>Rp {{ number_format($customer->customerService->monthly_price, 0, ',', '.') }}</span>
+                                            </div>
+                                            @if($customer->customerService->discount > 0)
+                                                <div class="flex justify-between text-green-600">
+                                                    <span>Potongan Diskon:</span>
+                                                    <span>- Rp {{ number_format($customer->customerService->discount, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">PPN ({{ number_format($customer->customerService->ppn, 0) }}%):</span>
+                                                <span>Rp {{ number_format(round(($customer->customerService->monthly_price - $customer->customerService->discount) * ($customer->customerService->ppn / 100), 2), 0, ',', '.') }}</span>
+                                            </div>
+                                            <hr class="border-dashed border-slate-200 my-1.5">
+                                            <div class="flex justify-between font-bold text-slate-900">
+                                                <span>Total Tagihan Nett:</span>
+                                                <span class="text-sky-600">Rp {{ number_format($customer->customerService->total_monthly_bill, 0, ',', '.') }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label for="billing_period" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Periode Tagihan (Bulan/Tahun)</label>
+                                        <input type="month" name="billing_period" id="billing_period" value="{{ $defaultPeriod }}" required
+                                               class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                                    </div>
+
+                                    <div>
+                                        <label for="issue_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Terbit</label>
+                                        <input type="date" name="issue_date" id="issue_date" value="{{ $defaultIssueDate }}" required
+                                               class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                                    </div>
+
+                                    <div>
+                                        <label for="due_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Jatuh Tempo</label>
+                                        <input type="date" name="due_date" id="due_date" value="{{ $defaultDueDate }}" required
+                                               class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                                    </div>
+                                </div>
+                                <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
+                                    <button type="button" onclick="closeInvoiceModal()" class="px-3 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                                        Batal
+                                    </button>
+                                    <button type="submit" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                                        Proses Tagihan
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endif
+            @endcan
 
             <!-- Tab 8: Pembayaran -->
             <div id="tab-content-pembayaran" class="tab-content hidden space-y-6">
@@ -766,6 +932,20 @@
         const activeBtn = document.getElementById('tab-btn-' + tabId);
         activeBtn.classList.add('border-sky-600', 'text-sky-600');
         activeBtn.classList.remove('border-transparent', 'text-slate-500');
+    }
+
+    function openInvoiceModal() {
+        const modal = document.getElementById('manual-invoice-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function closeInvoiceModal() {
+        const modal = document.getElementById('manual-invoice-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
     }
 </script>
 @endsection

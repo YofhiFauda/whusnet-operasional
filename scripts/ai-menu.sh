@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-AI_SCRIPT="./scripts/ai"
+AI_SCRIPT="./scripts/ai.sh"
 
 pause() {
   echo ""
@@ -20,7 +20,7 @@ header() {
 require_ai_script() {
   if [ ! -f "$AI_SCRIPT" ]; then
     echo "ERROR: $AI_SCRIPT tidak ditemukan."
-    echo "Pastikan file scripts/ai sudah dibuat."
+    echo "Pastikan file scripts/ai.sh sudah dibuat."
     pause
     return 1
   fi
@@ -131,6 +131,28 @@ show_changelog() {
   pause
 }
 
+show_ai_logs() {
+  require_ai_folder || return
+
+  header
+  echo "===== AI LOG INDEX ====="
+  if [ -f ".ai/logs/index.md" ]; then
+    tail -n 30 .ai/logs/index.md
+  else
+    echo ".ai/logs/index.md belum ada."
+  fi
+
+  echo ""
+  echo "===== AI LOG TERAKHIR ====="
+  if [ -f ".ai/logs/latest.log" ]; then
+    cat .ai/logs/latest.log
+  else
+    echo ".ai/logs/latest.log belum ada."
+  fi
+
+  pause
+}
+
 edit_active_task() {
   require_ai_folder || return
 
@@ -176,6 +198,7 @@ while true; do
   echo "  9) Lihat Review Notes"
   echo "  10) Lihat AI Changelog"
   echo "  11) Git Status / Diff"
+  echo "  12) Lihat Log AI Terakhir"
   echo ""
   echo "  0) Keluar"
   echo ""
@@ -215,6 +238,9 @@ while true; do
       ;;
     11)
       show_git_status
+      ;;
+    12)
+      show_ai_logs
       ;;
     0)
       echo "Keluar."

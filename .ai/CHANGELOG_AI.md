@@ -7,21 +7,16 @@ Format:
 ## YYYY-MM-DD HH:mm - Codex CLI
 
 ### Task
-
 ...
 
 ### File yang Diubah
-
 - ...
 
 ### Ringkasan Perubahan
-
 ...
 
 ### Cara Test
-
 ...
 
 ### Catatan
-
 ...

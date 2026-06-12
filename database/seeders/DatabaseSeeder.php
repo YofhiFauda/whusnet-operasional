@@ -28,9 +28,11 @@ class DatabaseSeeder extends Seeder
 
         $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
 
-        User::factory()->create([
-            'name' => 'Owner Whusnet',
+        User::updateOrCreate([
             'email' => 'owner@whusnet.net',
+        ], [
+            'name' => 'Owner Whusnet',
+            'email_verified_at' => now(),
             'phone' => '081234567890',
             'password' => bcrypt('password'),
             'status' => 'active',

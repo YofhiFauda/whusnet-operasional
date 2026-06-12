@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 5 — Billing Dasar
-Current Module: Buat Tagihan Manual
-Current Task: S5-T003 — Buat Tagihan Manual
+Current Module: Daftar dan Detail Tagihan
+Current Task: S5-T004 — Daftar dan Detail Tagihan
 
 ---
 
@@ -12,70 +12,11 @@ Current Task: S5-T003 — Buat Tagihan Manual
 
 ## Tujuan Sprint 5
 Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
-
----
-
-### S5-T003 — Buat Tagihan Manual
-Status: In Progress
-
-Tujuan:
-Membuat invoice manual dari pelanggan aktif.
-
-Checklist:
-- [ ] Buat tombol buat tagihan di detail pelanggan.
-- [ ] Cek pelanggan aktif/siap billing.
-- [ ] Ambil paket aktif pelanggan.
-- [ ] Ambil harga layanan pelanggan.
-- [ ] Ambil tanggal jatuh tempo.
-- [ ] Tentukan periode tagihan.
-- [ ] Cek invoice dobel untuk periode sama.
-- [ ] Buat invoice.
-- [ ] Status invoice default belum dibayar.
-
-Acceptance Criteria:
-- [ ] Tagihan hanya bisa dibuat untuk pelanggan aktif/siap billing.
-- [ ] Tagihan mengambil harga dari layanan pelanggan.
-- [ ] Tagihan memiliki periode.
-- [ ] Tagihan tidak dobel untuk periode yang sama.
-- [ ] Tagihan memiliki status belum dibayar.
-
----
-
-# Sprint 5 — Billing Dasar
-
-## Tujuan Sprint 5
-Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
-
----
-
-### S5-T003 — Buat Tagihan Manual
-Status: In Progress
-
-Tujuan:
-Membuat invoice manual dari pelanggan aktif.
-
-Checklist:
-- [ ] Buat tombol buat tagihan di detail pelanggan.
-- [ ] Cek pelanggan aktif/siap billing.
-- [ ] Ambil paket aktif pelanggan.
-- [ ] Ambil harga layanan pelanggan.
-- [ ] Ambil tanggal jatuh tempo.
-- [ ] Tentukan periode tagihan.
-- [ ] Cek invoice dobel untuk periode sama.
-- [ ] Buat invoice.
-- [ ] Status invoice default belum dibayar.
-
-Acceptance Criteria:
-- [ ] Tagihan hanya bisa dibuat untuk pelanggan aktif/siap billing.
-- [ ] Tagihan mengambil harga dari layanan pelanggan.
-- [ ] Tagihan memiliki periode.
-- [ ] Tagihan tidak dobel untuk periode yang sama.
-- [ ] Tagihan memiliki status belum dibayar.
 
 ---
 
 ### S5-T004 — Daftar dan Detail Tagihan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat halaman daftar dan detail invoice.
@@ -1350,6 +1291,35 @@ Acceptance Criteria:
 Catatan Test:
 - `php artisan test --filter=InvoiceModelTest` lulus: 1 test, 17 assertions.
 - Seluruh test suite `php artisan test` lulus: 88 tests, 485 assertions.
+---
+
+### S5-T003 — Buat Tagihan Manual
+Status: Done
+
+Tujuan:
+Membuat invoice manual dari pelanggan aktif.
+
+Checklist:
+- [x] Buat tombol buat tagihan di detail pelanggan.
+- [x] Cek pelanggan aktif/siap billing.
+- [x] Ambil paket aktif pelanggan.
+- [x] Ambil harga layanan pelanggan.
+- [x] Ambil tanggal jatuh tempo.
+- [x] Tentukan periode tagihan.
+- [x] Cek invoice dobel untuk periode sama.
+- [x] Buat invoice.
+- [x] Status invoice default belum dibayar.
+
+Acceptance Criteria:
+- [x] Tagihan hanya bisa dibuat untuk pelanggan aktif/siap billing.
+- [x] Tagihan mengambil harga dari layanan pelanggan.
+- [x] Tagihan memiliki periode.
+- [x] Tagihan tidak dobel untuk periode yang sama.
+- [x] Tagihan memiliki status belum dibayar.
+
+Catatan Test:
+- `php artisan test tests/Feature/InvoiceCreateTest.php` lulus: 6 tests, 17 assertions.
+- Seluruh test suite `php artisan test` lulus: 94 tests, 502 assertions.
 
 ---
 ## Blocked
