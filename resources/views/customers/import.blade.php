@@ -13,6 +13,14 @@
     </nav>
     <h1 class="text-xl font-bold text-slate-800 tracking-tight">Import Pelanggan Baru</h1>
     <p class="text-xs text-slate-500 mt-1">Salin data dari Excel/CSV atau unggah file secara langsung</p>
+    <div class="mt-4 flex gap-3">
+        <a href="{{ route('customers.import.template') }}" class="inline-flex items-center justify-center gap-2 bg-white border border-sky-200 text-sky-700 hover:bg-sky-50 text-xs font-semibold py-2 px-4 rounded transition-colors">
+            Download Template CSV
+        </a>
+        <a href="{{ route('customers.import.history') }}" class="inline-flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold py-2 px-4 rounded transition-colors">
+            Lihat Riwayat Import
+        </a>
+    </div>
 </div>
 
 <!-- Main Grid -->
@@ -22,40 +30,52 @@
     <div class="lg:col-span-1 flex flex-col gap-6">
         <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-4">
             <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Format Kolom Data</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">Pastikan data Anda memiliki urutan kolom sebagai berikut, atau baris pertama berisi nama kolom ini:</p>
+            <p class="text-xs text-slate-500 leading-relaxed">Gunakan template CSV agar field wajib dan field teknis opsional konsisten.</p>
             
             <div class="space-y-2.5">
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">1. No</span>
-                    <span class="text-[10px] text-slate-400">Nomor urut (diabaikan)</span>
+                    <span class="font-bold text-slate-700">old_customer_id</span>
+                    <span class="text-[10px] text-slate-400">ID pelanggan lama *</span>
                 </div>
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">2. ID</span>
-                    <span class="text-[10px] text-slate-400">Nomor Identitas (NIK) *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">3. NAMA</span>
+                    <span class="font-bold text-slate-700">full_name</span>
                     <span class="text-[10px] text-slate-400">Nama lengkap *</span>
                 </div>
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">4. DESA</span>
-                    <span class="text-[10px] text-slate-400">Nama Desa *</span>
+                    <span class="font-bold text-slate-700">primary_phone</span>
+                    <span class="text-[10px] text-slate-400">Nomor HP *</span>
                 </div>
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">5. PAKET</span>
-                    <span class="text-[10px] text-slate-400">Kode Paket Internet *</span>
+                    <span class="font-bold text-slate-700">full_address</span>
+                    <span class="text-[10px] text-slate-400">Alamat lengkap *</span>
                 </div>
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">6. HP</span>
-                    <span class="text-[10px] text-slate-400">Nomor HP/Telepon *</span>
+                    <span class="font-bold text-slate-700">village, district, city</span>
+                    <span class="text-[10px] text-slate-400">Wilayah alamat *</span>
                 </div>
                 <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">7. KOORDINAT</span>
-                    <span class="text-[10px] text-slate-400">Format: lat, long</span>
+                    <span class="font-bold text-slate-700">pop_code / pop_name</span>
+                    <span class="text-[10px] text-slate-400">POP/Cabang *</span>
+                </div>
+                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    <span class="font-bold text-slate-700">package_name, monthly_price</span>
+                    <span class="text-[10px] text-slate-400">Paket & harga *</span>
+                </div>
+                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    <span class="font-bold text-slate-700">activation_date, due_date</span>
+                    <span class="text-[10px] text-slate-400">Tanggal layanan *</span>
+                </div>
+                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    <span class="font-bold text-slate-700">service_status</span>
+                    <span class="text-[10px] text-slate-400">Status layanan *</span>
+                </div>
+                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                    <span class="font-bold text-slate-700">field teknis</span>
+                    <span class="text-[10px] text-slate-400">Opsional</span>
                 </div>
             </div>
             <div class="text-[10px] text-slate-400 italic">
-                * Wajib diisi. Jika nama desa atau paket tidak cocok, Anda dapat memetakan secara manual di tabel pratinjau.
+                * Wajib diisi agar data siap divalidasi pada task import berikutnya.
             </div>
         </div>
     </div>
@@ -156,12 +176,12 @@
                         <thead>
                             <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-[10px] uppercase">
                                 <th class="px-4 py-3 w-10 text-center">NO</th>
-                                <th class="px-4 py-3 w-36">NIK / ID</th>
+                                <th class="px-4 py-3 w-36">ID LAMA</th>
                                 <th class="px-4 py-3 w-48">NAMA LENGKAP</th>
-                                <th class="px-4 py-3 w-56">DESA</th>
+                                <th class="px-4 py-3 w-56">POP/CABANG</th>
                                 <th class="px-4 py-3 w-56">PAKET</th>
                                 <th class="px-4 py-3 w-32">NOMOR HP</th>
-                                <th class="px-4 py-3 w-36">KOORDINAT</th>
+                                <th class="px-4 py-3 w-40">STATUS LAYANAN</th>
                                 <th class="px-4 py-3">LOG / CATATAN VALIDASI</th>
                             </tr>
                         </thead>
@@ -178,6 +198,7 @@
                     <form action="/customers/import/confirm" method="POST" id="confirm-form">
                         @csrf
                         <input type="hidden" name="rows" id="confirm-rows-json">
+                        <input type="hidden" name="file_name" id="confirm-file-name">
                         <button type="submit" id="btn-submit-import" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold py-2 px-5 rounded transition-all cursor-pointer focus:outline-none shadow-sm disabled:cursor-not-allowed">
                             <svg id="btn-submit-import-spinner" class="hidden animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -224,6 +245,9 @@
     function handleFileSelect(e) {
         const file = e.target.files[0];
         if (!file) return;
+
+        // Set file name for confirm form
+        document.getElementById('confirm-file-name').value = file.name;
 
         // Show file info container
         document.getElementById('file-name-text').textContent = `${file.name} (${formatBytes(file.size)})`;
@@ -277,6 +301,8 @@
             return;
         }
 
+        document.getElementById('confirm-file-name').value = 'Manual Input / Paste';
+
         document.getElementById('preview-section').classList.remove('hidden');
         document.getElementById('loading-indicator').classList.remove('hidden');
         document.getElementById('metrics-container').classList.add('hidden');
@@ -315,22 +341,37 @@
         // Scan header row to look for field indices
         const headers = rawRows[0].map(h => String(h).trim().toLowerCase());
         
-        let colNo = headers.indexOf('no');
-        let colId = headers.findIndex(h => h.includes('id') || h.includes('nik'));
-        let colNama = headers.findIndex(h => h.includes('nama') || h.includes('name'));
-        let colDesa = headers.findIndex(h => h.includes('desa') || h.includes('village'));
-        let colPaket = headers.findIndex(h => h.includes('paket') || h.includes('package'));
-        let colHp = headers.findIndex(h => h.includes('hp') || h.includes('telepon') || h.includes('phone') || h.includes('wa'));
-        let colKoordinat = headers.findIndex(h => h.includes('koordinat') || h.includes('coords') || h.includes('location'));
+        const indexOfAny = (names) => headers.findIndex(h => names.includes(h));
+        const valueAt = (row, index) => index >= 0 && row[index] !== undefined ? String(row[index]).trim() : '';
 
-        // Fallbacks if not found by name, assume fixed order: No, ID, NAMA, DESA, PAKET, HP, KOORDINAT
-        if (colNo === -1) colNo = 0;
-        if (colId === -1) colId = 1;
-        if (colNama === -1) colNama = 2;
-        if (colDesa === -1) colDesa = 3;
-        if (colPaket === -1) colPaket = 4;
-        if (colHp === -1) colHp = 5;
-        if (colKoordinat === -1) colKoordinat = 6;
+        const columns = {
+            no: indexOfAny(['no']),
+            oldCustomerId: indexOfAny(['old_customer_id', 'id_pelanggan_lama', 'id lama', 'id']),
+            fullName: indexOfAny(['full_name', 'nama_lengkap', 'nama lengkap', 'nama']),
+            primaryPhone: indexOfAny(['primary_phone', 'nomor_hp', 'nomor hp', 'hp', 'phone']),
+            fullAddress: indexOfAny(['full_address', 'alamat_lengkap', 'alamat lengkap', 'address']),
+            village: indexOfAny(['village', 'desa', 'kelurahan', 'desa_kelurahan']),
+            district: indexOfAny(['district', 'kecamatan']),
+            city: indexOfAny(['city', 'kota', 'kabupaten', 'kota_kabupaten']),
+            popCode: indexOfAny(['pop_code', 'kode_pop', 'kode pop']),
+            popName: indexOfAny(['pop_name', 'nama_pop', 'pop/cabang', 'pop']),
+            packageName: indexOfAny(['package_name', 'nama_paket', 'paket', 'package']),
+            monthlyPrice: indexOfAny(['monthly_price', 'harga_paket', 'harga bulanan', 'harga']),
+            activationDate: indexOfAny(['activation_date', 'tanggal_aktivasi', 'tanggal aktivasi']),
+            dueDate: indexOfAny(['due_date', 'tanggal_jatuh_tempo', 'tanggal jatuh tempo']),
+            serviceStatus: indexOfAny(['service_status', 'status_layanan', 'status layanan', 'status']),
+            identityNumber: indexOfAny(['identity_number', 'nik', 'nomor_identitas']),
+            alternativePhone: indexOfAny(['alternative_phone', 'nomor_hp_alternatif', 'hp_alternatif']),
+            email: indexOfAny(['email']),
+            latitude: indexOfAny(['latitude', 'lat']),
+            longitude: indexOfAny(['longitude', 'lng', 'long']),
+            ontSn: indexOfAny(['ont_sn', 'serial_ont']),
+            ipAddress: indexOfAny(['ip_address', 'ip']),
+            odpCode: indexOfAny(['odp_code', 'odp']),
+            oltCode: indexOfAny(['olt_code', 'olt']),
+            vlanId: indexOfAny(['vlan_id', 'vlan']),
+            technicalNote: indexOfAny(['technical_note', 'catatan_teknis']),
+        };
 
         const parsedRows = [];
         for (let i = 1; i < rawRows.length; i++) {
@@ -340,13 +381,32 @@
             }
 
             parsedRows.push({
-                no: row[colNo] !== undefined ? String(row[colNo]).trim() : String(i),
-                id: row[colId] !== undefined ? String(row[colId]).trim() : '',
-                nama: row[colNama] !== undefined ? String(row[colNama]).trim() : '',
-                desa: row[colDesa] !== undefined ? String(row[colDesa]).trim() : '',
-                paket: row[colPaket] !== undefined ? String(row[colPaket]).trim() : '',
-                hp: row[colHp] !== undefined ? String(row[colHp]).trim() : '',
-                koordinat: row[colKoordinat] !== undefined ? String(row[colKoordinat]).trim() : '',
+                no: valueAt(row, columns.no) || String(i),
+                old_customer_id: valueAt(row, columns.oldCustomerId),
+                full_name: valueAt(row, columns.fullName),
+                primary_phone: valueAt(row, columns.primaryPhone),
+                full_address: valueAt(row, columns.fullAddress),
+                village: valueAt(row, columns.village),
+                district: valueAt(row, columns.district),
+                city: valueAt(row, columns.city),
+                pop_code: valueAt(row, columns.popCode),
+                pop_name: valueAt(row, columns.popName),
+                package_name: valueAt(row, columns.packageName),
+                monthly_price: valueAt(row, columns.monthlyPrice),
+                activation_date: valueAt(row, columns.activationDate),
+                due_date: valueAt(row, columns.dueDate),
+                service_status: valueAt(row, columns.serviceStatus),
+                identity_number: valueAt(row, columns.identityNumber),
+                alternative_phone: valueAt(row, columns.alternativePhone),
+                email: valueAt(row, columns.email),
+                latitude: valueAt(row, columns.latitude),
+                longitude: valueAt(row, columns.longitude),
+                ont_sn: valueAt(row, columns.ontSn),
+                ip_address: valueAt(row, columns.ipAddress),
+                odp_code: valueAt(row, columns.odpCode),
+                olt_code: valueAt(row, columns.oltCode),
+                vlan_id: valueAt(row, columns.vlanId),
+                technical_note: valueAt(row, columns.technicalNote),
             });
         }
 
@@ -409,10 +469,10 @@
             tdNo.textContent = index + 1;
             tr.appendChild(tdNo);
 
-            // 2. ID/NIK
+            // 2. ID LAMA
             const tdId = document.createElement('td');
             tdId.className = "px-4 py-3 font-mono";
-            tdId.textContent = row.identity_number || '-';
+            tdId.textContent = row.old_customer_id || '-';
             tr.appendChild(tdId);
 
             // 3. NAMA
@@ -421,34 +481,11 @@
             tdNama.textContent = row.full_name;
             tr.appendChild(tdNama);
 
-            // 4. DESA
-            const tdDesa = document.createElement('td');
-            tdDesa.className = "px-4 py-3";
-            if (!row.village_id) {
-                // Render dropdown village selector
-                const select = document.createElement('select');
-                select.className = "w-full text-xs font-sans px-2 py-1 border border-amber-300 bg-amber-50/50 rounded focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/25";
-                select.onchange = (e) => mapVillageRow(index, e.target.value);
-                
-                const optDefault = document.createElement('option');
-                optDefault.value = "";
-                optDefault.textContent = `-- Pilih Desa (Asli: ${row.original_desa}) --`;
-                optDefault.disabled = true;
-                optDefault.selected = true;
-                select.appendChild(optDefault);
-
-                allVillages.forEach(v => {
-                    const opt = document.createElement('option');
-                    opt.value = v.id;
-                    opt.textContent = `${v.name} (${v.district ? v.district.name : 'N/A'})`;
-                    select.appendChild(opt);
-                });
-                tdDesa.appendChild(select);
-            } else {
-                tdDesa.className = "px-4 py-3 font-medium text-slate-700";
-                tdDesa.textContent = `${row.village_name} (${row.district_id ? getDistrictName(row.district_id) : 'N/A'})`;
-            }
-            tr.appendChild(tdDesa);
+            // 4. POP
+            const tdPop = document.createElement('td');
+            tdPop.className = "px-4 py-3 font-medium text-slate-700";
+            tdPop.textContent = row.pop_name ? `${row.pop_name} (${row.pop_code || '-'})` : '-';
+            tr.appendChild(tdPop);
 
             // 5. PAKET
             const tdPaket = document.createElement('td');
@@ -475,7 +512,7 @@
                 tdPaket.appendChild(select);
             } else {
                 tdPaket.className = "px-4 py-3 font-medium text-slate-700";
-                tdPaket.textContent = row.package_code;
+                tdPaket.textContent = `${row.package_code} - ${row.package_name || ''}`;
             }
             tr.appendChild(tdPaket);
 
@@ -485,11 +522,11 @@
             tdHp.textContent = row.phone;
             tr.appendChild(tdHp);
 
-            // 7. KOORDINAT
-            const tdKoordinat = document.createElement('td');
-            tdKoordinat.className = "px-4 py-3 font-mono text-slate-500";
-            tdKoordinat.textContent = (row.latitude && row.longitude) ? `${row.latitude}, ${row.longitude}` : '-';
-            tr.appendChild(tdKoordinat);
+            // 7. STATUS
+            const tdStatus = document.createElement('td');
+            tdStatus.className = "px-4 py-3 font-mono text-slate-500";
+            tdStatus.textContent = row.service_status || '-';
+            tr.appendChild(tdStatus);
 
             // 8. LOG CATATAN
             const tdLog = document.createElement('td');
@@ -535,13 +572,13 @@
         summaryText.textContent = `${readyCount} dari ${validatedRows.length} baris siap di-import.`;
 
         // If there are errors (red) or unresolved warnings (e.g. missing village/package IDs), disable button
-        const hasUnresolvedWarnings = validatedRows.some(row => !row.village_id || !row.internet_package_id);
+        const hasUnresolvedWarnings = validatedRows.some(row => !row.village_id || !row.internet_package_id || !row.pop_id);
         const hasErrors = errorCount > 0;
 
         if (hasErrors || hasUnresolvedWarnings || validatedRows.length === 0) {
             btnSubmit.disabled = true;
             if (hasUnresolvedWarnings) {
-                summaryText.innerHTML = `<span class="text-amber-600 font-semibold">Terdapat desa atau paket yang belum cocok. Pilih secara manual di tabel.</span>`;
+                summaryText.innerHTML = `<span class="text-amber-600 font-semibold">Terdapat wilayah, POP, atau paket yang belum cocok.</span>`;
             } else if (hasErrors) {
                 summaryText.innerHTML = `<span class="text-red-600 font-semibold">Terdapat error data wajib. Mohon hapus data error dari file/spreadsheet Anda.</span>`;
             }

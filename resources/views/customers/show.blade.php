@@ -15,6 +15,21 @@
         <h1 class="text-xl font-bold text-slate-800 tracking-tight">Detail Pelanggan: {{ $customer->full_name }}</h1>
     </div>
     <div class="flex gap-2">
+        @can('validate_customer_data')
+            @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active')
+                <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin mengaktifkan layanan untuk pelanggan ini?')">
+                    @csrf
+                    <button type="submit" 
+                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none cursor-pointer"
+                            @if(!$completeness['is_ready_billing']) disabled title="Data profil belum lengkap untuk diaktifkan" @endif>
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Aktivasi Layanan
+                    </button>
+                </form>
+            @endif
+        @endcan
         <a href="/customers/{{ $customer->id }}/edit" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

@@ -43,6 +43,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:import_customers')->group(function () {
         Route::get('/customers/import', [CustomerController::class, 'importForm'])->name('customers.import');
+        Route::get('/customers/import/history', [CustomerController::class, 'importHistory'])->name('customers.import.history');
+        Route::get('/customers/import/history/{batch}', [CustomerController::class, 'importBatchDetail'])->name('customers.import.batch-detail');
+        Route::get('/customers/import/template', [CustomerController::class, 'downloadImportTemplate'])->name('customers.import.template');
         Route::post('/customers/import/validate', [CustomerController::class, 'validateImport'])->name('customers.import.validate');
         Route::post('/customers/import/confirm', [CustomerController::class, 'confirmImport'])->name('customers.import.confirm');
     });
@@ -51,6 +54,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit_customers')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+    });
+
+    Route::middleware('permission:validate_customer_data')->group(function () {
+        Route::post('/customers/{customer}/activate', [CustomerController::class, 'activate'])->name('customers.activate');
     });
 
     Route::middleware('permission:view_customers')->group(function () {

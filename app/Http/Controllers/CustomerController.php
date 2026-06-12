@@ -13,6 +13,7 @@ use App\Models\Pop;
 use App\Services\CustomerValidationService;
 use App\Support\IndonesianDate;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
@@ -587,156 +588,463 @@ class CustomerController extends Controller
     }
 
     /**
+     * Display the import history.
+     */
+    public function importHistory()
+    {
+        $batches = \App\Models\ImportBatch::with('user')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        return view('customers.import_history', compact('batches'));
+    }
+
+    /**
+     * Display the import batch detail and errors.
+     */
+    public function importBatchDetail($id)
+    {
+        $batch = \App\Models\ImportBatch::with(['user', 'errors'])
+            ->findOrFail($id);
+
+        return view('customers.import_batch_detail', compact('batch'));
+    }
+
+    /**
+     * Download the customer import template for legacy customer migration.
+     */
+    public function downloadImportTemplate(): StreamedResponse
+    {
+        $headers = [
+            'old_customer_id',
+            'full_name',
+            'primary_phone',
+            'full_address',
+            'village',
+            'district',
+            'city',
+            'pop_code',
+            'pop_name',
+            'package_name',
+            'monthly_price',
+            'activation_date',
+            'due_date',
+            'service_status',
+            'identity_number',
+            'alternative_phone',
+            'email',
+            'latitude',
+            'longitude',
+            'ont_sn',
+            'ip_address',
+            'odp_code',
+            'olt_code',
+            'vlan_id',
+            'technical_note',
+        ];
+
+        $exampleRow = [
+            'OLD-0001',
+            'Budi Santoso',
+            '081234567890',
+            'Jl. Merdeka No. 10 RT 01 RW 02',
+            'Sukorejo',
+            'Sukorejo',
+            'Ponorogo',
+            'SMN',
+            'POP Sukorejo',
+            'WHUSNET 20 Mbps',
+            '150000',
+            '2026-06-01',
+            '2026-07-01',
+            'aktif',
+            '3502180101900001',
+            '081298765432',
+            'budi@example.com',
+            '-7.86940',
+            '111.46210',
+            'ONT123456789',
+            '192.168.1.10',
+            'ODP-SMN-001',
+            'OLT-SMN-01',
+            '100',
+            'Field teknis opsional dapat dikosongkan',
+        ];
+
+        return response()->streamDownload(function () use ($headers, $exampleRow) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, $headers);
+            fputcsv($handle, $exampleRow);
+            fclose($handle);
+        }, 'template-import-pelanggan.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
      * Validate the parsed rows from import (Excel/CSV or Copy-Paste).
      */
     public function validateImport(Request $request)
     {
         $rows = $request->input('rows', []);
         $validatedRows = [];
+        $seenOldCustomerIds = [];
+        $seenPhones = [];
 
         foreach ($rows as $row) {
             $originalNo = $row['no'] ?? '';
-            $originalId = trim((string)($row['id'] ?? ''));
-            $originalNama = trim((string)($row['nama'] ?? ''));
-            $originalDesa = trim((string)($row['desa'] ?? ''));
-            $originalPaket = trim((string)($row['paket'] ?? ''));
-            $originalHp = trim((string)($row['hp'] ?? ''));
-            $originalKoordinat = trim((string)($row['koordinat'] ?? ''));
+            $oldCustomerId = trim((string)($row['old_customer_id'] ?? $row['id'] ?? ''));
+            $fullName = trim((string)($row['full_name'] ?? $row['nama'] ?? ''));
+            $primaryPhone = trim((string)($row['primary_phone'] ?? $row['hp'] ?? ''));
+            $fullAddress = trim((string)($row['full_address'] ?? $row['address'] ?? ''));
+            $villageNameInput = trim((string)($row['village'] ?? $row['desa'] ?? ''));
+            $districtNameInput = trim((string)($row['district'] ?? ''));
+            $cityNameInput = trim((string)($row['city'] ?? ''));
+            $popCodeInput = trim((string)($row['pop_code'] ?? ''));
+            $popNameInput = trim((string)($row['pop_name'] ?? ''));
+            $packageNameInput = trim((string)($row['package_name'] ?? $row['paket'] ?? ''));
+            $monthlyPriceInput = trim((string)($row['monthly_price'] ?? ''));
+            $activationDateInput = trim((string)($row['activation_date'] ?? ''));
+            $dueDateInput = trim((string)($row['due_date'] ?? ''));
+            $serviceStatusInput = trim((string)($row['service_status'] ?? $row['status'] ?? ''));
+            $identityNumber = trim((string)($row['identity_number'] ?? ''));
+            $alternativePhone = trim((string)($row['alternative_phone'] ?? ''));
+            $email = trim((string)($row['email'] ?? ''));
+            $latitudeInput = trim((string)($row['latitude'] ?? ''));
+            $longitudeInput = trim((string)($row['longitude'] ?? ''));
+            $legacyCoordinateInput = trim((string)($row['koordinat'] ?? ''));
+            $ontSn = trim((string)($row['ont_sn'] ?? ''));
+            $ipAddress = trim((string)($row['ip_address'] ?? ''));
+            $odpCode = trim((string)($row['odp_code'] ?? ''));
+            $oltCode = trim((string)($row['olt_code'] ?? ''));
+            $vlanId = trim((string)($row['vlan_id'] ?? ''));
+            $technicalNote = trim((string)($row['technical_note'] ?? ''));
 
             $errors = [];
             $warnings = [];
             $statusRow = 'valid';
 
-            // 1. Validate Nama (Mandatory)
-            if ($originalNama === '') {
+            if ($oldCustomerId === '') {
+                $errors[] = 'ID pelanggan lama wajib diisi.';
+                $statusRow = 'error';
+            } else {
+                $oldCustomerKey = strtolower($oldCustomerId);
+
+                if (isset($seenOldCustomerIds[$oldCustomerKey])) {
+                    $errors[] = 'ID pelanggan lama duplikat di file import.';
+                    $statusRow = 'error';
+                }
+
+                $seenOldCustomerIds[$oldCustomerKey] = true;
+
+                if (\App\Models\Customer::where('old_customer_id', $oldCustomerId)->exists()) {
+                    $errors[] = 'ID pelanggan lama sudah terdaftar di database.';
+                    $statusRow = 'error';
+                }
+            }
+
+            if ($fullName === '') {
                 $errors[] = 'Nama lengkap wajib diisi.';
                 $statusRow = 'error';
             }
 
-            // 2. Validate HP (Mandatory)
-            if ($originalHp === '') {
+            if ($primaryPhone === '') {
                 $errors[] = 'Nomor HP wajib diisi.';
                 $statusRow = 'error';
             } else {
-                // Check if duplicate phone exists in database
-                $phoneExists = \App\Models\Customer::where('phone', $originalHp)->exists();
+                $phoneKey = preg_replace('/\D+/', '', $primaryPhone) ?: $primaryPhone;
+
+                if (isset($seenPhones[$phoneKey])) {
+                    $errors[] = 'Nomor HP duplikat di file import.';
+                    $statusRow = 'error';
+                }
+
+                $seenPhones[$phoneKey] = true;
+
+                $phoneExists = \App\Models\Customer::where('phone', $primaryPhone)
+                    ->orWhere('primary_phone', $primaryPhone)
+                    ->exists();
                 if ($phoneExists) {
-                    $warnings[] = 'Nomor HP sudah terdaftar di database.';
+                    $errors[] = 'Nomor HP sudah terdaftar di database.';
+                    $statusRow = 'error';
                 }
             }
 
-            // 3. Validate Identity NIK (Mandatory)
-            if ($originalId === '') {
-                $errors[] = 'ID/NIK wajib diisi.';
+            if ($fullAddress === '') {
+                $errors[] = 'Alamat lengkap wajib diisi.';
                 $statusRow = 'error';
-            } else {
-                // Check duplicate NIK
-                $nikExists = \App\Models\Customer::where('identity_number', $originalId)->exists();
-                if ($nikExists) {
-                    $warnings[] = 'ID/NIK sudah terdaftar di database.';
-                }
             }
 
-            // 4. Match Desa (Village)
             $villageId = null;
             $districtId = null;
             $cityId = null;
             $villageName = null;
+            $districtName = null;
+            $cityName = null;
 
-            if ($originalDesa !== '') {
+            if ($villageNameInput !== '') {
                 $village = \App\Models\Village::with('district.city')
-                    ->where('name', 'like', $originalDesa)
+                    ->where('name', $villageNameInput)
+                    ->when($districtNameInput !== '', function ($query) use ($districtNameInput) {
+                        $query->whereHas('district', function ($districtQuery) use ($districtNameInput) {
+                            $districtQuery->where('name', $districtNameInput);
+                        });
+                    })
+                    ->when($cityNameInput !== '', function ($query) use ($cityNameInput) {
+                        $query->whereHas('district.city', function ($cityQuery) use ($cityNameInput) {
+                            $cityQuery->where('name', $cityNameInput);
+                        });
+                    })
                     ->first();
 
                 if ($village) {
                     $villageId = $village->id;
                     $villageName = $village->name;
                     $districtId = $village->district_id;
-                    if ($village->district) {
-                        $cityId = $village->district->city_id;
-                    }
+                    $districtName = $village->district?->name;
+                    $cityId = $village->district?->city_id;
+                    $cityName = $village->district?->city?->name;
                 } else {
-                    $warnings[] = "Desa '{$originalDesa}' tidak ditemukan di database. Silakan pilih manual.";
-                    if ($statusRow !== 'error') $statusRow = 'warning';
+                    $errors[] = "Desa/Kelurahan '{$villageNameInput}' tidak ditemukan di master wilayah.";
+                    $statusRow = 'error';
                 }
             } else {
-                $errors[] = 'Nama desa wajib diisi.';
+                $errors[] = 'Desa/Kelurahan wajib diisi.';
                 $statusRow = 'error';
             }
 
-            // 5. Match Paket (Service Package)
+            if ($districtNameInput === '') {
+                $errors[] = 'Kecamatan wajib diisi.';
+                $statusRow = 'error';
+            }
+
+            if ($cityNameInput === '') {
+                $errors[] = 'Kota/Kabupaten wajib diisi.';
+                $statusRow = 'error';
+            }
+
+            $pop = null;
+            if ($popCodeInput === '' && $popNameInput === '') {
+                $errors[] = 'POP/Cabang wajib diisi.';
+                $statusRow = 'error';
+            } else {
+                $pop = \App\Models\Pop::query()
+                    ->where('status', 'active')
+                    ->where(function ($query) use ($popCodeInput, $popNameInput) {
+                        if ($popCodeInput !== '') {
+                            $query->where('pop_code', $popCodeInput)
+                                ->orWhere('code', $popCodeInput);
+                        }
+
+                        if ($popNameInput !== '') {
+                            $query->orWhere('name', $popNameInput);
+                        }
+                    })
+                    ->first();
+
+                if (! $pop) {
+                    $errors[] = 'POP/Cabang tidak ditemukan atau tidak aktif.';
+                    $statusRow = 'error';
+                }
+            }
+
             $packageId = null;
             $packageCode = null;
+            $packageName = null;
+            $packageMonthlyPrice = null;
 
-            if ($originalPaket !== '') {
-                $package = \App\Models\InternetPackage::where('package_code', 'like', $originalPaket)
-                    ->orWhere('name', 'like', $originalPaket)
+            if ($packageNameInput !== '') {
+                $package = \App\Models\InternetPackage::active()
+                    ->where(function ($query) use ($packageNameInput) {
+                        $query->where('package_code', $packageNameInput)
+                            ->orWhere('name', $packageNameInput);
+                    })
                     ->first();
 
                 if ($package) {
                     $packageId = $package->id;
                     $packageCode = $package->package_code;
+                    $packageName = $package->name;
+                    $packageMonthlyPrice = (float) $package->monthly_price;
                 } else {
-                    $warnings[] = "Paket '{$originalPaket}' tidak ditemukan di database. Silakan pilih manual.";
-                    if ($statusRow !== 'error') $statusRow = 'warning';
+                    $errors[] = "Paket '{$packageNameInput}' tidak ditemukan di master paket aktif.";
+                    $statusRow = 'error';
                 }
             } else {
                 $errors[] = 'Paket internet wajib diisi.';
                 $statusRow = 'error';
             }
 
-            // 6. Parse Koordinat
+            $monthlyPrice = null;
+            if ($monthlyPriceInput === '') {
+                $errors[] = 'Harga paket wajib diisi.';
+                $statusRow = 'error';
+            } elseif (! is_numeric($monthlyPriceInput)) {
+                $errors[] = 'Harga paket harus berupa angka.';
+                $statusRow = 'error';
+            } else {
+                $monthlyPrice = (float) $monthlyPriceInput;
+
+                if ($packageMonthlyPrice !== null && abs($monthlyPrice - $packageMonthlyPrice) > 0.01) {
+                    $warnings[] = 'Harga paket berbeda dari master paket. Nilai import akan menjadi snapshot layanan.';
+                    if ($statusRow !== 'error') {
+                        $statusRow = 'warning';
+                    }
+                }
+            }
+
+            $activationDate = null;
+            if ($activationDateInput === '') {
+                $errors[] = 'Tanggal aktivasi wajib diisi.';
+                $statusRow = 'error';
+            } else {
+                try {
+                    $activationDate = \Carbon\Carbon::parse($activationDateInput)->format('Y-m-d');
+                } catch (\Throwable) {
+                    $errors[] = 'Tanggal aktivasi tidak valid.';
+                    $statusRow = 'error';
+                }
+            }
+
+            $dueDate = null;
+            if ($dueDateInput === '') {
+                $errors[] = 'Tanggal jatuh tempo wajib diisi.';
+                $statusRow = 'error';
+            } else {
+                try {
+                    $dueDate = \Carbon\Carbon::parse($dueDateInput)->format('Y-m-d');
+                } catch (\Throwable) {
+                    $errors[] = 'Tanggal jatuh tempo tidak valid.';
+                    $statusRow = 'error';
+                }
+            }
+
+            if ($activationDate && $dueDate && $dueDate < $activationDate) {
+                $errors[] = 'Tanggal jatuh tempo tidak boleh lebih awal dari tanggal aktivasi.';
+                $statusRow = 'error';
+            }
+
+            $statusAliases = [
+                'calon_pelanggan' => 'registered',
+                'terdaftar' => 'registered',
+                'survey' => 'waiting_survey',
+                'menunggu_survey' => 'waiting_survey',
+                'menunggu_pemasangan' => 'waiting_installation',
+                'aktif' => 'active',
+                'isolir' => 'suspended',
+                'nonaktif' => 'rejected',
+                'berhenti' => 'terminated',
+            ];
+
+            $normalizedStatusInput = strtolower(str_replace([' ', '-'], '_', $serviceStatusInput));
+            $serviceStatus = $statusAliases[$normalizedStatusInput] ?? $normalizedStatusInput;
+            $validStatuses = \App\Models\SubscriptionStatus::query()
+                ->where('is_active', true)
+                ->pluck('code')
+                ->all();
+
+            if ($serviceStatusInput === '') {
+                $errors[] = 'Status layanan wajib diisi.';
+                $statusRow = 'error';
+            } elseif (! in_array($serviceStatus, $validStatuses, true)) {
+                $errors[] = 'Status layanan tidak sesuai pilihan sistem.';
+                $statusRow = 'error';
+            }
+
             $latitude = null;
             $longitude = null;
-            if ($originalKoordinat !== '') {
-                $coords = explode(',', $originalKoordinat);
+            if ($legacyCoordinateInput !== '' && ($latitudeInput === '' || $longitudeInput === '')) {
+                $coords = explode(',', $legacyCoordinateInput);
                 if (count($coords) === 2) {
-                    $lat = trim($coords[0]);
-                    $lng = trim($coords[1]);
-                    if (is_numeric($lat) && is_numeric($lng)) {
-                        $latitude = floatval($lat);
-                        $longitude = floatval($lng);
-                    } else {
-                        $warnings[] = 'Format koordinat tidak valid (harus angka numerik: lat, long).';
-                        if ($statusRow !== 'error') $statusRow = 'warning';
-                    }
+                    $latitudeInput = trim($coords[0]);
+                    $longitudeInput = trim($coords[1]);
+                }
+            }
+
+            if ($latitudeInput !== '') {
+                if (is_numeric($latitudeInput) && (float) $latitudeInput >= -90 && (float) $latitudeInput <= 90) {
+                    $latitude = (float) $latitudeInput;
                 } else {
-                    $warnings[] = 'Format koordinat tidak valid (harus dipisah koma: lat, long).';
+                    $warnings[] = 'Latitude tidak valid.';
                     if ($statusRow !== 'error') $statusRow = 'warning';
+                }
+            }
+
+            if ($longitudeInput !== '') {
+                if (is_numeric($longitudeInput) && (float) $longitudeInput >= -180 && (float) $longitudeInput <= 180) {
+                    $longitude = (float) $longitudeInput;
+                } else {
+                    $warnings[] = 'Longitude tidak valid.';
+                    if ($statusRow !== 'error') $statusRow = 'warning';
+                }
+            }
+
+            $missingTechnicalFields = [];
+            foreach ([
+                'ont_sn' => $ontSn,
+                'ip_address' => $ipAddress,
+                'odp_code' => $odpCode,
+                'olt_code' => $oltCode,
+                'vlan_id' => $vlanId,
+                'technical_note' => $technicalNote,
+            ] as $field => $value) {
+                if ($value === '') {
+                    $missingTechnicalFields[] = $field;
+                }
+            }
+
+            if ($missingTechnicalFields !== []) {
+                $warnings[] = 'Field teknis opsional belum lengkap: ' . implode(', ', $missingTechnicalFields) . '.';
+                if ($statusRow !== 'error') {
+                    $statusRow = 'warning';
                 }
             }
 
             $validatedRows[] = [
                 'original_no' => $originalNo,
-                'original_id' => $originalId,
-                'original_nama' => $originalNama,
-                'original_desa' => $originalDesa,
-                'original_paket' => $originalPaket,
-                'original_hp' => $originalHp,
-                'original_koordinat' => $originalKoordinat,
-
-                'full_name' => $originalNama,
-                'identity_number' => $originalId,
+                'old_customer_id' => $oldCustomerId,
+                'full_name' => $fullName,
+                'identity_number' => $identityNumber,
                 'gender' => 'Laki-laki', // default
-                'phone' => $originalHp,
-                'email' => null,
-                'registration_date' => now()->format('Y-m-d'),
-                'address' => $originalDesa ? "Alamat Kel. {$originalDesa}" : '',
+                'phone' => $primaryPhone,
+                'primary_phone' => $primaryPhone,
+                'alternative_phone' => $alternativePhone !== '' ? $alternativePhone : null,
+                'email' => $email !== '' ? $email : null,
+                'registration_date' => $activationDate,
+                'address' => $fullAddress,
                 
+                'pop_id' => $pop?->id,
+                'pop_code' => $pop?->pop_code,
+                'pop_name' => $pop?->name,
                 'city_id' => $cityId,
                 'district_id' => $districtId,
                 'village_id' => $villageId,
                 'village_name' => $villageName,
+                'district_name' => $districtName,
+                'city_name' => $cityName,
                 
                 'internet_package_id' => $packageId,
                 'package_code' => $packageCode,
+                'package_name' => $packageName,
                 
                 'contract_period_months' => 12,
                 'discount_amount' => 0,
                 'tax_percent' => 11,
-                'status' => 'registered',
+                'monthly_price' => $monthlyPrice,
+                'activation_date' => $activationDate,
+                'due_date' => $dueDate,
+                'status' => $serviceStatus ?: null,
+                'service_status' => $serviceStatus ?: null,
                 'latitude' => $latitude,
                 'longitude' => $longitude,
+                'ont_sn' => $ontSn !== '' ? $ontSn : null,
+                'ip_address' => $ipAddress !== '' ? $ipAddress : null,
+                'odp_code' => $odpCode !== '' ? $odpCode : null,
+                'olt_code' => $oltCode !== '' ? $oltCode : null,
+                'vlan_id' => $vlanId !== '' ? $vlanId : null,
+                'technical_note' => $technicalNote !== '' ? $technicalNote : null,
+                'technical_incomplete' => $missingTechnicalFields !== [],
+                'missing_technical_fields' => $missingTechnicalFields,
 
                 'status_row' => $statusRow,
                 'errors' => $errors,
@@ -750,12 +1058,10 @@ class CustomerController extends Controller
         ]);
     }
 
-    /**
-     * Confirm and store the finalized imported customers.
-     */
     public function confirmImport(Request $request)
     {
         $rows = $request->input('rows', []);
+        $fileName = $request->input('file_name', 'Manual Input / Paste');
         
         if (is_string($rows)) {
             $rows = json_decode($rows, true);
@@ -765,48 +1071,228 @@ class CustomerController extends Controller
             return redirect()->route('customers.import')->withErrors('Tidak ada data yang di-import atau format data tidak valid.');
         }
 
+        $totalRows = count($rows);
+        $invalidRows = 0;
+        $validRows = 0;
         $insertedCount = 0;
 
-        \Illuminate\Support\Facades\DB::transaction(function() use ($rows, &$insertedCount) {
-            $year = now()->format('Y');
-            
-            // Find latest customer code or ID
-            $latestCustomer = \App\Models\Customer::orderBy('id', 'desc')->first();
-            $nextId = $latestCustomer ? $latestCustomer->id + 1 : 1;
-
-            foreach ($rows as $row) {
-                // double check required database fields
-                if (empty($row['full_name']) || empty($row['phone']) || empty($row['village_id']) || empty($row['internet_package_id'])) {
-                    continue; // Skip invalid rows that somehow bypassed frontend
-                }
-
-                $customerCode = "WHUS-{$year}-" . str_pad((string)$nextId, 4, '0', STR_PAD_LEFT);
-                $nextId++;
-
-                \App\Models\Customer::create([
-                    'customer_code' => $customerCode,
-                    'full_name' => $row['full_name'],
-                    'identity_number' => $row['identity_number'] ?? '',
-                    'gender' => $row['gender'] ?? 'Laki-laki',
-                    'phone' => $row['phone'],
-                    'email' => $row['email'] ?? null,
-                    'registration_date' => $row['registration_date'] ?? now()->format('Y-m-d'),
-                    'address' => $row['address'] ?? ("Alamat Kel. " . ($row['village_name'] ?? '')),
-                    'city_id' => $row['city_id'] ?? (\App\Models\City::first()->id ?? 1),
-                    'district_id' => $row['district_id'],
-                    'village_id' => $row['village_id'],
-                    'internet_package_id' => $row['internet_package_id'],
-                    'contract_period_months' => $row['contract_period_months'] ?? 12,
-                    'discount_amount' => $row['discount_amount'] ?? 0,
-                    'tax_percent' => $row['tax_percent'] ?? 11,
-                    'status' => $row['status'] ?? 'registered',
-                    'latitude' => $row['latitude'] ?? null,
-                    'longitude' => $row['longitude'] ?? null,
-                ]);
-                $insertedCount++;
+        foreach ($rows as $row) {
+            if (($row['status_row'] ?? '') === 'error') {
+                $invalidRows++;
+            } else {
+                $validRows++;
             }
+        }
+
+        $batch = \App\Models\ImportBatch::create([
+            'batch_number' => \App\Models\ImportBatch::generateBatchNumber(),
+            'file_name' => $fileName,
+            'uploaded_by' => auth()->id(),
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+            'status' => 'pending',
+        ]);
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function() use ($rows, $batch, &$insertedCount) {
+                foreach ($rows as $row) {
+                    // Skip if status is error or missing required DB fields
+                    if (($row['status_row'] ?? '') === 'error') {
+                        foreach (($row['errors'] ?? []) as $errMsg) {
+                            \App\Models\ImportError::create([
+                                'import_batch_id' => $batch->id,
+                                'row_number' => $row['original_no'] ?? null,
+                                'error_message' => $errMsg,
+                                'raw_data' => $row,
+                            ]);
+                        }
+                        continue;
+                    }
+
+                    if (empty($row['full_name']) || (empty($row['phone']) && empty($row['primary_phone'])) || empty($row['village_id']) || empty($row['internet_package_id']) || empty($row['pop_id'])) {
+                        \App\Models\ImportError::create([
+                            'import_batch_id' => $batch->id,
+                            'row_number' => $row['original_no'] ?? null,
+                            'error_message' => 'Data wajib database kosong (Nama/HP/Wilayah/Paket/POP).',
+                            'raw_data' => $row,
+                        ]);
+                        continue;
+                    }
+
+                    $pop = \App\Models\Pop::findOrFail($row['pop_id']);
+                    $customerCode = $pop->generateRegistrationNumber();
+
+                    $customer = \App\Models\Customer::create([
+                        'customer_code' => $customerCode,
+                        'old_customer_id' => $row['old_customer_id'] ?? null,
+                        'full_name' => $row['full_name'],
+                        'identity_number' => $row['identity_number'] ?? '',
+                        'gender' => $row['gender'] ?? 'Laki-laki',
+                        'phone' => $row['phone'] ?? $row['primary_phone'],
+                        'primary_phone' => $row['primary_phone'] ?? $row['phone'],
+                        'alternative_phone' => $row['alternative_phone'] ?? null,
+                        'email' => $row['email'] ?? null,
+                        'registration_date' => $row['registration_date'] ?? now()->format('Y-m-d'),
+                        'pop_id' => $row['pop_id'],
+                        'status' => $row['status'] ?? 'registered',
+                        'customer_status' => $this->mapServiceStatusToCustomerStatus($row['status'] ?? 'registered'),
+                        'created_by' => auth()->id(),
+                        
+                        // Technical fields
+                        'ont_sn' => $row['ont_sn'] ?? null,
+                        'ip_address' => $row['ip_address'] ?? null,
+                        'odp_code' => $row['odp_code'] ?? null,
+                        'olt_code' => $row['olt_code'] ?? null,
+                        'vlan_id' => $row['vlan_id'] ?? null,
+                    ]);
+
+                    \App\Models\CustomerAddress::create([
+                        'customer_id' => $customer->id,
+                        'full_address' => $row['address'] ?? $row['full_address'] ?? ("Alamat Kel. " . ($row['village_name'] ?? '')),
+                        'city_id' => $row['city_id'],
+                        'district_id' => $row['district_id'],
+                        'village_id' => $row['village_id'],
+                        'latitude' => $row['latitude'] ?? null,
+                        'longitude' => $row['longitude'] ?? null,
+                    ]);
+
+                    $package = \App\Models\InternetPackage::find($row['internet_package_id']);
+                    
+                    \App\Models\CustomerService::create([
+                        'customer_id' => $customer->id,
+                        'internet_package_id' => $row['internet_package_id'],
+                        'package_name_snapshot' => $package->name,
+                        'download_speed_snapshot' => $package->download_speed_mbps,
+                        'upload_speed_snapshot' => $package->upload_speed_mbps,
+                        'monthly_price' => $row['monthly_price'] ?? $package->monthly_price,
+                        'discount' => $row['discount_amount'] ?? 0,
+                        'ppn' => $row['tax_percent'] ?? 11,
+                        'total_monthly_bill' => ($row['monthly_price'] ?? $package->monthly_price) + (($row['monthly_price'] ?? $package->monthly_price) * ($row['tax_percent'] ?? 11) / 100) - ($row['discount_amount'] ?? 0),
+                        'activation_date' => $row['activation_date'] ?? $row['registration_date'] ?? now()->format('Y-m-d'),
+                        'due_date' => $row['due_date'] ?? null,
+                        'service_status' => $row['status'] ?? 'registered',
+                        'billing_status' => 'inactive',
+                    ]);
+
+                    $insertedCount++;
+                }
+                
+                $batch->update([
+                    'imported_rows' => $insertedCount,
+                    'status' => 'imported',
+                ]);
+            });
+        } catch (\Exception $e) {
+            $batch->update(['status' => 'failed']);
+            \Illuminate\Support\Facades\Log::error('Import Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return redirect()->route('customers.import')->withErrors('Gagal meng-import data: ' . $e->getMessage());
+        }
+
+        return redirect()->route('customers.index')->with('success', "Berhasil meng-import {$insertedCount} data pelanggan baru! (Batch: {$batch->batch_number})");
+    }
+
+    public function activate(Customer $customer)
+    {
+        $completeness = $customer->dataCompleteness();
+        if (!$completeness['is_ready_billing']) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Pelanggan tidak bisa diaktifkan karena data wajib belum lengkap.');
+        }
+
+        if (!$customer->internet_package_id) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Pelanggan tidak memiliki paket internet aktif.');
+        }
+
+        $service = $customer->customerService;
+        if (!$service) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Data layanan pelanggan tidak ditemukan.');
+        }
+
+        if ($service->total_monthly_bill <= 0) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Total tagihan bulanan tidak valid (harus lebih besar dari 0).');
+        }
+
+        $pop = $customer->pop;
+        if (!$pop) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'POP/Cabang pelanggan tidak ditemukan.');
+        }
+
+        if (!$pop->cid_prefix || !$pop->pop_code) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Konfigurasi prefix CID atau kode POP pada POP asal pelanggan belum lengkap.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $service, $pop) {
+            $cid = $pop->generateCid();
+
+            $oldValues = [
+                'cid' => $customer->cid,
+                'status' => $customer->status,
+                'customer_status' => $customer->customer_status,
+                'data_completeness_status' => $customer->data_completeness_status,
+                'service_status' => $service->service_status,
+                'billing_status' => $service->billing_status,
+            ];
+
+            $customer->update([
+                'cid' => $cid,
+                'status' => 'active',
+                'customer_status' => 'aktif',
+                'data_completeness_status' => 'siap_billing',
+            ]);
+
+            $service->update([
+                'service_status' => 'aktif',
+                'billing_status' => 'active',
+            ]);
+
+            $newValues = [
+                'cid' => $cid,
+                'status' => 'active',
+                'customer_status' => 'aktif',
+                'data_completeness_status' => 'siap_billing',
+                'service_status' => 'aktif',
+                'billing_status' => 'active',
+            ];
+
+            \App\Models\AuditLog::create([
+                'user_id' => auth()->id(),
+                'module' => 'Data Pelanggan',
+                'action' => 'activate',
+                'auditable_type' => get_class($customer),
+                'auditable_id' => $customer->id,
+                'old_values' => $oldValues,
+                'new_values' => $newValues,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+            ]);
         });
 
-        return redirect()->route('customers.index')->with('success', "Berhasil meng-import {$insertedCount} data pelanggan baru!");
+        return redirect()->route('customers.show', $customer->id)
+            ->with('success', "Layanan pelanggan berhasil diaktifkan dengan CID: {$customer->cid}!");
     }
+
+    private function mapServiceStatusToCustomerStatus(string $status): string
+    {
+        $mapping = [
+            'active' => 'aktif',
+            'suspended' => 'isolir',
+            'terminated' => 'berhenti',
+            'rejected' => 'nonaktif',
+            'waiting_survey' => 'survey',
+            'surveyed' => 'survey',
+            'waiting_installation' => 'menunggu_pemasangan',
+            'installed' => 'menunggu_pemasangan',
+            'registered' => 'calon_pelanggan',
+        ];
+
+        return $mapping[$status] ?? 'calon_pelanggan';
+    }
+
 }

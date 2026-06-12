@@ -2,145 +2,9 @@
 # Website Billing ISP Berbasis Master Data Pelanggan
 
 ## Status Project Saat Ini
-Current Sprint: Sprint 4 — Import Excel/CSV
-Current Module: Template Import Pelanggan
-Current Task: S4-T001 — Template Import Pelanggan
-
----
-
-
-# Sprint 4 — Import Excel/CSV
-
-## Tujuan Sprint 4
-Membuat modul import pelanggan lama ke master pelanggan baru.
-
----
-
-### S4-T001 — Template Import Pelanggan
-Status: In Progress
-
-Tujuan:
-Membuat template Excel/CSV untuk import pelanggan lama.
-
-Checklist:
-- [ ] Buat format kolom import.
-- [ ] Tambahkan ID pelanggan lama.
-- [ ] Tambahkan nama lengkap.
-- [ ] Tambahkan nomor HP.
-- [ ] Tambahkan alamat.
-- [ ] Tambahkan POP/Cabang.
-- [ ] Tambahkan nama paket.
-- [ ] Tambahkan harga paket.
-- [ ] Tambahkan tanggal aktivasi.
-- [ ] Tambahkan tanggal jatuh tempo.
-- [ ] Tambahkan status layanan.
-- [ ] Tambahkan field teknis opsional.
-
-Acceptance Criteria:
-- [ ] Admin dapat download template.
-- [ ] Template memiliki field wajib.
-- [ ] Template memiliki field opsional teknis.
-- [ ] Format siap digunakan untuk import.
-
----
-
-### S4-T002 — Upload dan Preview Import
-Status: Todo
-
-Tujuan:
-Membuat upload file dan preview data sebelum import.
-
-Checklist:
-- [ ] Buat halaman import pelanggan.
-- [ ] Buat upload Excel/CSV.
-- [ ] Baca isi file.
-- [ ] Tampilkan preview data.
-- [ ] Tampilkan jumlah baris.
-- [ ] Tampilkan data valid dan invalid.
-
-Acceptance Criteria:
-- [ ] Admin dapat upload file.
-- [ ] Sistem membaca data.
-- [ ] Sistem menampilkan preview sebelum import.
-- [ ] Sistem belum menyimpan data sebelum admin konfirmasi.
-
----
-
-### S4-T003 — Validasi Import
-Status: Todo
-
-Tujuan:
-Memvalidasi data import sebelum masuk master pelanggan.
-
-Checklist:
-- [ ] Cek ID pelanggan lama tidak duplikat.
-- [ ] Cek nama pelanggan tidak kosong.
-- [ ] Cek nomor HP tidak kosong.
-- [ ] Cek POP tersedia di master POP.
-- [ ] Cek paket tersedia di master paket.
-- [ ] Cek harga paket berupa angka.
-- [ ] Cek tanggal valid.
-- [ ] Cek status layanan sesuai pilihan sistem.
-- [ ] Tandai data teknis kosong sebagai belum lengkap.
-
-Acceptance Criteria:
-- [ ] Data invalid ditolak.
-- [ ] Alasan error ditampilkan.
-- [ ] Data duplikat ditandai.
-- [ ] Data valid siap dikonfirmasi import.
-
----
-
-### S4-T004 — Import Batch dan Import Error
-Status: Todo
-
-Tujuan:
-Menyimpan log import dan error import.
-
-Checklist:
-- [ ] Buat tabel `import_batches`.
-- [ ] Buat tabel `import_errors`.
-- [ ] Simpan nama file.
-- [ ] Simpan user pengupload.
-- [ ] Simpan total rows.
-- [ ] Simpan valid rows.
-- [ ] Simpan invalid rows.
-- [ ] Simpan imported rows.
-- [ ] Simpan error per baris.
-- [ ] Simpan raw data error.
-
-Acceptance Criteria:
-- [ ] Setiap import memiliki batch log.
-- [ ] Error import tersimpan.
-- [ ] Admin dapat melihat riwayat import.
-- [ ] Admin dapat melihat alasan data gagal.
-
----
-
-### S4-T005 — Konfirmasi Import ke Master Pelanggan
-Status: Todo
-
-Tujuan:
-Menyimpan data valid hasil import ke master pelanggan.
-
-Checklist:
-- [ ] Buat tombol konfirmasi import.
-- [ ] Simpan data valid ke customers.
-- [ ] Simpan alamat ke customer_addresses.
-- [ ] Simpan layanan ke customer_services.
-- [ ] Simpan ID pelanggan lama.
-- [ ] Generate ID Request berdasarkan POP.
-- [ ] Jangan generate CID jika pelanggan belum aktif/siap billing.
-- [ ] Update status kelengkapan data.
-- [ ] Simpan log audit import.
-
-Acceptance Criteria:
-- [ ] Data valid masuk master pelanggan.
-- [ ] Data invalid tidak masuk master pelanggan.
-- [ ] Data hasil import bisa diedit manual.
-- [ ] ID pelanggan lama tersimpan.
-- [ ] ID Request sistem baru dibuat.
-- [ ] Log import tersimpan.
+Current Sprint: Sprint 5 — Billing Dasar
+Current Module: Buat Tagihan Manual
+Current Task: S5-T003 — Buat Tagihan Manual
 
 ---
 
@@ -148,190 +12,44 @@ Acceptance Criteria:
 
 ## Tujuan Sprint 5
 Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
-
----
-
-### S5-T001 — Aktivasi Layanan Pelanggan
-Status: Todo
-
-Tujuan:
-Mengubah pelanggan lengkap menjadi aktif/siap billing.
-
-Checklist:
-- [ ] Buat tombol aktivasi layanan.
-- [ ] Cek kelengkapan data pelanggan.
-- [ ] Cek paket aktif.
-- [ ] Cek nominal tagihan.
-- [ ] Cek tanggal aktivasi.
-- [ ] Cek tanggal jatuh tempo.
-
-Tujuan:
-Membuat upload file dan preview data sebelum import.
-
-Checklist:
-- [ ] Buat halaman import pelanggan.
-- [ ] Buat upload Excel/CSV.
-- [ ] Baca isi file.
-- [ ] Tampilkan preview data.
-- [ ] Tampilkan jumlah baris.
-- [ ] Tampilkan data valid dan invalid.
-
-Acceptance Criteria:
-- [ ] Admin dapat upload file.
-- [ ] Sistem membaca data.
-- [ ] Sistem menampilkan preview sebelum import.
-- [ ] Sistem belum menyimpan data sebelum admin konfirmasi.
-
----
-
-### S4-T003 — Validasi Import
-Status: Todo
-
-Tujuan:
-Memvalidasi data import sebelum masuk master pelanggan.
-
-Checklist:
-- [ ] Cek ID pelanggan lama tidak duplikat.
-- [ ] Cek nama pelanggan tidak kosong.
-- [ ] Cek nomor HP tidak kosong.
-- [ ] Cek POP tersedia di master POP.
-- [ ] Cek paket tersedia di master paket.
-- [ ] Cek harga paket berupa angka.
-- [ ] Cek tanggal valid.
-- [ ] Cek status layanan sesuai pilihan sistem.
-- [ ] Tandai data teknis kosong sebagai belum lengkap.
-
-Acceptance Criteria:
-- [ ] Data invalid ditolak.
-- [ ] Alasan error ditampilkan.
-- [ ] Data duplikat ditandai.
-- [ ] Data valid siap dikonfirmasi import.
-
----
-
-### S4-T004 — Import Batch dan Import Error
-Status: Todo
-
-Tujuan:
-Menyimpan log import dan error import.
-
-Checklist:
-- [ ] Buat tabel `import_batches`.
-- [ ] Buat tabel `import_errors`.
-- [ ] Simpan nama file.
-- [ ] Simpan user pengupload.
-- [ ] Simpan total rows.
-- [ ] Simpan valid rows.
-- [ ] Simpan invalid rows.
-- [ ] Simpan imported rows.
-- [ ] Simpan error per baris.
-- [ ] Simpan raw data error.
-
-Acceptance Criteria:
-- [ ] Setiap import memiliki batch log.
-- [ ] Error import tersimpan.
-- [ ] Admin dapat melihat riwayat import.
-- [ ] Admin dapat melihat alasan data gagal.
-
----
-
-### S4-T005 — Konfirmasi Import ke Master Pelanggan
-Status: Todo
-
-Tujuan:
-Menyimpan data valid hasil import ke master pelanggan.
-
-Checklist:
-- [ ] Buat tombol konfirmasi import.
-- [ ] Simpan data valid ke customers.
-- [ ] Simpan alamat ke customer_addresses.
-- [ ] Simpan layanan ke customer_services.
-- [ ] Simpan ID pelanggan lama.
-- [ ] Generate ID Request berdasarkan POP.
-- [ ] Jangan generate CID jika pelanggan belum aktif/siap billing.
-- [ ] Update status kelengkapan data.
-- [ ] Simpan log audit import.
-
-Acceptance Criteria:
-- [ ] Data valid masuk master pelanggan.
-- [ ] Data invalid tidak masuk master pelanggan.
-- [ ] Data hasil import bisa diedit manual.
-- [ ] ID pelanggan lama tersimpan.
-- [ ] ID Request sistem baru dibuat.
-- [ ] Log import tersimpan.
-
----
-
-# Sprint 5 — Billing Dasar
-
-## Tujuan Sprint 5
-Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
-
----
-
-### S5-T001 — Aktivasi Layanan Pelanggan
-Status: Todo
-
-Tujuan:
-Mengubah pelanggan lengkap menjadi aktif/siap billing.
-
-Checklist:
-- [ ] Buat tombol aktivasi layanan.
-- [ ] Cek kelengkapan data pelanggan.
-- [ ] Cek paket aktif.
-- [ ] Cek nominal tagihan.
-- [ ] Cek tanggal aktivasi.
-- [ ] Cek tanggal jatuh tempo.
-- [ ] Generate CID berdasarkan POP.
-- [ ] Ubah status pelanggan menjadi aktif.
-- [ ] Ubah status kelengkapan menjadi siap billing.
-- [ ] Simpan riwayat aktivasi.
-
-Acceptance Criteria:
-- [ ] Pelanggan belum lengkap tidak bisa diaktifkan.
-- [ ] Pelanggan aktif memiliki paket.
-- [ ] Pelanggan aktif memiliki nominal tagihan.
-- [ ] Pelanggan aktif memiliki CID.
-- [ ] Tanggal jatuh tempo wajib ada.
-- [ ] Sistem menyimpan riwayat aktivasi.
-
----
-
-### S5-T002 — Migration dan Model Invoice
-Status: Todo
-
-Tujuan:
-Membuat struktur tagihan pelanggan.
-
-Checklist:
-- [ ] Buat tabel `invoices`.
-- [ ] Tambahkan nomor invoice.
-- [ ] Tambahkan customer_id.
-- [ ] Tambahkan pop_id.
-- [ ] Tambahkan customer_service_id.
-- [ ] Tambahkan internet_package_id.
-- [ ] Tambahkan periode tagihan.
-- [ ] Tambahkan tanggal terbit.
-- [ ] Tambahkan tanggal jatuh tempo.
-- [ ] Tambahkan subtotal.
-- [ ] Tambahkan diskon.
-- [ ] Tambahkan PPN.
-- [ ] Tambahkan total tagihan.
-- [ ] Tambahkan paid amount.
-- [ ] Tambahkan remaining amount.
-- [ ] Tambahkan status tagihan.
-
-Acceptance Criteria:
-- [ ] Invoice dapat disimpan.
-- [ ] Invoice terhubung ke customer.
-- [ ] Invoice terhubung ke POP.
-- [ ] Invoice memiliki periode.
-- [ ] Invoice memiliki status.
 
 ---
 
 ### S5-T003 — Buat Tagihan Manual
-Status: Todo
+Status: In Progress
+
+Tujuan:
+Membuat invoice manual dari pelanggan aktif.
+
+Checklist:
+- [ ] Buat tombol buat tagihan di detail pelanggan.
+- [ ] Cek pelanggan aktif/siap billing.
+- [ ] Ambil paket aktif pelanggan.
+- [ ] Ambil harga layanan pelanggan.
+- [ ] Ambil tanggal jatuh tempo.
+- [ ] Tentukan periode tagihan.
+- [ ] Cek invoice dobel untuk periode sama.
+- [ ] Buat invoice.
+- [ ] Status invoice default belum dibayar.
+
+Acceptance Criteria:
+- [ ] Tagihan hanya bisa dibuat untuk pelanggan aktif/siap billing.
+- [ ] Tagihan mengambil harga dari layanan pelanggan.
+- [ ] Tagihan memiliki periode.
+- [ ] Tagihan tidak dobel untuk periode yang sama.
+- [ ] Tagihan memiliki status belum dibayar.
+
+---
+
+# Sprint 5 — Billing Dasar
+
+## Tujuan Sprint 5
+Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
+
+---
+
+### S5-T003 — Buat Tagihan Manual
+Status: In Progress
 
 Tujuan:
 Membuat invoice manual dari pelanggan aktif.
@@ -1398,8 +1116,242 @@ Catatan Test:
 
 ---
 
+# Sprint 4 — Import Excel/CSV
 
+## Tujuan Sprint 4
+Membuat modul import pelanggan lama ke master pelanggan baru.
 
+---
+
+### S4-T001 — Template Import Pelanggan
+Status: Done
+
+Tujuan:
+Membuat template Excel/CSV untuk import pelanggan lama.
+
+Checklist:
+- [x] Buat format kolom import.
+- [x] Tambahkan ID pelanggan lama.
+- [x] Tambahkan nama lengkap.
+- [x] Tambahkan nomor HP.
+- [x] Tambahkan alamat.
+- [x] Tambahkan POP/Cabang.
+- [x] Tambahkan nama paket.
+- [x] Tambahkan harga paket.
+- [x] Tambahkan tanggal aktivasi.
+- [x] Tambahkan tanggal jatuh tempo.
+- [x] Tambahkan status layanan.
+- [x] Tambahkan field teknis opsional.
+
+Acceptance Criteria:
+- [x] Admin dapat download template.
+- [x] Template memiliki field wajib.
+- [x] Template memiliki field opsional teknis.
+- [x] Format siap digunakan untuk import.
+
+Catatan Test:
+- `php artisan test --filter=CustomerImportTest` lulus: 4 tests, 35 assertions.
+- `php artisan test` lulus: 81 tests, 408 assertions.
+
+---
+
+### S4-T002 — Upload dan Preview Import
+Status: Done
+
+Tujuan:
+Membuat upload file dan preview data sebelum import.
+
+Checklist:
+- [x] Buat halaman import pelanggan.
+- [x] Buat upload Excel/CSV.
+- [x] Baca isi file.
+- [x] Tampilkan preview data.
+- [x] Tampilkan jumlah baris.
+- [x] Tampilkan data valid dan invalid.
+
+Acceptance Criteria:
+- [x] Admin dapat upload file.
+- [x] Sistem membaca data.
+- [x] Sistem menampilkan preview sebelum import.
+- [x] Sistem belum menyimpan data sebelum admin konfirmasi.
+
+Catatan Test:
+- `php artisan test --filter=CustomerImportTest` lulus: 4 tests, 35 assertions.
+- Halaman `/customers/import` tampil dengan benar.
+- Upload file Excel/CSV dibaca oleh SheetJS (client-side), lalu divalidasi via API `/customers/import/validate`.
+- Preview tabel menampilkan status per baris (valid/warning/error) dengan metric cards jumlah baris.
+- Data hanya tersimpan ke database setelah admin klik tombol konfirmasi import.
+
+---
+
+# Sprint 4 — Import Excel/CSV
+
+## Tujuan Sprint 4
+Membuat modul import pelanggan lama ke master pelanggan baru.
+
+---
+
+### S4-T003 — Validasi Import
+Status: Done
+
+Tujuan:
+Memvalidasi data import sebelum masuk master pelanggan.
+
+Checklist:
+- [x] Cek ID pelanggan lama tidak duplikat.
+- [x] Cek nama pelanggan tidak kosong.
+- [x] Cek nomor HP tidak kosong.
+- [x] Cek POP tersedia di master POP.
+- [x] Cek paket tersedia di master paket.
+- [x] Cek harga paket berupa angka.
+- [x] Cek tanggal valid.
+- [x] Cek status layanan sesuai pilihan sistem.
+- [x] Tandai data teknis kosong sebagai belum lengkap.
+
+Acceptance Criteria:
+- [x] Data invalid ditolak.
+- [x] Alasan error ditampilkan.
+- [x] Data duplikat ditandai.
+- [x] Data valid siap dikonfirmasi import.
+
+Catatan Test:
+- `php artisan test --filter=CustomerImportTest` lulus: 5 tests, 54 assertions.
+- `php artisan test` lulus: 82 tests, 427 assertions.
+
+---
+
+### S4-T004 — Import Batch dan Import Error
+Status: Done
+
+Tujuan:
+Menyimpan log import dan error import.
+
+Checklist:
+- [x] Buat tabel `import_batches`.
+- [x] Buat tabel `import_errors`.
+- [x] Simpan nama file.
+- [x] Simpan user pengupload.
+- [x] Simpan total rows.
+- [x] Simpan valid rows.
+- [x] Simpan invalid rows.
+- [x] Simpan imported rows.
+- [x] Simpan error per baris.
+- [x] Simpan raw data error.
+
+Acceptance Criteria:
+- [x] Setiap import memiliki batch log.
+- [x] Error import tersimpan.
+- [x] Admin dapat melihat riwayat import.
+- [x] Admin dapat melihat alasan data gagal.
+
+Catatan Test:
+- `php artisan test tests/Feature/CustomerImportLoggingTest.php` lulus: 2 tests, 11 assertions.
+- Tabel `import_batches` dan `import_errors` dibuat.
+- Halaman riwayat dan detail batch tersedia.
+
+---
+
+### S4-T005 — Konfirmasi Import ke Master Pelanggan
+Status: Done
+
+Tujuan:
+Menyimpan data valid hasil import ke master pelanggan.
+
+Checklist:
+- [x] Buat tombol konfirmasi import.
+- [x] Simpan data valid ke customers.
+- [x] Simpan alamat ke customer_addresses.
+- [x] Simpan layanan ke customer_services.
+- [x] Simpan ID pelanggan lama.
+- [x] Generate ID Request berdasarkan POP.
+- [x] Jangan generate CID jika pelanggan belum aktif/siap billing.
+- [x] Update status kelengkapan data.
+- [x] Simpan log audit import.
+
+Acceptance Criteria:
+- [x] Data valid masuk master pelanggan.
+- [x] Data invalid tidak masuk master pelanggan.
+- [x] Data hasil import bisa diedit manual.
+- [x] ID pelanggan lama tersimpan.
+- [x] ID Request sistem baru dibuat.
+- [x] Log import tersimpan.
+
+Catatan Test:
+- `php artisan test tests/Feature/CustomerImportLoggingTest.php` lulus (verifikasi data masuk ke 3 tabel).
+- `php artisan test tests/Feature/CustomerImportTest.php` lulus (verifikasi regresi).
+
+---
+
+## Sprint 5 — Billing Dasar
+
+### S5-T001 — Aktivasi Layanan Pelanggan
+Status: Done
+
+Tujuan:
+Mengubah pelanggan lengkap menjadi aktif/siap billing.
+
+Checklist:
+- [x] Buat tombol aktivasi layanan.
+- [x] Cek kelengkapan data pelanggan.
+- [x] Cek paket aktif.
+- [x] Cek nominal tagihan.
+- [x] Cek tanggal aktivasi.
+- [x] Cek tanggal jatuh tempo.
+- [x] Generate CID berdasarkan POP.
+- [x] Ubah status pelanggan menjadi aktif.
+- [x] Ubah status kelengkapan menjadi siap billing.
+- [x] Simpan riwayat aktivasi.
+
+Acceptance Criteria:
+- [x] Pelanggan belum lengkap tidak bisa diaktifkan.
+- [x] Pelanggan aktif memiliki paket.
+- [x] Pelanggan aktif memiliki nominal tagihan.
+- [x] Pelanggan aktif memiliki CID.
+- [x] Tanggal jatuh tempo wajib ada.
+- [x] Sistem menyimpan riwayat aktivasi.
+
+Catatan Test:
+- `php artisan test --filter=CustomerActivationTest` lulus: 3 tests, 22 assertions.
+- Seluruh test suite `php artisan test` lulus: 87 tests, 468 assertions.
+
+---
+
+### S5-T002 — Migration dan Model Invoice
+Status: Done
+
+Tujuan:
+Membuat struktur tagihan pelanggan.
+
+Checklist:
+- [x] Buat tabel `invoices`.
+- [x] Tambahkan nomor invoice.
+- [x] Tambahkan customer_id.
+- [x] Tambahkan pop_id.
+- [x] Tambahkan customer_service_id.
+- [x] Tambahkan internet_package_id.
+- [x] Tambahkan periode tagihan.
+- [x] Tambahkan tanggal terbit.
+- [x] Tambahkan tanggal jatuh tempo.
+- [x] Tambahkan subtotal.
+- [x] Tambahkan diskon.
+- [x] Tambahkan PPN.
+- [x] Tambahkan total tagihan.
+- [x] Tambahkan paid amount.
+- [x] Tambahkan remaining amount.
+- [x] Tambahkan status tagihan.
+
+Acceptance Criteria:
+- [x] Invoice dapat disimpan.
+- [x] Invoice terhubung ke customer.
+- [x] Invoice terhubung ke POP.
+- [x] Invoice memiliki periode.
+- [x] Invoice memiliki status.
+
+Catatan Test:
+- `php artisan test --filter=InvoiceModelTest` lulus: 1 test, 17 assertions.
+- Seluruh test suite `php artisan test` lulus: 88 tests, 485 assertions.
+
+---
 ## Blocked
 Belum ada.
 
