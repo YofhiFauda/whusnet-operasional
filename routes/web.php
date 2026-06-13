@@ -71,6 +71,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     });
 
+    Route::middleware('permission:view_payments')->group(function () {
+        Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    });
+
     Route::middleware('permission:create_payments')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');

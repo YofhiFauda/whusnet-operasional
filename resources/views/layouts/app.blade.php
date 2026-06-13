@@ -116,6 +116,16 @@
                 </a>
                 @endif
 
+                @if(auth()->user()->hasPermission('view_payments'))
+                <!-- Payment Link -->
+                <a href="{{ route('payments.index') }}" title="Pembayaran" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('payments*') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
+                    <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <span class="sidebar-text">Pembayaran</span>
+                </a>
+                @endif
+
                 @if(auth()->user()->hasPermission('view_pop') || auth()->user()->hasPermission('view_packages'))
                 <!-- Master Data Dropdown -->
                 <div>

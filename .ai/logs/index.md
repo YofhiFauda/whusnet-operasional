@@ -24,3 +24,12 @@
 - 2026-06-13 08:48:32 | close | exit=0 | .ai/logs/20260613-084746-close.log
 - 2026-06-13 08:48:33 | sync | exit=0 | .ai/logs/20260613-084832-sync.log
 - 2026-06-13 08:50:47 | bootstrap | exit=0 | .ai/logs/20260613-085046-bootstrap.log
+- 2026-06-13 08:53:04 | bootstrap | exit=0 | .ai/logs/20260613-085303-bootstrap.log
+- 2026-06-13 08:53:48 | plan | exit=0 | .ai/logs/20260613-085308-plan.log
+- 2026-06-13 08:55:57 | plan | exit=0 | .ai/logs/20260613-085519-plan.log
+- 2026-06-13 09:03:26 | 💻 build | exit=0 | .ai/logs/20260613-085606-💻 build.log
+- 2026-06-13 09:04:01 | review | exit=130 | .ai/logs/20260613-090350-review.log
+- 2026-06-13 09:06:01 | review | exit=0 | .ai/logs/20260613-090412-review.log
+- 2026-06-13 09:08:32 | 🔧 fix | exit=0 | .ai/logs/20260613-090620-🔧 fix.log
+- 2026-06-13 09:09:49 | close | exit=0 | .ai/logs/20260613-090850-close.log
+- 2026-06-13 09:09:50 | sync | exit=0 | .ai/logs/20260613-090949-sync.log

@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 6 — Pembayaran
-Current Module: Daftar dan Detail Pembayaran
-Current Task: S6-T003 — Daftar dan Detail Pembayaran
+Current Module: Audit Log Pembayaran
+Current Task: S6-T004 — Audit Log Pembayaran
 
 ---
 
@@ -13,33 +13,8 @@ Current Task: S6-T003 — Daftar dan Detail Pembayaran
 ## Tujuan Sprint 6
 Membuat pencatatan pembayaran dan update status invoice.
 
-### S6-T003 — Daftar dan Detail Pembayaran
-Status: In Progress
-
-Tujuan:
-Membuat halaman daftar dan detail pembayaran.
-
-Checklist:
-- [ ] Buat halaman daftar pembayaran.
-- [ ] Buat filter tanggal.
-- [ ] Buat filter metode.
-- [ ] Buat filter POP.
-- [ ] Buat filter status.
-- [ ] Buat search pelanggan/invoice.
-- [ ] Buat detail pembayaran.
-- [ ] Tampilkan bukti pembayaran.
-
-Acceptance Criteria:
-- [ ] Pembayaran dapat difilter berdasarkan tanggal.
-- [ ] Pembayaran dapat difilter berdasarkan POP.
-- [ ] Pembayaran dapat difilter berdasarkan metode.
-- [ ] Pembayaran dapat difilter berdasarkan status.
-- [ ] Admin Cabang hanya melihat pembayaran POP yang ditugaskan.
-
----
-
 ### S6-T004 — Audit Log Pembayaran
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Mencatat perubahan pembayaran.
@@ -1333,6 +1308,35 @@ Catatan Test:
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentInputTest.php tests/Feature/PaymentModelTest.php tests/Feature/InvoiceListTest.php` lulus: 8 tests, 44 assertions.
 - `npm run build` lulus.
 - Full test suite dengan `VIEW_COMPILED_PATH` temp: 100 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pembayaran.
+
+---
+
+### S6-T003 — Daftar dan Detail Pembayaran
+Status: Done
+
+Tujuan:
+Membuat halaman daftar dan detail pembayaran.
+
+Checklist:
+- [x] Buat halaman daftar pembayaran.
+- [x] Buat filter tanggal.
+- [x] Buat filter metode.
+- [x] Buat filter POP.
+- [x] Buat filter status.
+- [x] Buat search pelanggan/invoice.
+- [x] Buat detail pembayaran.
+- [x] Tampilkan bukti pembayaran.
+
+Acceptance Criteria:
+- [x] Pembayaran dapat difilter berdasarkan tanggal.
+- [x] Pembayaran dapat difilter berdasarkan POP.
+- [x] Pembayaran dapat difilter berdasarkan metode.
+- [x] Pembayaran dapat difilter berdasarkan status.
+- [x] Admin Cabang hanya melihat pembayaran POP yang ditugaskan.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentListTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentModelTest.php tests/Feature/InvoiceListTest.php` lulus: 12 tests, 68 assertions.
+- `npm run build` lulus.
 
 ---
 

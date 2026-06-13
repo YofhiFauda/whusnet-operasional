@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Pop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,95 @@ use Illuminate\View\View;
 
 class PaymentController extends Controller
 {
+    /**
+     * Display a listing of payments with operational filters.
+     */
+    public function index(Request $request): View
+    {
+        $search = trim((string) $request->query('search', ''));
+        $popId = $request->query('pop_id', '');
+        $dateFrom = trim((string) $request->query('date_from', ''));
+        $dateTo = trim((string) $request->query('date_to', ''));
+        $method = trim((string) $request->query('method', ''));
+        $status = trim((string) $request->query('status', ''));
+        $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
+        $allowedStatuses = ['pending', 'valid', 'ditolak'];
+
+        $query = Payment::query()
+            ->forUser()
+            ->with(['invoice', 'customer', 'pop', 'receiver'])
+            ->latest('payment_date')
+            ->latest('id');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('payment_number', 'like', "%{$search}%")
+                    ->orWhereHas('invoice', function ($invoiceQuery) use ($search) {
+                        $invoiceQuery->where('invoice_number', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%")
+                            ->orWhere('cid', 'like', "%{$search}%")
+                            ->orWhere('primary_phone', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($popId !== '') {
+            $query->where('pop_id', $popId);
+        }
+
+        if ($dateFrom !== '') {
+            $query->whereDate('payment_date', '>=', $dateFrom);
+        }
+
+        if ($dateTo !== '') {
+            $query->whereDate('payment_date', '<=', $dateTo);
+        }
+
+        if ($method !== '' && in_array($method, $allowedMethods, true)) {
+            $query->where('payment_method', $method);
+        }
+
+        if ($status !== '' && in_array($status, $allowedStatuses, true)) {
+            $query->where('payment_status', $status);
+        }
+
+        $payments = $query->paginate(10)->withQueryString();
+        $pops = Pop::forUser()->orderBy('name')->get();
+
+        return view('payments.index', compact(
+            'payments',
+            'pops',
+            'search',
+            'popId',
+            'dateFrom',
+            'dateTo',
+            'method',
+            'status',
+            'allowedMethods',
+            'allowedStatuses'
+        ));
+    }
+
+    /**
+     * Display a single payment detail.
+     */
+    public function show(Payment $payment): View
+    {
+        abort_unless(
+            Payment::query()->forUser()->whereKey($payment->id)->exists(),
+            403,
+            'Anda tidak memiliki akses ke pembayaran POP ini.'
+        );
+
+        $payment->load(['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver']);
+
+        return view('payments.show', compact('payment'));
+    }
+
     /**
      * Show payment input form for an invoice.
      */

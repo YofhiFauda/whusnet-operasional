@@ -71,4 +71,28 @@ class Payment extends Model
     {
         return $this->belongsTo(User::class, 'received_by');
     }
+
+    /**
+     * Scope a query to payments from POPs accessible by the user.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param \App\Models\User|null $user
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeForUser($query, $user = null)
+    {
+        $user = $user ?? auth()->user();
+
+        if (!$user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+            return $query;
+        }
+
+        $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
+
+        return $query->whereIn('pop_id', $assignedPopIds);
+    }
 }

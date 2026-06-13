@@ -1,36 +1,32 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last synced at: 2026-06-13 08:50:47
+Last synced at: 2026-06-13 09:09:49
 
 Current Sprint: Sprint 6 — Pembayaran
-Current Module: Daftar dan Detail Pembayaran
-Current Task: S6-T003 — Daftar dan Detail Pembayaran
+Current Module: Audit Log Pembayaran
+Current Task: S6-T004 — Audit Log Pembayaran
 Status: In Progress
 
 ## Task Detail
 
-### S6-T003 — Daftar dan Detail Pembayaran
+### S6-T004 — Audit Log Pembayaran
 Status: In Progress
 
 Tujuan:
-Membuat halaman daftar dan detail pembayaran.
+Mencatat perubahan pembayaran.
 
 Checklist:
-- [ ] Buat halaman daftar pembayaran.
-- [ ] Buat filter tanggal.
-- [ ] Buat filter metode.
-- [ ] Buat filter POP.
-- [ ] Buat filter status.
-- [ ] Buat search pelanggan/invoice.
-- [ ] Buat detail pembayaran.
-- [ ] Tampilkan bukti pembayaran.
+- [ ] Catat create pembayaran.
+- [ ] Catat update pembayaran.
+- [ ] Catat pembatalan pembayaran jika ada.
+- [ ] Catat user yang melakukan perubahan.
+- [ ] Catat waktu perubahan.
+- [ ] Catat data sebelum dan sesudah.
 
 Acceptance Criteria:
-- [ ] Pembayaran dapat difilter berdasarkan tanggal.
-- [ ] Pembayaran dapat difilter berdasarkan POP.
-- [ ] Pembayaran dapat difilter berdasarkan metode.
-- [ ] Pembayaran dapat difilter berdasarkan status.
-- [ ] Admin Cabang hanya melihat pembayaran POP yang ditugaskan.
+- [ ] Perubahan pembayaran masuk audit log.
+- [ ] Owner/Admin Pusat dapat melihat log pembayaran.
+- [ ] Perubahan pembayaran tidak hilang dari riwayat.
 
 ---
