@@ -1,149 +1,15 @@
-# Current Tasks
-# Website Billing ISP Berbasis Master Data Pelanggan
-
 ## Status Project Saat Ini
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Pembayaran
-Current Task: S7-T004 — Laporan Pembayaran
+Current Module: Laporan Import Data
+Current Task: S7-T005 — Laporan Import Data (Selesai)
 
 ---
 
 # Sprint 7 — Dashboard dan Laporan
+Laporan hasil import data pelanggan lama.
+* **S7-T005 — Laporan Import Data** (Status: *Done*)
+* **S8-T001 — Data Survey Pelanggan** (Status: *Todo*)
 
-## Tujuan Sprint 7
-Membuat dashboard dan laporan operasional sederhana.
-
----
-
-### S7-T001 — Dashboard Ringkasan
-Status: Done
-
-Tujuan:
-Membuat dashboard ringkasan pelanggan dan billing.
-
-Checklist:
-- [x] Total pelanggan.
-- [x] Total pelanggan aktif.
-- [x] Total pelanggan belum lengkap.
-- [x] Total pelanggan siap billing.
-- [x] Total pelanggan per POP.
-- [x] Total tagihan bulan ini.
-- [x] Total pembayaran bulan ini.
-- [x] Total tunggakan.
-- [x] Tagihan jatuh tempo.
-- [x] Data pelanggan yang perlu dilengkapi.
-- [x] Filter POP.
-- [x] Filter periode.
-
-Acceptance Criteria:
-- [x] Owner melihat semua data.
-- [x] Admin Pusat melihat semua cabang.
-- [x] Admin Cabang hanya melihat cabangnya.
-- [x] Dashboard dapat difilter berdasarkan POP.
-- [x] Dashboard dapat difilter berdasarkan periode.
-
-Catatan Test:
-- `php artisan test --filter=DashboardTest` lulus: 8 tests, 40 assertions.
-- Menguji asersi visual, filter POP, filter periode, dan pembatasan data Admin Cabang.
-
----
-
-### S7-T002 — Laporan Pelanggan
-Status: Done
-
-Tujuan:
-Membuat laporan pelanggan.
-
-Checklist:
-- [x] Laporan pelanggan lengkap.
-- [x] Laporan pelanggan belum lengkap.
-- [x] Laporan pelanggan aktif.
-- [x] Laporan pelanggan isolir.
-- [x] Laporan pelanggan per POP.
-- [x] Filter tanggal.
-- [x] Filter POP.
-- [x] Export Excel/CSV.
-
-Acceptance Criteria:
-- [x] Laporan pelanggan dapat difilter.
-- [x] Laporan pelanggan dapat diexport.
-- [x] Admin Cabang hanya export data cabangnya.
-
-Catatan Test:
-- `php artisan test --filter=ReportCustomerTest` lulus: 6 tests, 26 assertions.
-
----
-
-### S7-T003 — Laporan Tagihan
-Status: Done
-
-Tujuan:
-Membuat laporan tagihan.
-
-Checklist:
-- [x] Laporan tagihan bulanan.
-- [x] Laporan tagihan per POP.
-- [x] Laporan tagihan per status.
-- [x] Laporan tunggakan.
-- [x] Filter tanggal.
-- [x] Filter POP.
-- [x] Export Excel/CSV.
-
-Acceptance Criteria:
-- [x] Laporan tagihan dapat difilter.
-- [x] Laporan tunggakan tersedia.
-- [x] Laporan tagihan dapat diexport.
-- [x] Admin Cabang hanya export data cabangnya.
-
-Catatan Test:
-- `php artisan test --filter=ReportInvoiceTest` lulus: 6 tests, 30 assertions.
-
----
-
-### S7-T004 — Laporan Pembayaran
-Status: Todo
-
-Tujuan:
-Membuat laporan pembayaran.
-
-Checklist:
-- [ ] Laporan pembayaran bulanan.
-- [ ] Laporan pembayaran per POP.
-- [ ] Laporan pembayaran per metode.
-- [ ] Filter tanggal.
-- [ ] Filter POP.
-- [ ] Filter metode.
-- [ ] Export Excel/CSV.
-
-Acceptance Criteria:
-- [ ] Laporan pembayaran dapat difilter.
-- [ ] Laporan pembayaran per metode tersedia.
-- [ ] Laporan pembayaran dapat diexport.
-- [ ] Admin Cabang hanya export data cabangnya.
-
----
-
-### S7-T005 — Laporan Import Data
-Status: Todo
-
-Tujuan:
-Membuat laporan hasil import data pelanggan lama.
-
-Checklist:
-- [ ] Tampilkan riwayat import.
-- [ ] Tampilkan total rows.
-- [ ] Tampilkan valid rows.
-- [ ] Tampilkan invalid rows.
-- [ ] Tampilkan imported rows.
-- [ ] Tampilkan error import.
-- [ ] Export laporan import jika dibutuhkan.
-
-Acceptance Criteria:
-- [ ] Admin dapat melihat riwayat import.
-- [ ] Admin dapat melihat data error import.
-- [ ] Admin dapat mengetahui data yang berhasil masuk.
-
----
 
 # Sprint 8 — Data Teknis Pelanggan
 
@@ -1347,6 +1213,150 @@ Catatan Test:
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentAuditLogTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/PaymentModelTest.php` lulus: 11 tests, 68 assertions.
 - `npm run build` lulus.
 - Full test suite dengan `VIEW_COMPILED_PATH` temp: 106 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul pembayaran.
+
+---
+
+
+## Tujuan Sprint 7
+Membuat dashboard dan laporan operasional sederhana.
+
+---
+
+### S7-T001 — Dashboard Ringkasan
+Status: Done
+
+Tujuan:
+Membuat dashboard ringkasan pelanggan dan billing.
+
+Checklist:
+- [x] Total pelanggan.
+- [x] Total pelanggan aktif.
+- [x] Total pelanggan belum lengkap.
+- [x] Total pelanggan siap billing.
+- [x] Total pelanggan per POP.
+- [x] Total tagihan bulan ini.
+- [x] Total pembayaran bulan ini.
+- [x] Total tunggakan.
+- [x] Tagihan jatuh tempo.
+- [x] Data pelanggan yang perlu dilengkapi.
+- [x] Filter POP.
+- [x] Filter periode.
+
+Acceptance Criteria:
+- [x] Owner melihat semua data.
+- [x] Admin Pusat melihat semua cabang.
+- [x] Admin Cabang hanya melihat cabangnya.
+- [x] Dashboard dapat difilter berdasarkan POP.
+- [x] Dashboard dapat difilter berdasarkan periode.
+
+Catatan Test:
+- `php artisan test --filter=DashboardTest` lulus: 8 tests, 40 assertions.
+- Menguji asersi visual, filter POP, filter periode, dan pembatasan data Admin Cabang.
+
+---
+
+### S7-T002 — Laporan Pelanggan
+Status: Done
+
+Tujuan:
+Membuat laporan pelanggan.
+
+Checklist:
+- [x] Laporan pelanggan lengkap.
+- [x] Laporan pelanggan belum lengkap.
+- [x] Laporan pelanggan aktif.
+- [x] Laporan pelanggan isolir.
+- [x] Laporan pelanggan per POP.
+- [x] Filter tanggal.
+- [x] Filter POP.
+- [x] Export Excel/CSV.
+
+Acceptance Criteria:
+- [x] Laporan pelanggan dapat difilter.
+- [x] Laporan pelanggan dapat diexport.
+- [x] Admin Cabang hanya export data cabangnya.
+
+Catatan Test:
+- `php artisan test --filter=ReportCustomerTest` lulus: 6 tests, 26 assertions.
+
+---
+
+### S7-T003 — Laporan Tagihan
+Status: Done
+
+Tujuan:
+Membuat laporan tagihan.
+
+Checklist:
+- [x] Laporan tagihan bulanan.
+- [x] Laporan tagihan per POP.
+- [x] Laporan tagihan per status.
+- [x] Laporan tunggakan.
+- [x] Filter tanggal.
+- [x] Filter POP.
+- [x] Export Excel/CSV.
+
+Acceptance Criteria:
+- [x] Laporan tagihan dapat difilter.
+- [x] Laporan tunggakan tersedia.
+- [x] Laporan tagihan dapat diexport.
+- [x] Admin Cabang hanya export data cabangnya.
+
+Catatan Test:
+- `php artisan test --filter=ReportInvoiceTest` lulus: 6 tests, 30 assertions.
+
+---
+
+### S7-T004 — Laporan Pembayaran
+Status: Done
+
+Tujuan:
+Membuat laporan pembayaran.
+
+Checklist:
+- [x] Laporan pembayaran bulanan.
+- [x] Laporan pembayaran per POP.
+- [x] Laporan pembayaran per metode.
+- [x] Filter tanggal.
+- [x] Filter POP.
+- [x] Filter metode.
+- [x] Export Excel/CSV.
+
+Acceptance Criteria:
+- [x] Laporan pembayaran dapat difilter.
+- [x] Laporan pembayaran per metode tersedia.
+- [x] Laporan pembayaran dapat diexport.
+- [x] Admin Cabang hanya export data cabangnya.
+
+Catatan Test:
+- `php artisan test --filter=ReportPaymentTest` lulus: 6 tests, 28 assertions.
+- Seluruh test suite `php artisan test` lulus: 129 passed, 681 assertions.
+
+---
+
+### S7-T005 — Laporan Import Data
+Status: Done
+
+Tujuan:
+Membuat laporan hasil import data pelanggan lama.
+
+Checklist:
+- [x] Tampilkan riwayat import.
+- [x] Tampilkan total rows.
+- [x] Tampilkan valid rows.
+- [x] Tampilkan invalid rows.
+- [x] Tampilkan imported rows.
+- [x] Tampilkan error import.
+- [x] Export laporan import jika dibutuhkan.
+
+Acceptance Criteria:
+- [x] Admin dapat melihat riwayat import.
+- [x] Admin dapat melihat data error import.
+- [x] Admin dapat mengetahui data yang berhasil masuk.
+
+Catatan Test:
+- `php artisan test --filter=ReportImportTest` lulus: 6 tests, 33 assertions.
+- Seluruh test suite `php artisan test` lulus (135 passed).
 
 ---
 

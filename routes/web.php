@@ -11,6 +11,7 @@ use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\InvoiceReportController;
+use App\Http\Controllers\PaymentReportController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -139,6 +140,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
     Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
     Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
+    Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
+    Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
+    Route::get('/reports/imports', [\App\Http\Controllers\ImportReportController::class, 'index'])->name('reports.imports.index');
+    Route::get('/reports/imports/{batch}', [\App\Http\Controllers\ImportReportController::class, 'show'])->name('reports.imports.show');
+    Route::get('/reports/imports/{batch}/export', [\App\Http\Controllers\ImportReportController::class, 'export'])->name('reports.imports.export');
 
     // Location APIs (used in forms)
     Route::get('/api/districts/{district}/villages', function (\App\Models\District $district) {

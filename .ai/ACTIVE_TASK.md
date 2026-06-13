@@ -1,32 +1,36 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last planned at: 2026-06-13 10:01:00
+Last planned at: 2026-06-13 10:19:00
 
-Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Pembayaran
-Current Task: S7-T004 — Laporan Pembayaran
+Current Sprint: Sprint 8 — Data Teknis Pelanggan
+Current Module: Data Survey Pelanggan
+Current Task: S8-T001 — Data Survey Pelanggan
 Status: Todo
 
 ## Task Detail
 
-### S7-T004 — Laporan Pembayaran
+### S8-T001 — Data Survey Pelanggan
 Status: Todo
 
 Tujuan:
-Membuat laporan pembayaran.
+Membuat data survey pelanggan.
 
 Checklist:
-- [ ] Laporan pembayaran bulanan.
-- [ ] Laporan pembayaran per POP.
-- [ ] Laporan pembayaran per metode.
-- [ ] Filter tanggal.
-- [ ] Filter POP.
-- [ ] Filter metode.
-- [ ] Export Excel/CSV.
+- [ ] Buat tabel `customer_surveys`.
+- [ ] Tambahkan status survey.
+- [ ] Tambahkan tanggal survey.
+- [ ] Tambahkan jam mulai.
+- [ ] Tambahkan jam selesai.
+- [ ] Tambahkan petugas survey.
+- [ ] Tambahkan kebutuhan alat.
+- [ ] Tambahkan estimasi kabel.
+- [ ] Tambahkan ODP terdekat.
+- [ ] Tambahkan foto survey.
+- [ ] Tambahkan catatan survey.
+- [ ] Tampilkan di detail pelanggan.
 
 Acceptance Criteria:
-- [ ] Laporan pembayaran dapat difilter.
-- [ ] Laporan pembayaran per metode tersedia.
-- [ ] Laporan pembayaran dapat diexport.
-- [ ] Admin Cabang hanya export data cabangnya.
+- [ ] Teknisi dapat mengisi data survey.
+- [ ] Data survey tampil di detail pelanggan.
+- [ ] User tanpa permission tidak dapat mengisi survey.
