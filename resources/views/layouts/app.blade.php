@@ -45,7 +45,7 @@
                     <span class="sidebar-text">Dashboard</span>
                 </a>
 
-                @if(auth()->user()->hasPermission('view_users') || auth()->user()->hasPermission('manage_users'))
+                @if(auth()->user()->hasPermission('view_users') || auth()->user()->hasPermission('manage_users') || auth()->user()->hasPermission('view_audit_logs'))
                 <!-- SETTINGS Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-settings', 'chevron-settings')" title="Sistem" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -56,15 +56,20 @@
                             </svg>
                             <span class="sidebar-text">SISTEM</span>
                         </span>
-                        <svg id="chevron-settings" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('users*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <svg id="chevron-settings" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('users*') || Request::is('audit-logs*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
                     <!-- Submenu -->
-                    <div id="submenu-settings" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('users*') ? '' : 'hidden' }}">
+                    <div id="submenu-settings" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('users*') || Request::is('audit-logs*') ? '' : 'hidden' }}">
                         @if(auth()->user()->hasPermission('view_users'))
                             <a href="/users" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('users*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Manajemen User & POP
+                            </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('view_audit_logs'))
+                            <a href="{{ route('audit-logs.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('audit-logs*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Audit Log
                             </a>
                         @endif
                     </div>

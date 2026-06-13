@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +28,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CustomerDevice extends Model
 {
+    use RecordsAuditLogs;
+
+    protected string $auditModule = 'Data Teknis';
+
+    protected array $auditEvents = ['created', 'updated', 'deleted'];
+
+    protected array $auditHidden = [
+        'pppoe_password',
+        'wifi_password',
+    ];
+
     protected function casts(): array
     {
         return [

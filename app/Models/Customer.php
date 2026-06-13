@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use App\Services\CustomerValidationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +52,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Customer extends Model
 {
+    use RecordsAuditLogs;
+
+    protected string $auditModule = 'Data Pelanggan';
+
+    protected array $auditHidden = [
+        'foto_ktp',
+        'foto_rumah',
+        'foto_kontrak',
+    ];
+
     /**
      * @return array<string, string>
      */

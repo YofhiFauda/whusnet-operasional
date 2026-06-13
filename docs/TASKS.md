@@ -1,122 +1,11 @@
 ## Status Project Saat Ini
 Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Audit Log Umum
-Current Task: S8-T005 — Audit Log Umum
-
----
-
-
-
-# Sprint 8 — Data Teknis Pelanggan
-
-## Tujuan Sprint 8
-Melengkapi data teknis pelanggan setelah billing dasar stabil.
-
----
-
-
-### S8-T003 — Data Modem/ONT/Router Pelanggan
-Status: Done
-Sprint: 8
-Selesai: 2026-06-13
-
-Tujuan:
-Membuat data perangkat pelanggan.
-
-Checklist:
-- [x] Buat tabel `customer_devices`.
-- [x] Tambahkan jenis perangkat.
-- [x] Tambahkan merk.
-- [x] Tambahkan tipe.
-- [x] Tambahkan serial number.
-- [x] Tambahkan MAC address.
-- [x] Tambahkan username PPPoE.
-- [x] Tambahkan password PPPoE.
-- [x] Tambahkan SSID WiFi.
-- [x] Tambahkan password WiFi.
-- [x] Tambahkan IP address.
-- [x] Tambahkan VLAN ID.
-- [x] Tambahkan ODP.
-- [x] Tambahkan port ODP.
-- [x] Tambahkan redaman.
-- [x] Tambahkan mode koneksi.
-- [x] Tambahkan catatan teknis.
-- [x] Batasi akses field sensitif.
-
-Acceptance Criteria:
-- [x] Teknisi dapat mengisi data perangkat.
-- [x] Data perangkat tampil di detail pelanggan.
-- [x] Password PPPoE dan WiFi dibatasi aksesnya.
-- [x] Finance tidak dapat mengubah data modem.
-- [x] CS tidak dapat melihat field sensitif jika tidak diizinkan.
-
-Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/PermissionTest.php` lulus: 7 tests, 52 assertions.
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerDetailTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php` lulus: 11 tests, 61 assertions.
-- `npm run build` lulus.
-- Full test suite dengan `VIEW_COMPILED_PATH` temp: 143 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul perangkat.
-
----
-
-### S8-T005 — Audit Log Umum
-Status: In Progress
-
-Tujuan:
-Membuat audit log untuk perubahan data penting.
-
-Checklist:
-- [ ] Buat tabel `audit_logs`.
-- [ ] Catat perubahan pelanggan.
-- [ ] Catat perubahan paket.
-- [ ] Catat perubahan POP.
-- [ ] Catat perubahan tagihan.
-- [ ] Catat perubahan pembayaran.
-- [ ] Catat perubahan user.
-- [ ] Catat perubahan role.
-- [ ] Catat perubahan data teknis.
-- [ ] Buat halaman audit log untuk Owner/Admin Pusat.
-
-Acceptance Criteria:
-- [ ] Perubahan pelanggan tercatat.
-- [ ] Perubahan pembayaran tercatat.
-- [ ] Perubahan tagihan tercatat.
-- [ ] Perubahan role tercatat.
-- [ ] Owner/Admin Pusat dapat melihat audit log.
+Current Module: Tidak ada task aktif
+Current Task: Tidak ada task In Progress
 
 ---
 
 ## Done
-
-### S8-T004 — Data Dokumen Pelanggan
-Status: Done
-Sprint: 8
-Selesai: 2026-06-13
-
-Tujuan:
-Membuat penyimpanan dokumen pelanggan.
-
-Checklist:
-- [x] Buat tabel `customer_documents`.
-- [x] Upload dokumen KTP.
-- [x] Upload foto rumah.
-- [x] Upload kontrak.
-- [x] Upload foto survey.
-- [x] Upload foto pemasangan.
-- [x] Tampilkan dokumen di detail pelanggan.
-- [x] Batasi akses dokumen berdasarkan permission.
-
-Acceptance Criteria:
-- [x] Dokumen pelanggan dapat diupload.
-- [x] Dokumen tampil di detail pelanggan.
-- [x] User tanpa permission tidak dapat mengakses dokumen tertentu.
-
-Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDocumentTest.php tests/Feature/CustomerDetailTest.php` lulus: 6 tests, 38 assertions.
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PermissionTest.php tests/Feature/RolePermissionTest.php tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDocumentTest.php` lulus: 23 tests, 108 assertions.
-- `npm run build` lulus.
-- Full test suite dengan `VIEW_COMPILED_PATH` temp: 148 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen legacy pelanggan, bukan modul `customer_documents`.
-
----
 
 ## Sprint 1 - Foundation
 
@@ -1390,6 +1279,117 @@ Catatan Test:
 
 ---
 
+
+### S8-T003 — Data Modem/ONT/Router Pelanggan
+Status: Done
+Sprint: 8
+Selesai: 2026-06-13
+
+Tujuan:
+Membuat data perangkat pelanggan.
+
+Checklist:
+- [x] Buat tabel `customer_devices`.
+- [x] Tambahkan jenis perangkat.
+- [x] Tambahkan merk.
+- [x] Tambahkan tipe.
+- [x] Tambahkan serial number.
+- [x] Tambahkan MAC address.
+- [x] Tambahkan username PPPoE.
+- [x] Tambahkan password PPPoE.
+- [x] Tambahkan SSID WiFi.
+- [x] Tambahkan password WiFi.
+- [x] Tambahkan IP address.
+- [x] Tambahkan VLAN ID.
+- [x] Tambahkan ODP.
+- [x] Tambahkan port ODP.
+- [x] Tambahkan redaman.
+- [x] Tambahkan mode koneksi.
+- [x] Tambahkan catatan teknis.
+- [x] Batasi akses field sensitif.
+
+Acceptance Criteria:
+- [x] Teknisi dapat mengisi data perangkat.
+- [x] Data perangkat tampil di detail pelanggan.
+- [x] Password PPPoE dan WiFi dibatasi aksesnya.
+- [x] Finance tidak dapat mengubah data modem.
+- [x] CS tidak dapat melihat field sensitif jika tidak diizinkan.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/PermissionTest.php` lulus: 7 tests, 52 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerDetailTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php` lulus: 11 tests, 61 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 143 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul perangkat.
+
+---
+
+
+### S8-T004 — Data Dokumen Pelanggan
+Status: Done
+Sprint: 8
+Selesai: 2026-06-13
+
+Tujuan:
+Membuat penyimpanan dokumen pelanggan.
+
+Checklist:
+- [x] Buat tabel `customer_documents`.
+- [x] Upload dokumen KTP.
+- [x] Upload foto rumah.
+- [x] Upload kontrak.
+- [x] Upload foto survey.
+- [x] Upload foto pemasangan.
+- [x] Tampilkan dokumen di detail pelanggan.
+- [x] Batasi akses dokumen berdasarkan permission.
+
+Acceptance Criteria:
+- [x] Dokumen pelanggan dapat diupload.
+- [x] Dokumen tampil di detail pelanggan.
+- [x] User tanpa permission tidak dapat mengakses dokumen tertentu.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDocumentTest.php tests/Feature/CustomerDetailTest.php` lulus: 6 tests, 38 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PermissionTest.php tests/Feature/RolePermissionTest.php tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDocumentTest.php` lulus: 23 tests, 108 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 148 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen legacy pelanggan, bukan modul `customer_documents`.
+
+---
+
+
+### S8-T005 — Audit Log Umum
+Status: Done
+Sprint: 8
+Selesai: 2026-06-13
+
+Tujuan:
+Membuat audit log untuk perubahan data penting.
+
+Checklist:
+- [x] Buat tabel `audit_logs`.
+- [x] Catat perubahan pelanggan.
+- [x] Catat perubahan paket.
+- [x] Catat perubahan POP.
+- [x] Catat perubahan tagihan.
+- [x] Catat perubahan pembayaran.
+- [x] Catat perubahan user.
+- [x] Catat perubahan role.
+- [x] Catat perubahan data teknis.
+- [x] Buat halaman audit log untuk Owner/Admin Pusat.
+
+Acceptance Criteria:
+- [x] Perubahan pelanggan tercatat.
+- [x] Perubahan pembayaran tercatat.
+- [x] Perubahan tagihan tercatat.
+- [x] Perubahan role tercatat.
+- [x] Owner/Admin Pusat dapat melihat audit log.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/AuditLogGeneralTest.php tests/Feature/CustomerActivationTest.php tests/Feature/PaymentAuditLogTest.php` lulus: 9 tests, 60 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerCreateTest.php tests/Feature/CustomerActivationTest.php tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/InvoiceListTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/PaymentAuditLogTest.php tests/Feature/PermissionTest.php tests/Feature/RolePermissionTest.php tests/Feature/PopCRUDTest.php tests/Feature/PopIdentifierSettingTest.php tests/Feature/InternetPackageSeederTest.php tests/Feature/AuditLogGeneralTest.php` lulus: 62 tests, 335 assertions.
+- `npm run build` lulus.
+- Regresi yang menyertakan `CustomerEditTest.php` masih memiliki 2 kegagalan legacy pada cleanup file dokumen pelanggan, sesuai catatan task sebelumnya, bukan dari modul audit log.
+
+---
 
 
 ## Blocked

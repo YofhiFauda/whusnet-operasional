@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
+    use RecordsAuditLogs;
+
+    protected string $auditModule = 'Tagihan';
+
+    protected array $auditEvents = ['updated', 'deleted'];
+
     protected $fillable = [
         'invoice_number',
         'customer_id',

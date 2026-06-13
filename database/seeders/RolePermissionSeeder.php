@@ -49,7 +49,6 @@ class RolePermissionSeeder extends Seeder
                 'view_customer_documents',
                 'upload_customer_documents',
                 'view_reports_own_pop',
-                'view_audit_logs',
             ];
             $permissionIds = Permission::whereIn('name', $adminCabangPermissions)->pluck('id');
             $adminCabangRole->permissions()->sync($permissionIds);

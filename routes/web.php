@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
@@ -79,6 +80,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view_payments')->group(function () {
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    });
+
+    Route::middleware('permission:view_audit_logs')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     });
 
     Route::middleware('permission:create_payments')->group(function () {

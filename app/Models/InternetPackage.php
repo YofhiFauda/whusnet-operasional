@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -33,6 +34,10 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class InternetPackage extends Model
 {
+    use RecordsAuditLogs;
+
+    protected string $auditModule = 'Master Paket';
+
     public const CATEGORIES = [
         'Paket Home Broadband' => 'Paket Home Broadband',
         'Paket Bisnis Broadband' => 'Paket Bisnis Broadband',

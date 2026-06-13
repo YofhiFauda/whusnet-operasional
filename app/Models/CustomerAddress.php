@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CustomerAddress extends Model
 {
+    use RecordsAuditLogs;
+
+    protected string $auditModule = 'Data Pelanggan';
+
+    protected array $auditHidden = [
+        'house_photo',
+        'ktp_photo',
+        'contract_photo',
+    ];
+
     /**
      * @return BelongsTo<Customer, $this>
      */
