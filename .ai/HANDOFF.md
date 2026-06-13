@@ -1,23 +1,23 @@
 # Handoff
 
-Generated at: 2026-06-13 09:54:00
+Generated at: 2026-06-13 10:01:00
 
 ## Log Pekerjaan Terakhir
-1.  **S7-T002 — Laporan Pelanggan (Selesai)**:
-    *   Membuat `CustomerReportController` yang mendukung visualisasi data dan export stream CSV.
-    *   Mendaftarkan route laporan pelanggan di `routes/web.php` dan dilindungi grup `auth`.
-    *   Menambahkan dropdown menu **LAPORAN** dan submenu **Laporan Pelanggan** di sidebar `app.blade.php`.
-    *   Membuat view `reports/customers/index.blade.php` dengan filter (POP, Kelengkapan, Status, Tanggal) dan visualisasi badge premium.
-    *   Menulis feature test `ReportCustomerTest.php` untuk memvalidasi filter, otentikasi, otorisasi RBAC, batasan data POP, serta validasi data export.
-    *   Menjalankan seluruh unit test (`117 passed`, `623 assertions`). Semua test hijau/lulus.
+1. **S7-T003 — Laporan Tagihan (Selesai)**:
+   - Membuat `InvoiceReportController` yang memproses filter-filter tagihan secara dinamis (`pop_id`, `billing_period`, `status`, `start_date`, `end_date`, `show_tunggakan`), menghitung ringkasan agregat, dan stream eksport CSV ber-BOM UTF-8.
+   - Melindungi data POP menggunakan query scoping `Invoice::forUser()` sehingga role Admin Cabang terikat pada batas POP yang di-assign.
+   - Menambahkan submenu **Laporan Tagihan** di bawah dropdown menu **LAPORAN** pada sidebar `layouts.app`.
+   - Membuat halaman view blade `reports/invoices/index.blade.php` dengan grid metrik agregat dan tabel data tagihan premium.
+   - Membuat file unit test `tests/Feature/ReportInvoiceTest.php` untuk memvalidasi seluruh fungsionalitas laporan tagihan.
+   - Menjalankan seluruh test suite dan semuanya lulus (`123 passed`, `653 assertions`).
 
 ## Posisi Project Saat Ini
-*   **Sprint Aktif**: Sprint 7 — Dashboard dan Laporan.
-*   **Task Aktif**: `S7-T003 — Laporan Tagihan` (Status: *In Progress*).
+* **Sprint Aktif**: Sprint 7 — Dashboard dan Laporan.
+* **Task Aktif**: `S7-T004 — Laporan Pembayaran` (Status: *Todo*).
 
 ## Langkah Berikutnya untuk Codex/AI Selanjutnya
-*   Memulai pengerjaan **S7-T003 — Laporan Tagihan**.
-*   Membuat `InvoiceReportController` (atau menggabungkannya ke controller laporan umum).
-*   Menambahkan link submenu **Laporan Tagihan** di bawah dropdown menu **LAPORAN** pada sidebar.
-*   Membuat view `reports/invoices/index.blade.php` dengan filter (Periode tagihan, POP, status invoice, dan nominal tunggakan jika relevan).
-*   Menulis unit test feature baru untuk memvalidasi filter laporan tagihan, export CSV tagihan, serta pembatasan hak akses POP bagi Admin Cabang.
+* Memulai pengerjaan **S7-T004 — Laporan Pembayaran**.
+* Membuat `PaymentReportController` (atau digabung ke controller laporan).
+* Menambahkan link submenu **Laporan Pembayaran** di sidebar `layouts.app` di bawah **Laporan Tagihan**.
+* Membuat view `reports/payments/index.blade.php` dengan filter (POP, Tanggal, Metode Pembayaran).
+* Menulis unit test feature `ReportPaymentTest.php` untuk memvalidasi filter, ekspor CSV pembayaran, dan pembatasan hak akses POP bagi Admin Cabang.

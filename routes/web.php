@@ -10,6 +10,7 @@ use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\CustomerReportController;
+use App\Http\Controllers\InvoiceReportController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -136,6 +137,8 @@ Route::middleware('auth')->group(function () {
     // Reports Management
     Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
     Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
+    Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
+    Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
 
     // Location APIs (used in forms)
     Route::get('/api/districts/{district}/villages', function (\App\Models\District $district) {

@@ -145,6 +145,9 @@
                         <a href="{{ route('reports.customers.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/customers*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                             Laporan Pelanggan
                         </a>
+                        <a href="{{ route('reports.invoices.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/invoices*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Laporan Tagihan
+                        </a>
                     </div>
                 </div>
                 @endif

@@ -31,7 +31,7 @@ class CustomerReportController extends Controller
         $endDate = $request->query('end_date', '');
 
         // POP yang bisa diakses user
-        $pops = Pop::query()->forUser()->orderBy('name')->get();
+        $pops = Pop::forUser()->orderBy('name')->get();
         $allowedPopIds = $pops->pluck('id')->toArray();
 
         // Jika user memfilter POP tertentu, pastikan POP itu ada di dalam POP yang diizinkan untuknya
@@ -104,7 +104,7 @@ class CustomerReportController extends Controller
         $endDate = $request->query('end_date', '');
 
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user ini
-        $allowedPopIds = Pop::query()->forUser()->pluck('id')->toArray();
+        $allowedPopIds = Pop::forUser()->pluck('id')->toArray();
         if ($popId !== '') {
             if (!in_array((int)$popId, $allowedPopIds)) {
                 abort(403, 'Unauthorized action.');

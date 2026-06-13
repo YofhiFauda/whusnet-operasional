@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Tagihan
-Current Task: S7-T003 — Laporan Tagihan
+Current Module: Laporan Pembayaran
+Current Task: S7-T004 — Laporan Pembayaran
 
 ---
 
@@ -75,25 +75,28 @@ Catatan Test:
 ---
 
 ### S7-T003 — Laporan Tagihan
-Status: In Progress
+Status: Done
 
 Tujuan:
 Membuat laporan tagihan.
 
 Checklist:
-- [ ] Laporan tagihan bulanan.
-- [ ] Laporan tagihan per POP.
-- [ ] Laporan tagihan per status.
-- [ ] Laporan tunggakan.
-- [ ] Filter tanggal.
-- [ ] Filter POP.
-- [ ] Export Excel/CSV.
+- [x] Laporan tagihan bulanan.
+- [x] Laporan tagihan per POP.
+- [x] Laporan tagihan per status.
+- [x] Laporan tunggakan.
+- [x] Filter tanggal.
+- [x] Filter POP.
+- [x] Export Excel/CSV.
 
 Acceptance Criteria:
-- [ ] Laporan tagihan dapat difilter.
-- [ ] Laporan tunggakan tersedia.
-- [ ] Laporan tagihan dapat diexport.
-- [ ] Admin Cabang hanya export data cabangnya.
+- [x] Laporan tagihan dapat difilter.
+- [x] Laporan tunggakan tersedia.
+- [x] Laporan tagihan dapat diexport.
+- [x] Admin Cabang hanya export data cabangnya.
+
+Catatan Test:
+- `php artisan test --filter=ReportInvoiceTest` lulus: 6 tests, 30 assertions.
 
 ---
 

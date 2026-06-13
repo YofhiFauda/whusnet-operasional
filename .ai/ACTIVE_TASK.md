@@ -1,32 +1,32 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last planned at: 2026-06-13 09:54:00
+Last planned at: 2026-06-13 10:01:00
 
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Tagihan
-Current Task: S7-T003 — Laporan Tagihan
-Status: In Progress
+Current Module: Laporan Pembayaran
+Current Task: S7-T004 — Laporan Pembayaran
+Status: Todo
 
 ## Task Detail
 
-### S7-T003 — Laporan Tagihan
-Status: In Progress
+### S7-T004 — Laporan Pembayaran
+Status: Todo
 
 Tujuan:
-Membuat laporan tagihan.
+Membuat laporan pembayaran.
 
 Checklist:
-- [ ] Laporan tagihan bulanan.
-- [ ] Laporan tagihan per POP.
-- [ ] Laporan tagihan per status.
-- [ ] Laporan tunggakan.
+- [ ] Laporan pembayaran bulanan.
+- [ ] Laporan pembayaran per POP.
+- [ ] Laporan pembayaran per metode.
 - [ ] Filter tanggal.
 - [ ] Filter POP.
+- [ ] Filter metode.
 - [ ] Export Excel/CSV.
 
 Acceptance Criteria:
-- [ ] Laporan tagihan dapat difilter.
-- [ ] Laporan tunggakan tersedia.
-- [ ] Laporan tagihan dapat diexport.
+- [ ] Laporan pembayaran dapat difilter.
+- [ ] Laporan pembayaran per metode tersedia.
+- [ ] Laporan pembayaran dapat diexport.
 - [ ] Admin Cabang hanya export data cabangnya.
