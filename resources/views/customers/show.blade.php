@@ -202,6 +202,7 @@
             <button onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Identitas</button>
             <button onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Alamat</button>
             <button onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">POP/Cabang</button>
+            <button onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Survey</button>
             <button onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Paket & Layanan</button>
             <button onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Billing</button>
             <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Tagihan</button>
@@ -480,6 +481,11 @@
                     </div>
                     @endif
                 </div>
+            </div>
+
+            <!-- Tab: Survey -->
+            <div id="tab-content-survey" class="tab-content hidden space-y-6">
+                @include('customers.tabs._survey')
             </div>
 
             <!-- Tab 5: Paket & Layanan -->
@@ -1003,6 +1009,20 @@
 
     function closeInvoiceModal() {
         const modal = document.getElementById('manual-invoice-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function openSurveyModal() {
+        const modal = document.getElementById('survey-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function closeSurveyModal() {
+        const modal = document.getElementById('survey-modal');
         if (modal) {
             modal.classList.add('hidden');
         }

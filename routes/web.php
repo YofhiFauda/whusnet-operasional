@@ -135,6 +135,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/paket/{paket}/toggle', [InternetPackageController::class, 'toggleStatus'])->name('master.paket.toggle');
     });
 
+    Route::middleware('permission:fill_survey')->group(function () {
+        Route::post('/customers/{customer}/survey', [\App\Http\Controllers\CustomerSurveyController::class, 'store'])->name('customers.survey.store');
+    });
+
     // Reports Management
     Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
     Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');

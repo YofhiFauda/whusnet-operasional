@@ -158,6 +158,24 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerSurvey, $this>
+     */
+    public function surveys(): HasMany
+    {
+        return $this->hasMany(CustomerSurvey::class);
+    }
+
+    /**
+     * Get the latest survey.
+     * 
+     * @return HasOne<CustomerSurvey, $this>
+     */
+    public function latestSurvey(): HasOne
+    {
+        return $this->hasOne(CustomerSurvey::class)->latestOfMany();
+    }
+
+    /**
      * Auto-update data_completeness_status whenever the model is saved.
      * Uses CustomerValidationService to derive the correct status.
      */
