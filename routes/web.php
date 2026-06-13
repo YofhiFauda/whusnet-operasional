@@ -9,6 +9,7 @@ use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\PopController;
+use App\Http\Controllers\CustomerReportController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -131,6 +132,10 @@ Route::middleware('auth')->group(function () {
         Route::put('/master/paket/{paket}', [InternetPackageController::class, 'update'])->name('master.paket.update');
         Route::post('/master/paket/{paket}/toggle', [InternetPackageController::class, 'toggleStatus'])->name('master.paket.toggle');
     });
+
+    // Reports Management
+    Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
+    Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
 
     // Location APIs (used in forms)
     Route::get('/api/districts/{district}/villages', function (\App\Models\District $district) {

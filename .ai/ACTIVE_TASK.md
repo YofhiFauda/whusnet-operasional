@@ -1,40 +1,32 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last planned at: 2026-06-13 09:40:10
+Last planned at: 2026-06-13 09:54:00
 
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Dashboard Ringkasan
-Current Task: S7-T001 — Dashboard Ringkasan
+Current Module: Laporan Tagihan
+Current Task: S7-T003 — Laporan Tagihan
 Status: In Progress
 
 ## Task Detail
 
-### S7-T001 — Dashboard Ringkasan
+### S7-T003 — Laporan Tagihan
 Status: In Progress
 
 Tujuan:
-Membuat dashboard ringkasan pelanggan dan billing.
+Membuat laporan tagihan.
 
 Checklist:
-- [ ] Total pelanggan.
-- [ ] Total pelanggan aktif.
-- [ ] Total pelanggan belum lengkap.
-- [ ] Total pelanggan siap billing.
-- [ ] Total pelanggan per POP.
-- [ ] Total tagihan bulan ini.
-- [ ] Total pembayaran bulan ini.
-- [ ] Total tunggakan.
-- [ ] Tagihan jatuh tempo.
-- [ ] Data pelanggan yang perlu dilengkapi.
+- [ ] Laporan tagihan bulanan.
+- [ ] Laporan tagihan per POP.
+- [ ] Laporan tagihan per status.
+- [ ] Laporan tunggakan.
+- [ ] Filter tanggal.
 - [ ] Filter POP.
-- [ ] Filter periode.
+- [ ] Export Excel/CSV.
 
 Acceptance Criteria:
-- [ ] Owner melihat semua data.
-- [ ] Admin Pusat melihat semua cabang.
-- [ ] Admin Cabang hanya melihat cabangnya.
-- [ ] Dashboard dapat difilter berdasarkan POP.
-- [ ] Dashboard dapat difilter berdasarkan periode.
-
----
+- [ ] Laporan tagihan dapat difilter.
+- [ ] Laporan tunggakan tersedia.
+- [ ] Laporan tagihan dapat diexport.
+- [ ] Admin Cabang hanya export data cabangnya.

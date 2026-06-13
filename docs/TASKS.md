@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Pelanggan
-Current Task: S7-T002 — Laporan Pelanggan
+Current Module: Laporan Tagihan
+Current Task: S7-T003 — Laporan Tagihan
 
 ---
 
@@ -49,30 +49,33 @@ Catatan Test:
 ---
 
 ### S7-T002 — Laporan Pelanggan
-Status: In Progress
+Status: Done
 
 Tujuan:
 Membuat laporan pelanggan.
 
 Checklist:
-- [ ] Laporan pelanggan lengkap.
-- [ ] Laporan pelanggan belum lengkap.
-- [ ] Laporan pelanggan aktif.
-- [ ] Laporan pelanggan isolir.
-- [ ] Laporan pelanggan per POP.
-- [ ] Filter tanggal.
-- [ ] Filter POP.
-- [ ] Export Excel/CSV.
+- [x] Laporan pelanggan lengkap.
+- [x] Laporan pelanggan belum lengkap.
+- [x] Laporan pelanggan aktif.
+- [x] Laporan pelanggan isolir.
+- [x] Laporan pelanggan per POP.
+- [x] Filter tanggal.
+- [x] Filter POP.
+- [x] Export Excel/CSV.
 
 Acceptance Criteria:
-- [ ] Laporan pelanggan dapat difilter.
-- [ ] Laporan pelanggan dapat diexport.
-- [ ] Admin Cabang hanya export data cabangnya.
+- [x] Laporan pelanggan dapat difilter.
+- [x] Laporan pelanggan dapat diexport.
+- [x] Admin Cabang hanya export data cabangnya.
+
+Catatan Test:
+- `php artisan test --filter=ReportCustomerTest` lulus: 6 tests, 26 assertions.
 
 ---
 
 ### S7-T003 — Laporan Tagihan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat laporan tagihan.

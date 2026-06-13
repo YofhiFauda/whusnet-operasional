@@ -126,6 +126,29 @@
                 </a>
                 @endif
 
+                @if(auth()->user()->hasPermission('view_reports_all') || auth()->user()->hasPermission('view_reports_own_pop'))
+                <!-- LAPORAN Dropdown -->
+                <div>
+                    <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')" title="Laporan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="sidebar-text">LAPORAN</span>
+                        </span>
+                        <svg id="chevron-laporan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('reports*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <!-- Submenu -->
+                    <div id="submenu-laporan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('reports*') ? '' : 'hidden' }}">
+                        <a href="{{ route('reports.customers.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/customers*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Laporan Pelanggan
+                        </a>
+                    </div>
+                </div>
+                @endif
+
                 @if(auth()->user()->hasPermission('view_pop') || auth()->user()->hasPermission('view_packages'))
                 <!-- Master Data Dropdown -->
                 <div>
