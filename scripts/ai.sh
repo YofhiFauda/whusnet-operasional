@@ -18,12 +18,51 @@ ensure_ai_dir() {
   mkdir -p "$LOG_DIR"
 }
 
+current_task_value() {
+  local key="$1"
+  sed -n "s/^$key:[[:space:]]*//p" docs/TASKS.md | head -n 1
+}
+
+current_task_block() {
+  local task="$1"
+
+  awk -v task="$task" '
+    $0 == "### " task { in_task = 1 }
+    in_task { print }
+    in_task && /^---$/ { exit }
+  ' docs/TASKS.md
+}
+
 write_if_missing() {
   local file="$1"
   local content="$2"
 
   if [ ! -s "$file" ]; then
     printf "%s\n" "$content" > "$file"
+  fi
+}
+
+confirm_external_agent() {
+  local tool="$1"
+  local phase="$2"
+
+  if [ "${AI_ALLOW_EXTERNAL:-}" = "1" ]; then
+    return 0
+  fi
+
+  echo "Mode '$phase' akan menjalankan agent eksternal: $tool."
+  echo "Mode ini dapat mengubah file context .ai/* dan menulis log baru."
+
+  if [ ! -t 0 ]; then
+    echo "ERROR: Jalankan dari terminal interaktif atau set AI_ALLOW_EXTERNAL=1 jika memang ingin lanjut." >&2
+    return 1
+  fi
+
+  read -rp "Lanjut? (y/n): " confirm
+
+  if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+    echo "Dibatalkan."
+    return 1
   fi
 }
 
@@ -68,31 +107,7 @@ append_log_index() {
 bootstrap_ai_context() {
   ensure_ai_dir
 
-  write_if_missing "$AI_DIR/ACTIVE_TASK.md" "# Active Task
-
-Source of truth: docs/TASKS.md
-
-Current Sprint: Sprint 5 - Billing Dasar
-Current Module: Buat Tagihan Manual
-Current Task: S5-T003 - Buat Tagihan Manual
-Status: In Progress
-"
-
-  write_if_missing "$AI_DIR/SESSION_STATE.md" "# Session State
-
-Last updated: $(now)
-
-Workflow phase: Bootstrap
-Context source: docs/TASKS.md
-Rule: Work only on the active task in docs/TASKS.md.
-"
-
-  write_if_missing "$AI_DIR/HANDOFF.md" "# Handoff
-
-Run FASE 1 - Gemini Plan / Scope Reader before coding.
-
-The builder must work only on the active task in docs/TASKS.md and follow AGENTS.md.
-"
+  sync_ai_context
 
   write_if_missing "$AI_DIR/DECISIONS.md" "# Decisions
 
@@ -122,8 +137,125 @@ Review notes from Gemini/Codex workflow will be written here.
 - $LOG_DIR/
 
 ## Catatan
-File yang sudah berisi data tidak dioverwrite.
+File context task disinkronkan dari docs/TASKS.md.
+File pendukung yang sudah berisi data tidak dioverwrite.
 EOF
+}
+
+sync_ai_context() {
+  ensure_ai_dir
+
+  local current_sprint
+  local current_module
+  local current_task
+  local task_block
+
+  current_sprint="$(current_task_value "Current Sprint")"
+  current_module="$(current_task_value "Current Module")"
+  current_task="$(current_task_value "Current Task")"
+
+  if [ -z "$current_sprint" ] || [ -z "$current_module" ] || [ -z "$current_task" ]; then
+    echo "ERROR: Current Sprint/Module/Task tidak lengkap di docs/TASKS.md." >&2
+    return 1
+  fi
+
+  task_block="$(current_task_block "$current_task")"
+
+  if [ -z "$task_block" ]; then
+    echo "ERROR: Detail task '$current_task' tidak ditemukan di docs/TASKS.md." >&2
+    return 1
+  fi
+
+  cat > "$AI_DIR/ACTIVE_TASK.md" << EOF
+# Active Task
+
+Source of truth: docs/TASKS.md
+Last synced at: $(now)
+
+Current Sprint: $current_sprint
+Current Module: $current_module
+Current Task: $current_task
+Status: In Progress
+
+## Task Detail
+
+$task_block
+EOF
+
+  cat > "$AI_DIR/HANDOFF.md" << EOF
+# Handoff
+
+## Dari Agent
+Local sync script
+
+## Untuk Agent
+Agent berikutnya wajib membaca docs/TASKS.md dan .ai/ACTIVE_TASK.md sebelum bekerja.
+
+## Task Aktif
+$current_task
+
+## Ringkasan Scope
+Ikuti task aktif di docs/TASKS.md. Jangan mengerjakan task lain atau modul sprint berikutnya.
+
+## Scope yang Boleh Dikerjakan
+Modul: $current_module
+
+## Scope yang Tidak Boleh Dikerjakan
+Semua fitur di luar task aktif, fitur post-MVP, dan modul sprint berikutnya.
+
+## File yang Boleh Diubah
+Hanya file yang relevan dengan task aktif setelah scope check.
+
+## File yang Tidak Boleh Disentuh
+File yang tidak terkait task aktif.
+
+## Acceptance Criteria
+Lihat checklist dan acceptance criteria di .ai/ACTIVE_TASK.md.
+
+## Instruksi untuk Agent Berikutnya
+Jalankan scope check sebelum coding. Gunakan docs/TASKS.md sebagai source of truth.
+
+## Catatan Risiko
+Context ini dibuat lokal tanpa memanggil gemini/codex.
+EOF
+
+  cat > "$AI_DIR/SESSION_STATE.md" << EOF
+# Session State
+
+## Status Project Saat Ini
+Context .ai disinkronkan dari docs/TASKS.md.
+
+## Last Updated
+$(now)
+
+## Workflow Phase
+Local Sync
+
+## Agent Terakhir
+scripts/ai.sh sync
+
+## Pekerjaan Terakhir
+Sinkronisasi file .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, dan .ai/SESSION_STATE.md dari docs/TASKS.md.
+
+## File yang Terakhir Dibaca
+- docs/TASKS.md
+
+## File yang Terakhir Diubah
+- .ai/ACTIVE_TASK.md
+- .ai/HANDOFF.md
+- .ai/SESSION_STATE.md
+
+## Status Task
+$current_task masih In Progress sesuai docs/TASKS.md.
+
+## Catatan untuk Agent Berikutnya
+Jangan percaya log lama sebagai source of truth. Gunakan docs/TASKS.md dan .ai/ACTIVE_TASK.md hasil sync terbaru.
+EOF
+
+  echo "Context .ai berhasil disinkronkan dari docs/TASKS.md."
+  echo "Current Sprint : $current_sprint"
+  echo "Current Module : $current_module"
+  echo "Current Task   : $current_task"
 }
 
 run_bootstrap_logged() {
@@ -149,12 +281,35 @@ run_bootstrap_logged() {
   return "$exit_code"
 }
 
+run_sync_logged() {
+  ensure_ai_dir
+
+  local log_file="$LOG_DIR/$(stamp)-sync.log"
+  phase_header "Sinkronisasi .ai dari docs/TASKS.md" "$log_file" | tee "$log_file"
+
+  echo "[1/3] Membaca Current Sprint/Module/Task dari docs/TASKS.md" | tee -a "$log_file"
+  echo "[2/3] Menulis ulang .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, dan .ai/SESSION_STATE.md" | tee -a "$log_file"
+  echo "[3/3] Menjadikan log sync sebagai latest.log agar log lama tidak menyesatkan" | tee -a "$log_file"
+  echo "--------------------------------------" | tee -a "$log_file"
+
+  set +e
+  sync_ai_context 2>&1 | tee -a "$log_file"
+  local exit_code=${PIPESTATUS[0]}
+  set -e
+
+  phase_footer "$exit_code" "$log_file" | tee -a "$log_file"
+  append_log_index "sync" "$log_file" "$exit_code"
+
+  return "$exit_code"
+}
+
 run_gemini_to_file() {
   local label="$1"
   local phase="$2"
   local output_file="$3"
   local prompt="$4"
 
+  confirm_external_agent "gemini" "$phase"
   ensure_ai_dir
 
   local log_file="$LOG_DIR/$(stamp)-$phase.log"
@@ -196,6 +351,7 @@ run_codex_logged() {
   local phase="$1"
   local prompt="$2"
 
+  confirm_external_agent "codex" "$phase"
   ensure_ai_dir
 
   local log_file="$LOG_DIR/$(stamp)-$phase.log"
@@ -407,6 +563,10 @@ case "$MODE" in
     run_bootstrap_logged
     ;;
 
+  sync)
+    run_sync_logged
+    ;;
+
   plan)
     run_gemini_to_file "Menjalankan Gemini: Planner / Scope Reader" "plan" "$AI_DIR/HANDOFF.md" "$PROMPT_PLAN"
     {
@@ -457,6 +617,8 @@ case "$MODE" in
       echo "Latest close recommendation: $AI_DIR/HANDOFF.md"
       echo "Latest log: $LOG_DIR/latest.log"
     } > "$AI_DIR/SESSION_STATE.md"
+    echo "Menjalankan sync lokal setelah close agar .ai mengikuti docs/TASKS.md..."
+    run_sync_logged
     ;;
 
   status)
@@ -487,6 +649,7 @@ case "$MODE" in
   *)
     echo "Perintah tidak dikenali. Gunakan:"
     echo "  ./scripts/ai.sh bootstrap"
+    echo "  ./scripts/ai.sh sync"
     echo "  ./scripts/ai.sh plan"
     echo "  ./scripts/ai.sh build"
     echo "  ./scripts/ai.sh review"

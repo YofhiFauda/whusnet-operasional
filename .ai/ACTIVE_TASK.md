@@ -1,33 +1,40 @@
 # Active Task
 
-## Sprint Aktif
+Source of truth: docs/TASKS.md
+Last synced at: 2026-06-13 07:54:20
 
-Belum ditentukan.
+Current Sprint: Sprint 6 — Pembayaran
+Current Module: Migration dan Model Payment
+Current Task: S6-T001 — Migration dan Model Payment
+Status: In Progress
 
-## Task Aktif
+## Task Detail
 
-Belum ditentukan.
+### S6-T001 — Migration dan Model Payment
+Status: In Progress
 
-## Modul yang Sedang Dikerjakan
+Tujuan:
+Membuat struktur pembayaran.
 
-Belum ditentukan.
+Checklist:
+- [ ] Buat tabel `payments`.
+- [ ] Tambahkan nomor pembayaran.
+- [ ] Tambahkan invoice_id.
+- [ ] Tambahkan customer_id.
+- [ ] Tambahkan pop_id.
+- [ ] Tambahkan tanggal bayar.
+- [ ] Tambahkan metode bayar.
+- [ ] Tambahkan nominal bayar.
+- [ ] Tambahkan penerima.
+- [ ] Tambahkan bukti pembayaran.
+- [ ] Tambahkan status pembayaran.
+- [ ] Tambahkan catatan.
 
-## Tujuan Task
+Acceptance Criteria:
+- [ ] Payment dapat disimpan.
+- [ ] Payment terhubung ke invoice.
+- [ ] Payment terhubung ke customer.
+- [ ] Payment terhubung ke POP.
+- [ ] Payment memiliki status.
 
-Belum ditentukan.
-
-## Scope yang Boleh Dikerjakan
-
-Belum ditentukan.
-
-## Scope yang Tidak Boleh Dikerjakan
-
-Belum ditentukan.
-
-## Acceptance Criteria
-
-Belum ditentukan.
-
-## Status
-
-Belum mulai.
+---

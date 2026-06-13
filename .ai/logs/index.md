@@ -1,0 +1,8 @@
+- 2026-06-12 16:19:18 | sync | exit=0 | .ai/logs/20260612-161918-sync.log
+- 2026-06-12 16:21:57 | bootstrap | exit=0 | .ai/logs/20260612-162156-bootstrap.log
+- 2026-06-12 16:22:42 | plan | exit=0 | .ai/logs/20260612-162202-plan.log
+- 2026-06-12 16:31:15 | build | exit=0 | .ai/logs/20260612-162302-build.log
+- 2026-06-12 16:32:40 | review | exit=0 | .ai/logs/20260612-163153-review.log
+- 2026-06-12 16:36:57 | fix | exit=0 | .ai/logs/20260612-163331-fix.log
+- 2026-06-12 16:46:29 | close | exit=0 | .ai/logs/20260612-164552-close.log
+- 2026-06-13 07:54:20 | sync | exit=0 | .ai/logs/20260613-075420-sync.log

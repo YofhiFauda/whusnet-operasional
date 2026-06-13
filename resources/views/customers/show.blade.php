@@ -646,7 +646,13 @@
                             <tbody class="divide-y divide-slate-100 text-slate-700">
                                 @foreach($customer->invoices as $invoice)
                                     <tr class="hover:bg-slate-50/50 transition-colors">
-                                        <td class="px-4 py-3 font-mono font-bold text-slate-800">{{ $invoice->invoice_number }}</td>
+                                        <td class="px-4 py-3 font-mono font-bold text-slate-800">
+                                            @can('view_invoices')
+                                                <a href="{{ route('invoices.show', $invoice->id) }}" class="text-sky-700 hover:text-sky-900">{{ $invoice->invoice_number }}</a>
+                                            @else
+                                                {{ $invoice->invoice_number }}
+                                            @endcan
+                                        </td>
                                         <td class="px-4 py-3 font-mono">{{ $invoice->billing_period }}</td>
                                         <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->issue_date) }}</td>
                                         <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->due_date) }}</td>

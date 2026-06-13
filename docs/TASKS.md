@@ -2,43 +2,9 @@
 # Website Billing ISP Berbasis Master Data Pelanggan
 
 ## Status Project Saat Ini
-Current Sprint: Sprint 5 — Billing Dasar
-Current Module: Daftar dan Detail Tagihan
-Current Task: S5-T004 — Daftar dan Detail Tagihan
-
----
-
-# Sprint 5 — Billing Dasar
-
-## Tujuan Sprint 5
-Membuat aktivasi layanan dan tagihan manual berdasarkan pelanggan aktif.
-
----
-
-### S5-T004 — Daftar dan Detail Tagihan
-Status: In Progress
-
-Tujuan:
-Membuat halaman daftar dan detail invoice.
-
-Checklist:
-- [ ] Buat halaman daftar invoice.
-- [ ] Buat filter POP.
-- [ ] Buat filter periode.
-- [ ] Buat filter status.
-- [ ] Buat search pelanggan/invoice.
-- [ ] Buat halaman detail invoice.
-- [ ] Tampilkan pelanggan.
-- [ ] Tampilkan paket.
-- [ ] Tampilkan total.
-- [ ] Tampilkan status.
-
-Acceptance Criteria:
-- [ ] Tagihan dapat difilter berdasarkan POP.
-- [ ] Tagihan dapat difilter berdasarkan periode.
-- [ ] Tagihan dapat difilter berdasarkan status.
-- [ ] Tagihan dapat difilter berdasarkan pelanggan.
-- [ ] Admin Cabang hanya melihat tagihan POP yang ditugaskan.
+Current Sprint: Sprint 6 — Pembayaran
+Current Module: Migration dan Model Payment
+Current Task: S6-T001 — Migration dan Model Payment
 
 ---
 
@@ -50,7 +16,7 @@ Membuat pencatatan pembayaran dan update status invoice.
 ---
 
 ### S6-T001 — Migration dan Model Payment
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat struktur pembayaran.
@@ -1320,6 +1286,38 @@ Acceptance Criteria:
 Catatan Test:
 - `php artisan test tests/Feature/InvoiceCreateTest.php` lulus: 6 tests, 17 assertions.
 - Seluruh test suite `php artisan test` lulus: 94 tests, 502 assertions.
+
+---
+
+### S5-T004 — Daftar dan Detail Tagihan
+Status: Done
+
+Tujuan:
+Membuat halaman daftar dan detail invoice.
+
+Checklist:
+- [x] Buat halaman daftar invoice.
+- [x] Buat filter POP.
+- [x] Buat filter periode.
+- [x] Buat filter status.
+- [x] Buat search pelanggan/invoice.
+- [x] Buat halaman detail invoice.
+- [x] Tampilkan pelanggan.
+- [x] Tampilkan paket.
+- [x] Tampilkan total.
+- [x] Tampilkan status.
+
+Acceptance Criteria:
+- [x] Tagihan dapat difilter berdasarkan POP.
+- [x] Tagihan dapat difilter berdasarkan periode.
+- [x] Tagihan dapat difilter berdasarkan status.
+- [x] Tagihan dapat difilter berdasarkan pelanggan.
+- [x] Admin Cabang hanya melihat tagihan POP yang ditugaskan.
+
+Catatan Test:
+- `php artisan test tests/Feature/InvoiceListTest.php` lulus: 3 tests, 17 assertions.
+- `php artisan test tests/Feature/InvoiceCreateTest.php tests/Feature/InvoiceModelTest.php` lulus: 7 tests, 34 assertions.
+- `php artisan test` dengan `VIEW_COMPILED_PATH` temp berjalan 95 passed, 2 failed pada `CustomerEditTest` lama terkait file upload cleanup dokumen, bukan modul tagihan.
 
 ---
 ## Blocked

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
@@ -62,6 +63,11 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:create_invoices')->group(function () {
         Route::post('/customers/{customer}/invoices/manual', [CustomerController::class, 'storeManualInvoice'])->name('customers.invoices.manual');
+    });
+
+    Route::middleware('permission:view_invoices')->group(function () {
+        Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     });
 
     Route::middleware('permission:view_customers')->group(function () {

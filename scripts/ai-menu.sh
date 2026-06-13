@@ -67,7 +67,7 @@ run_phase() {
   echo ""
   echo "Menjalankan $label..."
   echo "--------------------------------------"
-  $AI_SCRIPT "$command"
+  AI_ALLOW_EXTERNAL=1 $AI_SCRIPT "$command"
   echo "--------------------------------------"
   echo "$label selesai."
   pause

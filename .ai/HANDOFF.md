@@ -1,34 +1,34 @@
 # Handoff
 
 ## Dari Agent
-Belum ada.
+Local sync script
 
 ## Untuk Agent
-Belum ditentukan.
+Agent berikutnya wajib membaca docs/TASKS.md dan .ai/ACTIVE_TASK.md sebelum bekerja.
 
 ## Task Aktif
-Belum ditentukan.
+S6-T001 — Migration dan Model Payment
 
 ## Ringkasan Scope
-Belum ada.
+Ikuti task aktif di docs/TASKS.md. Jangan mengerjakan task lain atau modul sprint berikutnya.
 
 ## Scope yang Boleh Dikerjakan
-Belum ditentukan.
+Modul: Migration dan Model Payment
 
 ## Scope yang Tidak Boleh Dikerjakan
-Belum ditentukan.
+Semua fitur di luar task aktif, fitur post-MVP, dan modul sprint berikutnya.
 
 ## File yang Boleh Diubah
-Belum ditentukan.
+Hanya file yang relevan dengan task aktif setelah scope check.
 
 ## File yang Tidak Boleh Disentuh
-Belum ditentukan.
+File yang tidak terkait task aktif.
 
 ## Acceptance Criteria
-Belum ditentukan.
+Lihat checklist dan acceptance criteria di .ai/ACTIVE_TASK.md.
 
 ## Instruksi untuk Agent Berikutnya
-Belum ada.
+Jalankan scope check sebelum coding. Gunakan docs/TASKS.md sebagai source of truth.
 
 ## Catatan Risiko
-Belum ada.
+Context ini dibuat lokal tanpa memanggil gemini/codex.
