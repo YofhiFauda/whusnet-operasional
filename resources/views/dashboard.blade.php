@@ -1,386 +1,250 @@
 @extends('layouts.app')
 
 @section('title', 'Dashboard - Whusnet Operasional')
-@section('page_title', 'Dashboard')
+@section('page_title', 'Dashboard Ringkasan')
 
 @section('content')
-<!-- KPI Cards Row -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <!-- Card 1: Total Customers -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500">Total Pelanggan</span>
-            <div class="p-2 bg-sky-50 rounded-md text-sky-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
+@php
+    $currency = fn ($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
+    $percent = fn ($value, $total) => number_format(((int) $value / max(1, (int) $total)) * 100, 1) . '%';
+    $statusLabels = [
+        'draft' => 'Draft',
+        'perlu_dilengkapi' => 'Perlu Dilengkapi',
+        'lengkap' => 'Lengkap',
+        'siap_billing' => 'Siap Billing',
+        'belum_dibayar' => 'Belum Dibayar',
+        'sebagian' => 'Dibayar Sebagian',
+        'lunas' => 'Lunas',
+        'batal' => 'Batal',
+    ];
+@endphp
+
+<div class="space-y-6">
+    <div class="bg-white border border-slate-200 rounded-lg p-4">
+        <form method="GET" action="{{ route('dashboard') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label for="pop_id" class="block text-xs font-semibold text-slate-600 mb-1">Filter POP</label>
+                <select id="pop_id" name="pop_id" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+                    <option value="">Semua POP yang dapat diakses</option>
+                    @foreach($pops as $pop)
+                        <option value="{{ $pop->id }}" @selected((string) $filters['pop_id'] === (string) $pop->id)>
+                            {{ $pop->name }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
+
+            <div>
+                <label for="period_from" class="block text-xs font-semibold text-slate-600 mb-1">Periode Dari</label>
+                <input id="period_from" type="month" name="period_from" value="{{ $filters['period_from'] }}" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
+
+            <div>
+                <label for="period_to" class="block text-xs font-semibold text-slate-600 mb-1">Periode Sampai</label>
+                <input id="period_to" type="month" name="period_to" value="{{ $filters['period_to'] }}" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="inline-flex justify-center rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
+                    Terapkan Filter
+                </button>
+                <a href="{{ route('dashboard') }}" class="inline-flex justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Total Pelanggan</p>
+            <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($stats['total_customers']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Sesuai filter POP</p>
         </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-800 data-text">{{ $stats['total_customers'] }}</h3>
-            <p class="text-xs text-slate-500 mt-1">Pelanggan terdaftar</p>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Pelanggan Aktif</p>
+            <p class="mt-3 text-3xl font-semibold text-green-700">{{ number_format($stats['active_customers']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['active_customers'], $stats['total_customers']) }} dari total pelanggan</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Data Belum Lengkap</p>
+            <p class="mt-3 text-3xl font-semibold text-amber-700">{{ number_format($stats['incomplete_customers']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['incomplete_customers'], $stats['total_customers']) }} perlu dilengkapi</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Siap Billing</p>
+            <p class="mt-3 text-3xl font-semibold text-sky-700">{{ number_format($stats['ready_billing_customers']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['ready_billing_customers'], $stats['total_customers']) }} siap ditagih</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Tagihan Periode {{ $filters['period_label'] }}</p>
+            <p class="mt-3 text-2xl font-semibold text-slate-900">{{ $currency($stats['total_invoices_amount']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Berdasarkan periode tagihan</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Pembayaran Periode {{ $filters['period_label'] }}</p>
+            <p class="mt-3 text-2xl font-semibold text-emerald-700">{{ $currency($stats['total_payments_amount']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Hanya pembayaran valid</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Total Tunggakan</p>
+            <p class="mt-3 text-2xl font-semibold text-rose-700">{{ $currency($stats['total_unpaid_amount']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Invoice belum lunas pada periode filter</p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <p class="text-sm font-medium text-slate-500">Tagihan Jatuh Tempo</p>
+            <p class="mt-3 text-3xl font-semibold text-rose-700">{{ number_format($stats['due_invoices_count']) }}</p>
+            <p class="mt-1 text-xs text-slate-500">Invoice belum lunas melewati jatuh tempo</p>
         </div>
     </div>
 
-    <!-- Card 2: Active Services -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500">Pelanggan Aktif</span>
-            <div class="p-2 bg-green-50 rounded-md text-green-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">Total Pelanggan per POP</h3>
+                <span class="text-xs text-slate-500">{{ $customersByPop->count() }} POP</span>
+            </div>
+
+            <div class="space-y-3">
+                @forelse($customersByPop as $row)
+                    <div>
+                        <div class="flex justify-between gap-4 text-sm">
+                            <span class="font-medium text-slate-700">{{ $row->pop?->name ?? 'Tanpa POP' }}</span>
+                            <span class="font-semibold text-slate-900">{{ number_format($row->total) }}</span>
+                        </div>
+                        <div class="mt-1 h-2 rounded-full bg-slate-100">
+                            <div class="h-2 rounded-full bg-sky-600" style="width: {{ min(100, ((int) $row->total / max(1, (int) $stats['total_customers'])) * 100) }}%"></div>
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-sm text-slate-500">Belum ada pelanggan pada filter ini.</p>
+                @endforelse
             </div>
         </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-800 data-text">{{ $stats['active_customers'] }}</h3>
-            <p class="text-xs text-green-600 mt-1 font-medium flex items-center gap-1">
-                <span>{{ number_format(($stats['active_customers'] / max(1, $stats['total_customers'])) * 100, 1) }}%</span>
-                <span class="text-slate-500 font-normal">dari total pelanggan</span>
-            </p>
+
+        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">Tagihan Jatuh Tempo</h3>
+                @if(auth()->user()->hasPermission('view_invoices'))
+                    <a href="{{ route('invoices.index') }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800">Lihat Tagihan</a>
+                @endif
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <th class="py-2 pr-4">Invoice</th>
+                            <th class="py-2 pr-4">Pelanggan</th>
+                            <th class="py-2 pr-4">POP</th>
+                            <th class="py-2 pr-4">Jatuh Tempo</th>
+                            <th class="py-2 text-right">Sisa</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @forelse($dueInvoices as $invoice)
+                            <tr>
+                                <td class="py-3 pr-4 font-medium text-slate-800">{{ $invoice->invoice_number }}</td>
+                                <td class="py-3 pr-4 text-slate-700">{{ $invoice->customer?->full_name ?? '-' }}</td>
+                                <td class="py-3 pr-4 text-slate-600">{{ $invoice->pop?->name ?? '-' }}</td>
+                                <td class="py-3 pr-4 text-rose-700">{{ optional($invoice->due_date)->format('d/m/Y') }}</td>
+                                <td class="py-3 text-right font-semibold text-slate-900">{{ $currency($invoice->remaining_amount) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-slate-500">Tidak ada tagihan jatuh tempo.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <!-- Card 3: Incomplete Customers -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500">Data Belum Lengkap</span>
-            <div class="p-2 bg-rose-50 rounded-md text-rose-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">Pelanggan yang Perlu Dilengkapi</h3>
+                @if(auth()->user()->hasPermission('view_customers'))
+                    <a href="{{ route('customers.index', ['completeness_status' => 'perlu_dilengkapi']) }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800">Lihat Pelanggan</a>
+                @endif
             </div>
-        </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-800 data-text">{{ $stats['incomplete_customers'] }}</h3>
-            <p class="text-xs text-rose-600 mt-1 font-medium flex items-center gap-1">
-                <span>{{ number_format(($stats['incomplete_customers'] / max(1, $stats['total_customers'])) * 100, 1) }}%</span>
-                <span class="text-slate-500 font-normal">perlu dilengkapi</span>
-            </p>
-        </div>
-    </div>
 
-    <!-- Card 4: Internet Packages -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500">Paket Layanan</span>
-            <div class="p-2 bg-purple-50 rounded-md text-purple-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <th class="py-2 pr-4">ID</th>
+                            <th class="py-2 pr-4">Nama</th>
+                            <th class="py-2 pr-4">POP</th>
+                            <th class="py-2 pr-4">Status Kelengkapan</th>
+                            <th class="py-2">Update</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @forelse($incompleteCustomers as $customer)
+                            <tr>
+                                <td class="py-3 pr-4 font-medium text-slate-800">{{ $customer->customer_code }}</td>
+                                <td class="py-3 pr-4 text-slate-700">{{ $customer->full_name }}</td>
+                                <td class="py-3 pr-4 text-slate-600">{{ $customer->pop?->name ?? '-' }}</td>
+                                <td class="py-3 pr-4">
+                                    <span class="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                                        {{ $statusLabels[$customer->data_completeness_status] ?? $customer->data_completeness_status }}
+                                    </span>
+                                </td>
+                                <td class="py-3 text-slate-600">{{ optional($customer->updated_at)->format('d/m/Y') }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-6 text-center text-slate-500">Tidak ada pelanggan yang perlu dilengkapi.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-800 data-text">{{ $stats['total_packages'] }}</h3>
-            <p class="text-xs text-slate-500 mt-1">Pilihan paket aktif</p>
-        </div>
-    </div>
 
-    <!-- Card 5: Districts Covered -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500">Cakupan Wilayah</span>
-            <div class="p-2 bg-amber-50 rounded-md text-amber-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </div>
-        </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-800 data-text">{{ $stats['total_districts'] }}</h3>
-            <p class="text-xs text-slate-500 mt-1">Kecamatan tercover</p>
-        </div>
-    </div>
+        <div class="bg-white border border-slate-200 rounded-lg p-5">
+            <h3 class="text-sm font-semibold text-slate-800 mb-4">Akses Cepat</h3>
+            <div class="space-y-3">
+                @php $hasQuickAction = false; @endphp
 
-    <!-- Card 6: Total Tagihan Bulan Ini (Placeholder) -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow opacity-75 relative group">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                Tagihan Bulan Ini
-                <span class="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-500 rounded font-medium">Sprint 5</span>
-            </span>
-            <div class="p-2 bg-blue-50 rounded-md text-blue-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-            </div>
-        </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-400">Rp {{ number_format($stats['total_invoices_amount']) }}</h3>
-            <p class="text-xs text-slate-400 mt-1">Placeholder (Belum Aktif)</p>
-        </div>
-    </div>
+                @if(auth()->user()->hasPermission('view_customers'))
+                    @php $hasQuickAction = true; @endphp
+                    <a href="{{ route('customers.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <span>Data Pelanggan</span>
+                        <span class="text-sky-700">Buka</span>
+                    </a>
+                @endif
 
-    <!-- Card 7: Total Pembayaran Bulan Ini (Placeholder) -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow opacity-75 relative group">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                Pembayaran Bulan Ini
-                <span class="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-500 rounded font-medium">Sprint 6</span>
-            </span>
-            <div class="p-2 bg-emerald-50 rounded-md text-emerald-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-        </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-400">Rp {{ number_format($stats['total_payments_amount']) }}</h3>
-            <p class="text-xs text-slate-400 mt-1">Placeholder (Belum Aktif)</p>
-        </div>
-    </div>
+                @if(auth()->user()->hasPermission('view_invoices'))
+                    @php $hasQuickAction = true; @endphp
+                    <a href="{{ route('invoices.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <span>Daftar Tagihan</span>
+                        <span class="text-sky-700">Buka</span>
+                    </a>
+                @endif
 
-    <!-- Card 8: Total Tunggakan (Placeholder) -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow opacity-75 relative group">
-        <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-slate-500 flex items-center gap-1.5">
-                Total Tunggakan
-                <span class="px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-500 rounded font-medium">Sprint 5</span>
-            </span>
-            <div class="p-2 bg-rose-50 rounded-md text-rose-600">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                @if(auth()->user()->hasPermission('view_payments'))
+                    @php $hasQuickAction = true; @endphp
+                    <a href="{{ route('payments.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <span>Riwayat Pembayaran</span>
+                        <span class="text-sky-700">Buka</span>
+                    </a>
+                @endif
+
+                @if(!$hasQuickAction)
+                    <p class="text-sm text-slate-500">Tidak ada akses cepat yang tersedia untuk peran Anda.</p>
+                @endif
             </div>
-        </div>
-        <div class="mt-4">
-            <h3 class="text-3xl font-semibold text-slate-400">Rp {{ number_format($stats['total_unpaid_amount']) }}</h3>
-            <p class="text-xs text-slate-400 mt-1">Placeholder (Belum Aktif)</p>
         </div>
     </div>
 </div>
-
-<!-- Charts Section -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-    <!-- Chart 1: Registration Trend -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 lg:col-span-2">
-        <h3 class="text-sm font-semibold text-slate-700 mb-4">Tren Pendaftaran Pelanggan Baru</h3>
-        <div id="registration-trend-chart" class="h-80"></div>
-    </div>
-
-    <!-- Chart 2: Status Distribution -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6">
-        <h3 class="text-sm font-semibold text-slate-700 mb-4">Status Pelanggan</h3>
-        <div id="status-distribution-chart" class="h-80 flex items-center justify-center"></div>
-    </div>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Chart 3: Category Distribution -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 lg:col-span-2">
-        <h3 class="text-sm font-semibold text-slate-700 mb-4">Langganan per Kategori Paket</h3>
-        <div id="category-chart" class="h-80"></div>
-    </div>
-
-    <!-- Quick Actions Card -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6">
-        <h3 class="text-sm font-semibold text-slate-700 mb-4">Akses Cepat</h3>
-        <div class="space-y-3">
-            @php $hasQuickAction = false; @endphp
-
-            @if(auth()->user()->hasPermission('view_customers'))
-                @php $hasQuickAction = true; @endphp
-                <a href="/customers" class="flex items-center justify-between p-3 border border-slate-100 rounded-md hover:bg-slate-50 transition-colors group cursor-pointer">
-                    <span class="text-xs font-medium text-slate-700">Lihat Semua Pelanggan</span>
-                    <svg class="h-4 w-4 text-slate-400 group-hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                </a>
-            @endif
-
-            @if(auth()->user()->hasPermission('view_pop'))
-                @php $hasQuickAction = true; @endphp
-                <a href="/master/wilayah" class="flex items-center justify-between p-3 border border-slate-100 rounded-md hover:bg-slate-50 transition-colors group cursor-pointer">
-                    <span class="text-xs font-medium text-slate-700">Kelola Master Wilayah</span>
-                    <svg class="h-4 w-4 text-slate-400 group-hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                </a>
-            @endif
-
-            @if(auth()->user()->hasPermission('view_packages'))
-                @php $hasQuickAction = true; @endphp
-                <a href="/master/paket" class="flex items-center justify-between p-3 border border-slate-100 rounded-md hover:bg-slate-50 transition-colors group cursor-pointer">
-                    <span class="text-xs font-medium text-slate-700">Lihat Master Paket Internet</span>
-                    <svg class="h-4 w-4 text-slate-400 group-hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                </a>
-            @endif
-
-            @if(!$hasQuickAction)
-                <p class="text-xs text-slate-500 italic">Tidak ada akses cepat yang tersedia untuk peran Anda.</p>
-            @endif
-        </div>
-    </div>
-</div>
-@endsection
-
-@section('scripts')
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // Colors from Design System
-        const skyBlue = '#0284C7';
-        const slate900 = '#0F172A';
-        const green600 = '#16A34A';
-        const amber600 = '#D97706';
-        const red600 = '#DC2626';
-
-        // Trend Chart Data
-        const trends = @json($trends);
-        const trendMonths = Object.keys(trends);
-        const trendCounts = Object.values(trends);
-
-        var trendOptions = {
-            chart: {
-                type: 'area',
-                height: 320,
-                fontFamily: 'Inter, sans-serif',
-                toolbar: { show: false }
-            },
-            dataLabels: { enabled: false },
-            stroke: { curve: 'smooth', colors: [skyBlue], width: 2 },
-            fill: {
-                type: 'gradient',
-                gradient: {
-                    shadeIntensity: 1,
-                    opacityFrom: 0.45,
-                    opacityTo: 0.05,
-                    stops: [0, 100]
-                }
-            },
-            series: [{
-                name: 'Pendaftaran Baru',
-                data: trendCounts
-            }],
-            xaxis: {
-                categories: trendMonths,
-                labels: {
-                    style: {
-                        colors: '#64748B',
-                        fontSize: '11px',
-                        fontFamily: 'JetBrains Mono, monospace'
-                    }
-                }
-            },
-            yaxis: {
-                labels: {
-                    style: {
-                        colors: '#64748B',
-                        fontSize: '11px',
-                        fontFamily: 'JetBrains Mono, monospace'
-                    }
-                }
-            },
-            grid: { borderColor: '#F1F5F9' },
-            colors: [skyBlue]
-        };
-
-        var trendChart = new ApexCharts(document.querySelector("#registration-trend-chart"), trendOptions);
-        trendChart.render();
-
-        // Status Chart Data
-        const statusData = @json($statusData);
-        const statusLabels = Object.keys(statusData);
-        const statusCounts = Object.values(statusData);
-
-        var statusOptions = {
-            chart: {
-                type: 'donut',
-                height: 320,
-                fontFamily: 'Inter, sans-serif'
-            },
-            labels: statusLabels,
-            series: statusCounts,
-            colors: [skyBlue, red600, '#94A3B8', green600, amber600],
-            legend: {
-                position: 'bottom',
-                fontSize: '12px',
-                fontFamily: 'Inter, sans-serif'
-            },
-            plotOptions: {
-                pie: {
-                    donut: {
-                        size: '70%',
-                        labels: {
-                            show: true,
-                            total: {
-                                show: true,
-                                label: 'Total',
-                                formatter: function (w) {
-                                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
-                                },
-                                style: {
-                                    fontSize: '16px',
-                                    fontWeight: 600,
-                                    color: '#0F172A',
-                                    fontFamily: 'Inter, sans-serif'
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            dataLabels: { enabled: false }
-        };
-
-        var statusChart = new ApexCharts(document.querySelector("#status-distribution-chart"), statusOptions);
-        statusChart.render();
-
-        // Category Chart Data
-        const categoryData = @json($categoryData);
-        const categoryLabels = Object.keys(categoryData);
-        const categoryCounts = Object.values(categoryData);
-
-        var categoryOptions = {
-            chart: {
-                type: 'bar',
-                height: 320,
-                fontFamily: 'Inter, sans-serif',
-                toolbar: { show: false }
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: false,
-                    columnWidth: '40%',
-                    endingShape: 'rounded',
-                    borderRadius: 4
-                },
-            },
-            dataLabels: { enabled: false },
-            stroke: { show: true, width: 2, colors: ['transparent'] },
-            series: [{
-                name: 'Jumlah Pelanggan',
-                data: categoryCounts
-            }],
-            xaxis: {
-                categories: categoryLabels,
-                labels: {
-                    style: {
-                        colors: '#64748B',
-                        fontSize: '11px',
-                        fontFamily: 'Inter, sans-serif'
-                    }
-                }
-            },
-            yaxis: {
-                labels: {
-                    style: {
-                        colors: '#64748B',
-                        fontSize: '11px',
-                        fontFamily: 'JetBrains Mono, monospace'
-                    }
-                }
-            },
-            fill: { opacity: 1 },
-            colors: [skyBlue],
-            grid: { borderColor: '#F1F5F9' }
-        };
-
-        var categoryChart = new ApexCharts(document.querySelector("#category-chart"), categoryOptions);
-        categoryChart.render();
-    });
-</script>
 @endsection

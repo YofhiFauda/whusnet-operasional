@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Dashboard Ringkasan
-Current Task: S7-T001 — Dashboard Ringkasan
+Current Module: Laporan Pelanggan
+Current Task: S7-T002 — Laporan Pelanggan
 
 ---
 
@@ -16,36 +16,40 @@ Membuat dashboard dan laporan operasional sederhana.
 ---
 
 ### S7-T001 — Dashboard Ringkasan
-Status: In Progress
+Status: Done
 
 Tujuan:
 Membuat dashboard ringkasan pelanggan dan billing.
 
 Checklist:
-- [ ] Total pelanggan.
-- [ ] Total pelanggan aktif.
-- [ ] Total pelanggan belum lengkap.
-- [ ] Total pelanggan siap billing.
-- [ ] Total pelanggan per POP.
-- [ ] Total tagihan bulan ini.
-- [ ] Total pembayaran bulan ini.
-- [ ] Total tunggakan.
-- [ ] Tagihan jatuh tempo.
-- [ ] Data pelanggan yang perlu dilengkapi.
-- [ ] Filter POP.
-- [ ] Filter periode.
+- [x] Total pelanggan.
+- [x] Total pelanggan aktif.
+- [x] Total pelanggan belum lengkap.
+- [x] Total pelanggan siap billing.
+- [x] Total pelanggan per POP.
+- [x] Total tagihan bulan ini.
+- [x] Total pembayaran bulan ini.
+- [x] Total tunggakan.
+- [x] Tagihan jatuh tempo.
+- [x] Data pelanggan yang perlu dilengkapi.
+- [x] Filter POP.
+- [x] Filter periode.
 
 Acceptance Criteria:
-- [ ] Owner melihat semua data.
-- [ ] Admin Pusat melihat semua cabang.
-- [ ] Admin Cabang hanya melihat cabangnya.
-- [ ] Dashboard dapat difilter berdasarkan POP.
-- [ ] Dashboard dapat difilter berdasarkan periode.
+- [x] Owner melihat semua data.
+- [x] Admin Pusat melihat semua cabang.
+- [x] Admin Cabang hanya melihat cabangnya.
+- [x] Dashboard dapat difilter berdasarkan POP.
+- [x] Dashboard dapat difilter berdasarkan periode.
+
+Catatan Test:
+- `php artisan test --filter=DashboardTest` lulus: 8 tests, 40 assertions.
+- Menguji asersi visual, filter POP, filter periode, dan pembatasan data Admin Cabang.
 
 ---
 
 ### S7-T002 — Laporan Pelanggan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat laporan pelanggan.

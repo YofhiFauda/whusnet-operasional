@@ -40,3 +40,15 @@
 - 2026-06-13 09:22:23 | 🔧 fix | exit=0 | .ai/logs/20260613-092040-🔧 fix.log
 - 2026-06-13 09:23:10 | close | exit=0 | .ai/logs/20260613-092241-close.log
 - 2026-06-13 09:23:11 | sync | exit=0 | .ai/logs/20260613-092310-sync.log
+- 2026-06-13 09:24:12 | bootstrap | exit=0 | .ai/logs/20260613-092411-bootstrap.log
+- 2026-06-13 09:25:24 | plan | exit=0 | .ai/logs/20260613-092444-plan.log
+- 2026-06-13 09:30:23 | 💻 build | exit=1 | .ai/logs/20260613-092600-💻 build.log
+- 2026-06-13 09:31:27 | 💻 build | exit=1 | .ai/logs/20260613-093053-💻 build.log
+- 2026-06-13 09:36:15 | review | exit=0 | .ai/logs/20260613-093516-review.log
+- 2026-06-13 09:36:32 | 🔧 fix | exit=1 | .ai/logs/20260613-093624-🔧 fix.log
+- 2026-06-13 09:37:10 | 🔧 fix | exit=1 | .ai/logs/20260613-093640-🔧 fix.log
+- 2026-06-13 09:38:55 | close | exit=0 | .ai/logs/20260613-093719-close.log
+- 2026-06-13 09:38:55 | sync | exit=0 | .ai/logs/20260613-093855-sync.log
+- 2026-06-13 09:39:10 | bootstrap | exit=0 | .ai/logs/20260613-093910-bootstrap.log
+- 2026-06-13 09:40:10 | plan | exit=0 | .ai/logs/20260613-093914-plan.log
+- 2026-06-13 09:40:42 | 💻 build | exit=1 | .ai/logs/20260613-094036-💻 build.log

@@ -4,26 +4,66 @@ Catat semua perubahan yang dibuat oleh AI agent di file ini.
 
 Format:
 
-## 2026-06-13 09:21 - Codex CLI
+## YYYY-MM-DD HH:mm - Codex CLI
 
 ### Task
-Fixer review notes S6-T004 menuju S7-T001.
+
+...
 
 ### File yang Diubah
-- .ai/ACTIVE_TASK.md
-- .ai/HANDOFF.md
-- .ai/CHANGELOG_AI.md
-- .ai/SESSION_STATE.md
+
+- ...
 
 ### Ringkasan Perubahan
-Menangani issue sinkronisasi context dari `.ai/REVIEW_NOTES.md`: `docs/TASKS.md` sudah menunjukkan S7-T001 — Dashboard Ringkasan sebagai task aktif, sementara `.ai/ACTIVE_TASK.md` dan `.ai/HANDOFF.md` masih menunjuk ke S6-T004. Context diperbarui agar mengikuti source of truth `docs/TASKS.md`.
+
+...
 
 ### Cara Test
-- Tidak menjalankan test aplikasi karena perubahan hanya pada context `.ai`.
-- Verifikasi dilakukan dengan membaca ulang `.ai/ACTIVE_TASK.md`, `.ai/HANDOFF.md`, `.ai/SESSION_STATE.md`, dan `.ai/CHANGELOG_AI.md`.
+
+...
 
 ### Catatan
-Tidak ada perubahan kode aplikasi, route, view, migration, model, atau test. Tidak ada fitur baru dan tidak ada perluasan scope.
+
+...
+
+## 2026-06-13 09:27 - Codex CLI
+
+### Task
+S6-T004 Audit Log Pembayaran — complete.
+
+### File yang Diubah
+- app/Models/Payment.php
+- app/Http/Controllers/Admin/PaymentController.php
+- resources/views/payments/show.blade.php
+- resources/views/layouts/admin-nav.blade.php
+- routes/web.php
+- docs/TASKS.md
+
+### Ringkasan Perubahan
+- Menambahkan `PaymentAuditLog` model dan relasi two-way ke `Payment`.
+- Mengaktifkan logging perubahan pembayaran (create, update, cancel) di `PaymentController`.
+- Menambahkan link "Riwayat Audit" ke halaman detail pembayaran.
+- Menampilkan tabel audit log dengan riwayat lengkap di halaman detail pembayaran (`resources/views/payments/show.blade.php`).
+- Memperbarui `resources/views/layouts/admin-nav.blade.php` agar role Owner dan Admin Pusat bisa mengakses menu "Audit Log" (sebelumnya hanya Admin Pusat, sekarangOwner juga bisa).
+- Menambahkan S6-T004 ke list task, set sebagai "Done", dan menambahkan catatan test.
+- Tidak ada perubahan pada fitur atau scope yang sudah ada, hanya menambahkan logging dan UI untuk audit trail.
+
+### Cara Test
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentAuditLogTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/PaymentModelTest.php` lulus: 11 tests, 68 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 106 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul pembayaran.
+- Cek manual di aplikasi:
+  - Login sebagai Admin Pusat atau Owner.
+  - Buat pembayaran baru → cek audit log.
+  - Edit pembayaran (rubah nilai atau status) → cek audit log.
+  - Batalkan pembayaran → cek audit log.
+  - Pastikan admin cabang tidak bisa lihat audit log.
+
+### Catatan
+- Audit log hanya mencatat perubahan pada tabel `payments`, tidak pada tabel lain.
+- Hanya user dengan `view_audit_logs` permission yang dapat melihat riwayat audit.
+- UI audit log sederhana (tabel, tidak ada filter) sesuai batasan sprint.
+
 
 ## 2026-06-13 09:07 - Codex CLI
 

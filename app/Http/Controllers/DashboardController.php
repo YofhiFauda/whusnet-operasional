@@ -4,61 +4,131 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\InternetPackage;
-use App\Models\District;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\Pop;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
     /**
      * Display the operational dashboard.
      */
-    public function index()
+    public function index(Request $request): View
     {
-        // Calculate incomplete customers dynamically using model helper
-        $incompleteCustomers = Customer::all()->filter(function ($customer) {
-            return count($customer->dataCompleteness()['missing_required']) > 0;
-        })->count();
+        $popId = $request->query('pop_id', '');
+        $periodFrom = $this->normalizePeriod($request->query('period_from')) ?? now()->format('Y-m');
+        $periodTo = $this->normalizePeriod($request->query('period_to')) ?? $periodFrom;
+
+        if ($periodFrom > $periodTo) {
+            [$periodFrom, $periodTo] = [$periodTo, $periodFrom];
+        }
+
+        $periodStartDate = Carbon::createFromFormat('Y-m', $periodFrom)->startOfMonth();
+        $periodEndDate = Carbon::createFromFormat('Y-m', $periodTo)->endOfMonth();
+
+        $customerQuery = $this->scopedCustomerQuery($popId);
+        $invoiceQuery = $this->scopedInvoiceQuery($popId);
+        $paymentQuery = $this->scopedPaymentQuery($popId);
+
+        $periodInvoiceQuery = (clone $invoiceQuery)
+            ->whereBetween('billing_period', [$periodFrom, $periodTo]);
+
+        $periodPaymentQuery = (clone $paymentQuery)
+            ->whereBetween('payment_date', [$periodStartDate->toDateString(), $periodEndDate->toDateString()]);
 
         $stats = [
-            'total_customers' => Customer::count(),
-            'active_customers' => Customer::where('status', 'active')->count(),
-            'inactive_customers' => Customer::whereIn('status', ['terminated', 'rejected'])->count(),
-            'suspended_customers' => Customer::where('status', 'suspended')->count(),
-            'pending_customers' => Customer::whereIn('status', ['registered', 'waiting_survey', 'surveyed', 'waiting_installation', 'installed'])->count(),
-            'total_packages' => InternetPackage::count(),
-            'total_districts' => District::count(),
-            'incomplete_customers' => $incompleteCustomers,
-            // Financial placeholders for future sprints (Sprint 5 & 6)
-            'total_invoices_amount' => 0,
-            'total_payments_amount' => 0,
-            'total_unpaid_amount' => 0,
-            'due_invoices_count' => 0,
+            'total_customers' => (clone $customerQuery)->count(),
+            'active_customers' => (clone $customerQuery)->where('status', 'active')->count(),
+            'incomplete_customers' => (clone $customerQuery)
+                ->whereIn('data_completeness_status', ['draft', 'perlu_dilengkapi'])
+                ->count(),
+            'ready_billing_customers' => (clone $customerQuery)
+                ->where('data_completeness_status', 'siap_billing')
+                ->count(),
+            'total_invoices_amount' => (float) (clone $periodInvoiceQuery)->sum('total_amount'),
+            'total_payments_amount' => (float) (clone $periodPaymentQuery)
+                ->where('payment_status', 'valid')
+                ->sum('amount'),
+            'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
+                ->whereNotIn('invoice_status', ['lunas', 'batal'])
+                ->sum('remaining_amount'),
+            'due_invoices_count' => (clone $invoiceQuery)
+                ->whereNotIn('invoice_status', ['lunas', 'batal'])
+                ->whereDate('due_date', '<=', now()->toDateString())
+                ->count(),
         ];
 
-        // Chart Data: Status distribution
-        $statusData = Customer::selectRaw('status, count(*) as count')
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
+        $customersByPop = (clone $customerQuery)
+            ->with('pop')
+            ->selectRaw('pop_id, count(*) as total')
+            ->groupBy('pop_id')
+            ->orderByDesc('total')
+            ->get();
 
-        // Chart Data: Subscriptions by package category
-        $categoryData = Customer::join('internet_packages', 'customers.internet_package_id', '=', 'internet_packages.id')
-            ->selectRaw('internet_packages.category, count(*) as count')
-            ->groupBy('internet_packages.category')
-            ->pluck('count', 'internet_packages.category')
-            ->toArray();
+        $dueInvoices = (clone $invoiceQuery)
+            ->with(['customer', 'pop'])
+            ->whereNotIn('invoice_status', ['lunas', 'batal'])
+            ->whereDate('due_date', '<=', now()->toDateString())
+            ->orderBy('due_date')
+            ->limit(10)
+            ->get();
 
-        // Chart Data: Monthly registration trends (Database-agnostic using Eloquent Collection)
-        $trends = Customer::select('registration_date')
-            ->orderBy('registration_date', 'asc')
-            ->get()
-            ->groupBy(function ($customer) {
-                return $customer->registration_date ? $customer->registration_date->format('Y-m') : 'N/A';
-            })
-            ->map(fn ($group) => $group->count())
-            ->toArray();
+        $incompleteCustomers = (clone $customerQuery)
+            ->with('pop')
+            ->whereIn('data_completeness_status', ['draft', 'perlu_dilengkapi'])
+            ->orderByDesc('updated_at')
+            ->limit(10)
+            ->get();
 
-        return view('dashboard', compact('stats', 'statusData', 'categoryData', 'trends'));
+        $pops = Pop::forUser()->orderBy('name')->get();
+
+        $filters = [
+            'pop_id' => $popId,
+            'period_from' => $periodFrom,
+            'period_to' => $periodTo,
+            'period_label' => $periodFrom === $periodTo ? $periodFrom : "{$periodFrom} s/d {$periodTo}",
+        ];
+
+        return view('dashboard', compact(
+            'stats',
+            'customersByPop',
+            'dueInvoices',
+            'incompleteCustomers',
+            'pops',
+            'filters'
+        ));
+    }
+
+    private function scopedCustomerQuery(string|int|null $popId)
+    {
+        return Customer::query()
+            ->forUser()
+            ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
+    }
+
+    private function scopedInvoiceQuery(string|int|null $popId)
+    {
+        return Invoice::query()
+            ->forUser()
+            ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
+    }
+
+    private function scopedPaymentQuery(string|int|null $popId)
+    {
+        return Payment::query()
+            ->forUser()
+            ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
+    }
+
+    private function normalizePeriod(mixed $period): ?string
+    {
+        if (!is_string($period) || !preg_match('/^\d{4}-\d{2}$/', $period)) {
+            return null;
+        }
+
+        return $period;
     }
 }
