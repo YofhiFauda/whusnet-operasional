@@ -356,7 +356,12 @@ run_gemini_to_file() {
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
-  gemini -p "$prompt" 2>&1 | tee "$tmp_file" | tee -a "$log_file"
+  if command -v bat >/dev/null 2>&1; then
+    # Menggunakan bat untuk syntax highlight live streaming Markdown
+    gemini -p "$prompt" 2>&1 | tee "$tmp_file" | tee -a "$log_file" | bat -l markdown --color=always --style=plain --paging=never
+  else
+    gemini -p "$prompt" 2>&1 | tee "$tmp_file" | tee -a "$log_file"
+  fi
   local exit_code=${PIPESTATUS[0]}
   set -e
 
@@ -395,7 +400,12 @@ run_codex_logged() {
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
-  codex exec --sandbox workspace-write "$prompt" 2>&1 | tee -a "$log_file"
+  if command -v bat >/dev/null 2>&1; then
+    # Menggunakan bat untuk syntax highlight live streaming log
+    codex exec --sandbox workspace-write "$prompt" 2>&1 | tee -a "$log_file" | bat -l markdown --color=always --style=plain --paging=never
+  else
+    codex exec --sandbox workspace-write "$prompt" 2>&1 | tee -a "$log_file"
+  fi
   local exit_code=${PIPESTATUS[0]}
   set -e
 
@@ -403,6 +413,20 @@ run_codex_logged() {
   append_log_index "$phase" "$log_file" "$exit_code"
 
   return "$exit_code"
+}
+
+# --- Helper untuk mencetak file dengan bat jika tersedia ---
+print_file() {
+  local file="$1"
+  if [ -f "$file" ]; then
+    if command -v bat >/dev/null 2>&1; then
+      bat "$file" -l markdown --color=always --style=plain --paging=never
+    else
+      cat "$file"
+    fi
+  else
+    echo -e "${YELLOW}[Belum ada file: $file]${NC}"
+  fi
 }
 
 PROMPT_PLAN=$(cat << 'EOF'
@@ -667,16 +691,24 @@ case "$MODE" in
   status)
     ensure_ai_dir
     echo -e "\n${BLUE}${BOLD}===== 📋 ACTIVE TASK =====${NC}"
-    [ -f "$AI_DIR/ACTIVE_TASK.md" ] && cat "$AI_DIR/ACTIVE_TASK.md" || echo -e "${YELLOW}[Belum ada task aktif]${NC}"
+    print_file "$AI_DIR/ACTIVE_TASK.md"
 
     echo -e "\n${YELLOW}${BOLD}===== 🤝 HANDOFF =====${NC}"
-    [ -f "$AI_DIR/HANDOFF.md" ] && cat "$AI_DIR/HANDOFF.md" || echo -e "${YELLOW}[Belum ada handoff]${NC}"
+    print_file "$AI_DIR/HANDOFF.md"
 
     echo -e "\n${GREEN}${BOLD}===== 💾 SESSION STATE =====${NC}"
-    [ -f "$AI_DIR/SESSION_STATE.md" ] && cat "$AI_DIR/SESSION_STATE.md" || echo -e "${YELLOW}[Belum ada session state]${NC}"
+    print_file "$AI_DIR/SESSION_STATE.md"
 
     echo -e "\n${MAGENTA}${BOLD}===== 📄 LOG TERAKHIR =====${NC}"
-    [ -f "$LOG_DIR/latest.log" ] && tail -n 80 "$LOG_DIR/latest.log" || echo -e "${YELLOW}[Belum ada log]${NC}"
+    if [ -f "$LOG_DIR/latest.log" ]; then
+      if command -v bat >/dev/null 2>&1; then
+        tail -n 80 "$LOG_DIR/latest.log" | bat -l markdown --color=always --style=plain --paging=never
+      else
+        tail -n 80 "$LOG_DIR/latest.log"
+      fi
+    else
+      echo -e "${YELLOW}[Belum ada log]${NC}"
+    fi
     echo ""
     ;;
 
@@ -684,8 +716,9 @@ case "$MODE" in
     ensure_ai_dir
     echo -e "\n${CYAN}${BOLD}===== 📑 LOG INDEX =====${NC}"
     [ -f "$LOG_DIR/index.md" ] && tail -n 30 "$LOG_DIR/index.md" || echo -e "${YELLOW}[Belum ada log index]${NC}"
+    
     echo -e "\n${BLUE}${BOLD}===== 📄 LOG TERAKHIR =====${NC}"
-    [ -f "$LOG_DIR/latest.log" ] && cat "$LOG_DIR/latest.log" || echo -e "${YELLOW}[Belum ada log]${NC}"
+    print_file "$LOG_DIR/latest.log"
     echo ""
     ;;
 

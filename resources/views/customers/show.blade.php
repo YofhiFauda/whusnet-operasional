@@ -788,13 +788,67 @@
 
             <!-- Tab 8: Pembayaran -->
             <div id="tab-content-pembayaran" class="tab-content hidden space-y-6">
-                <div class="py-12 text-center text-slate-400">
-                    <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    <h4 class="text-sm font-semibold text-slate-700">Belum ada riwayat pembayaran</h4>
-                    <p class="text-xs text-slate-500 mt-1">Modul Pencatatan Pembayaran (Sprint 6) belum aktif pada sistem operasional.</p>
+                <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Pembayaran yang terhubung ke invoice pelanggan ini.</p>
+                    </div>
                 </div>
+
+                @if($customer->payments && $customer->payments->count() > 0)
+                    <div class="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider text-[10px]">
+                                    <th class="px-4 py-3">No. Pembayaran</th>
+                                    <th class="px-4 py-3">No. Tagihan</th>
+                                    <th class="px-4 py-3">Tanggal</th>
+                                    <th class="px-4 py-3">Metode</th>
+                                    <th class="px-4 py-3 text-right">Nominal</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3">Bukti</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-700">
+                                @foreach($customer->payments as $payment)
+                                    <tr class="hover:bg-slate-50/50 transition-colors">
+                                        <td class="px-4 py-3 font-mono font-bold text-slate-800">{{ $payment->payment_number }}</td>
+                                        <td class="px-4 py-3 font-mono">
+                                            @can('view_invoices')
+                                                <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="text-sky-700 hover:text-sky-900">{{ $payment->invoice->invoice_number ?? '-' }}</a>
+                                            @else
+                                                {{ $payment->invoice->invoice_number ?? '-' }}
+                                            @endcan
+                                        </td>
+                                        <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($payment->payment_date) }}</td>
+                                        <td class="px-4 py-3">{{ strtoupper($payment->payment_method) }}</td>
+                                        <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format((float) $payment->amount, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide bg-green-50 text-green-700 border-green-200">
+                                                {{ ucwords(str_replace('_', ' ', $payment->payment_status)) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            @if($payment->proof_file)
+                                                <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="text-sky-700 hover:text-sky-900 font-semibold">Lihat bukti</a>
+                                            @else
+                                                <span class="text-slate-400">-</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
+                        <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        <h4 class="text-sm font-semibold text-slate-700">Belum ada riwayat pembayaran</h4>
+                        <p class="text-xs text-slate-500 mt-1">Pembayaran akan tampil setelah finance mencatat pembayaran invoice.</p>
+                    </div>
+                @endif
             </div>
 
             <!-- Tab 9: Dokumen -->

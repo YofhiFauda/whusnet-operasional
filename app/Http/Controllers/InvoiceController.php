@@ -76,7 +76,16 @@ class InvoiceController extends Controller
             'Anda tidak memiliki akses ke tagihan POP ini.'
         );
 
-        $invoice->load(['customer.pop', 'pop', 'customerService', 'internetPackage', 'creator']);
+        $invoice->load([
+            'customer.pop',
+            'pop',
+            'customerService',
+            'internetPackage',
+            'creator',
+            'payments' => function ($query) {
+                $query->with('receiver')->latest('payment_date')->latest('id');
+            },
+        ]);
 
         return view('invoices.show', compact('invoice'));
     }

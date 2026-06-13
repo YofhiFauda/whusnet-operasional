@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 6 — Pembayaran
-Current Module: Input Pembayaran
-Current Task: S6-T002 — Input Pembayaran
+Current Module: Daftar dan Detail Pembayaran
+Current Task: S6-T003 — Daftar dan Detail Pembayaran
 
 ---
 
@@ -13,36 +13,8 @@ Current Task: S6-T002 — Input Pembayaran
 ## Tujuan Sprint 6
 Membuat pencatatan pembayaran dan update status invoice.
 
----
-
-### S6-T002 — Input Pembayaran
-Status: In Progress
-
-Tujuan:
-Membuat pencatatan pembayaran invoice.
-
-Checklist:
-- [ ] Buat tombol input pembayaran di invoice.
-- [ ] Buat form pembayaran.
-- [ ] Pilih metode pembayaran.
-- [ ] Input nominal.
-- [ ] Upload bukti jika ada.
-- [ ] Simpan pembayaran.
-- [ ] Update paid amount invoice.
-- [ ] Update remaining amount invoice.
-- [ ] Update status invoice.
-
-Acceptance Criteria:
-- [ ] Finance dapat mencatat pembayaran.
-- [ ] Pembayaran muncul di detail pelanggan.
-- [ ] Jika nominal penuh, invoice menjadi lunas.
-- [ ] Jika nominal kurang, invoice menjadi sebagian.
-- [ ] Bukti pembayaran dapat diupload.
-
----
-
 ### S6-T003 — Daftar dan Detail Pembayaran
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat halaman daftar dan detail pembayaran.
@@ -358,40 +330,6 @@ Acceptance Criteria:
 ---
 
 ## Done
-
-### S6-T001 — Migration dan Model Payment
-Status: Done
-
-Tujuan:
-Membuat struktur pembayaran.
-
-Checklist:
-- [x] Buat tabel `payments`.
-- [x] Tambahkan nomor pembayaran.
-- [x] Tambahkan invoice_id.
-- [x] Tambahkan customer_id.
-- [x] Tambahkan pop_id.
-- [x] Tambahkan tanggal bayar.
-- [x] Tambahkan metode bayar.
-- [x] Tambahkan nominal bayar.
-- [x] Tambahkan penerima.
-- [x] Tambahkan bukti pembayaran.
-- [x] Tambahkan status pembayaran.
-- [x] Tambahkan catatan.
-
-Acceptance Criteria:
-- [x] Payment dapat disimpan.
-- [x] Payment terhubung ke invoice.
-- [x] Payment terhubung ke customer.
-- [x] Payment terhubung ke POP.
-- [x] Payment memiliki status.
-
-Catatan Test:
-- `php artisan test --filter=PaymentModelTest` lulus: 1 test, 11 assertions.
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test --filter='PaymentModelTest|InvoiceModelTest|InvoiceCreateTest|InvoiceListTest'` lulus: 11 tests, 63 assertions.
-- Full test suite dengan `VIEW_COMPILED_PATH` temp: 96 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pembayaran.
-
----
 
 ## Sprint 1 - Foundation
 
@@ -1325,6 +1263,80 @@ Catatan Test:
 - `php artisan test` dengan `VIEW_COMPILED_PATH` temp berjalan 95 passed, 2 failed pada `CustomerEditTest` lama terkait file upload cleanup dokumen, bukan modul tagihan.
 
 ---
+
+# Sprint 6 — Pembayaran
+
+## Tujuan Sprint 6
+Membuat pencatatan pembayaran dan update status invoice.
+
+---
+
+### S6-T001 — Migration dan Model Payment
+Status: Done
+
+Tujuan:
+Membuat struktur pembayaran.
+
+Checklist:
+- [x] Buat tabel `payments`.
+- [x] Tambahkan nomor pembayaran.
+- [x] Tambahkan invoice_id.
+- [x] Tambahkan customer_id.
+- [x] Tambahkan pop_id.
+- [x] Tambahkan tanggal bayar.
+- [x] Tambahkan metode bayar.
+- [x] Tambahkan nominal bayar.
+- [x] Tambahkan penerima.
+- [x] Tambahkan bukti pembayaran.
+- [x] Tambahkan status pembayaran.
+- [x] Tambahkan catatan.
+
+Acceptance Criteria:
+- [x] Payment dapat disimpan.
+- [x] Payment terhubung ke invoice.
+- [x] Payment terhubung ke customer.
+- [x] Payment terhubung ke POP.
+- [x] Payment memiliki status.
+
+Catatan Test:
+- `php artisan test --filter=PaymentModelTest` lulus: 1 test, 11 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test --filter='PaymentModelTest|InvoiceModelTest|InvoiceCreateTest|InvoiceListTest'` lulus: 11 tests, 63 assertions.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 96 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pembayaran.
+
+---
+
+### S6-T002 — Input Pembayaran
+Status: Done
+
+Tujuan:
+Membuat pencatatan pembayaran invoice.
+
+Checklist:
+- [x] Buat tombol input pembayaran di invoice.
+- [x] Buat form pembayaran.
+- [x] Pilih metode pembayaran.
+- [x] Input nominal.
+- [x] Upload bukti jika ada.
+- [x] Simpan pembayaran.
+- [x] Update paid amount invoice.
+- [x] Update remaining amount invoice.
+- [x] Update status invoice.
+
+Acceptance Criteria:
+- [x] Finance dapat mencatat pembayaran.
+- [x] Pembayaran muncul di detail pelanggan.
+- [x] Jika nominal penuh, invoice menjadi lunas.
+- [x] Jika nominal kurang, invoice menjadi sebagian.
+- [x] Bukti pembayaran dapat diupload.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentInputTest.php tests/Feature/PaymentModelTest.php tests/Feature/InvoiceListTest.php` lulus: 8 tests, 44 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 100 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pembayaran.
+
+---
+
+
 ## Blocked
 Belum ada.
 

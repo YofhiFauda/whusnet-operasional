@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
@@ -68,6 +69,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view_invoices')->group(function () {
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    });
+
+    Route::middleware('permission:create_payments')->group(function () {
+        Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
+        Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
     });
 
     Route::middleware('permission:view_customers')->group(function () {

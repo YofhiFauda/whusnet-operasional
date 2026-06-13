@@ -505,7 +505,10 @@ class CustomerController extends Controller
             'updater',
             'invoices' => function ($query) {
                 $query->orderBy('billing_period', 'desc');
-            }
+            },
+            'payments' => function ($query) {
+                $query->with(['invoice', 'receiver'])->latest('payment_date')->latest('id');
+            },
         ]);
 
         $status = $customer->status;

@@ -21,6 +21,25 @@ Format:
 ### Catatan
 ...
 
+## 2026-06-13 08:46 - Codex CLI
+
+### Task
+Fixer review notes S6-T002.
+
+### File yang Diubah
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+Memverifikasi issue wajib di `.ai/REVIEW_NOTES.md`: context `.ai/ACTIVE_TASK.md` dan `.ai/HANDOFF.md` sudah sinkron dengan `docs/TASKS.md` dan menunjuk ke S6-T003 — Daftar dan Detail Pembayaran. Tidak ada perubahan kode aplikasi dan tidak ada perluasan scope.
+
+### Cara Test
+- Tidak menjalankan test aplikasi karena perubahan hanya pada context `.ai`.
+- Verifikasi dilakukan dengan membaca `.ai/REVIEW_NOTES.md`, `.ai/ACTIVE_TASK.md`, `.ai/HANDOFF.md`, dan `docs/TASKS.md`.
+
+### Catatan
+Fix dibatasi pada issue review notes. S6-T003 tetap menjadi task aktif.
+
 ## 2026-06-13 08:20 - Codex CLI
 
 ### Task
@@ -38,6 +57,27 @@ Review notes menyatakan tidak ada perbaikan wajib untuk implementasi S6-T001. Ti
 
 ### Catatan
 Item di bagian perbaikan opsional review notes tidak dikerjakan karena bersifat rekomendasi untuk task berikutnya dan bukan issue wajib.
+
+## 2026-06-13 08:42 - Codex CLI
+
+### Task
+Fix review notes setelah review S6-T002.
+
+### File yang Diubah
+- .ai/ACTIVE_TASK.md
+- .ai/HANDOFF.md
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+Review notes menemukan context `.ai/ACTIVE_TASK.md` masih menunjuk ke S6-T002 meskipun `docs/TASKS.md` sudah mencatat S6-T002 Done dan S6-T003 In Progress. Context diperbarui agar task aktif mengikuti source of truth `docs/TASKS.md`: S6-T003 — Daftar dan Detail Pembayaran.
+
+### Cara Test
+- Tidak menjalankan test aplikasi karena tidak ada perubahan kode, route, view, migration, model, atau test.
+- Verifikasi dilakukan dengan membaca ulang file context yang diperbarui.
+
+### Catatan
+Fix dibatasi hanya pada issue wajib di `.ai/REVIEW_NOTES.md`. Tidak ada fitur baru dan tidak ada perluasan scope.
 
 ## 2026-06-12 16:45 - Codex CLI
 

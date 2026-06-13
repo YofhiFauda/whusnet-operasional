@@ -23,6 +23,11 @@
         <h1 class="text-xl font-bold text-slate-800 tracking-tight">Detail Tagihan {{ $invoice->invoice_number }}</h1>
     </div>
     <div class="flex gap-2">
+        @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status, ['lunas', 'batal'], true))
+            <a href="{{ route('invoices.payments.create', $invoice->id) }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+                Input Pembayaran
+            </a>
+        @endif
         <a href="{{ route('customers.show', $invoice->customer_id) }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
             Detail Pelanggan
         </a>
@@ -100,6 +105,54 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="lg:col-span-2 bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Riwayat Pembayaran</h2>
+                <p class="text-xs text-slate-500 mt-1">Pembayaran yang sudah dicatat untuk invoice ini.</p>
+            </div>
+        </div>
+
+        @if($invoice->payments->count() > 0)
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider text-[10px]">
+                            <th class="px-4 py-3">No. Pembayaran</th>
+                            <th class="px-4 py-3">Tanggal</th>
+                            <th class="px-4 py-3">Metode</th>
+                            <th class="px-4 py-3 text-right">Nominal</th>
+                            <th class="px-4 py-3">Penerima</th>
+                            <th class="px-4 py-3">Bukti</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        @foreach($invoice->payments as $payment)
+                            <tr class="hover:bg-slate-50/50 transition-colors">
+                                <td class="px-4 py-3 font-mono font-bold text-slate-800">{{ $payment->payment_number }}</td>
+                                <td class="px-4 py-3">{{ optional($payment->payment_date)->format('d/m/Y') }}</td>
+                                <td class="px-4 py-3">{{ strtoupper($payment->payment_method) }}</td>
+                                <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format((float) $payment->amount, 2, ',', '.') }}</td>
+                                <td class="px-4 py-3">{{ $payment->receiver->name ?? '-' }}</td>
+                                <td class="px-4 py-3">
+                                    @if($payment->proof_file)
+                                        <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="text-sky-700 hover:text-sky-900 font-semibold">Lihat bukti</a>
+                                    @else
+                                        <span class="text-slate-400">-</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <div class="p-6 text-center text-sm text-slate-500">
+                Belum ada pembayaran untuk invoice ini.
+            </div>
+        @endif
     </div>
 
     <div class="space-y-6">
