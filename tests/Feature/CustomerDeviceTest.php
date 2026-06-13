@@ -1,0 +1,206 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Customer;
+use App\Models\Pop;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class CustomerDeviceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $this->seed(\Database\Seeders\PermissionSeeder::class);
+        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+    }
+
+    public function test_technician_can_fill_customer_device(): void
+    {
+        $pop = $this->createPop('DEV1');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-001');
+
+        $response = $this->actingAs($technician)
+            ->post(route('customers.device.store', $customer->id), [
+                'device_type' => 'ont',
+                'brand' => 'Huawei',
+                'model' => 'HG8245H',
+                'serial_number' => 'SN123456',
+                'mac_address' => 'AA:BB:CC:DD:EE:FF',
+                'pppoe_username' => 'user001@whusnet',
+                'pppoe_password' => 'secret-pppoe',
+                'wifi_ssid' => 'WHUSNET-001',
+                'wifi_password' => 'secret-wifi',
+                'ip_address' => '192.168.1.10',
+                'vlan_id' => 100,
+                'odp' => 'ODP-DEV-01',
+                'odp_port' => '1',
+                'signal_rx_power' => -18.75,
+                'connection_mode' => 'pppoe',
+                'technical_note' => 'Perangkat terpasang dan koneksi normal.',
+            ]);
+
+        $response->assertStatus(302);
+        $this->assertDatabaseHas('customer_devices', [
+            'customer_id' => $customer->id,
+            'device_type' => 'ont',
+            'brand' => 'Huawei',
+            'serial_number' => 'SN123456',
+            'mac_address' => 'AA:BB:CC:DD:EE:FF',
+            'pppoe_password' => 'secret-pppoe',
+            'wifi_password' => 'secret-wifi',
+        ]);
+    }
+
+    public function test_device_data_is_visible_on_customer_detail(): void
+    {
+        $pop = $this->createPop('DEV2');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-002');
+
+        $customer->customerDevice()->create([
+            'device_type' => 'router',
+            'brand' => 'MikroTik',
+            'model' => 'hAP ac2',
+            'serial_number' => 'RTR001',
+            'mac_address' => '11:22:33:44:55:66',
+            'pppoe_username' => 'router002@whusnet',
+            'pppoe_password' => 'router-secret',
+            'wifi_ssid' => 'WHUSNET-ROUTER',
+            'wifi_password' => 'wifi-secret',
+            'ip_address' => '10.10.10.2',
+            'vlan_id' => 200,
+            'odp' => 'ODP-DEV-02',
+            'odp_port' => '2',
+            'signal_rx_power' => -19.50,
+            'connection_mode' => 'router',
+            'technical_note' => 'Router pelanggan sudah dikonfigurasi manual.',
+        ]);
+
+        $response = $this->actingAs($technician)
+            ->get(route('customers.show', $customer->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('MikroTik');
+        $response->assertSee('router002@whusnet');
+        $response->assertSee('router-secret');
+        $response->assertSee('wifi-secret');
+        $response->assertSee('Router pelanggan sudah dikonfigurasi manual.');
+    }
+
+    public function test_finance_cannot_fill_customer_device(): void
+    {
+        $pop = $this->createPop('DEV3');
+        $finance = $this->createUserWithRole('Finance/Kasir');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-003');
+
+        $response = $this->actingAs($finance)
+            ->post(route('customers.device.store', $customer->id), [
+                'device_type' => 'ont',
+            ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseMissing('customer_devices', [
+            'customer_id' => $customer->id,
+        ]);
+    }
+
+    public function test_customer_service_cannot_see_sensitive_device_fields(): void
+    {
+        $pop = $this->createPop('DEV4');
+        $customerService = $this->createUserWithRole('Customer Service');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-004');
+
+        $customer->customerDevice()->create([
+            'device_type' => 'ont',
+            'brand' => 'ZTE',
+            'model' => 'F609',
+            'serial_number' => 'ZTE001',
+            'mac_address' => 'AA:11:BB:22:CC:33',
+            'pppoe_username' => 'zte004@whusnet',
+            'pppoe_password' => 'hidden-pppoe',
+            'wifi_ssid' => 'WHUSNET-CS',
+            'wifi_password' => 'hidden-wifi',
+            'ip_address' => '192.168.100.1',
+            'connection_mode' => 'bridge',
+        ]);
+
+        $response = $this->actingAs($customerService)
+            ->get(route('customers.show', $customer->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('ZTE');
+        $response->assertSee('zte004@whusnet');
+        $response->assertDontSee('hidden-pppoe');
+        $response->assertDontSee('hidden-wifi');
+        $response->assertSee('********');
+        $response->assertDontSee('Isi / Ubah Perangkat');
+    }
+
+    public function test_invalid_mac_and_ip_are_rejected(): void
+    {
+        $pop = $this->createPop('DEV5');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-005');
+
+        $response = $this->actingAs($technician)
+            ->from(route('customers.show', $customer->id))
+            ->post(route('customers.device.store', $customer->id), [
+                'device_type' => 'ont',
+                'mac_address' => 'invalid-mac',
+                'ip_address' => '999.999.999.999',
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHasErrors(['mac_address', 'ip_address']);
+        $this->assertDatabaseMissing('customer_devices', [
+            'customer_id' => $customer->id,
+        ]);
+    }
+
+    private function createPop(string $code): Pop
+    {
+        return Pop::create([
+            'code' => $code,
+            'pop_code' => $code,
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP ' . $code,
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+    }
+
+    private function createCustomer(Pop $pop, string $code): Customer
+    {
+        return Customer::create([
+            'customer_code' => $code,
+            'full_name' => 'Customer Device ' . $code,
+            'phone' => '0812345678',
+            'pop_id' => $pop->id,
+            'status' => 'installed',
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+    }
+
+    private function createUserWithRole(string $roleName): User
+    {
+        $user = User::factory()->create();
+        $role = Role::where('name', $roleName)->firstOrFail();
+        $user->role_id = $role->id;
+        $user->save();
+
+        return $user;
+    }
+}

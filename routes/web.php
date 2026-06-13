@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Master\RegionController;
@@ -141,6 +142,10 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:fill_installation')->group(function () {
         Route::post('/customers/{customer}/installation', [\App\Http\Controllers\CustomerInstallationController::class, 'store'])->name('customers.installation.store');
+    });
+
+    Route::middleware('permission:fill_device')->group(function () {
+        Route::post('/customers/{customer}/device', [CustomerDeviceController::class, 'store'])->name('customers.device.store');
     });
 
     // Reports Management

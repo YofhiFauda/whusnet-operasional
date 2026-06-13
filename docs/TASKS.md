@@ -1,7 +1,7 @@
 ## Status Project Saat Ini
 Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Data Modem/ONT/Router Pelanggan
-Current Task: S8-T003 — Data Modem/ONT/Router Pelanggan
+Current Module: Data Dokumen Pelanggan
+Current Task: S8-T004 — Data Dokumen Pelanggan
 
 ---
 
@@ -16,42 +16,50 @@ Melengkapi data teknis pelanggan setelah billing dasar stabil.
 
 
 ### S8-T003 — Data Modem/ONT/Router Pelanggan
-Status: In Progress
+Status: Done
+Sprint: 8
+Selesai: 2026-06-13
 
 Tujuan:
 Membuat data perangkat pelanggan.
 
 Checklist:
-- [ ] Buat tabel `customer_devices`.
-- [ ] Tambahkan jenis perangkat.
-- [ ] Tambahkan merk.
-- [ ] Tambahkan tipe.
-- [ ] Tambahkan serial number.
-- [ ] Tambahkan MAC address.
-- [ ] Tambahkan username PPPoE.
-- [ ] Tambahkan password PPPoE.
-- [ ] Tambahkan SSID WiFi.
-- [ ] Tambahkan password WiFi.
-- [ ] Tambahkan IP address.
-- [ ] Tambahkan VLAN ID.
-- [ ] Tambahkan ODP.
-- [ ] Tambahkan port ODP.
-- [ ] Tambahkan redaman.
-- [ ] Tambahkan mode koneksi.
-- [ ] Tambahkan catatan teknis.
-- [ ] Batasi akses field sensitif.
+- [x] Buat tabel `customer_devices`.
+- [x] Tambahkan jenis perangkat.
+- [x] Tambahkan merk.
+- [x] Tambahkan tipe.
+- [x] Tambahkan serial number.
+- [x] Tambahkan MAC address.
+- [x] Tambahkan username PPPoE.
+- [x] Tambahkan password PPPoE.
+- [x] Tambahkan SSID WiFi.
+- [x] Tambahkan password WiFi.
+- [x] Tambahkan IP address.
+- [x] Tambahkan VLAN ID.
+- [x] Tambahkan ODP.
+- [x] Tambahkan port ODP.
+- [x] Tambahkan redaman.
+- [x] Tambahkan mode koneksi.
+- [x] Tambahkan catatan teknis.
+- [x] Batasi akses field sensitif.
 
 Acceptance Criteria:
-- [ ] Teknisi dapat mengisi data perangkat.
-- [ ] Data perangkat tampil di detail pelanggan.
-- [ ] Password PPPoE dan WiFi dibatasi aksesnya.
-- [ ] Finance tidak dapat mengubah data modem.
-- [ ] CS tidak dapat melihat field sensitif jika tidak diizinkan.
+- [x] Teknisi dapat mengisi data perangkat.
+- [x] Data perangkat tampil di detail pelanggan.
+- [x] Password PPPoE dan WiFi dibatasi aksesnya.
+- [x] Finance tidak dapat mengubah data modem.
+- [x] CS tidak dapat melihat field sensitif jika tidak diizinkan.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/PermissionTest.php` lulus: 7 tests, 52 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerDetailTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php` lulus: 11 tests, 61 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 143 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul perangkat.
 
 ---
 
 ### S8-T004 — Data Dokumen Pelanggan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat penyimpanan dokumen pelanggan.

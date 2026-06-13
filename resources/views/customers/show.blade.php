@@ -195,6 +195,7 @@
             <button onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">POP/Cabang</button>
             <button onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Survey</button>
             <button onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Pemasangan</button>
+            <button onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Perangkat</button>
             <button onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Paket & Layanan</button>
             <button onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Billing</button>
             <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Tagihan</button>
@@ -483,6 +484,10 @@
             <!-- Tab: Pemasangan -->
             <div id="tab-content-pemasangan" class="tab-content hidden space-y-6">
                 @include('customers.tabs._installation')
+            </div>
+
+            <div id="tab-content-perangkat" class="tab-content hidden space-y-6">
+                @include('customers.tabs._device')
             </div>
 
             <!-- Tab 5: Paket & Layanan -->
@@ -1034,6 +1039,20 @@
 
     function closeInstallationModal() {
         const modal = document.getElementById('installation-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function openDeviceModal() {
+        const modal = document.getElementById('device-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function closeDeviceModal() {
+        const modal = document.getElementById('device-modal');
         if (modal) {
             modal.classList.add('hidden');
         }

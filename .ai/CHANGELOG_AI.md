@@ -26,6 +26,30 @@ Format:
 
 ...
 
+## 2026-06-13 15:20 - Codex CLI
+
+### Task
+Fixer review notes S8-T003 menuju S8-T004.
+
+### File yang Diubah
+- .ai/ACTIVE_TASK.md
+- .ai/HANDOFF.md
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+- Menangani issue wajib di `.ai/REVIEW_NOTES.md`: context AI yang masih tertinggal di S8-T003 disinkronkan dengan `docs/TASKS.md`.
+- `.ai/ACTIVE_TASK.md` dan `.ai/HANDOFF.md` sekarang menunjuk ke S8-T004 — Data Dokumen Pelanggan.
+- Tidak mengerjakan refactor dokumen atau implementasi upload dokumen dalam sesi Fixer ini agar tidak membuat fitur baru dan tidak memperluas scope.
+
+### Cara Test
+- Tidak menjalankan test aplikasi karena perubahan hanya pada file context `.ai`.
+- Verifikasi dilakukan dengan membaca ulang `.ai/ACTIVE_TASK.md`, `.ai/HANDOFF.md`, `.ai/SESSION_STATE.md`, dan `.ai/CHANGELOG_AI.md`.
+
+### Catatan
+- Fix dibatasi pada issue review notes terkait sinkronisasi context.
+- Working tree sudah memiliki perubahan implementasi Sprint 8 sebelum sesi Fixer ini; perubahan tersebut tidak disentuh.
+
 ## 2026-06-13 14:30 - Codex CLI
 
 ### Task

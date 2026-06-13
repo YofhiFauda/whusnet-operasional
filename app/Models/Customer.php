@@ -192,6 +192,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasOne<CustomerDevice, $this>
+     */
+    public function customerDevice(): HasOne
+    {
+        return $this->hasOne(CustomerDevice::class);
+    }
+
+    /**
      * Auto-update data_completeness_status whenever the model is saved.
      * Uses CustomerValidationService to derive the correct status.
      */
