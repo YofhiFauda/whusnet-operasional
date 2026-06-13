@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Payment extends Model
 {
@@ -30,6 +31,40 @@ class Payment extends Model
             'payment_date' => 'date',
             'amount' => 'decimal:2',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Payment $payment): void {
+            $payment->writeAuditLog('create', null, $payment->auditPayload());
+        });
+
+        static::updated(function (Payment $payment): void {
+            $changed = array_keys($payment->getChanges());
+            $changed = array_values(array_diff($changed, ['updated_at']));
+
+            if ($changed === []) {
+                return;
+            }
+
+            $action = $payment->wasChanged('payment_status') && $payment->payment_status === 'ditolak'
+                ? 'cancel'
+                : 'update';
+
+            $oldValues = [];
+            $newValues = [];
+
+            foreach ($changed as $field) {
+                $oldValues[$field] = $payment->getOriginal($field);
+                $newValues[$field] = $payment->{$field};
+            }
+
+            $payment->writeAuditLog($action, $oldValues, $newValues);
+        });
+
+        static::deleted(function (Payment $payment): void {
+            $payment->writeAuditLog('delete', $payment->auditPayload(), null);
+        });
     }
 
     /**
@@ -73,6 +108,16 @@ class Payment extends Model
     }
 
     /**
+     * Get audit logs for this payment.
+     *
+     * @return MorphMany<AuditLog, $this>
+     */
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
+    }
+
+    /**
      * Scope a query to payments from POPs accessible by the user.
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
@@ -94,5 +139,45 @@ class Payment extends Model
         $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
 
         return $query->whereIn('pop_id', $assignedPopIds);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function auditPayload(): array
+    {
+        return $this->only([
+            'payment_number',
+            'invoice_id',
+            'customer_id',
+            'pop_id',
+            'payment_date',
+            'payment_method',
+            'amount',
+            'received_by',
+            'proof_file',
+            'payment_status',
+            'note',
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed>|null $oldValues
+     * @param array<string, mixed>|null $newValues
+     */
+    private function writeAuditLog(string $action, ?array $oldValues, ?array $newValues): void
+    {
+        AuditLog::create([
+            'user_id' => auth()->id(),
+            'module' => 'Pembayaran',
+            'action' => $action,
+            'auditable_type' => self::class,
+            'auditable_id' => $this->id,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => request()?->ip(),
+            'user_agent' => request()?->userAgent(),
+            'created_at' => now(),
+        ]);
     }
 }

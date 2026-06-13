@@ -88,6 +88,50 @@
                 <p class="text-sm text-slate-500">Bukti pembayaran belum diupload.</p>
             @endif
         </div>
+
+        @if(auth()->user()->hasPermission('view_audit_logs'))
+            <div class="border-t border-slate-100 p-6">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Riwayat Audit Pembayaran</h3>
+                @if($payment->relationLoaded('auditLogs') && $payment->auditLogs->count() > 0)
+                    <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                        <table class="min-w-full divide-y divide-slate-100 text-xs">
+                            <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-bold">Waktu</th>
+                                    <th class="px-4 py-3 text-left font-bold">Aksi</th>
+                                    <th class="px-4 py-3 text-left font-bold">User</th>
+                                    <th class="px-4 py-3 text-left font-bold">Data Sebelum</th>
+                                    <th class="px-4 py-3 text-left font-bold">Data Sesudah</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach($payment->auditLogs as $auditLog)
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-slate-700">
+                                            {{ optional($auditLog->created_at)->format('d/m/Y H:i') }}
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap font-semibold text-slate-800">
+                                            {{ ucwords(str_replace('_', ' ', $auditLog->action)) }}
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-slate-700">
+                                            {{ $auditLog->user->name ?? '-' }}
+                                        </td>
+                                        <td class="px-4 py-3 align-top">
+                                            <pre class="max-w-xs whitespace-pre-wrap break-words text-[10px] text-slate-600 bg-slate-50 border border-slate-100 rounded p-2">{{ $auditLog->old_values ? json_encode($auditLog->old_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : '-' }}</pre>
+                                        </td>
+                                        <td class="px-4 py-3 align-top">
+                                            <pre class="max-w-xs whitespace-pre-wrap break-words text-[10px] text-slate-600 bg-slate-50 border border-slate-100 rounded p-2">{{ $auditLog->new_values ? json_encode($auditLog->new_values, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : '-' }}</pre>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="text-sm text-slate-500">Belum ada riwayat audit pembayaran.</p>
+                @endif
+            </div>
+        @endif
     </div>
 
     <div class="space-y-6">

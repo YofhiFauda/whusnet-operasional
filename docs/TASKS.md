@@ -2,35 +2,9 @@
 # Website Billing ISP Berbasis Master Data Pelanggan
 
 ## Status Project Saat Ini
-Current Sprint: Sprint 6 — Pembayaran
-Current Module: Audit Log Pembayaran
-Current Task: S6-T004 — Audit Log Pembayaran
-
----
-
-# Sprint 6 — Pembayaran
-
-## Tujuan Sprint 6
-Membuat pencatatan pembayaran dan update status invoice.
-
-### S6-T004 — Audit Log Pembayaran
-Status: In Progress
-
-Tujuan:
-Mencatat perubahan pembayaran.
-
-Checklist:
-- [ ] Catat create pembayaran.
-- [ ] Catat update pembayaran.
-- [ ] Catat pembatalan pembayaran jika ada.
-- [ ] Catat user yang melakukan perubahan.
-- [ ] Catat waktu perubahan.
-- [ ] Catat data sebelum dan sesudah.
-
-Acceptance Criteria:
-- [ ] Perubahan pembayaran masuk audit log.
-- [ ] Owner/Admin Pusat dapat melihat log pembayaran.
-- [ ] Perubahan pembayaran tidak hilang dari riwayat.
+Current Sprint: Sprint 7 — Dashboard dan Laporan
+Current Module: Dashboard Ringkasan
+Current Task: S7-T001 — Dashboard Ringkasan
 
 ---
 
@@ -42,7 +16,7 @@ Membuat dashboard dan laporan operasional sederhana.
 ---
 
 ### S7-T001 — Dashboard Ringkasan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat dashboard ringkasan pelanggan dan billing.
@@ -1337,6 +1311,32 @@ Acceptance Criteria:
 Catatan Test:
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentListTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentModelTest.php tests/Feature/InvoiceListTest.php` lulus: 12 tests, 68 assertions.
 - `npm run build` lulus.
+
+---
+
+### S6-T004 — Audit Log Pembayaran
+Status: Done
+
+Tujuan:
+Mencatat perubahan pembayaran.
+
+Checklist:
+- [x] Catat create pembayaran.
+- [x] Catat update pembayaran.
+- [x] Catat pembatalan pembayaran jika ada.
+- [x] Catat user yang melakukan perubahan.
+- [x] Catat waktu perubahan.
+- [x] Catat data sebelum dan sesudah.
+
+Acceptance Criteria:
+- [x] Perubahan pembayaran masuk audit log.
+- [x] Owner/Admin Pusat dapat melihat log pembayaran.
+- [x] Perubahan pembayaran tidak hilang dari riwayat.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PaymentAuditLogTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/PaymentModelTest.php` lulus: 11 tests, 68 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 106 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul pembayaran.
 
 ---
 

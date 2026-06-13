@@ -1,32 +1,40 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last synced at: 2026-06-13 09:09:49
+Last synced at: 2026-06-13 09:23:11
 
-Current Sprint: Sprint 6 — Pembayaran
-Current Module: Audit Log Pembayaran
-Current Task: S6-T004 — Audit Log Pembayaran
+Current Sprint: Sprint 7 — Dashboard dan Laporan
+Current Module: Dashboard Ringkasan
+Current Task: S7-T001 — Dashboard Ringkasan
 Status: In Progress
 
 ## Task Detail
 
-### S6-T004 — Audit Log Pembayaran
+### S7-T001 — Dashboard Ringkasan
 Status: In Progress
 
 Tujuan:
-Mencatat perubahan pembayaran.
+Membuat dashboard ringkasan pelanggan dan billing.
 
 Checklist:
-- [ ] Catat create pembayaran.
-- [ ] Catat update pembayaran.
-- [ ] Catat pembatalan pembayaran jika ada.
-- [ ] Catat user yang melakukan perubahan.
-- [ ] Catat waktu perubahan.
-- [ ] Catat data sebelum dan sesudah.
+- [ ] Total pelanggan.
+- [ ] Total pelanggan aktif.
+- [ ] Total pelanggan belum lengkap.
+- [ ] Total pelanggan siap billing.
+- [ ] Total pelanggan per POP.
+- [ ] Total tagihan bulan ini.
+- [ ] Total pembayaran bulan ini.
+- [ ] Total tunggakan.
+- [ ] Tagihan jatuh tempo.
+- [ ] Data pelanggan yang perlu dilengkapi.
+- [ ] Filter POP.
+- [ ] Filter periode.
 
 Acceptance Criteria:
-- [ ] Perubahan pembayaran masuk audit log.
-- [ ] Owner/Admin Pusat dapat melihat log pembayaran.
-- [ ] Perubahan pembayaran tidak hilang dari riwayat.
+- [ ] Owner melihat semua data.
+- [ ] Admin Pusat melihat semua cabang.
+- [ ] Admin Cabang hanya melihat cabangnya.
+- [ ] Dashboard dapat difilter berdasarkan POP.
+- [ ] Dashboard dapat difilter berdasarkan periode.
 
 ---

@@ -97,7 +97,13 @@ class PaymentController extends Controller
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
 
-        $payment->load(['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver']);
+        $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver'];
+
+        if (auth()->user()->hasPermission('view_audit_logs')) {
+            $relations[] = 'auditLogs.user';
+        }
+
+        $payment->load($relations);
 
         return view('payments.show', compact('payment'));
     }

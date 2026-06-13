@@ -7,13 +7,13 @@ Local sync script
 Agent berikutnya wajib membaca docs/TASKS.md dan .ai/ACTIVE_TASK.md sebelum bekerja.
 
 ## Task Aktif
-S6-T004 — Audit Log Pembayaran
+S7-T001 — Dashboard Ringkasan
 
 ## Ringkasan Scope
 Ikuti task aktif di docs/TASKS.md. Jangan mengerjakan task lain atau modul sprint berikutnya.
 
 ## Scope yang Boleh Dikerjakan
-Modul: Audit Log Pembayaran
+Modul: Dashboard Ringkasan
 
 ## Scope yang Tidak Boleh Dikerjakan
 Semua fitur di luar task aktif, fitur post-MVP, dan modul sprint berikutnya.
