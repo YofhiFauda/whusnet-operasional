@@ -166,6 +166,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerInstallation, $this>
+     */
+    public function installations(): HasMany
+    {
+        return $this->hasMany(CustomerInstallation::class);
+    }
+
+    /**
      * Get the latest survey.
      * 
      * @return HasOne<CustomerSurvey, $this>
@@ -173,6 +181,14 @@ class Customer extends Model
     public function latestSurvey(): HasOne
     {
         return $this->hasOne(CustomerSurvey::class)->latestOfMany();
+    }
+
+    /**
+     * @return HasOne<CustomerInstallation, $this>
+     */
+    public function latestInstallation(): HasOne
+    {
+        return $this->hasOne(CustomerInstallation::class)->latestOfMany();
     }
 
     /**

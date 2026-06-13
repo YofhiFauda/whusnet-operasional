@@ -1,23 +1,34 @@
 # Handoff
 
-Generated at: 2026-06-13 10:20:00
+## Dari Agent
+Local sync script
 
-## Log Pekerjaan Terakhir
-1. **S7-T005 — Laporan Import Data (Selesai)**:
-   - Membuat `ImportReportController` yang memproses filter pencarian (`search`), status (`pending`, `imported`, `failed`), dan rentang tanggal (`start_date`, `end_date`), menghitung ringkasan agregat, serta streaming ekspor CSV log error import dengan BOM UTF-8.
-   - Melindungi hak akses POP menggunakan logika filter `uploaded_by` sehingga Admin Cabang terikat pada batch yang diunggah sendiri.
-   - Menambahkan submenu **Laporan Import Data** pada sidebar `layouts.app` di bawah dropdown menu **LAPORAN**.
-   - Membuat halaman view blade premium `reports/imports/index.blade.php` dengan grid metrik agregat dan tabel log.
-   - Membuat halaman view blade premium `reports/imports/show.blade.php` dengan grid metrik detail batch dan tabel log error.
-   - Membuat file unit/feature test `tests/Feature/ReportImportTest.php` untuk memvalidasi hak akses (RBAC), filter, detail error, dan fitur ekspor CSV.
-   - Menjalankan seluruh test suite dan semuanya lulus (`135 passed`, `714 assertions`).
+## Untuk Agent
+Agent berikutnya wajib membaca docs/TASKS.md dan .ai/ACTIVE_TASK.md sebelum bekerja.
 
-## Posisi Project Saat Ini
-* **Sprint Aktif**: Sprint 8 — Data Teknis Pelanggan.
-* **Task Aktif**: `S8-T001 — Data Survey Pelanggan` (Status: *Todo*).
+## Task Aktif
+S8-T003 — Data Modem/ONT/Router Pelanggan
 
-## Langkah Berikutnya untuk Codex/AI Selanjutnya
-* Memulai pengerjaan **S8-T001 — Data Survey Pelanggan**.
-* Membuat migrasi dan model untuk tabel `customer_surveys`.
-* Menyediakan fungsionalitas input data survey oleh Teknisi (menggunakan permission `fill_survey`).
-* Menampilkan data survey di tab detail pelanggan yang sesuai.
+## Ringkasan Scope
+Ikuti task aktif di docs/TASKS.md. Jangan mengerjakan task lain atau modul sprint berikutnya.
+
+## Scope yang Boleh Dikerjakan
+Modul: Data Modem/ONT/Router Pelanggan
+
+## Scope yang Tidak Boleh Dikerjakan
+Semua fitur di luar task aktif, fitur post-MVP, dan modul sprint berikutnya.
+
+## File yang Boleh Diubah
+Hanya file yang relevan dengan task aktif setelah scope check.
+
+## File yang Tidak Boleh Disentuh
+File yang tidak terkait task aktif.
+
+## Acceptance Criteria
+Lihat checklist dan acceptance criteria di .ai/ACTIVE_TASK.md.
+
+## Instruksi untuk Agent Berikutnya
+Jalankan scope check sebelum coding. Gunakan docs/TASKS.md sebagai source of truth.
+
+## Catatan Risiko
+Context ini dibuat lokal tanpa memanggil gemini/codex.

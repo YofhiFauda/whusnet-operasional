@@ -1,14 +1,10 @@
 ## Status Project Saat Ini
-Current Sprint: Sprint 7 — Dashboard dan Laporan
-Current Module: Laporan Import Data
-Current Task: S7-T005 — Laporan Import Data (Selesai)
+Current Sprint: Sprint 8 — Data Teknis Pelanggan
+Current Module: Data Modem/ONT/Router Pelanggan
+Current Task: S8-T003 — Data Modem/ONT/Router Pelanggan
 
 ---
 
-# Sprint 7 — Dashboard dan Laporan
-Laporan hasil import data pelanggan lama.
-* **S7-T005 — Laporan Import Data** (Status: *Done*)
-* **S8-T001 — Data Survey Pelanggan** (Status: *Todo*)
 
 
 # Sprint 8 — Data Teknis Pelanggan
@@ -18,59 +14,9 @@ Melengkapi data teknis pelanggan setelah billing dasar stabil.
 
 ---
 
-### S8-T001 — Data Survey Pelanggan
-Status: Todo
-
-Tujuan:
-Membuat data survey pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customer_surveys`.
-- [ ] Tambahkan status survey.
-- [ ] Tambahkan tanggal survey.
-- [ ] Tambahkan jam mulai.
-- [ ] Tambahkan jam selesai.
-- [ ] Tambahkan petugas survey.
-- [ ] Tambahkan kebutuhan alat.
-- [ ] Tambahkan estimasi kabel.
-- [ ] Tambahkan ODP terdekat.
-- [ ] Tambahkan foto survey.
-- [ ] Tambahkan catatan survey.
-- [ ] Tampilkan di detail pelanggan.
-
-Acceptance Criteria:
-- [ ] Teknisi dapat mengisi data survey.
-- [ ] Data survey tampil di detail pelanggan.
-- [ ] User tanpa permission tidak dapat mengisi survey.
-
----
-
-### S8-T002 — Data Pemasangan Pelanggan
-Status: Todo
-
-Tujuan:
-Membuat data pemasangan pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customer_installations`.
-- [ ] Tambahkan status pemasangan.
-- [ ] Tambahkan tanggal jadwal.
-- [ ] Tambahkan jam jadwal.
-- [ ] Tambahkan teknisi pemasangan.
-- [ ] Tambahkan tanggal selesai.
-- [ ] Tambahkan foto pemasangan.
-- [ ] Tambahkan catatan pemasangan.
-- [ ] Tampilkan di detail pelanggan.
-
-Acceptance Criteria:
-- [ ] Teknisi dapat mengisi data pemasangan.
-- [ ] Data pemasangan tampil di detail pelanggan.
-- [ ] User tanpa permission tidak dapat mengisi pemasangan.
-
----
 
 ### S8-T003 — Data Modem/ONT/Router Pelanggan
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat data perangkat pelanggan.
@@ -155,6 +101,39 @@ Acceptance Criteria:
 ---
 
 ## Done
+
+### S8-T001 — Data Survey Pelanggan
+Status: Done
+Sprint: 8
+Tujuan: Membuat data survey pelanggan.
+Selesai: 2026-06-13
+
+### S8-T002 — Data Pemasangan Pelanggan
+Status: Done
+Sprint: 8
+Tujuan: Membuat data pemasangan pelanggan.
+Selesai: 2026-06-13
+
+Checklist:
+- [x] Buat tabel `customer_installations`.
+- [x] Tambahkan status pemasangan.
+- [x] Tambahkan tanggal jadwal.
+- [x] Tambahkan jam jadwal.
+- [x] Tambahkan teknisi pemasangan.
+- [x] Tambahkan tanggal selesai.
+- [x] Tambahkan foto pemasangan.
+- [x] Tambahkan catatan pemasangan.
+- [x] Tampilkan di detail pelanggan.
+
+Acceptance Criteria:
+- [x] Teknisi dapat mengisi data pemasangan.
+- [x] Data pemasangan tampil di detail pelanggan.
+- [x] User tanpa permission tidak dapat mengisi pemasangan.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDetailTest.php` lulus: 4 tests, 31 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 138 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pemasangan.
 
 ## Sprint 1 - Foundation
 
@@ -1360,6 +1339,44 @@ Catatan Test:
 
 ---
 
+# Sprint 8 — Data Teknis Pelanggan
+
+## Tujuan Sprint 8
+Melengkapi data teknis pelanggan setelah billing dasar stabil.
+
+---
+
+### S8-T001 — Data Survey Pelanggan
+Status: Done
+
+Tujuan:
+Membuat data survey pelanggan.
+
+Checklist:
+- [x] Buat tabel `customer_surveys`.
+- [x] Tambahkan status survey.
+- [x] Tambahkan tanggal survey.
+- [x] Tambahkan jam mulai.
+- [x] Tambahkan jam selesai.
+- [x] Tambahkan petugas survey.
+- [x] Tambahkan kebutuhan alat.
+- [x] Tambahkan estimasi kabel.
+- [x] Tambahkan ODP terdekat.
+- [x] Tambahkan foto survey.
+- [x] Tambahkan catatan survey.
+- [x] Tampilkan di detail pelanggan.
+
+Acceptance Criteria:
+- [x] Teknisi dapat mengisi data survey.
+- [x] Data survey tampil di detail pelanggan.
+- [x] User tanpa permission tidak dapat mengisi survey.
+
+Catatan Test:
+- `php artisan test tests/Feature/CustomerSurveyTest.php` lulus (PASS).
+- Status pelanggan otomatis berubah ke `surveyed` saat survey `completed`.
+- RBAC berfungsi: Teknisi dapat mengisi survey, Finance dilarang.
+
+---
 
 ## Blocked
 Belum ada.

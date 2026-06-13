@@ -503,6 +503,7 @@ class CustomerController extends Controller
             'customerService', 
             'creator', 
             'updater',
+            'installations.technician',
             'invoices' => function ($query) {
                 $query->orderBy('billing_period', 'desc');
             },

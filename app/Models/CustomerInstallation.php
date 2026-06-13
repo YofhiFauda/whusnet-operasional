@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable([
+    'customer_id',
+    'installation_status',
+    'scheduled_date',
+    'scheduled_time',
+    'technician_id',
+    'finished_date',
+    'installation_photo',
+    'installation_note',
+])]
+class CustomerInstallation extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'scheduled_date' => 'date',
+            'finished_date' => 'date',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<Customer, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function technician(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'technician_id');
+    }
+}

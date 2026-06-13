@@ -26,6 +26,65 @@ Format:
 
 ...
 
+## 2026-06-13 14:30 - Codex CLI
+
+### Task
+Fixer review notes Sprint 8 menuju S8-T003.
+
+### File yang Diubah
+- resources/views/customers/index.blade.php
+- resources/views/customers/show.blade.php
+- .ai/ACTIVE_TASK.md
+- .ai/HANDOFF.md
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+- Menyinkronkan context AI agar mengikuti `docs/TASKS.md`: task aktif adalah S8-T003 — Data Modem/ONT/Router Pelanggan.
+- Membersihkan placeholder UI out-of-scope/post-MVP dari halaman pelanggan: WhatsApp tagihan, cek redaman/ONT, tiket gangguan, dan ganti paket.
+- Menambahkan catatan changelog untuk pekerjaan Sprint 7 yang sudah selesai: dashboard ringkasan, laporan pelanggan, laporan tagihan, laporan pembayaran, dan laporan import.
+- Menambahkan catatan changelog untuk awal Sprint 8 yang sudah selesai: S8-T001 Data Survey Pelanggan dan S8-T002 Data Pemasangan Pelanggan.
+- Tidak mengimplementasikan fitur S8-T003 dalam sesi Fixer ini.
+
+### Cara Test
+- Verifikasi teks placeholder dengan pencarian pada `resources/views/customers/index.blade.php` dan `resources/views/customers/show.blade.php`: tidak ada hasil untuk placeholder yang ditargetkan.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views-fixer php artisan test tests/Feature/CustomerDetailTest.php tests/Feature/CustomerInstallationTest.php` lulus: 4 tests, 31 assertions.
+- `npm run build` lulus.
+
+### Catatan
+- Fix dibatasi pada issue di `.ai/REVIEW_NOTES.md`.
+- Working tree sudah memiliki perubahan Sprint 8 sebelum sesi Fixer ini; perubahan lain tidak disentuh.
+
+## 2026-06-13 14:20 - Codex CLI
+
+### Task
+Rangkuman Sprint 7 dan awal Sprint 8 yang sebelumnya belum tercatat.
+
+### File yang Diubah
+- docs/TASKS.md
+- app/Http/Controllers/CustomerController.php
+- app/Models/Customer.php
+- routes/web.php
+- resources/views/customers/show.blade.php
+- resources/views/customers/tabs/_installation.blade.php
+- app/Http/Controllers/CustomerInstallationController.php
+- app/Models/CustomerInstallation.php
+- database/migrations/2026_06_13_110000_create_customer_installations_table.php
+- tests/Feature/CustomerDetailTest.php
+- tests/Feature/CustomerInstallationTest.php
+
+### Ringkasan Perubahan
+- Sprint 7 selesai dengan dashboard ringkasan dan laporan sederhana untuk pelanggan, tagihan, pembayaran, dan import.
+- S8-T001 selesai untuk data survey pelanggan.
+- S8-T002 selesai untuk data pemasangan pelanggan, termasuk tabel, model, controller, tab detail pelanggan, RBAC, dan test feature.
+
+### Cara Test
+- Catatan test Sprint 7 dan Sprint 8 tersedia di `docs/TASKS.md`.
+- S8-T002 tercatat lulus pada `CustomerInstallationTest.php` dan `CustomerDetailTest.php`, serta `npm run build`.
+
+### Catatan
+- Entri ini menutup gap changelog yang disebut di `.ai/REVIEW_NOTES.md`.
+
 ## 2026-06-13 09:27 - Codex CLI
 
 ### Task

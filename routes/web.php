@@ -139,6 +139,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/survey', [\App\Http\Controllers\CustomerSurveyController::class, 'store'])->name('customers.survey.store');
     });
 
+    Route::middleware('permission:fill_installation')->group(function () {
+        Route::post('/customers/{customer}/installation', [\App\Http\Controllers\CustomerInstallationController::class, 'store'])->name('customers.installation.store');
+    });
+
     // Reports Management
     Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
     Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');

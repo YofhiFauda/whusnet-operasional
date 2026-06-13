@@ -1,36 +1,46 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last planned at: 2026-06-13 10:19:00
+Last synced at: 2026-06-13 14:42:16
 
 Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Data Survey Pelanggan
-Current Task: S8-T001 — Data Survey Pelanggan
-Status: Todo
+Current Module: Data Modem/ONT/Router Pelanggan
+Current Task: S8-T003 — Data Modem/ONT/Router Pelanggan
+Status: In Progress
 
 ## Task Detail
 
-### S8-T001 — Data Survey Pelanggan
-Status: Todo
+### S8-T003 — Data Modem/ONT/Router Pelanggan
+Status: In Progress
 
 Tujuan:
-Membuat data survey pelanggan.
+Membuat data perangkat pelanggan.
 
 Checklist:
-- [ ] Buat tabel `customer_surveys`.
-- [ ] Tambahkan status survey.
-- [ ] Tambahkan tanggal survey.
-- [ ] Tambahkan jam mulai.
-- [ ] Tambahkan jam selesai.
-- [ ] Tambahkan petugas survey.
-- [ ] Tambahkan kebutuhan alat.
-- [ ] Tambahkan estimasi kabel.
-- [ ] Tambahkan ODP terdekat.
-- [ ] Tambahkan foto survey.
-- [ ] Tambahkan catatan survey.
-- [ ] Tampilkan di detail pelanggan.
+- [ ] Buat tabel `customer_devices`.
+- [ ] Tambahkan jenis perangkat.
+- [ ] Tambahkan merk.
+- [ ] Tambahkan tipe.
+- [ ] Tambahkan serial number.
+- [ ] Tambahkan MAC address.
+- [ ] Tambahkan username PPPoE.
+- [ ] Tambahkan password PPPoE.
+- [ ] Tambahkan SSID WiFi.
+- [ ] Tambahkan password WiFi.
+- [ ] Tambahkan IP address.
+- [ ] Tambahkan VLAN ID.
+- [ ] Tambahkan ODP.
+- [ ] Tambahkan port ODP.
+- [ ] Tambahkan redaman.
+- [ ] Tambahkan mode koneksi.
+- [ ] Tambahkan catatan teknis.
+- [ ] Batasi akses field sensitif.
 
 Acceptance Criteria:
-- [ ] Teknisi dapat mengisi data survey.
-- [ ] Data survey tampil di detail pelanggan.
-- [ ] User tanpa permission tidak dapat mengisi survey.
+- [ ] Teknisi dapat mengisi data perangkat.
+- [ ] Data perangkat tampil di detail pelanggan.
+- [ ] Password PPPoE dan WiFi dibatasi aksesnya.
+- [ ] Finance tidak dapat mengubah data modem.
+- [ ] CS tidak dapat melihat field sensitif jika tidak diizinkan.
+
+---

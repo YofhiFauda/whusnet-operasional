@@ -122,15 +122,6 @@
                 </div>
             </div>
 
-            <!-- Actions shortcut -->
-            <div class="mt-6 grid grid-cols-2 gap-2 pt-6 border-t border-slate-100">
-                <button onclick="alert('[WA] Menghubungi WhatsApp...')" class="flex items-center justify-center gap-1.5 py-1.5 px-3 border border-slate-200 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
-                    WhatsApp
-                </button>
-                <button onclick="alert('[PING] Memindai status ONT... Redaman: -18.25 dBm (Stabil)')" class="flex items-center justify-center gap-1.5 py-1.5 px-3 border border-slate-200 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
-                    Cek ONT
-                </button>
-            </div>
         </div>
 
         <!-- Vertical Workflow Timeline Card -->
@@ -203,6 +194,7 @@
             <button onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Alamat</button>
             <button onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">POP/Cabang</button>
             <button onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Survey</button>
+            <button onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Pemasangan</button>
             <button onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Paket & Layanan</button>
             <button onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Billing</button>
             <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Tagihan</button>
@@ -486,6 +478,11 @@
             <!-- Tab: Survey -->
             <div id="tab-content-survey" class="tab-content hidden space-y-6">
                 @include('customers.tabs._survey')
+            </div>
+
+            <!-- Tab: Pemasangan -->
+            <div id="tab-content-pemasangan" class="tab-content hidden space-y-6">
+                @include('customers.tabs._installation')
             </div>
 
             <!-- Tab 5: Paket & Layanan -->
@@ -1023,6 +1020,20 @@
 
     function closeSurveyModal() {
         const modal = document.getElementById('survey-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function openInstallationModal() {
+        const modal = document.getElementById('installation-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function closeInstallationModal() {
+        const modal = document.getElementById('installation-modal');
         if (modal) {
             modal.classList.add('hidden');
         }

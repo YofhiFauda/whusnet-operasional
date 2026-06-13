@@ -32,12 +32,13 @@ class CustomerDetailTest extends TestCase
         $response->assertSee($customer->phone);
         $response->assertSee($customer->email);
 
-        // 6. Verify 10 Tab existence in layout
+        // 6. Verify 11 Tab existence in layout
         $tabs = [
             'Ringkasan',
             'Identitas',
             'Alamat',
             'POP/Cabang',
+            'Pemasangan',
             'Paket & Layanan',
             'Billing',
             'Tagihan',

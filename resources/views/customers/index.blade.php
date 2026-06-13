@@ -332,59 +332,7 @@
                     </div>
                 </button>
 
-                <!-- Option 3: Ganti Paket -->
-                <button onclick="triggerChangePackage()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-purple-50 text-purple-600 rounded-md group-hover:bg-purple-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.2" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-slate-800">Ubah Paket Internet</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Upgrade atau downgrade kecepatan</span>
-                    </div>
-                </button>
-
-                <!-- Option 4: Kirim WhatsApp Tagihan -->
-                <button onclick="triggerWhatsApp()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-green-50 text-green-600 rounded-md group-hover:bg-green-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-slate-800">WhatsApp Tagihan</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Kirim pengingat tagihan bulanan</span>
-                    </div>
-                </button>
-
-                <!-- Option 5: Redaman Signal ONT -->
-                <button onclick="triggerSignalCheck()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-amber-50 text-amber-600 rounded-md group-hover:bg-amber-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-slate-800">Cek Redaman (ONT)</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Ping sinyal & redaman optical dbm</span>
-                    </div>
-                </button>
-
-                <!-- Option 6: Buat Tiket Gangguan -->
-                <button onclick="triggerTicket()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-blue-50 text-blue-600 rounded-md group-hover:bg-blue-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-slate-800">Buat Tiket Gangguan</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Lapor NOC / gangguan redaman</span>
-                    </div>
-                </button>
-
-                <!-- Option 7: Terminate / Putus Layanan -->
+                <!-- Option 3: Terminate / Putus Layanan -->
                 <button onclick="triggerTerminate()" class="flex items-center gap-3 p-3 border border-red-50/50 rounded-lg hover:border-red-200 hover:bg-red-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/25 sm:col-span-2">
                     <div class="p-2 bg-red-50 text-red-600 rounded-md group-hover:bg-red-100 transition-colors">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -536,26 +484,6 @@
 
     function triggerEdit() {
         window.location.href = '/customers/' + selectedCustomerData.id + '/edit';
-    }
-
-    function triggerChangePackage() {
-        alert(`[LAYANAN] Membuka formulir migrasi paket layanan internet untuk ${selectedCustomerData.name}.\nPaket saat ini: ${selectedCustomerData.package}.`);
-        closeActionsModal();
-    }
-
-    function triggerWhatsApp() {
-        alert(`[WHATSAPP] Mengirim pengingat WhatsApp tagihan bulanan ${selectedCustomerData.price} ke nomor ${selectedCustomerData.phone}...`);
-        closeActionsModal();
-    }
-
-    function triggerSignalCheck() {
-        alert(`[ONT CHECK] Memindai status ONT untuk ${selectedCustomerData.name}...\n\nSinyal RX: -19.25 dBm (OPTIMAL)\nStatus Redaman: Normal\nUptime ONT: 14 hari, 6 jam`);
-        closeActionsModal();
-    }
-
-    function triggerTicket() {
-        alert(`[SUPPORT] Membuka formulir pembuatan tiket gangguan teknis baru untuk ${selectedCustomerData.name}.`);
-        closeActionsModal();
     }
 
     function triggerTerminate() {

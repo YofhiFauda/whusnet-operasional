@@ -1,10 +1,10 @@
 # Review Notes
 
 Source of truth: docs/TASKS.md
-Last reset at: 2026-06-13 09:39:10
+Last reset at: 2026-06-13 14:42:16
 
 ## Task Aktif
-S7-T001 — Dashboard Ringkasan
+S8-T003 — Data Modem/ONT/Router Pelanggan
 
 ## Status
 Belum ada review untuk task aktif ini.
