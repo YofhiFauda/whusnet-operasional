@@ -1,7 +1,7 @@
 ## Status Project Saat Ini
 Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Data Dokumen Pelanggan
-Current Task: S8-T004 — Data Dokumen Pelanggan
+Current Module: Audit Log Umum
+Current Task: S8-T005 — Audit Log Umum
 
 ---
 
@@ -58,31 +58,8 @@ Catatan Test:
 
 ---
 
-### S8-T004 — Data Dokumen Pelanggan
-Status: In Progress
-
-Tujuan:
-Membuat penyimpanan dokumen pelanggan.
-
-Checklist:
-- [ ] Buat tabel `customer_documents`.
-- [ ] Upload dokumen KTP.
-- [ ] Upload foto rumah.
-- [ ] Upload kontrak.
-- [ ] Upload foto survey.
-- [ ] Upload foto pemasangan.
-- [ ] Tampilkan dokumen di detail pelanggan.
-- [ ] Batasi akses dokumen berdasarkan permission.
-
-Acceptance Criteria:
-- [ ] Dokumen pelanggan dapat diupload.
-- [ ] Dokumen tampil di detail pelanggan.
-- [ ] User tanpa permission tidak dapat mengakses dokumen tertentu.
-
----
-
 ### S8-T005 — Audit Log Umum
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat audit log untuk perubahan data penting.
@@ -110,38 +87,36 @@ Acceptance Criteria:
 
 ## Done
 
-### S8-T001 — Data Survey Pelanggan
+### S8-T004 — Data Dokumen Pelanggan
 Status: Done
 Sprint: 8
-Tujuan: Membuat data survey pelanggan.
 Selesai: 2026-06-13
 
-### S8-T002 — Data Pemasangan Pelanggan
-Status: Done
-Sprint: 8
-Tujuan: Membuat data pemasangan pelanggan.
-Selesai: 2026-06-13
+Tujuan:
+Membuat penyimpanan dokumen pelanggan.
 
 Checklist:
-- [x] Buat tabel `customer_installations`.
-- [x] Tambahkan status pemasangan.
-- [x] Tambahkan tanggal jadwal.
-- [x] Tambahkan jam jadwal.
-- [x] Tambahkan teknisi pemasangan.
-- [x] Tambahkan tanggal selesai.
-- [x] Tambahkan foto pemasangan.
-- [x] Tambahkan catatan pemasangan.
-- [x] Tampilkan di detail pelanggan.
+- [x] Buat tabel `customer_documents`.
+- [x] Upload dokumen KTP.
+- [x] Upload foto rumah.
+- [x] Upload kontrak.
+- [x] Upload foto survey.
+- [x] Upload foto pemasangan.
+- [x] Tampilkan dokumen di detail pelanggan.
+- [x] Batasi akses dokumen berdasarkan permission.
 
 Acceptance Criteria:
-- [x] Teknisi dapat mengisi data pemasangan.
-- [x] Data pemasangan tampil di detail pelanggan.
-- [x] User tanpa permission tidak dapat mengisi pemasangan.
+- [x] Dokumen pelanggan dapat diupload.
+- [x] Dokumen tampil di detail pelanggan.
+- [x] User tanpa permission tidak dapat mengakses dokumen tertentu.
 
 Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDetailTest.php` lulus: 4 tests, 31 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDocumentTest.php tests/Feature/CustomerDetailTest.php` lulus: 6 tests, 38 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/PermissionTest.php tests/Feature/RolePermissionTest.php tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDocumentTest.php` lulus: 23 tests, 108 assertions.
 - `npm run build` lulus.
-- Full test suite dengan `VIEW_COMPILED_PATH` temp: 138 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pemasangan.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 148 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen legacy pelanggan, bukan modul `customer_documents`.
+
+---
 
 ## Sprint 1 - Foundation
 
@@ -1385,6 +1360,37 @@ Catatan Test:
 - RBAC berfungsi: Teknisi dapat mengisi survey, Finance dilarang.
 
 ---
+
+### S8-T002 — Data Pemasangan Pelanggan
+Status: Done
+Sprint: 8
+Tujuan: Membuat data pemasangan pelanggan.
+Selesai: 2026-06-13
+
+Checklist:
+- [x] Buat tabel `customer_installations`.
+- [x] Tambahkan status pemasangan.
+- [x] Tambahkan tanggal jadwal.
+- [x] Tambahkan jam jadwal.
+- [x] Tambahkan teknisi pemasangan.
+- [x] Tambahkan tanggal selesai.
+- [x] Tambahkan foto pemasangan.
+- [x] Tambahkan catatan pemasangan.
+- [x] Tampilkan di detail pelanggan.
+
+Acceptance Criteria:
+- [x] Teknisi dapat mengisi data pemasangan.
+- [x] Data pemasangan tampil di detail pelanggan.
+- [x] User tanpa permission tidak dapat mengisi pemasangan.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerInstallationTest.php tests/Feature/CustomerDetailTest.php` lulus: 4 tests, 31 assertions.
+- `npm run build` lulus.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 138 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pemasangan.
+
+---
+
+
 
 ## Blocked
 Belum ada.

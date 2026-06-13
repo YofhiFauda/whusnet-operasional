@@ -861,105 +861,86 @@
 
             <!-- Tab 9: Dokumen -->
             <div id="tab-content-dokumen" class="tab-content hidden space-y-6">
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">LAMPIRAN DOKUMEN PENDUKUNG</span>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <!-- Doc 1: KTP -->
-                    <div class="border border-slate-200 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm bg-white">
-                        <div class="p-4 bg-slate-50 flex items-center justify-center h-36 border-b border-slate-100 relative group">
-                            @if($customer->foto_ktp)
-                                <img src="{{ asset('storage/' . $customer->foto_ktp) }}" alt="Foto KTP" class="max-h-28 max-w-full rounded object-contain shadow-sm">
-                            @else
-                                <div class="text-center text-slate-400">
-                                    <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
-                                    </svg>
-                                    <span class="block text-[10px] mt-2 font-semibold uppercase tracking-wider">Belum Diunggah</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="p-3 bg-white flex items-center justify-between">
-                            <div>
-                                <span class="block text-xs font-semibold text-slate-800">Foto KTP</span>
-                                <span class="block text-[9px] text-slate-400 mt-0.5 font-mono">{{ $customer->foto_ktp ? 'Tersimpan' : 'Kosong' }}</span>
-                            </div>
-                            @if($customer->foto_ktp)
-                                <a href="{{ asset('storage/' . $customer->foto_ktp) }}" target="_blank" download class="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-slate-100 rounded cursor-pointer transition-colors" title="Download Foto KTP">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- Doc 2: Foto Rumah -->
-                    <div class="border border-slate-200 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm bg-white">
-                        <div class="p-4 bg-slate-50 flex items-center justify-center h-36 border-b border-slate-100 relative group">
-                            @if($customer->foto_rumah)
-                                <img src="{{ asset('storage/' . $customer->foto_rumah) }}" alt="Foto Rumah" class="max-h-28 max-w-full rounded object-contain shadow-sm">
-                            @else
-                                <div class="text-center text-slate-400">
-                                    <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                    </svg>
-                                    <span class="block text-[10px] mt-2 font-semibold uppercase tracking-wider">Belum Diunggah</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="p-3 bg-white flex items-center justify-between">
-                            <div>
-                                <span class="block text-xs font-semibold text-slate-800">Foto Depan Rumah</span>
-                                <span class="block text-[9px] text-slate-400 mt-0.5 font-mono">{{ $customer->foto_rumah ? 'Tersimpan' : 'Kosong' }}</span>
-                            </div>
-                            @if($customer->foto_rumah)
-                                <a href="{{ asset('storage/' . $customer->foto_rumah) }}" target="_blank" download class="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-slate-100 rounded cursor-pointer transition-colors" title="Download Foto Rumah">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- Doc 3: Foto Kontrak -->
-                    <div class="border border-slate-200 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm bg-white">
-                        <div class="p-4 bg-slate-50 flex items-center justify-center h-36 border-b border-slate-100 relative group">
-                            @if($customer->foto_kontrak)
-                                @if(Str::endsWith(strtolower($customer->foto_kontrak), '.pdf'))
-                                    <!-- PDF Icon -->
-                                    <div class="h-28 w-28 bg-red-50 border border-red-200 rounded-lg flex flex-col items-center justify-center text-red-600 shadow-sm">
-                                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <span class="text-[10px] font-bold mt-2">DOKUMEN PDF</span>
-                                    </div>
-                                @else
-                                    <img src="{{ asset('storage/' . $customer->foto_kontrak) }}" alt="Foto Kontrak" class="max-h-28 max-w-full rounded object-contain shadow-sm">
-                                @endif
-                            @else
-                                <div class="text-center text-slate-400">
-                                    <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    <span class="block text-[10px] mt-2 font-semibold uppercase tracking-wider">Belum Diunggah</span>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="p-3 bg-white flex items-center justify-between">
-                            <div>
-                                <span class="block text-xs font-semibold text-slate-800">Foto Kontrak</span>
-                                <span class="block text-[9px] text-slate-400 mt-0.5 font-mono">{{ $customer->foto_kontrak ? 'Tersimpan' : 'Kosong' }}</span>
-                            </div>
-                            @if($customer->foto_kontrak)
-                                <a href="{{ asset('storage/' . $customer->foto_kontrak) }}" target="_blank" download class="p-1.5 text-sky-600 hover:text-sky-800 hover:bg-slate-100 rounded cursor-pointer transition-colors" title="Download Foto Kontrak">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                </a>
-                            @endif
-                        </div>
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">LAMPIRAN DOKUMEN PENDUKUNG</span>
+                        <p class="text-xs text-slate-500">Dokumen disimpan private dan hanya bisa dibuka oleh user dengan permission dokumen pelanggan.</p>
                     </div>
                 </div>
+
+                @if(auth()->user()->hasPermission('view_customer_documents'))
+                    @if(auth()->user()->hasPermission('upload_customer_documents'))
+                        <form method="POST" action="{{ route('customers.documents.store', $customer->id) }}" enctype="multipart/form-data" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                            @csrf
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div>
+                                    <label for="document_type" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jenis Dokumen</label>
+                                    <select name="document_type" id="document_type" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                                        @foreach(\App\Models\CustomerDocument::TYPES as $type => $label)
+                                            <option value="{{ $type }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="document_file" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">File</label>
+                                    <input type="file" name="document_file" id="document_file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                                    <p class="text-[10px] text-slate-400 mt-1">Format: JPG, PNG, WEBP, PDF. Maksimal 4 MB.</p>
+                                </div>
+                                <div>
+                                    <button type="submit" class="w-full px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-md uppercase tracking-wide transition-colors">
+                                        Upload Dokumen
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    @endif
+
+                    @if($customer->documents->isNotEmpty())
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            @foreach($customer->documents->sortByDesc('created_at') as $document)
+                                <div class="border border-slate-200 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm bg-white">
+                                    <div class="p-4 bg-slate-50 flex items-center justify-center h-36 border-b border-slate-100">
+                                        @if($document->isImage())
+                                            <img src="{{ route('customers.documents.show', $document->id) }}" alt="{{ $document->typeLabel() }}" class="max-h-28 max-w-full rounded object-contain shadow-sm">
+                                        @else
+                                            <div class="h-28 w-28 bg-red-50 border border-red-200 rounded-lg flex flex-col items-center justify-center text-red-600 shadow-sm">
+                                                <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <span class="text-[10px] font-bold mt-2">DOKUMEN PDF</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="p-3 bg-white flex items-center justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <span class="block text-xs font-semibold text-slate-800 truncate">{{ $document->typeLabel() }}</span>
+                                            <span class="block text-[9px] text-slate-400 mt-0.5 font-mono">{{ $document->created_at?->format('d/m/Y H:i') }}</span>
+                                            <span class="block text-[9px] text-slate-400 mt-0.5 truncate">Upload: {{ $document->uploader?->name ?? '-' }}</span>
+                                        </div>
+                                        <a href="{{ route('customers.documents.show', $document->id) }}" target="_blank" class="shrink-0 p-1.5 text-sky-600 hover:text-sky-800 hover:bg-slate-100 rounded cursor-pointer transition-colors" title="Buka Dokumen">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0A9 9 0 113 12a9 9 0 0118 0z" />
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
+                            <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <h4 class="text-sm font-semibold text-slate-700">Belum ada dokumen pelanggan</h4>
+                            <p class="text-xs text-slate-500 mt-1">Dokumen KTP, rumah, kontrak, survey, dan pemasangan akan tampil setelah diupload.</p>
+                        </div>
+                    @endif
+                @else
+                    <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
+                        <h4 class="text-sm font-semibold text-slate-700">Akses dokumen dibatasi</h4>
+                        <p class="text-xs text-slate-500 mt-1">User Anda tidak memiliki permission untuk melihat dokumen pelanggan.</p>
+                    </div>
+                @endif
             </div>
 
             <!-- Tab 10: Riwayat Perubahan -->

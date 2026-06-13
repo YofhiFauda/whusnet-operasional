@@ -505,6 +505,7 @@ class CustomerController extends Controller
             'updater',
             'installations.technician',
             'customerDevice',
+            'documents.uploader',
             'invoices' => function ($query) {
                 $query->orderBy('billing_period', 'desc');
             },

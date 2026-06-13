@@ -64,3 +64,12 @@
 - 2026-06-13 14:58:37 | 💻 build | exit=0 | .ai/logs/20260613-144939-💻 build.log
 - 2026-06-13 15:03:04 | review | exit=0 | .ai/logs/20260613-150109-review.log
 - 2026-06-13 15:13:15 | 🔧 fix | exit=0 | .ai/logs/20260613-151006-🔧 fix.log
+- 2026-06-13 15:21:54 | close | exit=0 | .ai/logs/20260613-152119-close.log
+- 2026-06-13 15:21:54 | sync | exit=0 | .ai/logs/20260613-152154-sync.log
+- 2026-06-13 15:30:54 | bootstrap | exit=0 | .ai/logs/20260613-153054-bootstrap.log
+- 2026-06-13 15:31:40 | plan | exit=0 | .ai/logs/20260613-153103-plan.log
+- 2026-06-13 15:41:17 | 💻 build | exit=0 | .ai/logs/20260613-153159-💻 build.log
+- 2026-06-13 15:43:50 | review | exit=0 | .ai/logs/20260613-154213-review.log
+- 2026-06-13 15:47:42 | 🔧 fix | exit=0 | .ai/logs/20260613-154401-🔧 fix.log
+- 2026-06-13 15:48:35 | close | exit=0 | .ai/logs/20260613-154801-close.log
+- 2026-06-13 15:48:36 | sync | exit=0 | .ai/logs/20260613-154836-sync.log

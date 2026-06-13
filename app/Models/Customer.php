@@ -200,6 +200,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(CustomerDocument::class);
+    }
+
+    /**
      * Auto-update data_completeness_status whenever the model is saved.
      * Uses CustomerValidationService to derive the correct status.
      */

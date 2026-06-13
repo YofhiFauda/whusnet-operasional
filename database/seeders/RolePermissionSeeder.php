@@ -46,6 +46,8 @@ class RolePermissionSeeder extends Seeder
                 'fill_survey',
                 'fill_installation',
                 'fill_device',
+                'view_customer_documents',
+                'upload_customer_documents',
                 'view_reports_own_pop',
                 'view_audit_logs',
             ];
@@ -81,6 +83,8 @@ class RolePermissionSeeder extends Seeder
                 'fill_survey',
                 'fill_installation',
                 'fill_device',
+                'view_customer_documents',
+                'upload_customer_documents',
             ];
             $permissionIds = Permission::whereIn('name', $teknisiPermissions)->pluck('id');
             $teknisiRole->permissions()->sync($permissionIds);
@@ -95,6 +99,7 @@ class RolePermissionSeeder extends Seeder
                 'create_customers',
                 'edit_customers',
                 'view_customers',
+                'view_customer_documents',
             ];
             $permissionIds = Permission::whereIn('name', $csPermissions)->pluck('id');
             $csRole->permissions()->sync($permissionIds);

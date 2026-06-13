@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
+use App\Http\Controllers\CustomerDocumentController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Master\RegionController;
@@ -146,6 +147,14 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:fill_device')->group(function () {
         Route::post('/customers/{customer}/device', [CustomerDeviceController::class, 'store'])->name('customers.device.store');
+    });
+
+    Route::middleware('permission:upload_customer_documents')->group(function () {
+        Route::post('/customers/{customer}/documents', [CustomerDocumentController::class, 'store'])->name('customers.documents.store');
+    });
+
+    Route::middleware('permission:view_customer_documents')->group(function () {
+        Route::get('/customer-documents/{document}', [CustomerDocumentController::class, 'show'])->name('customers.documents.show');
     });
 
     // Reports Management

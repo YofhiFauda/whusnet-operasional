@@ -126,6 +126,16 @@ class PermissionSeeder extends Seeder
                 'module' => 'Data Teknis',
                 'description' => 'Mengelola data perangkat modem/ONT/router pelanggan',
             ],
+            [
+                'name' => 'view_customer_documents',
+                'module' => 'Data Teknis',
+                'description' => 'Melihat dokumen teknis dan pendukung pelanggan',
+            ],
+            [
+                'name' => 'upload_customer_documents',
+                'module' => 'Data Teknis',
+                'description' => 'Mengupload dokumen teknis dan pendukung pelanggan',
+            ],
             // Modul Laporan
             [
                 'name' => 'view_reports_all',

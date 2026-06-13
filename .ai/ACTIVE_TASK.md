@@ -1,34 +1,38 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last planned at: 2026-06-13 15:20:00
+Last synced at: 2026-06-13 15:48:36
 
 Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Data Dokumen Pelanggan
-Current Task: S8-T004 — Data Dokumen Pelanggan
+Current Module: Audit Log Umum
+Current Task: S8-T005 — Audit Log Umum
 Status: In Progress
 
 ## Task Detail
 
-### S8-T004 — Data Dokumen Pelanggan
+### S8-T005 — Audit Log Umum
 Status: In Progress
 
 Tujuan:
-Membuat penyimpanan dokumen pelanggan.
+Membuat audit log untuk perubahan data penting.
 
 Checklist:
-- [ ] Buat tabel `customer_documents`.
-- [ ] Upload dokumen KTP.
-- [ ] Upload foto rumah.
-- [ ] Upload kontrak.
-- [ ] Upload foto survey.
-- [ ] Upload foto pemasangan.
-- [ ] Tampilkan dokumen di detail pelanggan.
-- [ ] Batasi akses dokumen berdasarkan permission.
+- [ ] Buat tabel `audit_logs`.
+- [ ] Catat perubahan pelanggan.
+- [ ] Catat perubahan paket.
+- [ ] Catat perubahan POP.
+- [ ] Catat perubahan tagihan.
+- [ ] Catat perubahan pembayaran.
+- [ ] Catat perubahan user.
+- [ ] Catat perubahan role.
+- [ ] Catat perubahan data teknis.
+- [ ] Buat halaman audit log untuk Owner/Admin Pusat.
 
 Acceptance Criteria:
-- [ ] Dokumen pelanggan dapat diupload.
-- [ ] Dokumen tampil di detail pelanggan.
-- [ ] User tanpa permission tidak dapat mengakses dokumen tertentu.
+- [ ] Perubahan pelanggan tercatat.
+- [ ] Perubahan pembayaran tercatat.
+- [ ] Perubahan tagihan tercatat.
+- [ ] Perubahan role tercatat.
+- [ ] Owner/Admin Pusat dapat melihat audit log.
 
 ---

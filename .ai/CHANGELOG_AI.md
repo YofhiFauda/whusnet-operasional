@@ -26,6 +26,32 @@ Format:
 
 ...
 
+## 2026-06-13 15:45 - Codex CLI
+
+### Task
+Fixer review notes S8-T004 menuju S8-T005.
+
+### File yang Diubah
+- app/Http/Controllers/CustomerDocumentController.php
+- tests/Feature/CustomerDocumentTest.php
+- .ai/ACTIVE_TASK.md
+- .ai/HANDOFF.md
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+- Menangani issue wajib di `.ai/REVIEW_NOTES.md`: context AI disinkronkan ke S8-T005 — Audit Log Umum.
+- Upload dokumen pelanggan sekarang dicatat ke `audit_logs` dengan module `Dokumen Pelanggan` dan action `upload`.
+- Test upload dokumen pelanggan ditambah assertion audit log.
+- Tidak menambah fitur baru seperti delete dokumen atau preview PDF.
+
+### Cara Test
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views-fixer-doc-audit php artisan test tests/Feature/CustomerDocumentTest.php` lulus: 5 tests, 21 assertions.
+
+### Catatan
+- Fix dibatasi pada issue review notes.
+- S8-T005 tetap In Progress; pekerjaan audit log umum lain tetap mengikuti `docs/TASKS.md`.
+
 ## 2026-06-13 15:20 - Codex CLI
 
 ### Task
