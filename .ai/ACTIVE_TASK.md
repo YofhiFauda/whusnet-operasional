@@ -1,40 +1,37 @@
 # Active Task
 
 Source of truth: docs/TASKS.md
-Last synced at: 2026-06-13 07:54:20
+Last synced at: 2026-06-13 08:22:52
 
 Current Sprint: Sprint 6 — Pembayaran
-Current Module: Migration dan Model Payment
-Current Task: S6-T001 — Migration dan Model Payment
+Current Module: Input Pembayaran
+Current Task: S6-T002 — Input Pembayaran
 Status: In Progress
 
 ## Task Detail
 
-### S6-T001 — Migration dan Model Payment
+### S6-T002 — Input Pembayaran
 Status: In Progress
 
 Tujuan:
-Membuat struktur pembayaran.
+Membuat pencatatan pembayaran invoice.
 
 Checklist:
-- [ ] Buat tabel `payments`.
-- [ ] Tambahkan nomor pembayaran.
-- [ ] Tambahkan invoice_id.
-- [ ] Tambahkan customer_id.
-- [ ] Tambahkan pop_id.
-- [ ] Tambahkan tanggal bayar.
-- [ ] Tambahkan metode bayar.
-- [ ] Tambahkan nominal bayar.
-- [ ] Tambahkan penerima.
-- [ ] Tambahkan bukti pembayaran.
-- [ ] Tambahkan status pembayaran.
-- [ ] Tambahkan catatan.
+- [ ] Buat tombol input pembayaran di invoice.
+- [ ] Buat form pembayaran.
+- [ ] Pilih metode pembayaran.
+- [ ] Input nominal.
+- [ ] Upload bukti jika ada.
+- [ ] Simpan pembayaran.
+- [ ] Update paid amount invoice.
+- [ ] Update remaining amount invoice.
+- [ ] Update status invoice.
 
 Acceptance Criteria:
-- [ ] Payment dapat disimpan.
-- [ ] Payment terhubung ke invoice.
-- [ ] Payment terhubung ke customer.
-- [ ] Payment terhubung ke POP.
-- [ ] Payment memiliki status.
+- [ ] Finance dapat mencatat pembayaran.
+- [ ] Pembayaran muncul di detail pelanggan.
+- [ ] Jika nominal penuh, invoice menjadi lunas.
+- [ ] Jika nominal kurang, invoice menjadi sebagian.
+- [ ] Bukti pembayaran dapat diupload.
 
 ---

@@ -150,6 +150,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * Auto-update data_completeness_status whenever the model is saved.
      * Uses CustomerValidationService to derive the correct status.
      */

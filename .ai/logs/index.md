@@ -6,3 +6,12 @@
 - 2026-06-12 16:36:57 | fix | exit=0 | .ai/logs/20260612-163331-fix.log
 - 2026-06-12 16:46:29 | close | exit=0 | .ai/logs/20260612-164552-close.log
 - 2026-06-13 07:54:20 | sync | exit=0 | .ai/logs/20260613-075420-sync.log
+- 2026-06-13 08:01:10 | bootstrap | exit=0 | .ai/logs/20260613-080110-bootstrap.log
+- 2026-06-13 08:02:13 | plan | exit=0 | .ai/logs/20260613-080114-plan.log
+- 2026-06-13 08:05:13 | sync | exit=0 | .ai/logs/20260613-080512-sync.log
+- 2026-06-13 08:09:41 | sync | exit=0 | .ai/logs/20260613-080940-sync.log
+- 2026-06-13 08:16:57 | build | exit=0 | .ai/logs/20260613-081131-build.log
+- 2026-06-13 08:18:52 | review | exit=0 | .ai/logs/20260613-081735-review.log
+- 2026-06-13 08:21:42 | fix | exit=0 | .ai/logs/20260613-081922-fix.log
+- 2026-06-13 08:22:51 | close | exit=0 | .ai/logs/20260613-082205-close.log
+- 2026-06-13 08:22:52 | sync | exit=0 | .ai/logs/20260613-082251-sync.log

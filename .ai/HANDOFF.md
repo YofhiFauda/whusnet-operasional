@@ -7,13 +7,13 @@ Local sync script
 Agent berikutnya wajib membaca docs/TASKS.md dan .ai/ACTIVE_TASK.md sebelum bekerja.
 
 ## Task Aktif
-S6-T001 — Migration dan Model Payment
+S6-T002 — Input Pembayaran
 
 ## Ringkasan Scope
 Ikuti task aktif di docs/TASKS.md. Jangan mengerjakan task lain atau modul sprint berikutnya.
 
 ## Scope yang Boleh Dikerjakan
-Modul: Migration dan Model Payment
+Modul: Input Pembayaran
 
 ## Scope yang Tidak Boleh Dikerjakan
 Semua fitur di luar task aktif, fitur post-MVP, dan modul sprint berikutnya.

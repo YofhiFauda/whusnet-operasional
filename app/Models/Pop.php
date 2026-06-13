@@ -72,6 +72,16 @@ class Pop extends Model
     }
 
     /**
+     * Get payments recorded under this POP.
+     *
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * Get the users assigned to this POP.
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<User, $this>

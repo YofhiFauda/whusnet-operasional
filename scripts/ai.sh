@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
+# --- PENGATURAN WARNA & FORMAT TAMPILAN ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
 MODE="${1:-status}"
 AI_DIR=".ai"
 LOG_DIR="$AI_DIR/logs"
@@ -50,18 +60,19 @@ confirm_external_agent() {
     return 0
   fi
 
-  echo "Mode '$phase' akan menjalankan agent eksternal: $tool."
-  echo "Mode ini dapat mengubah file context .ai/* dan menulis log baru."
+  echo -e "${YELLOW}⚠️  Mode '$phase' akan menjalankan agent eksternal: ${BOLD}$tool${NC}."
+  echo -e "${YELLOW}💡 Mode ini dapat mengubah file context .ai/* dan menulis log baru.${NC}"
 
   if [ ! -t 0 ]; then
-    echo "ERROR: Jalankan dari terminal interaktif atau set AI_ALLOW_EXTERNAL=1 jika memang ingin lanjut." >&2
+    echo -e "${RED}❌ ERROR: Jalankan dari terminal interaktif atau set AI_ALLOW_EXTERNAL=1 jika memang ingin lanjut.${NC}" >&2
     return 1
   fi
 
-  read -rp "Lanjut? (y/n): " confirm
+  echo -e -n "${YELLOW}❓ Lanjut? (y/n): ${NC}"
+  read -r confirm
 
   if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "Dibatalkan."
+    echo -e "${RED}⛔ Dibatalkan.${NC}"
     return 1
   fi
 }
@@ -72,11 +83,11 @@ phase_header() {
 
   echo ""
   echo "======================================"
-  echo "$title"
+  echo "🚀 $title"
   echo "======================================"
-  echo "Mulai     : $(now)"
-  echo "Mode      : $MODE"
-  echo "Log file  : $log_file"
+  echo "🕒 Mulai    : $(now)"
+  echo "⚙️  Mode     : $MODE"
+  echo "📂 Log file : $log_file"
   echo "--------------------------------------"
 }
 
@@ -85,9 +96,9 @@ phase_footer() {
   local log_file="$2"
 
   echo "--------------------------------------"
-  echo "Selesai   : $(now)"
-  echo "Exit code : $exit_code"
-  echo "Log file  : $log_file"
+  echo "🏁 Selesai   : $(now)"
+  echo "🚦 Exit code : $exit_code"
+  echo "📂 Log file  : $log_file"
   echo "======================================"
   echo ""
 }
@@ -125,9 +136,10 @@ Review notes from Gemini/Codex workflow will be written here.
 "
 
   cat << EOF
-## Bootstrap Selesai
 
-## File Context Dibuat
+## ✨ Bootstrap Selesai
+
+## 📝 File Context Dibuat
 - $AI_DIR/ACTIVE_TASK.md
 - $AI_DIR/SESSION_STATE.md
 - $AI_DIR/HANDOFF.md
@@ -136,7 +148,7 @@ Review notes from Gemini/Codex workflow will be written here.
 - $AI_DIR/REVIEW_NOTES.md
 - $LOG_DIR/
 
-## Catatan
+## 💡 Catatan
 File context task disinkronkan dari docs/TASKS.md.
 File pendukung yang sudah berisi data tidak dioverwrite.
 EOF
@@ -155,14 +167,14 @@ sync_ai_context() {
   current_task="$(current_task_value "Current Task")"
 
   if [ -z "$current_sprint" ] || [ -z "$current_module" ] || [ -z "$current_task" ]; then
-    echo "ERROR: Current Sprint/Module/Task tidak lengkap di docs/TASKS.md." >&2
+    echo "❌ ERROR: Current Sprint/Module/Task tidak lengkap di docs/TASKS.md." >&2
     return 1
   fi
 
   task_block="$(current_task_block "$current_task")"
 
   if [ -z "$task_block" ]; then
-    echo "ERROR: Detail task '$current_task' tidak ditemukan di docs/TASKS.md." >&2
+    echo "❌ ERROR: Detail task '$current_task' tidak ditemukan di docs/TASKS.md." >&2
     return 1
   fi
 
@@ -219,6 +231,23 @@ Jalankan scope check sebelum coding. Gunakan docs/TASKS.md sebagai source of tru
 Context ini dibuat lokal tanpa memanggil gemini/codex.
 EOF
 
+  cat > "$AI_DIR/REVIEW_NOTES.md" << EOF
+# Review Notes
+
+Source of truth: docs/TASKS.md
+Last reset at: $(now)
+
+## Task Aktif
+$current_task
+
+## Status
+Belum ada review untuk task aktif ini.
+
+## Catatan
+File ini di-reset saat sync agar agent berikutnya tidak membaca review task lama.
+Jalankan mode review setelah build task aktif selesai.
+EOF
+
   cat > "$AI_DIR/SESSION_STATE.md" << EOF
 # Session State
 
@@ -235,7 +264,7 @@ Local Sync
 scripts/ai.sh sync
 
 ## Pekerjaan Terakhir
-Sinkronisasi file .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, dan .ai/SESSION_STATE.md dari docs/TASKS.md.
+Sinkronisasi file .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, .ai/REVIEW_NOTES.md, dan .ai/SESSION_STATE.md dari docs/TASKS.md.
 
 ## File yang Terakhir Dibaca
 - docs/TASKS.md
@@ -243,6 +272,7 @@ Sinkronisasi file .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, dan .ai/SESSION_STATE.md d
 ## File yang Terakhir Diubah
 - .ai/ACTIVE_TASK.md
 - .ai/HANDOFF.md
+- .ai/REVIEW_NOTES.md
 - .ai/SESSION_STATE.md
 
 ## Status Task
@@ -250,12 +280,13 @@ $current_task masih In Progress sesuai docs/TASKS.md.
 
 ## Catatan untuk Agent Berikutnya
 Jangan percaya log lama sebagai source of truth. Gunakan docs/TASKS.md dan .ai/ACTIVE_TASK.md hasil sync terbaru.
+REVIEW_NOTES.md sengaja dikosongkan untuk task aktif sampai mode review dijalankan lagi.
 EOF
 
-  echo "Context .ai berhasil disinkronkan dari docs/TASKS.md."
-  echo "Current Sprint : $current_sprint"
-  echo "Current Module : $current_module"
-  echo "Current Task   : $current_task"
+  echo "✅ Context .ai berhasil disinkronkan dari docs/TASKS.md."
+  echo "🏃 Current Sprint : $current_sprint"
+  echo "📦 Current Module : $current_module"
+  echo "🎯 Current Task   : $current_task"
 }
 
 run_bootstrap_logged() {
@@ -264,10 +295,10 @@ run_bootstrap_logged() {
   local log_file="$LOG_DIR/$(stamp)-bootstrap.log"
   phase_header "FASE 0 - Bootstrap .ai Lokal" "$log_file" | tee "$log_file"
 
-  echo "[1/4] Menyiapkan folder .ai dan .ai/logs" | tee -a "$log_file"
-  echo "[2/4] Membuat file context jika belum ada" | tee -a "$log_file"
-  echo "[3/4] Menjaga file existing agar tidak dioverwrite" | tee -a "$log_file"
-  echo "[4/4] Menampilkan ringkasan bootstrap" | tee -a "$log_file"
+  echo "👉 [1/4] Menyiapkan folder .ai dan .ai/logs" | tee -a "$log_file"
+  echo "👉 [2/4] Membuat file context jika belum ada" | tee -a "$log_file"
+  echo "👉 [3/4] Menjaga file existing agar tidak dioverwrite" | tee -a "$log_file"
+  echo "👉 [4/4] Menampilkan ringkasan bootstrap" | tee -a "$log_file"
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
@@ -287,9 +318,9 @@ run_sync_logged() {
   local log_file="$LOG_DIR/$(stamp)-sync.log"
   phase_header "Sinkronisasi .ai dari docs/TASKS.md" "$log_file" | tee "$log_file"
 
-  echo "[1/3] Membaca Current Sprint/Module/Task dari docs/TASKS.md" | tee -a "$log_file"
-  echo "[2/3] Menulis ulang .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, dan .ai/SESSION_STATE.md" | tee -a "$log_file"
-  echo "[3/3] Menjadikan log sync sebagai latest.log agar log lama tidak menyesatkan" | tee -a "$log_file"
+  echo "👉 [1/3] Membaca Current Sprint/Module/Task dari docs/TASKS.md" | tee -a "$log_file"
+  echo "👉 [2/3] Menulis ulang .ai/ACTIVE_TASK.md, .ai/HANDOFF.md, .ai/REVIEW_NOTES.md, dan .ai/SESSION_STATE.md" | tee -a "$log_file"
+  echo "👉 [3/3] Menjadikan log sync sebagai latest.log agar log lama tidak menyesatkan" | tee -a "$log_file"
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
@@ -317,11 +348,11 @@ run_gemini_to_file() {
   tmp_file="$(mktemp)"
 
   phase_header "$label" "$log_file" | tee "$log_file"
-  echo "[1/5] Menyiapkan prompt fase $phase" | tee -a "$log_file"
-  echo "[2/5] Menjalankan Gemini dan menampilkan output live" | tee -a "$log_file"
-  echo "[3/5] Menyimpan stdout/stderr lengkap ke log" | tee -a "$log_file"
-  echo "[4/5] Menulis output Gemini ke file context: $output_file" | tee -a "$log_file"
-  echo "[5/5] Menampilkan exit code fase" | tee -a "$log_file"
+  echo "👉 [1/5] Menyiapkan prompt fase $phase" | tee -a "$log_file"
+  echo "👉 [2/5] Menjalankan Gemini dan menampilkan output live" | tee -a "$log_file"
+  echo "👉 [3/5] Menyimpan stdout/stderr lengkap ke log" | tee -a "$log_file"
+  echo "👉 [4/5] Menulis output Gemini ke file context: $output_file" | tee -a "$log_file"
+  echo "👉 [5/5] Menampilkan exit code fase" | tee -a "$log_file"
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
@@ -339,7 +370,7 @@ run_gemini_to_file() {
 
   rm -f "$tmp_file"
   echo "" | tee -a "$log_file"
-  echo "Context ditulis ke: $output_file" | tee -a "$log_file"
+  echo "💾 Context ditulis ke: $output_file" | tee -a "$log_file"
 
   phase_footer "$exit_code" "$log_file" | tee -a "$log_file"
   append_log_index "$phase" "$log_file" "$exit_code"
@@ -356,11 +387,11 @@ run_codex_logged() {
 
   local log_file="$LOG_DIR/$(stamp)-$phase.log"
   phase_header "Menjalankan Codex: $phase" "$log_file" | tee "$log_file"
-  echo "[1/5] Menyiapkan prompt Codex" | tee -a "$log_file"
-  echo "[2/5] Menjalankan codex exec --sandbox workspace-write" | tee -a "$log_file"
-  echo "[3/5] Menampilkan output Codex live di terminal" | tee -a "$log_file"
-  echo "[4/5] Menyimpan stdout/stderr lengkap ke log" | tee -a "$log_file"
-  echo "[5/5] Menampilkan exit code fase" | tee -a "$log_file"
+  echo "👉 [1/5] Menyiapkan prompt Codex" | tee -a "$log_file"
+  echo "👉 [2/5] Menjalankan codex exec --sandbox workspace-write" | tee -a "$log_file"
+  echo "👉 [3/5] Menampilkan output Codex live di terminal" | tee -a "$log_file"
+  echo "👉 [4/5] Menyimpan stdout/stderr lengkap ke log" | tee -a "$log_file"
+  echo "👉 [5/5] Menampilkan exit code fase" | tee -a "$log_file"
   echo "--------------------------------------" | tee -a "$log_file"
 
   set +e
@@ -568,14 +599,26 @@ case "$MODE" in
     ;;
 
   plan)
-    run_gemini_to_file "Menjalankan Gemini: Planner / Scope Reader" "plan" "$AI_DIR/HANDOFF.md" "$PROMPT_PLAN"
+    run_gemini_to_file "🧠 Menjalankan Gemini: Planner / Scope Reader" "plan" "$AI_DIR/HANDOFF.md" "$PROMPT_PLAN"
     {
+      current_sprint="$(current_task_value "Current Sprint")"
+      current_module="$(current_task_value "Current Module")"
+      current_task="$(current_task_value "Current Task")"
+      task_block="$(current_task_block "$current_task")"
+
       echo "# Active Task"
       echo
       echo "Source of truth: docs/TASKS.md"
       echo "Last planned at: $(now)"
       echo
-      grep -A 20 "Current Sprint:" docs/TASKS.md || true
+      echo "Current Sprint: $current_sprint"
+      echo "Current Module: $current_module"
+      echo "Current Task: $current_task"
+      echo "Status: In Progress"
+      echo
+      echo "## Task Detail"
+      echo
+      echo "$task_block"
     } > "$AI_DIR/ACTIVE_TASK.md"
     {
       echo "# Session State"
@@ -588,11 +631,11 @@ case "$MODE" in
     ;;
 
   build)
-    run_codex_logged "build" "$PROMPT_BUILD"
+    run_codex_logged "💻 build" "$PROMPT_BUILD"
     ;;
 
   review)
-    run_gemini_to_file "Menjalankan Gemini: Reviewer" "review" "$AI_DIR/REVIEW_NOTES.md" "$PROMPT_REVIEW"
+    run_gemini_to_file "🕵️ Menjalankan Gemini: Reviewer" "review" "$AI_DIR/REVIEW_NOTES.md" "$PROMPT_REVIEW"
     {
       echo "# Session State"
       echo
@@ -604,11 +647,11 @@ case "$MODE" in
     ;;
 
   fix)
-    run_codex_logged "fix" "$PROMPT_FIX"
+    run_codex_logged "🔧 fix" "$PROMPT_FIX"
     ;;
 
   close)
-    run_gemini_to_file "Menjalankan Gemini: Task Closer" "close" "$AI_DIR/HANDOFF.md" "$PROMPT_CLOSE"
+    run_gemini_to_file "✅ Menjalankan Gemini: Task Closer" "close" "$AI_DIR/HANDOFF.md" "$PROMPT_CLOSE"
     {
       echo "# Session State"
       echo
@@ -617,46 +660,46 @@ case "$MODE" in
       echo "Latest close recommendation: $AI_DIR/HANDOFF.md"
       echo "Latest log: $LOG_DIR/latest.log"
     } > "$AI_DIR/SESSION_STATE.md"
-    echo "Menjalankan sync lokal setelah close agar .ai mengikuti docs/TASKS.md..."
+    echo -e "${YELLOW}🔄 Menjalankan sync lokal setelah close agar .ai mengikuti docs/TASKS.md...${NC}"
     run_sync_logged
     ;;
 
   status)
     ensure_ai_dir
-    echo -e "\n===== ACTIVE TASK ====="
-    [ -f "$AI_DIR/ACTIVE_TASK.md" ] && cat "$AI_DIR/ACTIVE_TASK.md" || echo "[Belum ada task aktif]"
+    echo -e "\n${BLUE}${BOLD}===== 📋 ACTIVE TASK =====${NC}"
+    [ -f "$AI_DIR/ACTIVE_TASK.md" ] && cat "$AI_DIR/ACTIVE_TASK.md" || echo -e "${YELLOW}[Belum ada task aktif]${NC}"
 
-    echo -e "\n===== HANDOFF ====="
-    [ -f "$AI_DIR/HANDOFF.md" ] && cat "$AI_DIR/HANDOFF.md" || echo "[Belum ada handoff]"
+    echo -e "\n${YELLOW}${BOLD}===== 🤝 HANDOFF =====${NC}"
+    [ -f "$AI_DIR/HANDOFF.md" ] && cat "$AI_DIR/HANDOFF.md" || echo -e "${YELLOW}[Belum ada handoff]${NC}"
 
-    echo -e "\n===== SESSION STATE ====="
-    [ -f "$AI_DIR/SESSION_STATE.md" ] && cat "$AI_DIR/SESSION_STATE.md" || echo "[Belum ada session state]"
+    echo -e "\n${GREEN}${BOLD}===== 💾 SESSION STATE =====${NC}"
+    [ -f "$AI_DIR/SESSION_STATE.md" ] && cat "$AI_DIR/SESSION_STATE.md" || echo -e "${YELLOW}[Belum ada session state]${NC}"
 
-    echo -e "\n===== LOG TERAKHIR ====="
-    [ -f "$LOG_DIR/latest.log" ] && tail -n 80 "$LOG_DIR/latest.log" || echo "[Belum ada log]"
+    echo -e "\n${MAGENTA}${BOLD}===== 📄 LOG TERAKHIR =====${NC}"
+    [ -f "$LOG_DIR/latest.log" ] && tail -n 80 "$LOG_DIR/latest.log" || echo -e "${YELLOW}[Belum ada log]${NC}"
     echo ""
     ;;
 
   logs)
     ensure_ai_dir
-    echo -e "\n===== LOG INDEX ====="
-    [ -f "$LOG_DIR/index.md" ] && tail -n 30 "$LOG_DIR/index.md" || echo "[Belum ada log index]"
-    echo -e "\n===== LOG TERAKHIR ====="
-    [ -f "$LOG_DIR/latest.log" ] && cat "$LOG_DIR/latest.log" || echo "[Belum ada log]"
+    echo -e "\n${CYAN}${BOLD}===== 📑 LOG INDEX =====${NC}"
+    [ -f "$LOG_DIR/index.md" ] && tail -n 30 "$LOG_DIR/index.md" || echo -e "${YELLOW}[Belum ada log index]${NC}"
+    echo -e "\n${BLUE}${BOLD}===== 📄 LOG TERAKHIR =====${NC}"
+    [ -f "$LOG_DIR/latest.log" ] && cat "$LOG_DIR/latest.log" || echo -e "${YELLOW}[Belum ada log]${NC}"
     echo ""
     ;;
 
   *)
-    echo "Perintah tidak dikenali. Gunakan:"
-    echo "  ./scripts/ai.sh bootstrap"
-    echo "  ./scripts/ai.sh sync"
-    echo "  ./scripts/ai.sh plan"
-    echo "  ./scripts/ai.sh build"
-    echo "  ./scripts/ai.sh review"
-    echo "  ./scripts/ai.sh fix"
-    echo "  ./scripts/ai.sh close"
-    echo "  ./scripts/ai.sh status"
-    echo "  ./scripts/ai.sh logs"
+    echo -e "${RED}❌ Perintah tidak dikenali.${NC} Gunakan:"
+    echo -e "  ${GREEN}./scripts/ai.sh bootstrap${NC}"
+    echo -e "  ${GREEN}./scripts/ai.sh sync${NC}"
+    echo -e "  ${CYAN}./scripts/ai.sh plan${NC}"
+    echo -e "  ${BLUE}./scripts/ai.sh build${NC}"
+    echo -e "  ${MAGENTA}./scripts/ai.sh review${NC}"
+    echo -e "  ${YELLOW}./scripts/ai.sh fix${NC}"
+    echo -e "  ${GREEN}./scripts/ai.sh close${NC}"
+    echo -e "  ${NC}./scripts/ai.sh status${NC}"
+    echo -e "  ${NC}./scripts/ai.sh logs${NC}"
     exit 1
     ;;
 esac

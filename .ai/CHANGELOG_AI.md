@@ -21,6 +21,24 @@ Format:
 ### Catatan
 ...
 
+## 2026-06-13 08:20 - Codex CLI
+
+### Task
+Fix review notes setelah review S6-T001.
+
+### File yang Diubah
+- .ai/CHANGELOG_AI.md
+- .ai/SESSION_STATE.md
+
+### Ringkasan Perubahan
+Review notes menyatakan tidak ada perbaikan wajib untuk implementasi S6-T001. Tidak ada perubahan kode dilakukan agar tidak memperluas scope. Context session diperbarui untuk mencatat bahwa review selesai dan source of truth task aktif tetap `docs/TASKS.md` dengan `S6-T002 — Input Pembayaran`.
+
+### Cara Test
+- Tidak menjalankan test karena tidak ada perubahan kode, migration, view, route, atau test.
+
+### Catatan
+Item di bagian perbaikan opsional review notes tidak dikerjakan karena bersifat rekomendasi untuk task berikutnya dan bukan issue wajib.
+
 ## 2026-06-12 16:45 - Codex CLI
 
 ### Task

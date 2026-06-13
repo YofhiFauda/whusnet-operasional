@@ -1,26 +1,37 @@
 #!/usr/bin/env bash
 set -e
 
+# --- PENGATURAN WARNA & FORMAT TAMPILAN ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
 AI_SCRIPT="./scripts/ai.sh"
 
 pause() {
   echo ""
-  read -rp "Tekan Enter untuk kembali ke menu..."
+  echo -e -n "${YELLOW}👉 Tekan Enter untuk kembali ke menu...${NC}"
+  read -r
 }
 
 header() {
   clear
-  echo "======================================"
-  echo " AI Agent Workflow CLI"
-  echo " Gemini Planner/Reviewer + Codex Builder"
-  echo "======================================"
+  echo -e "${CYAN}${BOLD}╔══════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}${BOLD}║       ${YELLOW}🤖 AI Agent Workflow CLI       ${CYAN}${BOLD}║${NC}"
+  echo -e "${CYAN}${BOLD}║  ${BLUE}Gemini Planner${NC} + ${GREEN}Codex Builder    ${CYAN}${BOLD}║${NC}"
+  echo -e "${CYAN}${BOLD}╚══════════════════════════════════════╝${NC}"
   echo ""
 }
 
 require_ai_script() {
   if [ ! -f "$AI_SCRIPT" ]; then
-    echo "ERROR: $AI_SCRIPT tidak ditemukan."
-    echo "Pastikan file scripts/ai.sh sudah dibuat."
+    echo -e "${RED}❌ ERROR: $AI_SCRIPT tidak ditemukan.${NC}"
+    echo -e "${YELLOW}💡 Pastikan file scripts/ai.sh sudah dibuat.${NC}"
     pause
     return 1
   fi
@@ -32,8 +43,8 @@ require_ai_script() {
 
 require_ai_folder() {
   if [ ! -d ".ai" ]; then
-    echo "Folder .ai belum ada."
-    echo "Jalankan FASE 0 Bootstrap terlebih dahulu."
+    echo -e "${RED}⚠️ Folder .ai belum ada.${NC}"
+    echo -e "${YELLOW}💡 Jalankan FASE 0 Bootstrap terlebih dahulu.${NC}"
     pause
     return 1
   fi
@@ -42,11 +53,12 @@ require_ai_folder() {
 confirm_run() {
   local label="$1"
   echo ""
-  echo "Anda akan menjalankan: $label"
-  read -rp "Lanjut? (y/n): " confirm
+  echo -e "${CYAN}▶ Anda akan menjalankan:${BOLD} $label${NC}"
+  echo -e -n "${YELLOW}❓ Lanjut? (y/n): ${NC}"
+  read -r confirm
 
   if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-    echo "Dibatalkan."
+    echo -e "${RED}⛔ Dibatalkan.${NC}"
     pause
     return 1
   fi
@@ -65,11 +77,14 @@ run_phase() {
   confirm_run "$label" || return
 
   echo ""
-  echo "Menjalankan $label..."
-  echo "--------------------------------------"
+  echo -e "${MAGENTA}${BOLD}🚀 Menjalankan $label...${NC}"
+  echo -e "${MAGENTA}--------------------------------------${NC}"
+  
+  # Eksekusi script utama
   AI_ALLOW_EXTERNAL=1 $AI_SCRIPT "$command"
-  echo "--------------------------------------"
-  echo "$label selesai."
+  
+  echo -e "${MAGENTA}--------------------------------------${NC}"
+  echo -e "${GREEN}✅ $label selesai.${NC}"
   pause
 }
 
@@ -77,27 +92,27 @@ show_status() {
   require_ai_folder || return
 
   header
-  echo "===== ACTIVE TASK ====="
+  echo -e "${BLUE}${BOLD}===== 📋 ACTIVE TASK =====${NC}"
   if [ -f ".ai/ACTIVE_TASK.md" ]; then
     cat .ai/ACTIVE_TASK.md
   else
-    echo ".ai/ACTIVE_TASK.md belum ada."
+    echo -e "${NC}.ai/ACTIVE_TASK.md belum ada.${NC}"
   fi
 
   echo ""
-  echo "===== HANDOFF ====="
+  echo -e "${YELLOW}${BOLD}===== 🤝 HANDOFF =====${NC}"
   if [ -f ".ai/HANDOFF.md" ]; then
     cat .ai/HANDOFF.md
   else
-    echo ".ai/HANDOFF.md belum ada."
+    echo -e "${NC}.ai/HANDOFF.md belum ada.${NC}"
   fi
 
   echo ""
-  echo "===== SESSION STATE ====="
+  echo -e "${GREEN}${BOLD}===== 💾 SESSION STATE =====${NC}"
   if [ -f ".ai/SESSION_STATE.md" ]; then
     cat .ai/SESSION_STATE.md
   else
-    echo ".ai/SESSION_STATE.md belum ada."
+    echo -e "${NC}.ai/SESSION_STATE.md belum ada.${NC}"
   fi
 
   pause
@@ -107,11 +122,11 @@ show_review_notes() {
   require_ai_folder || return
 
   header
-  echo "===== REVIEW NOTES ====="
+  echo -e "${MAGENTA}${BOLD}===== 🔍 REVIEW NOTES =====${NC}"
   if [ -f ".ai/REVIEW_NOTES.md" ]; then
     cat .ai/REVIEW_NOTES.md
   else
-    echo ".ai/REVIEW_NOTES.md belum ada."
+    echo -e "${NC}.ai/REVIEW_NOTES.md belum ada.${NC}"
   fi
 
   pause
@@ -121,11 +136,11 @@ show_changelog() {
   require_ai_folder || return
 
   header
-  echo "===== AI CHANGELOG ====="
+  echo -e "${CYAN}${BOLD}===== 📝 AI CHANGELOG =====${NC}"
   if [ -f ".ai/CHANGELOG_AI.md" ]; then
     cat .ai/CHANGELOG_AI.md
   else
-    echo ".ai/CHANGELOG_AI.md belum ada."
+    echo -e "${NC}.ai/CHANGELOG_AI.md belum ada.${NC}"
   fi
 
   pause
@@ -135,19 +150,19 @@ show_ai_logs() {
   require_ai_folder || return
 
   header
-  echo "===== AI LOG INDEX ====="
+  echo -e "${CYAN}${BOLD}===== 📑 AI LOG INDEX (Last 30) =====${NC}"
   if [ -f ".ai/logs/index.md" ]; then
     tail -n 30 .ai/logs/index.md
   else
-    echo ".ai/logs/index.md belum ada."
+    echo -e "${NC}.ai/logs/index.md belum ada.${NC}"
   fi
 
   echo ""
-  echo "===== AI LOG TERAKHIR ====="
+  echo -e "${BLUE}${BOLD}===== 📄 AI LOG TERAKHIR =====${NC}"
   if [ -f ".ai/logs/latest.log" ]; then
     cat .ai/logs/latest.log
   else
-    echo ".ai/logs/latest.log belum ada."
+    echo -e "${NC}.ai/logs/latest.log belum ada.${NC}"
   fi
 
   pause
@@ -161,19 +176,20 @@ edit_active_task() {
 
 show_git_status() {
   header
-  echo "===== GIT STATUS ====="
+  echo -e "${YELLOW}${BOLD}===== 🐙 GIT STATUS =====${NC}"
   git status --short || true
 
   echo ""
-  echo "===== GIT DIFF STAT ====="
+  echo -e "${CYAN}${BOLD}===== 📊 GIT DIFF STAT =====${NC}"
   git diff --stat || true
 
   echo ""
-  read -rp "Tampilkan full git diff? (y/n): " show_diff
+  echo -e -n "${YELLOW}❓ Tampilkan full git diff? (y/n): ${NC}"
+  read -r show_diff
 
   if [ "$show_diff" = "y" ] || [ "$show_diff" = "Y" ]; then
     echo ""
-    echo "===== FULL GIT DIFF ====="
+    echo -e "${BLUE}${BOLD}===== 📜 FULL GIT DIFF =====${NC}"
     git diff || true
   fi
 
@@ -183,27 +199,27 @@ show_git_status() {
 while true; do
   header
 
-  echo "Pilih fase:"
+  echo -e "${BOLD}🎯 Pilih Fase AI:${NC}\n"
+  echo -e "  ${GREEN}1) ${NC}📦 FASE 0 - Bootstrap .ai"
+  echo -e "  ${BLUE}2) ${NC}🧠 FASE 1 - Gemini Plan / Scope Reader"
+  echo -e "  ${CYAN}3) ${NC}💻 FASE 2 - Codex Build / Coding"
+  echo -e "  ${MAGENTA}4) ${NC}🕵️  FASE 3 - Gemini Review"
+  echo -e "  ${YELLOW}5) ${NC}🔧 FASE 4 - Codex Fix"
+  echo -e "  ${GREEN}6) ${NC}✅ FASE 5 - Close Task"
   echo ""
-  echo "  1) FASE 0 - Bootstrap .ai"
-  echo "  2) FASE 1 - Gemini Plan / Scope Reader"
-  echo "  3) FASE 2 - Codex Build / Coding"
-  echo "  4) FASE 3 - Gemini Review"
-  echo "  5) FASE 4 - Codex Fix"
-  echo "  6) FASE 5 - Close Task"
+  echo -e "${BOLD}📊 Monitoring & Utilities:${NC}\n"
+  echo -e "  ${NC}7)  ${NC}📋 Lihat Status Context"
+  echo -e "  ${NC}8)  ${NC}✏️  Edit Active Task"
+  echo -e "  ${NC}9)  ${NC}🔍 Lihat Review Notes"
+  echo -e "  ${NC}10) ${NC}📝 Lihat AI Changelog"
+  echo -e "  ${NC}11) ${NC}🐙 Git Status / Diff"
+  echo -e "  ${NC}12) ${NC}📑 Lihat Log AI Terakhir"
   echo ""
-  echo "Monitoring:"
-  echo "  7) Lihat Status Context"
-  echo "  8) Edit Active Task"
-  echo "  9) Lihat Review Notes"
-  echo "  10) Lihat AI Changelog"
-  echo "  11) Git Status / Diff"
-  echo "  12) Lihat Log AI Terakhir"
-  echo ""
-  echo "  0) Keluar"
+  echo -e "  ${RED}0)  🚪 Keluar${NC}"
   echo ""
 
-  read -rp "Masukkan pilihan: " choice
+  echo -e -n "${YELLOW}👉 Masukkan pilihan: ${NC}"
+  read -r choice
 
   case "$choice" in
     1)
@@ -243,11 +259,11 @@ while true; do
       show_ai_logs
       ;;
     0)
-      echo "Keluar."
+      echo -e "${GREEN}Sampai jumpa! 👋${NC}"
       exit 0
       ;;
     *)
-      echo "Pilihan tidak valid."
+      echo -e "${RED}❌ Pilihan tidak valid.${NC}"
       pause
       ;;
   esac

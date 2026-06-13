@@ -3,8 +3,8 @@
 
 ## Status Project Saat Ini
 Current Sprint: Sprint 6 — Pembayaran
-Current Module: Migration dan Model Payment
-Current Task: S6-T001 — Migration dan Model Payment
+Current Module: Input Pembayaran
+Current Task: S6-T002 — Input Pembayaran
 
 ---
 
@@ -15,37 +15,8 @@ Membuat pencatatan pembayaran dan update status invoice.
 
 ---
 
-### S6-T001 — Migration dan Model Payment
-Status: In Progress
-
-Tujuan:
-Membuat struktur pembayaran.
-
-Checklist:
-- [ ] Buat tabel `payments`.
-- [ ] Tambahkan nomor pembayaran.
-- [ ] Tambahkan invoice_id.
-- [ ] Tambahkan customer_id.
-- [ ] Tambahkan pop_id.
-- [ ] Tambahkan tanggal bayar.
-- [ ] Tambahkan metode bayar.
-- [ ] Tambahkan nominal bayar.
-- [ ] Tambahkan penerima.
-- [ ] Tambahkan bukti pembayaran.
-- [ ] Tambahkan status pembayaran.
-- [ ] Tambahkan catatan.
-
-Acceptance Criteria:
-- [ ] Payment dapat disimpan.
-- [ ] Payment terhubung ke invoice.
-- [ ] Payment terhubung ke customer.
-- [ ] Payment terhubung ke POP.
-- [ ] Payment memiliki status.
-
----
-
 ### S6-T002 — Input Pembayaran
-Status: Todo
+Status: In Progress
 
 Tujuan:
 Membuat pencatatan pembayaran invoice.
@@ -387,6 +358,40 @@ Acceptance Criteria:
 ---
 
 ## Done
+
+### S6-T001 — Migration dan Model Payment
+Status: Done
+
+Tujuan:
+Membuat struktur pembayaran.
+
+Checklist:
+- [x] Buat tabel `payments`.
+- [x] Tambahkan nomor pembayaran.
+- [x] Tambahkan invoice_id.
+- [x] Tambahkan customer_id.
+- [x] Tambahkan pop_id.
+- [x] Tambahkan tanggal bayar.
+- [x] Tambahkan metode bayar.
+- [x] Tambahkan nominal bayar.
+- [x] Tambahkan penerima.
+- [x] Tambahkan bukti pembayaran.
+- [x] Tambahkan status pembayaran.
+- [x] Tambahkan catatan.
+
+Acceptance Criteria:
+- [x] Payment dapat disimpan.
+- [x] Payment terhubung ke invoice.
+- [x] Payment terhubung ke customer.
+- [x] Payment terhubung ke POP.
+- [x] Payment memiliki status.
+
+Catatan Test:
+- `php artisan test --filter=PaymentModelTest` lulus: 1 test, 11 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test --filter='PaymentModelTest|InvoiceModelTest|InvoiceCreateTest|InvoiceListTest'` lulus: 11 tests, 63 assertions.
+- Full test suite dengan `VIEW_COMPILED_PATH` temp: 96 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen, bukan modul pembayaran.
+
+---
 
 ## Sprint 1 - Foundation
 
