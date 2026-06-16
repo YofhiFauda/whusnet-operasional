@@ -10,6 +10,12 @@ class Payment extends Model
 {
     protected $fillable = [
         'payment_number',
+        'old_payment_id',
+        'old_transaction_id',
+        'old_request_id',
+        'billing_period',
+        'received_by_old',
+        'deposited_by_old',
         'invoice_id',
         'customer_id',
         'pop_id',
@@ -132,7 +138,7 @@ class Payment extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+        if ($user->hasFullAccess()) {
             return $query;
         }
 
@@ -148,6 +154,12 @@ class Payment extends Model
     {
         return $this->only([
             'payment_number',
+            'old_payment_id',
+            'old_transaction_id',
+            'old_request_id',
+            'billing_period',
+            'received_by_old',
+            'deposited_by_old',
             'invoice_id',
             'customer_id',
             'pop_id',

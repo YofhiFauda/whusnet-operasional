@@ -22,11 +22,13 @@ class DatabaseSeeder extends Seeder
         $this->call(RoleSeeder::class);
         $this->call(PermissionSeeder::class);
         $this->call(RolePermissionSeeder::class);
-        $this->call(CustomerSeeder::class);
+        // $this->call(CustomerSeeder::class);
+        // $this->call(UserSeeder::class);
 
         // User::factory(10)->create();
 
         $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
+        $adminRole = \App\Models\Role::where('name', 'Admin')->first();
 
         User::updateOrCreate([
             'email' => 'owner@whusnet.net',
@@ -37,6 +39,17 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'status' => 'active',
             'role_id' => $ownerRole ? $ownerRole->id : null,
+        ]);
+
+        User::updateOrCreate([
+            'email' => 'admin@whusnet.net',
+        ], [
+            'name' => 'Admin Whusnet',
+            'email_verified_at' => now(),
+            'phone' => '081234567890',
+            'password' => bcrypt('password'),
+            'status' => 'active',
+            'role_id' => $adminRole ? $adminRole->id : null,
         ]);
     }
 }

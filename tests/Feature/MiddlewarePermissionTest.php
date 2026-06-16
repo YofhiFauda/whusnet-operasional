@@ -20,6 +20,13 @@ class MiddlewarePermissionTest extends TestCase
     {
         parent::setUp();
 
+        $compiledPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whusnet-test-views';
+        if (! is_dir($compiledPath)) {
+            @mkdir($compiledPath, 0777, true);
+        }
+
+        config()->set('view.compiled', $compiledPath);
+
         // Seed roles and permissions for tests
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
@@ -81,6 +88,20 @@ class MiddlewarePermissionTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_admin_has_access_to_all_permissions_like_owner(): void
+    {
+        $adminRole = Role::where('name', 'Admin')->firstOrFail();
+        $admin = User::factory()->create([
+            'role_id' => $adminRole->id,
+        ]);
+
+        $this->actingAs($admin)->get('/master/wilayah')->assertStatus(200);
+        $this->actingAs($admin)->get('/users')->assertStatus(200);
+        $this->actingAs($admin)->get('/customers/import')->assertStatus(200);
+        $this->actingAs($admin)->get('/invoices')->assertStatus(200);
+        $this->actingAs($admin)->get('/payments')->assertStatus(200);
+    }
+
     public function test_acceptance_criteria_teknisi_cannot_access_payments(): void
     {
         // CS/Teknisi/any role that doesn't have create_payments
@@ -92,6 +113,17 @@ class MiddlewarePermissionTest extends TestCase
         // Attempting to open payments simulation route
         $response = $this->actingAs($user)->get('/test-simulasi-pembayaran');
         $response->assertStatus(403);
+    }
+
+    public function test_teknisi_cannot_access_invoice_and_billing_routes(): void
+    {
+        $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
+        $user = User::factory()->create([
+            'role_id' => $teknisiRole->id,
+        ]);
+
+        $this->actingAs($user)->get('/invoices')->assertStatus(403);
+        $this->actingAs($user)->get('/payments')->assertStatus(403);
     }
 
     public function test_acceptance_criteria_finance_cannot_access_modem_devices(): void

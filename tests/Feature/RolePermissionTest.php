@@ -62,10 +62,15 @@ class RolePermissionTest extends TestCase
         $this->assertTrue($permission2->roles->contains($role));
     }
 
-    public function test_has_permission_helper_for_owner_and_admin_pusat(): void
+    public function test_has_permission_helper_for_owner_admin_and_admin_pusat(): void
     {
         $ownerRole = Role::create([
             'name' => 'Owner',
+            'guard_name' => 'web',
+        ]);
+
+        $adminRole = Role::create([
+            'name' => 'Admin',
             'guard_name' => 'web',
         ]);
 
@@ -82,8 +87,13 @@ class RolePermissionTest extends TestCase
             'role_id' => $adminPusatRole->id,
         ]);
 
-        // Owner and Admin Pusat should return true for any permission, even if it doesn't exist in the database
+        $adminUser = User::factory()->create([
+            'role_id' => $adminRole->id,
+        ]);
+
+        // Owner, Admin, and Admin Pusat should return true for any permission, even if it doesn't exist in the database
         $this->assertTrue($ownerUser->hasPermission('non_existent_permission'));
+        $this->assertTrue($adminUser->hasPermission('non_existent_permission'));
         $this->assertTrue($adminPusatUser->hasPermission('non_existent_permission'));
     }
 
@@ -149,5 +159,26 @@ class RolePermissionTest extends TestCase
         $this->assertContains('fill_installation', $teknisiPermissions);
         $this->assertNotContains('create_payments', $teknisiPermissions);
         $this->assertNotContains('manage_pop', $teknisiPermissions);
+
+        $adminRole = Role::where('name', 'Admin')->firstOrFail();
+        $adminPermissions = $adminRole->permissions->pluck('name')->toArray();
+
+        $this->assertContains('manage_pop', $adminPermissions);
+        $this->assertContains('manage_users', $adminPermissions);
+        $this->assertContains('create_payments', $adminPermissions);
+    }
+
+    public function test_role_semantics_cover_owner_admin_and_teknisi(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $owner = Role::where('name', 'Owner')->firstOrFail();
+        $admin = Role::where('name', 'Admin')->firstOrFail();
+        $teknisi = Role::where('name', 'Teknisi')->firstOrFail();
+
+        $this->assertTrue($owner->isFullAccessRole());
+        $this->assertTrue($admin->isFullAccessRole());
+        $this->assertTrue($teknisi->isTechnicianRole());
+        $this->assertFalse($teknisi->isFullAccessRole());
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'package_code',
+    'old_package_id',
     'name',
     'category',
     'package_group',

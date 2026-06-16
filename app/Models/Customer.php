@@ -17,6 +17,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'full_name',
     'identity_number',
     'gender',
+    'customer_type',
+    'company_name',
+    'npwp',
+    'old_account_status',
     'email',
     'phone',
     'primary_phone',
@@ -211,6 +215,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasOne<CustomerTechnicalDetail, $this>
+     */
+    public function customerTechnicalDetail(): HasOne
+    {
+        return $this->hasOne(CustomerTechnicalDetail::class);
+    }
+
+    /**
      * @return HasMany<CustomerDocument, $this>
      */
     public function documents(): HasMany
@@ -283,7 +295,7 @@ class Customer extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+        if ($user->hasFullAccess()) {
             return $query;
         }
 

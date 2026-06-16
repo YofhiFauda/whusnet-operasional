@@ -18,7 +18,7 @@
     <form action="{{ route('payments.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 items-end">
         <div class="sm:col-span-2 xl:col-span-2">
             <label for="search" class="block text-xs font-semibold text-slate-500 mb-2">CARI PEMBAYARAN</label>
-            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Pembayaran, invoice, pelanggan, CID, HP..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Cari Nama, ID Transaksi, atau ID Pembayaran Lama..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
         </div>
 
         <div>

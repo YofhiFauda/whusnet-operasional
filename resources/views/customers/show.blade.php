@@ -202,6 +202,9 @@
             <button onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Pembayaran</button>
             <button onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Dokumen</button>
             <button onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Riwayat Perubahan</button>
+            @if($customer->customerTechnicalDetail)
+            <button onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Detail Teknis Lama</button>
+            @endif
         </div>
 
         <!-- Tabs Content Body -->
@@ -953,6 +956,75 @@
                     <p class="text-xs text-slate-500 mt-1">Audit log umum (Sprint 8) belum aktif pada sistem operasional.</p>
                 </div>
             </div>
+
+            @if($customer->customerTechnicalDetail)
+            <!-- Tab: Detail Teknis Lama -->
+            <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6">
+                <div class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+                        <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Detail Teknis Jaringan Lama (Hasil Migrasi)</span>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-xs">
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">ID Report Lama</span>
+                            <span class="font-mono font-bold text-slate-800">{{ $customer->customerTechnicalDetail->old_report_id }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">ID Request/Layanan Lama</span>
+                            <span class="font-mono font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->old_request_id ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Tipe Koneksi</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->connection_type ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">ONT Serial Number</span>
+                            <span class="font-mono font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->router_or_ont_serial ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">IP Address</span>
+                            <span class="font-mono font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->ip_address ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">SSID WiFi</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->ssid ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Antenna MAC</span>
+                            <span class="font-mono text-slate-800">{{ $customer->customerTechnicalDetail->antenna_mac ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Router MAC</span>
+                            <span class="font-mono text-slate-800">{{ $customer->customerTechnicalDetail->router_mac ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Nomor ODP / Port</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->odp_number ?? '-' }} / {{ $customer->customerTechnicalDetail->odp_port ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Port OLT</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->olt_port ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Signal Wireless / Kabel</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->wireless_signal ?? '-' }} / {{ $customer->customerTechnicalDetail->fiber_signal ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Lokasi Pemancar / Source</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->customerTechnicalDetail->location_source ?? '-' }}</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between">
+                            <span class="text-slate-400">Hasil Test Speed</span>
+                            <span class="font-mono font-semibold text-sky-600">{{ $customer->customerTechnicalDetail->test_download ?? '-' }} Mbps Down / {{ $customer->customerTechnicalDetail->test_upload ?? '-' }} Mbps Up</span>
+                        </div>
+                        <div class="py-2 border-b border-slate-100 flex justify-between md:col-span-2">
+                            <span class="text-slate-400">Catatan Teknis Pemasangan</span>
+                            <span class="text-slate-800 font-semibold">{{ $customer->customerTechnicalDetail->note ?? '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
 
         </div>
     </div>

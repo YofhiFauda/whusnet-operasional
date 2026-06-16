@@ -30,7 +30,7 @@ class PaymentReportController extends Controller
 
         // POP yang bisa diakses user
         $popsQuery = Pop::query();
-        if (!in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'], true)) {
+        if (!$user->hasFullAccess()) {
             $popsQuery->whereHas('users', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -120,7 +120,7 @@ class PaymentReportController extends Controller
 
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user ini
         $allowedPopsQuery = Pop::query();
-        if (!in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'], true)) {
+        if (!$user->hasFullAccess()) {
             $allowedPopsQuery->whereHas('users', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });

@@ -19,6 +19,11 @@ class RoleSeeder extends Seeder
                 'description' => 'Owner Perusahaan (Akses Penuh)',
             ],
             [
+                'name' => 'Admin',
+                'guard_name' => 'web',
+                'description' => 'Admin Operasional (Akses Penuh)',
+            ],
+            [
                 'name' => 'Admin Pusat',
                 'guard_name' => 'web',
                 'description' => 'Administrator Pusat',

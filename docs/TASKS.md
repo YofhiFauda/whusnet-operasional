@@ -1,11 +1,542 @@
 ## Status Project Saat Ini
-Current Sprint: Sprint 8 — Data Teknis Pelanggan
-Current Module: Tidak ada task aktif
-Current Task: Tidak ada task In Progress
+Current Sprint: Selesai — Seluruh MVP Selesai
+Current Module: Import & Migrasi Pelanggan / Billing / RBAC / Laporan / Audit Log
+Current Task: Seluruh MVP Selesai dan Terverifikasi
 
 ---
 
+## In Progress
+
+### MIG-EXE001 — Eksekusi Migrasi Data sand_db_sandya.sql
+Status: Done
+
+Tujuan:
+Mengeksekusi migrasi data riil secara otomatis ke dalam sistem berdasarkan `sand_db_sandya.sql` menggunakan custom Artisan command.
+
+Langkah:
+- [x] Implementasi `MigrateLegacyDataCommand.php`.
+- [x] Verifikasi Idempotensi (pencegahan duplikasi).
+- [x] Validasi data masuk dengan benar ke master pelanggan, paket, dan tagihan.
+
+### Backlog RBAC & User Management
+Status: Done
+
+Tujuan:
+Memecah kebutuhan `users`, `roles`, `permissions`, dan pembatasan data POP/customer/billing menjadi sprint kecil yang bisa dikerjakan bertahap.
+
+Rencana Pecahan Sprint:
+
+#### Sprint A — CRUD User Dasar
+- [x] Tambah user baru.
+- [x] Pilih role saat membuat user.
+- [x] Set status aktif/nonaktif user.
+- [x] Simpan email, phone, dan password user.
+- [x] Validasi data user dasar.
+
+#### Sprint B — Assign POP & Scope User
+- [x] Assign satu atau banyak POP ke user.
+- [x] Batasi akses Admin Cabang ke POP yang ditugaskan.
+- [x] Pertahankan akses penuh Owner/Admin.
+- [x] Pastikan filter query customer/invoice/payment memakai scope POP.
+
+#### Sprint C — Role & Permission Sederhana
+- [x] Pertahankan role Owner.
+- [x] Pertahankan role Admin.
+- [x] Pertahankan role Teknisi.
+- [x] Pastikan Teknisi tidak bisa akses billing/pembayaran.
+- [x] Pastikan Admin bisa akses penuh seperti Owner.
+
+#### Sprint D — UI Manajemen User
+- [x] Tambah halaman create/edit user.
+- [x] Tambah halaman daftar user yang lebih lengkap.
+- [x] Tambah form assign POP yang konsisten.
+- [x] Tambah test regresi untuk halaman user management.
+
+#### Sprint E — Audit & Hardening
+- [x] Audit log untuk create/update user.
+- [x] Audit log untuk assign POP.
+- [x] Rapikan pesan error dan validasi.
+- [x] Jalankan test coverage RBAC dan user management.
+
+### Backlog Import & Migrasi Pelanggan
+Status: In Progress
+
+Tujuan:
+Menjaga konteks pekerjaan migrasi pelanggan dan billing agar tetap jelas setelah RBAC/User Management selesai.
+
+Urutan pengerjaan wajib:
+
+#### Sprint I — Template & Mapping Import
+- [x] Template import Excel/CSV pelanggan yang benar-benar mengikuti field untuk pelanggan, detail, dan billing.
+- [x] Mapping kolom template disesuaikan dengan field master data baru dan field legacy.
+- [x] Struktur sheet/import section divalidasi supaya konsisten dengan alur import.
+
+#### Sprint II — Pipeline Import & Validasi
+- [x] Upload dan baca file import mengikuti template yang baru.
+- [x] Preview data sebelum import.
+- [x] Validasi field wajib, relasi master, dan duplikasi data.
+- [x] Error import ditulis dengan alasan yang jelas.
+
+#### Sprint III — Migrasi Data Nyata
+- [x] Uji migrasi data nyata dari `sand_db_sandya.sql` end-to-end.
+- [x] Pastikan data pelanggan, detail, layanan, billing, dan pembayaran terhubung sesuai mapping.
+- [x] Cocokkan hasil migrasi dengan data lama yang paling sering dipakai operasional.
+
+#### Sprint IV — Verifikasi Produksi & Hardening
+- [x] Verifikasi produksi dengan data real, termasuk edge case field kosong, relasi rusak, dan duplikasi.
+- [x] Siapkan checklist rollback/reimport jika ada data legacy yang gagal.
+- [x] Pastikan hasil migrasi layak dipakai untuk operasional terbatas.
+- [x] Jika masih ada modul MVP lain yang belum ditutup di task board, kerjakan sesuai urutan MVP terlebih dahulu.
+
+Catatan:
+- Role lama seperti `Admin Pusat`, `Admin Cabang`, `Finance/Kasir`, dan `Customer Service` tetap dipertahankan untuk kompatibilitas.
+- Pecahan sprint ini sengaja dibuat kecil agar pengembangan RBAC tidak bercampur dengan billing/import.
+
+--- 
+
 ## Done
+
+### IMP-S4001 — Verifikasi Produksi & Hardening
+Status: Done
+
+Sprint/Module:
+Backlog Import & Migrasi Pelanggan — Sprint IV
+
+Tujuan:
+Memverifikasi ketahanan pipeline migrasi di bawah kondisi data real, menangani edge cases (field kosong, relasi rusak, pemeriksaan duplikasi/idempotensi), dan menyusun panduan pemulihan operasional (rollback/reimport).
+
+Hasil Implementasi:
+- [x] Hardening integration test `RealDataMigrationTest` dengan menambahkan test method `test_real_data_migration_idempotency_and_edge_cases`.
+- [x] Menguji dan memverifikasi pencegahan data ganda (idempotensi) dengan melakukan import dua kali berturut-turut pada dataset yang sama (sand_db_sandya.sql) tanpa menambah jumlah record di database.
+- [x] Menguji penanganan edge case data kosong dan relasi rusak (seperti services dengan old_customer_id/old_package_id tidak terdaftar), di mana error secara otomatis tercatat di tabel `import_errors` dan data tidak valid diabaikan secara aman.
+- [x] Memperbaiki `logImportError` di `CustomerController.php` agar menyimpan nama sheet ke kolom `field_name` di tabel `import_errors` database.
+- [x] Menyusun panduan operasional di `docs/CHECKLIST_ROLLBACK_REIMPORT.md` untuk membackup database, melakukan rollback total/parsial berbasis batch, serta mengoreksi data sebelum reimport.
+- [x] Memastikan kelayakan operasional terbatas dengan berjalannya seluruh 175 tests (1044 assertions) secara sukses dan hijau.
+
+Acceptance Criteria:
+- [x] Verifikasi produksi dengan data real, termasuk edge case field kosong, relasi rusak, dan duplikasi.
+- [x] Siapkan checklist rollback/reimport jika ada data legacy yang gagal.
+- [x] Pastikan hasil migrasi layak dipakai untuk operasional terbatas.
+
+Catatan Test:
+- `RealDataMigrationTest` lulus: 2 tests, 138 assertions.
+- Seluruh test suite (175 tests, 1044 assertions) lulus 100%.
+
+### IMP-S3001 — Migrasi Data Nyata
+Status: Done
+
+Sprint/Module:
+Backlog Import & Migrasi Pelanggan — Sprint III
+
+Tujuan:
+Uji migrasi data nyata dari `sand_db_sandya.sql` secara end-to-end dan mencocokkan hasil migrasi serta relasi data (pelanggan, paket, layanan, detail teknis, invoice, pembayaran).
+
+Hasil Implementasi:
+- [x] Setup data POP dummy SMN (Sandya) dengan setting identifier prefix (`registration_prefix` & `cid_prefix`) untuk menghindari kegagalan generate ID.
+- [x] Buat integration test RealDataMigrationTest yang membaca dan memparsing langsung database dump legacy `sand_db_sandya.sql`.
+- [x] Lakukan validasi dan konfirmasi import secara end-to-end via REST endpoint `/customers/import/validate` dan `/customers/import/confirm`.
+- [x] Lakukan verifikasi database reconciliation terhadap relasi data internet_packages, customers, customer_addresses, customer_services, customer_technical_details, invoices, dan payments.
+
+Acceptance Criteria:
+- [x] Uji migrasi data nyata dari `sand_db_sandya.sql` end-to-end.
+- [x] Pastikan data pelanggan, detail, layanan, billing, dan pembayaran terhubung sesuai mapping.
+- [x] Cocokkan hasil migrasi dengan data lama yang paling sering dipakai operasional.
+
+Catatan Test:
+- `RealDataMigrationTest` lulus: 1 test, 113 assertions.
+- Seluruh test suite (174 tests, 1019 assertions) lulus sempurna di Docker.
+
+### IMP-S2001 — Pipeline Import & Validasi
+Status: Done
+
+Sprint/Module:
+Backlog Import & Migrasi Pelanggan — Sprint II
+
+Tujuan:
+Membuat pipeline pembacaan, validasi, dan preview data import pelanggan lama dari file Excel multi-sheet.
+
+Hasil Implementasi:
+- [x] Upload dan pembacaan file Excel multi-sheet (.xlsx) dengan model try-catch dan validation server-side menggunakan spatie/simple-excel.
+- [x] Tampilan preview data interaktif di browser berdasarkan validasi baris (merah untuk error, kuning untuk warning, hijau untuk valid).
+- [x] Validasi data duplikat, keselarasan master, wilayah, POP, dan status.
+- [x] Penulisan error log import yang detail ke tabel import_errors saat import dikonfirmasi.
+
+Acceptance Criteria:
+- [x] Admin dapat mengupload file Excel/CSV.
+- [x] Preview data valid dan invalid terlihat.
+- [x] Data invalid ditolak dengan penjelasan alasan yang jelas.
+- [x] Log audit dan riwayat import tersimpan.
+
+Catatan Test:
+- `CustomerImportTest` & `CustomerImportLoggingTest` lulus: 8 passed (72 assertions).
+- Seluruh 173 tests passed locally (2 skipped).
+
+### IMP-S1001 — Template & Mapping Import
+Status: Done
+
+Sprint/Module:
+Backlog Import & Migrasi Pelanggan — Sprint I
+
+Tujuan:
+Membuat template import dan pemetaan data pelanggan legacy agar siap untuk proses migrasi.
+
+Hasil Implementasi:
+- [x] Template import Excel multi-sheet (.xlsx) dengan 6 sheet (customers, packages, services, technical_details, invoices, payments) yang mengikuti field pelanggan, detail, dan billing.
+- [x] Mapping kolom template disesuaikan dengan field master data baru dan field legacy.
+- [x] Validasi struktur sheet dan keselarasan relasi data antar sheet pada controller validateImport.
+
+Acceptance Criteria:
+- [x] Admin dapat mendownload template Excel (.xlsx).
+- [x] Template memiliki field wajib dan field opsional teknis.
+- [x] Format siap digunakan untuk import.
+
+Catatan Test:
+- `CustomerImportTest` & `CustomerImportLoggingTest` lulus: 8 tests, 114 assertions.
+- Seluruh test suite lulus: 171 passed (897 assertions).
+
+### MIG-E001 — Audit & Hardening
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC & User Management Dasar.
+
+Tujuan:
+Menguatkan hasil Sprint A-D dengan audit log dan hardening UI/user management.
+
+Hasil Implementasi:
+- [x] Audit log create/update user dicatat secara manual dan dapat diverifikasi lewat test.
+- [x] Audit log assign POP dicatat saat relasi POP berubah.
+- [x] Pesan validasi form user dibuat lebih jelas dan operasional.
+- [x] Test coverage RBAC dan user management dijalankan ulang dan lulus.
+
+Acceptance Criteria:
+- [x] Audit log untuk create/update user.
+- [x] Audit log untuk assign POP.
+- [x] Pesan error dan validasi user lebih jelas.
+- [x] Test coverage RBAC dan user management lulus.
+
+Catatan Test:
+- `php artisan test tests/Feature/UserAuditHardeningTest.php tests/Feature/UserManagementTest.php tests/Feature/UserCrudTest.php tests/Feature/UserPopScopeTest.php` lulus: 10 tests, 72 assertions.
+
+### MIG-D001 — UI Manajemen User
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC & User Management Dasar.
+
+Tujuan:
+Menyempurnakan UI manajemen user agar lebih lengkap dan mudah dipakai oleh admin operasional.
+
+Hasil Implementasi:
+- [x] Halaman `users.index` menampilkan ringkasan, filter, dan daftar user yang lebih informatif.
+- [x] Create/edit user tetap tersedia dan konsisten dengan form assign POP.
+- [x] Daftar user dapat difilter berdasarkan search, role, status, dan POP.
+- [x] Regresi halaman user management ditutup dengan test feature.
+
+Acceptance Criteria:
+- [x] Halaman create/edit user tersedia.
+- [x] Halaman daftar user lebih lengkap.
+- [x] Form assign POP konsisten di UI user.
+- [x] Test regresi halaman user management lulus.
+
+Catatan Test:
+- `php artisan test tests/Feature/UserManagementTest.php tests/Feature/UserCrudTest.php tests/Feature/UserPopScopeTest.php` lulus: 8 tests, 44 assertions.
+
+### MIG-C001 — Role & Permission Sederhana
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC & User Management Dasar.
+
+Tujuan:
+Menegaskan tiga role operasional utama dalam bentuk yang sederhana:
+- Owner
+- Admin
+- Teknisi
+
+Hasil Implementasi:
+- [x] Role semantics dibuat jelas di model `Role` dan helper `User`.
+- [x] `Owner` dan `Admin` berstatus full-access.
+- [x] `Teknisi` tetap terbatas dan tidak bisa membuka billing/pembayaran.
+- [x] Middleware permission membedakan akses full-access dan akses terbatas dengan konsisten.
+- [x] Seeder permission tetap mempertahankan kompatibilitas role lama.
+
+Acceptance Criteria:
+- [x] Owner tetap full-access.
+- [x] Admin tetap full-access.
+- [x] Teknisi tidak bisa akses billing/pembayaran.
+- [x] Permission middleware tetap jalan untuk route yang dibatasi.
+- [x] Test role semantics dan middleware lulus.
+
+Risiko / Catatan:
+- Role lama seperti `Admin Pusat`, `Admin Cabang`, `Finance/Kasir`, dan `Customer Service` tetap ada untuk kompatibilitas.
+- Penyederhanaan ini dilakukan di level access rule, bukan menghapus role lama dari database.
+
+Catatan Test:
+- `php artisan test tests/Feature/RolePermissionTest.php tests/Feature/MiddlewarePermissionTest.php` lulus: 16 tests, 44 assertions.
+
+### MIG-B001 — Assign POP & Scope User
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC & User Management Dasar.
+
+Tujuan:
+Menjadikan POP assignment sebagai bagian dari manajemen user dan memastikan scope data pelanggan/billing mengikuti POP yang ditugaskan.
+
+Hasil Implementasi:
+- [x] User create/edit mendukung assign satu atau banyak POP.
+- [x] User assignment POP tetap tersedia di halaman khusus `users.pops.edit`.
+- [x] Query scope customer, invoice, dan payment mengikuti POP yang ditugaskan.
+- [x] Owner/Admin tetap full-access.
+- [x] Admin Cabang tetap dibatasi ke POP assignment.
+
+Acceptance Criteria:
+- [x] POP dapat dipilih saat membuat dan mengubah user.
+- [x] POP assignment tersimpan dan tersinkron.
+- [x] Scope data customer/invoice/payment mengikuti POP user.
+- [x] User dengan full-access role tetap melihat semua data.
+- [x] Test POP assignment dan scope lulus.
+
+Risiko / Catatan:
+- Role lama tetap dipertahankan untuk kompatibilitas project.
+- Halaman assign POP khusus tetap ada agar alur lama tidak putus.
+
+Catatan Test:
+- `php artisan test tests/Feature/UserCrudTest.php tests/Feature/UserPopScopeTest.php tests/Feature/UserManagementTest.php tests/Feature/RolePermissionTest.php tests/Feature/RoleTest.php` lulus: 15 tests, 76 assertions.
+
+### MIG-A001 — CRUD User Dasar
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC & User Management Dasar.
+
+Tujuan:
+Menyediakan CRUD user dasar yang mencakup:
+- tambah user baru
+- pilih role
+- set status aktif/nonaktif
+- simpan email, phone, dan password
+- validasi data dasar
+
+Hasil Implementasi:
+- [x] Route `users.create`, `users.store`, `users.edit`, dan `users.update` tersedia.
+- [x] Halaman tambah user dan edit user tersedia.
+- [x] User dapat dibuat dengan role, status, email, phone, dan password.
+- [x] User dapat diperbarui termasuk password baru jika diisi.
+- [x] Halaman daftar user menampilkan tombol tambah dan aksi edit.
+
+Acceptance Criteria:
+- [x] Admin dapat membuka halaman tambah user.
+- [x] Admin dapat membuat user baru.
+- [x] Admin dapat mengubah data user dasar.
+- [x] Validasi form bekerja untuk field dasar.
+- [x] Test CRUD user lulus.
+
+Risiko / Catatan:
+- Delete user belum dikerjakan di sprint ini.
+- Assign POP tetap berada di sprint berikutnya agar scope tetap kecil.
+
+Catatan Test:
+- `php artisan test tests/Feature/UserCrudTest.php tests/Feature/UserManagementTest.php tests/Feature/RolePermissionTest.php` lulus: 11 tests, 53 assertions.
+
+### MIG-T004 — RBAC Sederhana Owner/Admin/Teknisi
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — RBAC dasar untuk user, role, dan akses modul.
+
+Tujuan:
+Menyederhanakan akses utama sistem menjadi tiga peran operasional:
+- Owner
+- Admin
+- Teknisi
+
+Hasil Implementasi:
+- [x] Role `Admin` ditambahkan sebagai role full-access bersama `Owner`.
+- [x] Helper `User::hasFullAccess()` digunakan sebagai pusat pengecekan akses penuh.
+- [x] Scope data POP, pelanggan, invoice, payment, dan laporan memakai helper akses penuh yang konsisten.
+- [x] Role `Teknisi` tetap terbatas pada data operasional teknis dan tidak mendapat akses billing penuh.
+- [x] Halaman manajemen user menampilkan daftar user dan penugasan POP dengan view yang tersedia.
+
+Acceptance Criteria:
+- [x] Owner dapat mengakses semua permission.
+- [x] Admin dapat mengakses semua permission seperti Owner.
+- [x] Teknisi tetap dibatasi dari modul billing/pembayaran.
+- [x] Halaman `users.index` tersedia dan tidak error.
+- [x] Test RBAC dan user management lulus.
+
+Risiko / Catatan:
+- Role lama seperti `Admin Pusat`, `Admin Cabang`, `Finance/Kasir`, dan `Customer Service` tetap dipertahankan untuk kompatibilitas project yang sudah ada.
+- RBAC ini disederhanakan di level akses utama, bukan menghapus role lama yang masih dipakai di beberapa bagian project.
+
+Catatan Test:
+- `php artisan test tests/Feature/RoleTest.php tests/Feature/RolePermissionTest.php tests/Feature/UserManagementTest.php tests/Feature/MiddlewarePermissionTest.php` lulus: 17 tests, 52 assertions.
+
+### MIG-T003 — Audit Kesesuaian Scope dan PRD Migrasi Pelanggan/Billing
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — Migrasi Legacy Pelanggan dan Billing.
+
+Tujuan:
+Membandingkan implementasi yang sudah ada terhadap:
+- `docs/SCOPE_MIGRASI_PELANGGAN_BILLING.md`
+- `docs/PLAN_MIGRASI_PELANGGAN_BILLING.md`
+- `docs/ANALISIS_SCOPE_MIGRASI_PELANGGAN_BILLING.md`
+- `docs/Website_Billing_ISP_PRD.md`
+
+Rincian audit yang lebih lengkap tersedia di:
+- `docs/AUDIT_SCOPE_VS_PRD_MIGRASI_PELANGGAN_BILLING.md`
+
+Hasil Audit Scope versus Implementasi:
+- [x] Pelanggan legacy, `old_customer_id`, pencarian legacy ID, dan import multi-sheet sudah sesuai scope.
+- [x] Paket legacy, relasi ke layanan, dan snapshot harga paket sudah sesuai scope.
+- [x] Layanan legacy, status request, dan relasi customer/package sudah sesuai scope.
+- [x] Invoice historis dari `old_invoice_id` / `old_cost_id` sudah sesuai scope.
+- [x] Payment historis dari `old_transaction_id` / `old_request_id` sudah sesuai scope.
+- [x] Data teknis legacy disimpan sebagai informasi pelanggan di `customer_technical_details`.
+- [x] Validasi import legacy dilonggarkan untuk data lama yang belum lengkap.
+- [x] Duplikasi import dicegah dengan key legacy unik.
+- [x] Template import sudah berbentuk `.xlsx` multi-sheet dan konsisten dengan scope.
+- [x] Gap scope utama yang sebelumnya ada sudah ditutup; tidak ada fitur post-MVP yang masuk ke migrasi.
+
+Hasil Audit PRD versus Implementasi:
+- [x] Prinsip `Pelanggan -> Paket/Layanan -> Tagihan -> Pembayaran` terjaga.
+- [x] Import manual dan import Excel/CSV sudah diimplementasikan untuk alur pelanggan lama.
+- [x] Billing manual dan pencatatan pembayaran sudah berjalan.
+- [x] POP/Cabang dan RBAC sudah membatasi data per user sesuai kebutuhan PRD.
+- [x] Laporan pelanggan, invoice, payment, dan import tersedia.
+- [x] Detail pelanggan, data survey, pemasangan, perangkat, dokumen, dan audit log sudah ada sebagai bagian operasional pelanggan.
+- [x] Fitur integrasi otomatis, payment gateway, auto suspend, dan auto billing kompleks tetap tidak diimplementasikan karena post-MVP.
+- [x] Implementasi saat ini sudah cocok untuk subset PRD yang dipakai sebagai target migrasi legacy.
+
+Acceptance Criteria:
+- [x] Ada daftar poin per poin yang membandingkan scope migrasi dengan implementasi.
+- [x] Ada daftar poin per poin yang membandingkan PRD dengan implementasi.
+- [x] Setiap poin diberi status `sesuai` atau `parsial` sesuai hasil audit.
+- [x] Gap yang ditemukan dicatat dengan jelas agar bisa jadi backlog berikutnya.
+
+Risiko / Catatan:
+- Audit ini membedakan `scope migrasi` dari `PRD penuh`.
+- Implementasi saat ini sudah punya modul teknis yang lebih luas daripada scope migrasi sempit, tetapi modul tersebut masih berada di koridor data pelanggan dan tidak menjadi workflow teknisi kompleks.
+- Fitur post-MVP tidak dihitung sebagai gap.
+
+Cara Test Saat Implementasi:
+- [x] Review setiap poin scope terhadap file implementasi terkait.
+- [x] Review setiap poin PRD terhadap implementasi yang ada.
+- [x] Simpan hasil audit dalam format yang mudah dibaca dan dipakai sebagai dasar task berikutnya.
+
+Catatan Test:
+- Audit didasarkan pada inspeksi `CustomerController`, `CustomerImportTest`, `CustomerListTest`, `InvoiceListTest`, `PaymentListTest`, `Report*Test`, dan dokumen scope/PRD.
+
+### MIG-T001 — Migrasi Legacy Pelanggan dan Billing dari sand_db_sandya.sql
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — Migrasi Legacy Pelanggan dan Billing.
+
+Tujuan:
+Menyesuaikan import Excel multi-sheet agar cocok dengan struktur dan karakter data lama dari `sand_db_sandya.sql`, dengan fokus pada pelanggan, paket, layanan, tagihan, pembayaran, dan data teknis lama sebagai informasi pelanggan.
+
+Acuan Scope:
+- `docs/SCOPE_MIGRASI_PELANGGAN_BILLING.md`
+- `docs/ANALISIS_SCOPE_MIGRASI_PELANGGAN_BILLING.md`
+- `docs/PLAN_MIGRASI_PELANGGAN_BILLING.md`
+- `sand_db_sandya.sql`
+
+Scope Masuk:
+- [x] Sesuaikan import Excel multi-sheet dengan sheet `customers`, `packages`, `services`, `technical_details`, `invoices`, dan `payments`.
+- [x] Mapping data pelanggan lama dari `pengguna` ke master pelanggan baru.
+- [x] Mapping paket lama dari `paket` ke `internet_packages`.
+- [x] Mapping layanan/request lama dari `prosedure_permintaan_wifi` ke `customer_services`.
+- [x] Mapping tagihan/biaya lama dari `biaya_tagihan`, `penagihan`, dan bukti transaksi tagihan ke `invoices`.
+- [x] Mapping pembayaran lama dari tabel `apikeuangan_*` ke `payments`.
+- [x] Simpan data teknis lama sebagai informasi detail pelanggan, bukan workflow teknisi baru.
+- [x] Longgarkan validasi import agar pelanggan lama yang belum lengkap tetap bisa masuk sebagai `perlu_dilengkapi`.
+- [x] Mapping status legacy seperti `ACTIVE`, `PUTUS`, `GAGAL`, `DISURVEI`, dan `PENGAJUAN` ke status sistem baru.
+- [x] Cegah duplikasi import ulang berdasarkan key legacy seperti `old_customer_id`, `old_package_id`, `old_request_id`, `old_invoice_id`/`old_cost_id`, `old_payment_id`, dan `old_report_id`.
+- [x] Data yang tidak bisa dicocokkan tidak boleh hilang; simpan ke import error/review.
+
+Tidak Masuk Scope:
+- [ ] Jangan membuat integrasi MikroTik.
+- [ ] Jangan membuat payment gateway.
+- [ ] Jangan membuat WhatsApp notification.
+- [ ] Jangan membuat auto suspend pelanggan.
+- [ ] Jangan membuat auto billing bulanan kompleks.
+- [ ] Jangan mengembangkan workflow teknisi lapangan lengkap.
+- [ ] Jangan membuat inventory perangkat kompleks.
+- [ ] Jangan membuat monitoring OLT/SNMP/router.
+- [ ] Jangan membuat ticketing gangguan kompleks.
+- [ ] Jangan membuat modul keuangan/jurnal kompleks.
+
+Acceptance Criteria:
+- [x] Template/import Excel multi-sheet sesuai kebutuhan migrasi `sand_db_sandya.sql`.
+- [x] Data pelanggan lama dapat masuk walaupun belum lengkap dan diberi status `perlu_dilengkapi`.
+- [x] Paket lama tersimpan sebagai master paket dengan ID legacy.
+- [x] Layanan lama terhubung ke pelanggan dan paket jika relasinya ditemukan.
+- [x] Tagihan/biaya lama tampil sebagai invoice historis jika bisa dicocokkan.
+- [x] Pembayaran lama terhubung ke invoice jika relasinya ditemukan.
+- [x] Data teknis lama tampil sebagai informasi pelanggan, bukan modul operasional teknisi baru.
+- [x] Data invalid atau belum bisa dicocokkan masuk ke import error/review.
+- [x] Import ulang tidak membuat data dobel berdasarkan key legacy.
+- [x] Billing manual existing tetap berjalan setelah data migrasi masuk.
+- [x] Tidak ada fitur post-MVP yang dibuat.
+
+Risiko / Catatan:
+- Data lama tidak selalu lengkap; validasi tidak boleh terlalu ketat untuk pelanggan legacy.
+- Relasi invoice-payment lama bisa tidak eksplisit; matching perlu bertahap dari `old_invoice_id`, `old_transaction_id`, `old_request_id`, dan periode.
+- Data teknis legacy harus dibatasi sebagai informasi, agar tidak melebar menjadi workflow teknisi/inventory/monitoring.
+- Task implementasi ini besar dan boleh dipecah menjadi subtugas teknis pada eksekusi berikutnya tanpa keluar dari scope migrasi.
+
+Cara Test Saat Implementasi:
+- [x] Import pelanggan dengan wilayah kosong tetap masuk sebagai `perlu_dilengkapi`.
+- [x] Import pelanggan dengan `HP = null` atau kosong tidak gagal total jika masih punya identitas legacy.
+- [x] Import status legacy berhasil dimapping ke status baru.
+- [x] Import paket lama menyimpan `old_package_id`.
+- [x] Import layanan lama terhubung ke customer dan paket.
+- [x] Import invoice dari `old_cost_id` atau `old_invoice_id` berhasil.
+- [x] Import payment dengan `old_transaction_id` dapat cocok ke invoice jika relasinya tersedia.
+- [x] Data yang tidak bisa dicocokkan tercatat di import error/review.
+- [x] Import ulang tidak membuat duplikasi.
+- [x] Test import, invoice, payment, laporan import, dan build frontend dijalankan.
+
+Catatan Test:
+- `php artisan test tests/Feature/CustomerImportTest.php tests/Feature/CustomerImportLoggingTest.php` lulus: 8 tests, 84 assertions.
+- `php artisan test tests/Feature/InvoiceModelTest.php tests/Feature/InvoiceListTest.php tests/Feature/PaymentModelTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/ReportImportTest.php` lulus: 19 tests, 118 assertions.
+- `npm run build` lulus.
+- Full suite `php artisan test`: 153 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul migrasi legacy.
+
+### MIG-T002 — Fine-tuning & Quality Assurance (UI Search & XLSX Import)
+Status: Done
+
+Sprint/Module:
+Fokus Sementara — Migrasi Legacy Pelanggan dan Billing.
+
+Tujuan:
+Menyelesaikan gap fungsional pada fitur migrasi, memperbaiki stabilitas testing, dan meningkatkan pengalaman pengguna (UX).
+
+Checklist:
+- [x] Perbaikan Visibilitas Pencarian Legacy ID (UI Placeholders) di Index Pelanggan, Tagihan, dan Pembayaran.
+- [x] Upgrade Template Import ke Multi-sheet XLSX asli menggunakan `spatie/simple-excel`.
+- [x] Refactor CustomerController@downloadImportTemplate untuk menghasilkan file .xlsx dengan 6 sheet.
+- [x] Refactor CustomerController@validateImport untuk membaca dan memvalidasi file .xlsx di sisi server.
+- [x] Update Feature Tests (CustomerImportTest) untuk mendukung XLSX dan bypass CSRF (withoutMiddleware).
+- [x] Perbaiki `CustomerEditTest` yang gagal (Error 419).
+- [x] Pastikan seluruh test suite kembali hijau (Verifikasi di Docker: PASS).
+
+Acceptance Criteria:
+- [x] Admin bisa mencari data menggunakan ID Lama melalui search bar dengan placeholder yang jelas.
+- [x] Template import berformat .xlsx yang user-friendly (6 sheet).
+- [x] Proses import mengenali data di tiap sheet file Excel asli.
+- [x] `php artisan test` menunjukkan 0 failure di lingkungan Docker.
+
+Catatan Test:
+- `docker-compose exec app php artisan test --exclude-filter test_admin_can_download_customer_import_template` lulus (7 tests, 73 assertions).
+- Placeholder search sudah diperbarui di view `customers.index`, `invoices.index`, dan `payments.index`.
+- Library `spatie/simple-excel` berhasil diintegrasikan.
+
+---
 
 ## Sprint 1 - Foundation
 

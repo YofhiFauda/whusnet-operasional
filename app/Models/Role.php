@@ -13,6 +13,16 @@ class Role extends Model
 
     protected string $auditModule = 'Role Management';
 
+    public function isFullAccessRole(): bool
+    {
+        return in_array($this->name, ['Owner', 'Admin', 'Admin Pusat'], true);
+    }
+
+    public function isTechnicianRole(): bool
+    {
+        return $this->name === 'Teknisi';
+    }
+
     /**
      * Get the permissions associated with the role.
      */

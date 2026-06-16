@@ -36,7 +36,7 @@
                 </div>
             </div>
 
-            @if(in_array(optional($user->role)->name, ['Owner', 'Admin Pusat']))
+            @if($user->hasFullAccess())
                 <div class="bg-purple-50 text-purple-800 p-4 rounded-lg border border-purple-100 mb-6">
                     <strong>Catatan:</strong> User ini memiliki role <strong>{{ $user->role->name }}</strong>, sehingga secara otomatis memiliki akses ke <strong>semua POP</strong>. Pilihan di bawah hanya sebagai data opsional dan tidak akan membatasi aksesnya.
                 </div>

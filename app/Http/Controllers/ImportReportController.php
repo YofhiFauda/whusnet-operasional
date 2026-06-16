@@ -32,7 +32,7 @@ class ImportReportController extends Controller
         $query = ImportBatch::with('user');
 
         // Batasi akses jika bukan Owner atau Admin Pusat
-        if (!in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'], true)) {
+        if (!$user->hasFullAccess()) {
             $query->where('uploaded_by', $user->id);
         }
 
@@ -98,7 +98,7 @@ class ImportReportController extends Controller
         $batch = ImportBatch::with(['user', 'errors'])->findOrFail($id);
 
         // Batasi akses jika bukan Owner atau Admin Pusat
-        if (!in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'], true)) {
+        if (!$user->hasFullAccess()) {
             if ($batch->uploaded_by !== $user->id) {
                 abort(403, 'Unauthorized action.');
             }
@@ -121,7 +121,7 @@ class ImportReportController extends Controller
         $batch = ImportBatch::with('errors')->findOrFail($id);
 
         // Batasi akses jika bukan Owner/Admin Pusat
-        if (!in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'], true)) {
+        if (!$user->hasFullAccess()) {
             if ($batch->uploaded_by !== $user->id) {
                 abort(403, 'Unauthorized action.');
             }

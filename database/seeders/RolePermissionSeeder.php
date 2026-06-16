@@ -16,12 +16,17 @@ class RolePermissionSeeder extends Seeder
         // Get all permissions
         $allPermissions = Permission::all();
 
-        // 1. Owner & Admin Pusat (Full Access)
+        // 1. Owner, Admin, & Admin Pusat (Full Access)
         $ownerRole = Role::where('name', 'Owner')->first();
+        $adminRole = Role::where('name', 'Admin')->first();
         $adminPusatRole = Role::where('name', 'Admin Pusat')->first();
 
         if ($ownerRole) {
             $ownerRole->permissions()->sync($allPermissions->pluck('id'));
+        }
+
+        if ($adminRole) {
+            $adminRole->permissions()->sync($allPermissions->pluck('id'));
         }
 
         if ($adminPusatRole) {

@@ -29,9 +29,12 @@ class InvoiceController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('old_invoice_id', 'like', "%{$search}%")
+                    ->orWhere('old_cost_id', 'like', "%{$search}%")
                     ->orWhereHas('customer', function ($customerQuery) use ($search) {
                         $customerQuery->where('full_name', 'like', "%{$search}%")
                             ->orWhere('customer_code', 'like', "%{$search}%")
+                            ->orWhere('old_customer_id', 'like', "%{$search}%")
                             ->orWhere('cid', 'like', "%{$search}%")
                             ->orWhere('primary_phone', 'like', "%{$search}%")
                             ->orWhere('phone', 'like', "%{$search}%");

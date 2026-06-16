@@ -111,7 +111,7 @@ class Pop extends Model
             return $query->whereRaw('1 = 0'); // return empty if no user
         }
 
-        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+        if ($user->hasFullAccess()) {
             return $query; // return all
         }
 

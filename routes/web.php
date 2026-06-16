@@ -35,6 +35,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:manage_users')->group(function () {
+        Route::get('/users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create');
+        Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
         Route::get('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'editPops'])->name('users.pops.edit');
         Route::put('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'updatePops'])->name('users.pops.update');
     });

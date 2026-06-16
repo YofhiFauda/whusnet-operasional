@@ -623,6 +623,123 @@ Output:
 EOF
 )
 
+PROMPT_LEGACY_TASK=$(cat << 'EOF'
+Anda bertindak sebagai Planner / Task Writer untuk migrasi legacy pelanggan dan billing.
+
+Baca terlebih dahulu:
+- AGENTS.md
+- docs/PROJECT_CONTEXT.md
+- docs/MVP_SCOPE.md
+- docs/IMPLEMENTATION_PLAN.md
+- docs/TASKS.md
+- docs/ACCEPTANCE_CRITERIA.md
+- docs/DATABASE_CONCEPT.md
+- docs/SCOPE_MIGRASI_PELANGGAN_BILLING.md
+- docs/ANALISIS_SCOPE_MIGRASI_PELANGGAN_BILLING.md
+- docs/PLAN_MIGRASI_PELANGGAN_BILLING.md
+
+Konteks:
+Project sementara dialihkan fokusnya ke migrasi data pelanggan dan billing dari sand_db_sandya.sql.
+Website baru hanya perlu menampung dan menampilkan data pelanggan, paket, layanan, tagihan, pembayaran, dan data teknis lama sebagai informasi pelanggan.
+
+Tugas:
+Update docs/TASKS.md untuk menambahkan task aktif baru:
+
+Nama task:
+Migrasi Legacy Pelanggan dan Billing dari sand_db_sandya.sql
+
+Scope task:
+- Menyesuaikan import Excel multi-sheet agar cocok dengan sand_db_sandya.sql.
+- Fokus hanya pada data pelanggan, paket, layanan, tagihan, pembayaran, dan data teknis lama sebagai informasi.
+- Jangan membuat fitur post-MVP.
+- Jangan mengembangkan workflow teknisi, inventory, MikroTik, payment gateway, WhatsApp, auto suspend, atau auto billing kompleks.
+
+Sebelum mengubah file, tampilkan scope check:
+1. Task ini masuk sprint/module apa?
+2. Modul apa yang disentuh?
+3. File apa yang akan dibuat/diubah?
+4. File apa yang tidak boleh disentuh?
+5. Acceptance criteria apa yang harus terpenuhi?
+6. Risiko apa yang perlu diperhatikan?
+
+Setelah scope check, update hanya docs/TASKS.md dan file context .ai jika dibutuhkan.
+Jangan ubah kode aplikasi.
+
+Output akhir wajib:
+## Task Selesai
+## File Diubah
+## Alasan Perubahan
+## Cara Test
+## Acceptance Criteria
+## Risiko / Catatan
+## Next Task
+EOF
+)
+
+PROMPT_LEGACY_BUILD=$(cat << 'EOF'
+Anda bertindak sebagai Builder untuk task migrasi legacy pelanggan dan billing.
+
+Baca terlebih dahulu:
+- AGENTS.md
+- docs/PROJECT_CONTEXT.md
+- docs/MVP_SCOPE.md
+- docs/IMPLEMENTATION_PLAN.md
+- docs/TASKS.md
+- docs/ACCEPTANCE_CRITERIA.md
+- docs/DATABASE_CONCEPT.md
+- docs/SCOPE_MIGRASI_PELANGGAN_BILLING.md
+- docs/ANALISIS_SCOPE_MIGRASI_PELANGGAN_BILLING.md
+- docs/PLAN_MIGRASI_PELANGGAN_BILLING.md
+- sand_db_sandya.sql
+- .ai/ACTIVE_TASK.md jika tersedia
+- .ai/HANDOFF.md jika tersedia
+- .ai/SESSION_STATE.md jika tersedia
+
+Kerjakan hanya task aktif di docs/TASKS.md.
+
+Prioritas implementasi:
+1. Lengkapi field legacy minimal yang belum tersedia.
+2. Perbaiki template import multi-sheet.
+3. Longgarkan validasi import pelanggan lama.
+4. Tambahkan mapping status legacy.
+5. Pastikan test import legacy dibuat/diupdate.
+
+Batasan:
+- Jangan membuat integrasi MikroTik.
+- Jangan membuat payment gateway.
+- Jangan membuat auto suspend.
+- Jangan membuat auto billing kompleks.
+- Jangan membuat workflow teknisi penuh.
+- Jangan menghapus modul existing yang tidak terkait.
+- Jangan mengubah file di luar task aktif.
+
+Sebelum coding, lakukan scope check:
+1. Task ini masuk sprint/module apa?
+2. Modul apa yang disentuh?
+3. Requirement scope migrasi mana yang relevan?
+4. File apa saja yang akan dibuat/diubah?
+5. File apa saja yang tidak boleh disentuh?
+6. Acceptance criteria apa yang harus terpenuhi?
+7. Risiko apa yang perlu diperhatikan?
+
+Setelah selesai:
+- Jelaskan file yang diubah.
+- Jelaskan alasan perubahan.
+- Jelaskan cara test.
+- Update docs/TASKS.md.
+- Laporkan acceptance criteria.
+
+Output akhir wajib:
+## Task Selesai
+## File Diubah
+## Alasan Perubahan
+## Cara Test
+## Acceptance Criteria
+## Risiko / Catatan
+## Next Task
+EOF
+)
+
 # --- FUNGSI EKSEKUSI PERINTAH ---
 execute_command() {
   local cmd="$1"
@@ -693,6 +810,14 @@ execute_command() {
       echo -e "${YELLOW}🔄 Menjalankan sync lokal setelah close agar .ai mengikuti docs/TASKS.md...${NC}"
       run_sync_logged
       ;;
+    legacy-task)
+      run_codex_logged "legacy-task" "$PROMPT_LEGACY_TASK"
+      echo -e "${YELLOW}🔄 Menjalankan sync lokal setelah task migrasi dibuat...${NC}"
+      run_sync_logged || true
+      ;;
+    legacy-build)
+      run_codex_logged "legacy-build" "$PROMPT_LEGACY_BUILD"
+      ;;
     status)
       ensure_ai_dir
       echo -e "\n${BLUE}${BOLD}===== 📋 ACTIVE TASK =====${NC}"
@@ -730,6 +855,8 @@ execute_command() {
       echo -e "  ${MAGENTA}./scripts/ai.sh review${NC}"
       echo -e "  ${YELLOW}./scripts/ai.sh fix${NC}"
       echo -e "  ${GREEN}./scripts/ai.sh close${NC}"
+      echo -e "  ${CYAN}./scripts/ai.sh legacy-task${NC}"
+      echo -e "  ${BLUE}./scripts/ai.sh legacy-build${NC}"
       echo -e "  ${NC}./scripts/ai.sh status${NC}"
       echo -e "  ${NC}./scripts/ai.sh logs${NC}"
       exit 1
@@ -764,11 +891,13 @@ while true; do
   echo -e "  ${MAGENTA}4) ${NC}🕵️  FASE 3 - Gemini Review"
   echo -e "  ${YELLOW}5) ${NC}🔧 FASE 4 - Codex Fix"
   echo -e "  ${GREEN}6) ${NC}✅ FASE 5 - Close Task"
+  echo -e "  ${CYAN}7) ${NC}🧭 Legacy - Buat Task Migrasi"
+  echo -e "  ${BLUE}8) ${NC}🛠️  Legacy - Build Migrasi"
   echo ""
   echo -e "${BOLD}📊 Monitoring & Utilities:${NC}\n"
-  echo -e "  ${NC}7)  ${NC}📋 Lihat Status Context"
-  echo -e "  ${NC}8)  ${NC}🐙 Git Status / Diff"
-  echo -e "  ${NC}9)  ${NC}📑 Lihat Log AI Terakhir"
+  echo -e "  ${NC}9)  ${NC}📋 Lihat Status Context"
+  echo -e "  ${NC}10) ${NC}🐙 Git Status / Diff"
+  echo -e "  ${NC}11) ${NC}📑 Lihat Log AI Terakhir"
   echo ""
   echo -e "  ${RED}0)  🚪 Keluar${NC}"
   echo ""
@@ -791,9 +920,11 @@ while true; do
     4) MODE="review"; execute_command "review"; pause ;;
     5) MODE="fix"; execute_command "fix"; pause ;;
     6) MODE="close"; execute_command "close"; pause ;;
-    7) MODE="status"; execute_command "status"; pause ;;
-    8) MODE="git"; echo -e "${YELLOW}${BOLD}===== 🐙 GIT STATUS =====${NC}"; git status --short || true; pause ;;
-    9) MODE="logs"; execute_command "logs"; pause ;;
+    7) MODE="legacy-task"; execute_command "legacy-task"; pause ;;
+    8) MODE="legacy-build"; execute_command "legacy-build"; pause ;;
+    9) MODE="status"; execute_command "status"; pause ;;
+    10) MODE="git"; echo -e "${YELLOW}${BOLD}===== 🐙 GIT STATUS =====${NC}"; git status --short || true; pause ;;
+    11) MODE="logs"; execute_command "logs"; pause ;;
     0) echo -e "${GREEN}Sampai jumpa! 👋${NC}"; exit 0 ;;
     *) echo -e "${RED}❌ Pilihan tidak valid.${NC}"; pause ;;
   esac

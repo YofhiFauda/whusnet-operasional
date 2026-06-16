@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Batch Import Pelanggan - Whusnet Operasional')
-@section('page_title', 'Batch Import Pelanggan')
+@section('title', 'Batch Import Pelanggan Multi-Sheet - Whusnet Operasional')
+@section('page_title', 'Batch Import Pelanggan Multi-Sheet')
 
 @section('content')
 <!-- Breadcrumbs & Header -->
@@ -9,13 +9,16 @@
     <nav class="flex text-xs font-semibold text-slate-400 uppercase tracking-wider gap-2 mb-2">
         <a href="/customers" class="hover:text-slate-700 transition-colors">Daftar Pelanggan</a>
         <span>/</span>
-        <span class="text-slate-600">Batch Import</span>
+        <span class="text-slate-600">Batch Import Multi-Sheet</span>
     </nav>
-    <h1 class="text-xl font-bold text-slate-800 tracking-tight">Import Pelanggan Baru</h1>
-    <p class="text-xs text-slate-500 mt-1">Salin data dari Excel/CSV atau unggah file secara langsung</p>
+    <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Import Pelanggan & Billing Lama</h1>
+    <p class="text-xs text-slate-500 mt-1">Unggah file Excel multi-sheet untuk memigrasikan data pelanggan, paket, layanan, detail teknis, tagihan, dan pembayaran</p>
     <div class="mt-4 flex gap-3">
-        <a href="{{ route('customers.import.template') }}" class="inline-flex items-center justify-center gap-2 bg-white border border-sky-200 text-sky-700 hover:bg-sky-50 text-xs font-semibold py-2 px-4 rounded transition-colors">
-            Download Template CSV
+        <a href="{{ route('customers.import.template') }}" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-4 rounded transition-all shadow-sm">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download Template Excel (Multi-Sheet)
         </a>
         <a href="{{ route('customers.import.history') }}" class="inline-flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold py-2 px-4 rounded transition-colors">
             Lihat Riwayat Import
@@ -24,190 +27,118 @@
 </div>
 
 <!-- Main Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+<div class="grid grid-cols-1 gap-6">
     
-    <!-- Left Column: Instructions & Column Format -->
-    <div class="lg:col-span-1 flex flex-col gap-6">
-        <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-4">
-            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Format Kolom Data</h4>
-            <p class="text-xs text-slate-500 leading-relaxed">Gunakan template CSV agar field wajib dan field teknis opsional konsisten.</p>
-            
-            <div class="space-y-2.5">
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">old_customer_id</span>
-                    <span class="text-[10px] text-slate-400">ID pelanggan lama *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">full_name</span>
-                    <span class="text-[10px] text-slate-400">Nama lengkap *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">primary_phone</span>
-                    <span class="text-[10px] text-slate-400">Nomor HP *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">full_address</span>
-                    <span class="text-[10px] text-slate-400">Alamat lengkap *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">village, district, city</span>
-                    <span class="text-[10px] text-slate-400">Wilayah alamat *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">pop_code / pop_name</span>
-                    <span class="text-[10px] text-slate-400">POP/Cabang *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">package_name, monthly_price</span>
-                    <span class="text-[10px] text-slate-400">Paket & harga *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">activation_date, due_date</span>
-                    <span class="text-[10px] text-slate-400">Tanggal layanan *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">service_status</span>
-                    <span class="text-[10px] text-slate-400">Status layanan *</span>
-                </div>
-                <div class="flex items-center justify-between text-xs p-2 bg-slate-50 rounded border border-slate-100">
-                    <span class="font-bold text-slate-700">field teknis</span>
-                    <span class="text-[10px] text-slate-400">Opsional</span>
-                </div>
+    <!-- Upload Area Card -->
+    <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden p-6">
+        <div class="border-2 border-dashed border-slate-200 hover:border-sky-400 transition-colors rounded-lg p-8 text-center bg-slate-50/50 relative">
+            <input type="file" id="file-input" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(event)">
+            <div class="flex flex-col items-center">
+                <svg class="h-12 w-12 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span class="block text-sm font-bold text-slate-700">Tarik & Letakkan File Excel Migrasi di Sini</span>
+                <span class="block text-xs text-slate-400 mt-1">Harus berupa file Excel (.XLSX / .XLS) yang memiliki 6 sheet: customers, packages, services, technical_details, invoices, payments</span>
+                <span class="inline-block mt-4 bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-xs font-bold px-4 py-2 rounded transition-colors">
+                    Pilih File Excel
+                </span>
             </div>
-            <div class="text-[10px] text-slate-400 italic">
-                * Wajib diisi agar data siap divalidasi pada task import berikutnya.
-            </div>
+        </div>
+        <div id="file-info-container" class="hidden mt-4 flex items-center justify-between text-xs p-3 bg-sky-50 border border-sky-100 rounded-md text-sky-800">
+            <span class="font-medium font-mono" id="file-name-text">filename.xlsx</span>
+            <button type="button" onclick="resetFileSelection()" class="text-sky-600 hover:text-sky-800 font-bold focus:outline-none">Hapus</button>
         </div>
     </div>
 
-    <!-- Right Column: Upload Tabs & Preview Area -->
-    <div class="lg:col-span-3 flex flex-col gap-6">
+    <!-- Preview & Validation Results -->
+    <div id="preview-section" class="hidden space-y-6">
         
-        <!-- Input Selector Card -->
-        <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-            <!-- Tabs Nav -->
-            <div class="border-b border-slate-200 bg-slate-50 flex">
-                <button type="button" onclick="switchMethod('upload')" id="tab-upload" class="px-5 py-3 text-xs font-semibold border-b-2 border-sky-600 text-sky-600 focus:outline-none cursor-pointer">
-                    Metode A: Upload File (Excel / CSV)
-                </button>
-                <button type="button" onclick="switchMethod('paste')" id="tab-paste" class="px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer">
-                    Metode B: Copy-Paste Data
-                </button>
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="hidden bg-white border border-slate-200 rounded-lg p-8 text-center shadow-sm">
+            <svg class="animate-spin h-8 w-8 text-sky-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="block text-xs font-semibold text-slate-700">Membaca & Memvalidasi Relasi Seluruh Sheet...</span>
+        </div>
+
+        <!-- Tab Selector for Sheets -->
+        <div id="sheets-tab-container" class="bg-slate-100 border border-slate-200 rounded-lg flex p-1.5 overflow-x-auto gap-2">
+            <button type="button" onclick="switchSheetTab('customers')" id="btn-tab-customers" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer bg-white text-slate-800 shadow-sm border border-slate-200">
+                Customers <span id="badge-cust-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-100 rounded text-slate-600">0</span>
+            </button>
+            <button type="button" onclick="switchSheetTab('packages')" id="btn-tab-packages" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50">
+                Packages <span id="badge-pkg-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-200/50 rounded text-slate-600">0</span>
+            </button>
+            <button type="button" onclick="switchSheetTab('services')" id="btn-tab-services" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50">
+                Services <span id="badge-serv-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-200/50 rounded text-slate-600">0</span>
+            </button>
+            <button type="button" onclick="switchSheetTab('technical_details')" id="btn-tab-technical_details" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50">
+                Technical Details <span id="badge-tech-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-200/50 rounded text-slate-600">0</span>
+            </button>
+            <button type="button" onclick="switchSheetTab('invoices')" id="btn-tab-invoices" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50">
+                Invoices <span id="badge-inv-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-200/50 rounded text-slate-600">0</span>
+            </button>
+            <button type="button" onclick="switchSheetTab('payments')" id="btn-tab-payments" class="flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50">
+                Payments <span id="badge-pay-count" class="ml-1 px-1.5 py-0.5 text-[10px] bg-slate-200/50 rounded text-slate-600">0</span>
+            </button>
+        </div>
+
+        <!-- Metrics per Sheet -->
+        <div id="sheet-metrics-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Baris</span>
+                <span class="block text-xl font-extrabold text-slate-800 mt-1 font-mono" id="metric-total">0</span>
             </div>
-
-            <!-- Tab Content Panel -->
-            <div class="p-6">
-                <!-- Method A: Upload File -->
-                <div id="panel-upload" class="method-panel space-y-4">
-                    <div class="border-2 border-dashed border-slate-200 hover:border-sky-400 transition-colors rounded-lg p-8 text-center bg-slate-50/50 relative">
-                        <input type="file" id="file-input" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(event)">
-                        <div class="flex flex-col items-center">
-                            <svg class="h-10 w-10 text-slate-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <span class="block text-xs font-bold text-slate-700">Tarik & Letakkan File Anda di sini</span>
-                            <span class="block text-[10px] text-slate-400 mt-1">Mendukung format file .XLSX, .XLS, dan .CSV (Maksimal 5MB)</span>
-                            <span class="inline-block mt-4 bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 text-[10px] font-bold px-3 py-1.5 rounded transition-colors">
-                                Pilih File Dari Komputer
-                            </span>
-                        </div>
-                    </div>
-                    <div id="file-info-container" class="hidden flex items-center justify-between text-xs p-3 bg-sky-50 border border-sky-100 rounded-md text-sky-800">
-                        <span class="font-medium font-mono" id="file-name-text">filename.xlsx</span>
-                        <button type="button" onclick="resetFileSelection()" class="text-sky-600 hover:text-sky-800 font-bold focus:outline-none">Hapus</button>
-                    </div>
-                </div>
-
-                <!-- Method B: Copy Paste -->
-                <div id="panel-paste" class="method-panel space-y-4 hidden">
-                    <div>
-                        <label for="paste-textarea" class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Tempel (Paste) data dari Excel / Spreadsheet:</label>
-                        <textarea id="paste-textarea" rows="8" class="w-full text-xs font-mono p-3 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Salin baris data dari Excel Anda lalu tempel di sini.&#10;Contoh format:&#10;1	3502181010900001	Fajar Pratama	Babadan	WHUS-LITE	08123456789	-7.86940,111.46210"></textarea>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="button" onclick="handlePasteInput()" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 px-4 rounded transition-colors cursor-pointer focus:outline-none">
-                            Proses & Pratinjau Data
-                        </button>
-                    </div>
-                </div>
+            <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Valid / Siap</span>
+                <span class="block text-xl font-extrabold text-green-600 mt-1 font-mono" id="metric-ready">0</span>
+            </div>
+            <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peringatan</span>
+                <span class="block text-xl font-extrabold text-amber-500 mt-1 font-mono" id="metric-warning">0</span>
+            </div>
+            <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Error Format / Wajib</span>
+                <span class="block text-xl font-extrabold text-red-600 mt-1 font-mono" id="metric-error">0</span>
             </div>
         </div>
 
-        <!-- Metrics & Loading indicators -->
-        <div id="preview-section" class="hidden space-y-6">
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="hidden bg-white border border-slate-200 rounded-lg p-8 text-center shadow-sm">
-                <svg class="animate-spin h-8 w-8 text-sky-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span class="block text-xs font-semibold text-slate-700">Menganalisis & memvalidasi data...</span>
+        <!-- Sheet Preview Tables -->
+        <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+            <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider" id="preview-title">Preview Data: Customers</h3>
+                <span class="text-[10px] text-slate-500 font-medium">Pastikan seluruh tab bebas dari error sebelum mengonfirmasi import</span>
             </div>
 
-            <!-- Stats Metrics -->
-            <div id="metrics-container" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Baris</span>
-                    <span class="block text-xl font-extrabold text-slate-800 mt-1 font-mono data-text" id="metric-total">0</span>
-                </div>
-                <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Siap Di-Import</span>
-                    <span class="block text-xl font-extrabold text-green-600 mt-1 font-mono data-text" id="metric-ready">0</span>
-                </div>
-                <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Butuh Resolusi</span>
-                    <span class="block text-xl font-extrabold text-amber-500 mt-1 font-mono data-text" id="metric-warning">0</span>
-                </div>
-                <div class="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Error Format</span>
-                    <span class="block text-xl font-extrabold text-red-600 mt-1 font-mono data-text" id="metric-error">0</span>
-                </div>
+            <!-- Table wrappers for each sheet -->
+            <div class="overflow-x-auto min-h-[300px]">
+                <table class="w-full text-left text-xs border-collapse text-slate-700">
+                    <thead id="preview-table-header" class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-[10px] uppercase">
+                        <!-- Header cells will be injected -->
+                    </thead>
+                    <tbody id="preview-table-body" class="divide-y divide-slate-100">
+                        <!-- Rows will be injected -->
+                    </tbody>
+                </table>
             </div>
 
-            <!-- Table Preview Card -->
-            <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
-                <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Pratinjau & Validasi Data Pelanggan</h3>
-                    <div class="text-[10px] text-slate-500 font-medium">Selesaikan baris peringatan (amber) sebelum mengimport data</div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs border-collapse text-slate-700">
-                        <thead>
-                            <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-[10px] uppercase">
-                                <th class="px-4 py-3 w-10 text-center">NO</th>
-                                <th class="px-4 py-3 w-36">ID LAMA</th>
-                                <th class="px-4 py-3 w-48">NAMA LENGKAP</th>
-                                <th class="px-4 py-3 w-56">POP/CABANG</th>
-                                <th class="px-4 py-3 w-56">PAKET</th>
-                                <th class="px-4 py-3 w-32">NOMOR HP</th>
-                                <th class="px-4 py-3 w-40">STATUS LAYANAN</th>
-                                <th class="px-4 py-3">LOG / CATATAN VALIDASI</th>
-                            </tr>
-                        </thead>
-                        <tbody id="preview-table-body" class="divide-y divide-slate-100">
-                            <!-- Rows will be injected by JS -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Footer with submit form -->
-                <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
-                    <span class="text-xs text-slate-500" id="submit-summary-text">0 dari 0 pelanggan valid</span>
-                    
-                    <form action="/customers/import/confirm" method="POST" id="confirm-form">
-                        @csrf
-                        <input type="hidden" name="rows" id="confirm-rows-json">
-                        <input type="hidden" name="file_name" id="confirm-file-name">
-                        <button type="submit" id="btn-submit-import" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold py-2 px-5 rounded transition-all cursor-pointer focus:outline-none shadow-sm disabled:cursor-not-allowed">
-                            <svg id="btn-submit-import-spinner" class="hidden animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span id="btn-submit-import-text">Mulai Import Data Pelanggan</span>
-                        </button>
-                    </form>
-                </div>
+            <!-- Action Form Footer -->
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+                <span class="text-xs text-slate-500" id="submit-summary-text">0 baris siap di-import.</span>
+                
+                <form action="{{ route('customers.import.confirm') }}" method="POST" id="confirm-form">
+                    @csrf
+                    <input type="hidden" name="sheets" id="confirm-sheets-json">
+                    <input type="hidden" name="file_name" id="confirm-file-name">
+                    <button type="submit" id="btn-submit-import" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold py-2.5 px-6 rounded transition-all cursor-pointer focus:outline-none shadow-sm disabled:cursor-not-allowed">
+                        <svg id="btn-submit-import-spinner" class="hidden animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span id="btn-submit-import-text">Simpan Hasil Migrasi ke Database</span>
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -216,74 +147,282 @@
 @endsection
 
 @section('scripts')
-<!-- Load SheetJS library from CDN -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
 <script>
-    let currentMethod = 'upload';
-    let validatedRows = [];
-    
-    // DB lists injected
-    const allVillages = @json($villages);
-    const allPackages = @json($packages);
-
-    function switchMethod(method) {
-        currentMethod = method;
-        document.querySelectorAll('.method-panel').forEach(el => el.classList.add('hidden'));
-        
-        if (method === 'upload') {
-            document.getElementById('panel-upload').classList.remove('hidden');
-            document.getElementById('tab-upload').className = "px-5 py-3 text-xs font-semibold border-b-2 border-sky-600 text-sky-600 focus:outline-none cursor-pointer";
-            document.getElementById('tab-paste').className = "px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer";
-        } else {
-            document.getElementById('panel-paste').classList.remove('hidden');
-            document.getElementById('tab-paste').className = "px-5 py-3 text-xs font-semibold border-b-2 border-sky-600 text-sky-600 focus:outline-none cursor-pointer";
-            document.getElementById('tab-upload').className = "px-5 py-3 text-xs font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer";
-        }
-    }
+    let validatedSheetsData = {};
+    let currentSheetTab = 'customers';
 
     function handleFileSelect(e) {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Set file name for confirm form
         document.getElementById('confirm-file-name').value = file.name;
-
-        // Show file info container
         document.getElementById('file-name-text').textContent = `${file.name} (${formatBytes(file.size)})`;
         document.getElementById('file-info-container').classList.remove('hidden');
 
-        // Show loading and preview section
         document.getElementById('preview-section').classList.remove('hidden');
         document.getElementById('loading-indicator').classList.remove('hidden');
-        document.getElementById('metrics-container').classList.add('hidden');
+        document.getElementById('sheets-tab-container').classList.add('hidden');
+        document.getElementById('sheet-metrics-container').classList.add('hidden');
         document.getElementById('preview-table-body').innerHTML = '';
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
+        validateSheets(file);
+    }
+
+    function validateSheets(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch('/customers/import/validate', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('loading-indicator').classList.add('hidden');
+            if (data.success) {
+                validatedSheetsData = data.sheets;
                 
-                // Convert sheet to raw array
-                const rawRows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                processRawArray(rawRows);
-            } catch (err) {
-                console.error("Gagal membaca file excel:", err);
-                alert("Format file tidak didukung atau rusak.");
+                // Show containers
+                document.getElementById('sheets-tab-container').classList.remove('hidden');
+                document.getElementById('sheet-metrics-container').classList.remove('hidden');
+                
+                updateTabBadges();
+                switchSheetTab(currentSheetTab);
+            } else {
+                alert(data.message || "Gagal memvalidasi data Excel. Pastikan format file sesuai.");
                 resetFileSelection();
             }
+        })
+        .catch(err => {
+            console.error("API error:", err);
+            alert("Kesalahan jaringan saat memvalidasi.");
+            document.getElementById('loading-indicator').classList.add('hidden');
+            resetFileSelection();
+        });
+    }
+
+    function switchSheetTab(sheetName) {
+        currentSheetTab = sheetName;
+        
+        // Update tab buttons style
+        const tabs = ['customers', 'packages', 'services', 'technical_details', 'invoices', 'payments'];
+        tabs.forEach(t => {
+            const btn = document.getElementById(`btn-tab-${t}`);
+            if (btn) {
+                if (t === sheetName) {
+                    btn.className = "flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer bg-white text-slate-800 shadow-sm border border-slate-200";
+                } else {
+                    btn.className = "flex-1 min-w-[120px] px-3 py-2 text-xs font-bold rounded-md transition-all text-center focus:outline-none cursor-pointer text-slate-600 hover:bg-white/50";
+                }
+            }
+        });
+
+        // Update preview title
+        const titleMap = {
+            customers: 'Preview Data: Customers',
+            packages: 'Preview Data: Packages (Master Paket)',
+            services: 'Preview Data: Services (Layanan)',
+            technical_details: 'Preview Data: Technical Details',
+            invoices: 'Preview Data: Invoices (Tagihan)',
+            payments: 'Preview Data: Payments (Pembayaran)'
         };
-        reader.readAsArrayBuffer(file);
+        document.getElementById('preview-title').textContent = titleMap[sheetName];
+
+        renderPreviewSheet(sheetName);
+    }
+
+    function renderPreviewSheet(sheetName) {
+        const sheet = validatedSheetsData[sheetName] || { rows: [] };
+        const rows = sheet.rows;
+
+        // Render Metrics
+        let total = rows.length;
+        let ready = 0, warning = 0, error = 0;
+        rows.forEach(r => {
+            if (r.status_row === 'error') error++;
+            else if (r.status_row === 'warning') warning++;
+            else ready++;
+        });
+
+        document.getElementById('metric-total').textContent = total;
+        document.getElementById('metric-ready').textContent = ready;
+        document.getElementById('metric-warning').textContent = warning;
+        document.getElementById('metric-error').textContent = error;
+
+        // Render Table Headers & Body
+        const thead = document.getElementById('preview-table-header');
+        const tbody = document.getElementById('preview-table-body');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        if (total === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-slate-400 italic">Sheet ini kosong atau tidak ditemukan.</td></tr>`;
+            return;
+        }
+
+        const headersMap = {
+            customers: ['NO', 'ID LAMA', 'NAMA LENGKAP', 'POP / CABANG', 'DESA', 'NOMOR HP', 'CATATAN'],
+            packages: ['NO', 'ID PAKET LAMA', 'NAMA PAKET', 'HARGA BULANAN', 'SPEED', 'CATATAN'],
+            services: ['NO', 'ID REQUEST LAMA', 'ID CUSTOMER LAMA', 'ID PAKET LAMA', 'STATUS LAYANAN', 'CATATAN'],
+            technical_details: ['NO', 'ID REPORT LAMA', 'ID CUSTOMER LAMA', 'ONT SN', 'IP ADDRESS', 'ODP', 'CATATAN'],
+            invoices: ['NO', 'ID INVOICE LAMA', 'ID CUSTOMER LAMA', 'PERIODE', 'NOMINAL TOTAL', 'STATUS', 'CATATAN'],
+            payments: ['NO', 'ID PEMBAYARAN LAMA', 'ID INVOICE LAMA', 'NOMINAL BAYAR', 'TGL BAYAR', 'CATATAN']
+        };
+
+        const currentHeaders = headersMap[sheetName];
+        const trHeader = document.createElement('tr');
+        currentHeaders.forEach(h => {
+            const th = document.createElement('th');
+            th.className = "px-4 py-3";
+            th.textContent = h;
+            trHeader.appendChild(th);
+        });
+        thead.appendChild(trHeader);
+
+        rows.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            if (row.status_row === 'error') tr.className = "bg-red-50/30 text-red-900";
+            else if (row.status_row === 'warning') tr.className = "bg-amber-50/30 text-amber-900";
+            else tr.className = "hover:bg-slate-50 transition-colors";
+
+            // Render columns based on sheet structure
+            let cells = [];
+            cells.push(index + 1);
+
+            if (sheetName === 'customers') {
+                cells.push(row.old_customer_id || '-');
+                cells.push(row.full_name || '-');
+                cells.push(row.pop_name || '-');
+                cells.push(row.village_name || row.village || '-');
+                cells.push(row.phone || '-');
+            } else if (sheetName === 'packages') {
+                cells.push(row.old_package_id || '-');
+                cells.push(row.name || '-');
+                cells.push(row.monthly_price !== null ? `Rp ${Number(row.monthly_price).toLocaleString('id-ID')}` : '-');
+                cells.push((row.download_speed || '10') + ' Mbps');
+            } else if (sheetName === 'services') {
+                cells.push(row.old_request_id || '-');
+                cells.push(row.old_customer_id || '-');
+                cells.push(row.old_package_id || '-');
+                cells.push(row.service_status || '-');
+            } else if (sheetName === 'technical_details') {
+                cells.push(row.old_report_id || '-');
+                cells.push(row.old_customer_id || '-');
+                cells.push(row.ont_sn || '-');
+                cells.push(row.ip_address || '-');
+                cells.push(row.odp_code || '-');
+            } else if (sheetName === 'invoices') {
+                cells.push(row.old_invoice_id || '-');
+                cells.push(row.old_customer_id || '-');
+                cells.push(row.billing_period || '-');
+                cells.push(`Rp ${Number(row.total_amount).toLocaleString('id-ID')}`);
+                cells.push(row.status || '-');
+            } else if (sheetName === 'payments') {
+                cells.push(row.old_payment_id || '-');
+                cells.push(row.old_invoice_id || '-');
+                cells.push(`Rp ${Number(row.amount).toLocaleString('id-ID')}`);
+                cells.push(row.payment_date || '-');
+            }
+
+            // Append standard columns
+            cells.forEach(c => {
+                const td = document.createElement('td');
+                td.className = "px-4 py-3 font-medium";
+                td.textContent = c;
+                tr.appendChild(td);
+            });
+
+            // Log / Status column
+            const tdLog = document.createElement('td');
+            tdLog.className = "px-4 py-3";
+            if (row.status_row === 'error') {
+                const span = document.createElement('span');
+                span.className = "inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200";
+                span.textContent = row.errors.join(' | ');
+                tdLog.appendChild(span);
+            } else if (row.status_row === 'warning') {
+                const span = document.createElement('span');
+                span.className = "inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200";
+                span.textContent = row.warnings.join(' | ');
+                tdLog.appendChild(span);
+            } else {
+                const span = document.createElement('span');
+                span.className = "inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200";
+                span.textContent = "VALID";
+                tdLog.appendChild(span);
+            }
+            tr.appendChild(tdLog);
+            tbody.appendChild(tr);
+        });
+
+        updateSubmitSection();
+    }
+
+    function updateTabBadges() {
+        const tabs = ['customers', 'packages', 'services', 'technical_details', 'invoices', 'payments'];
+        const badgeIds = {
+            customers: 'badge-cust-count',
+            packages: 'badge-pkg-count',
+            services: 'badge-serv-count',
+            technical_details: 'badge-tech-count',
+            invoices: 'badge-inv-count',
+            payments: 'badge-pay-count'
+        };
+
+        tabs.forEach(t => {
+            const count = (validatedSheetsData[t] && validatedSheetsData[t].rows) ? validatedSheetsData[t].rows.length : 0;
+            const badge = document.getElementById(badgeIds[t]);
+            if (badge) badge.textContent = count;
+        });
+    }
+
+    function updateSubmitSection() {
+        let hasErrors = false;
+        let totalCount = 0;
+        let validCount = 0;
+
+        const tabs = ['customers', 'packages', 'services', 'technical_details', 'invoices', 'payments'];
+        tabs.forEach(t => {
+            const rows = (validatedSheetsData[t] && validatedSheetsData[t].rows) ? validatedSheetsData[t].rows : [];
+            rows.forEach(r => {
+                totalCount++;
+                if (r.status_row === 'error') {
+                    hasErrors = true;
+                } else {
+                    validCount++;
+                }
+            });
+        });
+
+        const btnSubmit = document.getElementById('btn-submit-import');
+        const summaryText = document.getElementById('submit-summary-text');
+
+        if (totalCount === 0) {
+            btnSubmit.disabled = true;
+            summaryText.innerHTML = `<span class="text-slate-500">Tidak ada data terdeteksi untuk diimport.</span>`;
+            return;
+        }
+
+        if (hasErrors) {
+            btnSubmit.disabled = true;
+            summaryText.innerHTML = `<span class="text-red-600 font-bold">Terdeteksi baris error. Hapus baris bermasalah di file Excel lalu unggah ulang.</span>`;
+        } else {
+            btnSubmit.disabled = false;
+            summaryText.innerHTML = `<span class="text-green-600 font-bold">Semua data valid! ${validCount} baris siap dimasukkan ke database.</span>`;
+            
+            // Populate hidden inputs
+            document.getElementById('confirm-sheets-json').value = JSON.stringify(validatedSheetsData);
+        }
     }
 
     function resetFileSelection() {
         document.getElementById('file-input').value = '';
         document.getElementById('file-info-container').classList.add('hidden');
         document.getElementById('preview-section').classList.add('hidden');
-        validatedRows = [];
+        validatedSheetsData = {};
     }
 
     function formatBytes(bytes) {
@@ -294,352 +433,6 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    function handlePasteInput() {
-        const text = document.getElementById('paste-textarea').value;
-        if (!text.trim()) {
-            alert("Silakan tempel (paste) data Anda terlebih dahulu.");
-            return;
-        }
-
-        document.getElementById('confirm-file-name').value = 'Manual Input / Paste';
-
-        document.getElementById('preview-section').classList.remove('hidden');
-        document.getElementById('loading-indicator').classList.remove('hidden');
-        document.getElementById('metrics-container').classList.add('hidden');
-        document.getElementById('preview-table-body').innerHTML = '';
-
-        const lines = text.split(/\r?\n/);
-        const rawRows = [];
-        
-        let delimiter = '\t';
-        const firstLine = lines[0];
-        if (firstLine.includes('\t')) {
-            delimiter = '\t';
-        } else if (firstLine.includes(';')) {
-            delimiter = ';';
-        } else if (firstLine.includes(',')) {
-            delimiter = ',';
-        }
-
-        lines.forEach(line => {
-            if (line.trim() !== '') {
-                const cells = line.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
-                rawRows.push(cells);
-            }
-        });
-
-        processRawArray(rawRows);
-    }
-
-    function processRawArray(rawRows) {
-        if (rawRows.length < 2) {
-            alert("Baris data tidak mencukupi (minimal 2 baris termasuk header).");
-            document.getElementById('preview-section').classList.add('hidden');
-            return;
-        }
-        
-        // Scan header row to look for field indices
-        const headers = rawRows[0].map(h => String(h).trim().toLowerCase());
-        
-        const indexOfAny = (names) => headers.findIndex(h => names.includes(h));
-        const valueAt = (row, index) => index >= 0 && row[index] !== undefined ? String(row[index]).trim() : '';
-
-        const columns = {
-            no: indexOfAny(['no']),
-            oldCustomerId: indexOfAny(['old_customer_id', 'id_pelanggan_lama', 'id lama', 'id']),
-            fullName: indexOfAny(['full_name', 'nama_lengkap', 'nama lengkap', 'nama']),
-            primaryPhone: indexOfAny(['primary_phone', 'nomor_hp', 'nomor hp', 'hp', 'phone']),
-            fullAddress: indexOfAny(['full_address', 'alamat_lengkap', 'alamat lengkap', 'address']),
-            village: indexOfAny(['village', 'desa', 'kelurahan', 'desa_kelurahan']),
-            district: indexOfAny(['district', 'kecamatan']),
-            city: indexOfAny(['city', 'kota', 'kabupaten', 'kota_kabupaten']),
-            popCode: indexOfAny(['pop_code', 'kode_pop', 'kode pop']),
-            popName: indexOfAny(['pop_name', 'nama_pop', 'pop/cabang', 'pop']),
-            packageName: indexOfAny(['package_name', 'nama_paket', 'paket', 'package']),
-            monthlyPrice: indexOfAny(['monthly_price', 'harga_paket', 'harga bulanan', 'harga']),
-            activationDate: indexOfAny(['activation_date', 'tanggal_aktivasi', 'tanggal aktivasi']),
-            dueDate: indexOfAny(['due_date', 'tanggal_jatuh_tempo', 'tanggal jatuh tempo']),
-            serviceStatus: indexOfAny(['service_status', 'status_layanan', 'status layanan', 'status']),
-            identityNumber: indexOfAny(['identity_number', 'nik', 'nomor_identitas']),
-            alternativePhone: indexOfAny(['alternative_phone', 'nomor_hp_alternatif', 'hp_alternatif']),
-            email: indexOfAny(['email']),
-            latitude: indexOfAny(['latitude', 'lat']),
-            longitude: indexOfAny(['longitude', 'lng', 'long']),
-            ontSn: indexOfAny(['ont_sn', 'serial_ont']),
-            ipAddress: indexOfAny(['ip_address', 'ip']),
-            odpCode: indexOfAny(['odp_code', 'odp']),
-            oltCode: indexOfAny(['olt_code', 'olt']),
-            vlanId: indexOfAny(['vlan_id', 'vlan']),
-            technicalNote: indexOfAny(['technical_note', 'catatan_teknis']),
-        };
-
-        const parsedRows = [];
-        for (let i = 1; i < rawRows.length; i++) {
-            const row = rawRows[i];
-            if (row.length === 0 || row.every(cell => cell === null || cell === undefined || String(cell).trim() === '')) {
-                continue; // Skip empty rows
-            }
-
-            parsedRows.push({
-                no: valueAt(row, columns.no) || String(i),
-                old_customer_id: valueAt(row, columns.oldCustomerId),
-                full_name: valueAt(row, columns.fullName),
-                primary_phone: valueAt(row, columns.primaryPhone),
-                full_address: valueAt(row, columns.fullAddress),
-                village: valueAt(row, columns.village),
-                district: valueAt(row, columns.district),
-                city: valueAt(row, columns.city),
-                pop_code: valueAt(row, columns.popCode),
-                pop_name: valueAt(row, columns.popName),
-                package_name: valueAt(row, columns.packageName),
-                monthly_price: valueAt(row, columns.monthlyPrice),
-                activation_date: valueAt(row, columns.activationDate),
-                due_date: valueAt(row, columns.dueDate),
-                service_status: valueAt(row, columns.serviceStatus),
-                identity_number: valueAt(row, columns.identityNumber),
-                alternative_phone: valueAt(row, columns.alternativePhone),
-                email: valueAt(row, columns.email),
-                latitude: valueAt(row, columns.latitude),
-                longitude: valueAt(row, columns.longitude),
-                ont_sn: valueAt(row, columns.ontSn),
-                ip_address: valueAt(row, columns.ipAddress),
-                odp_code: valueAt(row, columns.odpCode),
-                olt_code: valueAt(row, columns.oltCode),
-                vlan_id: valueAt(row, columns.vlanId),
-                technical_note: valueAt(row, columns.technicalNote),
-            });
-        }
-
-        // Send to Validation API
-        fetch('/customers/import/validate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify({ rows: parsedRows })
-        })
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('loading-indicator').classList.add('hidden');
-            if (data.success) {
-                validatedRows = data.rows;
-                document.getElementById('metrics-container').classList.remove('hidden');
-                renderPreviewTable();
-            } else {
-                alert("Gagal memvalidasi data: " + data.message);
-                resetFileSelection();
-            }
-        })
-        .catch(err => {
-            console.error("API error:", err);
-            alert("Terjadi kesalahan jaringan saat memvalidasi data.");
-            document.getElementById('loading-indicator').classList.add('hidden');
-            resetFileSelection();
-        });
-    }
-
-    function renderPreviewTable() {
-        const tbody = document.getElementById('preview-table-body');
-        tbody.innerHTML = '';
-
-        let readyCount = 0;
-        let warningCount = 0;
-        let errorCount = 0;
-
-        validatedRows.forEach((row, index) => {
-            const tr = document.createElement('tr');
-            
-            // Apply background color based on status
-            if (row.status_row === 'error') {
-                tr.className = "bg-red-50/20";
-                errorCount++;
-            } else if (row.status_row === 'warning') {
-                tr.className = "bg-amber-50/20";
-                warningCount++;
-            } else {
-                tr.className = "bg-white";
-                readyCount++;
-            }
-
-            // Columns rendering
-            // 1. NO
-            const tdNo = document.createElement('td');
-            tdNo.className = "px-4 py-3 text-center font-mono text-slate-400";
-            tdNo.textContent = index + 1;
-            tr.appendChild(tdNo);
-
-            // 2. ID LAMA
-            const tdId = document.createElement('td');
-            tdId.className = "px-4 py-3 font-mono";
-            tdId.textContent = row.old_customer_id || '-';
-            tr.appendChild(tdId);
-
-            // 3. NAMA
-            const tdNama = document.createElement('td');
-            tdNama.className = "px-4 py-3 font-semibold text-slate-800";
-            tdNama.textContent = row.full_name;
-            tr.appendChild(tdNama);
-
-            // 4. POP
-            const tdPop = document.createElement('td');
-            tdPop.className = "px-4 py-3 font-medium text-slate-700";
-            tdPop.textContent = row.pop_name ? `${row.pop_name} (${row.pop_code || '-'})` : '-';
-            tr.appendChild(tdPop);
-
-            // 5. PAKET
-            const tdPaket = document.createElement('td');
-            tdPaket.className = "px-4 py-3";
-            if (!row.internet_package_id) {
-                // Render dropdown package selector
-                const select = document.createElement('select');
-                select.className = "w-full text-xs font-sans px-2 py-1 border border-amber-300 bg-amber-50/50 rounded focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/25";
-                select.onchange = (e) => mapPackageRow(index, e.target.value);
-                
-                const optDefault = document.createElement('option');
-                optDefault.value = "";
-                optDefault.textContent = `-- Pilih Paket (Asli: ${row.original_paket}) --`;
-                optDefault.disabled = true;
-                optDefault.selected = true;
-                select.appendChild(optDefault);
-
-                allPackages.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.textContent = `${p.package_code} - ${p.name}`;
-                    select.appendChild(opt);
-                });
-                tdPaket.appendChild(select);
-            } else {
-                tdPaket.className = "px-4 py-3 font-medium text-slate-700";
-                tdPaket.textContent = `${row.package_code} - ${row.package_name || ''}`;
-            }
-            tr.appendChild(tdPaket);
-
-            // 6. HP
-            const tdHp = document.createElement('td');
-            tdHp.className = "px-4 py-3 font-mono";
-            tdHp.textContent = row.phone;
-            tr.appendChild(tdHp);
-
-            // 7. STATUS
-            const tdStatus = document.createElement('td');
-            tdStatus.className = "px-4 py-3 font-mono text-slate-500";
-            tdStatus.textContent = row.service_status || '-';
-            tr.appendChild(tdStatus);
-
-            // 8. LOG CATATAN
-            const tdLog = document.createElement('td');
-            tdLog.className = "px-4 py-3";
-            if (row.status_row === 'error') {
-                const span = document.createElement('span');
-                span.className = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-100";
-                span.textContent = row.errors.join(' | ');
-                tdLog.appendChild(span);
-            } else if (row.status_row === 'warning') {
-                const div = document.createElement('div');
-                div.className = "flex flex-col gap-1";
-                row.warnings.forEach(w => {
-                    const span = document.createElement('span');
-                    span.className = "inline-flex items-center self-start gap-1.5 px-2 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-100";
-                    span.textContent = w;
-                    div.appendChild(span);
-                });
-                tdLog.appendChild(div);
-            } else {
-                const span = document.createElement('span');
-                span.className = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700 border border-green-100";
-                span.textContent = "VALID";
-                tdLog.appendChild(span);
-            }
-            tr.appendChild(tdLog);
-
-            tbody.appendChild(tr);
-        });
-
-        // Update metrics
-        document.getElementById('metric-total').textContent = validatedRows.length;
-        document.getElementById('metric-ready').textContent = readyCount;
-        document.getElementById('metric-warning').textContent = warningCount;
-        document.getElementById('metric-error').textContent = errorCount;
-
-        // Update submit button state
-        const btnSubmit = document.getElementById('btn-submit-import');
-        const summaryText = document.getElementById('submit-summary-text');
-        
-        const totalImportable = readyCount + warningCount; // Warnings can still be imported, but we block if there are errors or unresolved warning lists
-        
-        summaryText.textContent = `${readyCount} dari ${validatedRows.length} baris siap di-import.`;
-
-        // If there are errors (red) or unresolved warnings (e.g. missing village/package IDs), disable button
-        const hasUnresolvedWarnings = validatedRows.some(row => !row.village_id || !row.internet_package_id || !row.pop_id);
-        const hasErrors = errorCount > 0;
-
-        if (hasErrors || hasUnresolvedWarnings || validatedRows.length === 0) {
-            btnSubmit.disabled = true;
-            if (hasUnresolvedWarnings) {
-                summaryText.innerHTML = `<span class="text-amber-600 font-semibold">Terdapat wilayah, POP, atau paket yang belum cocok.</span>`;
-            } else if (hasErrors) {
-                summaryText.innerHTML = `<span class="text-red-600 font-semibold">Terdapat error data wajib. Mohon hapus data error dari file/spreadsheet Anda.</span>`;
-            }
-        } else {
-            btnSubmit.disabled = false;
-            summaryText.innerHTML = `<span class="text-green-600 font-semibold">Semua baris valid! Siap meng-import ${validatedRows.length} pelanggan.</span>`;
-            
-            // Set hidden field json value
-            document.getElementById('confirm-rows-json').value = JSON.stringify(validatedRows);
-        }
-    }
-
-    function mapVillageRow(index, villageId) {
-        const village = allVillages.find(v => v.id == villageId);
-        if (village && validatedRows[index]) {
-            validatedRows[index].village_id = village.id;
-            validatedRows[index].village_name = village.name;
-            validatedRows[index].district_id = village.district_id;
-            // set city_id to 1 (Ponorogo)
-            validatedRows[index].city_id = 1;
-            
-            // Remove the unmatched village warning
-            validatedRows[index].warnings = validatedRows[index].warnings.filter(w => !w.includes("Desa '"));
-            
-            // Check status row
-            recheckRowStatus(index);
-            renderPreviewTable();
-        }
-    }
-
-    function mapPackageRow(index, packageId) {
-        const pkg = allPackages.find(p => p.id == packageId);
-        if (pkg && validatedRows[index]) {
-            validatedRows[index].internet_package_id = pkg.id;
-            validatedRows[index].package_code = pkg.package_code;
-
-            // Remove unmatched package warning
-            validatedRows[index].warnings = validatedRows[index].warnings.filter(w => !w.includes("Paket '"));
-
-            recheckRowStatus(index);
-            renderPreviewTable();
-        }
-    }
-
-    function recheckRowStatus(index) {
-        const row = validatedRows[index];
-        if (row.errors.length > 0) {
-            row.status_row = 'error';
-        } else if (row.warnings.length > 0 || !row.village_id || !row.internet_package_id) {
-            row.status_row = 'warning';
-        } else {
-            row.status_row = 'valid';
-        }
-    }
-
-    function getDistrictName(districtId) {
-        // District id from village object
-        const village = allVillages.find(v => v.district_id == districtId);
-        return (village && village.district) ? village.district.name : 'N/A';
-    }
-
     document.getElementById('confirm-form').addEventListener('submit', function() {
         const btnSubmit = document.getElementById('btn-submit-import');
         const spinner = document.getElementById('btn-submit-import-spinner');
@@ -647,7 +440,7 @@
 
         btnSubmit.disabled = true;
         spinner.classList.remove('hidden');
-        buttonText.textContent = 'Mengimport...';
+        buttonText.textContent = 'Menyimpan...';
     });
 </script>
 @endsection

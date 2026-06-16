@@ -43,7 +43,7 @@
         <!-- Search -->
         <div>
             <label for="search" class="block text-xs font-semibold text-slate-500 mb-2">CARI PELANGGAN</label>
-            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Nama, NIK, kode, email, telepon..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Cari nama, No. HP, atau ID Lama..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
         </div>
 
         <!-- POP Filter -->

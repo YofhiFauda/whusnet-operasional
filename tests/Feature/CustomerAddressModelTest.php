@@ -20,6 +20,7 @@ class CustomerAddressModelTest extends TestCase
     {
         // Seed standard tables (including region master)
         $this->seed(DatabaseSeeder::class);
+        $this->seed(\Database\Seeders\CustomerSeeder::class);
 
         // Retrieve seeded records
         $customer = Customer::firstOrFail();
@@ -76,6 +77,7 @@ class CustomerAddressModelTest extends TestCase
     public function test_customer_address_is_deleted_on_customer_cascade(): void
     {
         $this->seed(DatabaseSeeder::class);
+        $this->seed(\Database\Seeders\CustomerSeeder::class);
         $customer = Customer::firstOrFail();
 
         // Create Address

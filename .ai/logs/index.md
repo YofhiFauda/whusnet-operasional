@@ -81,3 +81,7 @@
 - 2026-06-13 16:14:10 | 🔧 fix | exit=0 | .ai/logs/20260613-161231-🔧 fix.log
 - 2026-06-13 16:15:27 | close | exit=0 | .ai/logs/20260613-161415-close.log
 - 2026-06-13 16:15:27 | sync | exit=1 | .ai/logs/20260613-161527-sync.log
+- 2026-06-14 20:31:08 | bootstrap | exit=0 | .ai/logs/20260614-203108-bootstrap.log
+- 2026-06-15 10:07:30 | legacy-task | exit=0 | .ai/logs/20260615-100458-legacy-task.log
+- 2026-06-15 10:07:31 | sync | exit=0 | .ai/logs/20260615-100730-sync.log
+- 2026-06-15 10:21:55 | legacy-build | exit=0 | .ai/logs/20260615-100829-legacy-build.log

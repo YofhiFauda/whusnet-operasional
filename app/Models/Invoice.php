@@ -17,6 +17,9 @@ class Invoice extends Model
 
     protected $fillable = [
         'invoice_number',
+        'old_invoice_id',
+        'old_cost_id',
+        'old_request_id',
         'customer_id',
         'pop_id',
         'customer_service_id',
@@ -126,7 +129,7 @@ class Invoice extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        if (in_array(optional($user->role)->name, ['Owner', 'Admin Pusat'])) {
+        if ($user->hasFullAccess()) {
             return $query;
         }
 

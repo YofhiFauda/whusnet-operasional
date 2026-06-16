@@ -206,14 +206,16 @@ while true; do
   echo -e "  ${MAGENTA}4) ${NC}🕵️  FASE 3 - Gemini Review"
   echo -e "  ${YELLOW}5) ${NC}🔧 FASE 4 - Codex Fix"
   echo -e "  ${GREEN}6) ${NC}✅ FASE 5 - Close Task"
+  echo -e "  ${CYAN}7) ${NC}🧭 Legacy - Buat Task Migrasi"
+  echo -e "  ${BLUE}8) ${NC}🛠️  Legacy - Build Migrasi"
   echo ""
   echo -e "${BOLD}📊 Monitoring & Utilities:${NC}\n"
-  echo -e "  ${NC}7)  ${NC}📋 Lihat Status Context"
-  echo -e "  ${NC}8)  ${NC}✏️  Edit Active Task"
-  echo -e "  ${NC}9)  ${NC}🔍 Lihat Review Notes"
-  echo -e "  ${NC}10) ${NC}📝 Lihat AI Changelog"
-  echo -e "  ${NC}11) ${NC}🐙 Git Status / Diff"
-  echo -e "  ${NC}12) ${NC}📑 Lihat Log AI Terakhir"
+  echo -e "  ${NC}9)  ${NC}📋 Lihat Status Context"
+  echo -e "  ${NC}10) ${NC}✏️  Edit Active Task"
+  echo -e "  ${NC}11) ${NC}🔍 Lihat Review Notes"
+  echo -e "  ${NC}12) ${NC}📝 Lihat AI Changelog"
+  echo -e "  ${NC}13) ${NC}🐙 Git Status / Diff"
+  echo -e "  ${NC}14) ${NC}📑 Lihat Log AI Terakhir"
   echo ""
   echo -e "  ${RED}0)  🚪 Keluar${NC}"
   echo ""
@@ -241,21 +243,27 @@ while true; do
       run_phase "close" "FASE 5 - Close Task"
       ;;
     7)
-      show_status
+      run_phase "legacy-task" "Legacy - Buat Task Migrasi"
       ;;
     8)
-      edit_active_task
+      run_phase "legacy-build" "Legacy - Build Migrasi"
       ;;
     9)
-      show_review_notes
+      show_status
       ;;
     10)
-      show_changelog
+      edit_active_task
       ;;
     11)
-      show_git_status
+      show_review_notes
       ;;
     12)
+      show_changelog
+      ;;
+    13)
+      show_git_status
+      ;;
+    14)
       show_ai_logs
       ;;
     0)

@@ -16,6 +16,7 @@ class CustomerServiceModelTest extends TestCase
     public function test_customer_service_can_be_saved_with_relations_and_calculations(): void
     {
         $this->seed(DatabaseSeeder::class);
+        $this->seed(\Database\Seeders\CustomerSeeder::class);
 
         $customer = Customer::firstOrFail();
         $package = InternetPackage::firstOrFail();
@@ -73,6 +74,7 @@ class CustomerServiceModelTest extends TestCase
     public function test_customer_service_is_deleted_on_customer_cascade(): void
     {
         $this->seed(DatabaseSeeder::class);
+        $this->seed(\Database\Seeders\CustomerSeeder::class);
         $customer = Customer::firstOrFail();
         $package = InternetPackage::firstOrFail();
 

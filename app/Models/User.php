@@ -20,6 +20,8 @@ class User extends Authenticatable
 
     protected string $auditModule = 'User Management';
 
+    protected array $auditEvents = ['deleted'];
+
     protected array $auditHidden = [
         'password',
         'remember_token',
@@ -56,12 +58,27 @@ class User extends Authenticatable
             return false;
         }
 
-        // Owner and Admin Pusat have full access
-        if (in_array($this->role->name, ['Owner', 'Admin Pusat'])) {
+        if ($this->hasFullAccess()) {
             return true;
         }
 
         return $this->role->permissions()->where('name', $permission)->exists();
+    }
+
+    /**
+     * Check whether the user should be treated as a full-access admin.
+     */
+    public function hasFullAccess(): bool
+    {
+        return (bool) $this->role?->isFullAccessRole();
+    }
+
+    /**
+     * Check whether the user is a technician role.
+     */
+    public function isTechnician(): bool
+    {
+        return (bool) $this->role?->isTechnicianRole();
     }
 
     /**

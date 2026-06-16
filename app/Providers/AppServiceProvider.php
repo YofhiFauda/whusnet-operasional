@@ -24,6 +24,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Carbon::setLocale('id');
 
+        // Force HTTPS jika diakses via proxy (seperti ngrok)
+        if (request()->server('HTTP_X_FORWARDED_PROTO') == 'https' || app()->environment('production')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         // Register Gates from permissions
         try {
             if (app()->runningInConsole() === false || app()->runningUnitTests()) {

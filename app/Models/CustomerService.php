@@ -10,6 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'customer_id',
     'internet_package_id',
+    'old_request_id',
+    'old_cost_id',
+    'request_status',
+    'installation_status',
+    'network_type',
+    'member_type',
+    'reason',
     'package_name_snapshot',
     'download_speed_snapshot',
     'upload_speed_snapshot',

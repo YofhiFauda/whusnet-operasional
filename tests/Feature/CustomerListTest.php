@@ -166,6 +166,7 @@ class CustomerListTest extends TestCase
 
         $c1 = Customer::create([
             'customer_code' => 'C-PON-000001',
+            'old_customer_id' => 'PE-LEGACY-0001',
             'full_name' => 'Ahmad Subarjo',
             'primary_phone' => '08111111111',
             'phone' => '08111111111',
@@ -204,6 +205,11 @@ class CustomerListTest extends TestCase
 
         // Search by NIK
         $response = $this->get('/customers?search=3502999999999999');
+        $response->assertSee('Ahmad Subarjo');
+        $response->assertDontSee('Bambang Tri');
+
+        // Search by legacy customer ID
+        $response = $this->get('/customers?search=PE-LEGACY-0001');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
     }

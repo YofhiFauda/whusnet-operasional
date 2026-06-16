@@ -8,6 +8,9 @@ use App\Models\District;
 use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\CustomerTechnicalDetail;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,7 +22,7 @@ class CustomerImportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware();
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
     }
 
     public function test_import_page_loads_successfully(): void
@@ -30,10 +33,9 @@ class CustomerImportTest extends TestCase
         $response = $this->get('/customers/import');
 
         $response->assertStatus(200);
-        $response->assertSee('Import Pelanggan Baru');
-        $response->assertSee('Upload File (Excel / CSV)');
-        $response->assertSee('Copy-Paste Data');
-        $response->assertSee('Download Template CSV');
+        $response->assertSee('Import Pelanggan & Billing Lama', false);
+        $response->assertSee('Download Template Excel (Multi-Sheet)');
+        $response->assertSee('Tarik & Letakkan File Excel Migrasi di Sini', false);
     }
 
     public function test_admin_can_download_customer_import_template(): void
@@ -44,16 +46,11 @@ class CustomerImportTest extends TestCase
         $response = $this->get('/customers/import/template');
 
         $response->assertStatus(200);
-        $response->assertHeader('content-disposition', 'attachment; filename=template-import-pelanggan.csv');
-
-        $content = $response->streamedContent();
-
-        $this->assertStringContainsString('old_customer_id,full_name,primary_phone,full_address,village,district,city,pop_code,pop_name,package_name,monthly_price,activation_date,due_date,service_status', $content);
-        $this->assertStringContainsString('identity_number,alternative_phone,email,latitude,longitude,ont_sn,ip_address,odp_code,olt_code,vlan_id,technical_note', $content);
-        $this->assertStringContainsString('OLD-0001', $content);
+        $response->assertHeader('content-disposition', 'attachment; filename=template-import-pelanggan.xlsx');
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
 
-    public function test_validate_import_endpoint_performs_db_matching_and_returns_json(): void
+    public function test_validate_multisheet_import_returns_json_with_validation_results(): void
     {
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
@@ -61,183 +58,8 @@ class CustomerImportTest extends TestCase
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
-        $package = InternetPackage::firstOrFail();
-        $pop = Pop::create([
-            'code' => 'POP-SMN',
-            'pop_code' => 'SMN',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Siman',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
-
-        $rows = [
-            [
-                'no' => '1',
-                'old_customer_id' => 'OLD-1001',
-                'full_name' => 'Joni Wijaya',
-                'primary_phone' => '08123456701',
-                'full_address' => 'Jl. Merdeka No. 1',
-                'village' => $village->name,
-                'district' => $district->name,
-                'city' => $city->name,
-                'pop_code' => $pop->pop_code,
-                'pop_name' => $pop->name,
-                'package_name' => $package->package_code,
-                'monthly_price' => (string) (int) $package->monthly_price,
-                'activation_date' => '2026-06-01',
-                'due_date' => '2026-07-01',
-                'service_status' => 'aktif',
-                'identity_number' => '3502181010900008',
-                'latitude' => '-7.86940',
-                'longitude' => '111.46210',
-                'ont_sn' => 'ONT1001',
-                'ip_address' => '10.10.10.2',
-                'odp_code' => 'ODP-SMN-001',
-                'olt_code' => 'OLT-SMN-01',
-                'vlan_id' => '100',
-                'technical_note' => 'Lengkap',
-            ],
-            [
-                'no' => '2',
-                'old_customer_id' => '',
-                'full_name' => '',
-                'primary_phone' => '',
-                'full_address' => '',
-                'village' => 'Desa Fiktif',
-                'district' => '',
-                'city' => '',
-                'pop_code' => 'POP-FIKTIF',
-                'package_name' => 'PAKET-FIKTIF',
-                'monthly_price' => 'abc',
-                'activation_date' => 'tanggal-salah',
-                'due_date' => '2026-01-01',
-                'service_status' => 'status-fiktif',
-            ]
-        ];
-
-        $response = $this->postJson('/customers/import/validate', ['rows' => $rows]);
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('success', true);
         
-        $data = $response->json();
-        $this->assertCount(2, $data['rows']);
-
-        $row1 = $data['rows'][0];
-        $this->assertEquals('valid', $row1['status_row']);
-        $this->assertEquals('OLD-1001', $row1['old_customer_id']);
-        $this->assertEquals($pop->id, $row1['pop_id']);
-        $this->assertEquals($village->id, $row1['village_id']);
-        $this->assertEquals($package->id, $row1['internet_package_id']);
-        $this->assertEquals('active', $row1['service_status']);
-        $this->assertEmpty($row1['errors']);
-        $this->assertEmpty($row1['warnings']);
-
-        $row2 = $data['rows'][1];
-        $this->assertEquals('error', $row2['status_row']);
-        $this->assertNull($row2['village_id']);
-        $this->assertNull($row2['pop_id']);
-        $this->assertNull($row2['internet_package_id']);
-        $this->assertContains('ID pelanggan lama wajib diisi.', $row2['errors']);
-        $this->assertContains('Nama lengkap wajib diisi.', $row2['errors']);
-        $this->assertContains('Nomor HP wajib diisi.', $row2['errors']);
-        $this->assertContains('Alamat lengkap wajib diisi.', $row2['errors']);
-        $this->assertContains("Desa/Kelurahan 'Desa Fiktif' tidak ditemukan di master wilayah.", $row2['errors']);
-        $this->assertContains('POP/Cabang tidak ditemukan atau tidak aktif.', $row2['errors']);
-        $this->assertContains("Paket 'PAKET-FIKTIF' tidak ditemukan di master paket aktif.", $row2['errors']);
-        $this->assertContains('Harga paket harus berupa angka.', $row2['errors']);
-        $this->assertContains('Tanggal aktivasi tidak valid.', $row2['errors']);
-        $this->assertContains('Status layanan tidak sesuai pilihan sistem.', $row2['errors']);
-    }
-
-    public function test_validate_import_marks_duplicate_and_missing_technical_fields(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-        $this->loginAsAdmin();
-
-        $city = City::firstOrFail();
-        $district = District::where('city_id', $city->id)->firstOrFail();
-        $village = Village::where('district_id', $district->id)->firstOrFail();
-        $package = InternetPackage::firstOrFail();
         $pop = Pop::create([
-            'code' => 'POP-SUK',
-            'pop_code' => 'SUK',
-            'registration_prefix' => 'C',
-            'cid_prefix' => 'D',
-            'name' => 'POP Sukorejo',
-            'type' => 'cabang',
-            'status' => 'active',
-        ]);
-
-        Customer::create([
-            'customer_code' => 'C-SUK-000001',
-            'old_customer_id' => 'OLD-DUP',
-            'full_name' => 'Existing Customer',
-            'phone' => '081299999999',
-            'primary_phone' => '081299999999',
-            'registration_date' => '2026-01-01',
-            'status' => 'registered',
-        ]);
-
-        $baseRow = [
-            'full_name' => 'Valid Name',
-            'full_address' => 'Jl. Valid No. 1',
-            'village' => $village->name,
-            'district' => $district->name,
-            'city' => $city->name,
-            'pop_code' => $pop->pop_code,
-            'package_name' => $package->package_code,
-            'monthly_price' => (string) (int) $package->monthly_price,
-            'activation_date' => '2026-06-01',
-            'due_date' => '2026-07-01',
-            'service_status' => 'registered',
-        ];
-
-        $response = $this->postJson('/customers/import/validate', [
-            'rows' => [
-                $baseRow + [
-                    'old_customer_id' => 'OLD-DUP',
-                    'primary_phone' => '081299999999',
-                ],
-                $baseRow + [
-                    'old_customer_id' => 'OLD-FILE-DUP',
-                    'primary_phone' => '081200000001',
-                ],
-                $baseRow + [
-                    'old_customer_id' => 'OLD-FILE-DUP',
-                    'primary_phone' => '081200000001',
-                ],
-            ],
-        ]);
-
-        $response->assertStatus(200);
-        $rows = $response->json('rows');
-
-        $this->assertEquals('error', $rows[0]['status_row']);
-        $this->assertContains('ID pelanggan lama sudah terdaftar di database.', $rows[0]['errors']);
-        $this->assertContains('Nomor HP sudah terdaftar di database.', $rows[0]['errors']);
-
-        $this->assertEquals('warning', $rows[1]['status_row']);
-        $this->assertTrue($rows[1]['technical_incomplete']);
-        $this->assertContains('ont_sn', $rows[1]['missing_technical_fields']);
-
-        $this->assertEquals('error', $rows[2]['status_row']);
-        $this->assertContains('ID pelanggan lama duplikat di file import.', $rows[2]['errors']);
-        $this->assertContains('Nomor HP duplikat di file import.', $rows[2]['errors']);
-    }
-
-    public function test_confirm_import_endpoint_saves_records_to_database(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-        $this->loginAsAdmin();
-
-        $city = City::firstOrFail();
-        $district = District::where('city_id', $city->id)->firstOrFail();
-        $village = Village::where('district_id', $district->id)->firstOrFail();
-        $package = InternetPackage::firstOrFail();
-        $pop = \App\Models\Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
             'registration_prefix' => 'C',
@@ -247,95 +69,613 @@ class CustomerImportTest extends TestCase
             'status' => 'active',
         ]);
 
-        $resolvedRows = [
-            [
-                'pop_id' => $pop->id,
-                'full_name' => 'Imported Customer 1',
-                'identity_number' => '3502181010900010',
-                'gender' => 'Laki-laki',
-                'phone' => '087711223344',
-                'email' => null,
-                'registration_date' => '2026-06-09',
-                'address' => 'Alamat Kel. ' . $village->name,
-                'city_id' => $city->id,
-                'district_id' => $district->id,
-                'village_id' => $village->id,
-                'village_name' => $village->name,
-                'internet_package_id' => $package->id,
-                'package_code' => $package->package_code,
-                'contract_period_months' => 12,
-                'discount_amount' => 0,
-                'tax_percent' => 11,
-                'status' => 'registered',
-                'latitude' => -7.86940,
-                'longitude' => 111.46210,
+        $sheets = [
+            'packages' => [
+                [
+                    'old_package_id' => 'PKG-LEGACY-1',
+                    'name' => 'Legacy Package 10M',
+                    'monthly_price' => '150000',
+                    'download_speed' => '10',
+                    'upload_speed' => '10',
+                    'package_type' => 'Broadband',
+                    'category' => 'Home',
+                ]
             ],
-            [
-                'pop_id' => $pop->id,
-                'full_name' => 'Imported Customer 2',
-                'identity_number' => '3502181010900011',
-                'gender' => 'Perempuan',
-                'phone' => '087711223345',
-                'email' => 'imported2@gmail.com',
-                'registration_date' => '2026-06-09',
-                'address' => 'Alamat Kel. ' . $village->name,
-                'city_id' => $city->id,
-                'district_id' => $district->id,
-                'village_id' => $village->id,
-                'village_name' => $village->name,
-                'internet_package_id' => $package->id,
-                'package_code' => $package->package_code,
-                'contract_period_months' => 12,
-                'discount_amount' => 0,
-                'tax_percent' => 11,
-                'status' => 'registered',
-                'latitude' => null,
-                'longitude' => null,
-            ]
+            'customers' => [
+                [
+                    'old_customer_id' => 'CUST-LEGACY-1',
+                    'full_name' => 'Budi Santoso',
+                    'phone' => '081234567890',
+                    'primary_phone' => '081234567890',
+                    'full_address' => 'Jl. Pahlawan No. 10',
+                    'village' => $village->name,
+                    'district' => $district->name,
+                    'city' => $city->name,
+                    'pop_code' => 'TST',
+                    'pop_name' => 'POP Test',
+                    'gender' => 'Laki-laki',
+                    'identity_number' => '3502181010900001',
+                ]
+            ],
+            'services' => [
+                [
+                    'old_request_id' => 'REQ-LEGACY-1',
+                    'old_customer_id' => 'CUST-LEGACY-1',
+                    'old_package_id' => 'PKG-LEGACY-1',
+                    'service_status' => 'aktif',
+                    'activation_date' => '2026-01-01',
+                    'due_date' => '2026-02-01',
+                ]
+            ],
+            'technical_details' => [
+                [
+                    'old_report_id' => 'REP-LEGACY-1',
+                    'old_customer_id' => 'CUST-LEGACY-1',
+                    'old_request_id' => 'REQ-LEGACY-1',
+                    'connection_type' => 'FTTH',
+                    'router_or_ont_serial' => 'SN12345678',
+                    'ip_address' => '192.168.1.50',
+                    'odp_code' => 'ODP-TST-01',
+                    'odp_port' => '5',
+                    'olt_code' => '1/1/2',
+                    'wireless_signal' => '-15',
+                    'fiber_signal' => '-19',
+                    'location_source' => 'POLE-01',
+                    'note' => 'Migrasi lancar',
+                ]
+            ],
+            'invoices' => [
+                [
+                    'old_invoice_id' => 'INV-LEGACY-1',
+                    'old_customer_id' => 'CUST-LEGACY-1',
+                    'billing_period' => '2026-01',
+                    'total_amount' => '166500', // 150000 + 11% PPN
+                    'issue_date' => '2026-01-01',
+                    'due_date' => '2026-01-10',
+                    'status' => 'belum_dibayar',
+                ]
+            ],
+            'payments' => [
+                [
+                    'old_payment_id' => 'PAY-LEGACY-1',
+                    'old_invoice_id' => 'INV-LEGACY-1',
+                    'amount' => '166500',
+                    'payment_date' => '2026-01-05',
+                    'payment_method' => 'cash',
+                ]
+            ],
         ];
 
-        $response = $this->post('/customers/import/confirm', ['rows' => json_encode($resolvedRows)]);
+        $response = $this->postJson('/customers/import/validate', [
+            'sheets' => $sheets
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        
+        $data = $response->json();
+        $this->assertArrayHasKey('sheets', $data);
+        
+        $this->assertEquals('valid', $data['sheets']['packages']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['customers']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['services']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['technical_details']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['invoices']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['payments']['rows'][0]['status_row']);
+    }
+
+    public function test_validate_multisheet_import_detects_relational_errors(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $sheets = [
+            'packages' => [
+                [
+                    'old_package_id' => '', // Error: wajib diisi
+                    'name' => '', // Error: wajib diisi
+                    'monthly_price' => 'abc', // Error: harus angka
+                ]
+            ],
+            'customers' => [
+                [
+                    'old_customer_id' => 'CUST-LEGACY-2',
+                    'full_name' => 'Budi Santoso',
+                    'phone' => '081234567890',
+                    'full_address' => 'Jl. Pahlawan No. 10',
+                    'village' => 'Desa Fiktif', // Error: desa tidak ditemukan
+                    'district' => 'Kecamatan Fiktif',
+                    'city' => 'Kota Fiktif',
+                    'pop_code' => 'NONEXISTENT', // Error: POP tidak ditemukan
+                ]
+            ],
+            'services' => [
+                [
+                    'old_request_id' => 'REQ-LEGACY-2',
+                    'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
+                    'old_package_id' => 'PKG-NONEXISTENT', // Error: package tidak ditemukan
+                    'service_status' => 'status_salah', // Error: status tidak valid
+                ]
+            ],
+            'technical_details' => [
+                [
+                    'old_report_id' => 'REP-LEGACY-2',
+                    'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
+                ]
+            ],
+            'invoices' => [
+                [
+                    'old_invoice_id' => 'INV-LEGACY-2',
+                    'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
+                    'billing_period' => '2026/01', // Error: format YYYY-MM
+                    'total_amount' => 'abc', // Error: harus angka
+                ]
+            ],
+            'payments' => [
+                [
+                    'old_payment_id' => 'PAY-LEGACY-2',
+                    'old_invoice_id' => 'INV-NONEXISTENT', // Error: invoice tidak ditemukan
+                    'amount' => 'abc', // Error: harus angka
+                    'payment_date' => 'tanggal-salah', // Error: tidak valid
+                ]
+            ],
+        ];
+
+        $response = $this->postJson('/customers/import/validate', [
+            'sheets' => $sheets
+        ]);
+
+        $response->assertStatus(200);
+        $data = $response->json();
+        
+        $this->assertEquals('error', $data['sheets']['packages']['rows'][0]['status_row']);
+        $this->assertContains('ID paket lama wajib diisi.', $data['sheets']['packages']['rows'][0]['errors']);
+        $this->assertContains('Nama paket wajib diisi.', $data['sheets']['packages']['rows'][0]['errors']);
+        $this->assertContains('Harga paket harus berupa angka.', $data['sheets']['packages']['rows'][0]['errors']);
+
+        $this->assertEquals('valid', $data['sheets']['customers']['rows'][0]['status_row']);
+        $this->assertContains("Desa/Kelurahan 'Desa Fiktif' tidak ditemukan di master wilayah; teks legacy tetap disimpan.", $data['sheets']['customers']['rows'][0]['warnings']);
+        $this->assertContains('POP tidak ditemukan atau tidak aktif; pelanggan tetap diimport untuk review dan belum siap billing.', $data['sheets']['customers']['rows'][0]['warnings']);
+
+        $this->assertEquals('error', $data['sheets']['services']['rows'][0]['status_row']);
+        $this->assertContains("Pelanggan dengan ID 'CUST-NONEXISTENT' tidak ditemukan.", $data['sheets']['services']['rows'][0]['errors']);
+        $this->assertContains("Paket dengan ID 'PKG-NONEXISTENT' tidak ditemukan.", $data['sheets']['services']['rows'][0]['errors']);
+        $this->assertContains("Status layanan 'status_salah' tidak didukung.", $data['sheets']['services']['rows'][0]['errors']);
+
+        $this->assertEquals('error', $data['sheets']['technical_details']['rows'][0]['status_row']);
+        $this->assertContains("Pelanggan dengan ID 'CUST-NONEXISTENT' tidak ditemukan.", $data['sheets']['technical_details']['rows'][0]['errors']);
+
+        $this->assertEquals('error', $data['sheets']['invoices']['rows'][0]['status_row']);
+        $this->assertContains("Pelanggan dengan ID 'CUST-NONEXISTENT' belum ditemukan saat validasi; akan dicoba cocok lewat request saat import.", $data['sheets']['invoices']['rows'][0]['warnings']);
+        $this->assertContains('Format periode tagihan harus YYYY-MM.', $data['sheets']['invoices']['rows'][0]['errors']);
+        $this->assertContains('Total tagihan harus berupa angka.', $data['sheets']['invoices']['rows'][0]['errors']);
+
+        $this->assertEquals('error', $data['sheets']['payments']['rows'][0]['status_row']);
+        $this->assertContains("Invoice dengan ID 'INV-NONEXISTENT' belum ditemukan saat validasi; akan dicoba cocok lewat transaksi/request saat import.", $data['sheets']['payments']['rows'][0]['warnings']);
+        $this->assertContains('Nominal bayar harus berupa angka.', $data['sheets']['payments']['rows'][0]['errors']);
+        $this->assertContains('Tanggal bayar tidak valid.', $data['sheets']['payments']['rows'][0]['errors']);
+    }
+
+    public function test_confirm_multisheet_import_saves_all_relations_transactionally(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $user = $this->loginAsAdmin();
+
+        $city = City::firstOrFail();
+        $district = District::where('city_id', $city->id)->firstOrFail();
+        $village = Village::where('district_id', $district->id)->firstOrFail();
+        
+        $pop = Pop::create([
+            'code' => 'POP-TEST-2',
+            'pop_code' => 'TS2',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Test 2',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $sheets = [
+            'packages' => [
+                [
+                    'old_package_id' => 'PKG-LEG2-1',
+                    'name' => 'Legacy Package 20M',
+                    'monthly_price' => 250000,
+                    'download_speed' => 20,
+                    'upload_speed' => 20,
+                    'package_type' => 'Broadband',
+                    'category' => 'Home',
+                    'status_row' => 'valid',
+                ]
+            ],
+            'customers' => [
+                [
+                    'old_customer_id' => 'CUST-LEG2-1',
+                    'full_name' => 'Andi Wijaya',
+                    'phone' => '087788990011',
+                    'primary_phone' => '087788990011',
+                    'full_address' => 'Jl. Gajah Mada No. 25',
+                    'village_name' => $village->name,
+                    'district_name' => $district->name,
+                    'city_name' => $city->name,
+                    'village_id' => $village->id,
+                    'district_id' => $district->id,
+                    'city_id' => $city->id,
+                    'pop_id' => $pop->id,
+                    'pop_code' => 'TS2',
+                    'pop_name' => 'POP Test 2',
+                    'gender' => 'Laki-laki',
+                    'identity_number' => '3502181010900002',
+                    'status_row' => 'valid',
+                ]
+            ],
+            'services' => [
+                [
+                    'old_request_id' => 'REQ-LEG2-1',
+                    'old_customer_id' => 'CUST-LEG2-1',
+                    'old_package_id' => 'PKG-LEG2-1',
+                    'service_status' => 'active',
+                    'activation_date' => '2026-01-01',
+                    'due_date' => '2026-02-01',
+                    'status_row' => 'valid',
+                ]
+            ],
+            'technical_details' => [
+                [
+                    'old_report_id' => 'REP-LEG2-1',
+                    'old_customer_id' => 'CUST-LEG2-1',
+                    'old_request_id' => 'REQ-LEG2-1',
+                    'connection_type' => 'FTTH',
+                    'ont_sn' => 'SN87654321',
+                    'ip_address' => '192.168.2.100',
+                    'odp_code' => 'ODP-TS2-05',
+                    'odp_port' => '2',
+                    'olt_code' => '1/1/3',
+                    'wireless_signal' => '-12',
+                    'fiber_signal' => '-18',
+                    'location_source' => 'POLE-05',
+                    'note' => 'Pemasangan rapi',
+                    'status_row' => 'valid',
+                ]
+            ],
+            'invoices' => [
+                [
+                    'old_invoice_id' => 'INV-LEG2-1',
+                    'old_customer_id' => 'CUST-LEG2-1',
+                    'billing_period' => '2026-01',
+                    'total_amount' => 277500, // 250000 + 11% PPN
+                    'issue_date' => '2026-01-01',
+                    'due_date' => '2026-01-10',
+                    'status' => 'belum_dibayar',
+                    'status_row' => 'valid',
+                ]
+            ],
+            'payments' => [
+                [
+                    'old_payment_id' => 'PAY-LEG2-1',
+                    'old_invoice_id' => 'INV-LEG2-1',
+                    'amount' => 277500,
+                    'payment_date' => '2026-01-05',
+                    'payment_method' => 'cash',
+                    'status_row' => 'valid',
+                ]
+            ],
+        ];
+
+        $response = $this->post('/customers/import/confirm', [
+            'sheets' => json_encode($sheets),
+            'file_name' => 'multisheet_test.xlsx',
+        ]);
 
         $response->assertRedirect('/customers');
         $response->assertSessionHas('success');
 
-        // Assert database records
-        $this->assertDatabaseHas('customers', [
-            'full_name' => 'Imported Customer 1',
-            'identity_number' => '3502181010900010',
-            'phone' => '087711223344',
-            'pop_id' => $pop->id,
+        // Assert Package imported
+        $this->assertDatabaseHas('internet_packages', [
+            'old_package_id' => 'PKG-LEG2-1',
+            'package_code' => 'PKG-LEG2-1',
+            'name' => 'Legacy Package 20M',
+            'monthly_price' => 250000,
         ]);
 
-        $c1 = Customer::where('full_name', 'Imported Customer 1')->firstOrFail();
+        // Assert Customer imported
+        $this->assertDatabaseHas('customers', [
+            'old_customer_id' => 'CUST-LEG2-1',
+            'full_name' => 'Andi Wijaya',
+            'phone' => '087788990011',
+            'pop_id' => $pop->id,
+            'status' => 'active',
+            'customer_status' => 'aktif',
+        ]);
 
+        $customer = Customer::where('old_customer_id', 'CUST-LEG2-1')->firstOrFail();
+
+        // Assert Address imported
         $this->assertDatabaseHas('customer_addresses', [
-            'customer_id' => $c1->id,
+            'customer_id' => $customer->id,
+            'full_address' => 'Jl. Gajah Mada No. 25',
             'village_id' => $village->id,
         ]);
 
+        // Assert Service imported
         $this->assertDatabaseHas('customer_services', [
-            'customer_id' => $c1->id,
-            'internet_package_id' => $package->id,
+            'customer_id' => $customer->id,
+            'old_request_id' => 'REQ-LEG2-1',
+            'monthly_price' => 250000,
+            'total_monthly_bill' => 277500,
+            'service_status' => 'active',
         ]);
 
-        $this->assertDatabaseHas('customers', [
-            'full_name' => 'Imported Customer 2',
-            'identity_number' => '3502181010900011',
-            'phone' => '087711223345',
-            'email' => 'imported2@gmail.com',
+        // Assert Technical Detail imported
+        $this->assertDatabaseHas('customer_technical_details', [
+            'customer_id' => $customer->id,
+            'old_report_id' => 'REP-LEG2-1',
+            'router_or_ont_serial' => 'SN87654321',
+            'ip_address' => '192.168.2.100',
         ]);
 
-        // Assert customer codes are sequentially generated
-        $c1 = Customer::where('full_name', 'Imported Customer 1')->firstOrFail();
-        $c2 = Customer::where('full_name', 'Imported Customer 2')->firstOrFail();
+        // Assert Invoice imported
+        $this->assertDatabaseHas('invoices', [
+            'old_invoice_id' => 'INV-LEG2-1',
+            'invoice_number' => 'INV-LEGACY-INV-LEG2-1',
+            'customer_id' => $customer->id,
+            'total_amount' => 277500,
+            'invoice_status' => 'lunas',
+        ]);
 
-        $this->assertMatchesRegularExpression('/^[A-Z]-[A-Z]{3}-\d{6}$/', $c1->customer_code);
-        $this->assertMatchesRegularExpression('/^[A-Z]-[A-Z]{3}-\d{6}$/', $c2->customer_code);
+        // Assert Payment imported
+        $this->assertDatabaseHas('payments', [
+            'old_payment_id' => 'PAY-LEG2-1',
+            'payment_number' => 'PAY-LEGACY-PAY-LEG2-1',
+            'amount' => 277500,
+        ]);
 
-        // Code sequence comparison
-        $c1Num = intval(substr($c1->customer_code, -6));
-        $c2Num = intval(substr($c2->customer_code, -6));
-        $this->assertEquals($c1Num + 1, $c2Num);
+        // Verify show page displays legacy technical details
+        $showResponse = $this->get("/customers/{$customer->id}");
+        $showResponse->assertStatus(200);
+        $showResponse->assertSee('Detail Teknis Lama');
+        $showResponse->assertSee('REP-LEG2-1');
+        $showResponse->assertSee('SN87654321');
+        $showResponse->assertSee('192.168.2.100');
+    }
+
+    public function test_legacy_status_and_payment_transaction_mapping_are_imported(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $city = City::firstOrFail();
+        $district = District::where('city_id', $city->id)->firstOrFail();
+        $village = Village::where('district_id', $district->id)->firstOrFail();
+
+        $pop = Pop::create([
+            'code' => 'POP-LEGACY',
+            'pop_code' => 'LGC',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Legacy',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $sheets = [
+            'packages' => [
+                [
+                    'old_package_id' => 'PK-TRX-1',
+                    'name' => 'Legacy Paket Transaksi',
+                    'monthly_price' => 100000,
+                    'download_speed' => 10,
+                    'upload_speed' => 10,
+                    'status_row' => 'valid',
+                ],
+            ],
+            'customers' => [
+                [
+                    'old_customer_id' => 'PE-TRX-1',
+                    'full_name' => 'Legacy Active',
+                    'phone' => 'null',
+                    'primary_phone' => 'null',
+                    'identity_number' => '3502000000000001',
+                    'full_address' => 'Alamat legacy',
+                    'village_id' => $village->id,
+                    'district_id' => $district->id,
+                    'city_id' => $city->id,
+                    'village_name' => $village->name,
+                    'district_name' => $district->name,
+                    'city_name' => $city->name,
+                    'pop_id' => $pop->id,
+                    'status_row' => 'valid',
+                ],
+            ],
+            'services' => [
+                [
+                    'old_request_id' => 'RQ-TRX-1',
+                    'old_customer_id' => 'PE-TRX-1',
+                    'old_package_id' => 'PK-TRX-1',
+                    'old_cost_id' => 'IN-TRX-1',
+                    'request_status' => 'ACTIVE',
+                    'service_status' => 'ACTIVE',
+                    'activation_date' => '2025-05-06',
+                    'due_date' => '2025-05-10',
+                    'status_row' => 'valid',
+                ],
+            ],
+            'technical_details' => [],
+            'invoices' => [
+                [
+                    'old_invoice_id' => '',
+                    'old_cost_id' => 'IN-TRX-1',
+                    'old_customer_id' => 'PE-TRX-1',
+                    'old_request_id' => 'RQ-TRX-1',
+                    'billing_period' => '2025-05',
+                    'issue_date' => '2025-05-06',
+                    'due_date' => '2025-05-10',
+                    'monthly_fee' => 100000,
+                    'total_amount' => 100000,
+                    'status' => 'belum_dibayar',
+                    'status_row' => 'valid',
+                ],
+            ],
+            'payments' => [
+                [
+                    'old_payment_id' => 'PAY-TRX-1',
+                    'old_transaction_id' => 'IN-TRX-1',
+                    'old_invoice_id' => '',
+                    'old_customer_id' => 'PE-TRX-1',
+                    'old_request_id' => 'RQ-TRX-1',
+                    'payment_date' => '2025-05-07',
+                    'billing_period' => '2025-05',
+                    'payment_method' => 'tunai',
+                    'amount' => 50000,
+                    'received_by_old' => 'PG000005',
+                    'status' => 'valid',
+                    'status_row' => 'valid',
+                ],
+            ],
+        ];
+
+        $response = $this->post('/customers/import/confirm', [
+            'sheets' => json_encode($sheets),
+            'file_name' => 'legacy-transaction.xlsx',
+        ]);
+
+        $response->assertRedirect('/customers');
+
+        $customer = Customer::where('old_customer_id', 'PE-TRX-1')->firstOrFail();
+        $invoice = Invoice::where('old_cost_id', 'IN-TRX-1')->firstOrFail();
+
+        $this->assertSame('active', $customer->status);
+        $this->assertSame('aktif', $customer->customer_status);
+        $this->assertSame('sebagian', $invoice->invoice_status);
+        $this->assertEquals(50000.00, (float) $invoice->paid_amount);
+        $this->assertEquals(50000.00, (float) $invoice->remaining_amount);
+
+        $this->assertDatabaseHas('payments', [
+            'old_payment_id' => 'PAY-TRX-1',
+            'old_transaction_id' => 'IN-TRX-1',
+            'old_request_id' => 'RQ-TRX-1',
+            'billing_period' => '2025-05',
+            'payment_method' => 'cash',
+            'payment_status' => 'valid',
+            'amount' => 50000,
+        ]);
+    }
+
+    public function test_validate_uploaded_xlsx_file_successfully(): void
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            $this->markTestSkipped('ZipArchive extension is required to write XLSX files');
+        }
+
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $city = City::firstOrFail();
+        $district = District::where('city_id', $city->id)->firstOrFail();
+        $village = Village::where('district_id', $district->id)->firstOrFail();
+        
+        $pop = Pop::create([
+            'code' => 'POP-TEST-FILE',
+            'pop_code' => 'TFL',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP File Test',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test-import-' . uniqid() . '.xlsx';
+        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($tempFile);
+        
+        $writer->nameCurrentSheet('customers');
+        $writer->addHeader(['old_customer_id', 'full_name', 'phone', 'primary_phone', 'full_address', 'village', 'district', 'city', 'pop_code', 'pop_name', 'gender', 'identity_number']);
+        $writer->addRow([
+            'CUST-FILE-1', 'Budi Santoso', '081234567890', '081234567890', 'Jl. Pahlawan No. 10', 
+            $village->name, $district->name, $city->name, 'TFL', 'POP File Test', 'Laki-laki', '3502181010900001'
+        ]);
+
+        $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('packages');
+        $writer->addHeader(['old_package_id', 'name', 'monthly_price', 'download_speed', 'upload_speed', 'package_type', 'category']);
+        $writer->addRow(['PKG-FILE-1', 'Legacy Package 10M', '150000', '10', '10', 'Broadband', 'Home']);
+
+        $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('services');
+        $writer->addHeader(['old_request_id', 'old_customer_id', 'old_package_id', 'service_status', 'activation_date', 'due_date']);
+        $writer->addRow(['REQ-FILE-1', 'CUST-FILE-1', 'PKG-FILE-1', 'aktif', '2026-01-01', '2026-02-01']);
+
+        $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('technical_details');
+        $writer->addHeader(['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'router_or_ont_serial', 'ip_address', 'odp_code', 'odp_port', 'olt_code', 'wireless_signal', 'fiber_signal', 'location_source', 'note']);
+        $writer->addRow(['REP-FILE-1', 'CUST-FILE-1', 'REQ-FILE-1', 'FTTH', 'SN12345678', '192.168.1.50', 'ODP-TST-01', '5', '1/1/2', '-15', '-19', 'POLE-01', 'Migrasi lancar']);
+
+        $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('invoices');
+        $writer->addHeader(['old_invoice_id', 'old_customer_id', 'billing_period', 'total_amount', 'issue_date', 'due_date', 'status']);
+        $writer->addRow(['INV-FILE-1', 'CUST-FILE-1', '2026-01', '166500', '2026-01-01', '2026-01-10', 'belum_dibayar']);
+
+        $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('payments');
+        $writer->addHeader(['old_payment_id', 'old_invoice_id', 'amount', 'payment_date', 'payment_method']);
+        $writer->addRow(['PAY-FILE-1', 'INV-FILE-1', '166500', '2026-01-05', 'cash']);
+
+        $writer->close();
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile(
+            $tempFile,
+            'template-import-pelanggan.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        $response = $this->post('/customers/import/validate', [
+            'file' => $uploadedFile
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        
+        $data = $response->json();
+        $this->assertEquals('valid', $data['sheets']['customers']['rows'][0]['status_row']);
+        $this->assertEquals('valid', $data['sheets']['packages']['rows'][0]['status_row']);
+
+        if (file_exists($tempFile)) {
+            unlink($tempFile);
+        }
+    }
+
+    public function test_validate_uploaded_invalid_xlsx_file_fails_gracefully(): void
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            $this->markTestSkipped('ZipArchive extension is required to write XLSX files');
+        }
+
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test-import-invalid-' . uniqid() . '.xlsx';
+        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($tempFile);
+        
+        // Only write customers sheet, missing packages, services, technical_details, invoices, payments
+        $writer->nameCurrentSheet('customers');
+        $writer->addHeader(['old_customer_id', 'full_name']);
+        $writer->addRow(['CUST-FILE-INVALID', 'Budi']);
+        $writer->close();
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile(
+            $tempFile,
+            'template-import-pelanggan.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        $response = $this->post('/customers/import/validate', [
+            'file' => $uploadedFile
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonStructure(['success', 'message', 'error']);
+
+        if (file_exists($tempFile)) {
+            unlink($tempFile);
+        }
     }
 }
