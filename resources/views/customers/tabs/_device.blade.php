@@ -98,6 +98,50 @@
     </div>
 @endif
 
+@if($customer->customerTechnicalDetail)
+    @php
+        $tech = $customer->customerTechnicalDetail;
+    @endphp
+    <div class="mt-6 border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-700">Detail Teknis Tambahan & Migrasi</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider bg-slate-100 text-slate-600 border-slate-200">
+                Log Teknis
+            </span>
+        </div>
+        <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            <div class="space-y-3">
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Perangkat Pasif (Outdoor)</span>
+                    <span class="font-semibold text-slate-800">{{ $tech->passive_device ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Nomor Cabang (IDCABANG)</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->branch_number ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Nomor POP (IDWILAYAH)</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->pop_number ?: '-' }}</span>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Nomor Router / MAC</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->router_number ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Redaman Awal</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->initial_attenuation !== null ? $tech->initial_attenuation . ' dB' : '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Redaman Terkini (Actual)</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->actual_attenuation !== null ? $tech->actual_attenuation . ' dB' : '-' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
+
 @can('fill_device')
 <div id="device-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-3xl overflow-hidden transform transition-all">

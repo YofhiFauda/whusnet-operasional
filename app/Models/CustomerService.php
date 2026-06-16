@@ -29,6 +29,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'billing_cycle',
     'service_status',
     'billing_status',
+    'profile',
+    'contract_type',
+    'activation_time',
+    'activated_by_name',
 ])]
 class CustomerService extends Model
 {

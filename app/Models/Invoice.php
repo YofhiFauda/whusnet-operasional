@@ -35,6 +35,10 @@ class Invoice extends Model
         'remaining_amount',
         'invoice_status',
         'created_by',
+        'prorate_amount',
+        'extra_cable_fee',
+        'extra_installation_fee',
+        'extra_pole_fee',
     ];
 
     /**

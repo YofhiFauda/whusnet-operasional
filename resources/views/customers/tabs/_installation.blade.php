@@ -36,7 +36,7 @@
                     <div class="space-y-3">
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Teknisi Pemasangan</span>
-                            <span class="font-semibold text-slate-800">{{ $installation->technician->name ?? '-' }}</span>
+                            <span class="font-semibold text-slate-800">{{ $installation->technicians ?: ($installation->technician->name ?? '-') }}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Jadwal</span>
@@ -46,6 +46,24 @@
                             <span class="text-slate-500">Tanggal Selesai</span>
                             <span class="font-semibold text-slate-800">{{ $installation->finished_date ? \App\Support\IndonesianDate::date($installation->finished_date) : '-' }}</span>
                         </div>
+                        @if($installation->start_time || $installation->end_time)
+                            <div class="flex justify-between border-b border-slate-50 py-1">
+                                <span class="text-slate-500">Jam Pemasangan</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ $installation->start_time ? substr($installation->start_time, 0, 5) : '-' }} - {{ $installation->end_time ? substr($installation->end_time, 0, 5) : '-' }}</span>
+                            </div>
+                        @endif
+                        @if($installation->fop_id)
+                            <div class="flex justify-between border-b border-slate-50 py-1">
+                                <span class="text-slate-500">ID FOP</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ $installation->fop_id }}</span>
+                            </div>
+                        @endif
+                        @if($installation->assigned_at)
+                            <div class="flex justify-between border-b border-slate-50 py-1">
+                                <span class="text-slate-500">Waktu Penugasan</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ \App\Support\IndonesianDate::dateTime($installation->assigned_at) }}</span>
+                            </div>
+                        @endif
                         <div class="pt-2">
                             <span class="block text-slate-500 mb-1">Catatan Pemasangan:</span>
                             <p class="p-3 bg-slate-50 rounded border border-slate-100 italic">{{ $installation->installation_note ?? 'Tidak ada catatan' }}</p>
@@ -81,6 +99,112 @@
         <h4 class="text-sm font-semibold text-slate-700">Belum ada data pemasangan</h4>
         <p class="text-xs text-slate-500 mt-1">Silakan isi jadwal atau hasil pemasangan melalui tombol di atas.</p>
     </div>
+@endif
+
+@if($customer->customerTechnicalDetail)
+    @php
+        $tech = $customer->customerTechnicalDetail;
+    @endphp
+    @if($tech->test_date || $tech->test_download || $tech->test_upload || $tech->latency_ms !== null)
+        <div class="mt-8 pt-6 border-t border-slate-200">
+            <div>
+                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Laporan Hasil Pengujian Layanan (Speedtest)</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Metrik kualitas koneksi, kecepatan upload/download, latensi, dan kesesuaian profil paket.</p>
+            </div>
+            
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <!-- Speed test info -->
+                <div class="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Hasil Pengujian Kecepatan</span>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                <span class="text-slate-500">Download</span>
+                                <span class="font-bold text-slate-800 font-mono text-sm">{{ $tech->test_download !== null ? number_format($tech->test_download, 2) . ' Mbps' : '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                <span class="text-slate-500">Upload</span>
+                                <span class="font-bold text-slate-800 font-mono text-sm">{{ $tech->test_upload !== null ? number_format($tech->test_upload, 2) . ' Mbps' : '-' }}</span>
+                            </div>
+                            @if($tech->speed_conformity_percent !== null)
+                                <div class="flex justify-between items-center">
+                                    <span class="text-slate-500">Kesesuaian Paket</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono {{ $tech->speed_conformity_percent >= 80 ? 'bg-green-100 text-green-800' : ($tech->speed_conformity_percent >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
+                                        {{ number_format($tech->speed_conformity_percent, 1) }}%
+                                    </span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="mt-3 text-[10px] text-slate-400 font-mono">
+                        Uji: {{ $tech->test_date ? \App\Support\IndonesianDate::date($tech->test_date) : '-' }} {{ $tech->test_time ? substr($tech->test_time, 0, 5) : '' }}
+                    </div>
+                </div>
+
+                <!-- Signal & ping info -->
+                <div class="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Kualitas & Kinerja Koneksi</span>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                <span class="text-slate-500">Latency (Ping)</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ $tech->latency_ms !== null ? number_format($tech->latency_ms, 1) . ' ms' : '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                <span class="text-slate-500">Jitter</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ $tech->jitter_ms !== null ? number_format($tech->jitter_ms, 1) . ' ms' : '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-500">Packet Loss</span>
+                                <span class="font-semibold text-slate-800 font-mono">{{ $tech->packet_loss_percent !== null ? number_format($tech->packet_loss_percent, 2) . '%' : '0.00%' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Skor Sinyal:</span>
+                        <div class="flex gap-0.5 text-amber-500">
+                            @if($tech->quality_score)
+                                @for($i = 1; $i <= 5; $i++)
+                                    <svg class="h-3 w-3 {{ $i <= $tech->quality_score ? 'fill-current' : 'text-slate-300' }}" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                    </svg>
+                                @endfor
+                            @else
+                                <span class="text-[10px] font-semibold text-slate-500">-</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speedtest Photo -->
+                <div class="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Foto Hasil Speedtest</span>
+                        @if($tech->speedtest_photo)
+                            <div class="border border-slate-200 rounded overflow-hidden shadow-sm max-h-24 bg-white relative group">
+                                <img src="{{ asset('storage/' . $tech->speedtest_photo) }}" alt="Foto Speedtest" class="w-full object-cover max-h-24">
+                                <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <a href="{{ asset('storage/' . $tech->speedtest_photo) }}" target="_blank" class="text-[9px] bg-white text-slate-800 font-bold px-2 py-1 rounded shadow">LIHAT FULL</a>
+                                </div>
+                            </div>
+                        @else
+                            <div class="h-20 bg-white border border-dashed border-slate-200 rounded flex flex-col items-center justify-center text-slate-400">
+                                <svg class="h-6 w-6 opacity-40 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span class="text-[9px] font-semibold">Tidak Ada Foto Speedtest</span>
+                            </div>
+                        @endif
+                    </div>
+                    @if($tech->speedtest_photo)
+                        <div class="mt-2 text-right">
+                            <a href="{{ asset('storage/' . $tech->speedtest_photo) }}" target="_blank" class="text-[10px] font-bold text-sky-600 hover:text-sky-800">Buka Gambar ↗</a>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
 @endif
 
 @can('fill_installation')

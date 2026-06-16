@@ -96,6 +96,29 @@ Catatan:
 
 ## Done
 
+### DS-DASH001 — Implementasi Desain Sistem pada Dashboard
+Status: Done
+
+Sprint/Module:
+Refactoring & Polish UI Dashboard
+
+Tujuan:
+Merapikan halaman dashboard sesuai dokumen `Design-System-Enterprise-Grade(1).md` agar terlihat premium, *enterprise-ready*, rapi, *data-first*, dan responsif.
+
+Hasil Implementasi:
+- [x] Mendefinisikan variabel warna, spacing, radius, dan z-index lengkap pada `resources/css/app.css` sesuai token Section 5.
+- [x] Membuat kelas komponen umum (`.btn-primary`, `.btn-secondary`, `.badge`, `.badge-success`, dll., `.table-wrapper`, `.table`, `.data-cell`) untuk standardisasi UI di `resources/css/app.css`.
+- [x] Mengubah `resources/views/dashboard.blade.php` untuk menggunakan grid summary cards baru dengan format warna status semantik (kuning/perlu dilengkapi, hijau/aktif, merah/overdue & tunggakan, biru/siap billing).
+- [x] Mengubah seluruh visual angka, nominal uang, ID pelanggan/invoice, dan tanggal agar menggunakan font monospaced (`font-mono` / `.data-cell`).
+- [x] Menyempurnakan layout filter, card summary, list table, dan aksen hover di dashboard agar rapi dan responsif.
+- [x] Membangun aset CSS dengan `npm run build` dan memverifikasi kelulusan 175 tests.
+
+Acceptance Criteria:
+- [x] Filter form rapi, compact, dan responsif.
+- [x] Summary cards dikelompokkan sesuai jenisnya: Metric, Operational Status, dan Insight.
+- [x] Semua angka, currency, ID, dan tanggal menggunakan font monospaced.
+- [x] Tabel menggunakan wrapper `.table-wrapper` dan header berwarna abu-abu muda dengan hover effect.
+
 ### IMP-S4001 — Verifikasi Produksi & Hardening
 Status: Done
 
@@ -1937,6 +1960,16 @@ Catatan refactor S2-T004/S2-T005:
 - Master Paket Internet sekarang memakai tabel/model/controller `internet_packages`/`InternetPackage`, dengan struktur data dan UI hasil gabungan dari Service Package dan Internet Package.
 - Database development sudah di-reset dengan `php artisan migrate:fresh --seed`; hasil akhir: tabel `internet_packages` ada, tabel `service_packages` tidak ada, dan 27 paket ter-seed.
 - Test refactor lulus: `InternetPackageSeederTest`, `CustomerCreateTest`, `CustomerEditTest`, `CustomerImportTest`, dan `npm run build`.
+
+Catatan fix regresi import:
+- Filter akun internal legacy pada `CustomerController` dikembalikan agar hanya melewati ID internal seperti `PG*`, bukan semua ID pelanggan non-`PE`; import dengan ID legacy seperti `CUST-*` kembali tervalidasi dan tersimpan.
+- Test target lulus: `php artisan test tests/Feature/CustomerImportTest.php tests/Feature/CustomerImportLoggingTest.php` (8 passed, 2 skipped karena ZipArchive tidak tersedia).
+- Full suite lulus: `php artisan test` (178 passed, 2 skipped, 1086 assertions).
+
+Catatan hardening legacy mapping:
+- ID internal legacy `PG*` sekarang diselesaikan ke nama petugas saat migrasi data real, sehingga field `surveyors`, `installation_technicians`, dan `activated_by_name` tidak lagi bergantung pada kode mentah.
+- Alamat legacy tetap memakai fallback `ALMT` / `ALAMAT` lalu komposisi `DESA, KEC, KOTA` jika alamat jalan kosong.
+- Verifikasi terbaru lulus: `php artisan test tests/Feature/RealDataMigrationTest.php` dan `php artisan test tests/Feature/CustomerImportTest.php`.
 
 Setelah task selesai:
 1. Pindahkan task ke Done.

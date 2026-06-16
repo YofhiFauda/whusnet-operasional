@@ -14,7 +14,9 @@ class MadiunRegionSeeder extends Seeder
      */
     public function run(): void
     {
-        $city = City::query()->firstOrCreate(['name' => 'Kabupaten Madiun']);
+        $city = retry(5, function () {
+            return City::query()->firstOrCreate(['name' => 'Kabupaten Madiun']);
+        }, 100);
 
         $districtsData = [
             'Kebonsari' => [
@@ -233,22 +235,28 @@ class MadiunRegionSeeder extends Seeder
         ];
 
         foreach ($districtsData as $districtName => $villages) {
-            $district = District::query()->firstOrCreate([
-                'city_id' => $city->id,
-                'name' => $districtName,
-            ]);
+            $district = retry(5, function () use ($city, $districtName) {
+                return District::query()->firstOrCreate([
+                    'city_id' => $city->id,
+                    'name' => $districtName,
+                ]);
+            }, 100);
 
             foreach ($villages as $villageName => $postalCode) {
-                Village::query()->updateOrCreate([
-                    'district_id' => $district->id,
-                    'name' => $villageName,
-                ], [
-                    'postal_code' => $postalCode,
-                ]);
+                retry(5, function () use ($district, $villageName, $postalCode) {
+                    Village::query()->updateOrCreate([
+                        'district_id' => $district->id,
+                        'name' => $villageName,
+                    ], [
+                        'postal_code' => $postalCode,
+                    ]);
+                }, 100);
             }
         }
 
-        $city = City::query()->firstOrCreate(['name' => 'Kota Madiun']);
+        $city = retry(5, function () {
+            return City::query()->firstOrCreate(['name' => 'Kota Madiun']);
+        }, 100);
 
         $districtsData = [
             'Mangu Harjo' => [
@@ -287,18 +295,22 @@ class MadiunRegionSeeder extends Seeder
         ];
 
         foreach ($districtsData as $districtName => $villages) {
-            $district = District::query()->firstOrCreate([
-                'city_id' => $city->id,
-                'name' => $districtName,
-            ]);
+            $district = retry(5, function () use ($city, $districtName) {
+                return District::query()->firstOrCreate([
+                    'city_id' => $city->id,
+                    'name' => $districtName,
+                ]);
+            }, 100);
 
             foreach ($villages as $villageName => $postalCode) {
-                Village::query()->updateOrCreate([
-                    'district_id' => $district->id,
-                    'name' => $villageName,
-                ], [
-                    'postal_code' => $postalCode,
-                ]);
+                retry(5, function () use ($district, $villageName, $postalCode) {
+                    Village::query()->updateOrCreate([
+                        'district_id' => $district->id,
+                        'name' => $villageName,
+                    ], [
+                        'postal_code' => $postalCode,
+                    ]);
+                }, 100);
             }
         }
 

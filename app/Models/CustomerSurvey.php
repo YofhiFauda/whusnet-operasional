@@ -19,6 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'nearest_odp',
     'survey_photo',
     'survey_note',
+    'end_date',
+    'duration_minutes',
+    'surveyors',
+    'assigned_at',
+    'fop_id',
 ])]
 class CustomerSurvey extends Model
 {

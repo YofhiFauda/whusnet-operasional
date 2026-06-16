@@ -648,24 +648,24 @@ class CustomerController extends Controller
     {
         $sheets = [
             'customers' => [
-                'headers' => ['old_customer_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name'],
-                'data' => [['PE000001', 'PE000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo']]
+                'headers' => ['old_customer_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name', 'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
+                'data' => [['PE000001', 'PE000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']]
             ],
             'packages' => [
                 'headers' => ['old_package_id', 'name', 'package_type', 'category', 'monthly_price', 'upload_speed', 'download_speed', 'upload_limit', 'download_limit', 'olt_profile', 'ppp_profile', 'bonus', 'description'],
                 'data' => [['PK000001', 'WHUSNET 20 Mbps', 'Broadband', 'Paket Home Broadband', '150000', '20', '20', '', '', 'OLT-20M', 'PPP-20M', '', 'Paket legacy']]
             ],
             'services' => [
-                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason'],
-                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '']]
+                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason', 'profile', 'contract_type', 'activation_time', 'activated_by_name', 'survey_date', 'survey_start_time', 'survey_end_time', 'surveyors', 'survey_assigned_at', 'survey_fop_id', 'required_tools', 'survey_photo', 'survey_note', 'survey_duration_minutes', 'installation_date', 'installation_start_time', 'installation_end_time', 'installation_technicians', 'installation_photo', 'installation_note', 'installation_assigned_at', 'installation_fop_id'],
+                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001']]
             ],
             'technical_details' => [
-                'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'ip_address', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo'],
-                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '192.168.1.10', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '']]
+                'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'ip_address', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo', 'passive_device', 'branch_number', 'pop_number', 'router_number', 'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'],
+                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '192.168.1.10', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '', 'FAT-01', 'CB001', 'WL0001', 'RTR-001', '-18.5', '-19.2', '2025-05-06', '11:00:00', '2.5', '12.0', '0.00', '95.0', '5']]
             ],
             'invoices' => [
-                'headers' => ['old_invoice_id', 'old_cost_id', 'old_customer_id', 'old_request_id', 'billing_period', 'issue_date', 'due_date', 'installation_fee', 'monthly_fee', 'other_fee', 'total_amount', 'status'],
-                'data' => [['INVOICE-0001', 'IN000001', 'PE000001', 'RQ000001', '2025-05', '2025-05-06', '2025-05-10', '0', '150000', '0', '150000', 'belum_dibayar']]
+                'headers' => ['old_invoice_id', 'old_cost_id', 'old_customer_id', 'old_request_id', 'billing_period', 'issue_date', 'due_date', 'installation_fee', 'monthly_fee', 'other_fee', 'total_amount', 'status', 'prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee'],
+                'data' => [['INVOICE-0001', 'IN000001', 'PE000001', 'RQ000001', '2025-05', '2025-05-06', '2025-05-10', '0', '150000', '0', '150000', 'belum_dibayar', '', '0', '0', '0']]
             ],
             'payments' => [
                 'headers' => ['old_payment_id', 'old_transaction_id', 'old_invoice_id', 'old_customer_id', 'old_request_id', 'payment_date', 'billing_period', 'payment_method', 'amount', 'received_by_old', 'deposited_by_old', 'note', 'status'],
@@ -788,6 +788,9 @@ class CustomerController extends Controller
         $seenPhones = [];
         foreach ($customersData as $index => $row) {
             $oldCustomerId = $this->cleanLegacyValue($row['old_customer_id'] ?? null) ?? '';
+            if ($this->isInternalLegacyAccountId($oldCustomerId)) {
+                continue; // Skip internal account rows (like PG...)
+            }
             $fullName = $this->cleanLegacyValue($row['full_name'] ?? null) ?? '';
             $primaryPhone = $this->cleanLegacyValue($row['primary_phone'] ?? $row['phone'] ?? null) ?? '';
             $fullAddress = $this->cleanLegacyValue($row['full_address'] ?? null) ?? '';
@@ -949,6 +952,9 @@ class CustomerController extends Controller
         foreach ($servicesData as $index => $row) {
             $oldRequestId = $this->cleanLegacyValue($row['old_request_id'] ?? null) ?? '';
             $oldCustomerId = $this->cleanLegacyValue($row['old_customer_id'] ?? null) ?? '';
+            if ($this->isInternalLegacyAccountId($oldCustomerId)) {
+                continue; // Skip services belonging to internal users
+            }
             $oldPackageId = $this->cleanLegacyValue($row['old_package_id'] ?? null) ?? '';
             $requestStatus = $this->cleanLegacyValue($row['request_status'] ?? null);
             $serviceStatusInput = $this->cleanLegacyValue($row['service_status'] ?? null) ?? $requestStatus ?? '';
@@ -1044,6 +1050,9 @@ class CustomerController extends Controller
         foreach ($techDetailsData as $index => $row) {
             $oldReportId = trim((string)($row['old_report_id'] ?? ''));
             $oldCustomerId = trim((string)($row['old_customer_id'] ?? ''));
+            if ($this->isInternalLegacyAccountId($oldCustomerId)) {
+                continue; // Skip tech details belonging to internal users
+            }
             $oldRequestId = trim((string)($row['old_request_id'] ?? ''));
 
             $errors = [];
@@ -1104,6 +1113,9 @@ class CustomerController extends Controller
             $oldCostId = $this->cleanLegacyValue($row['old_cost_id'] ?? null);
             $oldRequestId = $this->cleanLegacyValue($row['old_request_id'] ?? null);
             $oldCustomerId = $this->cleanLegacyValue($row['old_customer_id'] ?? null) ?? '';
+            if ($this->isInternalLegacyAccountId($oldCustomerId)) {
+                continue; // Skip invoices belonging to internal users
+            }
             $billingPeriod = $this->normalizeBillingPeriod($row['billing_period'] ?? null)
                 ?? $this->normalizeBillingPeriod($row['issue_date'] ?? null)
                 ?? '';
@@ -1187,6 +1199,9 @@ class CustomerController extends Controller
             $oldTransactionId = $this->cleanLegacyValue($row['old_transaction_id'] ?? null);
             $oldRequestId = $this->cleanLegacyValue($row['old_request_id'] ?? null);
             $oldCustomerId = $this->cleanLegacyValue($row['old_customer_id'] ?? null);
+            if ($this->isInternalLegacyAccountId($oldCustomerId)) {
+                continue; // Skip payments belonging to internal users
+            }
             $billingPeriod = $this->normalizeBillingPeriod($row['billing_period'] ?? null);
             $amountInput = $this->cleanLegacyValue($row['amount'] ?? null) ?? '';
             $rawPaymentDate = $this->cleanLegacyValue($row['payment_date'] ?? null);
@@ -1373,10 +1388,8 @@ class CustomerController extends Controller
                         continue;
                     }
 
-                    $existingCustomer = Customer::where('old_customer_id', $row['old_customer_id'])->first();
-                    if ($existingCustomer) {
-                        $customersMap[$row['old_customer_id']] = $existingCustomer->id;
-                        continue;
+                    if ($this->isInternalLegacyAccountId($row['old_customer_id'])) {
+                        continue; // skip internal accounts in confirm
                     }
 
                     $pop = !empty($row['pop_id']) ? Pop::find($row['pop_id']) : null;
@@ -1401,13 +1414,19 @@ class CustomerController extends Controller
                         'status' => 'registered', // Default, updated by service activation or mapping
                         'customer_status' => 'calon_pelanggan',
                         'created_by' => auth()->id(),
+                        'foto_ktp' => $row['foto_ktp'] ?? null,
+                        'foto_rumah' => $row['foto_rumah'] ?? null,
+                        'foto_kontrak' => $row['foto_kontrak'] ?? null,
+                        'sales_code' => $row['sales_code'] ?? null,
+                        'agent_code' => $row['agent_code'] ?? null,
+                        'referral_customer_code' => $row['referral_customer_code'] ?? null,
                     ]);
 
                     CustomerAddress::create([
                         'customer_id' => $customer->id,
                         'old_region_id' => $row['old_region_id'] ?? null,
                         'old_branch_id' => $row['old_branch_id'] ?? null,
-                        'full_address' => $row['full_address'] ?? "Alamat Kel. " . ($row['village_name'] ?? ''),
+                        'full_address' => $this->resolveLegacyAddressText($row),
                         'city' => $row['city_name'] ?? $row['city'] ?? null,
                         'district' => $row['district_name'] ?? $row['district'] ?? null,
                         'village' => $row['village_name'] ?? $row['village'] ?? null,
@@ -1416,7 +1435,9 @@ class CustomerController extends Controller
                         'village_id' => $row['village_id'] ?? null,
                         'latitude' => $row['latitude'] ?? null,
                         'longitude' => $row['longitude'] ?? null,
-                        'ktp_photo' => $row['ktp_photo'] ?? null,
+                        'ktp_photo' => $row['foto_ktp'] ?? $row['ktp_photo'] ?? null,
+                        'house_photo' => $row['foto_rumah'] ?? $row['house_photo'] ?? null,
+                        'contract_photo' => $row['foto_kontrak'] ?? $row['contract_photo'] ?? null,
                     ]);
 
                     $customer->refresh();
@@ -1433,6 +1454,10 @@ class CustomerController extends Controller
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Services', 'Baris error pada sheet Services.');
                         continue;
+                    }
+
+                    if ($this->isInternalLegacyAccountId($row['old_customer_id'] ?? null)) {
+                        continue; // skip services for internal accounts
                     }
 
                     $customerId = $customersMap[$row['old_customer_id']] ?? Customer::where('old_customer_id', $row['old_customer_id'])->value('id');
@@ -1478,7 +1503,47 @@ class CustomerController extends Controller
                         'due_date' => $row['due_date'] ?? null,
                         'service_status' => $serviceStatus,
                         'billing_status' => ($serviceStatus === 'active') ? 'active' : 'inactive',
+                        'profile' => $row['profile'] ?? null,
+                        'contract_type' => $row['contract_type'] ?? null,
+                        'activation_time' => $row['activation_time'] ?? null,
+                        'activated_by_name' => $row['activated_by_name'] ?? null,
                     ]);
+
+                    // Survey creation
+                    if (!empty($row['survey_date']) || !empty($row['surveyors'])) {
+                        \App\Models\CustomerSurvey::create([
+                            'customer_id' => $customerId,
+                            'survey_status' => 'completed',
+                            'survey_date' => $row['survey_date'] ?? null,
+                            'start_time' => $row['survey_start_time'] ?? null,
+                            'end_time' => $row['survey_end_time'] ?? null,
+                            'duration_minutes' => $row['survey_duration_minutes'] ?? null,
+                            'surveyors' => $row['surveyors'] ?? null,
+                            'assigned_at' => $row['survey_assigned_at'] ?? null,
+                            'fop_id' => $row['survey_fop_id'] ?? null,
+                            'required_tools' => $row['required_tools'] ?? null,
+                            'survey_photo' => $row['survey_photo'] ?? null,
+                            'survey_note' => $row['survey_note'] ?? null,
+                        ]);
+                    }
+
+                    // Installation creation
+                    if (!empty($row['installation_date']) || !empty($row['installation_technicians'])) {
+                        \App\Models\CustomerInstallation::create([
+                            'customer_id' => $customerId,
+                            'installation_status' => 'completed',
+                            'scheduled_date' => $row['installation_date'] ?? null,
+                            'scheduled_time' => $row['installation_start_time'] ?? null,
+                            'finished_date' => $row['installation_date'] ?? null,
+                            'start_time' => $row['installation_start_time'] ?? null,
+                            'end_time' => $row['installation_end_time'] ?? null,
+                            'technicians' => $row['installation_technicians'] ?? null,
+                            'assigned_at' => $row['installation_assigned_at'] ?? null,
+                            'fop_id' => $row['installation_fop_id'] ?? null,
+                            'installation_photo' => $row['installation_photo'] ?? null,
+                            'installation_note' => $row['installation_note'] ?? null,
+                        ]);
+                    }
 
                     // Update parent customer state based on service activation
                     $custStatus = $this->mapServiceStatusToCustomerStatus($serviceStatus);
@@ -1498,6 +1563,10 @@ class CustomerController extends Controller
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Technical Details', 'Baris error pada sheet Technical Details.');
                         continue;
+                    }
+
+                    if ($this->isInternalLegacyAccountId($row['old_customer_id'] ?? null)) {
+                        continue; // skip internal account technical details
                     }
 
                     $customerId = $customersMap[$row['old_customer_id']] ?? Customer::where('old_customer_id', $row['old_customer_id'])->value('id');
@@ -1536,6 +1605,19 @@ class CustomerController extends Controller
                         'signed_form_photo' => $row['signed_form_photo'] ?? null,
                         'router_photo' => $row['router_photo'] ?? null,
                         'cable_photo' => $row['cable_photo'] ?? null,
+                        'passive_device' => $row['passive_device'] ?? null,
+                        'branch_number' => $row['branch_number'] ?? null,
+                        'pop_number' => $row['pop_number'] ?? null,
+                        'router_number' => $row['router_number'] ?? null,
+                        'initial_attenuation' => $row['initial_attenuation'] ?? null,
+                        'actual_attenuation' => $row['actual_attenuation'] ?? null,
+                        'test_date' => $row['test_date'] ?? null,
+                        'test_time' => $row['test_time'] ?? null,
+                        'jitter_ms' => $row['jitter_ms'] ?? null,
+                        'latency_ms' => $row['latency_ms'] ?? null,
+                        'packet_loss_percent' => $row['packet_loss_percent'] ?? null,
+                        'speed_conformity_percent' => $row['speed_conformity_percent'] ?? null,
+                        'quality_score' => $row['quality_score'] ?? null,
                     ]);
 
                     // Update parent customer technical fields directly for detail compatibility
@@ -1556,6 +1638,10 @@ class CustomerController extends Controller
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Invoices', 'Baris error pada sheet Invoices.');
                         continue;
+                    }
+
+                    if ($this->isInternalLegacyAccountId($row['old_customer_id'] ?? null)) {
+                        continue; // skip internal accounts
                     }
 
                     $customerId = $customersMap[$row['old_customer_id'] ?? ''] ?? Customer::where('old_customer_id', $row['old_customer_id'] ?? null)->value('id');
@@ -1622,6 +1708,10 @@ class CustomerController extends Controller
                         'remaining_amount' => $totalAmount,
                         'invoice_status' => $this->mapLegacyInvoiceStatus($row['status'] ?? null),
                         'created_by' => auth()->id(),
+                        'prorate_amount' => $row['prorate_amount'] ?? null,
+                        'extra_cable_fee' => $row['extra_cable_fee'] ?? null,
+                        'extra_installation_fee' => $row['extra_installation_fee'] ?? null,
+                        'extra_pole_fee' => $row['extra_pole_fee'] ?? null,
                     ]);
 
                     $invoicesMap[$legacyInvoiceId] = $invoice->id;
@@ -1636,6 +1726,10 @@ class CustomerController extends Controller
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Payments', 'Baris error pada sheet Payments.');
                         continue;
+                    }
+
+                    if ($this->isInternalLegacyAccountId($row['old_customer_id'] ?? null)) {
+                        continue; // skip internal account payments
                     }
 
                     if (Payment::where('old_payment_id', $row['old_payment_id'])->exists()) {
@@ -1721,6 +1815,33 @@ class CustomerController extends Controller
             'error_message' => "[{$sheetName}] " . $message,
             'raw_data' => $row,
         ]);
+    }
+
+    private function isInternalLegacyAccountId(mixed $value): bool
+    {
+        $legacyId = strtoupper($this->cleanLegacyValue($value) ?? '');
+
+        return $legacyId !== '' && str_starts_with($legacyId, 'PG');
+    }
+
+    private function resolveLegacyAddressText(array $row): string
+    {
+        $streetAddress = trim((string) ($row['full_address'] ?? $row['address'] ?? $row['ALMT'] ?? $row['ALAMAT'] ?? ''));
+        if ($streetAddress !== '' && !in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
+            return $streetAddress;
+        }
+
+        $parts = array_filter([
+            trim((string) ($row['village_name'] ?? $row['village'] ?? $row['DESA'] ?? '')),
+            trim((string) ($row['district_name'] ?? $row['district'] ?? $row['KEC'] ?? '')),
+            trim((string) ($row['city_name'] ?? $row['city'] ?? $row['KOTA'] ?? '')),
+        ]);
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        return $streetAddress !== '' ? $streetAddress : '-';
     }
 
     private function cleanLegacyValue(mixed $value): ?string

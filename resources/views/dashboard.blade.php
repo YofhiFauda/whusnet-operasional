@@ -20,11 +20,12 @@
 @endphp
 
 <div class="space-y-6">
-    <div class="bg-white border border-slate-200 rounded-lg p-4">
+    <!-- Filter Panel -->
+    <div class="bg-white border border-slate-200 rounded-lg p-4 shadow-none">
         <form method="GET" action="{{ route('dashboard') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div>
-                <label for="pop_id" class="block text-xs font-semibold text-slate-600 mb-1">Filter POP</label>
-                <select id="pop_id" name="pop_id" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+                <label for="pop_id" class="block text-xs font-semibold text-slate-600 mb-1.5">Filter POP</label>
+                <select id="pop_id" name="pop_id" class="w-full h-[38px] px-3 py-2 rounded-md border border-slate-200 text-sm focus:border-sky-500 focus:ring-sky-500 focus:outline-none transition-colors duration-150">
                     <option value="">Semua POP yang dapat diakses</option>
                     @foreach($pops as $pop)
                         <option value="{{ $pop->id }}" @selected((string) $filters['pop_id'] === (string) $pop->id)>
@@ -35,81 +36,92 @@
             </div>
 
             <div>
-                <label for="period_from" class="block text-xs font-semibold text-slate-600 mb-1">Periode Dari</label>
-                <input id="period_from" type="month" name="period_from" value="{{ $filters['period_from'] }}" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+                <label for="period_from" class="block text-xs font-semibold text-slate-600 mb-1.5">Periode Dari</label>
+                <input id="period_from" type="month" name="period_from" value="{{ $filters['period_from'] }}" class="w-full h-[38px] px-3 py-2 rounded-md border border-slate-200 text-sm focus:border-sky-500 focus:ring-sky-500 focus:outline-none transition-colors duration-150">
             </div>
 
             <div>
-                <label for="period_to" class="block text-xs font-semibold text-slate-600 mb-1">Periode Sampai</label>
-                <input id="period_to" type="month" name="period_to" value="{{ $filters['period_to'] }}" class="w-full rounded-md border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+                <label for="period_to" class="block text-xs font-semibold text-slate-600 mb-1.5">Periode Sampai</label>
+                <input id="period_to" type="month" name="period_to" value="{{ $filters['period_to'] }}" class="w-full h-[38px] px-3 py-2 rounded-md border border-slate-200 text-sm focus:border-sky-500 focus:ring-sky-500 focus:outline-none transition-colors duration-150">
             </div>
 
             <div class="flex gap-2">
-                <button type="submit" class="inline-flex justify-center rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
+                <button type="submit" class="btn-primary w-full md:w-auto cursor-pointer">
                     Terapkan Filter
                 </button>
-                <a href="{{ route('dashboard') }}" class="inline-flex justify-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <a href="{{ route('dashboard') }}" class="btn-secondary w-full md:w-auto cursor-pointer">
                     Reset
                 </a>
             </div>
         </form>
     </div>
 
+    <!-- Summary Cards Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
+        <!-- Total Pelanggan (Metric Card) -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-none">
             <p class="text-sm font-medium text-slate-500">Total Pelanggan</p>
-            <p class="mt-3 text-3xl font-semibold text-slate-900">{{ number_format($stats['total_customers']) }}</p>
+            <p class="mt-3 text-3xl font-semibold text-slate-900 font-mono">{{ number_format($stats['total_customers']) }}</p>
             <p class="mt-1 text-xs text-slate-500">Sesuai filter POP</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Pelanggan Aktif</p>
-            <p class="mt-3 text-3xl font-semibold text-green-700">{{ number_format($stats['active_customers']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['active_customers'], $stats['total_customers']) }} dari total pelanggan</p>
+        <!-- Pelanggan Aktif (Metric Card - Success) -->
+        <div class="bg-emerald-50/20 border border-emerald-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-emerald-700">Pelanggan Aktif</p>
+            <p class="mt-3 text-3xl font-semibold text-emerald-700 font-mono">{{ number_format($stats['active_customers']) }}</p>
+            <p class="mt-1 text-xs text-emerald-600"><span class="font-mono">{{ $percent($stats['active_customers'], $stats['total_customers']) }}</span> dari total pelanggan</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Data Belum Lengkap</p>
-            <p class="mt-3 text-3xl font-semibold text-amber-700">{{ number_format($stats['incomplete_customers']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['incomplete_customers'], $stats['total_customers']) }} perlu dilengkapi</p>
+        <!-- Data Belum Lengkap (Operational Status Card - Warning) -->
+        <div class="bg-amber-50/20 border border-amber-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-amber-700">Data Belum Lengkap</p>
+            <p class="mt-3 text-3xl font-semibold text-amber-700 font-mono">{{ number_format($stats['incomplete_customers']) }}</p>
+            <p class="mt-1 text-xs text-amber-600"><span class="font-mono">{{ $percent($stats['incomplete_customers'], $stats['total_customers']) }}</span> perlu dilengkapi</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Siap Billing</p>
-            <p class="mt-3 text-3xl font-semibold text-sky-700">{{ number_format($stats['ready_billing_customers']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">{{ $percent($stats['ready_billing_customers'], $stats['total_customers']) }} siap ditagih</p>
+        <!-- Siap Billing (Metric Card - Info) -->
+        <div class="bg-sky-50/20 border border-sky-300 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-sky-700">Siap Billing</p>
+            <p class="mt-3 text-3xl font-semibold text-sky-700 font-mono">{{ number_format($stats['ready_billing_customers']) }}</p>
+            <p class="mt-1 text-xs text-sky-600"><span class="font-mono">{{ $percent($stats['ready_billing_customers'], $stats['total_customers']) }}</span> siap ditagih</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Tagihan Periode {{ $filters['period_label'] }}</p>
-            <p class="mt-3 text-2xl font-semibold text-slate-900">{{ $currency($stats['total_invoices_amount']) }}</p>
+        <!-- Tagihan Periode (Metric Card) -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-slate-500">Tagihan Periode ({{ $filters['period_label'] }})</p>
+            <p class="mt-3 text-2xl font-semibold text-slate-900 font-mono">{{ $currency($stats['total_invoices_amount']) }}</p>
             <p class="mt-1 text-xs text-slate-500">Berdasarkan periode tagihan</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Pembayaran Periode {{ $filters['period_label'] }}</p>
-            <p class="mt-3 text-2xl font-semibold text-emerald-700">{{ $currency($stats['total_payments_amount']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">Hanya pembayaran valid</p>
+        <!-- Pembayaran Periode (Metric Card - Success) -->
+        <div class="bg-emerald-50/20 border border-emerald-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-emerald-700">Pembayaran Periode ({{ $filters['period_label'] }})</p>
+            <p class="mt-3 text-2xl font-semibold text-emerald-700 font-mono">{{ $currency($stats['total_payments_amount']) }}</p>
+            <p class="mt-1 text-xs text-emerald-600">Hanya pembayaran valid</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Total Tunggakan</p>
-            <p class="mt-3 text-2xl font-semibold text-rose-700">{{ $currency($stats['total_unpaid_amount']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">Invoice belum lunas pada periode filter</p>
+        <!-- Total Tunggakan (Operational Status Card - Danger) -->
+        <div class="bg-rose-50/20 border border-rose-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-rose-700">Total Tunggakan</p>
+            <p class="mt-3 text-2xl font-semibold text-rose-700 font-mono">{{ $currency($stats['total_unpaid_amount']) }}</p>
+            <p class="mt-1 text-xs text-rose-600">Invoice belum lunas pada filter</p>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
-            <p class="text-sm font-medium text-slate-500">Tagihan Jatuh Tempo</p>
-            <p class="mt-3 text-3xl font-semibold text-rose-700">{{ number_format($stats['due_invoices_count']) }}</p>
-            <p class="mt-1 text-xs text-slate-500">Invoice belum lunas melewati jatuh tempo</p>
+        <!-- Tagihan Jatuh Tempo (Operational Status Card - Danger) -->
+        <div class="bg-rose-50/20 border border-rose-200 rounded-lg p-5 shadow-none">
+            <p class="text-sm font-medium text-rose-700">Tagihan Jatuh Tempo</p>
+            <p class="mt-3 text-3xl font-semibold text-rose-700 font-mono">{{ number_format($stats['due_invoices_count']) }}</p>
+            <p class="mt-1 text-xs text-rose-600">Invoice belum lunas melewati batas</p>
         </div>
     </div>
 
+    <!-- Details Section Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
+        <!-- Customers by POP (Insight Card) -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-none">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-slate-800">Total Pelanggan per POP</h3>
-                <span class="text-xs text-slate-500">{{ $customersByPop->count() }} POP</span>
+                <span class="badge badge-neutral font-mono">{{ $customersByPop->count() }} POP</span>
             </div>
 
             <div class="space-y-3">
@@ -117,9 +129,9 @@
                     <div>
                         <div class="flex justify-between gap-4 text-sm">
                             <span class="font-medium text-slate-700">{{ $row->pop?->name ?? 'Tanpa POP' }}</span>
-                            <span class="font-semibold text-slate-900">{{ number_format($row->total) }}</span>
+                            <span class="font-semibold text-slate-900 font-mono">{{ number_format($row->total) }}</span>
                         </div>
-                        <div class="mt-1 h-2 rounded-full bg-slate-100">
+                        <div class="mt-1.5 h-2 rounded-full bg-slate-100">
                             <div class="h-2 rounded-full bg-sky-600" style="width: {{ min(100, ((int) $row->total / max(1, (int) $stats['total_customers'])) * 100) }}%"></div>
                         </div>
                     </div>
@@ -129,33 +141,34 @@
             </div>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2">
+        <!-- Due Invoices Table -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2 shadow-none">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-slate-800">Tagihan Jatuh Tempo</h3>
                 @if(auth()->user()->hasPermission('view_invoices'))
-                    <a href="{{ route('invoices.index') }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800">Lihat Tagihan</a>
+                    <a href="{{ route('invoices.index') }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800 transition-colors duration-150">Lihat Semua</a>
                 @endif
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <div class="table-wrapper">
+                <table class="table">
                     <thead>
-                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <th class="py-2 pr-4">Invoice</th>
-                            <th class="py-2 pr-4">Pelanggan</th>
-                            <th class="py-2 pr-4">POP</th>
-                            <th class="py-2 pr-4">Jatuh Tempo</th>
-                            <th class="py-2 text-right">Sisa</th>
+                        <tr>
+                            <th class="text-left">Invoice</th>
+                            <th class="text-left">Pelanggan</th>
+                            <th class="text-left">POP</th>
+                            <th class="text-left">Jatuh Tempo</th>
+                            <th class="text-right">Sisa Tagihan</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody>
                         @forelse($dueInvoices as $invoice)
                             <tr>
-                                <td class="py-3 pr-4 font-medium text-slate-800">{{ $invoice->invoice_number }}</td>
-                                <td class="py-3 pr-4 text-slate-700">{{ $invoice->customer?->full_name ?? '-' }}</td>
-                                <td class="py-3 pr-4 text-slate-600">{{ $invoice->pop?->name ?? '-' }}</td>
-                                <td class="py-3 pr-4 text-rose-700">{{ optional($invoice->due_date)->format('d/m/Y') }}</td>
-                                <td class="py-3 text-right font-semibold text-slate-900">{{ $currency($invoice->remaining_amount) }}</td>
+                                <td class="data-cell text-left font-medium text-slate-900">{{ $invoice->invoice_number }}</td>
+                                <td class="text-left text-slate-700">{{ $invoice->customer?->full_name ?? '-' }}</td>
+                                <td class="text-left text-slate-600">{{ $invoice->pop?->name ?? '-' }}</td>
+                                <td class="data-cell text-left text-rose-600 font-semibold">{{ optional($invoice->due_date)->format('d/m/Y') }}</td>
+                                <td class="data-cell text-right font-semibold text-slate-900">{{ $currency($invoice->remaining_amount) }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -168,38 +181,40 @@
         </div>
     </div>
 
+    <!-- Incomplete Customers and Quick Access Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2">
+        <!-- Incomplete Customers Table -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 xl:col-span-2 shadow-none">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-semibold text-slate-800">Pelanggan yang Perlu Dilengkapi</h3>
                 @if(auth()->user()->hasPermission('view_customers'))
-                    <a href="{{ route('customers.index', ['completeness_status' => 'perlu_dilengkapi']) }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800">Lihat Pelanggan</a>
+                    <a href="{{ route('customers.index', ['completeness_status' => 'perlu_dilengkapi']) }}" class="text-xs font-semibold text-sky-700 hover:text-sky-800 transition-colors duration-150">Lihat Semua</a>
                 @endif
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <div class="table-wrapper">
+                <table class="table">
                     <thead>
-                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <th class="py-2 pr-4">ID</th>
-                            <th class="py-2 pr-4">Nama</th>
-                            <th class="py-2 pr-4">POP</th>
-                            <th class="py-2 pr-4">Status Kelengkapan</th>
-                            <th class="py-2">Update</th>
+                        <tr>
+                            <th class="text-left">ID Pelanggan</th>
+                            <th class="text-left">Nama</th>
+                            <th class="text-left">POP</th>
+                            <th class="text-left">Status Kelengkapan</th>
+                            <th class="text-left">Terakhir Diupdate</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody>
                         @forelse($incompleteCustomers as $customer)
                             <tr>
-                                <td class="py-3 pr-4 font-medium text-slate-800">{{ $customer->customer_code }}</td>
-                                <td class="py-3 pr-4 text-slate-700">{{ $customer->full_name }}</td>
-                                <td class="py-3 pr-4 text-slate-600">{{ $customer->pop?->name ?? '-' }}</td>
-                                <td class="py-3 pr-4">
-                                    <span class="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                                <td class="data-cell text-left font-medium text-slate-900">{{ $customer->customer_code }}</td>
+                                <td class="text-left text-slate-700">{{ $customer->full_name }}</td>
+                                <td class="text-left text-slate-600">{{ $customer->pop?->name ?? '-' }}</td>
+                                <td class="text-left">
+                                    <span class="badge badge-warning">
                                         {{ $statusLabels[$customer->data_completeness_status] ?? $customer->data_completeness_status }}
                                     </span>
                                 </td>
-                                <td class="py-3 text-slate-600">{{ optional($customer->updated_at)->format('d/m/Y') }}</td>
+                                <td class="data-cell text-left text-slate-600">{{ optional($customer->updated_at)->format('d/m/Y') }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -211,32 +226,39 @@
             </div>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-lg p-5">
+        <!-- Quick Access Card -->
+        <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-none">
             <h3 class="text-sm font-semibold text-slate-800 mb-4">Akses Cepat</h3>
             <div class="space-y-3">
                 @php $hasQuickAction = false; @endphp
 
                 @if(auth()->user()->hasPermission('view_customers'))
                     @php $hasQuickAction = true; @endphp
-                    <a href="{{ route('customers.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    <a href="{{ route('customers.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-sky-200 hover:text-sky-700 transition-all duration-150 cursor-pointer">
                         <span>Data Pelanggan</span>
-                        <span class="text-sky-700">Buka</span>
+                        <svg class="h-4 w-4 text-slate-400 hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                     </a>
                 @endif
 
                 @if(auth()->user()->hasPermission('view_invoices'))
                     @php $hasQuickAction = true; @endphp
-                    <a href="{{ route('invoices.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    <a href="{{ route('invoices.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-sky-200 hover:text-sky-700 transition-all duration-150 cursor-pointer">
                         <span>Daftar Tagihan</span>
-                        <span class="text-sky-700">Buka</span>
+                        <svg class="h-4 w-4 text-slate-400 hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                     </a>
                 @endif
 
                 @if(auth()->user()->hasPermission('view_payments'))
                     @php $hasQuickAction = true; @endphp
-                    <a href="{{ route('payments.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    <a href="{{ route('payments.index') }}" class="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-sky-200 hover:text-sky-700 transition-all duration-150 cursor-pointer">
                         <span>Riwayat Pembayaran</span>
-                        <span class="text-sky-700">Buka</span>
+                        <svg class="h-4 w-4 text-slate-400 hover:text-sky-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                     </a>
                 @endif
 

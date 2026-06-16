@@ -32,6 +32,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'signed_form_photo',
     'router_photo',
     'cable_photo',
+    'passive_device',
+    'branch_number',
+    'pop_number',
+    'router_number',
+    'initial_attenuation',
+    'actual_attenuation',
+    'test_date',
+    'test_time',
+    'jitter_ms',
+    'latency_ms',
+    'packet_loss_percent',
+    'speed_conformity_percent',
+    'quality_score',
 ])]
 class CustomerTechnicalDetail extends Model
 {

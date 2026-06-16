@@ -14,21 +14,27 @@ class PonorogoRegionSeeder extends Seeder
      */
     public function run(): void
     {
-        $city = City::query()->firstOrCreate(['name' => 'Ponorogo']);
+        $city = retry(5, function () {
+            return City::query()->firstOrCreate(['name' => 'Ponorogo']);
+        }, 100);
 
         foreach ($this->districts() as $districtName => $villages) {
-            $district = District::query()->firstOrCreate([
-                'city_id' => $city->id,
-                'name' => $districtName,
-            ]);
+            $district = retry(5, function () use ($city, $districtName) {
+                return District::query()->firstOrCreate([
+                    'city_id' => $city->id,
+                    'name' => $districtName,
+                ]);
+            }, 100);
 
             foreach ($villages as $villageName => $postalCode) {
-                Village::query()->updateOrCreate([
-                    'district_id' => $district->id,
-                    'name' => $villageName,
-                ], [
-                    'postal_code' => $postalCode,
-                ]);
+                retry(5, function () use ($district, $villageName, $postalCode) {
+                    Village::query()->updateOrCreate([
+                        'district_id' => $district->id,
+                        'name' => $villageName,
+                    ], [
+                        'postal_code' => $postalCode,
+                    ]);
+                }, 100);
             }
         }
     }

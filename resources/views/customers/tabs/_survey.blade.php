@@ -35,7 +35,7 @@
                     <div class="space-y-3">
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Petugas Survey</span>
-                            <span class="font-semibold text-slate-800">{{ $survey->technician->name ?? '-' }}</span>
+                            <span class="font-semibold text-slate-800">{{ $survey->technician->name ?? $survey->surveyors ?? '-' }}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Waktu Survey</span>
@@ -49,6 +49,36 @@
                             <span class="text-slate-500">ODP Terdekat</span>
                             <span class="font-semibold text-slate-800">{{ $survey->nearest_odp ?? '-' }}</span>
                         </div>
+                        @if($survey->assigned_at)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Tanggal Penugasan FOP</span>
+                            <span class="font-semibold text-slate-800 font-mono">{{ \App\Support\IndonesianDate::date($survey->assigned_at) }}</span>
+                        </div>
+                        @endif
+                        @if($survey->fop_id)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">ID FOP / Penugasan</span>
+                            <span class="font-mono font-semibold text-slate-800">{{ $survey->fop_id }}</span>
+                        </div>
+                        @endif
+                        @if($survey->end_date)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Tanggal Selesai Survey</span>
+                            <span class="font-semibold text-slate-800 font-mono">{{ \App\Support\IndonesianDate::date($survey->end_date) }}</span>
+                        </div>
+                        @endif
+                        @if($survey->duration_minutes)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Durasi Survey</span>
+                            <span class="font-semibold text-slate-800">{{ $survey->duration_minutes }} Menit</span>
+                        </div>
+                        @endif
+                        @if($survey->surveyors)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Tim Survey (Surveyors)</span>
+                            <span class="font-semibold text-slate-800">{{ $survey->surveyors }}</span>
+                        </div>
+                        @endif
                         <div class="pt-2">
                             <span class="block text-slate-500 mb-1">Kebutuhan Alat:</span>
                             <p class="p-3 bg-slate-50 rounded border border-slate-100 italic">{{ $survey->required_tools ?? 'Tidak ada catatan' }}</p>

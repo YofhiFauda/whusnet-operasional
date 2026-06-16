@@ -14,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (file_exists(app_path('Helpers/helpers.php'))) {
+            require_once app_path('Helpers/helpers.php');
+        }
     }
 
     /**
@@ -23,6 +25,23 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Carbon::setLocale('id');
+
+        // Register Blade Directives for formatting
+        \Illuminate\Support\Facades\Blade::directive('rupiah', function ($expression) {
+            return "<?php echo \App\Helpers\FormatHelper::rupiah($expression); ?>";
+        });
+
+        \Illuminate\Support\Facades\Blade::directive('tanggal', function ($expression) {
+            return "<?php echo \App\Helpers\FormatHelper::tanggal($expression); ?>";
+        });
+
+        \Illuminate\Support\Facades\Blade::directive('jam', function ($expression) {
+            return "<?php echo \App\Helpers\FormatHelper::jam($expression); ?>";
+        });
+
+        \Illuminate\Support\Facades\Blade::directive('datetime', function ($expression) {
+            return "<?php echo \App\Helpers\FormatHelper::datetime($expression); ?>";
+        });
 
         // Force HTTPS jika diakses via proxy (seperti ngrok)
         if (request()->server('HTTP_X_FORWARDED_PROTO') == 'https' || app()->environment('production')) {

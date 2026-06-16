@@ -442,6 +442,23 @@ Enterprise dashboards need density control.
 
 ---
 
+## 4.11 Iconography System
+
+Standarisasi penggunaan icon sangat penting untuk menjaga konsistensi visual di seluruh aplikasi *enterprise*.
+
+### Iconography Rules
+
+- **Gunakan Lucide Icons atau Heroicons**: Pastikan seluruh *icon* di aplikasi diambil dari satu *library* yang sama (direkomendasikan **Lucide** atau **Heroicons**).
+- **Hindari Penggunaan Emoji**: Jangan pernah menggunakan emoji (seperti 🚀, ⚙️, 🎨) sebagai ikon antarmuka utama. Gunakan format SVG yang resmi.
+- **Konsistensi Ukuran**: 
+  - Gunakan ukuran standar `20px` atau `24px` (`w-5 h-5` atau `w-6 h-6` di Tailwind) dengan `viewBox` yang konsisten.
+  - Untuk ikon kecil di dalam teks atau *badge*, gunakan ukuran `16px` (`w-4 h-4`).
+- **Stroke Width Konsisten**: Gunakan ketebalan garis (*stroke width*) `1.5px` atau `2px` untuk semua *icon*. Jangan mencampur *icon* dengan gaya *outline* tebal dan tipis, atau mencampur gaya *outline* dengan *solid* secara acak tanpa alasan hierarki yang jelas.
+- **Aksesibilitas Label**: Jika *button* atau *link* hanya berisi *icon* tanpa teks, elemen tersebut **wajib** memiliki atribut `aria-label` atau `<title>` untuk aksesibilitas (*screen reader*).
+- **Brand Logo SVG**: Untuk logo eksternal (misalnya WhatsApp, Bank, MikroTik), pastikan mencari aset SVG resmi (misalnya dari Simple Icons), jangan menebak bentuk logo menggunakan *icon* umum.
+
+---
+
 # 5. Global CSS Variables
 
 Use this as the base token system.

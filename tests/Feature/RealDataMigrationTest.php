@@ -44,25 +44,29 @@ class RealDataMigrationTest extends TestCase
         $this->assertFileExists($sqlPath, "File sand_db_sandya.sql must exist in root directory.");
         $sql = file_get_contents($sqlPath);
 
-        // 3. Parse tables
-        $paketRows = $this->parseTableData($sql, 'paket');
-        $penggunaRows = $this->parseTableData($sql, 'pengguna');
-        $layananRows = $this->parseTableData($sql, 'prosedure_permintaan_wifi');
-        $laporanRows = $this->parseTableData($sql, 'laporan_pemasangan_wifi');
-        $biayaRows = $this->parseTableData($sql, 'biaya_tagihan');
-        $buktiRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksitagihan');
+        // 3. Parse and construct sheets using helper
+        $sheets = $this->parseSqlToSheets($sql);
+        
+        $packagesSheet = $sheets['packages'];
+        $customersSheet = $sheets['customers'];
+        $servicesSheet = $sheets['services'];
+        $technicalSheet = $sheets['technical_details'];
+        $invoicesSheet = $sheets['invoices'];
+        $paymentsSheet = $sheets['payments'];
 
         // Output counts for logging/reconciliation verification
         dump("Parsed counts from sand_db_sandya.sql:");
-        dump("- paket: " . count($paketRows));
-        dump("- pengguna: " . count($penggunaRows));
-        dump("- prosedure_permintaan_wifi: " . count($layananRows));
-        dump("- laporan_pemasangan_wifi: " . count($laporanRows));
-        dump("- biaya_tagihan: " . count($biayaRows));
-        dump("- apikeuangan_buktitransaksitagihan: " . count($buktiRows));
+        dump("- paket: " . count($packagesSheet));
+        dump("- pengguna: " . count($customersSheet));
 
-        $this->assertNotEmpty($paketRows, "Should have parsed packages.");
-        $this->assertNotEmpty($penggunaRows, "Should have parsed customers.");
+        $this->assertNotEmpty($packagesSheet, "Should have parsed packages.");
+        $this->assertNotEmpty($customersSheet, "Should have parsed customers.");
+
+        $legacySurveyRow = collect($servicesSheet)->firstWhere('old_request_id', 'RQ000006');
+        if ($legacySurveyRow) {
+            $this->assertSame('Lugas', $legacySurveyRow['surveyors']);
+            $this->assertSame('Lisvi Fitria Nur Lita', $legacySurveyRow['activated_by_name']);
+        }
 
         // Create Pop corresponding to legacy branch/POP
         $pop = Pop::firstOrCreate([
@@ -75,189 +79,6 @@ class RealDataMigrationTest extends TestCase
             'registration_prefix' => 'REG',
             'cid_prefix' => 'CID',
         ]);
-
-        // 4. Map to Sheet Arrays
-        // Sheet 1: packages
-        $packagesSheet = [];
-        foreach ($paketRows as $row) {
-            $packagesSheet[] = [
-                'old_package_id' => $row['KODEPAKET'],
-                'name' => $row['NAMA_PAKET'] ?: 'Default Paket',
-                'monthly_price' => (int) ($row['HARGA'] ?? 0),
-                'download_speed' => $row['SPEEDDOWN'] > 0 ? ($row['SPEEDDOWN'] / 1000) : 10,
-                'upload_speed' => $row['SPEEDUP'] > 0 ? ($row['SPEEDUP'] / 1000) : 10,
-                'package_type' => $row['JENIS_PAKET'] ?: 'Broadband',
-                'category' => $row['KATEGORI_PAKET'] ?: 'Home',
-            ];
-        }
-
-        // Sheet 2: customers
-        $customersSheet = [];
-        foreach ($penggunaRows as $row) {
-            $fullName = trim(($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? ''));
-            if (empty($fullName)) {
-                $fullName = $row['IDPENGGUNA'];
-            }
-
-            // Standardize gender
-            $gender = 'Laki-laki';
-            if (isset($row['JENISKELAMIN'])) {
-                if (strtoupper($row['JENISKELAMIN']) === 'P') {
-                    $gender = 'Perempuan';
-                }
-            }
-
-            // Date formatting
-            $regDate = now()->format('Y-m-d');
-            if (!empty($row['inserted_at'])) {
-                try {
-                    $regDate = \Carbon\Carbon::parse($row['inserted_at'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $customersSheet[] = [
-                'old_customer_id' => $row['IDPENGGUNA'],
-                'full_name' => $fullName,
-                'phone' => $row['HP'] ?? '',
-                'primary_phone' => $row['HP'] ?? '',
-                'alternative_phone' => $row['TLP'] ?? '',
-                'email' => $row['EMAIL'] ?? '',
-                'identity_number' => $row['KTP_SIM'] ?? '',
-                'gender' => $gender,
-                'customer_type' => $row['JENISPELANGGAN'] ?: 'RUMAHAN',
-                'company_name' => $row['NAMAPERUSAHAAN'] ?? '',
-                'npwp' => $row['NPWP'] ?? '',
-                'old_account_status' => $row['STATUSAKUN'] ?? '',
-                'full_address' => $row['ALMT'] ?? '',
-                'old_region_id' => $row['IDWILAYAH'] ?? '',
-                'old_branch_id' => $row['IDCABANG'] ?? '',
-                'registration_date' => $regDate,
-                'pop_code' => 'SMN',
-                'pop_name' => 'sandya',
-                'village' => $row['DESA'] ?? '',
-                'district' => $row['KEC'] ?? '',
-                'city' => $row['KOTA'] ?? '',
-            ];
-        }
-
-        // Sheet 3: services
-        $servicesSheet = [];
-        foreach ($layananRows as $row) {
-            $actDate = now()->format('Y-m-d');
-            if (!empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
-                $actDate = $row['TGL_AKTIFPUTUS'];
-            } elseif (!empty($row['TGLSELESAI'])) {
-                try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $servicesSheet[] = [
-                'old_request_id' => $row['IDPERMINTAAN'],
-                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
-                'old_package_id' => $row['IDPAKET'] ?? '',
-                'old_cost_id' => $row['IDBIAYA'] ?? '',
-                'request_status' => $row['STATUS'] ?? '',
-                'installation_status' => $row['STATUSPASANG'] ?? '',
-                'network_type' => $row['JENISJARINGAN'] ?? '',
-                'member_type' => $row['JENISMEMBER'] ?? '',
-                'reason' => $row['ALASAN'] ?? '',
-                'service_status' => $row['STATUS'] ?? '',
-                'activation_date' => $actDate,
-                'due_date' => '',
-            ];
-        }
-
-        // Sheet 4: technical_details
-        $technicalSheet = [];
-        foreach ($laporanRows as $row) {
-            $technicalSheet[] = [
-                'old_report_id' => $row['IDREPORT'],
-                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'connection_type' => $row['JENIS'] ?: 'KABEL',
-                'ont_sn' => $row['SNROOTER_FIBER'] ?? '',
-                'ip_address' => $row['IPADDR'] ?? '',
-                'odp_code' => $row['NOMOR_ODP'] ?? '',
-                'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
-                'olt_code' => $row['NOMOR_PORT_OLT'] ?? '',
-                'vlan_id' => '',
-            ];
-        }
-
-        // Sheet 5: invoices
-        $invoicesSheet = [];
-        foreach ($biayaRows as $row) {
-            $issueDate = now()->format('Y-m-d');
-            if (!empty($row['TGLINSERT'])) {
-                try {
-                    $issueDate = \Carbon\Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
-            $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
-
-            $invoicesSheet[] = [
-                'old_invoice_id' => $row['IDBIAYA'],
-                'old_cost_id' => $row['IDBIAYA'],
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'old_customer_id' => $row['IDPELANGGAN'] ?? '',
-                'billing_period' => $billingPeriod,
-                'total_amount' => (int) ($row['TOTALBIAYA'] ?? 0),
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
-                'monthly_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
-                'status' => 'belum_dibayar',
-            ];
-        }
-
-        // Sheet 6: payments
-        $paymentsSheet = [];
-        foreach ($buktiRows as $row) {
-            $payDate = now()->format('Y-m-d');
-            if (!empty($row['INSERTED_AT'])) {
-                try {
-                    $payDate = \Carbon\Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $billingPeriod = now()->format('Y-m');
-            if (!empty($row['BULANTAGIHAN'])) {
-                try {
-                    $billingPeriod = \Carbon\Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $paymentsSheet[] = [
-                'old_payment_id' => $row['IDUNIQ'],
-                'old_invoice_id' => $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'],
-                'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'old_customer_id' => '',
-                'billing_period' => $billingPeriod,
-                'amount' => (int) ($row['BAYAR'] ?? 0),
-                'payment_date' => $payDate,
-                'payment_method' => 'cash',
-                'received_by_old' => '',
-                'deposited_by_old' => '',
-                'status' => 'valid',
-            ];
-        }
-
-        $sheets = [
-            'packages' => $packagesSheet,
-            'customers' => $customersSheet,
-            'services' => $servicesSheet,
-            'technical_details' => $technicalSheet,
-            'invoices' => $invoicesSheet,
-            'payments' => $paymentsSheet,
-        ];
 
         // 5. POST to validate endpoint
         $validateResponse = $this->postJson('/customers/import/validate', [
@@ -307,6 +128,8 @@ class RealDataMigrationTest extends TestCase
             $this->assertDatabaseHas('customers', [
                 'old_customer_id' => $sampleCustomer['old_customer_id'],
                 'full_name' => $sampleCustomer['full_name'],
+                'sales_code' => $sampleCustomer['sales_code'],
+                'referral_customer_code' => empty($sampleCustomer['referral_customer_code']) ? null : $sampleCustomer['referral_customer_code'],
             ]);
 
             $dbCust = Customer::where('old_customer_id', $sampleCustomer['old_customer_id'])->first();
@@ -316,6 +139,8 @@ class RealDataMigrationTest extends TestCase
             $this->assertDatabaseHas('customer_addresses', [
                 'customer_id' => $dbCust->id,
                 'full_address' => $sampleCustomer['full_address'],
+                'latitude' => $sampleCustomer['latitude'],
+                'longitude' => $sampleCustomer['longitude'],
             ]);
         }
 
@@ -327,6 +152,24 @@ class RealDataMigrationTest extends TestCase
                 $mappedStatus = $dbSvc->service_status;
                 $expectedStatus = $this->mapLegacyServiceStatus($svc['service_status']);
                 $this->assertEquals($expectedStatus, $mappedStatus);
+                $this->assertEquals($svc['profile'], $dbSvc->profile);
+                $this->assertEquals($svc['contract_type'], $dbSvc->contract_type);
+
+                // Verify Survey & Installation matches
+                if (!empty($svc['survey_date']) || !empty($svc['surveyors'])) {
+                    $this->assertDatabaseHas('customer_surveys', [
+                        'customer_id' => $dbSvc->customer_id,
+                        'surveyors' => empty($svc['surveyors']) ? null : $svc['surveyors'],
+                        'fop_id' => $svc['survey_fop_id'],
+                    ]);
+                }
+                if (!empty($svc['installation_date']) || !empty($svc['installation_technicians'])) {
+                    $this->assertDatabaseHas('customer_installations', [
+                        'customer_id' => $dbSvc->customer_id,
+                        'technicians' => empty($svc['installation_technicians']) ? null : $svc['installation_technicians'],
+                        'fop_id' => $svc['installation_fop_id'],
+                    ]);
+                }
             }
         }
 
@@ -336,6 +179,8 @@ class RealDataMigrationTest extends TestCase
             $this->assertDatabaseHas('customer_technical_details', [
                 'old_report_id' => $sampleTech['old_report_id'],
                 'router_or_ont_serial' => $sampleTech['ont_sn'],
+                'passive_device' => empty($sampleTech['passive_device']) ? null : $sampleTech['passive_device'],
+                'initial_attenuation' => $sampleTech['initial_attenuation'] !== null ? number_format((float)$sampleTech['initial_attenuation'], 2, '.', '') : null,
             ]);
         }
 
@@ -345,6 +190,7 @@ class RealDataMigrationTest extends TestCase
             $this->assertDatabaseHas('invoices', [
                 'old_invoice_id' => $sampleInv['old_invoice_id'],
                 'billing_period' => $sampleInv['billing_period'],
+                'extra_cable_fee' => $sampleInv['extra_cable_fee'],
             ]);
         }
 
@@ -397,6 +243,78 @@ class RealDataMigrationTest extends TestCase
             'suspended' => 'suspended',
             '' => 'registered',
         ][$normalized] ?? $normalized;
+    }
+
+    private function resolveLegacySurveyRow(array $row, array $surveyMap): ?array
+    {
+        foreach ([
+            $row['IDPERMINTAAN'] ?? null,
+            $row['IDPENGGUNA'] ?? null,
+            $row['IDSURVEY'] ?? null,
+        ] as $key) {
+            if (!empty($key) && isset($surveyMap[$key])) {
+                return $surveyMap[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveLegacyAddressText(array $row): string
+    {
+        $streetAddress = trim((string) ($row['ALMT'] ?? $row['ALAMAT'] ?? ''));
+        if ($streetAddress !== '' && !in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
+            return $streetAddress;
+        }
+
+        $parts = array_filter([
+            trim((string) ($row['DESA'] ?? '')),
+            trim((string) ($row['KEC'] ?? '')),
+            trim((string) ($row['KOTA'] ?? '')),
+        ]);
+
+        if ($parts !== []) {
+            return implode(', ', $parts);
+        }
+
+        return $streetAddress !== '' ? $streetAddress : '-';
+    }
+
+    private function resolveLegacyUserLabel(mixed $value, array $penggunaMap): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '' || in_array(strtolower($raw), ['-', 'null', 'n/a'], true)) {
+            return '';
+        }
+
+        $tokens = preg_split('/\s*(?:,|\/|\||;|\r\n|\n)\s*/', $raw) ?: [$raw];
+        $labels = [];
+
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if ($token === '') {
+                continue;
+            }
+
+            if (isset($penggunaMap[$token])) {
+                $labels[] = $this->buildLegacyUserName($penggunaMap[$token]) ?: $token;
+                continue;
+            }
+
+            $labels[] = $token;
+        }
+
+        $labels = array_values(array_filter(array_map('trim', $labels), fn ($label) => $label !== ''));
+
+        return $labels !== [] ? implode(', ', array_unique($labels)) : $raw;
+    }
+
+    private function buildLegacyUserName(array $row): string
+    {
+        $name = trim((string) (($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? '')));
+        $name = preg_replace('/\s+/', ' ', $name) ?: '';
+
+        return $name !== '' ? $name : trim((string) ($row['IDPENGGUNA'] ?? ''));
     }
 
     /**
@@ -532,16 +450,18 @@ class RealDataMigrationTest extends TestCase
         $this->assertFileExists($sqlPath, "File sand_db_sandya.sql must exist in root directory.");
         $sql = file_get_contents($sqlPath);
 
-        // 3. Parse tables
-        $paketRows = $this->parseTableData($sql, 'paket');
-        $penggunaRows = $this->parseTableData($sql, 'pengguna');
-        $layananRows = $this->parseTableData($sql, 'prosedure_permintaan_wifi');
-        $laporanRows = $this->parseTableData($sql, 'laporan_pemasangan_wifi');
-        $biayaRows = $this->parseTableData($sql, 'biaya_tagihan');
-        $buktiRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksitagihan');
+        // 3. Parse and construct sheets using helper
+        $sheets = $this->parseSqlToSheets($sql);
+        
+        $packagesSheet = $sheets['packages'];
+        $customersSheet = $sheets['customers'];
+        $servicesSheet = $sheets['services'];
+        $technicalSheet = $sheets['technical_details'];
+        $invoicesSheet = $sheets['invoices'];
+        $paymentsSheet = $sheets['payments'];
 
         // Create Pop corresponding to legacy branch/POP
-        $pop = Pop::firstOrCreate([
+        Pop::firstOrCreate([
             'code' => 'SMN',
             'pop_code' => 'SMN',
         ], [
@@ -551,188 +471,6 @@ class RealDataMigrationTest extends TestCase
             'registration_prefix' => 'REG',
             'cid_prefix' => 'CID',
         ]);
-
-        // 4. Map to Sheet Arrays
-        // Sheet 1: packages
-        $packagesSheet = [];
-        foreach ($paketRows as $row) {
-            $packagesSheet[] = [
-                'old_package_id' => $row['KODEPAKET'],
-                'name' => $row['NAMA_PAKET'] ?: 'Default Paket',
-                'monthly_price' => (int) ($row['HARGA'] ?? 0),
-                'download_speed' => $row['SPEEDDOWN'] > 0 ? ($row['SPEEDDOWN'] / 1000) : 10,
-                'upload_speed' => $row['SPEEDUP'] > 0 ? ($row['SPEEDUP'] / 1000) : 10,
-                'package_type' => $row['JENIS_PAKET'] ?: 'Broadband',
-                'category' => $row['KATEGORI_PAKET'] ?: 'Home',
-            ];
-        }
-
-        // Sheet 2: customers
-        $customersSheet = [];
-        foreach ($penggunaRows as $row) {
-            $fullName = trim(($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? ''));
-            if (empty($fullName)) {
-                $fullName = $row['IDPENGGUNA'];
-            }
-
-            // Standardize gender
-            $gender = 'Laki-laki';
-            if (isset($row['JENISKELAMIN'])) {
-                if (strtoupper($row['JENISKELAMIN']) === 'P') {
-                    $gender = 'Perempuan';
-                }
-            }
-
-            $regDate = now()->format('Y-m-d');
-            if (!empty($row['inserted_at'])) {
-                try {
-                    $regDate = \Carbon\Carbon::parse($row['inserted_at'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $customersSheet[] = [
-                'old_customer_id' => $row['IDPENGGUNA'],
-                'full_name' => $fullName,
-                'phone' => $row['HP'] ?? '',
-                'primary_phone' => $row['HP'] ?? '',
-                'alternative_phone' => $row['TLP'] ?? '',
-                'email' => $row['EMAIL'] ?? '',
-                'identity_number' => $row['KTP_SIM'] ?? '',
-                'gender' => $gender,
-                'customer_type' => $row['JENISPELANGGAN'] ?: 'RUMAHAN',
-                'company_name' => $row['NAMAPERUSAHAAN'] ?? '',
-                'npwp' => $row['NPWP'] ?? '',
-                'old_account_status' => $row['STATUSAKUN'] ?? '',
-                'full_address' => $row['ALMT'] ?? '',
-                'old_region_id' => $row['IDWILAYAH'] ?? '',
-                'old_branch_id' => $row['IDCABANG'] ?? '',
-                'registration_date' => $regDate,
-                'pop_code' => 'SMN',
-                'pop_name' => 'sandya',
-                'village' => $row['DESA'] ?? '',
-                'district' => $row['KEC'] ?? '',
-                'city' => $row['KOTA'] ?? '',
-            ];
-        }
-
-        // Sheet 3: services
-        $servicesSheet = [];
-        foreach ($layananRows as $row) {
-            $actDate = now()->format('Y-m-d');
-            if (!empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
-                $actDate = $row['TGL_AKTIFPUTUS'];
-            } elseif (!empty($row['TGLSELESAI'])) {
-                try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $servicesSheet[] = [
-                'old_request_id' => $row['IDPERMINTAAN'],
-                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
-                'old_package_id' => $row['IDPAKET'] ?? '',
-                'old_cost_id' => $row['IDBIAYA'] ?? '',
-                'request_status' => $row['STATUS'] ?? '',
-                'installation_status' => $row['STATUSPASANG'] ?? '',
-                'network_type' => $row['JENISJARINGAN'] ?? '',
-                'member_type' => $row['JENISMEMBER'] ?? '',
-                'reason' => $row['ALASAN'] ?? '',
-                'service_status' => $row['STATUS'] ?? '',
-                'activation_date' => $actDate,
-                'due_date' => '',
-            ];
-        }
-
-        // Sheet 4: technical_details
-        $technicalSheet = [];
-        foreach ($laporanRows as $row) {
-            $technicalSheet[] = [
-                'old_report_id' => $row['IDREPORT'],
-                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'connection_type' => $row['JENIS'] ?: 'KABEL',
-                'ont_sn' => $row['SNROOTER_FIBER'] ?? '',
-                'ip_address' => $row['IPADDR'] ?? '',
-                'odp_code' => $row['NOMOR_ODP'] ?? '',
-                'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
-                'olt_code' => $row['NOMOR_PORT_OLT'] ?? '',
-                'vlan_id' => '',
-            ];
-        }
-
-        // Sheet 5: invoices
-        $invoicesSheet = [];
-        foreach ($biayaRows as $row) {
-            $issueDate = now()->format('Y-m-d');
-            if (!empty($row['TGLINSERT'])) {
-                try {
-                    $issueDate = \Carbon\Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
-            $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
-
-            $invoicesSheet[] = [
-                'old_invoice_id' => $row['IDBIAYA'],
-                'old_cost_id' => $row['IDBIAYA'],
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'old_customer_id' => $row['IDPELANGGAN'] ?? '',
-                'billing_period' => $billingPeriod,
-                'total_amount' => (int) ($row['TOTALBIAYA'] ?? 0),
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
-                'monthly_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
-                'status' => 'belum_dibayar',
-            ];
-        }
-
-        // Sheet 6: payments
-        $paymentsSheet = [];
-        foreach ($buktiRows as $row) {
-            $payDate = now()->format('Y-m-d');
-            if (!empty($row['INSERTED_AT'])) {
-                try {
-                    $payDate = \Carbon\Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $billingPeriod = now()->format('Y-m');
-            if (!empty($row['BULANTAGIHAN'])) {
-                try {
-                    $billingPeriod = \Carbon\Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $paymentsSheet[] = [
-                'old_payment_id' => $row['IDUNIQ'],
-                'old_invoice_id' => $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'],
-                'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
-                'old_customer_id' => '',
-                'billing_period' => $billingPeriod,
-                'amount' => (int) ($row['BAYAR'] ?? 0),
-                'payment_date' => $payDate,
-                'payment_method' => 'cash',
-                'received_by_old' => '',
-                'deposited_by_old' => '',
-                'status' => 'valid',
-            ];
-        }
-
-        $sheets = [
-            'packages' => $packagesSheet,
-            'customers' => $customersSheet,
-            'services' => $servicesSheet,
-            'technical_details' => $technicalSheet,
-            'invoices' => $invoicesSheet,
-            'payments' => $paymentsSheet,
-        ];
 
         // First execution of import
         $validateResponse1 = $this->postJson('/customers/import/validate', [
@@ -781,7 +519,7 @@ class RealDataMigrationTest extends TestCase
         // Inject an invalid customer row (missing name and broken POP)
         $invalidCustomers = $customersSheet;
         $invalidCustomers[] = [
-            'old_customer_id' => 'CUST-EDGE-1',
+            'old_customer_id' => 'PE-EDGE-1',
             'full_name' => '', // Empty field edge case
             'phone' => '0877112233',
             'pop_code' => 'NON_EXISTENT_POP_CODE', // Broken POP relation
@@ -795,7 +533,7 @@ class RealDataMigrationTest extends TestCase
         $invalidServices = $servicesSheet;
         $invalidServices[] = [
             'old_request_id' => 'REQ-EDGE-1',
-            'old_customer_id' => 'NON_EXISTENT_CUST_ID', // Broken customer relation
+            'old_customer_id' => 'PE_NON_EXISTENT', // Broken customer relation
             'old_package_id' => 'NON_EXISTENT_PKG_ID', // Broken package relation
             'service_status' => 'aktif',
             'activation_date' => '2026-01-01',
@@ -818,7 +556,7 @@ class RealDataMigrationTest extends TestCase
 
         // Verify the customer edge case is handled with warnings but marked valid row
         $custRows = $edgeData['sheets']['customers']['rows'];
-        $edgeCustRow = collect($custRows)->firstWhere('old_customer_id', 'CUST-EDGE-1');
+        $edgeCustRow = collect($custRows)->firstWhere('old_customer_id', 'PE-EDGE-1');
         $this->assertNotNull($edgeCustRow);
         $this->assertEquals('valid', $edgeCustRow['status_row']);
         $this->assertNotEmpty($edgeCustRow['warnings']);
@@ -846,10 +584,441 @@ class RealDataMigrationTest extends TestCase
 
         // Verify that the customer with empty name has fallback name or is saved as "perlu_dilengkapi" completeness status
         $this->assertDatabaseHas('customers', [
-            'old_customer_id' => 'CUST-EDGE-1',
+            'old_customer_id' => 'PE-EDGE-1',
             'data_completeness_status' => 'perlu_dilengkapi',
         ]);
 
         dump("Idempotency, duplication prevention, empty fields, and broken relations tested successfully on real data!");
+    }
+
+    /**
+     * Parses the SQL dump directly into sheets format matching the command mappings.
+     */
+    private function parseSqlToSheets(string $sql): array
+    {
+        $paketRows = $this->parseTableData($sql, 'paket');
+        $penggunaRows = $this->parseTableData($sql, 'pengguna');
+        $layananRows = $this->parseTableData($sql, 'prosedure_permintaan_wifi');
+        $laporanRows = $this->parseTableData($sql, 'laporan_pemasangan_wifi');
+        $biayaRows = $this->parseTableData($sql, 'biaya_tagihan');
+        $buktiRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksitagihan');
+        $surveyRows = $this->parseTableData($sql, 'survey_pemasangan_wifi');
+        $oltRows = $this->parseTableData($sql, 'olt_slot_register');
+
+        // Pre-build maps for lookup
+        $penggunaMap = [];
+        foreach ($penggunaRows as $row) {
+            if (!empty($row['IDPENGGUNA'])) {
+                $penggunaMap[$row['IDPENGGUNA']] = $row;
+            }
+        }
+
+        $requestToCustomerMap = [];
+        foreach ($layananRows as $row) {
+            $requestToCustomerMap[$row['IDPERMINTAAN']] = $row['IDPENGGUNA'] ?? '';
+        }
+
+        $invoiceToCustomerMap = [];
+        foreach ($biayaRows as $row) {
+            $invoiceToCustomerMap[$row['IDBIAYA']] = $row['IDPELANGGAN'] ?? '';
+        }
+
+        $surveyMap = [];
+        foreach ($surveyRows as $row) {
+            if (!empty($row['IDPERMINTAAN'])) {
+                $surveyMap[$row['IDPERMINTAAN']] = $row;
+            }
+            if (!empty($row['IDPENGGUNA'])) {
+                $surveyMap[$row['IDPENGGUNA']] = $row;
+            }
+            if (!empty($row['IDSURVEY'])) {
+                $surveyMap[$row['IDSURVEY']] = $row;
+            }
+        }
+
+        $laporanMap = [];
+        foreach ($laporanRows as $row) {
+            if (!empty($row['IDPERMINTAAN'])) {
+                $laporanMap[$row['IDPERMINTAAN']] = $row;
+            }
+            if (!empty($row['IDPENGGUNA'])) {
+                $laporanMap[$row['IDPENGGUNA']] = $row;
+            }
+        }
+
+        $oltMap = [];
+        foreach ($oltRows as $row) {
+            if (!empty($row['IDPELANGGAN'])) {
+                $oltMap[$row['IDPELANGGAN']] = $row;
+            }
+        }
+
+        // Sheet 1: packages
+        $packagesSheet = [];
+        foreach ($paketRows as $row) {
+            $packagesSheet[] = [
+                'old_package_id' => $row['KODEPAKET'],
+                'name' => $row['NAMA_PAKET'] ?: 'Default Paket',
+                'monthly_price' => (int) ($row['HARGA'] ?? 0),
+                'download_speed' => $row['SPEEDDOWN'] > 0 ? ($row['SPEEDDOWN'] / 1000) : 10,
+                'upload_speed' => $row['SPEEDUP'] > 0 ? ($row['SPEEDUP'] / 1000) : 10,
+                'package_type' => $row['JENIS_PAKET'] ?: 'Broadband',
+                'category' => $row['KATEGORI_PAKET'] ?: 'Home',
+            ];
+        }
+
+        // Sheet 2: customers
+        $customersSheet = [];
+        foreach ($penggunaRows as $row) {
+            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+                continue;
+            }
+
+            $fullName = trim(($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? ''));
+            $fullName = ucwords(str_replace('-', ' ', $fullName));
+            if (empty($fullName)) {
+                $fullName = $row['IDPENGGUNA'];
+            }
+
+            $gender = 'Laki-laki';
+            if (isset($row['JENISKELAMIN'])) {
+                if (strtoupper($row['JENISKELAMIN']) === 'P') {
+                    $gender = 'Perempuan';
+                }
+            }
+
+            $regDate = now()->format('Y-m-d');
+            if (!empty($row['inserted_at'])) {
+                try {
+                    $regDate = \Carbon\Carbon::parse($row['inserted_at'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            }
+
+            $custSurvey = $this->resolveLegacySurveyRow([
+                'IDPERMINTAAN' => $row['IDPERMINTAAN'] ?? null,
+                'IDPENGGUNA' => $row['IDPENGGUNA'] ?? null,
+                'IDSURVEY' => $row['IDSURVEY'] ?? null,
+            ], $surveyMap);
+            $lat = $custSurvey['LAT'] ?? null;
+            $lon = $custSurvey['LONG'] ?? null;
+            $fotoRumah = $custSurvey['FOTORUMAH'] ?? null;
+
+            $custLaporan = $laporanMap[$row['IDPENGGUNA']] ?? null;
+            $salesCode = '';
+            foreach ($layananRows as $lRow) {
+                if (($lRow['IDPENGGUNA'] ?? '') === $row['IDPENGGUNA']) {
+                    $salesCode = $lRow['CREATED'] ?? '';
+                    if (!$custLaporan) {
+                        $custLaporan = $laporanMap[$lRow['IDPERMINTAAN']] ?? null;
+                    }
+                }
+            }
+            $fotoKontrak = $custLaporan['FOTOFORMULIR'] ?? null;
+
+            $customersSheet[] = [
+                'old_customer_id' => $row['IDPENGGUNA'],
+                'full_name' => $fullName,
+                'phone' => $row['HP'] ?? '',
+                'primary_phone' => $row['HP'] ?? '',
+                'alternative_phone' => $row['TLP'] ?? '',
+                'email' => $row['EMAIL'] ?? '',
+                'identity_number' => $row['KTP_SIM'] ?? '',
+                'gender' => $gender,
+                'customer_type' => $row['JENISPELANGGAN'] ?: 'RUMAHAN',
+                'company_name' => $row['NAMAPERUSAHAAN'] ?? '',
+                'npwp' => $row['NPWP'] ?? '',
+                'old_account_status' => $row['STATUSAKUN'] ?? '',
+                'full_address' => $this->resolveLegacyAddressText($row),
+                'old_region_id' => $row['IDWILAYAH'] ?? '',
+                'old_branch_id' => $row['IDCABANG'] ?? '',
+                'registration_date' => $regDate,
+                'pop_code' => 'SMN',
+                'pop_name' => 'sandya',
+                'village' => $row['DESA'] ?? '',
+                'district' => $row['KEC'] ?? '',
+                'city' => $row['KOTA'] ?? '',
+                'latitude' => $lat,
+                'longitude' => $lon,
+                'foto_ktp' => $row['FOTOKTP'] ?? '',
+                'foto_rumah' => $fotoRumah ?? '',
+                'foto_kontrak' => $fotoKontrak ?? '',
+                'sales_code' => $salesCode,
+                'agent_code' => '',
+                'referral_customer_code' => $row['REKOMENDASI'] ?? '',
+            ];
+        }
+
+        // Sheet 3: services
+        $servicesSheet = [];
+        foreach ($layananRows as $row) {
+            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+                continue;
+            }
+
+            $actDate = now()->format('Y-m-d');
+            if (!empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
+                $actDate = $row['TGL_AKTIFPUTUS'];
+            } elseif (!empty($row['TGLSELESAI'])) {
+                try {
+                    $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            }
+
+            $profile = '';
+            if (!empty($row['IDPAKET'])) {
+                $pkg = collect($paketRows)->firstWhere('KODEPAKET', $row['IDPAKET']);
+                $profile = $pkg['PROFILPPP'] ?? $pkg['PROFILOLT'] ?? '';
+            }
+
+            $survey = $this->resolveLegacySurveyRow($row, $surveyMap);
+            $surveyDate = null;
+            $surveyStartTime = null;
+            if ($survey && !empty($survey['TGLSURVEY'])) {
+                try {
+                    $cDate = \Carbon\Carbon::parse($survey['TGLSURVEY']);
+                    $surveyDate = $cDate->format('Y-m-d');
+                    $surveyStartTime = $cDate->format('H:i:s');
+                } catch (\Exception $e) {}
+            } elseif (!empty($row['TGLSURVEY'])) {
+                try {
+                    $cDate = \Carbon\Carbon::parse($row['TGLSURVEY']);
+                    $surveyDate = $cDate->format('Y-m-d');
+                    $surveyStartTime = $cDate->format('H:i:s');
+                } catch (\Exception $e) {}
+            }
+
+            $laporan = $laporanMap[$row['IDPERMINTAAN']] ?? $laporanMap[$row['IDPENGGUNA'] ?? ''] ?? null;
+            $installDate = null;
+            $installStartTime = null;
+            $installEndTime = null;
+            if (!empty($row['TGLSELESAI'])) {
+                try {
+                    $cDate = \Carbon\Carbon::parse($row['TGLSELESAI']);
+                    $installDate = $cDate->format('Y-m-d');
+                    $installEndTime = $cDate->format('H:i:s');
+                } catch (\Exception $e) {}
+            }
+            if (!empty($row['TGLDIPROSES'])) {
+                try {
+                    $cDate = \Carbon\Carbon::parse($row['TGLDIPROSES']);
+                    if (!$installDate) {
+                        $installDate = $cDate->format('Y-m-d');
+                    }
+                    $installStartTime = $cDate->format('H:i:s');
+                } catch (\Exception $e) {}
+            }
+
+            $servicesSheet[] = [
+                'old_request_id' => $row['IDPERMINTAAN'],
+                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
+                'old_package_id' => $row['IDPAKET'] ?? '',
+                'old_cost_id' => $row['IDBIAYA'] ?? '',
+                'request_status' => $row['STATUS'] ?? '',
+                'installation_status' => $row['STATUSPASANG'] ?? '',
+                'network_type' => $row['JENISJARINGAN'] ?? '',
+                'member_type' => $row['JENISMEMBER'] ?? '',
+                'reason' => $row['ALASAN'] ?? '',
+                'service_status' => $row['STATUS'] ?? '',
+                'activation_date' => $actDate,
+                'due_date' => '',
+                'profile' => $profile,
+                'contract_type' => $row['STATUSLANGGANAN'] ?? '',
+                'activation_time' => !empty($row['VERIFIED_AT']) ? \Carbon\Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
+                'activated_by_name' => $this->resolveLegacyUserLabel($row['VERIFIED'] ?? '', $penggunaMap),
+                'survey_date' => $surveyDate,
+                'survey_start_time' => $surveyStartTime,
+                'survey_end_time' => null,
+                'surveyors' => $this->resolveLegacyUserLabel($row['DISURVEY'] ?? '', $penggunaMap),
+                'survey_assigned_at' => $row['TGLSURVEY'] ?? null,
+                'survey_fop_id' => $row['IDPERMINTAAN'],
+                'required_tools' => $survey['ESTIMASIKEBUTUHAN'] ?? '',
+                'survey_photo' => $survey['FOTORUMAH'] ?? '',
+                'survey_note' => $survey['ALATPASIF'] ?? '',
+                'survey_duration_minutes' => 30,
+                'installation_date' => $installDate,
+                'installation_start_time' => $installStartTime,
+                'installation_end_time' => $installEndTime,
+                'installation_technicians' => $this->resolveLegacyUserLabel($row['DIPROSES'] ?? '', $penggunaMap),
+                'installation_photo' => $laporan['FOTOROOTER'] ?? '',
+                'installation_note' => $laporan['KETERANGAN'] ?? '',
+                'installation_assigned_at' => $row['TGLDIPROSES'] ?? null,
+                'installation_fop_id' => $row['IDPERMINTAAN'],
+            ];
+        }
+
+        // Sheet 4: technical_details
+        $technicalSheet = [];
+        foreach ($laporanRows as $row) {
+            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+                continue;
+            }
+
+            $olt = $oltMap[$row['IDPENGGUNA']] ?? null;
+            $oltCode = $olt['LOKASIOLT'] ?? $row['NOMOR_PORT_OLT'] ?? '';
+            $oltPort = $olt['INDEXONU'] ?? '';
+            $actualAttenuation = $olt['RX_POWER'] ?? null;
+
+            $reqDate = null;
+            $reqTime = null;
+            $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN'])
+                ?? collect($layananRows)->firstWhere('IDPENGGUNA', $row['IDPENGGUNA'] ?? null);
+            if ($req && !empty($req['TGLSELESAI'])) {
+                try {
+                    $cDate = \Carbon\Carbon::parse($req['TGLSELESAI']);
+                    $reqDate = $cDate->format('Y-m-d');
+                    $reqTime = $cDate->format('H:i:s');
+                } catch (\Exception $e) {}
+            }
+
+            $jitter = is_numeric($row['PINGGATEWAY'] ?? null) ? (int)$row['PINGGATEWAY'] : null;
+            $latency = is_numeric($row['PINGGOOGLE'] ?? null) ? (int)$row['PINGGOOGLE'] : null;
+
+            $conformity = null;
+            if ($req && !empty($req['IDPAKET'])) {
+                $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
+                $pkgSpeed = $pkg['SPEEDDOWN'] ?? 0;
+                $testSpeed = is_numeric($row['TESTDOWN'] ?? null) ? (float)$row['TESTDOWN'] * 1000 : 0;
+                if ($pkgSpeed > 0 && $testSpeed > 0) {
+                    $conformity = min(100, round(($testSpeed / $pkgSpeed) * 100, 2));
+                }
+            }
+
+            $technicalSheet[] = [
+                'old_report_id' => $row['IDREPORT'],
+                'old_customer_id' => $row['IDPENGGUNA'] ?? '',
+                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
+                'connection_type' => $row['JENIS'] ?: 'KABEL',
+                'ont_sn' => $row['SNROOTER_FIBER'] ?? '',
+                'ip_address' => $row['IPADDR'] ?? '',
+                'odp_code' => $row['NOMOR_ODP'] ?? '',
+                'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
+                'olt_code' => $oltCode,
+                'olt_port' => $oltPort,
+                'vlan_id' => '',
+                'passive_device' => $row['BRG_OUTDOOR'] ?? '',
+                'branch_number' => $penggunaMap[$row['IDPENGGUNA']]['IDCABANG'] ?? '',
+                'pop_number' => $penggunaMap[$row['IDPENGGUNA']]['IDWILAYAH'] ?? '',
+                'router_number' => $row['MACADDR_ROOTER'] ?? '',
+                'initial_attenuation' => is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null),
+                'actual_attenuation' => is_numeric($actualAttenuation) ? (float)$actualAttenuation : null,
+                'test_date' => $reqDate,
+                'test_time' => $reqTime,
+                'speedtest_photo' => $row['FOTOSPEED'] ?? '',
+                'jitter_ms' => $jitter,
+                'latency_ms' => $latency,
+                'test_upload' => $row['TESTUP'] ?? null,
+                'test_download' => $row['TESTDOWN'] ?? null,
+                'packet_loss_percent' => 0.00,
+                'speed_conformity_percent' => $conformity,
+                'quality_score' => is_numeric($row['SINYAL'] ?? null) ? (int)$row['SINYAL'] : 5,
+            ];
+        }
+
+        // Sheet 5: invoices
+        $invoicesSheet = [];
+        foreach ($biayaRows as $row) {
+            $cust = $row['IDPELANGGAN'] ?? $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
+            if (!str_starts_with($cust, 'PE')) {
+                continue;
+            }
+
+            $issueDate = now()->format('Y-m-d');
+            if (!empty($row['TGLINSERT'])) {
+                try {
+                    $issueDate = \Carbon\Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            }
+
+            $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
+            $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
+
+            $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN'])
+                ?? collect($layananRows)->firstWhere('IDPENGGUNA', $row['IDPENGGUNA'] ?? null);
+            $pkgPrice = 0;
+            if ($req && !empty($req['IDPAKET'])) {
+                $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
+                $pkgPrice = (int) ($pkg['HARGA'] ?? 0);
+            }
+
+            $monthlyFee = (int) ($row['BIAYABULANAN'] ?? 0);
+            $prorateAmount = null;
+            if ($pkgPrice > 0 && $monthlyFee < $pkgPrice) {
+                $prorateAmount = $monthlyFee;
+            }
+
+            $invoicesSheet[] = [
+                'old_invoice_id' => $row['IDBIAYA'],
+                'old_cost_id' => $row['IDBIAYA'],
+                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
+                'old_customer_id' => $row['IDPELANGGAN'] ?: $cust,
+                'billing_period' => $billingPeriod,
+                'total_amount' => (int) ($row['TOTALBIAYA'] ?? 0),
+                'issue_date' => $issueDate,
+                'due_date' => $dueDate,
+                'monthly_fee' => $monthlyFee,
+                'status' => 'belum_dibayar',
+                'installation_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
+                'other_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
+                'prorate_amount' => $prorateAmount,
+                'extra_cable_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
+                'extra_installation_fee' => 0,
+                'extra_pole_fee' => 0,
+            ];
+        }
+
+        // Sheet 6: payments
+        $paymentsSheet = [];
+        foreach ($buktiRows as $row) {
+            $reqCust = $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? $requestToCustomerMap[$row['IDSURVEY'] ?? ''] ?? '';
+            $invCust = $invoiceToCustomerMap[$row['IDTRANSAKSI'] ?? ''] ?? '';
+            $cust = $invCust ?: $reqCust;
+
+            if ($cust !== '' && !str_starts_with($cust, 'PE')) {
+                continue;
+            }
+
+            $payDate = now()->format('Y-m-d');
+            if (!empty($row['INSERTED_AT'])) {
+                try {
+                    $payDate = \Carbon\Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            }
+
+            $billingPeriod = now()->format('Y-m');
+            if (!empty($row['BULANTAGIHAN'])) {
+                try {
+                    $billingPeriod = \Carbon\Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
+                } catch (\Exception $e) {
+                }
+            }
+
+            $paymentsSheet[] = [
+                'old_payment_id' => $row['IDUNIQ'],
+                'old_invoice_id' => $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'],
+                'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
+                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
+                'old_customer_id' => $cust,
+                'billing_period' => $billingPeriod,
+                'amount' => (int) ($row['BAYAR'] ?? 0),
+                'payment_date' => $payDate,
+                'payment_method' => 'cash',
+                'received_by_old' => '',
+                'deposited_by_old' => '',
+                'status' => 'valid',
+            ];
+        }
+
+        return [
+            'packages' => $packagesSheet,
+            'customers' => $customersSheet,
+            'services' => $servicesSheet,
+            'technical_details' => $technicalSheet,
+            'invoices' => $invoicesSheet,
+            'payments' => $paymentsSheet,
+        ];
     }
 }

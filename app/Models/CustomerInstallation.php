@@ -16,6 +16,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'finished_date',
     'installation_photo',
     'installation_note',
+    'start_time',
+    'end_time',
+    'technicians',
+    'assigned_at',
+    'fop_id',
 ])]
 class CustomerInstallation extends Model
 {
