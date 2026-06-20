@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Distribution;
 use App\Models\Pop;
 use App\Models\User;
 use Illuminate\Console\Command;
@@ -14,7 +15,10 @@ class MigrateLegacyDataCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'app:import-legacy-sql {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql}';
+protected $signature = 'app:import-legacy-sql 
+                        {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql} 
+                        {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)} 
+                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}';
 
     /**
      * The console command description.
@@ -41,6 +45,7 @@ class MigrateLegacyDataCommand extends Command
 
         // Parse tables
         $this->info("Parsing SQL dump...");
+        $cabangRows = $this->parseTableData($sql, 'cabang');
         $paketRows = $this->parseTableData($sql, 'paket');
         $penggunaRows = $this->parseTableData($sql, 'pengguna');
         $layananRows = $this->parseTableData($sql, 'prosedure_permintaan_wifi');
@@ -49,8 +54,10 @@ class MigrateLegacyDataCommand extends Command
         $buktiRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksitagihan');
         $surveyRows = $this->parseTableData($sql, 'survey_pemasangan_wifi');
         $oltRows = $this->parseTableData($sql, 'olt_slot_register');
+        $distribusiRows = $this->parseTableData($sql, 'kode_kontrol_distribusi');
 
         $this->info("Parsed counts:");
+        $this->line("- cabang: " . count($cabangRows));
         $this->line("- paket: " . count($paketRows));
         $this->line("- pengguna: " . count($penggunaRows));
         $this->line("- prosedure_permintaan_wifi: " . count($layananRows));
@@ -59,23 +66,47 @@ class MigrateLegacyDataCommand extends Command
         $this->line("- apikeuangan_buktitransaksitagihan: " . count($buktiRows));
         $this->line("- survey_pemasangan_wifi: " . count($surveyRows));
         $this->line("- olt_slot_register: " . count($oltRows));
+        $this->line("- kode_kontrol_distribusi: " . count($distribusiRows));
 
         if (empty($paketRows) && empty($penggunaRows)) {
             $this->error("No data parsed. Make sure the SQL format matches.");
             return Command::FAILURE;
         }
 
-        // Create Pop corresponding to legacy branch/POP
-        $pop = Pop::firstOrCreate([
-            'code' => 'SMN',
-            'pop_code' => 'SMN',
-        ], [
-            'name' => 'sandya',
-            'type' => 'cabang',
-            'status' => 'active',
-            'registration_prefix' => 'REG',
-            'cid_prefix' => 'CID',
-        ]);
+
+        $overrideCode = $this->option('branch-code');
+        $overrideName = $this->option('branch-name');
+
+
+        // Create POPs from the legacy cabang table so this command can migrate
+        // multiple branches from any dump with the same schema.
+            // Kirimkan override ke pembuatan Map POP
+        $legacyPopMap = $this->createLegacyPopMap($cabangRows, $overrideCode, $overrideName);
+        
+        if ($legacyPopMap === []) {
+            // Fallback jika tabel cabang kosong
+            $defaultCode = $overrideCode ?: 'C';
+            $defaultName = $overrideName ?: 'Jetis';
+            
+            $defaultPop = Pop::firstOrCreate(
+                ['pop_code' => $defaultCode],
+                [
+                    'code' => $defaultCode,
+                    'name' => $defaultName,
+                    'type' => 'cabang',
+                    'status' => 'active',
+                    'registration_prefix' => 'RQ',
+                    'cid_prefix' => $defaultCode,
+                ]
+            );
+            $legacyPopMap = [
+                'default' => [
+                    'pop_code' => $defaultPop->pop_code ?? $defaultCode,
+                    'pop_name' => $defaultPop->name ?? $defaultName,
+                    'pop_model' => $defaultPop,
+                ],
+            ];
+        }
 
         $this->info("Mapping data to sheets...");
 
@@ -87,14 +118,133 @@ class MigrateLegacyDataCommand extends Command
             }
         }
 
+        // Build distribution metadata map from kode_kontrol_distribusi table
+        $distribusiMetaMap = [];
+        foreach ($distribusiRows as $row) {
+            $code = strtoupper(trim((string) ($row['kode'] ?? '')));
+            if ($code !== '' && $code !== '0') {
+                $distribusiMetaMap[$code] = [
+                    'name' => trim((string) ($row['nama'] ?? '')),
+                    'description' => trim((string) ($row['deskripsi'] ?? '')),
+                ];
+            }
+        }
+
         $requestToCustomerMap = [];
+        $legacyRequestByCustomer = [];
+        $legacyMiniPopByCustomer = [];
+        $legacyDistributionByCustomer = [];
+        $createdDistributions = [];
+
         foreach ($layananRows as $row) {
-            $requestToCustomerMap[$row['IDPERMINTAAN']] = $row['IDPENGGUNA'] ?? '';
+            $requestId = $row['IDPERMINTAAN'] ?? '';
+            $customerId = $row['IDPENGGUNA'] ?? '';
+            $branchId = trim((string) ($penggunaMap[$customerId]['IDCABANG'] ?? ''));
+            $legacyPop = $this->resolveLegacyPopForBranch($branchId, $legacyPopMap);
+            $branchPop = $legacyPop['pop_model'];
+            $miniSegment = $this->normalizeLegacyMiniPopSegment($row['kategori_perangkat_jaringan'] ?? null);
+            $miniPopCode = $legacyPop['pop_code'] . $miniSegment;
+            $distributionCode = strtoupper(trim((string) ($row['kode_kontrol_distribusi'] ?? '')));
+            if ($distributionCode === '0') {
+                $distributionCode = '';
+            }
+
+            $miniPop = Pop::firstOrCreate(
+                ['pop_code' => $miniPopCode],
+                [
+                    'code' => $miniPopCode,
+                    'name' => $miniPopCode,
+                    'type' => 'mini_pop',
+                    'parent_id' => $branchPop?->id,
+                    'status' => 'active',
+                    'registration_prefix' => 'RQ',
+                    'cid_prefix' => $legacyPop['pop_code'],
+                ]
+            );
+
+            if ($distributionCode !== '' && $distributionCode !== '0') {
+                $meta = $distribusiMetaMap[$distributionCode] ?? [];
+                $distName = (!empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $distributionCode;
+                $distDesc = (!empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi ' . $distributionCode;
+
+                Distribution::firstOrCreate(
+                    [
+                        'code' => $distributionCode,
+                    ],
+                    [
+                        'pop_id' => $miniPop->id,
+                        'name' => $distName,
+                        'description' => $distDesc,
+                    ]
+                );
+                $createdDistributions[$distributionCode] = true;
+            }
+
+            if ($requestId !== '') {
+                $requestToCustomerMap[$requestId] = $customerId;
+            }
+
+            if ($customerId !== '' && $requestId !== '' && !isset($legacyRequestByCustomer[$customerId])) {
+                $legacyRequestByCustomer[$customerId] = $requestId;
+            }
+
+            if ($customerId !== '' && !isset($legacyMiniPopByCustomer[$customerId])) {
+                $legacyMiniPopByCustomer[$customerId] = $miniPopCode;
+            }
+
+            if ($customerId !== '' && !isset($legacyDistributionByCustomer[$customerId])) {
+                $legacyDistributionByCustomer[$customerId] = $distributionCode;
+            }
+        }
+
+        // Seed any remaining distributions from legacy table that don't have customers yet
+        // We put them under the default Mini POP of the resolved POP
+        $firstPop = collect($legacyPopMap)->first();
+        if ($firstPop) {
+            $branchPop = $firstPop['pop_model'];
+            $defaultMiniPopCode = $firstPop['pop_code'] . '1';
+            $defaultMiniPop = Pop::firstOrCreate(
+                ['pop_code' => $defaultMiniPopCode],
+                [
+                    'code' => $defaultMiniPopCode,
+                    'name' => $defaultMiniPopCode,
+                    'type' => 'mini_pop',
+                    'parent_id' => $branchPop?->id,
+                    'status' => 'active',
+                    'registration_prefix' => 'RQ',
+                    'cid_prefix' => $firstPop['pop_code'],
+                ]
+            );
+
+            foreach ($distribusiMetaMap as $code => $meta) {
+                if (!isset($createdDistributions[$code])) {
+                    $distName = (!empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $code;
+                    $distDesc = (!empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi ' . $code;
+
+                    Distribution::firstOrCreate(
+                        [
+                            'code' => $code,
+                        ],
+                        [
+                            'pop_id' => $defaultMiniPop->id,
+                            'name' => $distName,
+                            'description' => $distDesc,
+                        ]
+                    );
+                }
+            }
         }
 
         $invoiceToCustomerMap = [];
         foreach ($biayaRows as $row) {
             $invoiceToCustomerMap[$row['IDBIAYA']] = $row['IDPELANGGAN'] ?? '';
+        }
+
+        $billingExtraByRequest = [];
+        foreach ($biayaRows as $row) {
+            if (!empty($row['IDPERMINTAAN'])) {
+                $billingExtraByRequest[$row['IDPERMINTAAN']] = (int) ($row['BIAYALAINLAIN'] ?? 0);
+            }
         }
 
         $surveyMap = [];
@@ -178,8 +328,8 @@ class MigrateLegacyDataCommand extends Command
                 'IDPENGGUNA' => $row['IDPENGGUNA'] ?? null,
                 'IDSURVEY' => $row['IDSURVEY'] ?? null,
             ], $surveyMap);
-            $lat = $custSurvey['LAT'] ?? null;
-            $lon = $custSurvey['LONG'] ?? null;
+            $lat = $this->normalizeCoordinate($custSurvey['LAT'] ?? null);
+            $lon = $this->normalizeCoordinate($custSurvey['LONG'] ?? null);
             $fotoRumah = $custSurvey['FOTORUMAH'] ?? null;
 
             // Laporan lookups for contract photo and sales code
@@ -195,8 +345,15 @@ class MigrateLegacyDataCommand extends Command
             }
             $fotoKontrak = $custLaporan['FOTOFORMULIR'] ?? null;
 
+            $legacyBranchId = trim((string) ($row['IDCABANG'] ?? ''));
+            $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
+            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'] . '1');
+
             $customersSheet[] = [
                 'old_customer_id' => $row['IDPENGGUNA'],
+                'old_request_id' => $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '',
+                'customer_code' => $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '',
+                'branch_pop_code' => $legacyPop['pop_code'],
                 'full_name' => $fullName,
                 'phone' => $row['HP'] ?? '',
                 'primary_phone' => $row['HP'] ?? '',
@@ -210,10 +367,11 @@ class MigrateLegacyDataCommand extends Command
                 'old_account_status' => $row['STATUSAKUN'] ?? '',
                 'full_address' => $this->resolveLegacyAddressText($row),
                 'old_region_id' => $row['IDWILAYAH'] ?? '',
-                'old_branch_id' => $row['IDCABANG'] ?? '',
+                'old_branch_id' => $legacyBranchId,
                 'registration_date' => $regDate,
-                'pop_code' => 'SMN',
-                'pop_name' => 'sandya',
+                'pop_code' => $miniPopCode,
+                'pop_name' => $legacyPop['pop_name'],
+                'distribution_code' => $legacyDistributionByCustomer[$row['IDPENGGUNA']] ?? '',
                 'village' => $row['DESA'] ?? '',
                 'district' => $row['KEC'] ?? '',
                 'city' => $row['KOTA'] ?? '',
@@ -312,6 +470,7 @@ class MigrateLegacyDataCommand extends Command
                 'contract_type' => $row['STATUSLANGGANAN'] ?? '',
                 'activation_time' => !empty($row['VERIFIED_AT']) ? \Carbon\Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
                 'activated_by_name' => $this->resolveLegacyUserLabel($row['VERIFIED'] ?? '', $penggunaMap),
+                'other_fee' => $billingExtraByRequest[$row['IDPERMINTAAN']] ?? 0,
                 
                 'survey_date' => $surveyDate,
                 'survey_start_time' => $surveyStartTime,
@@ -390,13 +549,26 @@ class MigrateLegacyDataCommand extends Command
                 'olt_port' => $oltPort,
                 'vlan_id' => '',
                 
+                // Full Device & Technical Fields mapping
+                'ssid' => $row['SSID'] ?? '',
+                'antenna_mac' => $row['MACADDR_ANTENA'] ?? '',
+                'router_mac' => $row['MACADDR_ROOTER'] ?? '',
+                'wireless_signal' => $row['SIGNAL_WIRELESS'] ?? '',
+                'fiber_signal' => $row['SIGNAL_KABEL'] ?? '',
+                'location_source' => $row['LOKASIPEMANCAR'] ?? '',
+                'note' => $row['KETERANGAN'] ?? '',
+                'form_photo' => $row['FOTOFORMULIR'] ?? '',
+                'signed_form_photo' => $row['FOTOTTDFORMULIR'] ?? '',
+                'router_photo' => $row['FOTOROOTER'] ?? '',
+                'cable_photo' => $row['FOTOKABEL'] ?? '',
+
                 // Extended tech fields
                 'passive_device' => $row['BRG_OUTDOOR'] ?? '',
                 'branch_number' => $penggunaMap[$row['IDPENGGUNA']]['IDCABANG'] ?? '',
                 'pop_number' => $penggunaMap[$row['IDPENGGUNA']]['IDWILAYAH'] ?? '',
                 'router_number' => $row['MACADDR_ROOTER'] ?? '',
-                'initial_attenuation' => is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null),
-                'actual_attenuation' => is_numeric($actualAttenuation) ? (float)$actualAttenuation : null,
+                'initial_attenuation' => $this->cleanDecimal(is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null), -999.99, 999.99),
+                'actual_attenuation' => $this->cleanDecimal(is_numeric($actualAttenuation) ? (float)$actualAttenuation : null, -999.99, 999.99),
                 'test_date' => $reqDate,
                 'test_time' => $reqTime,
                 'speedtest_photo' => $row['FOTOSPEED'] ?? '',
@@ -460,7 +632,7 @@ class MigrateLegacyDataCommand extends Command
                 'installation_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
                 'other_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
                 'prorate_amount' => $prorateAmount,
-                'extra_cable_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
+                'extra_cable_fee' => 0,
                 'extra_installation_fee' => 0,
                 'extra_pole_fee' => 0,
             ];
@@ -525,7 +697,7 @@ class MigrateLegacyDataCommand extends Command
         })->first();
 
         if ($admin) {
-            auth()->login($admin);
+            \Illuminate\Support\Facades\Auth::login($admin);
             $this->info("Logged in programmatically as: " . $admin->name);
         } else {
             $this->warn("No Owner user found. Migration might fail audit log validation.");
@@ -644,6 +816,153 @@ class MigrateLegacyDataCommand extends Command
         return $name !== '' ? $name : trim((string) ($row['IDPENGGUNA'] ?? ''));
     }
 
+    /**
+     * Build POP records from the legacy cabang table.
+     *
+     * @return array<string, array{pop_code: string, pop_name: string, pop_model: Pop}>
+     */
+    private function createLegacyPopMap(array $cabangRows, ?string $overrideCode = null, ?string $overrideName = null): array
+    {
+        $map = [];
+
+        foreach ($cabangRows as $row) {
+            $legacyBranchId = trim((string) ($row['ID'] ?? ''));
+            $legacyBranchName = trim((string) ($row['CABANG'] ?? ''));
+
+            // 1. Tentukan Kode Cabang POP
+            if ($overrideCode) {
+                $popCode = strtoupper(trim($overrideCode));
+            } else {
+                // Tanya secara interaktif jika dijalankan tanpa parameter
+                $detectedDefault = $this->resolveLegacyBranchPopCode($legacyBranchName, $legacyBranchId);
+                $popCode = $this->ask("Cabang legacy '{$legacyBranchName}' terdeteksi. Masukkan Kode POP baru (contoh: C, D)", $detectedDefault);
+                $popCode = strtoupper(trim($popCode));
+            }
+
+            // 2. Tentukan Nama Cabang POP
+            if ($overrideName) {
+                $popName = $overrideName;
+            } else {
+                $popName = $this->ask("Masukkan Nama POP baru untuk cabang ini", $legacyBranchName ?: $popCode);
+            }
+
+            $pop = Pop::firstOrCreate(
+                ['pop_code' => $popCode],
+                [
+                    'code' => $popCode,
+                    'name' => $popName,
+                    'type' => 'cabang',
+                    'status' => 'active',
+                    'registration_prefix' => 'RQ',
+                    'cid_prefix' => $popCode, // Otomatis diset sesuai kode cabang yang dipilih (C atau D)
+                    'latitude' => is_numeric($row['LAT_PERUSAHAAN'] ?? null) ? (float) $row['LAT_PERUSAHAAN'] : null,
+                    'longitude' => is_numeric($row['LONG_PERUSAHAAN'] ?? null) ? (float) $row['LONG_PERUSAHAAN'] : null,
+                ]
+            );
+
+            $map[$legacyBranchId !== '' ? $legacyBranchId : $popCode] = [
+                'pop_code' => $pop->pop_code ?? $popCode,
+                'pop_name' => $pop->name ?? $popName,
+                'pop_model' => $pop,
+            ];
+        }
+
+        return $map;
+    }
+
+
+    private function resolveLegacyBranchPopCode(string $legacyBranchName, string $legacyBranchId): string
+    {
+        $branchName = strtoupper(trim($legacyBranchName));
+        $branchCode = preg_replace('/[^A-Z0-9]+/', '', $branchName) ?: '';
+        if ($branchCode !== '' && $branchCode !== 'JETIS') {
+            return substr($branchCode, 0, 1);
+        }
+
+        $branchId = preg_replace('/[^A-Z0-9]+/', '', strtoupper(trim($legacyBranchId))) ?: '';
+        if ($branchId !== '') {
+            return 'C' . $branchId;
+        }
+
+        return 'C';
+    }
+
+    /**
+     * Resolve the POP context for a legacy branch id.
+     *
+     * @param array<string, array{pop_code: string, pop_name: string, pop_model: Pop}> $legacyPopMap
+     * @return array{pop_code: string, pop_name: string, pop_model: Pop}
+     */
+    private function resolveLegacyPopForBranch(string $legacyBranchId, array $legacyPopMap): array
+    {
+        if ($legacyBranchId !== '' && isset($legacyPopMap[$legacyBranchId])) {
+            return $legacyPopMap[$legacyBranchId];
+        }
+
+        if (isset($legacyPopMap['default'])) {
+            return $legacyPopMap['default'];
+        }
+
+        $firstPop = collect($legacyPopMap)->first();
+        if ($firstPop) {
+            return $firstPop;
+        }
+
+        $defaultPop = Pop::firstOrCreate(
+            ['pop_code' => 'UNASSIGNED'],
+            [
+                'code' => 'UNASSIGNED',
+                'name' => 'Belum Dialokasikan',
+                'type' => 'cabang',
+                'status' => 'active',
+                'registration_prefix' => 'RQ',
+                'cid_prefix' => 'C',
+            ]
+        );
+
+        return [
+            'pop_code' => $defaultPop->pop_code ?? 'UNASSIGNED',
+            'pop_name' => $defaultPop->name ?? 'Belum Dialokasikan',
+            'pop_model' => $defaultPop,
+        ];
+    }
+
+    private function normalizeLegacyMiniPopSegment(mixed $value): string
+    {
+        $segment = strtoupper(trim((string) $value));
+        $segment = preg_replace('/[^A-Z0-9]+/', '', $segment) ?: '';
+
+        if ($segment === '' || $segment === '0') {
+            return '1';
+        }
+
+        $replaced = preg_replace('/^([A-Z]*)0+([1-9A-Z].*)?$/', '$1$2', $segment);
+        if ($replaced !== null && $replaced !== '') {
+            $segment = $replaced;
+        }
+
+        if ($segment === '' || $segment === '0') {
+            return '1';
+        }
+
+        return $segment;
+    }
+
+    private function normalizeLegacyPopCode(string $name, string $fallback = ''): string
+    {
+        $value = strtoupper(trim($name));
+        $value = preg_replace('/[^A-Z0-9]+/', '', $value) ?: '';
+
+        if ($value !== '') {
+            return $value;
+        }
+
+        $fallback = strtoupper(trim($fallback));
+        $fallback = preg_replace('/[^A-Z0-9]+/', '', $fallback) ?: '';
+
+        return $fallback !== '' ? 'CB' . $fallback : 'UNASSIGNED';
+    }
+
     private function parseTableData(string $sql, string $tableName): array
     {
         $insertMatches = [];
@@ -735,5 +1054,84 @@ class MigrateLegacyDataCommand extends Command
             return null;
         }
         return $val;
+    }
+
+    private function normalizeCoordinate(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '' || in_array(strtolower($value), ['null', 'nil', 'n/a', '-'], true)) {
+            return null;
+        }
+
+        // Replace comma with dot
+        $value = str_replace(',', '.', $value);
+
+        // Keep only digits, dots, minus sign
+        $value = preg_replace('/[^\d\.\-]/', '', $value);
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $floatVal = (float) $value;
+
+        // If the absolute value is out of range (> 180), it means it's a shifted coordinate (missing decimal point)
+        if (abs($floatVal) > 180) {
+            // Strip any existing dot or minus sign to get only digits
+            $isNegative = str_starts_with($value, '-');
+            $digits = preg_replace('/[^\d]/', '', $value);
+            
+            if ($digits === '') {
+                return null;
+            }
+
+            if ($isNegative) {
+                // Negative coordinates in Indonesia are always latitude (around -7 or -8)
+                // Place the dot after the first digit
+                $normalized = '-' . substr($digits, 0, 1) . '.' . substr($digits, 1);
+            } else {
+                // Positive coordinates
+                if (str_starts_with($digits, '1')) {
+                    // Longitude in Indonesia is around 110-115
+                    // Place the dot after the first 3 digits
+                    $normalized = substr($digits, 0, 3) . '.' . substr($digits, 3);
+                } else {
+                    // Positive latitude
+                    $normalized = substr($digits, 0, 1) . '.' . substr($digits, 1);
+                }
+            }
+            $value = $normalized;
+        }
+
+        return is_numeric($value) ? $value : null;
+    }
+
+    private function cleanDecimal(mixed $value, float $min = -999.99, float $max = 999.99): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '' || in_array(strtolower($value), ['null', 'nil', 'n/a', '-'], true)) {
+            return null;
+        }
+
+        // Replace comma with dot
+        $value = str_replace(',', '.', $value);
+
+        // Keep only digits, dots, minus sign
+        $value = preg_replace('/[^\d\.\-]/', '', $value);
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $val = (float) $value;
+        return ($val >= $min && $val <= $max) ? $val : null;
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerDocumentController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Master\RegionController;
+use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\PopController;
@@ -97,6 +98,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view_customers')->group(function () {
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+        Route::get('/customers/{customer}/payment-info', [CustomerController::class, 'paymentInfo'])->name('customers.payment-info');
     });
 
     // Master Data
@@ -123,6 +125,11 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view_pop')->group(function () {
         Route::get('/master/pop/{pop}', [PopController::class, 'show'])->name('master.pop.show');
+    });
+
+    // Distribusi
+    Route::middleware('permission:manage_pop')->group(function () {
+        Route::resource('/master/distribusi', DistributionController::class)->except(['show'])->names('master.distribusi');
     });
 
     Route::middleware('permission:view_packages')->group(function () {
@@ -152,6 +159,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:fill_installation')->group(function () {
         Route::post('/customers/{customer}/installation', [\App\Http\Controllers\CustomerInstallationController::class, 'store'])->name('customers.installation.store');
+        Route::post('/customers/{customer}/test-report', [\App\Http\Controllers\CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
     });
 
     Route::middleware('permission:fill_device')->group(function () {

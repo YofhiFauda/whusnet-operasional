@@ -8,6 +8,7 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\Village;
 use App\Models\InternetPackage;
+use App\Models\Distribution;
 use App\Models\SubscriptionStatus;
 use App\Models\Pop;
 use App\Models\CustomerAddress;
@@ -33,6 +34,7 @@ class CustomerController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $status = trim((string) $request->query('status', ''));
+        $statusGroup = trim((string) $request->query('status_group', ''));
         $districtId = $request->query('district_id', '');
         $packageId = $request->query('package_id', '');
         $popId = $request->query('pop_id', '');
@@ -40,7 +42,7 @@ class CustomerController extends Controller
 
         $query = Customer::query()
             ->forUser()
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop']);
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress']);
 
         // Search filter
         if ($search !== '') {
@@ -48,6 +50,7 @@ class CustomerController extends Controller
                 $q->where('full_name', 'like', "%{$search}%")
                   ->orWhere('customer_code', 'like', "%{$search}%")
                   ->orWhere('old_customer_id', 'like', "%{$search}%")
+                                    ->orWhere('old_request_id', 'like', "%{$search}%")
                   ->orWhere('cid', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%")
@@ -59,6 +62,17 @@ class CustomerController extends Controller
         // Status filter
         if ($status !== '') {
             $query->where('status', $status);
+        } elseif ($statusGroup !== '') {
+            $statuses = match ($statusGroup) {
+                'survey' => ['waiting_survey', 'surveyed'],
+                'verification' => ['waiting_installation', 'installed'],
+                'failed' => ['failed', 'rejected', 'gagal'],
+                'terminated' => ['terminated', 'putus'],
+                default => []
+            };
+            if (!empty($statuses)) {
+                $query->whereIn('status', $statuses);
+            }
         }
 
         // District filter
@@ -110,6 +124,7 @@ class CustomerController extends Controller
             'subscriptionStatuses',
             'search',
             'status',
+            'statusGroup',
             'districtId',
             'packageId',
             'popId',
@@ -125,8 +140,9 @@ class CustomerController extends Controller
         $districts = \App\Models\District::orderBy('name')->get();
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
-        $pops = \App\Models\Pop::forUser()->get();
-        return view('customers.create', compact('districts', 'packages', 'cities', 'pops'));
+        $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
+        $distributions = \App\Models\Distribution::with('pop')->orderBy('name')->get();
+        return view('customers.create', compact('districts', 'packages', 'cities', 'pops', 'distributions'));
     }
 
     /**
@@ -143,6 +159,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
             'pop_id' => 'required|exists:pops,id',
+            'distribution_id' => 'nullable|exists:distributions,id',
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -153,6 +170,7 @@ class CustomerController extends Controller
             'contract_period_months' => 'nullable|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
+            'other_fee' => 'nullable|numeric|min:0',
             
             // Referrals
             'sales_code' => 'nullable|string|max:30',
@@ -251,10 +269,11 @@ class CustomerController extends Controller
                 $monthlyPrice = (float)$package->monthly_price;
                 $discount = (float)($validated['discount_amount'] ?? 0.00);
                 $ppn = (float)($validated['tax_percent'] ?? 0.00);
+                $otherFee = (float)($validated['other_fee'] ?? 0.00);
 
                 // Calculate total bill
                 $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100);
+                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
                 $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
                 $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
@@ -273,6 +292,7 @@ class CustomerController extends Controller
                     'monthly_price' => $monthlyPrice,
                     'discount' => $discount,
                     'ppn' => $ppn,
+                    'other_fee' => $otherFee,
                     'total_monthly_bill' => $totalBill,
                     'activation_date' => $activationDate,
                     'due_date' => $dueDate,
@@ -304,11 +324,16 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer)
     {
+        if (!$customer->exists) {
+            $customer = Customer::findOrFail(request()->route('customer'));
+        }
+
         $districts = \App\Models\District::orderBy('name')->get();
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
-        $pops = \App\Models\Pop::forUser()->get();
-        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops'));
+        $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
+        $distributions = \App\Models\Distribution::with('pop')->orderBy('name')->get();
+        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops', 'distributions'));
     }
 
     /**
@@ -330,6 +355,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
             'pop_id' => 'required|exists:pops,id',
+            'distribution_id' => 'nullable|exists:distributions,id',
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -340,6 +366,7 @@ class CustomerController extends Controller
             'contract_period_months' => 'nullable|integer|min:1',
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
+            'other_fee' => 'nullable|numeric|min:0',
             
             // Referrals
             'sales_code' => 'nullable|string|max:30',
@@ -414,6 +441,35 @@ class CustomerController extends Controller
             // 1. Update customer record
             $customer->update($validated);
 
+            // 1b. Auto-generate / update CID berdasarkan status pelanggan
+            // Sesuai spesifikasi-pop-distribusi-cid.md:
+            // - Status active/suspended: generate CID lengkap jika ada distribusi,
+            //   atau set ke format C00RQ###### jika belum ada distribusi
+            // - Status terminated: hapus cid (kembali tampilkan REQ ID murni)
+            $newStatus = strtolower((string) ($validated['status'] ?? ''));
+            $pop = $customer->pop;
+
+            if ($pop && in_array($newStatus, ['active', 'suspended'], true)) {
+                $distribution = $customer->distribution;
+                if ($distribution) {
+                    // Ada distribusi → generate CID lengkap
+                    $customer->load(['village', 'customerTechnicalDetail']);
+                    $newCid = $pop->generateComplexCid($customer, $distribution);
+                } else {
+                    // Belum ada distribusi → format default C00RQ######
+                    $reqId = $pop->extractBareRegistrationId($customer->customer_code);
+                    $newCid = sprintf('%s00%s', $pop->cid_prefix, $reqId);
+                }
+
+                if ($customer->cid !== $newCid) {
+                    $customer->updateQuietly(['cid' => $newCid]);
+                }
+            } elseif ($newStatus === 'terminated') {
+                // Terminate: cid tidak lagi aktif, tapi simpan sebagai histori (jangan hapus)
+                // Display akan dikembalikan ke REQ ID murni via display_id accessor
+                // Tidak perlu update kolom cid
+            }
+
             // 2. Update address record
             $cityName = null;
             if (!empty($validated['city_id'])) {
@@ -451,10 +507,11 @@ class CustomerController extends Controller
                 $monthlyPrice = (float)$package->monthly_price;
                 $discount = (float)($validated['discount_amount'] ?? 0.00);
                 $ppn = (float)($validated['tax_percent'] ?? 0.00);
+                $otherFee = (float)($validated['other_fee'] ?? 0.00);
 
                 // Calculate total bill
                 $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100);
+                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
                 $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
                 $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
@@ -473,6 +530,7 @@ class CustomerController extends Controller
                     'monthly_price' => $monthlyPrice,
                     'discount' => $discount,
                     'ppn' => $ppn,
+                    'other_fee' => $otherFee,
                     'total_monthly_bill' => $totalBill,
                     'activation_date' => $activationDate,
                     'due_date' => $dueDate,
@@ -513,6 +571,10 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
+        if (!$customer->exists) {
+            $customer = Customer::findOrFail(request()->route('customer'));
+        }
+
         $customer->load([
             'city', 
             'district', 
@@ -542,11 +604,18 @@ class CustomerController extends Controller
         // Dynamic completeness calculation
         $completeness = $customer->dataCompleteness();
 
-        // Format display ID (CID for active/suspended, REQ for others)
-        $isCustomer = in_array($status, ['active', 'suspended']);
-        $displayId = $isCustomer 
-            ? str_replace('WHUS-', 'CID-', $customer->customer_code) 
-            : str_replace('WHUS-', 'REQ-', $customer->customer_code);
+        // Format display ID berdasarkan siklus hidup pelanggan
+        // menggunakan accessor display_id di Customer model (sesuai spesifikasi-pop-distribusi-cid.md):
+        // - REQ ID murni (RQ######): pending, survey, pemasangan, installed, terminated
+        // - CID lengkap (D2X6CRQ######_DESA_NAMA): aktif + punya distribusi
+        // - Format default (C00RQ######): aktif tanpa distribusi
+        $customer->load(['pop', 'distribution']); // pastikan relasi dimuat untuk accessor
+        $displayId = $customer->display_id;
+        $displayIdLabel = $customer->display_id_label;
+
+        // Keep backward compat for views that still reference $isCustomer / $isActive
+        $isActive = in_array($status, ['active', 'suspended']);
+        $isCustomer = $isActive;
 
         // Determine current status rank for timeline
         $statusRank = match ($status) {
@@ -599,12 +668,52 @@ class CustomerController extends Controller
             ],
         ];
 
+        // Daftar user aktif untuk dropdown petugas (survey, pemasangan)
+        $activeUsers = \App\Models\User::where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('customers.show', compact(
             'customer',
             'displayId',
+            'displayIdLabel',
             'completeness',
-            'timeline'
+            'timeline',
+            'activeUsers'
         ));
+    }
+
+    /**
+     * Get payment info for the customer action modal.
+     */
+    public function paymentInfo(Customer $customer)
+    {
+        // Pastikan user punya akses ke POP pelanggan
+        if (!auth()->user()->hasFullAccess() && !in_array($customer->pop_id, auth()->user()->pops()->pluck('pops.id')->toArray())) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Cari invoice terbaru yang belum lunas
+        $latestInvoice = $customer->invoices()
+            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian'])
+            ->latest('issue_date')
+            ->first();
+
+        // Hitung total piutang (sum dari remaining_amount semua invoice yang belum lunas)
+        $totalPiutang = $customer->invoices()
+            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian'])
+            ->sum('remaining_amount');
+
+        return response()->json([
+            'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
+            'invoice_number' => $latestInvoice ? $latestInvoice->invoice_number : null,
+            'total_amount' => $latestInvoice ? (float) $latestInvoice->total_amount : 0,
+            'remaining_amount' => $latestInvoice ? (float) $latestInvoice->remaining_amount : 0,
+            'discount' => $latestInvoice ? (float) $latestInvoice->discount : 0,
+            'total_piutang' => (float) $totalPiutang,
+            'billing_period' => $latestInvoice ? $latestInvoice->billing_period : null,
+            'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
+        ]);
     }
 
     /**
@@ -648,16 +757,16 @@ class CustomerController extends Controller
     {
         $sheets = [
             'customers' => [
-                'headers' => ['old_customer_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name', 'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
-                'data' => [['PE000001', 'PE000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']]
+                'headers' => ['old_customer_id', 'old_request_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name', 'distribution_code', 'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
+                'data' => [['PE000001', 'RQ000001', 'C00RQ000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']]
             ],
             'packages' => [
                 'headers' => ['old_package_id', 'name', 'package_type', 'category', 'monthly_price', 'upload_speed', 'download_speed', 'upload_limit', 'download_limit', 'olt_profile', 'ppp_profile', 'bonus', 'description'],
                 'data' => [['PK000001', 'WHUSNET 20 Mbps', 'Broadband', 'Paket Home Broadband', '150000', '20', '20', '', '', 'OLT-20M', 'PPP-20M', '', 'Paket legacy']]
             ],
             'services' => [
-                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason', 'profile', 'contract_type', 'activation_time', 'activated_by_name', 'survey_date', 'survey_start_time', 'survey_end_time', 'surveyors', 'survey_assigned_at', 'survey_fop_id', 'required_tools', 'survey_photo', 'survey_note', 'survey_duration_minutes', 'installation_date', 'installation_start_time', 'installation_end_time', 'installation_technicians', 'installation_photo', 'installation_note', 'installation_assigned_at', 'installation_fop_id'],
-                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001']]
+                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason', 'profile', 'contract_type', 'activation_time', 'activated_by_name', 'survey_date', 'survey_start_time', 'survey_end_time', 'surveyors', 'survey_assigned_at', 'survey_fop_id', 'required_tools', 'survey_photo', 'survey_note', 'survey_duration_minutes', 'installation_date', 'installation_start_time', 'installation_end_time', 'installation_technicians', 'installation_photo', 'installation_note', 'installation_assigned_at', 'installation_fop_id', 'other_fee'],
+                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001', '0']]
             ],
             'technical_details' => [
                 'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'ip_address', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo', 'passive_device', 'branch_number', 'pop_number', 'router_number', 'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'],
@@ -800,6 +909,10 @@ class CustomerController extends Controller
             $cityNameInput = $this->cleanLegacyValue($row['city'] ?? null) ?? '';
             $popCodeInput = $this->cleanLegacyValue($row['pop_code'] ?? null) ?? '';
             $popNameInput = $this->cleanLegacyValue($row['pop_name'] ?? null) ?? '';
+            $distributionCodeInput = $this->cleanLegacyValue($row['distribution_code'] ?? null) ?? '';
+            if ($distributionCodeInput === '0') {
+                $distributionCodeInput = '';
+            }
 
             $errors = [];
             $warnings = [];
@@ -881,9 +994,20 @@ class CustomerController extends Controller
                     $cityName = $cityNameInput ?: null;
                 }
             } else {
-                $warnings[] = 'Desa/Kelurahan kosong; pelanggan akan masuk sebagai perlu dilengkapi.';
-                $districtName = $districtNameInput ?: null;
-                $cityName = $cityNameInput ?: null;
+                // Try to resolve from fullAddress if available
+                $resolved = $fullAddress !== '' ? $this->resolveRegionFromAddress($fullAddress) : null;
+                if ($resolved) {
+                    $villageId = $resolved['village_id'];
+                    $villageName = $resolved['village_name'];
+                    $districtId = $resolved['district_id'];
+                    $districtName = $resolved['district_name'];
+                    $cityId = $resolved['city_id'];
+                    $cityName = $resolved['city_name'];
+                } else {
+                    $warnings[] = 'Desa/Kelurahan kosong; pelanggan akan masuk sebagai perlu dilengkapi.';
+                    $districtName = $districtNameInput ?: null;
+                    $cityName = $cityNameInput ?: null;
+                }
             }
 
             if ($districtNameInput === '') {
@@ -913,6 +1037,16 @@ class CustomerController extends Controller
                 }
             }
 
+            $rawLat = $row['latitude'] ?? null;
+            $rawLon = $row['longitude'] ?? null;
+            $normalizedLat = $this->normalizeCoordinate($rawLat);
+            $normalizedLon = $this->normalizeCoordinate($rawLon);
+
+            if (($rawLat !== null && $rawLat !== '' && $normalizedLat === null) || 
+                ($rawLon !== null && $rawLon !== '' && $normalizedLon === null)) {
+                $warnings[] = 'Format koordinat latitude/longitude tidak valid; nilai diabaikan.';
+            }
+
             $validatedCustomers[] = array_merge($row, [
                 'original_no' => $index + 1,
                 'old_customer_id' => $oldCustomerId,
@@ -934,12 +1068,15 @@ class CustomerController extends Controller
                 'pop_id' => $pop?->id,
                 'pop_name' => $pop?->name,
                 'pop_code' => $pop?->pop_code,
+                'distribution_code' => $distributionCodeInput,
                 'city_id' => $cityId,
                 'district_id' => $districtId,
                 'village_id' => $villageId,
                 'village_name' => $villageName,
                 'district_name' => $districtName,
                 'city_name' => $cityName,
+                'latitude' => $normalizedLat,
+                'longitude' => $normalizedLon,
                 'status_row' => $statusRow,
                 'errors' => $errors,
                 'warnings' => $warnings,
@@ -1035,6 +1172,7 @@ class CustomerController extends Controller
                 'package_id' => $package instanceof InternetPackage ? $package->id : ($package['old_package_id'] ?? null),
                 'package_name' => $package instanceof InternetPackage ? $package->name : ($package['name'] ?? null),
                 'monthly_price' => $package instanceof InternetPackage ? $package->monthly_price : ($package['monthly_price'] ?? 0),
+                'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float)$row['other_fee'] : 0,
                 'service_status' => $serviceStatus,
                 'activation_date' => $this->normalizeLegacyDate($row['activation_date'] ?? $row['finished_at'] ?? null) ?? now()->format('Y-m-d'),
                 'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null),
@@ -1099,6 +1237,12 @@ class CustomerController extends Controller
                 'odp_code' => trim((string)($row['odp_number'] ?? $row['odp_code'] ?? '')),
                 'olt_code' => trim((string)($row['olt_port'] ?? $row['olt_code'] ?? '')),
                 'vlan_id' => trim((string)($row['vlan_id'] ?? '')),
+                'initial_attenuation' => $this->cleanDecimal($row['initial_attenuation'] ?? null, -999.99, 999.99),
+                'actual_attenuation' => $this->cleanDecimal($row['actual_attenuation'] ?? null, -999.99, 999.99),
+                'jitter_ms' => $this->cleanDecimal($row['jitter_ms'] ?? null, -999999.99, 999999.99),
+                'latency_ms' => $this->cleanDecimal($row['latency_ms'] ?? null, -999999.99, 999999.99),
+                'packet_loss_percent' => $this->cleanDecimal($row['packet_loss_percent'] ?? null, -999.99, 999.99),
+                'speed_conformity_percent' => $this->cleanDecimal($row['speed_conformity_percent'] ?? null, -999.99, 999.99),
                 'status_row' => $statusRow,
                 'errors' => $errors,
                 'warnings' => $warnings,
@@ -1363,6 +1507,8 @@ class CustomerController extends Controller
                             'old_package_id' => $row['old_package_id'],
                             'name' => $row['name'],
                             'monthly_price' => $row['monthly_price'],
+                            'ppn' => 0.00,
+                            'total_price' => $row['monthly_price'],
                             'category' => $row['category'] ?? 'Paket Home Broadband',
                             'package_group' => $row['package_type'] ?? 'Broadband',
                             'bandwidth_label' => ($row['download_speed'] ?? '10') . ' Mbps',
@@ -1393,11 +1539,28 @@ class CustomerController extends Controller
                     }
 
                     $pop = !empty($row['pop_id']) ? Pop::find($row['pop_id']) : null;
-                    $customerCode = $pop?->generateRegistrationNumber() ?: ($row['customer_code'] ?? $row['old_customer_id']);
+                    $distribution = null;
+                    $distributionCode = trim((string) ($row['distribution_code'] ?? ''));
+                    if ($distributionCode === '0') {
+                        $distributionCode = '';
+                    }
+                    if ($distributionCode !== '' && $pop) {
+                        $distribution = Distribution::firstOrCreate(
+                            [
+                                'code' => $distributionCode,
+                            ],
+                            [
+                                'pop_id' => $pop->id,
+                                'name' => $distributionCode,
+                            ]
+                        );
+                    }
+                    $customerCode = !empty($row['customer_code']) ? $row['customer_code'] : ($pop?->generateRegistrationNumber() ?: $row['old_customer_id']);
 
                     $customer = Customer::create([
                         'customer_code' => $customerCode,
                         'old_customer_id' => $row['old_customer_id'],
+                        'old_request_id' => $row['old_request_id'] ?? null,
                         'full_name' => $row['full_name'] ?: $row['old_customer_id'],
                         'identity_number' => $row['identity_number'] ?? null,
                         'gender' => $row['gender'] ?? 'Laki-laki',
@@ -1411,6 +1574,7 @@ class CustomerController extends Controller
                         'email' => $row['email'] ?? null,
                         'registration_date' => $row['registration_date'] ?? now()->format('Y-m-d'),
                         'pop_id' => $pop?->id,
+                        'distribution_id' => $distribution?->id,
                         'status' => 'registered', // Default, updated by service activation or mapping
                         'customer_status' => 'calon_pelanggan',
                         'created_by' => auth()->id(),
@@ -1420,6 +1584,12 @@ class CustomerController extends Controller
                         'sales_code' => $row['sales_code'] ?? null,
                         'agent_code' => $row['agent_code'] ?? null,
                         'referral_customer_code' => $row['referral_customer_code'] ?? null,
+                        'address' => $this->resolveLegacyAddressText($row),
+                        'latitude' => $row['latitude'] ?? null,
+                        'longitude' => $row['longitude'] ?? null,
+                        'city_id' => $row['city_id'] ?? null,
+                        'district_id' => $row['district_id'] ?? null,
+                        'village_id' => $row['village_id'] ?? null,
                     ]);
 
                     CustomerAddress::create([
@@ -1475,8 +1645,9 @@ class CustomerController extends Controller
 
                     $package = InternetPackage::findOrFail($packageId);
                     $monthlyPrice = (float)($row['monthly_price'] ?? $package->monthly_price);
-                    $ppnPercent = 11.00;
-                    $totalBill = $monthlyPrice * (1 + $ppnPercent / 100);
+                    $ppnPercent = 0.00; // Legacy data uses 0% PPN
+                    $otherFee = (float)($row['other_fee'] ?? 0);
+                    $totalBill = $monthlyPrice + $otherFee; // No PPN for legacy, but keep biaya lain-lain in billing cycle
 
                     $customer = Customer::findOrFail($customerId);
                     $serviceStatus = $this->mapLegacyServiceStatus($row['service_status'] ?? $row['request_status'] ?? null);
@@ -1498,6 +1669,7 @@ class CustomerController extends Controller
                         'monthly_price' => $monthlyPrice,
                         'discount' => 0.00,
                         'ppn' => $ppnPercent,
+                        'other_fee' => $otherFee > 0 ? $otherFee : null,
                         'total_monthly_bill' => $totalBill,
                         'activation_date' => $row['activation_date'] ?? now()->format('Y-m-d'),
                         'due_date' => $row['due_date'] ?? null,
@@ -1545,14 +1717,24 @@ class CustomerController extends Controller
                         ]);
                     }
 
-                    // Update parent customer state based on service activation
                     $custStatus = $this->mapServiceStatusToCustomerStatus($serviceStatus);
 
-                    $customer->updateQuietly([
+                    $updateData = [
                         'internet_package_id' => $packageId,
                         'status' => $serviceStatus,
                         'customer_status' => $custStatus,
-                    ]);
+                    ];
+
+                    // Generate CID if active or suspended
+                    if (in_array($serviceStatus, ['active', 'suspended'], true)) {
+                        $pop = $customer->pop;
+                        $distribution = $customer->distribution;
+                        if ($pop) {
+                            $updateData['cid'] = $pop->generateComplexCid($customer, $distribution);
+                        }
+                    }
+
+                    $customer->updateQuietly($updateData);
                     $customer->recalculateCompleteness();
 
                     $insertedCount++;
@@ -1702,7 +1884,7 @@ class CustomerController extends Controller
                         'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null) ?? now()->addDays(10)->format('Y-m-d'),
                         'subtotal' => $row['monthly_fee'] ?? $service->monthly_price,
                         'discount' => 0.00,
-                        'ppn' => $service->ppn,
+                        'ppn' => 0.00, // Legacy invoices use 0% PPN
                         'total_amount' => $totalAmount,
                         'paid_amount' => 0.00,
                         'remaining_amount' => $totalAmount,
@@ -1710,6 +1892,7 @@ class CustomerController extends Controller
                         'created_by' => auth()->id(),
                         'prorate_amount' => $row['prorate_amount'] ?? null,
                         'extra_cable_fee' => $row['extra_cable_fee'] ?? null,
+                        'other_fee' => $row['other_fee'] ?? null,
                         'extra_installation_fee' => $row['extra_installation_fee'] ?? null,
                         'extra_pole_fee' => $row['extra_pole_fee'] ?? null,
                     ]);
@@ -1806,6 +1989,57 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')->with('success', "Berhasil meng-import {$insertedCount} baris data dari sheet migrasi! (Batch: {$batch->batch_number})");
     }
 
+    private function resolveRegionFromAddress(string $address): ?array
+    {
+        $villages = Village::with('district.city')->get();
+        $matches = [];
+        
+        foreach ($villages as $v) {
+            $vName = $v->name;
+            $dName = $v->district->name;
+            $cName = $v->district->city->name;
+            
+            if (stripos($address, $vName) !== false) {
+                $hasDistrict = stripos($address, $dName) !== false;
+                $hasCity = stripos($address, $cName) !== false;
+                
+                $score = 1;
+                if ($hasDistrict) $score += 2;
+                if ($hasCity) $score += 1;
+                
+                if ($hasDistrict && (preg_match('/kec\b/i', $address) || preg_match('/kecamatan\b/i', $address))) {
+                    if (preg_match('/kec(amatan)?\s*' . preg_quote($dName, '/') . '/i', $address)) {
+                        $score += 2;
+                    }
+                }
+                
+                $matches[] = [
+                    'village' => $v,
+                    'score' => $score
+                ];
+            }
+        }
+        
+        if (empty($matches)) {
+            return null;
+        }
+        
+        usort($matches, function($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+        
+        $best = $matches[0]['village'];
+        
+        return [
+            'village_id' => $best->id,
+            'village_name' => $best->name,
+            'district_id' => $best->district_id,
+            'district_name' => $best->district?->name,
+            'city_id' => $best->district?->city_id,
+            'city_name' => $best->district?->city?->name,
+        ];
+    }
+
     private function logImportError($batchId, $row, $sheetName, $message)
     {
         \App\Models\ImportError::create([
@@ -1888,6 +2122,77 @@ class CustomerController extends Controller
         } catch (\Throwable) {
             return $value;
         }
+    }
+
+    private function normalizeCoordinate(mixed $value): ?string
+    {
+        $value = $this->cleanLegacyValue($value);
+        if ($value === null) {
+            return null;
+        }
+
+        // Replace comma with dot
+        $value = str_replace(',', '.', $value);
+
+        // Keep only digits, dots, minus sign
+        $value = preg_replace('/[^\d\.\-]/', '', $value);
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $floatVal = (float) $value;
+
+        // If the absolute value is out of range (> 180), it means it's a shifted coordinate (missing decimal point)
+        if (abs($floatVal) > 180) {
+            // Strip any existing dot or minus sign to get only digits
+            $isNegative = str_starts_with($value, '-');
+            $digits = preg_replace('/[^\d]/', '', $value);
+            
+            if ($digits === '') {
+                return null;
+            }
+
+            if ($isNegative) {
+                // Negative coordinates in Indonesia are always latitude (around -7 or -8)
+                // Place the dot after the first digit
+                $normalized = '-' . substr($digits, 0, 1) . '.' . substr($digits, 1);
+            } else {
+                // Positive coordinates
+                if (str_starts_with($digits, '1')) {
+                    // Longitude in Indonesia is around 110-115
+                    // Place the dot after the first 3 digits
+                    $normalized = substr($digits, 0, 3) . '.' . substr($digits, 3);
+                } else {
+                    // Positive latitude
+                    $normalized = substr($digits, 0, 1) . '.' . substr($digits, 1);
+                }
+            }
+            $value = $normalized;
+        }
+
+        return is_numeric($value) ? $value : null;
+    }
+
+    private function cleanDecimal(mixed $value, float $min = -999.99, float $max = 999.99): ?float
+    {
+        $cleaned = $this->cleanLegacyValue($value);
+        if ($cleaned === null) {
+            return null;
+        }
+
+        // Replace comma with dot
+        $cleaned = str_replace(',', '.', $cleaned);
+
+        // Keep only digits, dots, minus sign
+        $cleaned = preg_replace('/[^\d\.\-]/', '', $cleaned);
+
+        if (!is_numeric($cleaned)) {
+            return null;
+        }
+
+        $val = (float) $cleaned;
+        return ($val >= $min && $val <= $max) ? $val : null;
     }
 
     private function mapLegacyServiceStatus(?string $status): string
@@ -2005,6 +2310,10 @@ class CustomerController extends Controller
 
     public function activate(Customer $customer)
     {
+        if (!$customer->exists) {
+            $customer = Customer::findOrFail(request()->route('customer'));
+        }
+
         $completeness = $customer->dataCompleteness();
         if (!$completeness['is_ready_billing']) {
             return redirect()->route('customers.show', $customer->id)
@@ -2033,13 +2342,18 @@ class CustomerController extends Controller
                 ->with('error', 'POP/Cabang pelanggan tidak ditemukan.');
         }
 
-        if (!$pop->cid_prefix || !$pop->pop_code) {
+        if (!$pop->cid_prefix) {
             return redirect()->route('customers.show', $customer->id)
-                ->with('error', 'Konfigurasi prefix CID atau kode POP pada POP asal pelanggan belum lengkap.');
+                ->with('error', 'Konfigurasi prefix CID pada POP asal pelanggan belum lengkap. Pastikan field cid_prefix terisi.');
         }
 
+        // Load relasi teknis dan distribusi untuk generate CID kompleks
+        $customer->loadMissing(['customerTechnicalDetail', 'distribution', 'village']);
         \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $service, $pop) {
-            $cid = $pop->generateCid();
+            // Generate CID kompleks: {pop.cid_prefix}{olt_number}{dist_code}{customer_code}_{village}_{name}
+            // Contoh: D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH
+            $distribution = $customer->distribution;
+            $cid = $pop->generateComplexCid($customer, $distribution);
 
             $oldValues = [
                 'cid' => $customer->cid,
@@ -2060,6 +2374,9 @@ class CustomerController extends Controller
             $service->update([
                 'service_status' => 'aktif',
                 'billing_status' => 'active',
+                'activated_by_name' => auth()->user()->name,
+                'activated_by_user_id' => auth()->id(),
+                'activation_time' => $service->activation_time ?? now()->format('H:i:s'),
             ]);
 
             $newValues = [
@@ -2085,8 +2402,11 @@ class CustomerController extends Controller
             ]);
         });
 
+        // Reload untuk mendapatkan CID yang baru disimpan
+        $customer->refresh();
+
         return redirect()->route('customers.show', $customer->id)
-            ->with('success', "Layanan pelanggan berhasil diaktifkan dengan CID: {$customer->cid}!");
+            ->with('success', "Layanan pelanggan berhasil diaktifkan! CID: {$customer->cid}");
     }
 
     private function mapServiceStatusToCustomerStatus(string $status): string
@@ -2112,6 +2432,10 @@ class CustomerController extends Controller
      */
     public function storeManualInvoice(Request $request, Customer $customer)
     {
+        if (!$customer->exists) {
+            $customer = Customer::findOrFail($request->route('customer'));
+        }
+
         // 1. Authorization checks
         if (!auth()->user()->hasPermission('create_invoices')) {
             abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
@@ -2124,14 +2448,22 @@ class CustomerController extends Controller
 
         // 2. Validate request
         $validated = $request->validate([
-            'billing_period' => 'required|date_format:Y-m',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:issue_date',
+            'billing_period'          => 'required|date_format:Y-m',
+            'issue_date'              => 'required|date',
+            'due_date'                => 'required|date|after_or_equal:issue_date',
+            'prorate_amount'          => 'nullable|numeric|min:0',
+            'extra_cable_fee'         => 'nullable|numeric|min:0',
+            'extra_installation_fee'  => 'nullable|numeric|min:0',
+            'extra_pole_fee'          => 'nullable|numeric|min:0',
         ]);
 
-        $billingPeriod = $validated['billing_period'];
-        $issueDate = $validated['issue_date'];
-        $dueDate = $validated['due_date'];
+        $billingPeriod        = $validated['billing_period'];
+        $issueDate            = $validated['issue_date'];
+        $dueDate              = $validated['due_date'];
+        $prorateAmount        = (float)($validated['prorate_amount'] ?? 0);
+        $extraCableFee        = (float)($validated['extra_cable_fee'] ?? 0);
+        $extraInstallationFee = (float)($validated['extra_installation_fee'] ?? 0);
+        $extraPoleFee         = (float)($validated['extra_pole_fee'] ?? 0);
 
         // 3. Business logic checks
         // Cek pelanggan aktif/siap billing
@@ -2156,7 +2488,10 @@ class CustomerController extends Controller
         // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
         $periodCode = str_replace('-', '', $billingPeriod);
         
-        $invoice = \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode) {
+        $invoice = \Illuminate\Support\Facades\DB::transaction(function () use (
+            $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode,
+            $prorateAmount, $extraCableFee, $extraInstallationFee, $extraPoleFee
+        ) {
             $lastInvoice = \App\Models\Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
                 ->orderBy('invoice_number', 'desc')
                 ->lockForUpdate()
@@ -2171,31 +2506,42 @@ class CustomerController extends Controller
             }
             $invoiceNumber = sprintf('INV-%s-%04d', $periodCode, $nextSeq);
 
-            // Fetch pricing details from service snapshot
-            $subtotal = (float)$service->monthly_price;
-            $discount = (float)($service->discount ?? 0.00);
-            $ppnPercent = (float)($service->ppn ?? 0.00);
-            $totalAmount = (float)$service->total_monthly_bill;
-            $paidAmount = 0.00;
+            // Rincian biaya dari service snapshot
+            $subtotal    = (float)$service->monthly_price;
+            $discount    = (float)($service->discount ?? 0.00);
+            $ppnPercent  = (float)($service->ppn ?? 0.00);
+
+            // Hitung PPN dari (subtotal - discount) × rate
+            $afterDiscount = max(0, $subtotal - $discount);
+            $ppnAmount     = round($afterDiscount * ($ppnPercent / 100), 2);
+            $nettMonthly   = $afterDiscount + $ppnAmount;
+
+            // Total = tagihan bulanan nett + semua biaya tambahan
+            $totalAmount     = $nettMonthly + $prorateAmount + $extraCableFee + $extraInstallationFee + $extraPoleFee;
+            $paidAmount      = 0.00;
             $remainingAmount = $totalAmount;
 
             $newInvoice = \App\Models\Invoice::create([
-                'invoice_number' => $invoiceNumber,
-                'customer_id' => $customer->id,
-                'pop_id' => $customer->pop_id,
-                'customer_service_id' => $service->id,
-                'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $billingPeriod,
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'ppn' => $ppnPercent,
-                'total_amount' => $totalAmount,
-                'paid_amount' => $paidAmount,
-                'remaining_amount' => $remainingAmount,
-                'invoice_status' => 'belum_dibayar',
-                'created_by' => auth()->id(),
+                'invoice_number'          => $invoiceNumber,
+                'customer_id'             => $customer->id,
+                'pop_id'                  => $customer->pop_id,
+                'customer_service_id'     => $service->id,
+                'internet_package_id'     => $service->internet_package_id,
+                'billing_period'          => $billingPeriod,
+                'issue_date'              => $issueDate,
+                'due_date'                => $dueDate,
+                'subtotal'                => $subtotal,
+                'discount'                => $discount,
+                'ppn'                     => $ppnPercent,
+                'prorate_amount'          => $prorateAmount > 0 ? $prorateAmount : null,
+                'extra_cable_fee'         => $extraCableFee > 0 ? $extraCableFee : null,
+                'extra_installation_fee'  => $extraInstallationFee > 0 ? $extraInstallationFee : null,
+                'extra_pole_fee'          => $extraPoleFee > 0 ? $extraPoleFee : null,
+                'total_amount'            => $totalAmount,
+                'paid_amount'             => $paidAmount,
+                'remaining_amount'        => $remainingAmount,
+                'invoice_status'          => 'belum_dibayar',
+                'created_by'              => auth()->id(),
             ]);
 
             // Save changes to audit log (Sprint 8: audit_logs)

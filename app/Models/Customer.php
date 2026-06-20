@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Services\CustomerValidationService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'customer_code',
     'old_customer_id',
+    'old_request_id',
     'cid',
     'full_name',
     'identity_number',
@@ -29,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'data_completeness_status',
     'customer_status',
     'pop_id',
+    'distribution_id',
     'status',
     'address',
     'latitude',
@@ -56,7 +59,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Customer extends Model
 {
-    use RecordsAuditLogs;
+    use RecordsAuditLogs, HasFactory;
 
     protected string $auditModule = 'Data Pelanggan';
 
@@ -122,6 +125,17 @@ class Customer extends Model
     public function pop(): BelongsTo
     {
         return $this->belongsTo(Pop::class);
+    }
+
+    /**
+     * The distribution area this customer belongs to.
+     * Used as part of CID generation: {pop.cid_prefix}{olt_number}{distribution.code}...
+     *
+     * @return BelongsTo<Distribution, $this>
+     */
+    public function distribution(): BelongsTo
+    {
+        return $this->belongsTo(Distribution::class);
     }
 
     /**
@@ -278,6 +292,51 @@ class Customer extends Model
         /** @var CustomerValidationService $service */
         $service = app(CustomerValidationService::class);
         return $service->validate($this);
+    }
+
+    /**
+     * Compute the display identifier based on customer status.
+     *
+     * Sesuai spesifikasi-pop-distribusi-cid.md:
+     * - REQ ID murni (RQ######) saat: pending/survey/pemasangan/installed/terminated
+     * - CID lengkap saat: aktif + punya distribusi
+     * - C00RQ###### saat: aktif tanpa distribusi
+     *
+     * @return string
+     */
+    public function getDisplayIdAttribute(): string
+    {
+        $pop = $this->pop;
+        if (!$pop) {
+            return $this->customer_code;
+        }
+
+        return $pop->resolveDisplayId($this);
+    }
+
+    /**
+     * Get the label type for the display ID.
+     * Returns 'REQ ID', 'CID', or 'ID' depending on the customer's status.
+     *
+     * @return string
+     */
+    public function getDisplayIdLabelAttribute(): string
+    {
+        $status = strtolower((string) ($this->status ?? ''));
+
+        $bareStatuses = ['terminated', 'pending', 'waiting_survey', 'surveyed', 'waiting_installation', 'installed'];
+        if (in_array($status, $bareStatuses, true)) {
+            return 'REQ ID';
+        }
+
+        if (in_array($status, ['active', 'suspended'], true)) {
+            if ($this->distribution_id && $this->cid) {
+                return 'CID';
+            }
+            return 'ID';
+        }
+
+        return 'ID';
     }
 
     /**

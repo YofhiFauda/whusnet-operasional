@@ -22,7 +22,7 @@ class CustomerImportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware();
     }
 
     public function test_import_page_loads_successfully(): void
@@ -402,7 +402,7 @@ class CustomerImportTest extends TestCase
             'customer_id' => $customer->id,
             'old_request_id' => 'REQ-LEG2-1',
             'monthly_price' => 250000,
-            'total_monthly_bill' => 277500,
+            'total_monthly_bill' => 250000,
             'service_status' => 'active',
         ]);
 

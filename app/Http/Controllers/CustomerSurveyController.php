@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 
 class CustomerSurveyController extends Controller
@@ -16,21 +15,32 @@ class CustomerSurveyController extends Controller
         abort_unless(auth()->user()->hasPermission('fill_survey'), 403);
 
         $validated = $request->validate([
-            'survey_status' => 'required|string|in:pending,completed,failed',
-            'survey_date' => 'required|date',
-            'start_time' => 'nullable',
-            'end_time' => 'nullable',
-            'technician_id' => 'nullable|exists:users,id',
-            'required_tools' => 'nullable|string',
-            'cable_estimation_meter' => 'nullable|integer|min:0',
-            'nearest_odp' => 'nullable|string',
-            'survey_photo' => 'nullable|image|max:2048',
-            'survey_note' => 'nullable|string',
+            'survey_status'           => 'required|string|in:pending,completed,failed',
+            'survey_date'             => 'required|date',
+            'end_date'                => 'nullable|date',
+            'start_time'              => 'nullable',
+            'end_time'                => 'nullable',
+            'duration_minutes'        => 'nullable|integer|min:0',
+            'assigned_at'             => 'nullable|date',
+            'fop_id'                  => 'nullable|string',
+            'technician_id'           => 'nullable|exists:users,id',
+            'surveyor_2_id'           => 'nullable|exists:users,id',
+            'surveyor_3_id'           => 'nullable|exists:users,id',
+            'surveyors'               => 'nullable|string',
+            'required_tools'          => 'nullable|string',
+            'cable_estimation_meter'  => 'nullable|integer|min:0',
+            'nearest_odp'             => 'nullable|string',
+            'survey_photo'            => 'nullable|image|max:2048',
+            'house_photo'             => 'nullable|image|max:2048',
+            'survey_note'             => 'nullable|string',
         ]);
 
         if ($request->hasFile('survey_photo')) {
-            $path = $request->file('survey_photo')->store('surveys', 'public');
-            $validated['survey_photo'] = $path;
+            $validated['survey_photo'] = $request->file('survey_photo')->store('surveys', 'public');
+        }
+
+        if ($request->hasFile('house_photo')) {
+            $validated['house_photo'] = $request->file('house_photo')->store('surveys/house', 'public');
         }
 
         $validated['customer_id'] = $customer->id;

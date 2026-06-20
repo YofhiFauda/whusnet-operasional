@@ -15,6 +15,7 @@
 
 @php
     $device = $customer->customerDevice;
+    $technicalDetail = $customer->customerTechnicalDetail;
     $canViewSensitiveDeviceFields = auth()->user()->hasPermission('fill_device');
     $maskSensitive = fn ($value) => $canViewSensitiveDeviceFields ? ($value ?: '-') : ($value ? '********' : '-');
 @endphp
@@ -89,13 +90,100 @@
         </div>
     </div>
 @else
-    <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
-        <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-        <h4 class="text-sm font-semibold text-slate-700">Belum ada data perangkat</h4>
-        <p class="text-xs text-slate-500 mt-1">Silakan isi data modem, ONT, atau router pelanggan melalui tombol di atas.</p>
-    </div>
+    @if($technicalDetail || $customer->ont_sn || $customer->ip_address)
+        @php
+            $fallbackDeviceType = '-';
+            if ($technicalDetail?->connection_type) {
+                $connType = strtolower($technicalDetail->connection_type);
+                if (str_contains($connType, 'wireless') || str_contains($connType, 'radio')) {
+                    $fallbackDeviceType = 'ROUTER';
+                } elseif (str_contains($connType, 'fiber') || str_contains($connType, 'ont') || str_contains($connType, 'onu')) {
+                    $fallbackDeviceType = 'ONT';
+                } else {
+                    $fallbackDeviceType = strtoupper($technicalDetail->connection_type);
+                }
+            } elseif ($customer->ont_sn) {
+                $fallbackDeviceType = 'ONT';
+            }
+        @endphp
+        <div class="border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+                <span class="text-xs font-bold text-amber-800 uppercase tracking-wider">Data Perangkat Migrasi</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider bg-amber-100 text-amber-700 border-amber-200">
+                    Fallback
+                </span>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Jenis Perangkat</span>
+                        <span class="font-semibold text-slate-800">{{ $fallbackDeviceType }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Merk / Tipe</span>
+                        <span class="font-semibold text-slate-800">{{ $technicalDetail?->passive_device ?: '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Serial Number</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $technicalDetail?->router_or_ont_serial ?? $customer->ont_sn ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">MAC Address</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $technicalDetail?->router_mac ?? $technicalDetail?->antenna_mac ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">IP Address</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $technicalDetail?->ip_address ?? $customer->ip_address ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">VLAN ID</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $customer->vlan_id ?? '-' }}</span>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Username PPPoE</span>
+                        <span class="font-semibold text-slate-800 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Password PPPoE</span>
+                        <span class="font-semibold text-slate-800 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">SSID WiFi</span>
+                        <span class="font-semibold text-slate-800">{{ $technicalDetail?->ssid ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Password WiFi</span>
+                        <span class="font-semibold text-slate-800 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">ODP / Port</span>
+                        <span class="font-semibold text-slate-800">{{ $technicalDetail?->odp_number ?? $customer->odp_code ?? '-' }} / {{ $technicalDetail?->odp_port ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Redaman / Mode</span>
+                        <span class="font-semibold text-slate-800">{{ ($technicalDetail?->fiber_signal ?? $technicalDetail?->wireless_signal) ?: '-' }} / {{ $technicalDetail?->connection_type ?: '-' }}</span>
+                    </div>
+                </div>
+                <div class="md:col-span-2 pt-2">
+                    <span class="block text-slate-500 mb-1">Catatan Teknis:</span>
+                    <p class="p-3 bg-slate-50 rounded border border-slate-100 italic">{{ $technicalDetail?->note ?? 'Tidak ada catatan' }}</p>
+                </div>
+            </div>
+            <div class="px-5 py-3 bg-amber-50/60 text-[10px] font-medium text-amber-800 border-t border-amber-100">
+                Data ini tampil dari detail teknis migrasi karena tabel perangkat pelanggan belum terisi.
+            </div>
+        </div>
+    @else
+        <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
+            <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-slate-700">Belum ada data perangkat</h4>
+            <p class="text-xs text-slate-500 mt-1">Silakan isi data modem, ONT, atau router pelanggan melalui tombol di atas.</p>
+        </div>
+    @endif
 @endif
 
 @if($customer->customerTechnicalDetail)
@@ -123,6 +211,18 @@
                     <span class="text-slate-500">Nomor POP (IDWILAYAH)</span>
                     <span class="font-semibold text-slate-800 font-mono">{{ $tech->pop_number ?: '-' }}</span>
                 </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Nomor OLT</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->olt_number ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Slot OLT</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->olt_slot ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Nomor Port OLT</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->olt_port ?: '-' }}</span>
+                </div>
             </div>
             <div class="space-y-3">
                 <div class="flex justify-between border-b border-slate-50 py-1">
@@ -136,6 +236,10 @@
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">Redaman Terkini (Actual)</span>
                     <span class="font-semibold text-slate-800 font-mono">{{ $tech->actual_attenuation !== null ? $tech->actual_attenuation . ' dB' : '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">VLAN (Teknis Jaringan)</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->vlan ?: '-' }}</span>
                 </div>
             </div>
         </div>
@@ -159,8 +263,23 @@
                 <div>
                     <label for="device_type" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jenis Perangkat</label>
                     <select name="device_type" id="device_type" required class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        @php
+                            $defaultDeviceType = old('device_type', $device?->device_type);
+                            if (!$defaultDeviceType && !$device) {
+                                if ($technicalDetail?->connection_type) {
+                                    $connType = strtolower($technicalDetail->connection_type);
+                                    if (str_contains($connType, 'wireless') || str_contains($connType, 'radio')) {
+                                        $defaultDeviceType = 'router';
+                                    } else {
+                                        $defaultDeviceType = 'ont';
+                                    }
+                                } else {
+                                    $defaultDeviceType = 'ont';
+                                }
+                            }
+                        @endphp
                         @foreach(['modem' => 'Modem', 'ont' => 'ONT', 'onu' => 'ONU', 'router' => 'Router', 'other' => 'Lainnya'] as $value => $label)
-                            <option value="{{ $value }}" {{ old('device_type', $device?->device_type ?? 'ont') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            <option value="{{ $value }}" {{ $defaultDeviceType === $value ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -168,26 +287,57 @@
                     <label for="connection_mode" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mode Koneksi</label>
                     <select name="connection_mode" id="connection_mode" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                         <option value="">Pilih mode</option>
+                        @php
+                            $defaultConnMode = old('connection_mode', $device?->connection_mode);
+                            if (!$defaultConnMode && !$device && $technicalDetail?->connection_type) {
+                                $connType = strtolower($technicalDetail->connection_type);
+                                if (str_contains($connType, 'pppoe')) {
+                                    $defaultConnMode = 'pppoe';
+                                } elseif (str_contains($connType, 'static')) {
+                                    $defaultConnMode = 'static';
+                                } elseif (str_contains($connType, 'dhcp')) {
+                                    $defaultConnMode = 'dhcp';
+                                } elseif (str_contains($connType, 'bridge')) {
+                                    $defaultConnMode = 'bridge';
+                                } elseif (str_contains($connType, 'router')) {
+                                    $defaultConnMode = 'router';
+                                }
+                            }
+                        @endphp
                         @foreach(['bridge' => 'Bridge', 'router' => 'Router', 'pppoe' => 'PPPoE', 'static' => 'Static', 'dhcp' => 'DHCP', 'other' => 'Lainnya'] as $value => $label)
-                            <option value="{{ $value }}" {{ old('connection_mode', $device?->connection_mode) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            <option value="{{ $value }}" {{ $defaultConnMode === $value ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div>
                     <label for="brand" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Merk</label>
-                    <input type="text" name="brand" id="brand" value="{{ old('brand', $device?->brand) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                    @php
+                        $defaultBrand = $device?->brand;
+                        if (!$defaultBrand && !$device && $technicalDetail?->passive_device) {
+                            $parts = explode(' ', trim($technicalDetail->passive_device), 2);
+                            $defaultBrand = $parts[0] ?? '';
+                        }
+                    @endphp
+                    <input type="text" name="brand" id="brand" value="{{ old('brand', $defaultBrand) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 </div>
                 <div>
                     <label for="model" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tipe</label>
-                    <input type="text" name="model" id="model" value="{{ old('model', $device?->model) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                    @php
+                        $defaultModel = $device?->model;
+                        if (!$defaultModel && !$device && $technicalDetail?->passive_device) {
+                            $parts = explode(' ', trim($technicalDetail->passive_device), 2);
+                            $defaultModel = $parts[1] ?? '';
+                        }
+                    @endphp
+                    <input type="text" name="model" id="model" value="{{ old('model', $defaultModel) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 </div>
                 <div>
                     <label for="serial_number" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Serial Number</label>
-                    <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number', $device?->serial_number) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number', $device?->serial_number ?? $technicalDetail?->router_or_ont_serial ?? $customer->ont_sn) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="mac_address" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">MAC Address</label>
-                    <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $device?->mac_address) }}" placeholder="AA:BB:CC:DD:EE:FF" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $device?->mac_address ?? $technicalDetail?->router_mac ?? $technicalDetail?->antenna_mac) }}" placeholder="AA:BB:CC:DD:EE:FF" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="pppoe_username" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Username PPPoE</label>
@@ -199,7 +349,7 @@
                 </div>
                 <div>
                     <label for="wifi_ssid" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">SSID WiFi</label>
-                    <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $device?->wifi_ssid) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                    <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $device?->wifi_ssid ?? $technicalDetail?->ssid) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 </div>
                 <div>
                     <label for="wifi_password" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password WiFi</label>
@@ -207,27 +357,57 @@
                 </div>
                 <div>
                     <label for="ip_address" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">IP Address</label>
-                    <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $device?->ip_address) }}" placeholder="192.168.1.1" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $device?->ip_address ?? $technicalDetail?->ip_address ?? $customer->ip_address) }}" placeholder="192.168.1.1" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="vlan_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">VLAN ID</label>
-                    <input type="number" name="vlan_id" id="vlan_id" value="{{ old('vlan_id', $device?->vlan_id) }}" min="1" max="4094" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="number" name="vlan_id" id="vlan_id" value="{{ old('vlan_id', $device?->vlan_id ?? $customer->vlan_id) }}" min="1" max="4094" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="odp" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ODP</label>
-                    <input type="text" name="odp" id="odp" value="{{ old('odp', $device?->odp) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="odp" id="odp" value="{{ old('odp', $device?->odp ?? $technicalDetail?->odp_number ?? $customer->odp_code) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="odp_port" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Port ODP</label>
-                    <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $device?->odp_port) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $device?->odp_port ?? $technicalDetail?->odp_port) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="olt_number" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor OLT</label>
+                    <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $technicalDetail?->olt_number) }}" placeholder="Contoh: OLT-01" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="olt_slot" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Slot OLT</label>
+                    <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $technicalDetail?->olt_slot) }}" placeholder="Contoh: 0/1" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="olt_port_tech" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Port OLT</label>
+                    <input type="text" name="olt_port" id="olt_port_tech" value="{{ old('olt_port', $technicalDetail?->olt_port) }}" placeholder="Contoh: 1" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="tech_vlan" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">VLAN (Jaringan)</label>
+                    <input type="text" name="tech_vlan" id="tech_vlan" value="{{ old('tech_vlan', $technicalDetail?->vlan) }}" placeholder="Contoh: 100" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="signal_rx_power" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman (dBm)</label>
-                    <input type="number" step="0.01" name="signal_rx_power" id="signal_rx_power" value="{{ old('signal_rx_power', $device?->signal_rx_power) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    @php
+                        $sigPower = old('signal_rx_power', $device?->signal_rx_power);
+                        if (!$device && $technicalDetail) {
+                            $rawSig = $technicalDetail->fiber_signal ?? $technicalDetail->wireless_signal;
+                            if (is_numeric($rawSig)) {
+                                $sigPower = $rawSig;
+                            } else {
+                                preg_match('/-\d+(?:\.\d+)?/', $rawSig, $matches);
+                                if (!empty($matches)) {
+                                    $sigPower = $matches[0];
+                                }
+                            }
+                        }
+                    @endphp
+                    <input type="number" step="0.01" name="signal_rx_power" id="signal_rx_power" value="{{ $sigPower }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div class="md:col-span-2">
                     <label for="technical_note" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Catatan Teknis</label>
-                    <textarea name="technical_note" id="technical_note" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">{{ old('technical_note', $device?->technical_note) }}</textarea>
+                    <textarea name="technical_note" id="technical_note" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">{{ old('technical_note', $device?->technical_note ?? $technicalDetail?->note) }}</textarea>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">

@@ -8,6 +8,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+
 class PopController extends Controller
 {
     /**
@@ -19,7 +22,7 @@ class PopController extends Controller
         $type = $request->query('type');
         $status = $request->query('status');
 
-        $pops = Pop::query()
+        $allItems = Pop::query()
             ->forUser()
             ->with('parent')
             ->when($search !== '', function ($query) use ($search) {
@@ -36,11 +39,51 @@ class PopController extends Controller
             ->when($status && in_array($status, ['active', 'inactive']), function ($query) use ($status) {
                 $query->where('status', $status);
             })
-            ->orderBy('name')
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
+
+        // Build the tree hierarchy from the filtered collection
+        $roots = $allItems->filter(function ($pop) use ($allItems) {
+            return is_null($pop->parent_id) || !$allItems->contains('id', $pop->parent_id);
+        })->sortBy('name');
+
+        $sortedPops = collect();
+        foreach ($roots as $root) {
+            $sortedPops = $sortedPops->merge($this->flattenTree($root, $allItems, 0));
+        }
+
+        // Paginate the sorted collection
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 50; // Increased page limit for better tree visibility
+        $currentPageItems = $sortedPops->slice(($currentPage - 1) * $perPage, $perPage)->values()->all();
+
+        $pops = new LengthAwarePaginator(
+            $currentPageItems,
+            $sortedPops->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+                'query' => $request->query(),
+            ]
+        );
 
         return view('master.pop.index', compact('pops', 'search', 'type', 'status'));
+    }
+
+    /**
+     * Helper to flatten POPs into a tree hierarchy.
+     */
+    private function flattenTree(Pop $item, Collection $allCollection, int $depth = 0): Collection
+    {
+        $item->depth = $depth;
+        $result = collect([$item]);
+        
+        $children = $allCollection->where('parent_id', $item->id)->sortBy('name');
+        foreach ($children as $child) {
+            $result = $result->merge($this->flattenTree($child, $allCollection, $depth + 1));
+        }
+        
+        return $result;
     }
 
     /**
@@ -185,9 +228,11 @@ class PopController extends Controller
     private function normalizeIdentifierInput(Request $request): void
     {
         $request->merge([
+            'code' => strtoupper(trim((string) $request->input('code'))),
             'pop_code' => strtoupper(trim((string) $request->input('pop_code'))),
             'registration_prefix' => strtoupper(trim((string) $request->input('registration_prefix'))),
             'cid_prefix' => strtoupper(trim((string) $request->input('cid_prefix'))),
+            'name' => trim((string) $request->input('name')),
         ]);
     }
 }

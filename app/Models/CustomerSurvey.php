@@ -14,10 +14,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'start_time',
     'end_time',
     'technician_id',
+    'surveyor_2_id',
+    'surveyor_3_id',
     'required_tools',
     'cable_estimation_meter',
     'nearest_odp',
     'survey_photo',
+    'house_photo',
     'survey_note',
     'end_date',
     'duration_minutes',
@@ -35,12 +38,15 @@ class CustomerSurvey extends Model
 
     protected array $auditHidden = [
         'survey_photo',
+        'house_photo',
     ];
 
     protected function casts(): array
     {
         return [
             'survey_date' => 'date',
+            'end_date'    => 'date',
+            'assigned_at' => 'datetime',
         ];
     }
 
@@ -58,5 +64,21 @@ class CustomerSurvey extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'technician_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function surveyor2(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'surveyor_2_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function surveyor3(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'surveyor_3_id');
     }
 }

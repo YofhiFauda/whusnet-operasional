@@ -186,13 +186,30 @@
                         </div>
 
                         <div>
-                            <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP / CABANG <span class="text-red-500">*</span></label>
-                            <select name="pop_id" id="pop_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
-                                <option value="" disabled selected>Pilih POP / Cabang</option>
+                            <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP CABANG <span class="text-red-500">*</span></label>
+                            <select name="pop_id" id="pop_id" onchange="filterDistributionsByPop(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="" disabled selected>Pilih POP Cabang</option>
                                 @foreach($pops as $pop)
-                                    <option value="{{ $pop->id }}" {{ old('pop_id', $customer->pop_id) == $pop->id ? 'selected' : '' }}>{{ $pop->name }} ({{ strtoupper($pop->type) }})</option>
+                                    <option value="{{ $pop->id }}" {{ old('pop_id', $customer->pop_id) == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
                                 @endforeach
                             </select>
+                        </div>
+
+                        <div>
+                            <label for="distribution_id" class="block mb-2 uppercase tracking-wide">KODE DISTRIBUSI
+                                <span class="text-slate-400 font-normal normal-case text-[10px] ml-1">(bagian dari CID pelanggan)</span>
+                            </label>
+                            <select name="distribution_id" id="distribution_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="">— Pilih Distribusi (Opsional, Pilih POP Dulu) —</option>
+                                @foreach($distributions as $dist)
+                                    <option value="{{ $dist->id }}"
+                                        data-pop-id="{{ $dist->pop?->parent_id ?? $dist->pop_id }}"
+                                        {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>
+                                        {{ $dist->code }} — {{ $dist->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-[10px] text-slate-400 mt-1 font-mono">Kode distribusi digunakan untuk membentuk CID: <span class="text-sky-600">{POP}{OLT}<strong>{Distribusi}</strong>{RQ}_{Desa}_{Nama}</span></p>
                         </div>
 
                         <div class="md:col-span-2">
@@ -388,7 +405,7 @@
                             <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                                 <option value="" disabled>Pilih Paket Internet</option>
                                 @foreach($packages as $package)
-                                    <option value="{{ $package->id }}" data-price="{{ $package->monthly_price }}" {{ old('internet_package_id', $customer->internet_package_id) == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->category }} (Rp {{ number_format($package->monthly_price, 0, ',', '.') }}/bln)</option>
+                                    <option value="{{ $package->id }}" data-price="{{ $package->monthly_price }}" {{ old('internet_package_id', $customer->internet_package_id) == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }} (Rp {{ number_format($package->monthly_price, 0, ',', '.') }}/bln)</option>
                                 @endforeach
                             </select>
                         </div>
@@ -407,6 +424,11 @@
                             <label class="block mb-2 uppercase tracking-wide" for="tax_percent">PPN (%) <span class="text-red-500">*</span></label>
                             <input type="number" name="tax_percent" id="tax_percent" oninput="updateLayananBreakdown()" value="{{ old('tax_percent', $customer->tax_percent) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 11">
                         </div>
+
+                        <div>
+                            <label class="block mb-2 uppercase tracking-wide" for="other_fee">BIAYA LAIN DI LUAR STANDAR (RP)</label>
+                            <input type="number" name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="{{ old('other_fee', $customer->customerService?->other_fee ?? 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 11000">
+                        </div>
                     </div>
 
                     <!-- Dynamic Pricing Calculations Preview -->
@@ -424,6 +446,10 @@
                             <div class="flex justify-between">
                                 <span class="text-slate-500" id="preview-tax-label">PPN (11%):</span>
                                 <span class="text-slate-700" id="preview-tax">Rp 0,00</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Biaya Lain di luar Standar:</span>
+                                <span class="text-slate-700" id="preview-other-fee">Rp 0,00</span>
                             </div>
                             <hr class="border-dashed border-slate-200">
                             <div class="flex justify-between text-sm font-bold text-slate-900">
@@ -496,8 +522,11 @@
                         </div>
 
                         <div>
-                            <label for="olt_code" class="block mb-2 uppercase tracking-wide">KODE OLT</label>
+                            <label for="olt_code" class="block mb-2 uppercase tracking-wide">NAMA / KODE PERANGKAT OLT
+                                <span class="text-slate-400 font-normal normal-case text-[10px] ml-1">(label perangkat, bukan untuk CID)</span>
+                            </label>
                             <input type="text" name="olt_code" id="olt_code" value="{{ old('olt_code', $customer->olt_code) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: OLT-ZTE-C320">
+                            <p class="text-[10px] text-slate-400 mt-1">Label nama perangkat OLT. <strong class="text-amber-600">Nomor OLT untuk CID diisi teknisi saat survei/pemasangan.</strong></p>
                         </div>
 
                         <div>
@@ -546,7 +575,7 @@
     const formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
-            optional: ['email', 'alternative_phone', 'latitude', 'longitude']
+            optional: ['email', 'alternative_phone', 'latitude', 'longitude', 'distribution_id']
         },
         'dokumen': {
             required: [],
@@ -595,6 +624,28 @@
     
     if (activeCityId) {
         loadDistricts(activeCityId, activeDistrictId, activeVillageId);
+    }
+
+    // Filter distribusi berdasarkan POP yang dipilih
+    function filterDistributionsByPop(popId) {
+        const distSelect = document.getElementById('distribution_id');
+        if (!distSelect) return;
+        const options = distSelect.querySelectorAll('option[data-pop-id]');
+        options.forEach(opt => {
+            if (!popId || opt.dataset.popId === popId) {
+                opt.style.display = '';
+            } else {
+                opt.style.display = 'none';
+                // Deselect hidden options
+                if (opt.selected) opt.selected = false;
+            }
+        });
+    }
+
+    // Run on page load if POP already selected (e.g. after validation failure or initial load)
+    const oldPopId = "{{ old('pop_id', $customer->pop_id) }}";
+    if (oldPopId) {
+        filterDistributionsByPop(oldPopId);
     }
 
     // Dynamic dropdown for Districts
@@ -760,16 +811,22 @@
 
         const discount = parseFloat(discountInput.value) || 0;
         const taxPercent = parseFloat(taxInput.value) || 0;
+        const otherFeeInput = document.getElementById('other_fee');
+        const otherFee = otherFeeInput ? (parseFloat(otherFeeInput.value) || 0) : 0;
 
         const taxable = Math.max(0, basePrice - discount);
         const tax = Math.round(taxable * (taxPercent / 100));
-        const total = taxable + tax;
+        const total = taxable + tax + otherFee;
 
         // Render preview texts
         document.getElementById('preview-base-price').textContent = formatRupiah(basePrice);
         document.getElementById('preview-discount').textContent = '- ' + formatRupiah(discount);
         document.getElementById('preview-tax-label').textContent = `PPN (${taxPercent}%):`;
         document.getElementById('preview-tax').textContent = formatRupiah(tax);
+        const otherFeeEl = document.getElementById('preview-other-fee');
+        if (otherFeeEl) {
+            otherFeeEl.textContent = formatRupiah(otherFee);
+        }
         document.getElementById('preview-total-monthly').textContent = formatRupiah(total);
     }
 
@@ -906,7 +963,7 @@
             phone: 'Nomor HP',
             primary_phone: 'Nomor HP Utama',
             alternative_phone: 'Nomor HP Alternatif',
-            pop_id: 'POP / Cabang',
+            pop_id: 'POP Cabang',
             email: 'Email',
             registration_date: 'Tgl Registrasi',
             address: 'Alamat',

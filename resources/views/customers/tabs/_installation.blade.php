@@ -4,12 +4,20 @@
         <p class="text-xs text-slate-500 mt-0.5">Jadwal, teknisi, status, foto, dan catatan hasil pemasangan pelanggan.</p>
     </div>
     @can('fill_installation')
-        <button onclick="openInstallationModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Isi Data Pemasangan
-        </button>
+        <div class="flex gap-2">
+            <button onclick="openTestReportModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Isi Laporan Uji (Speedtest)
+            </button>
+            <button onclick="openInstallationModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Isi Data Pemasangan
+            </button>
+        </div>
     @endcan
 </div>
 
@@ -35,9 +43,21 @@
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                     <div class="space-y-3">
                         <div class="flex justify-between border-b border-slate-50 py-1">
-                            <span class="text-slate-500">Teknisi Pemasangan</span>
+                            <span class="text-slate-500">Teknisi 1 (Utama)</span>
                             <span class="font-semibold text-slate-800">{{ $installation->technicians ?: ($installation->technician->name ?? '-') }}</span>
                         </div>
+                        @if($installation->technician2)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Teknisi 2</span>
+                            <span class="font-semibold text-slate-800">{{ $installation->technician2->name }}</span>
+                        </div>
+                        @endif
+                        @if($installation->technician3)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Teknisi 3</span>
+                            <span class="font-semibold text-slate-800">{{ $installation->technician3->name }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Jadwal</span>
                             <span class="font-semibold text-slate-800">{{ \App\Support\IndonesianDate::date($installation->scheduled_date) }} {{ $installation->scheduled_time ? substr($installation->scheduled_time, 0, 5) : '' }}</span>
@@ -158,6 +178,12 @@
                                 <span class="text-slate-500">Packet Loss</span>
                                 <span class="font-semibold text-slate-800 font-mono">{{ $tech->packet_loss_percent !== null ? number_format($tech->packet_loss_percent, 2) . '%' : '0.00%' }}</span>
                             </div>
+                            @if($tech->initial_attenuation || $tech->actual_attenuation)
+                                <div class="flex justify-between items-center border-t border-slate-100 mt-1 pt-1">
+                                    <span class="text-slate-500">Redaman (Awal / Aktual)</span>
+                                    <span class="font-semibold text-slate-800 font-mono text-[10px]">{{ $tech->initial_attenuation ?: '-' }} / {{ $tech->actual_attenuation ?: '-' }} dBm</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
                     <div class="mt-3 flex items-center justify-between">
@@ -256,17 +282,78 @@
                 </div>
 
                 <div>
-                    <label for="installation_technician_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Teknisi Pemasangan</label>
+                    <label for="start_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Mulai Pemasangan</label>
+                    <input type="time" name="start_time" id="start_time"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="end_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Selesai Pemasangan</label>
+                    <input type="time" name="end_time" id="end_time"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="finished_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Selesai (Aktual)</label>
+                    <input type="date" name="finished_date" id="finished_date"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="fop_id_inst" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID FOP / Penugasan</label>
+                    <input type="text" name="fop_id" id="fop_id_inst" placeholder="FOP-2026-..."
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="assigned_at_inst" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Penugasan Pemasangan</label>
+                    <input type="datetime-local" name="assigned_at" id="assigned_at_inst"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="installation_technician_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Teknisi 1 (Utama)</label>
                     <select name="technician_id" id="installation_technician_id" required
                             class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                         <option value="{{ auth()->id() }}">{{ auth()->user()->name }} (Saya)</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers->where('id', '!=', auth()->id()) as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
                     </select>
                 </div>
 
                 <div>
-                    <label for="finished_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Selesai</label>
-                    <input type="date" name="finished_date" id="finished_date"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <label for="technician_2_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Teknisi 2</label>
+                    <select name="technician_2_id" id="technician_2_id"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="">— Tidak ada —</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
+
+                <div>
+                    <label for="technician_3_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Teknisi 3</label>
+                    <select name="technician_3_id" id="technician_3_id"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="">— Tidak ada —</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="technicians" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Tim Teknisi (Opsional)</label>
+                    <input type="text" name="technicians" id="technicians" placeholder="Contoh: Tim Pemasangan - Budi, Andi"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 </div>
 
                 <div class="md:col-span-2">
@@ -288,6 +375,105 @@
                 </button>
                 <button type="submit" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
                     Simpan Data Pemasangan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Input Laporan Uji (Speedtest) -->
+<div id="test-report-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden transform transition-all">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Laporan Hasil Pengujian Layanan (Speedtest)</h3>
+            <button onclick="closeTestReportModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form action="{{ route('customers.test-report.store', $customer->id) }}" method="POST" enctype="multipart/form-data">
+            @csrf
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="test_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Uji</label>
+                    <input type="date" name="test_date" id="test_date" value="{{ date('Y-m-d') }}" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="test_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jam Uji</label>
+                    <input type="time" name="test_time" id="test_time" value="{{ date('H:i') }}"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="test_download" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Speed Download (Mbps)</label>
+                    <input type="number" step="0.01" name="test_download" id="test_download" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="test_upload" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Speed Upload (Mbps)</label>
+                    <input type="number" step="0.01" name="test_upload" id="test_upload" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="latency_ms" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Latency (Ping ms)</label>
+                    <input type="number" step="0.1" name="latency_ms" id="latency_ms"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="jitter_ms" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jitter (ms)</label>
+                    <input type="number" step="0.1" name="jitter_ms" id="jitter_ms"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="packet_loss_percent" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Packet Loss (%)</label>
+                    <input type="number" step="0.01" name="packet_loss_percent" id="packet_loss_percent"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="quality_score" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Skor Kualitas (1-5)</label>
+                    <select name="quality_score" id="quality_score"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="5">⭐⭐⭐⭐⭐ (Sangat Bagus)</option>
+                        <option value="4">⭐⭐⭐⭐ (Bagus)</option>
+                        <option value="3" selected>⭐⭐⭐ (Cukup)</option>
+                        <option value="2">⭐⭐ (Kurang)</option>
+                        <option value="1">⭐ (Buruk)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="initial_attenuation" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman Awal (dBm)</label>
+                    <input type="text" name="initial_attenuation" id="initial_attenuation" placeholder="-19.50"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="actual_attenuation" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman Aktual (dBm)</label>
+                    <input type="text" name="actual_attenuation" id="actual_attenuation" placeholder="-21.20"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="speedtest_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto Hasil Speedtest</label>
+                    <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                    <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
+                </div>
+            </div>
+            <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
+                <button type="button" onclick="closeTestReportModal()" class="px-3 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                    Batal
+                </button>
+                <button type="submit" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                    Simpan Laporan Hasil Uji
                 </button>
             </div>
         </form>

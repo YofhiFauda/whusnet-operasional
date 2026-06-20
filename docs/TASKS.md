@@ -7,6 +7,315 @@ Current Task: Seluruh MVP Selesai dan Terverifikasi
 
 ## In Progress
 
+---
+
+## Master Data Tambahan
+
+### MD-001 — Master Data Distribusi
+Status: Done
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
+
+### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
+1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
+2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
+3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
+
+Scope:
+- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
+- Model: update fillable `CustomerTechnicalDetail`.
+- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
+- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
+
+Acceptance Criteria:
+- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
+- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
+- [x] Migration berjalan tanpa error.
+- [x] Tidak ada data existing yang rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 2 gap pada Data Survey:
+1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
+2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
+
+Acceptance Criteria:
+- [x] Petugas survey 1–3 dapat diisi dari daftar user.
+- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
+- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Laporan Aktivasi:
+- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
+
+Acceptance Criteria:
+- [x] `activated_by_user_id` tersimpan saat aktivasi.
+- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
+- [x] Data existing tidak rusak (nullable).
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Data Pemasangan:
+- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
+
+Acceptance Criteria:
+- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
+- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
+
+Scope:
+- Tambah field `other_fee` pada `customer_services`.
+- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
+- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
+- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
+- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
+
+Acceptance Criteria:
+- [x] `other_fee` tersimpan di `customer_services`.
+- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
+- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
+- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
+- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
+
+---
+
+---
+
+## Master Data Tambahan
+
+### MD-001 — Master Data Distribusi
+Status: Done
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+### MD-002 — Collapse & Expand Parent POP
+Status: Done
+
+Tujuan:
+Mempermudah maintenance data wilayah dengan menambahkan fitur collapse dan expand pada parent POP yang memiliki anak (cabang / mini POP) di tabel list Master POP.
+
+Scope:
+- Controller: Mengurutkan hasil query POP secara hirarki tree rekursif dan menyertakan tingkat kedalaman (`depth`).
+- View: Indentasi visual nama POP berdasarkan depth, konektor `└─` untuk child, tombol toggle chevron berotasi 90 derajat, dan vanilla JS untuk menyembunyikan/menampilkan child rows secara rekursif.
+
+Acceptance Criteria:
+- [x] Parent POP yang memiliki child menampilkan tombol chevron toggle.
+- [x] Mengklik tombol toggle menyembunyikan/menampilkan child rows di bawahnya secara interaktif & rekursif.
+- [x] Tampilan visual rapi dengan indentasi dan simbol konektor yang membedakan tingkat kedalaman.
+- [x] Test suite Pop CRUD dan relasi tetap lulus 100%.
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
+
+### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
+1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
+2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
+3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
+
+Scope:
+- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
+- Model: update fillable `CustomerTechnicalDetail`.
+- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
+- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
+
+Acceptance Criteria:
+- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
+- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
+- [x] Migration berjalan tanpa error.
+- [x] Tidak ada data existing yang rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 2 gap pada Data Survey:
+1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
+2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
+
+Acceptance Criteria:
+- [x] Petugas survey 1–3 dapat diisi dari daftar user.
+- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
+- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Laporan Aktivasi:
+- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
+
+Acceptance Criteria:
+- [x] `activated_by_user_id` tersimpan saat aktivasi.
+- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
+- [x] Data existing tidak rusak (nullable).
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Data Pemasangan:
+- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
+
+Acceptance Criteria:
+- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
+- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
+
+Scope:
+- Tambah field `other_fee` pada `customer_services`.
+- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
+- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
+- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
+- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
+
+Acceptance Criteria:
+- [x] `other_fee` tersimpan di `customer_services`.
+- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
+- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
+- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
+- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
+
+---
+
 ### MIG-EXE001 — Eksekusi Migrasi Data sand_db_sandya.sql
 Status: Done
 
@@ -1873,6 +2182,7 @@ Catatan Test:
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/PermissionTest.php` lulus: 7 tests, 52 assertions.
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerDetailTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php` lulus: 11 tests, 61 assertions.
 - `npm run build` lulus.
+- Catatan tambahan: tab `Perangkat` kini fallback ke detail teknis migrasi jika `customer_devices` belum terisi, supaya `ONT Serial Number` dan `IP Address` legacy tetap terlihat.
 - Full test suite dengan `VIEW_COMPILED_PATH` temp: 143 passed, 2 failed pada `CustomerEditTest` lama terkait cleanup file dokumen pelanggan, bukan modul perangkat.
 
 ---
@@ -1938,13 +2248,64 @@ Acceptance Criteria:
 - [x] Owner/Admin Pusat dapat melihat audit log.
 
 Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/AuditLogGeneralTest.php tests/Feature/CustomerActivationTest.php tests/Feature/PaymentAuditLogTest.php` lulus: 9 tests, 60 assertions.
+- `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php ar  tisan test tests/Feature/AuditLogGeneralTest.php tests/Feature/CustomerActivationTest.php tests/Feature/PaymentAuditLogTest.php` lulus: 9 tests, 60 assertions.
 - `VIEW_COMPILED_PATH=%TEMP%/whusnet-test-views php artisan test tests/Feature/CustomerCreateTest.php tests/Feature/CustomerActivationTest.php tests/Feature/CustomerDeviceTest.php tests/Feature/CustomerSurveyTest.php tests/Feature/CustomerInstallationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/InvoiceListTest.php tests/Feature/PaymentInputTest.php tests/Feature/PaymentListTest.php tests/Feature/PaymentAuditLogTest.php tests/Feature/PermissionTest.php tests/Feature/RolePermissionTest.php tests/Feature/PopCRUDTest.php tests/Feature/PopIdentifierSettingTest.php tests/Feature/InternetPackageSeederTest.php tests/Feature/AuditLogGeneralTest.php` lulus: 62 tests, 335 assertions.
 - `npm run build` lulus.
 - Regresi yang menyertakan `CustomerEditTest.php` masih memiliki 2 kegagalan legacy pada cleanup file dokumen pelanggan, sesuai catatan task sebelumnya, bukan dari modul audit log.
 
 ---
 
+
+## Sprint 10 — Complex CID & Termination Logic
+
+### S10-T001 — Implement Complex CID Generation Logic
+Status: Done
+
+Sprint/Module: Sprint 10 — Complex CID & Termination Logic
+
+Tujuan:
+Implementasi logic generate CID yang lebih kompleks sesuai kebutuhan operasional lapangan.
+Format: {prefix}{olt}{dist}{req}_{village}_{name}
+
+Acceptance Criteria:
+- [x] Method `generateComplexCid` tersedia di model `Pop`.
+- [x] Format CID sesuai: {prefix}{olt_number}{dist_code}{customer_code}_{village_name}_{customer_name}.
+- [x] `olt_number` diambil dari `customer_technical_details` (default '1').
+- [x] `dist_code` diambil dari `Distribution` (default 'XXX').
+- [x] `village_name` dan `customer_name` di-normalize (uppercase, no space).
+- [x] Unit test `tests/Unit/PopCidGenerationTest.php` lulus.
+
+Catatan Test:
+- `php artisan test tests/Unit/PopCidGenerationTest.php` lulus.
+
+### S10-T002 — Implement Customer Termination Logic
+Status: Todo
+
+Sprint/Module: Sprint 10 — Complex CID & Termination Logic
+
+Tujuan:
+Implementasi backend untuk terminasi (pemutusan) layanan pelanggan.
+
+Acceptance Criteria:
+- [ ] Endpoint `POST /customers/{customer}/terminate` tersedia.
+- [ ] Status pelanggan berubah menjadi `terminated`.
+- [ ] Status layanan di `customer_services` berubah menjadi `berhenti`.
+- [ ] Audit log mencatat aksi terminasi.
+
+### S10-T003 — Update UI for Termination & ID Display Logic
+Status: Todo
+
+Sprint/Module: Sprint 10 — Complex CID & Termination Logic
+
+Tujuan:
+Menghubungkan tombol terminasi di UI ke backend dan mengatur logika tampilan ID.
+
+Acceptance Criteria:
+- [ ] Tombol terminasi di modal aksi pelanggan berfungsi.
+- [ ] UI menampilkan Request ID (customer_code) alih-alih CID jika pelanggan sudah terminasi.
+- [ ] Konfirmasi terminasi muncul sebelum eksekusi.
+
+---
 
 ## Blocked
 Belum ada.
@@ -1969,6 +2330,62 @@ Catatan fix regresi import:
 Catatan hardening legacy mapping:
 - ID internal legacy `PG*` sekarang diselesaikan ke nama petugas saat migrasi data real, sehingga field `surveyors`, `installation_technicians`, dan `activated_by_name` tidak lagi bergantung pada kode mentah.
 - Alamat legacy tetap memakai fallback `ALMT` / `ALAMAT` lalu komposisi `DESA, KEC, KOTA` jika alamat jalan kosong.
+- Legacy request ID sekarang ikut disimpan di `customers.old_request_id`, dan migrasi legacy memakai prefix `RQ`/`C` agar data REQ/CID tetap konsisten dengan histori operasional.
+- Hierarki legacy sekarang juga dipetakan ke cabang POP, mini POP, dan distribusi: `KODEAPP`/cabang legacy menjadi POP induk, `kategori_perangkat_jaringan` menjadi mini POP child, dan `kode_kontrol_distribusi` disimpan sebagai distribusi untuk mendukung format CID operasional.
+- Verifikasi terbaru lulus: `php artisan test tests/Feature/RealDataMigrationTest.php` dan `php artisan test tests/Feature/CustomerImportTest.php`.
+Status: Todo
+
+Sprint/Module: Sprint 10 — Complex CID & Termination Logic
+
+Tujuan:
+Implementasi backend untuk terminasi (pemutusan) layanan pelanggan.
+
+Acceptance Criteria:
+- [ ] Endpoint `POST /customers/{customer}/terminate` tersedia.
+- [ ] Status pelanggan berubah menjadi `terminated`.
+- [ ] Status layanan di `customer_services` berubah menjadi `berhenti`.
+- [ ] Audit log mencatat aksi terminasi.
+
+### S10-T003 — Update UI for Termination & ID Display Logic
+Status: Todo
+
+Sprint/Module: Sprint 10 — Complex CID & Termination Logic
+
+Tujuan:
+Menghubungkan tombol terminasi di UI ke backend dan mengatur logika tampilan ID.
+
+Acceptance Criteria:
+- [ ] Tombol terminasi di modal aksi pelanggan berfungsi.
+- [ ] UI menampilkan Request ID (customer_code) alih-alih CID jika pelanggan sudah terminasi.
+- [ ] Konfirmasi terminasi muncul sebelum eksekusi.
+
+---
+
+## Blocked
+Belum ada.
+
+## Notes
+AI hanya boleh mengerjakan task dengan status `In Progress`.
+
+Catatan hasil S2-T006:
+- POP existing yang sudah ada sebelum migration identifier wajib dilengkapi `pop_code`, `registration_prefix`, dan `cid_prefix` melalui edit POP sebelum generator ID Request/CID digunakan.
+
+Catatan refactor S2-T004/S2-T005:
+- Duplikasi `service_packages`/`ServicePackage` dihapus dari kode aplikasi.
+- Master Paket Internet sekarang memakai tabel/model/controller `internet_packages`/`InternetPackage`, dengan struktur data dan UI hasil gabungan dari Service Package dan Internet Package.
+- Database development sudah di-reset dengan `php artisan migrate:fresh --seed`; hasil akhir: tabel `internet_packages` ada, tabel `service_packages` tidak ada, dan 27 paket ter-seed.
+- Test refactor lulus: `InternetPackageSeederTest`, `CustomerCreateTest`, `CustomerEditTest`, `CustomerImportTest`, dan `npm run build`.
+
+Catatan fix regresi import:
+- Filter akun internal legacy pada `CustomerController` dikembalikan agar hanya melewati ID internal seperti `PG*`, bukan semua ID pelanggan non-`PE`; import dengan ID legacy seperti `CUST-*` kembali tervalidasi dan tersimpan.
+- Test target lulus: `php artisan test tests/Feature/CustomerImportTest.php tests/Feature/CustomerImportLoggingTest.php` (8 passed, 2 skipped karena ZipArchive tidak tersedia).
+- Full suite lulus: `php artisan test` (178 passed, 2 skipped, 1086 assertions).
+
+Catatan hardening legacy mapping:
+- ID internal legacy `PG*` sekarang diselesaikan ke nama petugas saat migrasi data real, sehingga field `surveyors`, `installation_technicians`, dan `activated_by_name` tidak lagi bergantung pada kode mentah.
+- Alamat legacy tetap memakai fallback `ALMT` / `ALAMAT` lalu komposisi `DESA, KEC, KOTA` jika alamat jalan kosong.
+- Legacy request ID sekarang ikut disimpan di `customers.old_request_id`, dan migrasi legacy memakai prefix `RQ`/`C` agar data REQ/CID tetap konsisten dengan histori operasional.
+- Hierarki legacy sekarang juga dipetakan ke cabang POP, mini POP, dan distribusi: `KODEAPP`/cabang legacy menjadi POP induk, `kategori_perangkat_jaringan` menjadi mini POP child, dan `kode_kontrol_distribusi` disimpan sebagai distribusi untuk mendukung format CID operasional.
 - Verifikasi terbaru lulus: `php artisan test tests/Feature/RealDataMigrationTest.php` dan `php artisan test tests/Feature/CustomerImportTest.php`.
 
 Setelah task selesai:

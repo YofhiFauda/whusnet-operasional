@@ -92,18 +92,89 @@
                 <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">POP / Cabang</p>
                 <p class="text-slate-900 mt-1">{{ $invoice->pop->name ?? '-' }}</p>
             </div>
-            <div class="pt-3 border-t border-slate-100 space-y-2">
-                <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">Total</span>
-                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->total_amount, 2, ',', '.') }}</span>
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">No. Tagihan</p>
+                <p class="font-mono text-slate-900 mt-1">{{ $invoice->invoice_number }}</p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Periode</p>
+                <p class="font-mono text-slate-900 mt-1">{{ $invoice->billing_period }}</p>
+            </div>
+
+            {{-- Rincian Biaya --}}
+            <div class="pt-3 border-t border-slate-100 space-y-2 text-xs">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Rincian Biaya</p>
+
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Harga Paket</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->subtotal, 0, ',', '.') }}</span>
                 </div>
-                <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">Terbayar</span>
-                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->paid_amount, 2, ',', '.') }}</span>
+
+                @if((float)$invoice->discount > 0)
+                <div class="flex justify-between gap-2 text-green-600">
+                    <span>Diskon</span>
+                    <span class="font-mono">- Rp {{ number_format((float)$invoice->discount, 0, ',', '.') }}</span>
                 </div>
-                <div class="flex justify-between gap-4">
-                    <span class="font-bold text-slate-800">Sisa</span>
-                    <span class="font-mono font-bold text-slate-900">Rp {{ number_format((float) $invoice->remaining_amount, 2, ',', '.') }}</span>
+                @endif
+
+                @php
+                    $ppnRate   = (float)$invoice->ppn;
+                    $ppnBase   = max(0, (float)$invoice->subtotal - (float)$invoice->discount);
+                    $ppnAmount = round($ppnBase * ($ppnRate / 100), 2);
+                @endphp
+                @if($ppnRate > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>PPN ({{ number_format($ppnRate, 0) }}%)</span>
+                    <span class="font-mono">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->prorate_amount ?? 0) > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Prorate</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->prorate_amount, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_cable_fee ?? 0) > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Kabel Tambahan</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->extra_cable_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->other_fee ?? 0) > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Biaya Lain-lain</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->other_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_installation_fee ?? 0) > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Jasa Instalasi</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->extra_installation_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_pole_fee ?? 0) > 0)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span>Tambahan Tiang</span>
+                    <span class="font-mono">Rp {{ number_format((float)$invoice->extra_pole_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                <div class="flex justify-between gap-2 pt-2 border-t border-slate-200 font-bold text-slate-900">
+                    <span>Total</span>
+                    <span class="font-mono">Rp {{ number_format((float) $invoice->total_amount, 0, ',', '.') }}</span>
+                </div>
+                <div class="flex justify-between gap-2 text-emerald-600">
+                    <span>Terbayar</span>
+                    <span class="font-mono">Rp {{ number_format((float) $invoice->paid_amount, 0, ',', '.') }}</span>
+                </div>
+                <div class="flex justify-between gap-2 font-bold {{ (float)$invoice->remaining_amount > 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                    <span>Sisa</span>
+                    <span class="font-mono">Rp {{ number_format((float) $invoice->remaining_amount, 0, ',', '.') }}</span>
                 </div>
             </div>
         </div>

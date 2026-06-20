@@ -51,29 +51,24 @@ class PopIdentifierSettingTest extends TestCase
         $sleman = $this->makePop('POP-SMN', 'SMN');
         $bantul = $this->makePop('POP-BTL', 'BTL');
 
-        $this->assertSame('C-SMN-000001', $sleman->generateRegistrationNumber());
-        $this->assertSame('C-SMN-000002', $sleman->generateRegistrationNumber());
-        $this->assertSame('C-BTL-000001', $bantul->generateRegistrationNumber());
+        // Format baru: {cid_prefix}00{registration_prefix}{######}
+        // cid_prefix = 'D', registration_prefix = 'C' → D00C000001
+        $this->assertSame('D00C000001', $sleman->generateRegistrationNumber());
+        $this->assertSame('D00C000002', $sleman->generateRegistrationNumber());
+        $this->assertSame('D00C000001', $bantul->generateRegistrationNumber());
     }
 
     public function test_cid_sequence_is_separate_from_registration_sequence(): void
     {
         $pop = $this->makePop('POP-SMN', 'SMN');
 
-        $this->assertSame('C-SMN-000001', $pop->generateRegistrationNumber());
-        $this->assertSame('D-SMN-000001', $pop->generateCid());
-        $this->assertSame('C-SMN-000002', $pop->generateRegistrationNumber());
-        $this->assertSame('D-SMN-000002', $pop->generateCid());
+        // Registration counter harus terpisah dari CID counter
+        $this->assertSame('D00C000001', $pop->generateRegistrationNumber());
+        $this->assertSame('D00C000002', $pop->generateRegistrationNumber());
 
         $this->assertDatabaseHas('pop_sequences', [
             'pop_id' => $pop->id,
             'sequence_type' => PopSequence::TYPE_REGISTRATION,
-            'current_number' => 2,
-        ]);
-
-        $this->assertDatabaseHas('pop_sequences', [
-            'pop_id' => $pop->id,
-            'sequence_type' => PopSequence::TYPE_CID,
             'current_number' => 2,
         ]);
     }

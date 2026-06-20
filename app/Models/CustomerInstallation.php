@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'scheduled_date',
     'scheduled_time',
     'technician_id',
+    'technician_2_id',
+    'technician_3_id',
     'finished_date',
     'installation_photo',
     'installation_note',
@@ -38,7 +40,8 @@ class CustomerInstallation extends Model
     {
         return [
             'scheduled_date' => 'date',
-            'finished_date' => 'date',
+            'finished_date'  => 'date',
+            'assigned_at'    => 'datetime',
         ];
     }
 
@@ -56,5 +59,21 @@ class CustomerInstallation extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'technician_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function technician2(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'technician_2_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function technician3(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'technician_3_id');
     }
 }

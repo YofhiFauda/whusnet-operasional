@@ -98,9 +98,10 @@ class CustomerCreateTest extends TestCase
             'ont_sn' => 'ONT-ZTE-TEST',
         ]);
 
-        // Assert customer code matches WHUS-YYYY-XXXX (actually POP format: C-SMN-000001)
+        // Assert customer code matches new format: {cid_prefix}00{registration_prefix}{######}
+        // POP ini: cid_prefix='D', registration_prefix='C' → D00C000001
         $customer = Customer::where('full_name', 'Fajar Pratama')->firstOrFail();
-        $this->assertMatchesRegularExpression('/^C-SMN-\d{6}$/', $customer->customer_code);
+        $this->assertMatchesRegularExpression('/^D00C\d{6}$/', $customer->customer_code);
 
         // Assert address record created
         $this->assertDatabaseHas('customer_addresses', [

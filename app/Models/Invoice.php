@@ -37,6 +37,7 @@ class Invoice extends Model
         'created_by',
         'prorate_amount',
         'extra_cable_fee',
+        'other_fee',
         'extra_installation_fee',
         'extra_pole_fee',
     ];
@@ -55,6 +56,7 @@ class Invoice extends Model
             'total_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'remaining_amount' => 'decimal:2',
+            'other_fee' => 'decimal:2',
         ];
     }
 

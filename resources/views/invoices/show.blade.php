@@ -79,29 +79,87 @@
         <div class="border-t border-slate-100 p-6">
             <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">Rincian Biaya</h3>
             <div class="space-y-3 text-sm">
+                {{-- Biaya Pokok --}}
                 <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">Subtotal</span>
-                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->subtotal, 2, ',', '.') }}</span>
+                    <span class="text-slate-500">Harga Paket (Subtotal)</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->subtotal, 0, ',', '.') }}</span>
                 </div>
+
+                @if((float)$invoice->discount > 0)
+                <div class="flex justify-between gap-4 text-green-700">
+                    <span>Potongan Diskon</span>
+                    <span class="font-mono">- Rp {{ number_format((float) $invoice->discount, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @php
+                    $afterDiscount = max(0, (float)$invoice->subtotal - (float)$invoice->discount);
+                    $ppnRate = (float)$invoice->ppn;
+                    $ppnAmount = round($afterDiscount * ($ppnRate / 100), 2);
+                @endphp
+
+                @if($ppnRate > 0)
                 <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">Diskon</span>
-                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->discount, 2, ',', '.') }}</span>
+                    <span class="text-slate-500">PPN ({{ number_format($ppnRate, 0) }}%)</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format($ppnAmount, 0, ',', '.') }}</span>
                 </div>
+                @else
                 <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">PPN (%)</span>
-                    <span class="font-mono text-slate-900">{{ number_format((float) $invoice->ppn, 2, ',', '.') }}%</span>
+                    <span class="text-slate-500">PPN</span>
+                    <span class="font-mono text-slate-400">Tidak dikenakan</span>
                 </div>
-                <div class="flex justify-between gap-4 pt-3 border-t border-slate-100">
+                @endif
+
+                {{-- Biaya Tambahan Di Luar Standar --}}
+                @if((float)($invoice->prorate_amount ?? 0) > 0)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Tagihan Prorate</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->prorate_amount, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_cable_fee ?? 0) > 0)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Biaya Kabel Tambahan</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->extra_cable_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->other_fee ?? 0) > 0)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Biaya Lain-lain</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->other_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_installation_fee ?? 0) > 0)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Jasa Instalasi Tambahan</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->extra_installation_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                @if((float)($invoice->extra_pole_fee ?? 0) > 0)
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-500">Tambahan Tiang</span>
+                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->extra_pole_fee, 0, ',', '.') }}</span>
+                </div>
+                @endif
+
+                {{-- Total & Pembayaran --}}
+                <div class="flex justify-between gap-4 pt-3 border-t border-slate-200">
                     <span class="font-bold text-slate-800">Total Tagihan</span>
-                    <span class="font-mono font-bold text-slate-900">Rp {{ number_format((float) $invoice->total_amount, 2, ',', '.') }}</span>
+                    <span class="font-mono font-bold text-slate-900 text-base">Rp {{ number_format((float) $invoice->total_amount, 0, ',', '.') }}</span>
                 </div>
                 <div class="flex justify-between gap-4">
-                    <span class="text-slate-500">Terbayar</span>
-                    <span class="font-mono text-slate-900">Rp {{ number_format((float) $invoice->paid_amount, 2, ',', '.') }}</span>
+                    <span class="text-slate-500">Sudah Terbayar</span>
+                    <span class="font-mono text-emerald-700">Rp {{ number_format((float) $invoice->paid_amount, 0, ',', '.') }}</span>
                 </div>
-                <div class="flex justify-between gap-4">
+                <div class="flex justify-between gap-4 pt-2 border-t border-slate-100">
                     <span class="font-bold text-slate-800">Sisa Tagihan</span>
-                    <span class="font-mono font-bold text-slate-900">Rp {{ number_format((float) $invoice->remaining_amount, 2, ',', '.') }}</span>
+                    <span class="font-mono font-bold {{ (float)$invoice->remaining_amount > 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                        Rp {{ number_format((float) $invoice->remaining_amount, 0, ',', '.') }}
+                    </span>
                 </div>
             </div>
         </div>

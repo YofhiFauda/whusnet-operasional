@@ -160,12 +160,34 @@
             </thead>
             <tbody class="bg-white divide-y divide-slate-100">
                 @foreach($pops as $pop)
-                <tr class="hover:bg-slate-50/50 transition-colors">
+                <tr class="hover:bg-slate-50/50 transition-colors pop-row" data-id="{{ $pop->id }}" data-parent-id="{{ $pop->parent_id ?? '' }}">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900 tracking-tight">
                         {{ $pop->code }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-semibold text-slate-800">{{ $pop->name }}</div>
+                        <div class="flex items-center" style="padding-left: {{ ($pop->depth ?? 0) * 1.5 }}rem">
+                            @if($pop->children->isNotEmpty())
+                            <button type="button" 
+                                    class="toggle-children-btn mr-2 p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus:outline-none cursor-pointer"
+                                    data-id="{{ $pop->id }}"
+                                    data-expanded="true"
+                                    onclick="togglePopChildren({{ $pop->id }}, this)"
+                                    title="Toggle Anak POP">
+                                <svg class="h-4 w-4 transform transition-transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                            @else
+                                @if(($pop->depth ?? 0) > 0)
+                                <div class="w-6 h-4 flex items-center justify-center mr-1">
+                                    <span class="text-slate-300 font-light text-xs">└─</span>
+                                </div>
+                                @else
+                                <div class="w-6"></div>
+                                @endif
+                            @endif
+                            <div class="text-sm font-semibold text-slate-800">{{ $pop->name }}</div>
+                        </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
                         <span class="font-mono font-bold text-slate-700">{{ $pop->pop_code ?? '-' }}</span>
@@ -267,5 +289,42 @@
     </div>
     @endif
     @endif
-</div>
+
+@section('scripts')
+<script>
+function togglePopChildren(parentId, button) {
+    const isExpanded = button.getAttribute('data-expanded') === 'true';
+    const newExpanded = !isExpanded;
+    
+    button.setAttribute('data-expanded', newExpanded ? 'true' : 'false');
+    const svg = button.querySelector('svg');
+    if (newExpanded) {
+        svg.classList.add('rotate-90');
+    } else {
+        svg.classList.remove('rotate-90');
+    }
+    
+    setChildRowVisibility(parentId, newExpanded);
+}
+
+function setChildRowVisibility(parentId, visible) {
+    const childRows = document.querySelectorAll(`tr[data-parent-id="${parentId}"]`);
+    childRows.forEach(row => {
+        const childId = row.getAttribute('data-id');
+        
+        if (visible) {
+            row.classList.remove('hidden');
+            const toggleBtn = row.querySelector('.toggle-children-btn');
+            // If child row itself has children and was previously expanded, keep its children visible.
+            if (!toggleBtn || toggleBtn.getAttribute('data-expanded') === 'true') {
+                setChildRowVisibility(childId, true);
+            }
+        } else {
+            row.classList.add('hidden');
+            setChildRowVisibility(childId, false);
+        }
+    });
+}
+</script>
+@endsection
 @endsection

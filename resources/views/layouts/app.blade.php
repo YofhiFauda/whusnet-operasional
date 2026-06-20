@@ -92,14 +92,26 @@
                     </button>
                     <!-- Submenu -->
                     <div id="submenu-pelanggan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('customers*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('view_customers'))
-                            <a href="/customers" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                List Pelanggan
-                            </a>
-                        @endif
                         @if(auth()->user()->hasPermission('create_customers'))
                             <a href="/customers/create" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Input Pelanggan
+                                Registrasi Pelanggan
+                            </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('view_customers'))
+                            <a href="/customers?status_group=survey" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'survey' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Survey
+                            </a>
+                            <a href="/customers?status_group=verification" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'verification' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Verifikasi Admin & Teknisi
+                            </a>
+                            <a href="/customers" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                List Pelanggan
+                            </a>
+                            <a href="/customers?status_group=failed" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'failed' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                List Pelanggan Gagal
+                            </a>
+                            <a href="/customers?status_group=terminated" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'terminated' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                List Pelanggan Putus
                             </a>
                         @endif
                         @if(auth()->user()->hasPermission('import_customers'))
@@ -185,6 +197,9 @@
                             </a>
                             <a href="/master/pop" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/pop*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master POP/Cabang
+                            </a>
+                            <a href="/master/distribusi" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/distribusi*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Master Distribusi
                             </a>
                         @endif
                         @if(auth()->user()->hasPermission('view_packages'))

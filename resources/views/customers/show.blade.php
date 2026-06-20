@@ -96,7 +96,8 @@
                     {{ strtoupper(substr($customer->full_name, 0, 2)) }}
                 </div>
                 <h3 class="font-bold text-slate-800 text-base leading-tight">{{ $customer->full_name }}</h3>
-                <span class="text-xs font-mono text-slate-400 mt-1.5 data-text">{{ $displayId }}</span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">{{ $displayIdLabel ?? 'ID' }}</span>
+                <span class="text-xs font-mono text-slate-600 mt-0.5 data-text">{{ $displayId }}</span>
                 
                 <!-- Status Badge -->
                 <div class="mt-3">
@@ -249,7 +250,7 @@
                             <h4 class="text-sm font-semibold text-slate-800">{{ $customer->internetPackage->package_code }} - {{ $customer->internetPackage->name }}</h4>
                             <p class="text-xs text-slate-500 mt-1">Kategori: {{ $customer->internetPackage->category }}</p>
                             <div class="flex items-baseline mt-3">
-                                <span class="text-lg font-bold text-slate-800 data-text">Rp {{ number_format($customer->customerService?->total_monthly_bill ?? (($customer->internetPackage->monthly_price - ($customer->discount_amount ?? 0)) * (1 + ($customer->tax_percent ?? 11) / 100)), 0, ',', '.') }}</span>
+                                <span class="text-lg font-bold text-slate-800 data-text">Rp {{ number_format($customer->customerService?->total_monthly_bill ?? (($customer->internetPackage->monthly_price - ($customer->discount_amount ?? 0)) * (1 + ($customer->tax_percent ?? 0) / 100)), 0, ',', '.') }}</span>
                                 <span class="text-[10px] text-slate-400 ml-1">/bulan (Nett)</span>
                             </div>
                         @else
@@ -504,7 +505,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div class="border border-slate-100 rounded-lg p-4 bg-slate-50/10">
                                 <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE LAYANAN</span>
-                                <span class="font-mono font-semibold text-slate-800 mt-1 block data-text">{{ $customer->internetPackage->package_code }}</span>
+                                <span class="font-mono font-semibold text-slate-800 mt-1 block data-text">{{ $customer->internetPackage->package_code }} - {{ $customer->internetPackage->name }}</span>
                             </div>
                             <div class="border border-slate-100 rounded-lg p-4 bg-slate-50/10">
                                 <span class="block text-[9px] font-bold text-slate-400 uppercase">KATEGORI LAYANAN</span>
@@ -535,6 +536,23 @@
                                     <span class="text-slate-800">{{ $customer->ip_address ?? 'Belum teralokasi' }}</span>
                                 </div>
                                 <div class="flex justify-between py-1 border-b border-slate-100/50">
+                                    <span class="text-slate-400">Nama Perangkat OLT</span>
+                                    <span class="text-slate-800">{{ $customer->olt_code ?? 'Belum diisi' }}</span>
+                                </div>
+                                {{-- olt_number diisi oleh teknisi dan digunakan untuk generate CID --}}
+                                <div class="flex justify-between py-1 border-b border-slate-100/50">
+                                    <span class="text-slate-400">
+                                        Nomor OLT
+                                        <span class="text-[9px] text-sky-500 font-bold ml-1" title="Nilai ini digunakan saat generate CID pelanggan">[CID]</span>
+                                    </span>
+                                    @php $oltNumber = $customer->customerTechnicalDetail?->olt_number; @endphp
+                                    @if($oltNumber)
+                                        <span class="text-sky-700 font-bold">{{ $oltNumber }}</span>
+                                    @else
+                                        <span class="text-amber-600 italic">Belum diisi teknisi</span>
+                                    @endif
+                                </div>
+                                <div class="flex justify-between py-1 border-b border-slate-100/50">
                                     <span class="text-slate-400">Kode Kotak ODP</span>
                                     <span class="text-slate-800">{{ $customer->odp_code ?? 'Belum terhubung' }}</span>
                                 </div>
@@ -556,13 +574,19 @@
                     </div>
                     <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
                         @php
-                            $monthlyPrice = (float)($customer->customerService?->monthly_price ?? ($customer->internetPackage?->monthly_price ?? 0));
-                            $discount = (float)($customer->customerService?->discount ?? ($customer->discount_amount ?? 0));
-                            $ppnPercent = (float)($customer->customerService?->ppn ?? ($customer->tax_percent ?? 11));
-                            
+                            $monthlyPrice  = (float)($customer->customerService?->monthly_price ?? ($customer->internetPackage?->monthly_price ?? 0));
+                            $discount      = (float)($customer->customerService?->discount ?? ($customer->discount_amount ?? 0));
+                            $otherFee      = (float)($customer->customerService?->other_fee ?? 0);
+                            // Gunakan nilai ppn dari customer_services secara langsung (bisa 0 atau nilai tertentu)
+                            // Jangan fallback ke 11 karena 0 berarti memang tanpa PPN
+                            $ppnPercent    = $customer->customerService ? (float)$customer->customerService->ppn : (float)($customer->tax_percent ?? 0);
+
                             $discountedPrice = max(0, $monthlyPrice - $discount);
-                            $ppnAmount = round($discountedPrice * ($ppnPercent / 100), 2);
-                            $totalBill = $discountedPrice + $ppnAmount;
+                            $ppnAmount       = round($discountedPrice * ($ppnPercent / 100), 2);
+                            // Gunakan total dari service snapshot jika tersedia, hitung ulang hanya sebagai fallback
+                            $totalBill = $customer->customerService
+                                ? (float)$customer->customerService->total_monthly_bill
+                                : ($discountedPrice + $ppnAmount + $otherFee);
                         @endphp
                         <div>
                             <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT</span>
@@ -579,6 +603,12 @@
                                     <span>PPN ({{ number_format($ppnPercent, 0) }}%)</span>
                                     <span>Rp {{ number_format($ppnAmount, 2, ',', '.') }}</span>
                                 </div>
+                                @if($otherFee > 0)
+                                <div class="flex justify-between text-slate-500">
+                                    <span>Biaya Lain di luar Standar</span>
+                                    <span>Rp {{ number_format($otherFee, 2, ',', '.') }}</span>
+                                </div>
+                                @endif
                                 <hr class="border-dashed border-slate-200">
                                 <div class="flex justify-between text-xs font-bold text-slate-900">
                                     <span>Total Biaya Per Bulan</span>
@@ -596,6 +626,22 @@
                                         {{ $customer->customerService?->activation_date ? \App\Support\IndonesianDate::date($customer->customerService->activation_date) : 'Belum diaktivasi' }}
                                     </span>
                                 </div>
+                                @if($customer->customerService?->activation_time)
+                                <div class="flex justify-between py-1.5 border-b border-slate-50">
+                                    <span class="text-slate-400">Waktu Aktivasi</span>
+                                    <span class="font-mono font-semibold text-slate-800 data-text">
+                                        {{ substr($customer->customerService->activation_time, 0, 5) }} WIB
+                                    </span>
+                                </div>
+                                @endif
+                                @if($customer->customerService?->activated_by_name || $customer->customerService?->activatedBy)
+                                <div class="flex justify-between py-1.5 border-b border-slate-50">
+                                    <span class="text-slate-400">Petugas Aktivasi</span>
+                                    <span class="font-semibold text-slate-800">
+                                        {{ $customer->customerService->activatedBy->name ?? $customer->customerService->activated_by_name ?? '-' }}
+                                    </span>
+                                </div>
+                                @endif
                                 <div class="flex justify-between py-1.5 border-b border-slate-50">
                                     <span class="text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
                                     <span class="font-mono font-semibold text-slate-800 data-text">
@@ -734,33 +780,44 @@
                             </div>
                             <form action="{{ route('customers.invoices.manual', $customer->id) }}" method="POST">
                                 @csrf
-                                <div class="p-6 space-y-4">
+                    <div class="p-6 space-y-4">
                                     <!-- Snapshot Biaya Info -->
+                                    @php
+                                        $svc = $customer->customerService;
+                                        $svcMonthly = (float)$svc->monthly_price;
+                                        $svcDiscount = (float)($svc->discount ?? 0);
+                                        $svcPpnRate = (float)($svc->ppn ?? 0);
+                                        $svcAfterDiscount = max(0, $svcMonthly - $svcDiscount);
+                                        $svcPpnAmount = round($svcAfterDiscount * ($svcPpnRate / 100), 2);
+                                        $svcTotal = $svcAfterDiscount + $svcPpnAmount;
+                                    @endphp
                                     <div class="p-4 bg-slate-50 border border-slate-100 rounded-lg text-xs">
                                         <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Rincian Paket & Layanan</span>
                                         <div class="space-y-1.5 font-medium text-slate-700">
                                             <div class="flex justify-between">
                                                 <span class="text-slate-500">Paket Internet:</span>
-                                                <span class="font-semibold text-slate-900">{{ $customer->customerService->package_name_snapshot }}</span>
+                                                <span class="font-semibold text-slate-900">{{ $svc->package_name_snapshot }}</span>
                                             </div>
                                             <div class="flex justify-between">
                                                 <span class="text-slate-500">Harga Bulanan:</span>
-                                                <span>Rp {{ number_format($customer->customerService->monthly_price, 0, ',', '.') }}</span>
+                                                <span class="font-mono" id="modal-monthly-price">Rp {{ number_format($svcMonthly, 0, ',', '.') }}</span>
                                             </div>
-                                            @if($customer->customerService->discount > 0)
+                                            @if($svcDiscount > 0)
                                                 <div class="flex justify-between text-green-600">
                                                     <span>Potongan Diskon:</span>
-                                                    <span>- Rp {{ number_format($customer->customerService->discount, 0, ',', '.') }}</span>
+                                                    <span class="font-mono">- Rp {{ number_format($svcDiscount, 0, ',', '.') }}</span>
                                                 </div>
                                             @endif
-                                            <div class="flex justify-between">
-                                                <span class="text-slate-500">PPN ({{ number_format($customer->customerService->ppn, 0) }}%):</span>
-                                                <span>Rp {{ number_format(round(($customer->customerService->monthly_price - $customer->customerService->discount) * ($customer->customerService->ppn / 100), 2), 0, ',', '.') }}</span>
-                                            </div>
+                                            @if($svcPpnRate > 0)
+                                                <div class="flex justify-between">
+                                                    <span class="text-slate-500">PPN ({{ number_format($svcPpnRate, 0) }}%):</span>
+                                                    <span class="font-mono">Rp {{ number_format($svcPpnAmount, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
                                             <hr class="border-dashed border-slate-200 my-1.5">
                                             <div class="flex justify-between font-bold text-slate-900">
                                                 <span>Total Tagihan Nett:</span>
-                                                <span class="text-sky-600">Rp {{ number_format($customer->customerService->total_monthly_bill, 0, ',', '.') }}</span>
+                                                <span class="font-mono text-sky-600">Rp {{ number_format($svcTotal, 0, ',', '.') }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -781,6 +838,88 @@
                                         <label for="due_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Jatuh Tempo</label>
                                         <input type="date" name="due_date" id="due_date" value="{{ $defaultDueDate }}" required
                                                class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                                    </div>
+
+                                    <!-- Biaya Tambahan Di Luar Standar -->
+                                    <div class="border-t border-slate-100 pt-4">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">Biaya Tambahan (Opsional)</span>
+                                            @if($customer->customerService?->activation_date)
+                                                <button type="button" onclick="autoCalculateProrate()" class="text-[9px] font-bold text-sky-600 hover:text-sky-700 uppercase tracking-wider cursor-pointer">
+                                                    Hitung Otomatis Prorate
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label for="prorate_amount" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                    Tagihan Prorate
+                                                    <span class="text-slate-400 font-normal normal-case">— biaya hari aktivasi s/d akhir bulan</span>
+                                                </label>
+                                                <input type="number" name="prorate_amount" id="prorate_amount" value="{{ old('prorate_amount', 0) }}" min="0" step="1"
+                                                       class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono"
+                                                       oninput="recalcInvoiceTotal()">
+                                            </div>
+                                            <div>
+                                                <label for="extra_installation_fee" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Biaya Pemasangan / Jasa Instalasi</label>
+                                                @php
+                                                    $defaultInstallFee = 0;
+                                                    if ($customer->invoices->count() === 0 && $customer->internetPackage) {
+                                                        $defaultInstallFee = (float)$customer->internetPackage->installation_fee;
+                                                    }
+                                                @endphp
+                                                <input type="number" name="extra_installation_fee" id="extra_installation_fee" value="{{ old('extra_installation_fee', $defaultInstallFee) }}" min="0" step="1"
+                                                       class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono"
+                                                       oninput="recalcInvoiceTotal()">
+                                                @if($defaultInstallFee > 0)
+                                                    <p class="text-[9px] text-slate-400 mt-1 italic">Default dari Master Paket: Rp {{ number_format($defaultInstallFee, 0, ',', '.') }}</p>
+                                                @endif
+                                            </div>
+                                            <div>
+                                                <label for="extra_cable_fee" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Biaya Kabel Tambahan</label>
+                                                <input type="number" name="extra_cable_fee" id="extra_cable_fee" value="{{ old('extra_cable_fee', 0) }}" min="0" step="1"
+                                                       class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono"
+                                                       oninput="recalcInvoiceTotal()">
+                                            </div>
+                                            <div>
+                                                <label for="extra_pole_fee" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tambahan Tiang</label>
+                                                <input type="number" name="extra_pole_fee" id="extra_pole_fee" value="{{ old('extra_pole_fee', 0) }}" min="0" step="1"
+                                                       class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono"
+                                                       oninput="recalcInvoiceTotal()">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Preview Total -->
+                                    <div class="bg-sky-50 border border-sky-100 rounded-lg p-4 text-xs">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Preview Total Tagihan</span>
+                                        <div class="space-y-1.5">
+                                            <div class="flex justify-between text-slate-600">
+                                                <span>Tagihan Bulanan Nett:</span>
+                                                <span class="font-mono" id="preview-nett">Rp {{ number_format($svcTotal, 0, ',', '.') }}</span>
+                                            </div>
+                                            <div class="flex justify-between text-slate-600" id="preview-prorate-row" style="display:none!important">
+                                                <span>+ Prorate:</span>
+                                                <span class="font-mono" id="preview-prorate">Rp 0</span>
+                                            </div>
+                                            <div class="flex justify-between text-slate-600" id="preview-cable-row" style="display:none!important">
+                                                <span>+ Kabel:</span>
+                                                <span class="font-mono" id="preview-cable">Rp 0</span>
+                                            </div>
+                                            <div class="flex justify-between text-slate-600" id="preview-install-row" style="display:none!important">
+                                                <span>+ Instalasi:</span>
+                                                <span class="font-mono" id="preview-install">Rp 0</span>
+                                            </div>
+                                            <div class="flex justify-between text-slate-600" id="preview-pole-row" style="display:none!important">
+                                                <span>+ Tiang:</span>
+                                                <span class="font-mono" id="preview-pole">Rp 0</span>
+                                            </div>
+                                            <hr class="border-dashed border-sky-200">
+                                            <div class="flex justify-between font-bold text-slate-900 text-sm">
+                                                <span>Total Bayar:</span>
+                                                <span class="font-mono text-sky-700" id="preview-total">Rp {{ number_format($svcTotal, 0, ',', '.') }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
@@ -873,7 +1012,7 @@
 
                 @if(auth()->user()->hasPermission('view_customer_documents'))
                     @if(auth()->user()->hasPermission('upload_customer_documents'))
-                        <form method="POST" action="{{ route('customers.documents.store', $customer->id) }}" enctype="multipart/form-data" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                        <form method="POST" action="{{ route('customers.documents.store', ['customer' => $customer->id]) }}" enctype="multipart/form-data" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
                             @csrf
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                                 <div>
@@ -1059,6 +1198,7 @@
         const modal = document.getElementById('manual-invoice-modal');
         if (modal) {
             modal.classList.remove('hidden');
+            recalcInvoiceTotal(); // Recalculate initially for pre-filled fees
         }
     }
 
@@ -1066,6 +1206,65 @@
         const modal = document.getElementById('manual-invoice-modal');
         if (modal) {
             modal.classList.add('hidden');
+        }
+    }
+
+    // Recalculate invoice total preview saat biaya tambahan diubah
+    const BASE_NETT = {{ (float)$customer->customerService?->total_monthly_bill ?? 0 }};
+    function recalcInvoiceTotal() {
+        const prorate = parseFloat(document.getElementById('prorate_amount')?.value || 0) || 0;
+        const cable   = parseFloat(document.getElementById('extra_cable_fee')?.value || 0) || 0;
+        const install = parseFloat(document.getElementById('extra_installation_fee')?.value || 0) || 0;
+        const pole    = parseFloat(document.getElementById('extra_pole_fee')?.value || 0) || 0;
+        const total   = BASE_NETT + prorate + cable + install + pole;
+
+        const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
+        const showRow = (rowId, valId, label, v) => {
+            const row = document.getElementById(rowId);
+            const el  = document.getElementById(valId);
+            if (row && el) {
+                row.style.display = v > 0 ? 'flex' : 'none';
+                el.textContent = fmt(v);
+            }
+        };
+
+        showRow('preview-prorate-row', 'preview-prorate', 'Prorate', prorate);
+        showRow('preview-cable-row',   'preview-cable',   'Kabel',   cable);
+        showRow('preview-install-row', 'preview-install', 'Instalasi', install);
+        showRow('preview-pole-row',    'preview-pole',    'Tiang',   pole);
+
+        const totalEl = document.getElementById('preview-total');
+        if (totalEl) totalEl.textContent = fmt(total);
+    }
+
+    function autoCalculateProrate() {
+        const activationDateStr = "{{ $customer->customerService?->activation_date }}";
+        if (!activationDateStr) {
+            alert('Tanggal aktivasi belum diisi di sistem. Silakan pastikan data aktivasi sudah ada.');
+            return;
+        }
+
+        // Activation date from DB (Y-m-d)
+        const activationDate = new Date(activationDateStr);
+        const year = activationDate.getFullYear();
+        const month = activationDate.getMonth();
+        
+        // Last day of that specific month
+        const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+        const startDay = activationDate.getDate();
+        
+        // Days remaining in month (inclusive of activation day)
+        // Logic: (LastDay - StartDay) + 1
+        const daysRemaining = (lastDayOfMonth - startDay) + 1;
+        
+        // Calculate: (Monthly Bill / 30) * Days
+        const monthlyBill = {{ (float)$customer->customerService?->total_monthly_bill ?? 0 }};
+        const prorate = (monthlyBill / 30) * daysRemaining;
+        
+        const prorateInput = document.getElementById('prorate_amount');
+        if (prorateInput) {
+            prorateInput.value = Math.round(prorate);
+            recalcInvoiceTotal();
         }
     }
 
@@ -1092,6 +1291,20 @@
 
     function closeInstallationModal() {
         const modal = document.getElementById('installation-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function openTestReportModal() {
+        const modal = document.getElementById('test-report-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    function closeTestReportModal() {
+        const modal = document.getElementById('test-report-modal');
         if (modal) {
             modal.classList.add('hidden');
         }

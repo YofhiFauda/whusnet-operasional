@@ -122,9 +122,10 @@ class InvoiceModelTest extends TestCase
             'subtotal' => 150000.00,
             'discount' => 10000.00,
             'ppn' => 11.00,
-            'total_amount' => 155400.00,
+            'other_fee' => 11000.00,
+            'total_amount' => 166400.00,
             'paid_amount' => 0.00,
-            'remaining_amount' => 155400.00,
+            'remaining_amount' => 166400.00,
             'invoice_status' => 'belum_dibayar',
             'created_by' => $user->id,
         ]);
@@ -148,9 +149,10 @@ class InvoiceModelTest extends TestCase
         $this->assertSame('150000.00', $invoice->subtotal);
         $this->assertSame('10000.00', $invoice->discount);
         $this->assertSame('11.00', $invoice->ppn);
-        $this->assertSame('155400.00', $invoice->total_amount);
+        $this->assertSame('11000.00', $invoice->other_fee);
+        $this->assertSame('166400.00', $invoice->total_amount);
         $this->assertSame('0.00', $invoice->paid_amount);
-        $this->assertSame('155400.00', $invoice->remaining_amount);
+        $this->assertSame('166400.00', $invoice->remaining_amount);
 
         // Relation assertions
         $this->assertEquals($customer->id, $invoice->customer->id);

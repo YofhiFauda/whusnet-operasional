@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'monthly_price',
     'discount',
     'ppn',
+    'other_fee',
     'total_monthly_bill',
     'activation_date',
     'due_date',
@@ -33,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'contract_type',
     'activation_time',
     'activated_by_name',
+    'activated_by_user_id',
 ])]
 class CustomerService extends Model
 {
@@ -49,6 +51,7 @@ class CustomerService extends Model
             'monthly_price' => 'decimal:2',
             'discount' => 'decimal:2',
             'ppn' => 'decimal:2',
+            'other_fee' => 'decimal:2',
             'total_monthly_bill' => 'decimal:2',
             'activation_date' => 'date',
             'due_date' => 'date',
@@ -69,6 +72,14 @@ class CustomerService extends Model
     public function internetPackage(): BelongsTo
     {
         return $this->belongsTo(InternetPackage::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function activatedBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'activated_by_user_id');
     }
 
     /**

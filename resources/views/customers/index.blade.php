@@ -74,7 +74,7 @@
             <select name="package_id" id="package_id" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                 <option value="">Semua Paket</option>
                 @foreach($packages as $package)
-                    <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->category }}</option>
+                    <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
                 @endforeach
             </select>
         </div>
@@ -105,6 +105,7 @@
 
 <!-- Status Tabs Nav & Table Content -->
 <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+    @if(empty($statusGroup))
     <!-- Status Tabs Nav -->
     <div class="border-b border-slate-200 bg-slate-50 px-6 py-3 flex flex-wrap gap-2 items-center justify-between">
         <div class="flex flex-wrap gap-1">
@@ -118,6 +119,21 @@
             @endforeach
         </div>
     </div>
+    @else
+    <!-- Filter Group Header -->
+    <div class="border-b border-slate-200 bg-sky-50 px-6 py-3 flex flex-wrap gap-2 items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-sky-800 uppercase tracking-wider">
+                @if($statusGroup === 'survey') Daftar Survey Pelanggan
+                @elseif($statusGroup === 'verification') Daftar Verifikasi Pelanggan
+                @elseif($statusGroup === 'failed') Daftar Pelanggan Gagal
+                @elseif($statusGroup === 'terminated') Daftar Pelanggan Putus
+                @endif
+            </span>
+            <a href="/customers" class="text-xs font-medium text-sky-600 hover:text-sky-800 hover:underline">(Kembali ke Semua Pelanggan)</a>
+        </div>
+    </div>
+    @endif
 
     <!-- Table Container -->
     <div class="overflow-x-auto">
@@ -141,7 +157,11 @@
                 @forelse($customers as $customer)
                 @php
                     $isCustomer = $customer->status === 'active';
-                    $displayId = $customer->cid ?? $customer->customer_code;
+                    $isTerminated = $customer->status === 'terminated';
+                    // Gunakan accessor display_id dari Customer model
+                    // yang menghitung format ID berdasarkan status pelanggan
+                    // sesuai spesifikasi-pop-distribusi-cid.md
+                    $displayId = $customer->display_id;
                     $completeness = $customer->dataCompleteness();
                     $stages = $customer->workflowProgress();
                 @endphp
@@ -164,11 +184,11 @@
                     </td>
                     <!-- Desa -->
                     <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
-                        {{ $customer->village->name ?? '-' }}
+                        {{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}
                     </td>
                     <!-- Paket -->
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-semibold">
-                        {{ $customer->internetPackage->package_code ?? '-' }}
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-semibold text-xs">
+                        {{ $customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-' }}
                     </td>
                     <!-- HP -->
                     <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
@@ -250,11 +270,11 @@
                                 data-email="{{ $customer->email }}"
                                 data-status="{{ $customer->subscriptionStatus->name ?? Str::headline($customer->status) }}"
                                 data-reg="{{ \App\Support\IndonesianDate::date($customer->registration_date) }}"
-                                data-package="{{ $customer->internetPackage ? $customer->internetPackage->package_code . ' (' . $customer->internetPackage->category . ')' : '-' }}"
+                                data-package="{{ $customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-' }}"
                                 data-price="{{ $customer->internetPackage ? 'Rp ' . number_format($customer->internetPackage->monthly_price, 0, ',', '.') : '-' }}"
                                 data-address="{{ $customer->address }}"
-                                data-village="{{ $customer->village->name ?? '-' }}"
-                                data-district="{{ $customer->district->name ?? '-' }}"
+                                data-village="{{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}"
+                                data-district="{{ $customer->district->name ?? ($customer->customerAddress->district ?? '-') }}"
                                 class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 transition-colors border border-sky-200 hover:bg-sky-50 rounded px-2.5 py-1 cursor-pointer">
                             Action
                         </button>
@@ -286,9 +306,9 @@
     @endif
 </div>
 
-<!-- Customer Action Modal -->
-<div id="actions-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center hidden z-40 p-4 transition-all duration-300">
-    <div class="bg-white border border-slate-200 rounded-lg w-full max-w-xl shadow-xl overflow-hidden transform scale-95 transition-all duration-300">
+<!-- Customer Action & Payment Modal -->
+<div id="actions-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center hidden z-40 p-4 transition-all duration-300 overflow-y-auto">
+    <div class="bg-white border border-slate-200 rounded-lg w-full max-w-2xl shadow-xl overflow-hidden transform scale-95 transition-all duration-300 my-8">
         <!-- Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -301,54 +321,119 @@
                 </svg>
             </button>
         </div>
-        <!-- Body (Options Grid) -->
-        <div class="p-6">
-            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">PILIHAN AKSI OPERASIONAL</span>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Option 1: Detail Info -->
-                <button onclick="triggerDetail()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-sky-50 text-sky-600 rounded-md group-hover:bg-sky-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-slate-800">Detail Pelanggan</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Lihat data & profil lengkap</span>
-                    </div>
-                </button>
+        
+        <!-- Loading State -->
+        <div id="modal-loading" class="p-8 text-center hidden">
+            <svg class="animate-spin h-6 w-6 text-sky-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-xs text-slate-500 mt-2">Memuat data tagihan...</p>
+        </div>
 
-                <!-- Option 2: Edit Profil -->
-                <button onclick="triggerEdit()" class="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:border-sky-200 hover:bg-sky-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
-                    <div class="p-2 bg-slate-50 text-slate-600 rounded-md group-hover:bg-slate-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
+        <!-- Body Content -->
+        <div id="modal-content" class="hidden">
+            <!-- Informasi Layanan & Tagihan -->
+            <div class="p-6 bg-white border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-700">
+                <div class="space-y-3">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Informasi Layanan</span>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-500 block">Alamat</span>
+                        <span id="modal-info-address" class="font-medium text-slate-900"></span>
                     </div>
                     <div>
-                        <span class="block text-xs font-semibold text-slate-800">Ubah Data Profil</span>
-                        <span class="block text-[10px] text-slate-400 mt-0.5">Koreksi info alamat / nomor HP</span>
+                        <span class="text-xs font-semibold text-slate-500 block">Paket Internet</span>
+                        <span id="modal-info-package" class="font-medium text-slate-900"></span>
                     </div>
-                </button>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-500 block">Harga Bulanan</span>
+                        <span id="modal-info-price" class="font-mono text-slate-900"></span>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Informasi Tagihan Aktif</span>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-500 block">Periode & Jatuh Tempo</span>
+                        <span id="modal-info-period" class="font-medium text-slate-900"></span>
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-500 block">Status Piutang</span>
+                        <span id="modal-info-arrears" class="font-mono font-bold text-red-600"></span>
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-500 block">Diskon</span>
+                        <span id="modal-info-discount" class="font-mono text-emerald-600"></span>
+                    </div>
+                    <div class="pt-2 mt-2 border-t border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 block">Total Sisa Tagihan (Yg Harus Dibayar)</span>
+                        <span id="modal-info-total" class="font-mono text-lg font-bold text-slate-900"></span>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Option 3: Terminate / Putus Layanan -->
-                <button onclick="triggerTerminate()" class="flex items-center gap-3 p-3 border border-red-50/50 rounded-lg hover:border-red-200 hover:bg-red-50/30 transition-all text-left group cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/25 sm:col-span-2">
-                    <div class="p-2 bg-red-50 text-red-600 rounded-md group-hover:bg-red-100 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+            <!-- Form Pembayaran -->
+            <div class="p-6 bg-slate-50/50" id="payment-form-container">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">Input Pembayaran</span>
+                <form id="payment-form" method="POST" action="">
+                    @csrf
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Tanggal Pembayaran</label>
+                            <input type="date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Metode</label>
+                            <select name="payment_method" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                                <option value="cash">Tunai (Cash)</option>
+                                <option value="transfer">Transfer Bank</option>
+                                <option value="qris">QRIS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Nominal Pembayaran</label>
+                            <input type="number" name="amount" id="payment_amount" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Alokasi Pembayaran</label>
+                            <select id="payment_allocation" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="Untuk Tagihan Bulanan">Tagihan Bulanan</option>
+                                <option value="Bayar Piutang">Bayar Piutang</option>
+                                <option value="Lebih Bayar">Lebih Bayar</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Keterangan Tambahan</label>
+                            <input type="text" name="note" id="payment_note" placeholder="Keterangan opsional..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-xs font-semibold text-red-800">Putuskan Layanan</span>
-                        <span class="block text-[10px] text-red-400 mt-0.5">Terminasi kontrak berlangganan</span>
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-5 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/25 cursor-pointer">
+                            Simpan Pembayaran
+                        </button>
                     </div>
-                </button>
+                </form>
+            </div>
+            
+            <div id="no-invoice-state" class="p-8 text-center hidden">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-3">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <p class="text-sm font-medium text-slate-900">Tidak ada tagihan aktif atau piutang.</p>
+                <p class="text-xs text-slate-500 mt-1">Pelanggan ini sudah melunasi semua tagihannya.</p>
             </div>
         </div>
+
         <!-- Footer -->
-        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-            <button onclick="closeActionsModal()" class="btn-secondary">Tutup</button>
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex gap-2">
+                <button onclick="triggerDetail()" class="text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors cursor-pointer">Detail</button>
+                <button onclick="triggerEdit()" class="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition-colors cursor-pointer">Edit</button>
+                <button onclick="triggerTerminate()" class="text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition-colors cursor-pointer">Putus Langganan</button>
+            </div>
+            <button onclick="closeActionsModal()" class="text-xs font-medium text-slate-500 hover:text-slate-700 cursor-pointer">Tutup</button>
         </div>
     </div>
 </div>
@@ -444,29 +529,97 @@
         selectedCustomerData = {
             id: button.getAttribute('data-id'),
             code: button.getAttribute('data-code'),
-            rawCode: button.getAttribute('data-raw-code'),
             name: button.getAttribute('data-name'),
-            phone: button.getAttribute('data-phone'),
-            email: button.getAttribute('data-email') || '-',
-            status: button.getAttribute('data-status'),
-            reg: button.getAttribute('data-reg'),
             package: button.getAttribute('data-package'),
             price: button.getAttribute('data-price'),
-            address: button.getAttribute('data-address') || '-',
+            address: button.getAttribute('data-address'),
             village: button.getAttribute('data-village'),
             district: button.getAttribute('data-district'),
-            btn: button
         };
         
         document.getElementById('actions-modal-title').innerText = selectedCustomerData.name;
         document.getElementById('actions-modal-code').innerText = selectedCustomerData.code;
+        
+        // Setup static info
+        const fullAddress = `${selectedCustomerData.address !== '-' ? selectedCustomerData.address + ', ' : ''}Kel. ${selectedCustomerData.village}, Kec. ${selectedCustomerData.district}`;
+        document.getElementById('modal-info-address').innerText = fullAddress;
+        document.getElementById('modal-info-package').innerText = selectedCustomerData.package;
+        document.getElementById('modal-info-price').innerText = selectedCustomerData.price;
+        
+        // Show modal and loading state
+        document.getElementById('modal-loading').classList.remove('hidden');
+        document.getElementById('modal-content').classList.add('hidden');
         
         modal.classList.remove('hidden');
         setTimeout(() => {
             content.classList.remove('scale-95');
             content.classList.add('scale-100');
         }, 10);
+        
+        // Fetch payment info
+        fetch(`/customers/${selectedCustomerData.id}/payment-info`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('modal-loading').classList.add('hidden');
+                document.getElementById('modal-content').classList.remove('hidden');
+                
+                if (data.invoice_id) {
+                    document.getElementById('payment-form-container').classList.remove('hidden');
+                    document.getElementById('no-invoice-state').classList.add('hidden');
+                    
+                    document.getElementById('modal-info-period').innerText = `${data.billing_period} (Jatuh Tempo: ${data.due_date || '-'})`;
+                    
+                    const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
+                    
+                    // Piutang
+                    if (data.total_piutang > 0) {
+                        document.getElementById('modal-info-arrears').innerText = formatRp(data.total_piutang);
+                    } else {
+                        document.getElementById('modal-info-arrears').innerText = '-';
+                    }
+                    
+                    // Discount
+                    if (data.discount > 0) {
+                        document.getElementById('modal-info-discount').innerText = formatRp(data.discount);
+                    } else {
+                        document.getElementById('modal-info-discount').innerText = '-';
+                    }
+                    
+                    // Total to pay (remaining amount of the specific invoice)
+                    document.getElementById('modal-info-total').innerText = formatRp(data.remaining_amount);
+                    
+                    // Setup form
+                    document.getElementById('payment-form').action = `/invoices/${data.invoice_id}/payments`;
+                    document.getElementById('payment_amount').value = data.remaining_amount;
+                    document.getElementById('payment_amount').max = data.remaining_amount;
+                    
+                    // Sync allocation to note
+                    document.getElementById('payment_note').value = 'Pembayaran: ' + document.getElementById('payment_allocation').value;
+                    
+                } else {
+                    document.getElementById('payment-form-container').classList.add('hidden');
+                    document.getElementById('no-invoice-state').classList.remove('hidden');
+                    
+                    document.getElementById('modal-info-period').innerText = '-';
+                    document.getElementById('modal-info-arrears').innerText = '-';
+                    document.getElementById('modal-info-discount').innerText = '-';
+                    document.getElementById('modal-info-total').innerText = 'Rp 0';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('modal-loading').innerHTML = '<p class="text-red-500 text-sm">Gagal memuat data. Silakan tutup dan coba lagi.</p>';
+            });
     }
+
+    // Event listener for allocation change to update note
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'payment_allocation') {
+            const noteInput = document.getElementById('payment_note');
+            const currentNote = noteInput.value.replace(/Pembayaran: [^,]+(,\s*)?/, '');
+            noteInput.value = 'Pembayaran: ' + e.target.value + (currentNote ? ', ' + currentNote : '');
+        }
+    });
 
     function closeActionsModal() {
         const modal = document.getElementById('actions-modal');

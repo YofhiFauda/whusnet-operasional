@@ -127,6 +127,7 @@ class RealDataMigrationTest extends TestCase
         if ($sampleCustomer) {
             $this->assertDatabaseHas('customers', [
                 'old_customer_id' => $sampleCustomer['old_customer_id'],
+                'old_request_id' => $sampleCustomer['old_request_id'] ?? null,
                 'full_name' => $sampleCustomer['full_name'],
                 'sales_code' => $sampleCustomer['sales_code'],
                 'referral_customer_code' => empty($sampleCustomer['referral_customer_code']) ? null : $sampleCustomer['referral_customer_code'],
@@ -154,6 +155,7 @@ class RealDataMigrationTest extends TestCase
                 $this->assertEquals($expectedStatus, $mappedStatus);
                 $this->assertEquals($svc['profile'], $dbSvc->profile);
                 $this->assertEquals($svc['contract_type'], $dbSvc->contract_type);
+                $this->assertEquals((float) ($svc['other_fee'] ?? 0), (float) ($dbSvc->other_fee ?? 0));
 
                 // Verify Survey & Installation matches
                 if (!empty($svc['survey_date']) || !empty($svc['surveyors'])) {
@@ -190,7 +192,7 @@ class RealDataMigrationTest extends TestCase
             $this->assertDatabaseHas('invoices', [
                 'old_invoice_id' => $sampleInv['old_invoice_id'],
                 'billing_period' => $sampleInv['billing_period'],
-                'extra_cable_fee' => $sampleInv['extra_cable_fee'],
+                'other_fee' => $sampleInv['other_fee'],
             ]);
         }
 
@@ -614,8 +616,18 @@ class RealDataMigrationTest extends TestCase
         }
 
         $requestToCustomerMap = [];
+        $legacyRequestByCustomer = [];
         foreach ($layananRows as $row) {
-            $requestToCustomerMap[$row['IDPERMINTAAN']] = $row['IDPENGGUNA'] ?? '';
+            $requestId = $row['IDPERMINTAAN'] ?? '';
+            $customerId = $row['IDPENGGUNA'] ?? '';
+
+            if ($requestId !== '') {
+                $requestToCustomerMap[$requestId] = $customerId;
+            }
+
+            if ($customerId !== '' && $requestId !== '' && !isset($legacyRequestByCustomer[$customerId])) {
+                $legacyRequestByCustomer[$customerId] = $requestId;
+            }
         }
 
         $invoiceToCustomerMap = [];
@@ -718,6 +730,7 @@ class RealDataMigrationTest extends TestCase
 
             $customersSheet[] = [
                 'old_customer_id' => $row['IDPENGGUNA'],
+                'old_request_id' => $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '',
                 'full_name' => $fullName,
                 'phone' => $row['HP'] ?? '',
                 'primary_phone' => $row['HP'] ?? '',
@@ -963,7 +976,7 @@ class RealDataMigrationTest extends TestCase
                 'installation_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
                 'other_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
                 'prorate_amount' => $prorateAmount,
-                'extra_cable_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
+                'extra_cable_fee' => 0,
                 'extra_installation_fee' => 0,
                 'extra_pole_fee' => 0,
             ];

@@ -34,9 +34,21 @@
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                     <div class="space-y-3">
                         <div class="flex justify-between border-b border-slate-50 py-1">
-                            <span class="text-slate-500">Petugas Survey</span>
+                            <span class="text-slate-500">Petugas Survey 1</span>
                             <span class="font-semibold text-slate-800">{{ $survey->technician->name ?? $survey->surveyors ?? '-' }}</span>
                         </div>
+                        @if($survey->surveyor2 || $survey->surveyor_2_id)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Petugas Survey 2</span>
+                            <span class="font-semibold text-slate-800">{{ $survey->surveyor2->name ?? '-' }}</span>
+                        </div>
+                        @endif
+                        @if($survey->surveyor3 || $survey->surveyor_3_id)
+                        <div class="flex justify-between border-b border-slate-50 py-1">
+                            <span class="text-slate-500">Petugas Survey 3</span>
+                            <span class="font-semibold text-slate-800">{{ $survey->surveyor3->name ?? '-' }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between border-b border-slate-50 py-1">
                             <span class="text-slate-500">Waktu Survey</span>
                             <span class="font-semibold text-slate-800">{{ $survey->start_time ? substr($survey->start_time, 0, 5) : '-' }} - {{ $survey->end_time ? substr($survey->end_time, 0, 5) : '-' }}</span>
@@ -89,7 +101,7 @@
                         </div>
                     </div>
                     <div>
-                        <span class="block text-slate-500 mb-2 font-bold uppercase text-[9px] tracking-wider">Foto Hasil Survey</span>
+                        <span class="block text-slate-500 mb-2 font-bold uppercase text-[9px] tracking-wider">Foto ODP / Survey Lapangan</span>
                         @if($survey->survey_photo)
                             <div class="border border-slate-200 rounded overflow-hidden shadow-sm">
                                 <img src="{{ asset('storage/' . $survey->survey_photo) }}" alt="Foto Survey" class="w-full object-cover max-h-64">
@@ -102,9 +114,29 @@
                                 <svg class="h-10 w-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <span class="text-[10px] font-bold uppercase tracking-wider">Tidak Ada Foto</span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider">Tidak Ada Foto ODP/Survey</span>
                             </div>
                         @endif
+
+                        {{-- Foto Rumah Pelanggan --}}
+                        <div class="mt-4">
+                            <span class="block text-slate-500 mb-2 font-bold uppercase text-[9px] tracking-wider">Foto Rumah Pelanggan</span>
+                            @if($survey->house_photo)
+                                <div class="border border-slate-200 rounded overflow-hidden shadow-sm">
+                                    <img src="{{ asset('storage/' . $survey->house_photo) }}" alt="Foto Rumah" class="w-full object-cover max-h-48">
+                                    <div class="p-2 bg-slate-50 text-center">
+                                        <a href="{{ asset('storage/' . $survey->house_photo) }}" target="_blank" class="text-[10px] font-bold text-sky-600 hover:text-sky-800">LIHAT FULL RESOLUSI</a>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="h-32 bg-slate-50 border border-dashed border-slate-200 rounded flex flex-col items-center justify-center text-slate-400">
+                                    <svg class="h-8 w-8 mb-1 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                    </svg>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider">Belum Ada Foto Rumah</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,17 +182,15 @@
                 </div>
 
                 <div>
-                    <label for="survey_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Survey</label>
+                    <label for="survey_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Mulai Survey</label>
                     <input type="date" name="survey_date" id="survey_date" value="{{ date('Y-m-d') }}" required
                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
 
                 <div>
-                    <label for="technician_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey</label>
-                    <select name="technician_id" id="technician_id" required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                        <option value="{{ auth()->id() }}">{{ auth()->user()->name }} (Saya)</option>
-                    </select>
+                    <label for="end_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Selesai Survey</label>
+                    <input type="date" name="end_date" id="end_date" value="{{ date('Y-m-d') }}"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
 
                 <div>
@@ -173,6 +203,69 @@
                     <label for="end_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jam Selesai</label>
                     <input type="time" name="end_time" id="end_time" value="10:00"
                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="duration_minutes" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Durasi Survey (Menit)</label>
+                    <input type="number" name="duration_minutes" id="duration_minutes" placeholder="60"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="fop_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID FOP / Penugasan</label>
+                    <input type="text" name="fop_id" id="fop_id" placeholder="FOP-2026-..."
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="assigned_at" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Penugasan FOP</label>
+                    <input type="datetime-local" name="assigned_at" id="assigned_at"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+
+                <div>
+                    <label for="technician_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 1 (Utama)</label>
+                    <select name="technician_id" id="technician_id" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="{{ auth()->id() }}">{{ auth()->user()->name }} (Saya)</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers->where('id', '!=', auth()->id()) as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
+
+                <div>
+                    <label for="surveyor_2_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 2</label>
+                    <select name="surveyor_2_id" id="surveyor_2_id"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="">— Tidak ada —</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
+
+                <div>
+                    <label for="surveyor_3_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 3</label>
+                    <select name="surveyor_3_id" id="surveyor_3_id"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="">— Tidak ada —</option>
+                        @if(isset($activeUsers))
+                            @foreach($activeUsers as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        @endif
+                    </select>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="surveyors" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Tim Survey (Opsional)</label>
+                    <input type="text" name="surveyors" id="surveyors" placeholder="Contoh: Tim A - Budi, Andi, Caca"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 </div>
 
                 <div>
@@ -200,10 +293,17 @@
                 </div>
 
                 <div class="md:col-span-2">
-                    <label for="survey_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto Lokasi / ODP</label>
+                    <label for="survey_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto ODP / Lokasi Survey</label>
                     <input type="file" name="survey_photo" id="survey_photo" accept="image/*"
                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                     <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="house_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto Rumah Pelanggan</label>
+                    <input type="file" name="house_photo" id="house_photo" accept="image/*"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                    <p class="text-[9px] text-slate-400 mt-1 italic">Foto tampak depan rumah pelanggan. Format JPG/PNG, maksimal 2MB.</p>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">

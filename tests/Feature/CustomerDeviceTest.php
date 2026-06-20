@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerTechnicalDetail;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -145,6 +146,38 @@ class CustomerDeviceTest extends TestCase
         $response->assertDontSee('hidden-wifi');
         $response->assertSee('********');
         $response->assertDontSee('Isi / Ubah Perangkat');
+    }
+
+    public function test_device_tab_falls_back_to_migrated_technical_detail(): void
+    {
+        $pop = $this->createPop('DEV4B');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-004B');
+
+        CustomerTechnicalDetail::create([
+            'customer_id' => $customer->id,
+            'old_report_id' => 'RPT-004B',
+            'old_customer_id' => $customer->customer_code,
+            'old_request_id' => 'RQ000716',
+            'connection_type' => 'KABEL',
+            'router_or_ont_serial' => 'ZICG10237307',
+            'ip_address' => 'SMN_RQ000716@PurnamaAyuLestari',
+            'odp_number' => '236 sandia',
+            'odp_port' => '6 sandia',
+            'olt_port' => 'Olt sandia',
+            'passive_device' => 'KABEL',
+            'note' => 'Purnama Ayu Lestari Putri',
+        ]);
+
+        $response = $this->actingAs($technician)
+            ->get(route('customers.show', $customer->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('Data Perangkat Migrasi');
+        $response->assertSee('ZICG10237307');
+        $response->assertSee('SMN_RQ000716@PurnamaAyuLestari');
+        $response->assertSee('Data ini tampil dari detail teknis migrasi karena tabel perangkat pelanggan belum terisi.');
+        $response->assertDontSee('Belum ada data perangkat');
     }
 
     public function test_invalid_mac_and_ip_are_rejected(): void

@@ -14,17 +14,23 @@ class CustomerInstallationController extends Controller
 
         $validated = $request->validate([
             'installation_status' => 'required|string|in:scheduled,in_progress,completed,failed',
-            'scheduled_date' => 'required|date',
-            'scheduled_time' => 'nullable',
-            'technician_id' => 'nullable|exists:users,id',
-            'finished_date' => 'nullable|date',
-            'installation_photo' => 'nullable|image|max:2048',
-            'installation_note' => 'nullable|string',
+            'scheduled_date'      => 'required|date',
+            'scheduled_time'      => 'nullable',
+            'start_time'          => 'nullable',
+            'end_time'            => 'nullable',
+            'assigned_at'         => 'nullable|date',
+            'fop_id'              => 'nullable|string',
+            'technician_id'       => 'nullable|exists:users,id',
+            'technician_2_id'     => 'nullable|exists:users,id',
+            'technician_3_id'     => 'nullable|exists:users,id',
+            'technicians'         => 'nullable|string',
+            'finished_date'       => 'nullable|date',
+            'installation_photo'  => 'nullable|image|max:2048',
+            'installation_note'   => 'nullable|string',
         ]);
 
         if ($request->hasFile('installation_photo')) {
-            $path = $request->file('installation_photo')->store('installations', 'public');
-            $validated['installation_photo'] = $path;
+            $validated['installation_photo'] = $request->file('installation_photo')->store('installations', 'public');
         }
 
         $validated['customer_id'] = $customer->id;

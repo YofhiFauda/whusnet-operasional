@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use Database\Seeders\JetisPopSeeder;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -17,6 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PonorogoRegionSeeder::class);
         $this->call(MadiunRegionSeeder::class);
+        // $this->call(JetisPopSeeder::class);
         $this->call(SubscriptionStatusSeeder::class);
         $this->call(InternetPackageSeeder::class);
         $this->call(RoleSeeder::class);

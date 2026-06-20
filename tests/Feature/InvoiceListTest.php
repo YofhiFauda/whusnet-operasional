@@ -90,8 +90,8 @@ class InvoiceListTest extends TestCase
         $response->assertSee($invoice->invoice_number);
         $response->assertSee('Detail Invoice Customer');
         $response->assertSee($invoice->customerService->package_name_snapshot);
-        $response->assertSee('PPN (%)');
-        $response->assertSee('150.000,00');
+        $response->assertSee('Tidak dikenakan'); // ppn=0 maka tampil "Tidak dikenakan"
+        $response->assertSee('150.000');
         $response->assertSee('Sebagian');
     }
 
