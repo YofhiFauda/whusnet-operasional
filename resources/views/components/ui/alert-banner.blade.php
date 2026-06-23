@@ -1,7 +1,7 @@
 @props([
     'type' => 'info', // error, warning, info, success
     'title',
-    'message',
+    'message' => null,
     'actionLabel' => null,
     'actionUrl' => null,
     'dismissible' => true,
@@ -22,7 +22,12 @@
     </div>
     <div class="alert-banner-body">
         <p class="alert-banner-title">{{ $title }}</p>
-        <p class="alert-banner-message">{{ $message }}</p>
+        <div class="alert-banner-message">
+            @if(isset($message) && $message)
+                {{ $message }}
+            @endif
+            {{ $slot }}
+        </div>
         @if($actionLabel && $actionUrl)
             <div class="alert-banner-actions">
                 <a href="{{ $actionUrl }}" class="btn-secondary !py-1 !min-h-0 text-xs">{{ $actionLabel }}</a>

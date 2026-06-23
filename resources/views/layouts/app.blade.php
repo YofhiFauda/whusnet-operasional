@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-background">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full text-slate-900 font-sans antialiased">
+<body class="h-full text-text-main font-sans antialiased">
     <div class="min-h-full flex flex-col md:flex-row">
         <!-- Sidebar Container -->
         <aside id="sidebar" class="bg-slate-900 text-white w-64 shrink-0 transition-all duration-300 ease-in-out md:flex md:flex-col md:h-screen md:sticky md:top-0 hidden z-30">
@@ -288,9 +288,9 @@
         </header>
 
         <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col min-w-0 bg-slate-50">
+        <div class="flex-1 flex flex-col min-w-0 bg-background">
             <!-- Top Navbar -->
-            <header class="h-16 bg-white border-b border-slate-200 hidden md:flex items-center justify-between px-8 shadow-sm">
+            <header class="h-16 bg-surface border-b border-border hidden md:flex items-center justify-between px-8 shadow-sm">
                 <div class="flex items-center gap-4">
                     <button onclick="toggleDesktopSidebar()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer focus:outline-none" title="Toggle Sidebar">
                         <!-- Lucide Panel Left Icon -->
@@ -299,12 +299,12 @@
                             <path d="M9 3v18"/>
                         </svg>
                     </button>
-                    <h2 class="text-lg font-semibold text-slate-800">@yield('page_title', 'Dashboard')</h2>
+                    <h2 class="text-lg font-semibold text-text-main">@yield('page_title', 'Dashboard')</h2>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span class="text-xs text-slate-500 data-text">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
-                    <div class="h-8 w-px bg-slate-200"></div>
-                    <div class="flex items-center gap-2 text-sm text-slate-700">
+                    <span class="text-xs text-text-muted data-text">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
+                    <div class="h-8 w-px bg-border"></div>
+                    <div class="flex items-center gap-2 text-sm text-text-secondary">
                         <span class="font-medium">Admin Panel</span>
                     </div>
                 </div>
