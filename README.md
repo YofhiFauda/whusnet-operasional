@@ -169,8 +169,7 @@ composer test
 
 ## Catatan Implementasi
 
-Project ini sudah menyediakan fondasi fitur operasional ISP. Namun beberapa data detail seperti survey, FOP, pemasangan, aktivasi, uji layanan, dan invoice awal masih disusun secara simulatif dari data pelanggan, tanggal registrasi, dan status. Untuk operasional produksi, bagian tersebut perlu dikembangkan menjadi tabel transaksi dan workflow backend tersendiri.
-
+Project ini sudah menyediakan fondasi fitur operasional ISP, termasuk modul Onboarding Workflow (Survey, Verifikasi Lapangan, Pemasangan, Aktivasi) yang diatur menggunakan *State Machine* (`CustomerWorkflowService`) serta tabel riwayat transaksi pendukung (`customer_surveys`, `customer_installations`, `customer_technical_details`). Data tagihan awal dan uji layanan secara bertahap akan diintegrasikan dengan modul Billing.
 ## Menu Dokumentasi Fitur
 
 Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu sesuai fitur yang ingin dipelajari, lalu buka dokumentasi detailnya.
@@ -201,12 +200,12 @@ Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu se
 
 | Kebutuhan | Dokumentasi |
 | --- | --- |
-| Memahami fitur master secara umum | [Overview Master](docs/master/README.md) |
-| Melihat master wilayah | [Master Wilayah](docs/master/wilayah.md) |
-| Melihat master internet package | [Master Internet Package](docs/master/internet-package.md) |
-| Melihat master status langganan | [Master Status Langganan](docs/master/status-langganan.md) |
-| Melihat flowchart master | [Flowchart Master](docs/master/flowchart.md) |
-| Melihat schema master | [Schema Master](docs/master/database-schema.md) |
+| Memahami modul Master secara umum | [Overview Master](docs/master/README.md) |
+| Melihat master wilayah | [Master Wilayah](docs/master/wilayah/README.md) |
+| Melihat master internet package | [Master Internet Package](docs/master/internet-package/README.md) |
+| Melihat master status pelanggan | [Master Status Pelanggan](docs/master/status-pelanggan/README.md) |
+| Melihat master POP (Cabang) | [Master POP](docs/master/pop/README.md) |
+| Melihat master Distribusi jaringan | [Master Distribusi](docs/master/distribution/README.md) |
 
 ### Penunjang
 

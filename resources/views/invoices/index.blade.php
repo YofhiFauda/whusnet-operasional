@@ -1,12 +1,26 @@
 @extends('layouts.app')
 
-@section('title', 'Daftar Tagihan - Whusnet Operasional')
-@section('page_title', 'Daftar Tagihan')
+@php
+    $pageTitle = 'Daftar Tagihan';
+    $formAction = route('invoices.index');
+    if (isset($statusGroup) && $statusGroup !== '') {
+        if ($statusGroup === 'lunas') {
+            $pageTitle = 'Tagihan Lunas';
+            $formAction = route('invoices.lunas');
+        } elseif ($statusGroup === 'belum_lunas') {
+            $pageTitle = 'Tagihan Belum Lunas';
+            $formAction = route('invoices.belum-lunas');
+        }
+    }
+@endphp
+
+@section('title', $pageTitle . ' - Whusnet Operasional')
+@section('page_title', $pageTitle)
 
 @section('content')
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
     <div>
-        <h3 class="text-slate-800 text-sm font-semibold uppercase tracking-wider">Daftar dan Filter Tagihan</h3>
+        <h3 class="text-slate-800 text-sm font-semibold uppercase tracking-wider">Daftar dan Filter {{ $pageTitle }}</h3>
         <p class="text-xs text-slate-500 mt-1">Tagihan berasal dari pelanggan aktif dan layanan pelanggan yang sudah tersimpan.</p>
     </div>
     <a href="/customers" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
@@ -15,7 +29,7 @@
 </div>
 
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
-    <form action="{{ route('invoices.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+    <form action="{{ $formAction }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
         <div>
             <label for="search" class="block text-xs font-semibold text-slate-500 mb-2">CARI TAGIHAN</label>
             <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Cari Nama, No. Tagihan, atau ID Invoice Lama..." class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
@@ -41,7 +55,11 @@
             <select name="status" id="status" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                 <option value="">Semua Status</option>
                 @foreach($allowedStatuses as $invoiceStatus)
-                    <option value="{{ $invoiceStatus }}" {{ $status === $invoiceStatus ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $invoiceStatus)) }}</option>
+                    @if(!isset($statusGroup) || $statusGroup === '' || 
+                        ($statusGroup === 'lunas' && $invoiceStatus === 'lunas') || 
+                        ($statusGroup === 'belum_lunas' && ($invoiceStatus === 'belum_dibayar' || $invoiceStatus === 'sebagian')))
+                        <option value="{{ $invoiceStatus }}" {{ $status === $invoiceStatus ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $invoiceStatus)) }}</option>
+                    @endif
                 @endforeach
             </select>
         </div>
@@ -50,7 +68,7 @@
             <button type="submit" class="flex-1 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium py-2 px-4 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/25">
                 Filter
             </button>
-            <a href="{{ route('invoices.index') }}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 px-4 rounded-md transition-colors cursor-pointer text-center focus:outline-none">
+            <a href="{{ $formAction }}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 px-4 rounded-md transition-colors cursor-pointer text-center focus:outline-none">
                 Reset
             </a>
         </div>

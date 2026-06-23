@@ -86,26 +86,39 @@
                             </svg>
                             <span class="sidebar-text">PELANGGAN</span>
                         </span>
-                        <svg id="chevron-pelanggan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('customers*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <svg id="chevron-pelanggan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
                     <!-- Submenu -->
-                    <div id="submenu-pelanggan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('customers*') ? '' : 'hidden' }}">
+                    <div id="submenu-pelanggan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? '' : 'hidden' }}">
                         @if(auth()->user()->hasPermission('create_customers'))
                             <a href="/customers/create" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Registrasi Pelanggan
                             </a>
                         @endif
                         @if(auth()->user()->hasPermission('view_customers'))
-                            <a href="/customers?status_group=survey" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'survey' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Survey
+                            <div class="pt-2 pb-1">
+                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Onboarding</p>
+                            </div>
+                            <a href="{{ route('surveys.queue') }}" class="flex items-center justify-between py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('surveys.queue') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                <span>Antrean Survey</span>
+                                @if(isset($badge_survey_count) && $badge_survey_count > 0)
+                                    <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
+                                @endif
                             </a>
-                            <a href="/customers?status_group=verification" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'verification' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Verifikasi Admin & Teknisi
+                            <a href="{{ route('verifications.queue') }}" class="flex items-center justify-between py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('verifications.queue') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                <span>Verif & Pemasangan</span>
+                                @if(isset($badge_verification_count) && $badge_verification_count > 0)
+                                    <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
+                                @endif
                             </a>
-                            <a href="/customers" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                List Pelanggan
+                            
+                            <div class="pt-2 pb-1">
+                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</p>
+                            </div>
+                            <a href="/customers?status=active" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                List Pelanggan Aktif
                             </a>
                             <a href="/customers?status_group=failed" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'failed' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 List Pelanggan Gagal
@@ -115,6 +128,9 @@
                             </a>
                         @endif
                         @if(auth()->user()->hasPermission('import_customers'))
+                            <div class="pt-2 pb-1">
+                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Data</p>
+                            </div>
                             <a href="/customers/import" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/import') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Import Pelanggan
                             </a>
@@ -124,13 +140,32 @@
                 @endif
 
                 @if(auth()->user()->hasPermission('view_invoices'))
-                <!-- Billing Link -->
-                <a href="{{ route('invoices.index') }}" title="Tagihan" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('invoices*') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
-                    <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 14h6m-6 4h6M5 3h14a2 2 0 012 2v16l-3-2-3 2-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />
-                    </svg>
-                    <span class="sidebar-text">Tagihan</span>
-                </a>
+                <!-- TAGIHAN Dropdown -->
+                <div>
+                    <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')" title="Tagihan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 14h6m-6 4h6M5 3h14a2 2 0 012 2v16l-3-2-3 2-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />
+                            </svg>
+                            <span class="sidebar-text">TAGIHAN</span>
+                        </span>
+                        <svg id="chevron-tagihan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('invoices*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <!-- Submenu -->
+                    <div id="submenu-tagihan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('invoices*') ? '' : 'hidden' }}">
+                        <a href="{{ route('invoices.belum-lunas') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.belum-lunas') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Tagihan Belum Lunas
+                        </a>
+                        <a href="{{ route('invoices.lunas') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.lunas') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Tagihan Lunas
+                        </a>
+                        <a href="{{ route('invoices.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Semua Tagihan
+                        </a>
+                    </div>
+                </div>
                 @endif
 
                 @if(auth()->user()->hasPermission('view_payments'))
@@ -277,6 +312,7 @@
 
             <!-- Main Dynamic Page Content -->
             <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+
                 @yield('content')
             </main>
         </div>
@@ -324,7 +360,148 @@
             }
         }
     </script>
+    <script>
+        window.confirmAction = function(message, formElement) {
+            window.Dialog.show({
+                title: 'Konfirmasi',
+                message: message,
+                icon: 'warning',
+                buttons: [
+                    { text: 'Batal', type: 'secondary' },
+                    { text: 'Lanjutkan', type: 'primary', onClick: () => {
+                        window.Dialog.close();
+                        if (formElement && formElement.submit) {
+                            formElement.submit();
+                        }
+                    }}
+                ]
+            });
+        };
+
+        window.confirmDelete = function(message, formElement) {
+            window.Dialog.show({
+                title: 'Konfirmasi Hapus',
+                message: message,
+                icon: 'error',
+                buttons: [
+                    { text: 'Batal', type: 'secondary' },
+                    { text: 'Ya, Hapus', type: 'danger', onClick: () => {
+                        window.Dialog.close();
+                        if (formElement && formElement.submit) {
+                            formElement.submit();
+                        }
+                    }}
+                ]
+            });
+        };
+
+        // Global Alert Wrapper
+        window.Alert = function(title, message, icon = 'info') {
+            window.Dialog.show({
+                title: title,
+                message: message,
+                icon: icon,
+                buttons: [
+                    { text: 'Tutup', type: 'secondary', onClick: () => window.Dialog.close() }
+                ]
+            });
+        };
+
+        // Global Confirm Wrapper (Asynchronous)
+        window.Confirm = function(title, message, icon = 'warning', onConfirm = null, onCancel = null) {
+            window.Dialog.show({
+                title: title,
+                message: message,
+                icon: icon,
+                buttons: [
+                    { text: 'Batal', type: 'secondary', onClick: () => {
+                        window.Dialog.close();
+                        if (typeof onCancel === 'function') onCancel();
+                    }},
+                    { text: 'Ya, Lanjutkan', type: 'primary', onClick: () => {
+                        window.Dialog.close();
+                        if (typeof onConfirm === 'function') onConfirm();
+                    }}
+                ]
+            });
+        };
+
+        // Global Form Validation (Intersepsi semua submit form POST/PUT/DELETE)
+        document.addEventListener('submit', function(e) {
+            const form = e.target;
+            
+            // Jangan intercept form GET (seperti filter/pencarian)
+            if (form.method && form.method.toLowerCase() === 'get') return;
+            
+            // Abaikan form yang tidak perlu konfirmasi
+            if (form.classList.contains('no-confirm') || 
+                form.id === 'logout-form' || 
+                (form.action && (form.action.includes('login') || form.action.includes('logout')))) {
+                return;
+            }
+            
+            // Jika form sudah memiliki attribute onsubmit yang menggunakan custom confirm, lewati
+            const onsubmitAttr = form.getAttribute('onsubmit');
+            if (onsubmitAttr && (onsubmitAttr.includes('confirmAction') || onsubmitAttr.includes('confirmDelete') || onsubmitAttr.includes('Confirm'))) {
+                return;
+            }
+            
+            // Hindari intercept jika event default sudah dicegah sebelumnya
+            if (e.defaultPrevented) return;
+            
+            e.preventDefault();
+            
+            let method = form.method.toUpperCase();
+            const methodInput = form.querySelector('input[name="_method"]');
+            if (methodInput) {
+                method = methodInput.value.toUpperCase();
+            }
+            
+            let actionWord = 'menyimpan';
+            let title = 'Konfirmasi Simpan';
+            let icon = 'warning';
+            let confirmText = 'Ya, Simpan';
+            let confirmType = 'primary';
+            
+            if (method === 'DELETE') {
+                actionWord = 'menghapus';
+                title = 'Konfirmasi Hapus';
+                icon = 'error';
+                confirmText = 'Ya, Hapus';
+                confirmType = 'danger';
+            } else if (method === 'PUT' || method === 'PATCH') {
+                actionWord = 'mengubah';
+                title = 'Konfirmasi Ubah';
+                confirmText = 'Ya, Ubah';
+            } else {
+                title = 'Konfirmasi Tambah';
+                confirmText = 'Ya, Lanjutkan';
+            }
+
+            let customMessage = null;
+            if (e.submitter && e.submitter.getAttribute('data-confirm')) {
+                customMessage = e.submitter.getAttribute('data-confirm');
+            } else if (form.getAttribute('data-confirm')) {
+                customMessage = form.getAttribute('data-confirm');
+            }
+            
+            window.Dialog.show({
+                title: title,
+                message: customMessage || `Apakah Anda yakin ingin ${actionWord} data ini?`,
+                icon: icon,
+                buttons: [
+                    { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                    { text: confirmText, type: confirmType, onClick: () => {
+                        window.Dialog.close();
+                        form.submit();
+                    }}
+                ]
+            });
+        });
+    </script>
     
     @yield('scripts')
+    <x-toast />
+    <x-dialog />
 </body>
 </html>

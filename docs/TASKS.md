@@ -1,11 +1,141 @@
 ## Status Project Saat Ini
-Current Sprint: Selesai — Seluruh MVP Selesai
-Current Module: Import & Migrasi Pelanggan / Billing / RBAC / Laporan / Audit Log
-Current Task: Seluruh MVP Selesai dan Terverifikasi
+Current Sprint: Sprint 5
+Current Module: Modul Import Excel/CSV Data Pelanggan Lama
+Current Task: Merancang dan membuat fitur unggah, preview, dan simpan data pelanggan lama.
 
 ---
 
 ## In Progress
+
+### Sprint 5 — Modul Import Excel/CSV Data Pelanggan Lama
+Status: In Progress
+
+Tujuan:
+Membangun fitur mass-import pelanggan lama menggunakan format Excel/CSV agar migrasi data pelanggan lama bisa dilakukan cepat dengan validasi ketat.
+
+Scope:
+- Halaman UI untuk Upload File Import.
+- Endpoint Download Template Excel.
+- Validasi data format file (nomor hp duplicate, format salah, dsb).
+- Tampilan Preview / Review Data sebelum dimasukkan (Draft/Batch).
+- Logika penyimpanan multitable: `customers`, `customer_addresses`, `customer_services`.
+- Error log per baris gagal.
+- Integrasi status langsung menjadi Pelanggan Aktif/Siap Billing.
+
+Acceptance Criteria:
+- [ ] Admin dapat mengunduh format template.
+- [ ] Sistem memunculkan preview (valid & invalid) setelah diunggah.
+- [ ] Proses simpan memasukkan data valid ke database dengan sukses.
+- [ ] Pelanggan import masuk ke List Pelanggan Aktif.
+
+---
+
+### UX-VA001 — Halaman Penuh Verifikasi Admin (Proses Pemasangan + Pengujian + Aktivasi)
+Status: Done
+
+Sprint/Module: Verifikasi Admin — Workflow UX Polish
+
+Tujuan:
+Membuat halaman penuh Sub Menu Verifikasi Admin yang menampilkan data proses pemasangan, data pengujian speedtest, dan form aktivasi tagihan dalam satu halaman terstruktur dengan tab navigasi.
+
+Scope:
+- [x] Buat `verifications/admin.blade.php` — halaman tab 3-bagian: Proses Pemasangan, Pengujian, Verifikasi & Aktivasi.
+- [x] Tambah method `showAdmin` di `CustomerVerificationController`.
+- [x] Tambah route `GET /customers/{customer}/verification/admin`.
+- [x] Hilangkan Modal "Proses ke Tim" — tombol langsung POST konfirmasi native browser.
+- [x] Ganti tombol modal "Verifikasi & Aktivasi" di queue dengan link ke halaman penuh admin.blade.php.
+- [x] Hapus `finalVerifyModal` dari `queue.blade.php` (tidak lagi diperlukan).
+
+Acceptance Criteria:
+- [x] Admin dapat melihat detail data pemasangan (perangkat, ODP/OLT, durasi SLA) dari tab Proses Pemasangan.
+- [x] Admin dapat melihat data speedtest (download, upload, latency, packet loss, kesesuaian paket) dari tab Pengujian.
+- [x] Admin dapat mengisi form tagihan dan mengaktifkan pelanggan dari tab Verifikasi & Aktivasi.
+- [x] Tombol "Verifikasi" di queue langsung menuju halaman penuh (bukan modal).
+- [x] Modal finalVerify telah dihapus dari halaman queue.
+
+---
+
+### Workflow-S4 — Modul Aktivasi & Tagihan + Polish
+Status: Done
+
+Tujuan:
+Pelanggan resmi aktif, masuk list Pelanggan, sistem siap produksi dengan tagihan pertama tergenerate.
+
+Scope:
+- `VerificationController@finalVerify` (action "Verifikasi").
+- Modal Buat Tagihan Manual → `invoices`.
+- Activation flow (Update `customer_services` dan `customers.status = active`).
+- Pelanggan masuk List Pelanggan utama.
+- Cron/job: auto-reminder countdown lewat batas waktu (Sudah ada di `Kernel.php` / Scheduler Laravel).
+- Testing end-to-end.
+
+Acceptance Criteria:
+- [x] Admin dapat melakukan verifikasi akhir dan menerbitkan tagihan pertama.
+- [x] Pelanggan statusnya berubah menjadi `active` (aktif) dan mendapatkan CID kompleks.
+- [x] Data layanan berubah status menjadi `aktif` dan tersimpan relasi invoice pertamanya.
+
+---
+
+### Workflow-S3 — Modul Verifikasi Admin & Pemasangan
+Status: Done
+
+Tujuan:
+Alur 4-tahap di halaman Verifikasi (ACC → Proses Tim → Mulai Pasang → Verifikasi Admin).
+
+Scope:
+- Endpoint List Antrean Proses Verifikasi.
+- `VerificationController@processToTeam` (action "Proses ke Tim").
+- `InstallationController@start` (action "Start Proses") & broadcast event.
+- Frontend: Countdown pemasangan.
+- `InstallationController@complete` (action "Lapor Pemasangan").
+- Form Modal Data Perangkat & Speedtest → `customer_technical_details`.
+- Fitur SCAN QR (di-skip sesuai instruksi).
+- Audit log integration.
+
+Acceptance Criteria:
+- [x] Dari status `surveyed`, admin bisa proses sampai `verification_admin` dengan seluruh data perangkat & speedtest tersimpan di `customer_technical_details`.
+
+---
+
+### Workflow-S2 — Modul Registrasi & Survey (Backend + Frontend)
+Status: Done
+
+Tujuan:
+Pelanggan bisa didaftarkan dan masuk antrian survey dengan countdown live.
+
+Scope:
+- `CustomerRegistrationController@store`: Multi-step form
+- Validasi form registrasi
+- Endpoint List Antrean Survey
+- `SurveyController@start` & `SurveyController@complete`
+- Event `SurveyStarted` & `SurveyCompleted` + Reverb
+- Frontend: Halaman List Antrean Survey
+- Frontend: Countdown component (Reverb)
+- Frontend: Form Antrian Survei modal
+- Frontend: Data Survey Pelanggan di Detail Pelanggan
+
+Acceptance Criteria:
+- [x] End-to-end bisa daftar pelanggan → antrian survey → tekan Survey Data → countdown jalan real-time → Lapor Data → status pindah ke Verifikasi Admin.
+
+---
+
+### Workflow-S1 — Foundation: Schema + State Machine Service
+Status: Done
+
+Tujuan:
+Menyediakan pondasi database & state machine service untuk alur registrasi pelanggan.
+
+Scope:
+- Migration: tambah status baru ke `subscription_statuses` (`survey_in_progress`, `waiting_acc`, `installation_in_progress`, `verification_admin`).
+- Migration: tambah `started_at`, `completed_at` ke `customer_surveys` dan `customer_installations`.
+- Migration: tambah `contract_type` ke `customer_services`.
+- Buat `CustomerWorkflowService`.
+- Buat `WorkflowTransition` enum.
+- Unit test state machine.
+
+Acceptance Criteria:
+- [x] Migration jalan tanpa error.
+- [x] `CustomerWorkflowService::transition()` memiliki test coverage untuk seluruh alur happy path + reject path.
 
 ---
 

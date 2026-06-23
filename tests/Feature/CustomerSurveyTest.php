@@ -50,7 +50,7 @@ class CustomerSurveyTest extends TestCase
             'customer_code' => 'TEST-001',
             'full_name' => 'Test Customer',
             'phone' => '0812345678',
-            'status' => 'waiting_survey',
+            'status' => 'survey_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
@@ -64,8 +64,10 @@ class CustomerSurveyTest extends TestCase
             'technician_id' => $technician->id,
             'cable_estimation_meter' => 50,
             'nearest_odp' => 'ODP-TEST-01',
+            'house_photo' => UploadedFile::fake()->image('house.jpg'),
             'survey_photo' => UploadedFile::fake()->image('survey.jpg'),
             'survey_note' => 'Test survey note',
+            'difficulty_level' => 'SEDANG',
         ];
 
         $response = $this->actingAs($technician)
@@ -80,7 +82,7 @@ class CustomerSurveyTest extends TestCase
         ]);
 
         $customer->refresh();
-        $this->assertEquals('surveyed', $customer->status);
+        $this->assertEquals('waiting_acc', $customer->status);
         
         $survey = $customer->surveys()->first();
         $this->assertNotNull($survey->survey_photo);

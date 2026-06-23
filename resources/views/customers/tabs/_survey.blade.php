@@ -4,12 +4,16 @@
         <p class="text-xs text-slate-500 mt-0.5">Informasi hasil survey lapangan untuk persiapan instalasi.</p>
     </div>
     @can('fill_survey')
-        <button onclick="openSurveyModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Isi Hasil Survey
-        </button>
+        @if($customer->status === 'survey_in_progress')
+            <a href="{{ route('customers.survey.report', $customer) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Lapor Hasil Survey
+            </a>
+        @elseif($customer->status === 'waiting_survey')
+            <span class="text-[10px] text-amber-600 italic border border-amber-200 bg-amber-50 px-2 py-1 rounded">Mulai survey dari menu Antrean Survey terlebih dahulu.</span>
+        @endif
     @endcan
 </div>
 
@@ -152,169 +156,4 @@
     </div>
 @endif
 
-<!-- Modal Input Survey -->
-@can('fill_survey')
-<div id="survey-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden transform transition-all">
-        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Input Hasil Survey Lapangan</h3>
-            <button onclick="closeSurveyModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <form action="{{ route('customers.survey.store', $customer->id) }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status Survey</label>
-                    <div class="flex gap-4">
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="survey_status" value="completed" class="text-sky-600 focus:ring-sky-500" checked>
-                            <span class="ml-2 text-xs text-slate-700">Berhasil (Surveyed)</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="survey_status" value="failed" class="text-sky-600 focus:ring-sky-500">
-                            <span class="ml-2 text-xs text-slate-700">Gagal / Dibatalkan</span>
-                        </label>
-                    </div>
-                </div>
 
-                <div>
-                    <label for="survey_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Mulai Survey</label>
-                    <input type="date" name="survey_date" id="survey_date" value="{{ date('Y-m-d') }}" required
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="end_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Selesai Survey</label>
-                    <input type="date" name="end_date" id="end_date" value="{{ date('Y-m-d') }}"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="start_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jam Mulai</label>
-                    <input type="time" name="start_time" id="start_time" value="09:00"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="end_time" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jam Selesai</label>
-                    <input type="time" name="end_time" id="end_time" value="10:00"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="duration_minutes" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Durasi Survey (Menit)</label>
-                    <input type="number" name="duration_minutes" id="duration_minutes" placeholder="60"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="fop_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID FOP / Penugasan</label>
-                    <input type="text" name="fop_id" id="fop_id" placeholder="FOP-2026-..."
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="assigned_at" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Penugasan FOP</label>
-                    <input type="datetime-local" name="assigned_at" id="assigned_at"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="technician_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 1 (Utama)</label>
-                    <select name="technician_id" id="technician_id" required
-                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                        <option value="{{ auth()->id() }}">{{ auth()->user()->name }} (Saya)</option>
-                        @if(isset($activeUsers))
-                            @foreach($activeUsers->where('id', '!=', auth()->id()) as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
-                            @endforeach
-                        @endif
-                    </select>
-                </div>
-
-                <div>
-                    <label for="surveyor_2_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 2</label>
-                    <select name="surveyor_2_id" id="surveyor_2_id"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                        <option value="">— Tidak ada —</option>
-                        @if(isset($activeUsers))
-                            @foreach($activeUsers as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
-                            @endforeach
-                        @endif
-                    </select>
-                </div>
-
-                <div>
-                    <label for="surveyor_3_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Petugas Survey 3</label>
-                    <select name="surveyor_3_id" id="surveyor_3_id"
-                            class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                        <option value="">— Tidak ada —</option>
-                        @if(isset($activeUsers))
-                            @foreach($activeUsers as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
-                            @endforeach
-                        @endif
-                    </select>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="surveyors" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Tim Survey (Opsional)</label>
-                    <input type="text" name="surveyors" id="surveyors" placeholder="Contoh: Tim A - Budi, Andi, Caca"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                </div>
-
-                <div>
-                    <label for="cable_estimation_meter" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Estimasi Kabel (Meter)</label>
-                    <input type="number" name="cable_estimation_meter" id="cable_estimation_meter" value="0" min="0" required
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div>
-                    <label for="nearest_odp" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ODP Terdekat</label>
-                    <input type="text" name="nearest_odp" id="nearest_odp" placeholder="Contoh: ODP-SMN-01"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="required_tools" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kebutuhan Alat Khusus</label>
-                    <textarea name="required_tools" id="required_tools" rows="2" placeholder="Sebutkan alat khusus jika dibutuhkan..."
-                              class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs"></textarea>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="survey_note" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Catatan Hasil Survey</label>
-                    <textarea name="survey_note" id="survey_note" rows="3" placeholder="Tuliskan catatan detail hasil survey lapangan..."
-                              class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs"></textarea>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="survey_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto ODP / Lokasi Survey</label>
-                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                    <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="house_photo" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Foto Rumah Pelanggan</label>
-                    <input type="file" name="house_photo" id="house_photo" accept="image/*"
-                           class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
-                    <p class="text-[9px] text-slate-400 mt-1 italic">Foto tampak depan rumah pelanggan. Format JPG/PNG, maksimal 2MB.</p>
-                </div>
-            </div>
-            <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 text-xs">
-                <button type="button" onclick="closeSurveyModal()" class="px-3 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
-                    Batal
-                </button>
-                <button type="submit" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
-                    Simpan Hasil Survey
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-@endcan

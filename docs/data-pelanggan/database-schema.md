@@ -2,58 +2,51 @@
 
 ## Tabel Utama
 
-Fitur Data Pelanggan menggunakan tabel utama `customers` dan bergantung pada master `cities`, `districts`, `villages`, `internet_packages`, dan `subscription_statuses`.
+Fitur Data Pelanggan menggunakan tabel sentral `customers` yang berelasi dengan data master (`cities`, `districts`, `villages`, `internet_packages`, `subscription_statuses`, `pops`, dll) dan tabel-tabel transaksi workflow.
 
 ```mermaid
 erDiagram
+    CUSTOMERS ||--o{ CUSTOMER_ADDRESSES : has
+    CUSTOMERS ||--o{ CUSTOMER_SERVICES : has
+    CUSTOMERS ||--o{ CUSTOMER_SURVEYS : has
+    CUSTOMERS ||--o{ CUSTOMER_INSTALLATIONS : has
+    CUSTOMERS ||--o{ CUSTOMER_TECHNICAL_DETAILS : has
+    CUSTOMERS ||--o{ CUSTOMER_DOCUMENTS : has
     CUSTOMERS }o--|| CITIES : city_id
     CUSTOMERS }o--|| DISTRICTS : district_id
     CUSTOMERS }o--|| VILLAGES : village_id
-    CUSTOMERS }o--|| internet_packages : internet_package_id
+    CUSTOMERS }o--|| INTERNET_PACKAGES : internet_package_id
     CUSTOMERS }o--|| SUBSCRIPTION_STATUSES : status_code
 ```
 
-## Field Wajib di Form Registrasi
+## Struktur Transaksi Workflow (Onboarding)
 
-| Field | Validasi |
-| --- | --- |
-| `full_name` | required, string, max 150 |
-| `identity_number` | required, string, max 50 |
-| `gender` | required, string, max 20 |
-| `phone` | required, string, max 20 |
-| `registration_date` | required, date |
-| `address` | required, string |
-| `city_id` | required, exists `cities.id` |
-| `district_id` | required, exists `districts.id` |
-| `village_id` | required, exists `villages.id` |
-| `internet_package_id` | required, exists `internet_packages.id` |
-| `contract_period_months` | required, integer, min 1 |
-| `discount_amount` | required, numeric, min 0 |
-| `tax_percent` | required, numeric, 0 sampai 100 |
-| `status` | required, string, max 50 |
+Setiap pelanggan melewati alur workflow, datanya disimpan pada tabel terpisah sesuai konteks proses:
 
-## Field Opsional
+### 1. `customer_surveys`
+Pencatatan data survey pelanggan.
+- `customer_id`
+- `technician_id` (User)
+- `surveyors` (JSON, Multi-petugas)
+- `started_at`, `completed_at` (Countdown)
+- `signal_quality`, `cable_length`, `fat_sn`, `fat_port`
 
-| Field | Keterangan |
-| --- | --- |
-| `email` | Email pelanggan. |
-| `latitude`, `longitude` | Koordinat instalasi. |
-| `sales_code`, `agent_code`, `referral_customer_code` | Referral. |
-| `ont_sn`, `ip_address`, `odp_code`, `olt_code`, `vlan_id` | Data teknis. |
-| `foto_ktp`, `foto_rumah`, `foto_kontrak` | Dokumen upload. |
+### 2. `customer_installations`
+Pencatatan proses pemasangan perangkat.
+- `customer_id`
+- `technician_id` (User)
+- `technicians` (JSON, Multi-teknisi)
+- `started_at`, `completed_at` (Countdown)
+- `modem_sn`, `modem_mac`, `router_sn`
 
-## Dokumen Upload
-
-| Field | Validasi | Storage |
-| --- | --- | --- |
-| `foto_ktp` | image, max 2048 KB | `storage/app/public/documents` |
-| `foto_rumah` | image, max 2048 KB | `storage/app/public/documents` |
-| `foto_kontrak` | jpeg, png, pdf, max 2048 KB | `storage/app/public/documents` |
+### 3. `customer_technical_details`
+Detail konfigurasi teknis / FOP yang diisi saat verifikasi admin & pemasangan.
+- `customer_id`
+- `ip_address`, `vlan`, `olt_number`, `olt_slot`
+- `odp_code`, `olt_code`
+- `speedtest_download`, `speedtest_upload`, `speedtest_ping`
 
 ## Catatan Teknis
-
-1. `customer_code` dibuat otomatis pada proses `store()` dan `confirmImport()`.
-2. Relasi status pada model menggunakan `customers.status` ke `subscription_statuses.code`.
-3. Migration belum membuat foreign key eksplisit dari `customers.status` ke `subscription_statuses.code`.
-4. Detail operasional masih belum memiliki tabel transaksi terpisah untuk survey, FOP, instalasi, aktivasi, invoice, dan pembayaran.
-
+1. Proses perpindahan antar state diatur di `CustomerWorkflowService`.
+2. Validasi antrean dan countdown di database mengandalkan kolom `started_at` dan `completed_at` di tabel survey maupun installation.
+3. Field Multi-User (Petugas Survey, Teknisi Instalasi) menggunakan tipe data JSON array untuk mendukung >1 petugas.

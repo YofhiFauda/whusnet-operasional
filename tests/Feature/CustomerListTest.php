@@ -83,7 +83,7 @@ class CustomerListTest extends TestCase
             'data_completeness_status' => 'lengkap',
         ]);
 
-        $response = $this->get('/customers');
+        $response = $this->get('/customers?status=');
 
         $response->assertStatus(200);
         $response->assertSee('Customer Satu');
@@ -150,7 +150,7 @@ class CustomerListTest extends TestCase
 
         $this->actingAs($adminCabang);
 
-        $response = $this->get('/customers');
+        $response = $this->get('/customers?status=');
 
         $response->assertStatus(200);
         $response->assertSee('Customer Ponorogo Satu');
@@ -189,27 +189,27 @@ class CustomerListTest extends TestCase
         ]);
 
         // Search by name
-        $response = $this->get('/customers?search=Subarjo');
+        $response = $this->get('/customers?search=Subarjo&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
         // Search by phone
-        $response = $this->get('/customers?search=08222222222');
+        $response = $this->get('/customers?search=08222222222&status=');
         $response->assertSee('Bambang Tri');
         $response->assertDontSee('Ahmad Subarjo');
 
         // Search by code
-        $response = $this->get('/customers?search=C-PON-000001');
+        $response = $this->get('/customers?search=C-PON-000001&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
         // Search by NIK
-        $response = $this->get('/customers?search=3502999999999999');
+        $response = $this->get('/customers?search=3502999999999999&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
         // Search by legacy customer ID
-        $response = $this->get('/customers?search=PE-LEGACY-0001');
+        $response = $this->get('/customers?search=PE-LEGACY-0001&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
     }
@@ -261,11 +261,11 @@ class CustomerListTest extends TestCase
             'data_completeness_status' => 'lengkap',
         ]);
 
-        $response = $this->get("/customers?pop_id={$pop1->id}");
+        $response = $this->get("/customers?pop_id={$pop1->id}&status=");
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
-        $response = $this->get("/customers?pop_id={$pop2->id}");
+        $response = $this->get("/customers?pop_id={$pop2->id}&status=");
         $response->assertSee('Bambang Tri');
         $response->assertDontSee('Ahmad Subarjo');
     }
@@ -328,11 +328,11 @@ class CustomerListTest extends TestCase
             'billing_status' => 'active',
         ]);
 
-        $response = $this->get("/customers?completeness_status=draft");
+        $response = $this->get("/customers?completeness_status=draft&status=");
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
-        $response = $this->get("/customers?completeness_status=lengkap");
+        $response = $this->get("/customers?completeness_status=lengkap&status=");
         $response->assertSee('Bambang Tri');
         $response->assertDontSee('Ahmad Subarjo');
     }

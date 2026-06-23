@@ -35,10 +35,17 @@ class CustomerInstallationTest extends TestCase
             'customer_code' => 'TEST-INST-001',
             'full_name' => 'Test Installation Customer',
             'phone' => '0812345678',
-            'status' => 'waiting_installation',
+            'status' => 'installation_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
+        ]);
+
+        $customer->installations()->create([
+            'installation_status' => 'scheduled',
+            'scheduled_date' => now()->format('Y-m-d'),
+            'scheduled_time' => '09:00',
+            'technician_id' => $technician->id,
         ]);
 
         $installationData = [
@@ -48,12 +55,20 @@ class CustomerInstallationTest extends TestCase
             'technician_id' => $technician->id,
             'finished_date' => now()->format('Y-m-d'),
             'installation_photo' => UploadedFile::fake()->image('installation.jpg'),
+            'contract_photo' => UploadedFile::fake()->image('contract.jpg'),
+            'signature_photo' => UploadedFile::fake()->image('signature.jpg'),
+            'speedtest_photo' => UploadedFile::fake()->image('speedtest.jpg'),
             'installation_note' => 'Instalasi selesai dan koneksi normal.',
+            'device_type' => 'ont',
         ];
 
         $response = $this->actingAs($technician)
             ->post(route('customers.installation.store', $customer->id), $installationData);
 
+        if (session()->has('error')) {
+            dump(session('error'));
+        }
+        $response->assertSessionHas('success');
         $response->assertStatus(302);
         $this->assertDatabaseHas('customer_installations', [
             'customer_id' => $customer->id,
@@ -63,11 +78,11 @@ class CustomerInstallationTest extends TestCase
         ]);
 
         $customer->refresh();
-        $this->assertEquals('installed', $customer->status);
+        $this->assertEquals('verification_admin', $customer->status);
 
         $installation = $customer->installations()->first();
         $this->assertNotNull($installation->installation_photo);
-        Storage::disk('public')->assertExists($installation->installation_photo);
+        $this->assertTrue(Storage::disk('public')->exists($installation->installation_photo));
     }
 
     public function test_installation_data_is_visible_on_customer_detail(): void

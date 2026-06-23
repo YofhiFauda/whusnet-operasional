@@ -1,29 +1,21 @@
-# Fitur Master
+# Dokumentasi Data Master
 
-Folder ini mendokumentasikan master data yang digunakan sebagai referensi operasional.
+Modul Master Data bertugas menyimpan referensi tetap atau data *lookup* (kamus data) yang krusial untuk operasional ISP, mulai dari data referensi wilayah hingga pengaturan jaringan (POP, Router). Data master sangat jarang berubah namun sangat vital bagi modul transaksi (Pelanggan, Tagihan).
 
-## Master yang Tersedia
+## Struktur Modul Master Data
 
-| Master | Route | Fungsi |
+Untuk mempelajari setiap modul master, silakan buka sub-folder masing-masing yang berisi README, Schema DB, Flowchart, dan User Flow:
+
+| Modul | Folder / Tautan | Penjelasan Singkat |
 | --- | --- | --- |
-| Wilayah | `GET /master/wilayah` | Referensi kota, kecamatan, dan desa untuk alamat pelanggan. |
-| Paket Internet | `GET /master/paket` | Master paket internet yang bisa dipilih pelanggan. |
-| Status Langganan | `GET /master/status-langganan` | Referensi status workflow pelanggan. |
+| **Paket Internet** | [`docs/master/internet-package/`](internet-package/README.md) | Kamus paket layanan dan harganya. |
+| **Status Pelanggan** | [`docs/master/status-pelanggan/`](status-pelanggan/README.md) | Urutan workflow pelanggan (state machine). |
+| **Wilayah** | [`docs/master/wilayah/`](wilayah/README.md) | Hierarki Kota, Kecamatan, Kelurahan. |
+| **POP (Cabang)** | [`docs/master/pop/`](pop/README.md) | Titik Point of Presence untuk RBAC dan prefix id pelanggan. |
+| **Distribusi** | [`docs/master/distribution/`](distribution/README.md) | Perangkat infrastruktur jaringan (OLT, ODP, Router). |
 
-## Ketergantungan ke Modul Pelanggan
-
-```mermaid
-flowchart LR
-    A[Master Wilayah] --> D[Data Pelanggan]
-    B[Master Paket Internet] --> D
-    C[Master Status Langganan] --> D
-    D --> E[Dashboard Operasional]
-```
-
-## File Terkait
-
-| Master | Controller | Model | View |
-| --- | --- | --- | --- |
-| Wilayah | `RegionController` | `City`, `District`, `Village` | `resources/views/master/wilayah.blade.php` |
-| Paket Internet | `InternetPackageController` | `InternetPackage` | `resources/views/master/paket/*.blade.php` |
-| Status Langganan | `SubscriptionStatusController` | `SubscriptionStatus` | `resources/views/master/status-langganan.blade.php` |
+Setiap folder di atas minimal memiliki 4 file standar:
+1. `README.md` - Penjelasan umum fitur.
+2. `database-schema.md` - Diagram Entity Relationship (ERD) dan field.
+3. `flowchart.md` - Alur sistem (system flow) di belakang layar.
+4. `user-flow.md` - Langkah demi langkah skenario pengguna dalam aplikasi.

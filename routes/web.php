@@ -16,6 +16,8 @@ use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\PaymentReportController;
+use App\Http\Controllers\CustomerVerificationController;
+use App\Http\Controllers\CustomerInstallationController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -67,6 +69,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit_customers')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
     });
 
     Route::middleware('permission:validate_customer_data')->group(function () {
@@ -79,6 +82,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:view_invoices')->group(function () {
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/lunas', [InvoiceController::class, 'lunas'])->name('invoices.lunas');
+        Route::get('/invoices/belum-lunas', [InvoiceController::class, 'belumLunas'])->name('invoices.belum-lunas');
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     });
 
@@ -154,12 +159,30 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:fill_survey')->group(function () {
+        Route::get('/surveys/queue', [\App\Http\Controllers\CustomerSurveyController::class, 'index'])->name('surveys.queue');
+        Route::get('/customers/{customer}/survey/report', [\App\Http\Controllers\CustomerSurveyController::class, 'report'])->name('customers.survey.report');
+        Route::post('/customers/{customer}/survey/start', [\App\Http\Controllers\CustomerSurveyController::class, 'start'])->name('customers.survey.start');
         Route::post('/customers/{customer}/survey', [\App\Http\Controllers\CustomerSurveyController::class, 'store'])->name('customers.survey.store');
     });
 
+    Route::middleware('permission:edit_customers')->group(function () {
+        Route::post('/customers/{customer}/assign-survey', [\App\Http\Controllers\CustomerController::class, 'assignSurvey'])->name('customers.assign-survey');
+    });
+
     Route::middleware('permission:fill_installation')->group(function () {
+        Route::get('/verifications/queue', [\App\Http\Controllers\CustomerVerificationController::class, 'index'])->name('verifications.queue');
+        Route::get('/customers/{customer}/installation/report', [\App\Http\Controllers\CustomerInstallationController::class, 'report'])->name('customers.installation.report');
+        Route::post('/customers/{customer}/installation/start', [\App\Http\Controllers\CustomerInstallationController::class, 'start'])->name('customers.installation.start');
         Route::post('/customers/{customer}/installation', [\App\Http\Controllers\CustomerInstallationController::class, 'store'])->name('customers.installation.store');
         Route::post('/customers/{customer}/test-report', [\App\Http\Controllers\CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
+    });
+
+    Route::middleware('permission:edit_customers')->group(function () {
+        Route::get('/verifications/{customer}/admin', [CustomerVerificationController::class, 'showAdmin'])->name('customers.verification.admin');
+        Route::post('/verifications/{customer}/process-to-team', [CustomerVerificationController::class, 'processToTeam'])->name('customers.verification.process-to-team');
+        Route::post('/verifications/{customer}/final', [CustomerVerificationController::class, 'finalVerify'])->name('customers.verification.final');
+        Route::post('/verifications/{customer}/revisi', [CustomerVerificationController::class, 'revisi'])->name('customers.verification.revisi');
+        Route::post('/verifications/{customer}/reject', [CustomerVerificationController::class, 'reject'])->name('customers.verification.reject');
     });
 
     Route::middleware('permission:fill_device')->group(function () {

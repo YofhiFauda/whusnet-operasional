@@ -15,14 +15,19 @@ class SubscriptionStatusMasterTest extends TestCase
     {
         $this->seed(SubscriptionStatusSeeder::class);
 
-        $this->assertSame(9, SubscriptionStatus::query()->count());
+        $this->assertSame(14, SubscriptionStatus::query()->count());
 
         $expectedCodes = [
             'registered',
             'waiting_survey',
+            'survey_in_progress',
             'surveyed',
+            'waiting_acc',
             'waiting_installation',
+            'installation_in_progress',
             'installed',
+            'verification_admin',
+            'revision_installation',
             'active',
             'suspended',
             'terminated',
@@ -43,7 +48,7 @@ class SubscriptionStatusMasterTest extends TestCase
         $this->seed(SubscriptionStatusSeeder::class);
         $this->seed(SubscriptionStatusSeeder::class);
 
-        $this->assertSame(9, SubscriptionStatus::query()->count());
+        $this->assertSame(14, SubscriptionStatus::query()->count());
     }
 
     public function test_subscription_status_master_page_is_available(): void

@@ -74,3 +74,16 @@ flowchart TD
     M --> N[Redirect daftar pelanggan]
 ```
 
+## Flow Onboarding Workflow (Sprint 2 & 3)
+
+```mermaid
+flowchart TD
+    A[Registrasi Pelanggan] --> B[waiting_survey]
+    B -->|Mulai Survey| C[survey_in_progress]
+    C -->|Lapor Data Survey| D[surveyed]
+    D -->|Proses ke Tim| E[waiting_installation]
+    E -->|Mulai Pasang| F[installation_in_progress]
+    F -->|Lapor Pemasangan| G[verification_admin]
+    G -->|Verifikasi Valid| H[installed]
+    H -->|Aktivasi Layanan| I[active]
+```

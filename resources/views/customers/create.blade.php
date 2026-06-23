@@ -86,33 +86,7 @@
                         </div>
                     </button>
 
-                    <!-- Step 4 Trigger -->
-                    <button type="button" onclick="goToStep(4)" id="step-nav-4" class="w-full text-left p-3.5 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-all group focus:outline-none">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 shrink-0" id="step-nav-icon-4">
-                                <!-- Will be inserted by JS -->
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-slate-700 group-hover:text-slate-900">4. Info Referral</span>
-                                <span id="step-nav-status-4" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-4" class="text-[9px] text-slate-400 block mt-1 leading-relaxed whitespace-pre-wrap"></span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <!-- Step 5 Trigger -->
-                    <button type="button" onclick="goToStep(5)" id="step-nav-5" class="w-full text-left p-3.5 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-all group focus:outline-none">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 shrink-0" id="step-nav-icon-5">
-                                <!-- Will be inserted by JS -->
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-slate-700 group-hover:text-slate-900">5. Operasional & Teknis</span>
-                                <span id="step-nav-status-5" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-5" class="text-[9px] text-slate-400 block mt-1 leading-relaxed whitespace-pre-wrap"></span>
-                            </div>
-                        </div>
-                    </button>
+                    <!-- Step 4 and 5 Removed -->
                 </div>
             </div>
         </div>
@@ -173,6 +147,11 @@
                         </div>
 
                         <div>
+                            <label for="npwp" class="block mb-2 uppercase tracking-wide">NPWP</label>
+                            <input type="text" name="npwp" id="npwp" value="{{ old('npwp') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 12.345.678.9-012.000">
+                        </div>
+
+                        <div>
                             <label for="email" class="block mb-2 uppercase tracking-wide">ALAMAT EMAIL</label>
                             <input type="email" name="email" id="email" value="{{ old('email') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: budi@gmail.com">
                         </div>
@@ -192,22 +171,7 @@
                             </select>
                         </div>
 
-                        <div>
-                            <label for="distribution_id" class="block mb-2 uppercase tracking-wide">KODE DISTRIBUSI
-                                <span class="text-slate-400 font-normal normal-case text-[10px] ml-1">(bagian dari CID pelanggan)</span>
-                            </label>
-                            <select name="distribution_id" id="distribution_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
-                                <option value="">— Pilih Distribusi (Opsional, Pilih POP Dulu) —</option>
-                                @foreach($distributions as $dist)
-                                    <option value="{{ $dist->id }}"
-                                        data-pop-id="{{ $dist->pop?->parent_id ?? $dist->pop_id }}"
-                                        {{ old('distribution_id') == $dist->id ? 'selected' : '' }}>
-                                        {{ $dist->code }} — {{ $dist->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-[10px] text-slate-400 mt-1 font-mono">Kode distribusi digunakan untuk membentuk CID: <span class="text-sky-600">{POP}{OLT}<strong>{Distribusi}</strong>{RQ}_{Desa}_{Nama}</span></p>
-                        </div>
+
 
                         <div class="md:col-span-2">
                             <label for="address" class="block mb-2 uppercase tracking-wide">ALAMAT INSTALASI LENGKAP <span class="text-red-500">*</span></label>
@@ -260,14 +224,14 @@
                         <p class="text-xs text-slate-400 mt-1">Upload lampiran dokumen pendukung pelanggan (opsional)</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Foto KTP -->
                         <div class="border border-slate-200 rounded-lg p-5 flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm relative">
                             <div id="default-placeholder-foto_ktp" class="text-center py-4">
                                 <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
                                 </svg>
-                                <span class="block text-xs font-bold text-slate-700 mt-3">FOTO KTP</span>
+                                <span class="block text-xs font-bold text-slate-700 mt-3">FOTO KTP <span class="text-red-500">*</span></span>
                                 <span class="block text-[10px] text-slate-400 mt-1">Format: JPG, PNG (Max 2MB)</span>
                             </div>
 
@@ -292,79 +256,6 @@
                                 <span id="file-label-foto_ktp" class="block text-[10px] text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
                             </div>
                         </div>
-
-                        <!-- Foto Rumah -->
-                        <div class="border border-slate-200 rounded-lg p-5 flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm relative">
-                            <div id="default-placeholder-foto_rumah" class="text-center py-4">
-                                <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                </svg>
-                                <span class="block text-xs font-bold text-slate-700 mt-3">FOTO RUMAH</span>
-                                <span class="block text-[10px] text-slate-400 mt-1">Format: JPG, PNG (Max 2MB)</span>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="preview-container-foto_rumah" class="hidden text-center py-2 flex flex-col items-center justify-center">
-                                <div class="relative inline-block">
-                                    <img id="preview-img-foto_rumah" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 shadow-sm" src="" alt="Preview Foto Rumah">
-                                    <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <span class="block text-xs font-bold text-slate-700 mt-2">PREVIEW FOTO RUMAH</span>
-                            </div>
-
-                            <div class="mt-4">
-                                <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')">
-                                <label for="foto_rumah" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
-                                    Pilih File
-                                </label>
-                                <span id="file-label-foto_rumah" class="block text-[10px] text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
-                            </div>
-                        </div>
-
-                        <!-- Foto Kontrak -->
-                        <div class="border border-slate-200 rounded-lg p-5 flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm relative">
-                            <div id="default-placeholder-foto_kontrak" class="text-center py-4">
-                                <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span class="block text-xs font-bold text-slate-700 mt-3">FOTO KONTRAK</span>
-                                <span class="block text-[10px] text-slate-400 mt-1">Format: JPG, PNG, PDF (Max 2MB)</span>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="preview-container-foto_kontrak" class="hidden text-center py-2 flex flex-col items-center justify-center">
-                                <div class="relative inline-block">
-                                    <img id="preview-img-foto_kontrak" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 shadow-sm hidden" src="" alt="Preview Foto Kontrak">
-                                    
-                                    <!-- PDF Icon Preview -->
-                                    <div id="preview-pdf-foto_kontrak" class="h-28 w-28 bg-red-50 border border-red-200 rounded-lg flex flex-col items-center justify-center text-red-600 shadow-sm hidden">
-                                        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <span class="text-[10px] font-bold mt-2">DOKUMEN PDF</span>
-                                    </div>
-
-                                    <button type="button" onclick="clearFile('foto_kontrak')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <span class="block text-xs font-bold text-slate-700 mt-2">PREVIEW FOTO KONTRAK</span>
-                            </div>
-
-                            <div class="mt-4">
-                                <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('foto_kontrak')">
-                                <label for="foto_kontrak" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
-                                    Pilih File
-                                </label>
-                                <span id="file-label-foto_kontrak" class="block text-[10px] text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -387,130 +278,27 @@
                         </div>
 
                         <div>
+                            <label class="block mb-2 uppercase tracking-wide" for="jenis_kontrak">JENIS KONTRAK <span class="text-red-500">*</span></label>
+                            <select name="jenis_kontrak" id="jenis_kontrak" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="" disabled selected>Pilih Jenis Kontrak</option>
+                                <option value="sewa" {{ old('jenis_kontrak') === 'sewa' ? 'selected' : '' }}>Sewa</option>
+                                <option value="beli" {{ old('jenis_kontrak') === 'beli' ? 'selected' : '' }}>Beli</option>
+                            </select>
+                        </div>
+
+                        <div>
                             <label class="block mb-2 uppercase tracking-wide" for="contract_period_months">MASA KONTRAK (BULAN) <span class="text-red-500">*</span></label>
                             <input type="number" name="contract_period_months" id="contract_period_months" value="{{ old('contract_period_months', 12) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 12">
                         </div>
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="discount_amount">DISKON PROMOSI (RP) <span class="text-red-500">*</span></label>
-                            <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="{{ old('discount_amount', 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 10000">
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="tax_percent">PPN (%) <span class="text-red-500">*</span></label>
-                            <input type="number" name="tax_percent" id="tax_percent" oninput="updateLayananBreakdown()" value="{{ old('tax_percent', 11) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 11">
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="other_fee">BIAYA LAIN DI LUAR STANDAR (RP)</label>
-                            <input type="number" name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="{{ old('other_fee', 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 11000">
-                        </div>
-                    </div>
-
-                    <!-- Dynamic Pricing Calculations Preview -->
-                    <div class="border border-slate-200 rounded-lg p-5 bg-slate-50/50 mt-6">
-                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Rincian Estimasi Biaya Bulanan</span>
-                        <div class="space-y-2 max-w-sm text-xs font-mono data-text">
-                            <div class="flex justify-between">
-                                <span class="text-slate-500">Harga Paket Dasar:</span>
-                                <span class="text-slate-700" id="preview-base-price">Rp 0,00</span>
-                            </div>
-                            <div class="flex justify-between text-green-600">
-                                <span>Diskon Promosi:</span>
-                                <span id="preview-discount">- Rp 0,00</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-500" id="preview-tax-label">PPN (11%):</span>
-                                <span class="text-slate-700" id="preview-tax">Rp 0,00</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-500">Biaya Lain di luar Standar:</span>
-                                <span class="text-slate-700" id="preview-other-fee">Rp 0,00</span>
-                            </div>
-                            <hr class="border-dashed border-slate-200">
-                            <div class="flex justify-between text-sm font-bold text-slate-900">
-                                <span>Total Biaya Bulanan:</span>
-                                <span id="preview-total-monthly">Rp 0,00</span>
-                            </div>
+                            <input type="number" name="discount_amount" id="discount_amount" value="{{ old('discount_amount', 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 10000">
                         </div>
                     </div>
                 </div>
 
-                <!-- STEP 4 PANEL: Referral -->
-                <div id="step-panel-4" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-slate-100 pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider">4. INFORMASI REFERRAL & AKUISISI</h4>
-                        <p class="text-xs text-slate-400 mt-1">Masukkan kode sales, agen, atau kode pelanggan yang mereferensikan</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-semibold text-slate-500">
-                        <div>
-                            <label for="sales_code" class="block mb-2 uppercase tracking-wide">KODE / ID SALES</label>
-                            <input type="text" name="sales_code" id="sales_code" value="{{ old('sales_code') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: SLS-043">
-                        </div>
-
-                        <div>
-                            <label for="agent_code" class="block mb-2 uppercase tracking-wide">KODE / ID AGENT</label>
-                            <input type="text" name="agent_code" id="agent_code" value="{{ old('agent_code') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: AGT-012">
-                        </div>
-
-                        <div>
-                            <label for="referral_customer_code" class="block mb-2 uppercase tracking-wide">ID REFERRAL PELANGGAN</label>
-                            <input type="text" name="referral_customer_code" id="referral_customer_code" value="{{ old('referral_customer_code') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: CID-2026-0005">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- STEP 5 PANEL: Operasional Awal & Teknis -->
-                <div id="step-panel-5" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-slate-100 pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider">5. PENYETELAN OPERASIONAL & PARAMETER TEKNIS</h4>
-                        <p class="text-xs text-slate-400 mt-1">Tentukan status alur kerja dan konfigurasi data perangkat ONT / Jaringan awal</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-slate-500">
-                        <div>
-                            <label for="status" class="block mb-2 uppercase tracking-wide">STATUS AWAL ALUR KERJA <span class="text-red-500">*</span></label>
-                            <select name="status" id="status" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
-                                <option value="registered" {{ old('status') === 'registered' ? 'selected' : '' }}>Registered (Baru Terdaftar)</option>
-                                <option value="waiting_survey" {{ old('status') === 'waiting_survey' ? 'selected' : '' }}>Waiting Survey (Menunggu Survey)</option>
-                                <option value="surveyed" {{ old('status') === 'surveyed' ? 'selected' : '' }}>Surveyed (Selesai Survey)</option>
-                                <option value="waiting_installation" {{ old('status') === 'waiting_installation' ? 'selected' : '' }}>Waiting Installation (Menunggu Pemasangan)</option>
-                                <option value="installed" {{ old('status') === 'installed' ? 'selected' : '' }}>Installed (Selesai Pemasangan)</option>
-                                <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>Active (Aktif Berlangganan)</option>
-                                <option value="suspended" {{ old('status') === 'suspended' ? 'selected' : '' }}>Suspended (Diisolir Sementara)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="ont_sn" class="block mb-2 uppercase tracking-wide">SERIAL NUMBER (SN) ONT</label>
-                            <input type="text" name="ont_sn" id="ont_sn" value="{{ old('ont_sn') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: ZTEG12345678">
-                        </div>
-
-                        <div>
-                            <label for="ip_address" class="block mb-2 uppercase tracking-wide">IP ADDRESS DIAL-UP</label>
-                            <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 10.200.45.10">
-                        </div>
-
-                        <div>
-                            <label for="odp_code" class="block mb-2 uppercase tracking-wide">KODE / KOTAK ODP</label>
-                            <input type="text" name="odp_code" id="odp_code" value="{{ old('odp_code') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: ODP-PON-024">
-                        </div>
-
-                        <div>
-                            <label for="olt_code" class="block mb-2 uppercase tracking-wide">NAMA / KODE PERANGKAT OLT
-                                <span class="text-slate-400 font-normal normal-case text-[10px] ml-1">(label perangkat, bukan untuk CID)</span>
-                            </label>
-                            <input type="text" name="olt_code" id="olt_code" value="{{ old('olt_code') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: OLT-ZTE-C320">
-                            <p class="text-[10px] text-slate-400 mt-1">Label nama perangkat OLT. <strong class="text-amber-600">Nomor OLT untuk CID diisi teknisi saat survei/pemasangan.</strong></p>
-                        </div>
-
-                        <div>
-                            <label for="vlan_id" class="block mb-2 uppercase tracking-wide">VLAN ID</label>
-                            <input type="text" name="vlan_id" id="vlan_id" value="{{ old('vlan_id') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 1024">
-                        </div>
-                    </div>
-                </div>
+                <!-- Removed Step 4 and 5 -->
 
             </div>
 
@@ -545,29 +333,21 @@
 @section('scripts')
 <script>
     let currentActiveStep = 1;
-    const totalStepsCount = 5;
+    const totalStepsCount = 3;
 
     // Define wizard fields configurations
     const formFields = {
         'data-diri': {
-            required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
-            optional: ['email', 'alternative_phone', 'latitude', 'longitude']
+            required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id', 'status'],
+            optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
         },
         'dokumen': {
-            required: [],
-            optional: ['foto_ktp', 'foto_rumah', 'foto_kontrak']
-        },
-        'layanan': {
-            required: ['internet_package_id', 'contract_period_months', 'discount_amount', 'tax_percent'],
+            required: ['foto_ktp'],
             optional: []
         },
-        'referral': {
-            required: [],
-            optional: ['sales_code', 'agent_code', 'referral_customer_code']
-        },
-        'operasional': {
-            required: ['status'],
-            optional: ['ont_sn', 'ip_address', 'odp_code', 'olt_code', 'vlan_id']
+        'layanan': {
+            required: ['internet_package_id', 'jenis_kontrak', 'contract_period_months', 'discount_amount'],
+            optional: []
         }
     };
 
@@ -575,9 +355,7 @@
     const stepKeys = {
         1: 'data-diri',
         2: 'dokumen',
-        3: 'layanan',
-        4: 'referral',
-        5: 'operasional'
+        3: 'layanan'
     };
 
     document.addEventListener("DOMContentLoaded", function() {
@@ -600,28 +378,7 @@
         loadDistricts(oldCityId, oldDistrictId, oldVillageId);
     }
 
-    // Filter distribusi berdasarkan POP yang dipilih
-    // Distribusi D2X6C: D=cabang, 2=OLT number, X6C=kode distribusi
-    function filterDistributionsByPop(popId) {
-        const distSelect = document.getElementById('distribution_id');
-        if (!distSelect) return;
-        const options = distSelect.querySelectorAll('option[data-pop-id]');
-        options.forEach(opt => {
-            if (!popId || opt.dataset.popId === popId) {
-                opt.style.display = '';
-            } else {
-                opt.style.display = 'none';
-                // Deselect hidden options
-                if (opt.selected) opt.selected = false;
-            }
-        });
-    }
-
-    // Run on page load if POP already selected (e.g. after validation failure)
-    const oldPopId = "{{ old('pop_id') }}";
-    if (oldPopId) {
-        filterDistributionsByPop(oldPopId);
-    }
+    // Distribution filtering removed
 
     // Dynamic dropdown for Districts
     function loadDistricts(cityId, selectedDistrictId = null, selectedVillageId = null) {
@@ -757,42 +514,7 @@
         }
     }
 
-    // Estimate monthly total preview
-    function updateLayananBreakdown() {
-        const packageSelect = document.getElementById('internet_package_id');
-        const discountInput = document.getElementById('discount_amount');
-        const taxInput = document.getElementById('tax_percent');
-
-        const selectedOption = packageSelect.options[packageSelect.selectedIndex];
-        let basePrice = 0;
-        if (selectedOption && selectedOption.value) {
-            basePrice = parseFloat(selectedOption.getAttribute('data-price')) || 0;
-        }
-
-        const discount = parseFloat(discountInput.value) || 0;
-        const taxPercent = parseFloat(taxInput.value) || 0;
-        const otherFeeInput = document.getElementById('other_fee');
-        const otherFee = otherFeeInput ? (parseFloat(otherFeeInput.value) || 0) : 0;
-
-        const taxable = Math.max(0, basePrice - discount);
-        const tax = Math.round(taxable * (taxPercent / 100));
-        const total = taxable + tax + otherFee;
-
-        // Render preview texts
-        document.getElementById('preview-base-price').textContent = formatRupiah(basePrice);
-        document.getElementById('preview-discount').textContent = '- ' + formatRupiah(discount);
-        document.getElementById('preview-tax-label').textContent = `PPN (${taxPercent}%):`;
-        document.getElementById('preview-tax').textContent = formatRupiah(tax);
-        const otherFeeEl = document.getElementById('preview-other-fee');
-        if (otherFeeEl) {
-            otherFeeEl.textContent = formatRupiah(otherFee);
-        }
-        document.getElementById('preview-total-monthly').textContent = formatRupiah(total);
-    }
-
-    function formatRupiah(number) {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number).replace(/,/g, '.');
-    }
+    // Estimate monthly total preview removed
 
     // Central live validation validator
     function runLiveProgressUpdates() {
@@ -923,6 +645,7 @@
             phone: 'Nomor HP',
             primary_phone: 'Nomor HP Utama',
             alternative_phone: 'Nomor HP Alternatif',
+            npwp: 'NPWP',
             pop_id: 'POP Cabang',
             email: 'Email',
             registration_date: 'Tgl Registrasi',
@@ -933,21 +656,11 @@
             latitude: 'Latitude',
             longitude: 'Longitude',
             foto_ktp: 'Foto KTP',
-            foto_rumah: 'Foto Rumah',
-            foto_kontrak: 'Foto Kontrak',
             internet_package_id: 'Paket Internet',
+            jenis_kontrak: 'Jenis Kontrak',
             contract_period_months: 'Masa Kontrak',
             discount_amount: 'Diskon',
-            tax_percent: 'PPN',
-            sales_code: 'Kode Sales',
-            agent_code: 'Kode Agent',
-            referral_customer_code: 'Ref Pelanggan',
-            status: 'Status Awal',
-            ont_sn: 'ONT SN',
-            ip_address: 'IP Dialup',
-            odp_code: 'Kode ODP',
-            olt_code: 'Kode OLT',
-            vlan_id: 'VLAN ID'
+            status: 'Status Awal'
         };
         return labels[field] || field;
     }

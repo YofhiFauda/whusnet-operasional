@@ -13,6 +13,9 @@ erDiagram
     VILLAGES ||--o{ CUSTOMERS : selected_by
     internet_packages ||--o{ CUSTOMERS : subscribed_by
     SUBSCRIPTION_STATUSES ||--o{ CUSTOMERS : tracks
+    CUSTOMERS ||--o{ CUSTOMER_SURVEYS : has
+    CUSTOMERS ||--o{ CUSTOMER_INSTALLATIONS : has
+    CUSTOMERS ||--o{ CUSTOMER_TECHNICAL_DETAILS : has
 
     CITIES {
         bigint id PK

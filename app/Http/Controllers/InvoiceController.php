@@ -9,15 +9,13 @@ use Illuminate\View\View;
 
 class InvoiceController extends Controller
 {
-    /**
-     * Display a listing of invoices with billing filters.
-     */
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('search', ''));
         $popId = $request->query('pop_id', '');
         $billingPeriod = trim((string) $request->query('billing_period', ''));
         $status = trim((string) $request->query('status', ''));
+        $statusGroup = trim((string) $request->query('status_group', ''));
         $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
 
         $query = Invoice::query()
@@ -50,7 +48,11 @@ class InvoiceController extends Controller
             $query->where('billing_period', $billingPeriod);
         }
 
-        if ($status !== '' && in_array($status, $allowedStatuses, true)) {
+        if ($statusGroup === 'lunas') {
+            $query->where('invoice_status', 'lunas');
+        } elseif ($statusGroup === 'belum_lunas') {
+            $query->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+        } elseif ($status !== '' && in_array($status, $allowedStatuses, true)) {
             $query->where('invoice_status', $status);
         }
 
@@ -64,8 +66,21 @@ class InvoiceController extends Controller
             'popId',
             'billingPeriod',
             'status',
+            'statusGroup',
             'allowedStatuses'
         ));
+    }
+
+    public function lunas(Request $request): View
+    {
+        $request->merge(['status_group' => 'lunas']);
+        return $this->index($request);
+    }
+
+    public function belumLunas(Request $request): View
+    {
+        $request->merge(['status_group' => 'belum_lunas']);
+        return $this->index($request);
     }
 
     /**

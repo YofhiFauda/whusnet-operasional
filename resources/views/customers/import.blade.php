@@ -192,13 +192,13 @@
                 updateTabBadges();
                 switchSheetTab(currentSheetTab);
             } else {
-                alert(data.message || "Gagal memvalidasi data Excel. Pastikan format file sesuai.");
+                window.Toast.error("Gagal Validasi", data.message || "Gagal memvalidasi data Excel. Pastikan format file sesuai.");
                 resetFileSelection();
             }
         })
         .catch(err => {
             console.error("API error:", err);
-            alert("Kesalahan jaringan saat memvalidasi.");
+            window.Toast.error("Error Jaringan", "Kesalahan jaringan saat memvalidasi.");
             document.getElementById('loading-indicator').classList.add('hidden');
             resetFileSelection();
         });

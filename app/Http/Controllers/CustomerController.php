@@ -33,8 +33,9 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
-        $status = trim((string) $request->query('status', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
+        // Default to 'active' if neither 'status' nor 'status_group' are present in the query string
+        $status = $request->has('status') ? trim((string) $request->query('status')) : ($statusGroup !== '' ? '' : 'active');
         $districtId = $request->query('district_id', '');
         $packageId = $request->query('package_id', '');
         $popId = $request->query('pop_id', '');
@@ -148,53 +149,13 @@ class CustomerController extends Controller
     /**
      * Store a newly created customer in storage.
      */
-    public function store(Request $request)
+    public function store(\App\Http\Requests\CustomerRegistrationRequest $request)
     {
-        $validated = $request->validate([
-            'full_name' => 'required|string|max:150',
-            'identity_number' => 'nullable|string|max:50',
-            'gender' => 'nullable|string|max:20',
-            'primary_phone' => 'required|string|max:20',
-            'alternative_phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:100',
-            'registration_date' => 'required|date',
-            'pop_id' => 'required|exists:pops,id',
-            'distribution_id' => 'nullable|exists:distributions,id',
-            'address' => 'nullable|string',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'city_id' => 'nullable|exists:cities,id',
-            'district_id' => 'nullable|exists:districts,id',
-            'village_id' => 'nullable|exists:villages,id',
-            'internet_package_id' => 'nullable|exists:internet_packages,id',
-            'contract_period_months' => 'nullable|integer|min:1',
-            'discount_amount' => 'nullable|numeric|min:0',
-            'tax_percent' => 'nullable|numeric|between:0,100',
-            'other_fee' => 'nullable|numeric|min:0',
-            
-            // Referrals
-            'sales_code' => 'nullable|string|max:30',
-            'agent_code' => 'nullable|string|max:30',
-            'referral_customer_code' => 'nullable|string|max:30',
-            
-            // Technical specs
-            'ont_sn' => 'nullable|string|max:100',
-            'ip_address' => 'nullable|string|max:45',
-            'odp_code' => 'nullable|string|max:50',
-            'olt_code' => 'nullable|string|max:50',
-            'vlan_id' => 'nullable|string|max:20',
-            
-            // Status
-            'status' => 'required|string|max:50',
-            
-            // Documents
-            'foto_ktp' => 'nullable|file|image|max:2048',
-            'foto_rumah' => 'nullable|file|image|max:2048',
-            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,pdf|max:2048',
-        ]);
+        $validated = $request->validated();
 
         $validated['phone'] = $validated['primary_phone'];
         $validated['created_by'] = auth()->id();
+        $validated['status'] = 'waiting_survey';
         $validated['updated_by'] = auth()->id();
 
         $statusMapping = [
@@ -317,6 +278,37 @@ class CustomerController extends Controller
         });
 
         return redirect()->route('customers.index')->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
+    }
+
+    /**
+     * Assign a survey to a technician and transition status to waiting_survey.
+     */
+    public function assignSurvey(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
+    {
+        abort_unless(auth()->user()->hasPermission('edit_customers'), 403);
+
+        $validated = $request->validate([
+            'technician_id' => 'required|exists:users,id',
+            'scheduled_date' => 'required|date',
+            'note' => 'nullable|string',
+        ]);
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated, $workflowService) {
+            // Create the initial customer_surveys record with pending status
+            \App\Models\CustomerSurvey::create([
+                'customer_id' => $customer->id,
+                'technician_id' => $validated['technician_id'],
+                'survey_date' => $validated['scheduled_date'],
+                'assigned_at' => now(),
+                'survey_status' => 'pending',
+                'survey_note' => $validated['note'] ?? null,
+            ]);
+
+            // Transition customer status
+            $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_SURVEY, 'Assigned to survey');
+        });
+
+        return redirect()->back()->with('success', 'Pelanggan berhasil di-assign ke tim survey.');
     }
 
     /**
@@ -567,6 +559,20 @@ class CustomerController extends Controller
         }
 
         return redirect()->route('customers.show', $customer->id)->with('success', "Data pelanggan {$customer->full_name} berhasil diperbarui!");
+    }
+
+    /**
+     * Remove the specified customer from storage.
+     */
+    public function destroy(Customer $customer)
+    {
+        abort_unless(auth()->user()->hasPermission('edit_customers'), 403);
+        
+        \Illuminate\Support\Facades\DB::transaction(function() use ($customer) {
+            $customer->delete();
+        });
+        
+        return redirect()->back()->with('success', "Data pelanggan berhasil dihapus!");
     }
 
     public function show(Customer $customer)
@@ -2400,6 +2406,19 @@ class CustomerController extends Controller
                 'user_agent' => request()->userAgent(),
                 'created_at' => now(),
             ]);
+
+            try {
+                $telegram = app(\App\Services\TelegramBotService::class);
+                $message = "🎉 <b>Pelanggan Aktif</b>\n";
+                $message .= "Pelanggan: {$customer->full_name}\n";
+                $message .= "CID: {$cid}\n";
+                $message .= "No. HP: {$customer->phone}\n";
+                $message .= "POP: {$customer->pop->name}\n";
+                $message .= "Telah berhasil diaktivasi dan masuk siklus penagihan.";
+                $telegram->sendMessage($message);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Gagal mengirim notifikasi Telegram: ' . $e->getMessage());
+            }
         });
 
         // Reload untuk mendapatkan CID yang baru disimpan

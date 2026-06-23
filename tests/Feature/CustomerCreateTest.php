@@ -27,8 +27,6 @@ class CustomerCreateTest extends TestCase
         $response->assertSee('IDENTITAS PELANGGAN');
         $response->assertSee('UPLOAD DOKUMEN LAMPIRAN');
         $response->assertSee('LAYANAN');
-        $response->assertSee('INFORMASI REFERRAL');
-        $response->assertSee('PENYETELAN OPERASIONAL');
     }
 
     public function test_submitting_valid_customer_data_stores_customer_and_redirects(): void
@@ -79,6 +77,7 @@ class CustomerCreateTest extends TestCase
             'odp_code' => 'ODP-PON-999',
             'olt_code' => 'OLT-ZTE-C320',
             'vlan_id' => '1024',
+            'foto_ktp' => \Illuminate\Http\UploadedFile::fake()->image('ktp.jpg'),
         ];
 
         $response = $this->post('/customers', $data);
@@ -93,15 +92,15 @@ class CustomerCreateTest extends TestCase
             'identity_number' => '3502181010900002',
             'primary_phone' => '08123456789',
             'pop_id' => $pop->id,
-            'status' => 'registered',
+            'status' => 'waiting_survey',
             'sales_code' => 'SLS-099',
             'ont_sn' => 'ONT-ZTE-TEST',
         ]);
 
-        // Assert customer code matches new format: {cid_prefix}00{registration_prefix}{######}
-        // POP ini: cid_prefix='D', registration_prefix='C' → D00C000001
+        // Assert customer code matches new format: {registration_prefix}{######}
+        // POP ini: registration_prefix='C' → C000001
         $customer = Customer::where('full_name', 'Fajar Pratama')->firstOrFail();
-        $this->assertMatchesRegularExpression('/^D00C\d{6}$/', $customer->customer_code);
+        $this->assertMatchesRegularExpression('/^C\d{6}$/', $customer->customer_code);
 
         // Assert address record created
         $this->assertDatabaseHas('customer_addresses', [
@@ -128,10 +127,16 @@ class CustomerCreateTest extends TestCase
 
         $response->assertSessionHasErrors([
             'full_name',
+            'identity_number',
             'primary_phone',
             'registration_date',
             'pop_id',
-            'status',
+            'address',
+            'city_id',
+            'district_id',
+            'village_id',
+            'internet_package_id',
+            'foto_ktp',
         ]);
     }
 

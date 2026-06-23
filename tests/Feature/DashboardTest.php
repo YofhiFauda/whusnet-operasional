@@ -58,7 +58,7 @@ class DashboardTest extends TestCase
         // Owner has all permissions, so should see everything
         $response->assertSee('PELANGGAN');
         $response->assertSee('List Pelanggan');
-        $response->assertSee('Input Pelanggan');
+        $response->assertSee('Registrasi Pelanggan');
         $response->assertSee('Import Pelanggan');
         $response->assertSee('Master Data');
         $response->assertSee('Master Data Wilayah');
@@ -81,7 +81,7 @@ class DashboardTest extends TestCase
 
         $response->assertSee('PELANGGAN');
         $response->assertSee('List Pelanggan');
-        $response->assertSee('Input Pelanggan');
+        $response->assertSee('Registrasi Pelanggan');
         $response->assertDontSee('Import Pelanggan'); // No permission
 
         $response->assertSee('Master Data');

@@ -22,7 +22,6 @@ class CustomerImportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware();
     }
 
     public function test_import_page_loads_successfully(): void

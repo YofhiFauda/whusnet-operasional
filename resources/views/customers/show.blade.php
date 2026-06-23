@@ -17,7 +17,7 @@
     <div class="flex gap-2">
         @can('validate_customer_data')
             @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active')
-                <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="return confirm('Apakah Anda yakin ingin mengaktifkan layanan untuk pelanggan ini?')">
+                <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengaktifkan layanan untuk pelanggan ini?', this);">
                     @csrf
                     <button type="submit" 
                             class="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none cursor-pointer"
@@ -1240,7 +1240,7 @@
     function autoCalculateProrate() {
         const activationDateStr = "{{ $customer->customerService?->activation_date }}";
         if (!activationDateStr) {
-            alert('Tanggal aktivasi belum diisi di sistem. Silakan pastikan data aktivasi sudah ada.');
+            window.Toast.warning('Peringatan', 'Tanggal aktivasi belum diisi di sistem. Silakan pastikan data aktivasi sudah ada.');
             return;
         }
 

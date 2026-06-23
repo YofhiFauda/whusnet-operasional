@@ -95,6 +95,36 @@ class InvoiceListTest extends TestCase
         $response->assertSee('Sebagian');
     }
 
+    public function test_invoice_list_lunas_shows_only_lunas(): void
+    {
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-C', 'PONC', 'POP C');
+        $invoiceLunas = $this->createInvoice($pop, 'Customer Lunas', 'INV-202608-9202', '2026-08', 'lunas');
+        $invoiceBelumLunas = $this->createInvoice($pop, 'Customer Belum Lunas', 'INV-202608-9203', '2026-08', 'belum_dibayar');
+
+        $response = $this->actingAs($owner)->get(route('invoices.lunas'));
+
+        $response->assertOk();
+        $response->assertSee('Customer Lunas');
+        $response->assertDontSee('Customer Belum Lunas');
+    }
+
+    public function test_invoice_list_belum_lunas_shows_only_unpaid_or_partial(): void
+    {
+        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $pop = $this->createPop('POP-C', 'PONC', 'POP C');
+        $invoiceLunas = $this->createInvoice($pop, 'Customer Lunas', 'INV-202608-9202', '2026-08', 'lunas');
+        $invoiceBelumLunas = $this->createInvoice($pop, 'Customer Belum Lunas', 'INV-202608-9203', '2026-08', 'belum_dibayar');
+        $invoiceSebagian = $this->createInvoice($pop, 'Customer Sebagian', 'INV-202608-9204', '2026-08', 'sebagian');
+
+        $response = $this->actingAs($owner)->get(route('invoices.belum-lunas'));
+
+        $response->assertOk();
+        $response->assertDontSee('Customer Lunas');
+        $response->assertSee('Customer Belum Lunas');
+        $response->assertSee('Customer Sebagian');
+    }
+
     protected function createPop(string $code, string $popCode, string $name): Pop
     {
         return Pop::create([

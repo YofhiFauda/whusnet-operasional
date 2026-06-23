@@ -61,5 +61,14 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Exception $e) {
             // Skip if table doesn't exist yet
         }
+
+        // View Composer for Sidebar Badges
+        \Illuminate\Support\Facades\View::composer('layouts.app', function ($view) {
+            $surveyCount = \App\Models\Customer::whereIn('status', ['waiting_survey', 'survey_in_progress'])->count();
+            $verificationCount = \App\Models\Customer::whereIn('status', ['surveyed', 'waiting_acc', 'waiting_installation', 'installation_in_progress', 'installed', 'verification_admin'])->count();
+            
+            $view->with('badge_survey_count', $surveyCount)
+                 ->with('badge_verification_count', $verificationCount);
+        });
     }
 }

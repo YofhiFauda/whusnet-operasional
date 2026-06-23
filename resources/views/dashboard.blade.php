@@ -265,8 +265,73 @@
                 @if(!$hasQuickAction)
                     <p class="text-sm text-slate-500">Tidak ada akses cepat yang tersedia untuk peran Anda.</p>
                 @endif
+
+                <div class="mt-6 pt-4 border-t border-slate-100">
+                    <p class="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">Uji Coba UI (Toast & Dialog)</p>
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button type="button" onclick="Toast.success('Berhasil', 'Aksi berhasil dilakukan dengan aman.')" class="px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">Test Success</button>
+                        <button type="button" onclick="Toast.error('Sistem Error', 'Terjadi kesalahan saat memproses data Anda. Silakan coba lagi nanti.')" class="px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">Test Error</button>
+                        <button type="button" onclick="Toast.warning('Perhatian', 'Kuota penyimpanan Anda hampir penuh.')" class="px-3 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">Test Warning</button>
+                        <button type="button" onclick="Toast.info('Pembaruan', 'Sistem akan melakukan maintenance pada pukul 00:00 WIB.')" class="px-3 py-2 bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">Test Info</button>
+                    </div>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button type="button" onclick="openIsolirDialog()" class="px-3 py-2 bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 rounded-md text-xs font-medium transition-colors text-center cursor-pointer">Test Dialog Form (Isolir)</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+@section('scripts')
+<script>
+function openIsolirDialog() {
+    // 1. Definisikan string HTML untuk Content/Form
+    const formHtml = `
+        <form id="formIsolir" onsubmit="submitIsolir(event)">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                    Alasan Isolir Koneksi <span class="text-rose-500">*</span>
+                </label>
+                <textarea id="alasanIsolir" name="alasan" rows="3" required
+                    class="w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm p-2.5 border outline-none"
+                    placeholder="Masukkan alasan pemutusan/isolir..."></textarea>
+            </div>
+            <div class="text-xs text-amber-600 flex items-start gap-1.5 bg-amber-50 p-2.5 rounded border border-amber-100">
+                <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <span>Tindakan ini akan memutus akses pelanggan dari jaringan secara otomatis.</span>
+            </div>
+        </form>
+    `;
+
+    // 2. Trigger Global Dialog
+    window.Dialog.show({
+        title: 'Isolir Koneksi Pelanggan',
+        icon: 'warning',
+        contentHtml: formHtml,
+        buttons: [
+            {
+                text: 'Batal',
+                type: 'secondary',
+            },
+            {
+                text: 'Simpan Isolir',
+                type: 'submit',
+                formId: 'formIsolir'
+            }
+        ]
+    });
+}
+
+function submitIsolir(event) {
+    event.preventDefault();
+    const alasan = document.getElementById('alasanIsolir').value;
+    console.log("Memproses isolir dengan alasan:", alasan);
+    window.Dialog.close();
+    window.Toast.success('Berhasil', 'Koneksi pelanggan telah diisolir.');
+}
+</script>
+@endsection
 @endsection

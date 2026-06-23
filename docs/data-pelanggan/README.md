@@ -1,84 +1,60 @@
 # Fitur Data Pelanggan
 
-Fitur Data Pelanggan adalah modul utama untuk mengelola calon pelanggan dan pelanggan ISP. Modul ini mencakup daftar pelanggan, registrasi, edit data, detail operasional, dan import batch.
+Fitur Data Pelanggan adalah modul utama untuk mengelola calon pelanggan dan pelanggan ISP. Modul ini mencakup pendaftaran pelanggan, antrean survey, verifikasi lapangan, pemasangan, hingga aktivasi dan import batch.
 
 ## File Terkait
 
 | Bagian | File |
 | --- | --- |
-| Controller | `app/Http/Controllers/CustomerController.php` |
-| Model | `app/Models/Customer.php` |
+| Controller | `app/Http/Controllers/CustomerController.php`<br>`app/Http/Controllers/CustomerRegistrationController.php`<br>`app/Http/Controllers/CustomerSurveyController.php`<br>`app/Http/Controllers/CustomerVerificationController.php`<br>`app/Http/Controllers/CustomerInstallationController.php` |
+| Service | `app/Services/CustomerWorkflowService.php` |
+| Model | `app/Models/Customer.php`<br>`app/Models/CustomerSurvey.php`<br>`app/Models/CustomerInstallation.php`<br>`app/Models/CustomerTechnicalDetail.php` |
 | Daftar | `resources/views/customers/index.blade.php` |
-| Registrasi | `resources/views/customers/create.blade.php` |
-| Edit | `resources/views/customers/edit.blade.php` |
-| Detail | `resources/views/customers/show.blade.php` |
-| Import | `resources/views/customers/import.blade.php` |
+| Antrean | `resources/views/surveys/queue.blade.php`<br>`resources/views/verifications/queue.blade.php` |
 | Route | `routes/web.php` |
 
 ## Fungsi Utama
 
 1. Menampilkan daftar pelanggan dengan pencarian dan filter.
-2. Menambahkan pelanggan baru melalui form registrasi.
-3. Mengubah data pelanggan.
-4. Menampilkan detail pelanggan dengan tab operasional.
-5. Mengimport banyak pelanggan sekaligus.
-6. Menghitung kelengkapan data pelanggan.
-7. Menampilkan progress workflow berdasarkan status langganan.
-
-## Data yang Dikelola
-
-| Kelompok | Field |
-| --- | --- |
-| Identitas | `customer_code`, `full_name`, `identity_number`, `gender`, `phone`, `email` |
-| Registrasi | `registration_date`, `status` |
-| Alamat | `address`, `city_id`, `district_id`, `village_id`, `latitude`, `longitude` |
-| Layanan | `internet_package_id`, `contract_period_months`, `discount_amount`, `tax_percent` |
-| Referral | `sales_code`, `agent_code`, `referral_customer_code` |
-| Teknis | `ont_sn`, `ip_address`, `odp_code`, `olt_code`, `vlan_id` |
-| Dokumen | `foto_ktp`, `foto_rumah`, `foto_kontrak` |
+2. Menambahkan pelanggan baru melalui multi-step form registrasi.
+3. Mengelola antrean survey dan verifikasi secara real-time.
+4. Memfasilitasi workflow status (survey, acc, pemasangan, verifikasi).
+5. Menyimpan data teknis (perangkat, OLT, VLAN, speedtest) secara terstruktur.
+6. Mengimport banyak pelanggan sekaligus.
 
 ## Relasi Model
 
 | Relasi | Keterangan |
 | --- | --- |
-| `Customer belongsTo City` | Kota/kabupaten lokasi pelanggan. |
-| `Customer belongsTo District` | Kecamatan lokasi pelanggan. |
-| `Customer belongsTo Village` | Desa/kelurahan lokasi pelanggan. |
+| `Customer belongsTo City/District/Village` | Wilayah lokasi pelanggan. |
 | `Customer belongsTo InternetPackage` | Paket layanan yang dipilih. |
-| `Customer belongsTo SubscriptionStatus` | Status workflow berdasarkan `customers.status = subscription_statuses.code`. |
+| `Customer belongsTo SubscriptionStatus` | Status workflow. |
+| `Customer hasMany CustomerSurvey` | Histori / data survey pelanggan. |
+| `Customer hasMany CustomerInstallation` | Histori / data pemasangan pelanggan. |
+| `Customer hasOne CustomerTechnicalDetail` | Data perangkat (ONT, Router), FOP, OLT, VLAN. |
 
 ## Status Workflow Pelanggan
 
-Status default disediakan oleh `SubscriptionStatusSeeder`:
+Urutan status pelanggan dalam alur Onboarding:
 
-| Urutan | Code | Nama | Terminal |
-| --- | --- | --- | --- |
-| 1 | `registered` | Registered | Tidak |
-| 2 | `waiting_survey` | Waiting Survey | Tidak |
-| 3 | `surveyed` | Surveyed | Tidak |
-| 4 | `waiting_installation` | Waiting Installation | Tidak |
-| 5 | `installed` | Installed | Tidak |
-| 6 | `active` | Active | Tidak |
-| 7 | `suspended` | Suspended | Tidak |
-| 8 | `terminated` | Terminated | Ya |
-| 9 | `rejected` | Rejected | Ya |
+| Urutan | Code | Nama | Terminal | Keterangan |
+| --- | --- | --- | --- | --- |
+| 1 | `waiting_survey` | Waiting Survey | Tidak | Menunggu tim survey |
+| 2 | `survey_in_progress` | Survey In Progress | Tidak | Sedang disurvey (Live Countdown) |
+| 3 | `surveyed` | Surveyed | Tidak | Selesai survey, menunggu ACC |
+| 4 | `waiting_installation`| Waiting Installation | Tidak | Menunggu jadwal pasang |
+| 5 | `installation_in_progress` | Installation In Progress | Tidak | Sedang dipasang (Live Countdown) |
+| 6 | `verification_admin` | Verification Admin | Tidak | Review perangkat & speedtest |
+| 7 | `installed` | Installed | Tidak | Pemasangan selesai & valid |
+| 8 | `active` | Active | Tidak | Siap ditagih (Layanan aktif) |
 
 ## Tab Detail Pelanggan
 
 Halaman detail menyusun informasi pelanggan dalam beberapa area operasional:
-
-1. Ringkasan dan identitas tampilan.
-2. Timeline workflow.
-3. Survey.
-4. FOP.
-5. Pemasangan.
-6. Aktivasi.
-7. Profil teknis.
-8. Uji layanan.
-9. Invoice pembayaran awal.
-10. Referral.
-11. Workflow timelog.
-12. Data paket dan biaya.
-
-Catatan: Beberapa informasi detail masih bersifat simulatif dan dihitung dari `registration_date` serta `status`.
+1. Ringkasan dan identitas.
+2. Timeline workflow terperinci.
+3. Survey (termasuk foto rumah, petugas).
+4. FOP & Perangkat (ONT, OLT, Speedtest).
+5. Pemasangan (teknisi).
+6. Aktivasi & Billing.
 

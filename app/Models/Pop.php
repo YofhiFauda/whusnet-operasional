@@ -147,7 +147,9 @@ class Pop extends Model
             throw new LogicException('POP registration_prefix belum dikonfigurasi.');
         }
 
-        $nextNumber = DB::transaction(function (): int {
+        $prefix = $this->registration_prefix;
+
+        $candidateCode = DB::transaction(function () use ($prefix): string {
             $sequence = PopSequence::query()
                 ->where('pop_id', $this->id)
                 ->where('sequence_type', PopSequence::TYPE_REGISTRATION)
@@ -162,14 +164,31 @@ class Pop extends Model
                 ]);
             }
 
-            $sequence->current_number++;
+            // Sinkronisasi counter: pastikan current_number >= nomor tertinggi
+            // yang sudah ada di tabel customers untuk POP ini (menghindari collision
+            // akibat data import/migrasi yang memiliki kode lebih tinggi dari counter).
+            $prefixLen = strlen($prefix) + 1;
+            $maxExistingNumber = Customer::where('pop_id', $this->id)
+                ->where('customer_code', 'like', $prefix . '%')
+                ->selectRaw("MAX(CAST(SUBSTRING(customer_code, {$prefixLen}) AS UNSIGNED)) as max_num")
+                ->value('max_num') ?? 0;
+
+            if ($maxExistingNumber >= $sequence->current_number) {
+                $sequence->current_number = $maxExistingNumber;
+            }
+
+            // Loop sampai menemukan kode yang belum dipakai
+            do {
+                $sequence->current_number++;
+                $candidate = sprintf('%s%06d', $prefix, $sequence->current_number);
+            } while (Customer::where('customer_code', $candidate)->exists());
+
             $sequence->save();
 
-            return $sequence->current_number;
+            return $candidate;
         });
 
-        // Format: {registration_prefix}{######}
-        return sprintf('%s%06d', $this->registration_prefix, $nextNumber);
+        return $candidateCode;
     }
 
     /**

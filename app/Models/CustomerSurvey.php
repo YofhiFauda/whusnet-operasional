@@ -47,6 +47,8 @@ class CustomerSurvey extends Model
             'survey_date' => 'date',
             'end_date'    => 'date',
             'assigned_at' => 'datetime',
+            'started_at'  => 'datetime',
+            'completed_at'=> 'datetime',
         ];
     }
 

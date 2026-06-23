@@ -640,17 +640,39 @@
     }
 
     function triggerTerminate() {
-        if (confirm(`Apakah Anda yakin ingin melakukan TERMINASI / PEMUTUSAN kontrak layanan untuk ${selectedCustomerData.name} (${selectedCustomerData.code})?`)) {
-            alert(`[TERMINASI] Layanan untuk ${selectedCustomerData.name} telah masuk daftar terminasi.`);
-        }
         closeActionsModal();
+        window.Dialog.show({
+            title: 'Konfirmasi Terminasi',
+            message: `Apakah Anda yakin ingin melakukan TERMINASI / PEMUTUSAN kontrak layanan untuk ${selectedCustomerData.name} (${selectedCustomerData.code})?`,
+            icon: 'error',
+            buttons: [
+                { text: 'Batal', type: 'secondary' },
+                { text: 'Ya, Terminasi', type: 'danger', onClick: () => {
+                    window.Dialog.close();
+                    window.Toast.info('Terminasi', `Layanan untuk ${selectedCustomerData.name} telah masuk daftar terminasi.`);
+                }}
+            ]
+        });
     }
 
     function toggleConnection(id, name, checkbox) {
         const isChecked = checkbox.checked;
         const actionText = isChecked ? 'mengaktifkan kembali' : 'mengisolir / menonaktifkan';
         
-        alert(`[KONEKSI] Anda berhasil ${actionText} koneksi internet untuk pelanggan ${name}.`);
+        window.Confirm(
+            'Konfirmasi Perubahan Status',
+            `Apakah Anda yakin ingin ${actionText} koneksi internet untuk pelanggan ${name}?`,
+            'warning',
+            () => {
+                // Konfirmasi: lanjutkan action (contoh memanggil Toast)
+                window.Toast.success('Koneksi Diubah', `Anda berhasil ${actionText} koneksi internet untuk pelanggan ${name}.`);
+                // TODO: tambahkan AJAX call ke backend jika diperlukan di sini
+            },
+            () => {
+                // Batal: kembalikan state checkbox
+                checkbox.checked = !isChecked;
+            }
+        );
     }
 
     function openDetailModal(button) {

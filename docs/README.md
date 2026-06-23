@@ -44,5 +44,4 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 
 ## Catatan Scope Implementasi Saat Ini
 
-Aplikasi sudah menyediakan fondasi operasional ISP untuk registrasi dan monitoring pelanggan. Beberapa data pada detail pelanggan seperti survey, FOP, pemasangan, aktivasi, uji layanan, dan invoice awal masih dihitung atau disusun secara simulatif dari `registration_date` dan `status`, belum disimpan sebagai tabel transaksi terpisah.
-
+Aplikasi sudah menyediakan fondasi operasional ISP untuk registrasi dan monitoring pelanggan. Modul Onboarding (Survey, Verifikasi, Pemasangan, Aktivasi) sudah mengimplementasikan State Machine (`CustomerWorkflowService`) dengan menyimpan histori dan data teknis pada tabel transaksi terpisah seperti `customer_surveys`, `customer_installations`, dan `customer_technical_details`.

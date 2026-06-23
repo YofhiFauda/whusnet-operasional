@@ -17,9 +17,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'technician_3_id',
     'finished_date',
     'installation_photo',
+    'contract_photo',
+    'signature_photo',
     'installation_note',
     'start_time',
     'end_time',
+    'started_at',
+    'completed_at',
     'technicians',
     'assigned_at',
     'fop_id',
@@ -42,6 +46,8 @@ class CustomerInstallation extends Model
             'scheduled_date' => 'date',
             'finished_date'  => 'date',
             'assigned_at'    => 'datetime',
+            'started_at'     => 'datetime',
+            'completed_at'   => 'datetime',
         ];
     }
 

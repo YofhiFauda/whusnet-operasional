@@ -196,7 +196,7 @@
                     </a>
                     <form action="{{ route('master.paket.toggle', $package) }}" method="POST">
                         @csrf
-                        <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50" onclick="return confirm('Ubah status package {{ $package->package_code }}?')">
+                        <button type="submit" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50" onclick="event.preventDefault(); window.confirmAction('Ubah status package {{ $package->package_code }}?', this.closest('form'))">
                             {{ $package->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
                         </button>
                     </form>

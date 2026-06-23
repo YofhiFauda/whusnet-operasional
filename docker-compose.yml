@@ -1,5 +1,6 @@
 services:
   app:
+    image: whusnet-app:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -83,6 +84,156 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:alpine
+    container_name: whusnet-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # ─────────────────────────────────────────
+  #  HORIZON — Queue Worker
+  # ─────────────────────────────────────────
+  horizon:
+    image: whusnet-app:${APP_VERSION:-latest}
+    container_name: whusnet-horizon
+    restart: unless-stopped
+    working_dir: /var/www
+    networks:
+      - app_network
+    env_file:
+      - .env
+    volumes:
+      - ./:/var/www
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    environment:
+      CONTAINER_ROLE: horizon
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'horizon' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ─────────────────────────────────────────
+  #  REVERB — WebSocket Server
+  # ─────────────────────────────────────────
+  reverb:
+    image: whusnet-app:${APP_VERSION:-latest}
+    container_name: whusnet-reverb
+    restart: unless-stopped
+    working_dir: /var/www
+    networks:
+      - app_network
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./:/var/www
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    environment:
+      CONTAINER_ROLE: reverb
+    env_file:
+      - .env
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.20'
+          memory: 256M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      # nc (netcat) lebih tepat untuk WebSocket — cukup cek port TCP terbuka
+      # curl bisa return non-200 pada WebSocket server meski sebenarnya healthy
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ─────────────────────────────────────────
+  #  SCHEDULER — Laravel Cron
+  # ─────────────────────────────────────────
+  scheduler:
+    image: whusnet-app:${APP_VERSION:-latest}
+    container_name: whusnet-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    networks:
+      - app_network
+    env_file:
+      - .env
+    volumes:
+      - ./:/var/www
+      - storage_data:/var/www/storage
+      - cache_data:/var/www/bootstrap/cache
+    environment:
+      CONTAINER_ROLE: scheduler
+    depends_on:
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 192M
+        reservations:
+          cpus: '0.05'
+          memory: 96M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      # schedule:work adalah long-running process — pgrep lebih tepat dari 'ps aux | grep php'
+      # 'ps aux | grep php' hampir selalu true karena grep itu sendiri muncul sebagai proses
+      test: ["CMD-SHELL", "pgrep -f 'schedule:work' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: whusnet-phpmyadmin
@@ -122,3 +273,4 @@ volumes:
   dbdata:
   storage_data:
   cache_data:
+  redis_data:
