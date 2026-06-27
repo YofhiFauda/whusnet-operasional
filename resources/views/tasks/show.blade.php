@@ -860,6 +860,180 @@ $taskData = [
     </div>
 </div>
 
+{{-- ══ Slide-Over: Laporan Pemasangan Multi-Step ════════════════════════ --}}
+<div x-data="installReportForm({{ json_encode($taskData) }})"
+     x-show="open"
+     x-cloak
+     class="fixed inset-0 z-50 flex"
+     @open-install-report="openInstallReport()"
+     style="display:none">
+
+    {{-- Backdrop --}}
+    <div class="absolute inset-0 bg-black/50" @click="closeSlideOver()"></div>
+
+    {{-- Drawer --}}
+    <div class="relative ml-auto w-full max-w-lg h-full bg-surface shadow-2xl flex flex-col overflow-hidden"
+         @click.stop>
+
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-text-muted">Laporan Pemasangan</p>
+                <p class="text-sm font-semibold text-text-main mt-0.5" x-text="taskData.customer_name"></p>
+            </div>
+            <button @click="closeSlideOver()" class="p-1.5 rounded-md hover:bg-surface-muted transition-colors">
+                <svg class="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        {{-- Step Pills --}}
+        <div class="flex items-center gap-1 px-5 py-3 border-b border-border shrink-0 overflow-x-auto">
+            <template x-for="(label, idx) in steps" :key="idx">
+                <button @click="goToStep(idx)" class="flex items-center gap-1 shrink-0">
+                    <span class="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors"
+                          :style="idx === currentStep ? 'background:var(--color-primary); color:white'
+                                  : (idx < currentStep ? 'background:var(--color-success); color:white'
+                                  : 'background:var(--color-surface-muted); color:var(--color-text-muted)')">
+                        <template x-if="idx < currentStep">✓</template>
+                        <template x-if="idx >= currentStep" ><span x-text="idx+1"></span></template>
+                    </span>
+                    <span class="text-[11px] font-medium whitespace-nowrap"
+                          :style="idx === currentStep ? 'color:var(--color-primary)' : 'color:var(--color-text-muted)'"
+                          x-text="label"></span>
+                    <template x-if="idx < steps.length - 1">
+                        <svg class="h-3 w-3 text-border mx-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </template>
+                </button>
+            </template>
+        </div>
+
+        {{-- Body —scrollable --}}
+        <div class="flex-1 overflow-y-auto p-5 space-y-4">
+
+            {{-- Step 1: Foto Pemasangan --}}
+            <div x-show="currentStep === 0">
+                <h3 class="text-sm font-semibold text-text-main mb-1">Foto Pemasangan</h3>
+                <p class="text-xs text-text-muted mb-3">Upload minimal 2 foto (ONT terpasang & kabel routing).</p>
+
+                <div class="grid grid-cols-3 gap-2 mb-3" x-show="uploadedPhotos.length > 0">
+                    <template x-for="(photo, idx) in uploadedPhotos" :key="idx">
+                        <div class="relative aspect-square rounded-md overflow-hidden border border-border bg-surface-muted">
+                            <img :src="photo.url" class="h-full w-full object-cover" alt="Bukti">
+                        </div>
+                    </template>
+                </div>
+
+                <label class="block cursor-pointer" x-show="!uploading">
+                    <input type="file" accept="image/*" capture="environment" class="hidden" @change="uploadPhoto($event.target)">
+                    <div class="flex items-center justify-center gap-2 py-4 border-2 border-dashed rounded-md text-xs font-medium transition-colors"
+                         style="border-color:var(--color-primary-border); color:var(--color-primary)">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Ambil / Pilih Foto
+                    </div>
+                </label>
+                <div x-show="uploading" class="flex items-center gap-2 text-xs text-text-muted py-3">
+                    <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Mengupload...
+                </div>
+                <p x-show="uploadError" x-text="uploadError" class="text-xs mt-1" style="color:var(--color-error)"></p>
+                <p class="text-xs mt-2" :style="uploadedPhotos.length >= 2 ? 'color:var(--color-success)' : 'color:var(--color-text-muted)'">
+                    <span x-text="uploadedPhotos.length"></span> foto diupload (minimal 2)
+                </p>
+            </div>
+
+            {{-- Step 2: Data Teknis --}}
+            <div x-show="currentStep === 1">
+                <h3 class="text-sm font-semibold text-text-main mb-3">Data Teknis</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Paket Internet <span style="color:var(--color-error)">*</span></label>
+                        <select x-model="form.internet_package_id" class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none focus:ring-2" style="--tw-ring-color: var(--color-primary)">
+                            <option value="">Pilih Paket</option>
+                            @foreach(\App\Models\InternetPackage::active()->get() as $pkg)
+                            <option value="{{ $pkg->id }}">{{ $pkg->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Serial ONT/Router <span style="color:var(--color-error)">*</span></label>
+                        <input type="text" x-model="form.router_or_ont_serial" class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none focus:ring-2" style="--tw-ring-color: var(--color-primary)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">MAC Address <span style="color:var(--color-error)">*</span></label>
+                        <input type="text" x-model="form.router_mac" class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none focus:ring-2" style="--tw-ring-color: var(--color-primary)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">VLAN <span style="color:var(--color-error)">*</span></label>
+                        <input type="number" x-model="form.vlan" class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none focus:ring-2" style="--tw-ring-color: var(--color-primary)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">IP Address <span style="color:var(--color-error)">*</span></label>
+                        <input type="text" x-model="form.ip_address" placeholder="192.168.1.1" class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none focus:ring-2" style="--tw-ring-color: var(--color-primary)">
+                    </div>
+                </div>
+            </div>
+
+            {{-- Step 3: Kontrak & TTD --}}
+            <div x-show="currentStep === 2">
+                <h3 class="text-sm font-semibold text-text-main mb-3">Kontrak & Tanda Tangan</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Foto Kontrak <span style="color:var(--color-error)">*</span></label>
+                        <input type="file" accept="image/*" @change="handleContractUpload($event.target)" class="w-full text-sm">
+                        <p x-show="form.contract_file" class="text-xs mt-1" style="color:var(--color-success)">✓ File dipilih</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">TTD Pelanggan <span style="color:var(--color-error)">*</span></label>
+                        <canvas id="install-customer-signature-canvas" class="w-full h-24 border border-border rounded-md bg-white cursor-crosshair"></canvas>
+                        <button type="button" @click="clearSignature('customer')" class="text-xs mt-1" style="color:var(--color-error)">Hapus</button>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">TTD Teknisi <span style="color:var(--color-error)">*</span></label>
+                        <canvas id="install-tech-signature-canvas" class="w-full h-24 border border-border rounded-md bg-white cursor-crosshair"></canvas>
+                        <button type="button" @click="clearSignature('tech')" class="text-xs mt-1" style="color:var(--color-error)">Hapus</button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Step 4: Catatan --}}
+            <div x-show="currentStep === 3">
+                <h3 class="text-sm font-semibold text-text-main mb-3">Catatan Pemasangan</h3>
+                <textarea x-model="form.installation_note" rows="5" placeholder="Catatan tambahan..." class="w-full text-sm px-3 py-2 border border-border rounded-md bg-background text-text-main focus:outline-none resize-none"></textarea>
+            </div>
+
+        </div>
+
+        {{-- Footer --}}
+        <div class="flex items-center justify-between px-5 py-4 border-t border-border bg-surface-muted shrink-0 gap-3">
+            <button @click="previousStep()" x-show="currentStep > 0" class="text-sm font-semibold px-3 py-2 rounded-md border border-border text-text-main hover:bg-surface transition-colors">
+                ← Sebelumnya
+            </button>
+            <button @click="nextStep()" x-show="currentStep < steps.length - 1" class="ml-auto text-sm font-semibold px-4 py-2 rounded-md text-white transition-colors" style="background:var(--color-primary)">
+                Lanjut →
+            </button>
+            <button @click="submitReport()" x-show="currentStep === steps.length - 1" :disabled="submitting" class="ml-auto text-sm font-semibold px-4 py-2 rounded-md text-white transition-colors"
+                    :style="submitting ? 'background:var(--color-surface-muted)' : 'background:var(--color-success)'"
+                    :class="{ 'cursor-not-allowed': submitting }">
+                <span x-show="!submitting">Submit Laporan</span>
+                <span x-show="submitting">Mengirim...</span>
+            </button>
+        </div>
+
+        <p x-show="submitError" x-text="submitError" class="text-xs px-5 py-2" style="color:var(--color-error); background:var(--color-error-bg)"></p>
+
+    </div>
+</div>
+
 @push('scripts')
 <script>
 function evidenceSection(taskId, initialCanComplete, initialCount) {
@@ -1084,6 +1258,213 @@ function surveyReportForm(taskData) {
                 Object.entries(this.form).forEach(([k, v]) => { if (v !== '') body.append(k, v); });
 
                 const res = await fetch(this.taskData.submit_url_survey, {
+                    method: 'POST', body, headers: { 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    this.closeSlideOver();
+                    window.location.reload();
+                } else {
+                    this.submitError = data.message || 'Terjadi kesalahan. Coba lagi.';
+                }
+            } catch (err) {
+                this.submitError = 'Koneksi bermasalah. Pastikan internet aktif dan coba lagi.';
+            } finally {
+                this.submitting = false;
+            }
+        },
+    };
+}
+
+function installReportForm(taskData) {
+    return {
+        taskData,
+        open: false,
+        currentStep: 0,
+        steps: ['Foto', 'Teknis', 'Kontrak & TTD', 'Catatan'],
+        uploadedPhotos: [],
+        uploading: false,
+        uploadError: null,
+        submitting: false,
+        submitError: null,
+        customerIsEmpty: true,
+        techIsEmpty: true,
+        contractFile: null,
+
+        form: {
+            internet_package_id: taskData.current_package_id || '',
+            router_or_ont_serial: '',
+            router_mac: '',
+            vlan: '',
+            ip_address: '',
+            signature_customer: '',
+            signature_technician: '',
+            installation_note: '',
+        },
+
+        customerCanvas: null,
+        techCanvas: null,
+
+        openInstallReport() {
+            this.currentStep = 0;
+            this.uploadedPhotos = [];
+            this.uploading = false;
+            this.uploadError = null;
+            this.submitting = false;
+            this.submitError = null;
+            this.customerIsEmpty = true;
+            this.techIsEmpty = true;
+            this.contractFile = null;
+            this.form = {
+                internet_package_id: this.taskData.current_package_id || '',
+                router_or_ont_serial: '',
+                router_mac: '',
+                vlan: '',
+                ip_address: '',
+                signature_customer: '',
+                signature_technician: '',
+                installation_note: '',
+            };
+            this.open = true;
+            document.body.style.overflow = 'hidden';
+            this.$nextTick(() => {
+                this.initCustomerCanvas();
+                this.initTechCanvas();
+            });
+        },
+
+        closeSlideOver() {
+            this.open = false;
+            document.body.style.overflow = '';
+        },
+
+        goToStep(idx) { this.currentStep = idx; },
+        previousStep() { if (this.currentStep > 0) this.currentStep--; },
+        nextStep() { if (this.validateCurrentStep() && this.currentStep < this.steps.length - 1) this.currentStep++; },
+
+        validateCurrentStep() {
+            if (this.currentStep === 0 && this.uploadedPhotos.length < 2) {
+                this.uploadError = 'Upload minimal 2 foto pemasangan sebelum lanjut.';
+                return false;
+            }
+            this.uploadError = null;
+            return true;
+        },
+
+        async uploadPhoto(input) {
+            const file = input.files[0];
+            if (!file) return;
+            this.uploading = true;
+            this.uploadError = null;
+            const form = new FormData();
+            form.append('photo', file);
+            form.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+            try {
+                const res = await fetch(this.taskData.evidence_url, {
+                    method: 'POST', body: form, headers: { 'Accept': 'application/json' },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.uploadedPhotos.push({ url: data.evidence.url });
+                } else {
+                    this.uploadError = 'Gagal upload. Coba lagi.';
+                }
+            } catch (err) {
+                this.uploadError = 'Koneksi bermasalah. Coba lagi.';
+            } finally {
+                this.uploading = false;
+                input.value = '';
+            }
+        },
+
+        handleContractUpload(input) {
+            if (input.files[0]) {
+                this.contractFile = input.files[0];
+            }
+        },
+
+        initCustomerCanvas() {
+            this.initSignatureCanvas('install-customer-signature-canvas', 'customer');
+        },
+
+        initTechCanvas() {
+            this.initSignatureCanvas('install-tech-signature-canvas', 'tech');
+        },
+
+        initSignatureCanvas(id, type) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = 96;
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            let drawing = false, lastX = 0, lastY = 0;
+            const getPos = (e) => {
+                const r = canvas.getBoundingClientRect();
+                return { x: (e.clientX ?? e.pageX) - r.left, y: (e.clientY ?? e.pageY) - r.top };
+            };
+
+            canvas.addEventListener('mousedown', (e) => {
+                drawing = true;
+                const p = getPos(e);
+                lastX = p.x; lastY = p.y;
+                if (type === 'customer') this.customerIsEmpty = false;
+                if (type === 'tech') this.techIsEmpty = false;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!drawing) return;
+                const p = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+                lastX = p.x; lastY = p.y;
+            });
+
+            canvas.addEventListener('mouseup', () => { drawing = false; });
+            canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+            if (type === 'customer') this.customerCanvas = canvas;
+            if (type === 'tech') this.techCanvas = canvas;
+        },
+
+        clearSignature(type) {
+            const canvas = type === 'customer' ? this.customerCanvas : this.techCanvas;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (type === 'customer') this.customerIsEmpty = true;
+            if (type === 'tech') this.techIsEmpty = true;
+        },
+
+        async submitReport() {
+            this.submitError = null;
+
+            if (this.uploadedPhotos.length < 2) {
+                this.submitError = 'Minimal 2 foto pemasangan wajib.';
+                return;
+            }
+            if (!this.customerIsEmpty) {
+                this.form.signature_customer = this.customerCanvas.toDataURL('image/png');
+            }
+            if (!this.techIsEmpty) {
+                this.form.signature_technician = this.techCanvas.toDataURL('image/png');
+            }
+
+            this.submitting = true;
+            try {
+                const body = new FormData();
+                body.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+                Object.entries(this.form).forEach(([k, v]) => { if (v !== '') body.append(k, v); });
+                if (this.contractFile) body.append('contract_file', this.contractFile);
+
+                const res = await fetch(this.taskData.submit_url_install, {
                     method: 'POST', body, headers: { 'Accept': 'application/json' },
                 });
                 const data = await res.json();
