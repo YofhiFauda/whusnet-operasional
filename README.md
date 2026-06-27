@@ -167,9 +167,35 @@ Atau melalui Composer:
 composer test
 ```
 
+## Sprint 8 — FOP Task Management & Design System
+
+Sprint 8 menambahkan modul task scheduling dan management untuk FOP:
+
+| Fitur | Route | Dokumentasi |
+|-------|-------|-------------|
+| FOP Dashboard | `/fop` | [Dashboard](docs/sprint-8/fop-dashboard.md) |
+| Kanban Task Scheduler | `/fop/kanban` | [Kanban](docs/sprint-8/kanban-task-scheduler.md) |
+| Calendar Scheduler | `/fop/calendar` | [Calendar](docs/sprint-8/calendar-scheduler.md) |
+| Task Workflow | — | [Workflow](docs/sprint-8/task-workflow.md) |
+| Design System UI | — | [Design System](docs/sprint-8/design-system-ui.md) |
+| Overdue Indicator | `/fop` (stat card) | [Overdue](docs/sprint-8/overdue-indicator.md) |
+
+**Overview lengkap:** [Sprint 8 Documentation](docs/sprint-8/README.md)
+
+---
+
 ## Catatan Implementasi
 
-Project ini sudah menyediakan fondasi fitur operasional ISP, termasuk modul Onboarding Workflow (Survey, Verifikasi Lapangan, Pemasangan, Aktivasi) yang diatur menggunakan *State Machine* (`CustomerWorkflowService`) serta tabel riwayat transaksi pendukung (`customer_surveys`, `customer_installations`, `customer_technical_details`). Data tagihan awal dan uji layanan secara bertahap akan diintegrasikan dengan modul Billing.
+Project ini sudah menyediakan fondasi fitur operasional ISP, termasuk modul Onboarding Workflow (Survey, Verifikasi Lapangan, Pemasangan, Aktivasi) yang diatur menggunakan *State Machine* (`CustomerWorkflowService`) serta tabel riwayat transaksi pendukung (`customer_surveys`, `customer_installations`, `customer_technical_details`). 
+
+Sprint 8 menambahkan Task Management untuk FOP dengan:
+- **Kanban & Calendar views** untuk task scheduling
+- **Real-time updates** via Reverb WebSocket
+- **Design System konsistensi** UI (CSS vars)
+- **Workflow approval gates** — FOP approve trigger customer transition (no auto-update)
+- **Overdue indicator** untuk SLA waiting phase
+
+Data tagihan awal dan uji layanan secara bertahap akan diintegrasikan dengan modul Billing.
 ## Menu Dokumentasi Fitur
 
 Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu sesuai fitur yang ingin dipelajari, lalu buka dokumentasi detailnya.
