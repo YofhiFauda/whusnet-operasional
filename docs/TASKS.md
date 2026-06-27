@@ -1,9 +1,9 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.9** (Koreksi Architecture Task Management)
 Current Module: Task Management Refactor — Central List, FOP Quality Gate, Checklist Scheduling
-Current Task: S8.9-T001 — Buat Central List Task View
+Current Task: S8.9-T002 — FOP Reject/Pending Actions di Task Detail
 
-> **Sprint 8.9 Tasks:** T001–T006 (To Do)
+> **Sprint 8.9 Tasks:** T001 (Done), T002 (In Progress), T003–T006 (To Do)
 > **Sebelumnya:** Sprint 8.4 SELESAI, Sprint 8.5–8.8 ada issues (Calendar unnecessary, Missing Quality Gate, Missing Checklist)
 > **Analisa Koreksi:** `memory/S8_architecture_correction.md` — Reinterpretasi brief, architecture breakdown, action items
 
@@ -32,7 +32,7 @@ Restruktur task management workflow sesuai brief yang benar:
 ## Sprint 8.9A — Task List & Quality Gate
 
 ### S8.9-T001 — Buat Central List Task View (`/tasks`)
-**Status**: To Do
+**Status**: Done
 **Tujuan**: Membuat view Central List Task yang menampilkan semua tasks (pending, scheduled, in_progress, selesai) dalam satu dashboard. Ini menggantikan Calendar S8.7 sebagai pusat manajemen task FOP.
 
 **File dibuat/diubah:**
@@ -48,7 +48,7 @@ Restruktur task management workflow sesuai brief yang benar:
 
 **Acceptance Criteria**:
 - [x] Route `GET /tasks` menampilkan list task (bukan calendar)
-- [x] Tasks grouped by status: pending, scheduled, in_progress, selesai
+- [x] Tasks grouped by status: pending, scheduled, in_progress, selesai (via List filtering)
 - [x] Card view dengan info: task number, customer, type, team, status, SLA countdown
 - [x] Click card → Detail Task (`/tasks/{id}`)
 - [x] Filter dropdown: by status, by type, by date range
@@ -59,7 +59,7 @@ Restruktur task management workflow sesuai brief yang benar:
 ---
 
 ### S8.9-T002 — FOP Reject/Pending Actions di Task Detail
-**Status**: To Do
+**Status**: In Progress
 **Tujuan**: Implementasi button "Reject" dan "Pending" untuk FOP pada pending task, dan "Approve/Reject/Pending" saat review task yang sudah `selesai` oleh teknisi.
 
 **File dibuat/diubah:**
@@ -103,12 +103,12 @@ FOP Reject (selesai task):
 ```
 
 **Acceptance Criteria**:
-- [x] FOP bisa reject pending task dengan alasan
-- [x] FOP bisa pending scheduled task dengan alasan
-- [x] FOP bisa approve/reject/pending task yang sudah selesai oleh teknisi
-- [x] Task status & fop_review_status tercatat di DB
-- [x] Customer status hanya auto-update saat FOP approve (bukan saat teknisi submit)
-- [x] Permission gate: hanya role FOP (atau authorized user) bisa trigger action ini
+- [ ] FOP bisa reject pending task dengan alasan
+- [ ] FOP bisa pending scheduled task dengan alasan
+- [ ] FOP bisa approve/reject/pending task yang sudah selesai oleh teknisi
+- [ ] Task status & fop_review_status tercatat di DB
+- [ ] Customer status hanya auto-update saat FOP approve (bukan saat teknisi submit)
+- [ ] Permission gate: hanya role FOP (atau authorized user) bisa trigger action ini
 
 ---
 
@@ -148,12 +148,12 @@ Teknisi Complete (TaskSurveyReportController::store):
 ```
 
 **Acceptance Criteria**:
-- [x] FOP bisa input checklist template saat jadwalkan task
-- [x] Checklist items tersimpan sebagai JSON di `tasks.checklist_template`
-- [x] Task detail menampilkan checklist (untuk FOP & teknisi)
-- [x] Teknisi bisa check/uncheck items saat task in_progress
-- [x] Teknisi tidak bisa submit laporan sampai semua checklist done
-- [x] Checklist items immutable (tidak bisa edit setelah scheduled)
+- [ ] FOP bisa input checklist template saat jadwalkan task
+- [ ] Checklist items tersimpan sebagai JSON di `tasks.checklist_template`
+- [ ] Task detail menampilkan checklist (untuk FOP & teknisi)
+- [ ] Teknisi bisa check/uncheck items saat task in_progress
+- [ ] Teknisi tidak bisa submit laporan sampai semua checklist done
+- [ ] Checklist items immutable (tidak bisa edit setelah scheduled)
 
 ---
 
@@ -185,10 +185,10 @@ AFTER (Correct):
 ```
 
 **Acceptance Criteria**:
-- [x] Teknisi submit laporan tidak trigger customer workflow transition
-- [x] Task status = selesai, fop_review_status = pending after submit
-- [x] FOP approve di `TaskController::review()` trigger customer transition
-- [x] FOP reject restore task ke in_progress (atau pending) + revert customer status
+- [ ] Teknisi submit laporan tidak trigger customer workflow transition
+- [ ] Task status = selesai, fop_review_status = pending after submit
+- [ ] FOP approve di `TaskController::review()` trigger customer transition
+- [ ] FOP reject restore task ke in_progress (atau pending) + revert customer status
 
 ---
 
@@ -202,10 +202,10 @@ AFTER (Correct):
 - Validation: checklist items tidak boleh kosong (optional tapi recommended)
 
 **Acceptance Criteria**:
-- [x] Schedule form accept checklist input
-- [x] Checklist template saved to DB
-- [x] Teknisi see checklist saat task detail
-- [x] Laporan submit require checklist complete
+- [ ] Schedule form accept checklist input
+- [ ] Checklist template saved to DB
+- [ ] Teknisi see checklist saat task detail
+- [ ] Laporan submit require checklist complete
 
 ---
 
@@ -227,6 +227,94 @@ AFTER (Correct):
 - Keep: FopCalendarController tapi ubah logic ke list (atau rename ke TaskListController)
 
 **Decision**: Clarify dengan user
+
+---
+
+## TIER 1 — ENTERPRISE CRITICAL (After S8.9)
+
+Setelah S8.9 DONE, prioritaskan Tier 1 berikut untuk skalabilitas enterprise dan compliance:
+
+### S8.10 — Audit Trail + Notification System
+
+**Tujuan:** Catat setiap perubahan task (siapa, apa, kapan) dan implementasi notifikasi real-time.
+
+**Tasks:**
+- **S8.10-T001:** Audit Trail Model & Logging
+  - Track: task created, scheduled, rejected, approved, reassigned
+  - Fields: user_id, action, old_values, new_values, timestamp, IP, user_agent
+  - View: Audit log di task detail (FOP only)
+
+- **S8.10-T002:** Notification System
+  - Events: task_assigned, task_rejected, task_approved, checklist_updated
+  - Channels: database (in-app), email, Webhook (Slack/Teams optional)
+  - Delivery: queue-based (async)
+
+- **S8.10-T003:** FOP Notification Dashboard
+  - View notification history
+  - Filter: by date, by action, by user
+  - Mark as read/unread
+
+**Effort:** 8–10 hours | **Priority:** High (compliance, auditability)
+
+---
+
+### S8.11 — Advanced Task Management (Reassignment + Bulk Actions)
+
+**Tujuan:** Skalabilitas handling ratusan tasks per hari dengan reassignment & bulk operations.
+
+**Tasks:**
+- **S8.11-T001:** Task Reassignment (Live)
+  - Change team saat task berjalan (in_progress)
+  - Notify old team & new team
+  - Keep checklist progress (tidak reset)
+  - Log: reassignment timestamp, old/new team, reason
+
+- **S8.11-T002:** Bulk Actions
+  - Select multiple tasks → Reject/Pending/Assign sekaligus
+  - Bulk reason input modal
+  - Progress bar untuk bulk operation
+  - Audit trail untuk setiap bulk action
+
+- **S8.11-T003:** Conflict Resolution UI (Enhanced)
+  - Saat detect conflict: Show "Team X punya task Y jam Z"
+  - Suggest alternative teams berdasarkan availability
+  - Show SLA impact jika assign ke tim A vs tim B
+
+**Effort:** 10–12 hours | **Priority:** High (handling scale)
+
+---
+
+### S9.0 — Performance Metrics + Export/Report
+
+**Tujuan:** Business intelligence untuk FOP leadership — task completion rate, team utilization, SLA compliance.
+
+**Tasks:**
+- **S9.0-T001:** Task Metrics Dashboard
+  - Metrics: total tasks, completed, rejected, pending, avg duration
+  - Team metrics: utilization rate, completion rate, SLA compliance %
+  - Timeframe: daily, weekly, monthly
+  - Chart: line (trend), bar (by team), pie (by status)
+
+- **S9.0-T002:** Export & Report
+  - Export formats: CSV, Excel, PDF
+  - Report types: Daily Task Summary, Team Performance, SLA Compliance
+  - Scheduled report: email daily/weekly to FOP manager
+
+- **S9.0-T003:** SLA Alerts (Optional)
+  - Webhook: saat task at-risk (< 1 jam remaining)
+  - Destinations: Slack channel, email, SMS (optional)
+
+**Effort:** 12–15 hours | **Priority:** Medium (BI, not blocking ops)
+
+---
+
+## TIER 2 — NICE-TO-HAVE (Defer to S9.1+)
+
+- Mobile app (Teknisi di lapangan)
+- Offline mode (sync saat online)
+- Task templates (copy checklist dari survey lain)
+- Recurring tasks (maintenance schedule)
+- Custom workflows (workflow builder)
 
 ---
 
