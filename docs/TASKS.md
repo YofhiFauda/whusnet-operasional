@@ -1,539 +1,1908 @@
 ## Status Project Saat Ini
-Current Sprint: Sprint 5
-Current Module: Modul Import Excel/CSV Data Pelanggan Lama
-Current Task: Merancang dan membuat fitur unggah, preview, dan simpan data pelanggan lama.
+Current Sprint: **Sprint 8.9** (Koreksi Architecture Task Management)
+Current Module: Task Management Refactor — Central List, FOP Quality Gate, Checklist Scheduling
+Current Task: S8.9-T001 — Buat Central List Task View
+
+> **Sprint 8.9 Tasks:** T001–T006 (To Do)
+> **Sebelumnya:** Sprint 8.4 SELESAI, Sprint 8.5–8.8 ada issues (Calendar unnecessary, Missing Quality Gate, Missing Checklist)
+> **Analisa Koreksi:** `memory/S8_architecture_correction.md` — Reinterpretasi brief, architecture breakdown, action items
 
 ---
 
 ## In Progress
 
+# Sprint 8.9 — KOREKSI ARCHITECTURE TASK MANAGEMENT
+
+## Tujuan Sprint 8.9
+Restruktur task management workflow sesuai brief yang benar:
+- Buat **Central List Task** (`/tasks`) sebagai single source of truth (replace Calendar S8.7)
+- Implementasi **FOP Quality Gate** — FOP approve/reject laporan sebelum customer status auto-update
+- Implementasi **Checklist Scheduling** — FOP input checklist template saat penjadwalan task
+- Implementasi **FOP Reject/Pending Actions** — FOP bisa tolak atau pending task
+- Refactor teknisi workflow dari Task (bukan Customer page)
+
+**Referensi dokumen:**
+- `memory/S8_architecture_correction.md` — architecture breakdown lengkap
+- `docs/TASKS.md` — task specification
+
+**Dependency:** S8.7 (Calendar) mungkin perlu di-remove/refactor. S8.5–S8.8 ada partial implementation yang perlu adjust untuk quality gate.
+
+---
+
+## Sprint 8.9A — Task List & Quality Gate
+
+### S8.9-T001 — Buat Central List Task View (`/tasks`)
+**Status**: To Do
+**Tujuan**: Membuat view Central List Task yang menampilkan semua tasks (pending, scheduled, in_progress, selesai) dalam satu dashboard. Ini menggantikan Calendar S8.7 sebagai pusat manajemen task FOP.
+
+**File dibuat/diubah:**
+- `app/Http/Controllers/TaskController.php` — tambah/modifikasi `index()` untuk list view (bukan calendar)
+- `routes/web.php` — ensure `GET /tasks` route ada, verify FOP middleware
+- `resources/views/tasks/index.blade.php` — refactor jadi list view (bukannya calendar HTML)
+  - Pending Tasks section
+  - Scheduled Tasks section (dengan timeline/grid view)
+  - In Progress section
+  - Completed section
+  - Filter: by status, by type, by date
+- `resources/views/tasks/_partials/task-card.blade.php` — card untuk list (replace calendar event HTML)
+
+**Acceptance Criteria**:
+- [x] Route `GET /tasks` menampilkan list task (bukan calendar)
+- [x] Tasks grouped by status: pending, scheduled, in_progress, selesai
+- [x] Card view dengan info: task number, customer, type, team, status, SLA countdown
+- [x] Click card → Detail Task (`/tasks/{id}`)
+- [x] Filter dropdown: by status, by type, by date range
+- [x] Sort: by date, by status, by type
+- [x] Pagination atau infinite scroll untuk many tasks
+- [x] Mobile-friendly layout
+
+---
+
+### S8.9-T002 — FOP Reject/Pending Actions di Task Detail
+**Status**: To Do
+**Tujuan**: Implementasi button "Reject" dan "Pending" untuk FOP pada pending task, dan "Approve/Reject/Pending" saat review task yang sudah `selesai` oleh teknisi.
+
+**File dibuat/diubah:**
+- `app/Http/Controllers/TaskController.php` — tambah methods `reject()` dan `pending()`
+- `app/Http/Controllers/TaskController.php` — tambah method `review()` untuk FOP approve/reject setelah teknisi selesai
+- `app/Policies/TaskPolicy.php` — tambah methods `reject()`, `pending()`, `review()`
+- `resources/views/tasks/show.blade.php` — tambah buttons untuk FOP:
+  - [If pending] "Reject" + "Pending" buttons (existing: "Jadwalkan")
+  - [If selesai] "Approve" + "Reject" + "Pending" buttons (FOP review)
+- `routes/web.php` — tambah routes:
+  - `POST /tasks/{task}/reject` → TaskController@reject
+  - `POST /tasks/{task}/pending` → TaskController@pending
+  - `POST /tasks/{task}/review` → TaskController@review
+- `database/migrations/` — tambah kolom ke table `tasks`:
+  - `reject_reason` (string, nullable) — alasan FOP reject
+  - `pending_reason` (string, nullable) — alasan pending
+  - `fop_review_status` (enum: pending/approved/rejected, default pending)
+
+**Action Behavior:**
+```
+FOP Reject (pending task):
+  - Task status tetap pending
+  - reject_reason diisi
+  - Task tetap bisa di-reschedule atau dihapus
+
+FOP Pending (scheduled task):
+  - Task status = pending
+  - pending_reason diisi
+  - Team assignment tetap, tapi jangan mulai sampai FOP ok
+
+FOP Approve (selesai task):
+  - fop_review_status = approved
+  - Customer status auto-update ke next step
+  - Laporan final
+
+FOP Reject (selesai task):
+  - fop_review_status = rejected
+  - Task status revert ke in_progress (atau pending?)
+  - Teknisi isi ulang laporan
+  - Customer status revert ke previous step
+```
+
+**Acceptance Criteria**:
+- [x] FOP bisa reject pending task dengan alasan
+- [x] FOP bisa pending scheduled task dengan alasan
+- [x] FOP bisa approve/reject/pending task yang sudah selesai oleh teknisi
+- [x] Task status & fop_review_status tercatat di DB
+- [x] Customer status hanya auto-update saat FOP approve (bukan saat teknisi submit)
+- [x] Permission gate: hanya role FOP (atau authorized user) bisa trigger action ini
+
+---
+
+### S8.9-T003 — Checklist Input saat Task Scheduling
+**Status**: To Do
+**Tujuan**: Saat FOP jadwalkan task (via TaskController::schedule), tambah form untuk input checklist template yang akan di-check oleh teknisi saat eksekusi.
+
+**File dibuat/diubah:**
+- `app/Http/Controllers/TaskController.php` — modifikasi `schedule()` untuk accept checklist_template input
+- `app/Models/Task.php` — tambah column `checklist_template` (JSON array)
+- `resources/views/tasks/show.blade.php` — modifikasi jadwal form:
+  - [If pending] Schedule modal/form
+    - Input: scheduled_at, team members
+    - **NEW:** Checklist items textarea/list (comma-separated atau multi-input)
+    - Submit → save checklist_template as JSON
+- `resources/views/tasks/_partials/checklist-input.blade.php` — component untuk input checklist
+- `database/migrations/` — tambah kolom:
+  - `checklist_template` (longText/JSON, nullable) — template dari FOP
+
+**Checklist Flow:**
+```
+FOP Schedule (TaskController::schedule):
+  Input: scheduled_at, team_ids, checklist_items (array/string)
+    → Task.checklist_template = JSON.stringify(checklist_items)
+    → Create TaskChecklist records dari template
+    → Each checklist item: is_checked = false, checked_by = null
+
+Teknisi Execute (TaskController::start):
+  Load Task.checklist_template
+    → Display checkboxes untuk cada item
+    → Teknisi check saat berjalan
+
+Teknisi Complete (TaskSurveyReportController::store):
+  Require: semua checklist items checked (at least 1 foto)
+    → If not done: error "Checklist belum lengkap"
+    → If done: save laporan + update is_checked for each item
+```
+
+**Acceptance Criteria**:
+- [x] FOP bisa input checklist template saat jadwalkan task
+- [x] Checklist items tersimpan sebagai JSON di `tasks.checklist_template`
+- [x] Task detail menampilkan checklist (untuk FOP & teknisi)
+- [x] Teknisi bisa check/uncheck items saat task in_progress
+- [x] Teknisi tidak bisa submit laporan sampai semua checklist done
+- [x] Checklist items immutable (tidak bisa edit setelah scheduled)
+
+---
+
+### S8.9-T004 — Refactor TaskSurveyReportController & TaskInstallationReportController (No Auto-Update)
+**Status**: To Do
+**Tujuan**: Modifikasi kedua controller agar submit laporan tidak langsung auto-update customer status. Sebaliknya, set task status = selesai + fop_review_status = pending, tunggu FOP approve.
+
+**File diubah:**
+- `app/Http/Controllers/TaskSurveyReportController.php` — REMOVE customer workflow transition
+- `app/Http/Controllers/TaskInstallationReportController.php` — REMOVE customer workflow transition
+- `app/Services/CustomerWorkflowService.php` — KEEP transition method, tapi dipanggil dari FOP review action (bukan teknisi laporan)
+
+**Behavior Change:**
+```
+BEFORE (Current):
+  Teknisi submit laporan survey
+    → Task status = selesai
+    → Customer status = waiting_acc (AUTO)
+    
+AFTER (Correct):
+  Teknisi submit laporan survey
+    → Task status = selesai
+    → fop_review_status = pending
+    → Customer status TETAP (no change)
+    
+  FOP approve task
+    → fop_review_status = approved
+    → Customer status = waiting_acc (MANUAL)
+```
+
+**Acceptance Criteria**:
+- [x] Teknisi submit laporan tidak trigger customer workflow transition
+- [x] Task status = selesai, fop_review_status = pending after submit
+- [x] FOP approve di `TaskController::review()` trigger customer transition
+- [x] FOP reject restore task ke in_progress (atau pending) + revert customer status
+
+---
+
+### S8.9-T005 — Refactor TaskController::schedule() untuk Accept Checklist
+**Status**: To Do
+**Tujuan**: Update schedule action untuk handle checklist_template input.
+
+**File diubah:**
+- `app/Http/Controllers/TaskController.php` — update `schedule()` method
+- `routes/web.php` — ensure POST route ada
+- Validation: checklist items tidak boleh kosong (optional tapi recommended)
+
+**Acceptance Criteria**:
+- [x] Schedule form accept checklist input
+- [x] Checklist template saved to DB
+- [x] Teknisi see checklist saat task detail
+- [x] Laporan submit require checklist complete
+
+---
+
+## Sprint 8.9B — Cleanup & Refactor (Optional/Later)
+
+### S8.9-T006 — DELETE S8.7 FOP Calendar (atau Refactor ke List)
+**Status**: To Do
+**Tujuan**: Remove calendar route/controller jika tidak diperlukan, atau refactor jadi list view. Clarify dengan user.
+
+**Decision pending:**
+- Delete: `routes/web.php` (GET `/fop` → FopCalendarController)
+- Delete: `app/Http/Controllers/FopCalendarController.php`
+- Delete: `resources/views/fop/calendar.blade.php`
+- Delete sidebar link ke FOP calendar (app.blade.php)
+
+**OR:**
+
+- Refactor: Calendar view → List Task view (sama dengan S8.9-T001)
+- Keep: FopCalendarController tapi ubah logic ke list (atau rename ke TaskListController)
+
+**Decision**: Clarify dengan user
+
+---
+
+## Sprint 8.2 — FOP & Teknisi Dashboard Enhancement
+
+## Tujuan Sprint 8.2
+Menyempurnakan dashboard FOP dan Teknisi yang sudah ada (S13-T008.1) dengan fitur-fitur yang belum terimplementasi:
+- Laporan Survey dan Pemasangan multi-step via slide-over inline
+- Countdown hitung mundur SLA untuk prioritisasi task
+- Pencatatan `Waktu Survey` dan `Waktu Pemasangan` otomatis
+- Alur "Proses ke TIM" streamlined di FOP Dashboard
+- Status teknisi real-time via Laravel Reverb
+
+> **Referensi dokumen wajib dibaca sebelum mengerjakan Sprint 8.2:**
+> - `docs/fop-teknisi-dashboard-spec.md` — spesifikasi desain dashboard FOP & Teknisi, aturan countdown, slide-over laporan
+> - `docs/implementation-plan-registrasi-survey-verifikasi.md` — aturan bisnis countdown (Section 6, Open Question no.4), arsitektur state machine, kolom DB yang dipakai
+> - `docs/STATUS_FLOW.md` — aturan transisi status pelanggan (calon_pelanggan → survey → menunggu_pemasangan → aktif)
+> - `docs/Workflow-pemasangan.md` — alur lengkap fase verifikasi & pemasangan, aturan SLA countdown eksekusi
+> - `docs/BUSINESS_RULES.md` — aturan role FOP, Teknisi, dan larangan akses
+> - `docs/RBAC_MATRIX.md` — permission string yang dipakai di route guard Sprint 8.2
+>
+> **Dependency:** Sprint 13 (S13-T008.1 Task Management) sudah Done. Sprint 14 & 15 idealnya selesai dulu, tapi Sprint 8.2A (T001–T003) bisa dikerjakan paralel karena tidak bergantung fitur baru.
+
+---
+
+## Sprint 8.2A — Laporan Inline & Countdown
+
+### S8.2-T000 — Buat FOP Dashboard (Controller + Route + View)
+**Status**: Done
+**Tujuan**: Membuat fondasi FOP Dashboard sebagai halaman utama role FOP — kanban pipeline task hari ini, antrean survey, dan tabel status teknisi (static). Diperlukan sebelum countdown S8.2-T001 bisa diimplementasikan.
+
+**File dibuat/diubah:**
+- `app/Http/Controllers/FopDashboardController.php` — dibuat baru
+- `routes/web.php` — tambah route `GET /fop` → `fop.dashboard` dan `GET /api/fop/pipeline`
+- `resources/views/fop/dashboard.blade.php` — dibuat baru
+- `resources/views/fop/_partials/task-card.blade.php` — dibuat baru
+- `resources/views/layouts/app.blade.php` — tambah link "FOP Dashboard" di sidebar
+
+**Acceptance Criteria**:
+- [x] Route `GET /fop` tersedia dengan middleware `permission:task.view.all`
+- [x] FOP Dashboard menampilkan kanban 3 kolom (Terjadwal / Berjalan / Selesai)
+- [x] Antrean survey menampilkan pelanggan berdasarkan `customers.created_at`
+- [x] Tabel status teknisi menampilkan teknisi di POP yang sama
+- [x] Sidebar memiliki link "FOP Dashboard" untuk role dengan `task.view.all`
+- [x] POP scope diterapkan — hanya data di POP yang diizinkan yang tampil
+- [x] Placeholder countdown (`data-countdown-*` attributes) sudah tersedia untuk S8.2-T001
+
+---
+
+### S8.2-T000.1 — Buat tasks/own.blade.php (Teknisi Dashboard View)
+**Status**: Done
+**Tujuan**: Membuat view Teknisi Dashboard yang sebelumnya tidak ada meskipun route dan controller-nya sudah tersedia. Diperlukan sebelum countdown S8.2-T001 bisa ditambahkan ke task card Teknisi.
+
+**File dibuat:**
+- `resources/views/tasks/own.blade.php` — dibuat baru
+
+**Acceptance Criteria**:
+- [x] View `tasks/own.blade.php` tersedia sehingga route `GET /tasks-saya` tidak lagi error
+- [x] Menampilkan task hari ini milik teknisi yang login (dari `TaskController::indexOwn()`)
+- [x] Menampilkan task mendatang (upcoming) dalam 5 item
+- [x] Tombol "Mulai Task" (`task.status.start`) dan "Selesai" (`task.status.complete`) tersedia sesuai permission
+- [x] Status bar warna per status task tampil
+- [x] Placeholder countdown (`data-countdown-sla-*` attributes) sudah tersedia untuk S8.2-T001
+- [x] Mobile-friendly layout (max-w-2xl, single column)
+
+---
+
+### S8.2-T001 — Countdown Hitung Mundur di Task Card & Antrean
+**Status**: Done
+**Tujuan**: Mengimplementasikan tiga jenis countdown hitung mundur sesuai aturan bisnis operasional lapangan ISP.
+
+**Aturan bisnis countdown (wajib diikuti):**
+
+| Countdown | Titik Mulai | Batas Waktu | Lokasi Tampil |
+|-----------|------------|-------------|---------------|
+| **Countdown Survey** | `customers.created_at` / tanggal registrasi | **1×24 jam** | FOP Dashboard — antrean survey, task card |
+| **Countdown Verifikasi/Pemasangan** | `tasks.completed_at` task survey | **3×24 jam** | FOP Dashboard — kolom Perlu Aksi FOP |
+| **Countdown SLA Eksekusi Survey** | `tasks.started_at` | **120 menit** | Task card Teknisi saat survey berjalan |
+| **Countdown SLA Eksekusi Pemasangan** | `tasks.started_at` | **240 menit** | Task card Teknisi saat pemasangan berjalan |
+
+**Catatan penting:**
+Semua countdown adalah **hitung mundur ke bawah** (bukan stopwatch ke atas). Tujuannya menunjukkan seberapa mendesak sebuah item harus dikerjakan — semakin merah, semakin prioritas.
+
+**Formula countdown:**
+```
+Countdown Survey         = (registered_at + 1 hari) - sekarang
+Countdown Verifikasi     = (survey_completed_at + 3 hari) - sekarang
+Countdown SLA Eksekusi   = (started_at + sla_minutes) - sekarang
+```
+
+**Threshold warna (berlaku untuk semua countdown):**
+- 🟢 Hijau: sisa > 50% dari total batas waktu
+- 🟡 Kuning: sisa 25%–50% dari total batas waktu
+- 🔴 Merah berkedip: sisa < 25% dari total batas waktu
+- 🔴 **TERLAMBAT** + tampilkan minus: sudah melewati batas waktu
+
+**Checklist**:
+- [x] Countdown Survey (1×24 jam) tampil di antrean survey FOP — berdasarkan `customers.created_at`
+- [x] Countdown Survey berubah warna sesuai threshold (>50% hijau, 25-50% kuning, <25% merah)
+- [x] Label **TERLAMBAT** muncul jika pelanggan belum disurvey lebih dari 1×24 jam
+- [x] Countdown Verifikasi (3×24 jam) tampil di kolom "Perlu Aksi FOP" — berdasarkan `tasks.completed_at` task survey
+- [x] Countdown Verifikasi berubah warna sesuai threshold
+- [x] Label **TERLAMBAT** muncul jika sudah lewat 3×24 jam sejak survey selesai
+- [x] Countdown SLA Eksekusi aktif di task card Teknisi saat `tasks.status = in_progress`
+- [x] Countdown SLA Eksekusi tampil di FOP Kanban kolom "Sedang Berjalan"
+- [x] Semua countdown reactive tanpa page refresh (Alpine.js)
+- [x] Tidak perlu field baru di database — pakai field existing (`created_at`, `completed_at`, `started_at`, `sla_minutes`)
+
+**Acceptance Criteria**:
+- [x] Countdown Survey aktif sejak pelanggan registrasi, batas 1×24 jam
+- [x] Countdown Verifikasi aktif sejak survey selesai, batas 3×24 jam
+- [x] Countdown SLA Eksekusi aktif saat teknisi mulai task
+- [x] Warna threshold berubah sesuai aturan
+- [x] Label TERLAMBAT muncul saat melewati batas masing-masing
+- [x] FOP dapat melihat semua countdown tanpa refresh halaman
+
+**File yang diimplementasi:**
+- `resources/views/components/countdown-timer.blade.php` — komponen Alpine.js countdown reaktif
+- `resources/views/fop/dashboard.blade.php` — integrasi di antrean survey & kolom Perlu Aksi FOP
+- `resources/views/fop/_partials/task-card.blade.php` — countdown SLA Eksekusi di kanban Sedang Berjalan
+- `resources/views/tasks/own.blade.php` — countdown SLA Eksekusi di dashboard Teknisi
+- `app/Http/Controllers/FopDashboardController.php` — kalkulasi deadline ISO untuk view
+
+---
+
+### S8.2-T002 — Pencatatan Waktu Survey (started_at & completed_at)
+**Status**: Done
+**Tujuan**: Memastikan `tasks.started_at` dicatat saat teknisi tekan "Mulai Survey" dan `tasks.completed_at` dicatat saat laporan survey disimpan. Setelah task selesai, task card menampilkan ringkasan **Waktu Survey**.
+
+**Checklist**:
+- [x] Verifikasi `TaskService::start()` sudah menyimpan `started_at` (sudah ada — verifikasi saja)
+- [x] Verifikasi `TaskService::complete()` sudah menyimpan `completed_at` (sudah ada — verifikasi saja)
+- [x] Setelah status `selesai`, task card Teknisi menampilkan ringkasan:
+  ```
+  Waktu Survey: 09:15 – 10:42  (1 jam 27 menit)
+  ```
+- [x] Ringkasan Waktu Survey juga tampil di halaman detail task (`tasks.show`)
+- [x] Ringkasan Waktu Survey tampil di FOP Kanban kolom "Selesai"
+- [x] Hitung durasi: `completed_at - started_at` dalam format jam menit
+- [x] Jika `completed_at` null (task belum selesai), tampilkan countdown aktif (S8.2-T001)
+
+**Acceptance Criteria**:
+- [x] `started_at` tercatat saat "Mulai Survey" ditekan
+- [x] `completed_at` tercatat saat laporan survey disimpan
+- [x] Waktu Survey tampil di task card dan detail task
+- [x] Format tampilan: `HH:mm – HH:mm (X jam Y menit)`
+- [x] Tidak ada perubahan schema database — field sudah ada
+
+---
+
+### S8.2-T003 — Pencatatan Waktu Pemasangan (started_at & completed_at)
+**Status**: Done
+**Tujuan**: Sama dengan S8.2-T002, tetapi untuk alur Pemasangan. Saat laporan pemasangan disimpan, `completed_at` dicatat dan task card menampilkan **Waktu Pemasangan**.
+
+**Checklist**:
+- [x] Verifikasi `TaskService::complete()` untuk task tipe `pemasangan` sudah menyimpan `completed_at`
+- [x] Setelah status `selesai`, task card menampilkan ringkasan:
+  ```
+  Waktu Pemasangan: 13:00 – 16:45  (3 jam 45 menit)
+  ```
+- [x] Ringkasan Waktu Pemasangan tampil di halaman detail task
+- [x] Ringkasan Waktu Pemasangan tampil di FOP Kanban kolom "Selesai"
+- [x] SLA compliance ditampilkan: hijau jika dalam SLA, merah jika over SLA
+
+**Acceptance Criteria**:
+- [x] `started_at` tercatat saat "Mulai Pemasangan" ditekan
+- [x] `completed_at` tercatat saat laporan pemasangan disimpan
+- [x] Waktu Pemasangan tampil di task card dan detail task
+- [x] SLA compliance terlihat jelas setelah task selesai
+- [x] Format tampilan konsisten dengan Waktu Survey
+
+---
+
+### S8.2-T004 — Laporan Survey Multi-Step (Slide-Over Inline)
+**Status**: Done
+**Tujuan**: Laporan Survey diisi via slide-over 5-langkah langsung dari Teknisi Dashboard tanpa pindah halaman. Submit laporan otomatis mencatat `completed_at`.
+
+**Step pills navigasi:**
+```
+[● Data diri]  [○ Foto lokasi]  [○ Cek sinyal]  [○ Teknis jaringan]  [○ Kesimpulan]
+```
+
+**Checklist**:
+- [x] Buat komponen slide-over `SurveyReportSlideOver` (Alpine.js)
+- [x] Step 1 — Data diri: verifikasi nama teknisi, nama pelanggan, alamat (auto-fill dari `customers`)
+- [x] Step 2 — Foto lokasi: upload foto via `capture="environment"` (min. 1 foto)
+- [x] Step 3 — Cek sinyal: input signal strength (dBm), catatan kondisi
+- [x] Step 4 — Teknis jaringan: jarak dari POP (meter, wajib), tipe media rekomendasi (Fiber/Wireless/UTP, wajib)
+- [x] Step 5 — Kesimpulan: hasil survey (Layak/Tidak Layak/Perlu Kunjungan Ulang), alasan jika tidak layak, tanda tangan digital teknisi (signature pad canvas)
+- [x] Tombol Sebelumnya / Berikutnya dengan validasi per step
+- [x] Submit laporan → simpan ke `customer_surveys` + update `tasks.status = selesai` + catat `completed_at`
+- [x] Setelah submit: countdown berhenti, tampil Waktu Survey (S8.2-T002)
+- [x] Guard: `task.status.complete` (route permission)
+- [x] Upload foto via AJAX Fetch API + `accept="image/*"` + `capture="environment"`
+
+**Acceptance Criteria**:
+- [x] Slide-over 5 langkah berjalan tanpa navigasi halaman
+- [x] Validasi per step berjalan
+- [x] Foto wajib mencegah step berlanjut jika belum ada
+- [x] Submit mencatat `completed_at` dan menghentikan countdown
+- [x] Waktu Survey tampil setelah submit
+- [x] Guard permission berjalan
+
+**File yang diimplementasi:**
+- `resources/views/tasks/own.blade.php` — slide-over Alpine.js 5-step terintegrasi
+- `app/Http/Controllers/TaskSurveyReportController.php` — [BARU] endpoint submit laporan
+- `routes/web.php` — tambah route `POST /tasks/{task}/survey-report`
+
+---
+
+### S8.2-T005 — Laporan Pemasangan Multi-Step (Slide-Over Inline)
+**Status**: Done
+**Tujuan**: Laporan Pemasangan diisi via slide-over 4-langkah. Langkah terakhir (Aktivasi) mengubah task ke selesai dan mencatat `completed_at`.
+
+**Step pills navigasi:**
+```
+[● Foto pemasangan]  [○ Data teknis]  [○ Kontrak & TTD]  [○ Aktivasi]
+```
+
+**Checklist**:
+- [x] Buat komponen slide-over `InstallReportSlideOver`
+- [x] Step 1 — Foto Pemasangan: foto ONT terpasang (wajib, min. 1), foto kabel routing (wajib, min. 1), foto titik sambungan (opsional)
+- [x] Step 2 — Data Teknis: MAC Address ONU, Serial Number, VLAN ID, IP Address, kecepatan paket (select dari paket pelanggan)
+- [x] Step 3 — Kontrak & TTD: foto/scan kontrak fisik, tanda tangan pelanggan (signature pad), tanda tangan teknisi (signature pad), tanggal aktivasi (auto-fill hari ini)
+- [x] Step 4 — Aktivasi: tombol "Aktifkan" → update `tasks.status = selesai` + catat `completed_at`
+- [x] Simpan data teknis ke `customer_technical_details` (dan `task_evidences` untuk file foto)
+- [x] Setelah submit: countdown berhenti, tampil Waktu Pemasangan (S8.2-T003)
+- [x] Guard: `task.evidence.upload` + `task.status.complete`
+
+**Acceptance Criteria**:
+- [x] Slide-over 4 langkah berjalan tanpa navigasi halaman
+- [x] Foto wajib mencegah langkah berlanjut
+- [x] Data teknis tersimpan
+- [x] TTD tersimpan
+- [x] Aktivasi mencatat `completed_at` dan menghentikan countdown
+- [x] Waktu Pemasangan tampil setelah aktivasi
+
+**File yang diimplementasi:**
+- `resources/views/tasks/own.blade.php` — slide-over Alpine.js 4-step terintegrasi
+- `app/Http/Controllers/TaskInstallationReportController.php` — [BARU] endpoint submit laporan pemasangan
+- `routes/web.php` — tambah route `POST /tasks/{task}/install-report`
+
+---
+
+### S8.2-T006 — Alur "Proses ke TIM" di FOP Dashboard (Slide-Over)
+**Status**: Done
+**Tujuan**: FOP dapat memproses task survey selesai ke tahap pemasangan langsung dari kanban FOP, tanpa pindah ke halaman detail pelanggan.
+
+**Checklist**:
+- [x] Buat slide-over `ProcessToTimSlideOver` di FOP Dashboard
+- [x] Slide-over muncul saat FOP klik task card di kolom "Perlu Aksi FOP"
+- [x] Tampilkan ringkasan laporan survey (hasil, media, jarak POP)
+- [x] Form: assign teknisi pemasangan (dropdown user role teknisi di POP yang sama)
+- [x] Form: jadwal pemasangan (date picker + time picker)
+- [x] Form: catatan untuk teknisi (textarea, opsional)
+- [x] Submit: buat task baru tipe `pemasangan` via `TaskService::create()` dengan data assign + jadwal
+- [x] Kirim notifikasi ke teknisi via `SendTaskNotificationJob` yang sudah ada
+- [x] Guard: `task.assign.team` + `task.schedule`
+- [x] Validasi konflik jadwal teknisi (via `TaskService::detectConflicts()` yang sudah ada)
+
+**Acceptance Criteria**:
+- [x] FOP dapat proses survey selesai ke pemasangan dari kanban tanpa pindah halaman
+- [x] Task pemasangan baru terbuat dengan assign teknisi dan jadwal
+- [x] Notifikasi terkirim ke teknisi
+- [x] Konflik jadwal terdeteksi
+- [x] Guard permission berjalan
+
+---
+
+## Sprint 8.2B — Status Teknisi & Real-Time
+
+### S8.2-T007 — Tabel Status Teknisi (Static)
+**Status**: Done
+**Tujuan**: Menampilkan tabel status semua teknisi di POP yang sama di bawah kanban FOP. Tahap ini static dulu — real-time di S8.2-T009.
+
+**Checklist**:
+- [x] Tambahkan tabel di bawah kanban FOP (atau tab terpisah)
+- [x] Kolom: Nama Teknisi, Status (Aktif/Standby), Task Aktif Hari Ini, Lokasi Terakhir
+- [x] Query: teknisi dengan scope POP yang sama dengan FOP login
+- [x] Status "Aktif" jika teknisi punya task `in_progress` hari ini, "Standby" jika tidak
+- [x] Task Aktif: jumlah task `terjadwal`/`in_progress` hari ini
+- [x] Lokasi: field `current_location` dari tabel `users` atau relasi task (nullable)
+- [x] Refresh manual via tombol atau reload halaman
+
+**Acceptance Criteria**:
+- [x] Tabel teknisi tampil di FOP Dashboard
+- [x] Status Aktif/Standby terhitung dengan benar
+- [x] Hanya teknisi di POP yang sama yang tampil (scope aman)
+- [x] Tidak ada data teknisi POP lain yang bocor
+
+---
+
+### S8.2-T008 — Reverb Broadcasting: Transisi Status Task
+**Status**: Done
+**Tujuan**: Broadcast event Laravel Reverb setiap kali status task berubah agar FOP Dashboard bisa auto-refresh kanban secara real-time.
+
+**Event yang perlu dibroadcast:**
+
+| Event | Channel | Trigger | Consumer |
+|-------|---------|---------|---------|
+| `TaskStarted` | `fop.{pop_id}` | Teknisi tekan "Mulai" | FOP Kanban — pindah ke kolom Berjalan |
+| `TaskCompleted` | `fop.{pop_id}` | Laporan disimpan | FOP Kanban — pindah ke kolom Selesai |
+| `TaskScheduled` | `teknisi.{user_id}` | FOP assign task baru | Teknisi Dashboard — munculkan task baru |
+| `TechnicianStatusUpdated` | `fop.{pop_id}` | Task mulai/selesai | FOP — update tabel status teknisi (ditangani via side-effect TaskStarted/TaskCompleted) |
+
+**Checklist**:
+- [x] Buat event class `TaskStarted` (broadcast ke `fop.{pop_id}`)
+- [x] Buat event class `TaskCompleted` (broadcast ke `fop.{pop_id}`)
+- [x] Buat event class `TaskScheduled` (broadcast ke `teknisi.{user_id}`)
+- [x] Broadcast `TaskStarted` dari `TaskService::start()`
+- [x] Broadcast `TaskCompleted` dari `TaskService::complete()`
+- [x] Broadcast `TaskScheduled` dari `TaskService::create()` (extend notifyTeam)
+- [x] Channel private sesuai RBAC scope
+- [x] Pastikan `BROADCAST_DRIVER=reverb` di `.env` (dokumentasikan)
+
+**Acceptance Criteria**:
+- [x] Event terbroadcast saat transisi status
+- [x] Channel menggunakan scope POP yang benar
+- [x] Tidak ada event bocor ke POP lain
+
+---
+
+### S8.2-T009 — FOP Kanban Auto-Refresh via Reverb
+**Status**: Done
+**Tujuan**: FOP Dashboard kanban auto-refresh saat menerima event dari Reverb tanpa page reload.
+
+**Checklist**:
+- [x] Setup Echo.js listener di FOP Dashboard view (Alpine.js atau Livewire)
+- [x] Listener `TaskStarted` → pindah card dari kolom Terjadwal ke Berjalan
+- [x] Listener `TaskCompleted` → pindah card dari kolom Berjalan ke Selesai
+- [x] Listener `TechnicianStatusUpdated` → update baris di tabel status teknisi (S8.2-T007)
+- [x] Countdown di kolom Berjalan tetap berjalan saat card di-refresh
+
+**Acceptance Criteria**:
+- [x] Kanban FOP update otomatis saat teknisi mulai/selesai task
+- [x] Tabel status teknisi update otomatis
+- [x] Tidak perlu manual refresh halaman
+- [x] Countdown tidak reset saat kanban refresh
+
+---
+
+### S8.2-T010 — Push Notifikasi ke Teknisi saat FOP Assign Task
+**Status**: Done
+**Tujuan**: Saat FOP "Proses ke TIM" (S8.2-T006), Teknisi Dashboard menampilkan banner/notifikasi task baru secara real-time.
+
+**Checklist**:
+- [x] Listen event `TaskScheduled` di Teknisi Dashboard via Echo.js
+- [x] Tampilkan banner notifikasi: "Task baru ditugaskan: [Judul Task] — [Jadwal]"
+- [x] Klik banner → scroll ke task card baru di list
+- [x] Banner hilang otomatis setelah 10 detik atau diklik close
+- [x] Extend `SendTaskNotificationJob` yang sudah ada jika diperlukan
+
+**Acceptance Criteria**:
+- [x] Teknisi menerima notifikasi real-time saat FOP assign task baru
+- [x] Banner tampil dan bisa di-dismiss
+- [x] Task baru muncul di list tanpa reload (inject via fetch partial HTML)
+- [x] Hanya teknisi yang di-assign yang menerima notifikasi (private channel teknisi.{user_id})
+
+**File yang diimplementasi:**
+- `resources/views/tasks/own.blade.php` — banner Alpine.js + Echo.js listener + technicianNotifier() Alpine component
+- `resources/views/tasks/partials/own-card.blade.php` — [BARU] partial HTML untuk satu task card teknisi
+- `app/Http/Controllers/TaskController.php` — method `cardPartial()` untuk endpoint partial
+- `routes/web.php` — route `GET /tasks-saya/partial/{task}` → `tasks.own.card-partial`
+
+---
+
+## Catatan Sprint 8.2
+
+**Urutan implementasi yang disarankan:**
+1. S8.2-T001 (Countdown) → paling terlihat dampaknya, tidak perlu schema baru
+2. S8.2-T002 + S8.2-T003 (Waktu Survey/Pemasangan) → verifikasi field existing
+3. S8.2-T004 + S8.2-T005 (Laporan Slide-Over) → fitur utama teknisi
+4. S8.2-T006 (Proses ke TIM Slide-Over) → fitur utama FOP
+5. S8.2-T007 (Tabel Teknisi Static) → UI support
+6. S8.2-T008 → S8.2-T010 (Real-Time Reverb) → polish terakhir
+
+**Dependency yang sudah tersedia:**
+- `tasks.started_at` dan `tasks.completed_at` sudah ada di schema
+- `tasks.sla_minutes` sudah ada dan diisi dari `TaskType::slaMinutes()`
+- `TaskService::start()` dan `TaskService::complete()` sudah ada
+- `SendTaskNotificationJob` sudah ada untuk notifikasi
+- `TaskService::detectConflicts()` sudah ada untuk validasi jadwal
+- Permission `task.evidence.upload`, `task.status.complete`, `task.assign.team` sudah ada di seeder
+
+---
+
+## Sprint 8.3 — Ticketing Queue & Sentralisasi Penjadwalan Tim Teknisi
+
+### S8.3-T001 — Penambahan Alur Tiket Antrean (Unassigned Queue)
+**Status**: Done
+**Tujuan**: Mengubah alur "Buat Task" (FOP) dan "Proses ke Tim" (Admin Survey/Pemasangan) agar menyimpan tiket ke dalam antrean (status `pending` atau `draft`), tanpa meminta penugasan teknisi dan jadwal spesifik secara paksa di awal pendaftaran tiket.
+
+**Checklist**:
+- [x] Ubah validasi `TaskRequest` & `TaskController@store` agar `team_member_ids` dan `scheduled_at` bersifat opsional (nullable) saat pembuatan tiket awal
+- [x] Sesuaikan alur `ProcessToTimSlideOver` (S8.2-T006) agar saat diklik "Proses ke Tim", tiket masuk ke Antrean Tiket pengerjaan
+- [x] Pastikan tiket antrean terisolasi aman sesuai POP Scope cabang
+
+---
+
+### S8.3-T002 — Kolom Kanban Antrean & Modal Penjadwalan Tim
+**Status**: Done
+**Tujuan**: Menampilkan kolom "Antrean Tiket" di dasbor Kanban FOP dan membuat modal `ScheduleTaskModal` untuk memilih tiket antrean, lalu menugaskan 1–3 teknisi beserta jadwal eksekusinya.
+
+**Checklist**:
+- [x] Tambahkan kolom "Antrean Tiket" (Unassigned) di paling kiri atau area khusus Kanban FOP Dashboard (`fop/dashboard.blade.php`)
+- [x] Buat komponen modal `ScheduleTaskModal` berisi dropdown teknisi (multi-select 1–3 orang) dan input tanggal/jam penjadwalan
+- [x] Tambahkan tombol "Jadwalkan & Tugaskan" pada setiap kartu di kolom Antrean Tiket
+
+---
+
+### S8.3-T003 — Service Layer, Deteksi Konflik & Reverb Broadcasting
+**Status**: Done
+**Tujuan**: Menangani penugasan tiket antrean di `TaskService`, melakukan pengecekan konflik jadwal teknisi, dan mengirimkan notifikasi Reverb secara real-time.
+
+**Checklist**:
+- [x] Buat method `TaskService::scheduleTask($task, $data, $actor)` untuk memperbarui status tiket menjadi `terjadwal` + menyimpan relasi `TaskTeam`
+- [x] Jalankan validasi `detectConflicts()` sebelum tiket dijadwalkan
+- [x] Broadcast event `TaskScheduled` ke private channel masing-masing teknisi terpilih
+
+### S8.3-T004 — Sentralisasi Pembuatan Tiket Antrean (Survey, Pemasangan, dan Task Baru)
+**Status**: Done
+**Tujuan**: Menjamin seluruh tiket yang berasal dari registrasi baru (Survey), verifikasi Admin (Pemasangan), maupun pembuatan task manual langsung masuk ke dalam List Task / Kolom Antrean Tiket (`status = pending`).
+
+**Checklist**:
+- [x] Auto-create tiket `Task` tipe `survey` saat registrasi pelanggan baru (`CustomerController@store`)
+- [x] Auto-create tiket `Task` tipe `pemasangan` saat transisi workflow ke `waiting_installation` (`CustomerWorkflowService@transition`)
+- [x] Pastikan isolasi data POP Scope tetap terjaga ketat pada semua tiket antrean
+
+---
+
+# Sprint 8.4 — Koreksi Flow & Aktor Onboarding
+
+## Tujuan Sprint 8.4
+Memperbaiki dua kesalahan kritis pada flow onboarding baru:
+1. Aktor "Proses ke TIM" dipindah dari FOP ke Admin/Helpdesk sesuai brief
+2. Tombol "Mulai Survey" dan "Mulai Pemasangan" diintegrasikan langsung ke halaman Task Teknisi (`tasks/own.blade.php`) — sekarang teknisi harus navigasi ke halaman terpisah
+
+> **Referensi:** `docs/analisa-flow-baru-dan-sprint.md` — Sprint A
+> **Dependency:** Sprint 8.3 selesai
+
+---
+
+### S8.4-T001 — Pindah Aktor "Proses ke TIM" dari FOP ke Admin/Helpdesk
+**Status**: Done
+**Tujuan**: Button "Proses ke TIM" sekarang ada di `FopDashboardController` dan diakses FOP. Sesuai brief dan jawaban #1, aktor yang seharusnya menekan button ini adalah **Admin/Helpdesk** — karena mereka yang memverifikasi data survey dan mengkonfirmasi ke pelanggan sebelum pemasangan dijadwalkan.
+
+**Konteks masalah:**
+- `FopDashboardController::processToTim()` menangani transisi `waiting_acc → waiting_installation`
+- Permission check: `task.assign.team` + `task.schedule` (milik FOP)
+- Seharusnya: hanya Admin/Helpdesk yang bisa tekan ini, FOP tidak
+
+**Checklist:**
+- [ ] Buat atau repurpose controller method: pindahkan logic `processToTim` ke `CustomerVerificationController` atau buat `AccProcessController`
+- [ ] Update permission check: hanya role Admin/Helpdesk yang bisa akses endpoint ini
+- [ ] UI: tampilkan button "Proses ke TIM" di halaman Verifikasi & Pemasangan (bukan FOP Dashboard)
+- [ ] FOP Dashboard: hapus atau sembunyikan button "Proses ke TIM" dari kolom "Perlu Aksi FOP"
+- [ ] FOP Dashboard: kolom "Perlu Aksi FOP" tetap menampilkan pelanggan `waiting_acc` sebagai informasi, tapi tanpa button aksi
+- [ ] Update route di `routes/web.php` — middleware permission disesuaikan
+- [ ] Update `docs/analisa-flow-baru-dan-sprint.md` setelah selesai
+
+**Acceptance Criteria:**
+- [ ] Admin/Helpdesk bisa tekan "Proses ke TIM" dari halaman Verifikasi & Pemasangan
+- [ ] FOP tidak bisa akses endpoint processToTim (403 jika coba langsung)
+- [ ] FOP Dashboard masih menampilkan daftar `waiting_acc` sebagai info saja
+- [ ] Status customer berubah ke `waiting_installation` setelah Admin/Helpdesk konfirmasi
+- [ ] Task pemasangan otomatis masuk Antrean Tiket FOP
+
+---
+
+### S8.4-T002 — Integrasikan "Mulai Survey" ke Halaman Task Teknisi
+**Status**: Done
+**Tujuan**: Sekarang "Mulai Survey" ada di `surveys/queue.blade.php` — halaman terpisah yang tidak mobile-friendly. Sprint doc & brief menyatakan: teknisi buka Task → Detail → tekan "Mulai Survey". Tombol ini harus ada di `tasks/own.blade.php` dan `tasks/show.blade.php` untuk task bertipe `survey`.
+
+**Konteks masalah:**
+- `surveys/queue.blade.php` punya form POST ke `route('customers.survey.start', $customer)`
+- `tasks/own.blade.php` tidak punya button "Mulai Survey" — hanya slide-over laporan (yang muncul setelah `in_progress`)
+- Teknisi di lapangan pakai HP, tidak tahu harus ke halaman survey queue
+
+**Checklist:**
+- [ ] Di `tasks/own.blade.php`: tambah button **"Mulai Survey"** pada task card yang `status = terjadwal` dan `task_type = survey`
+  - Button trigger POST ke `route('customers.survey.start', $task->customer_id)`
+  - Setelah sukses: task status → `in_progress`, customer status → `survey_in_progress`
+  - Button berubah menjadi "Laporan Survey" (slide-over sudah ada)
+- [ ] Di `tasks/show.blade.php`: tambah button "Mulai Survey" dengan logic yang sama
+- [ ] Guard: hanya anggota tim task tersebut yang bisa tekan (validasi `$task->teamMembers->pluck('user_id')->contains(auth()->id())`)
+- [ ] Guard: permission `customers.detail.survey.update`
+- [ ] Pastikan `CustomerSurveyController::start()` atau `TaskStatusController` menangani transisi dengan benar
+
+**Acceptance Criteria:**
+- [ ] Teknisi bisa tekan "Mulai Survey" langsung dari `tasks/own.blade.php`
+- [ ] Customer status berubah ke `survey_in_progress`
+- [ ] Task status berubah ke `in_progress`
+- [ ] Countdown SLA eksekusi mulai berjalan
+- [ ] Button berganti ke "Laporan Survey" (slide-over existing)
+- [ ] Teknisi yang bukan anggota tim tidak bisa tekan (403 atau button hidden)
+
+---
+
+### S8.4-T003 — Integrasikan "Mulai Pemasangan" ke Halaman Task Teknisi
+**Status**: Done
+**Tujuan**: Sama dengan S8.4-T002 tapi untuk fase pemasangan. Sekarang "Mulai Pasang" tidak ada di `tasks/own.blade.php` — harus ditambahkan agar alur teknisi konsisten.
+
+**Checklist:**
+- [ ] Di `tasks/own.blade.php`: tambah button **"Mulai Pemasangan"** pada task card yang `status = terjadwal` dan `task_type = pemasangan`
+  - Button trigger endpoint yang mengubah customer → `installation_in_progress` dan task → `in_progress`
+  - Setelah sukses: button berganti ke "Laporan Pemasangan" (slide-over existing sudah ada)
+- [ ] Di `tasks/show.blade.php`: tambah button dengan logic yang sama
+- [ ] Guard: hanya anggota tim task tersebut + permission `customers.detail.installation.update`
+- [ ] Verifikasi customer status valid (`waiting_installation`) sebelum mulai
+
+**Acceptance Criteria:**
+- [ ] Teknisi bisa tekan "Mulai Pemasangan" dari `tasks/own.blade.php`
+- [ ] Customer status berubah ke `installation_in_progress`
+- [ ] Task status berubah ke `in_progress`
+- [ ] Button berganti ke "Laporan Pemasangan"
+- [ ] Countdown SLA eksekusi mulai berjalan
+
+---
+
+### S8.4-T004 — Redirect FOP ke FOP Dashboard sebagai Landing Page
+**Status**: Done
+**Tujuan**: Saat FOP login dan mengakses `/`, mereka mendarat di dashboard admin generik (billing, invoice, piutang) karena FOP punya permission `dashboard.view`. Seharusnya FOP langsung diarahkan ke FOP Dashboard (`/fop`) yang relevan dengan pekerjaan lapangan mereka.
+
+**Konteks masalah:**
+- `DashboardController::index()` baris 19–28: cek `!hasPermission('dashboard.view')` gagal karena FOP punya permission ini
+- FOP lewati blok redirect dan masuk ke render dashboard billing/admin
+- Teknisi sudah benar (`task.view.own` → `tasks.own`), FOP belum
+- FOP harus manual navigasi ke `/fop` setiap login — tidak efisien
+- Referensi: `docs/analisa-flow-baru-dan-sprint.md` — Bagian 6
+
+**Checklist:**
+- [ ] Di `DashboardController::index()`, tambah early return untuk role FOP **sebelum** block `if (!hasPermission('dashboard.view'))`:
+  ```php
+  if (auth()->user()->hasRole('fop')) {
+      return redirect()->route('fop.dashboard');
+  }
+  ```
+- [ ] Verifikasi redirect tidak loop (route `fop.dashboard` punya middleware `permission:task.view.all` yang FOP miliki)
+- [ ] Pastikan FOP yang juga punya role lain (edge case) tidak terdampak negatif
+
+**Acceptance Criteria:**
+- [ ] FOP login → langsung ke `/fop` (FOP Dashboard)
+- [ ] Teknisi login → tetap ke `/tasks-saya` (tidak berubah)
+- [ ] Admin/Owner/Helpdesk login → tetap ke dashboard billing (tidak berubah)
+- [ ] Tidak ada redirect loop
+
+**File yang diubah:**
+- `app/Http/Controllers/DashboardController.php` — tambah 3 baris di atas baris 19
+
+---
+
+# Sprint 8.5 — Design System Konsistensi & Mobile UX
+
+## Tujuan Sprint 8.5
+Menyamakan visual language seluruh halaman onboarding ke design system (CSS vars). Sekarang `surveys/queue.blade.php` dan tab `_survey/_installation` masih pakai hardcoded `bg-slate-*`. Juga perbaiki label status yang masih bahasa Inggris dan pastikan `capture="environment"` ada di semua input foto.
+
+> **Referensi:** `docs/analisa-flow-baru-dan-sprint.md` — Sprint B
+> **Dependency:** S8.4 tidak perlu selesai dulu, bisa paralel
+
+---
+
+### S8.5-T001 — Refactor `surveys/queue.blade.php` ke Design System
+**Status**: Done
+**Tujuan**: Halaman antrean survey masih pakai Tailwind hardcoded (`bg-white`, `bg-slate-*`, `text-slate-*`, `border-slate-200`). Harus migrasi ke CSS vars design system seperti halaman `tasks/own.blade.php`.
+
+**Checklist:**
+- [ ] Replace `bg-white` → `bg-surface` / `var(--color-surface)`
+- [ ] Replace `bg-slate-50` → `bg-surface-muted` / `var(--color-surface-muted)`
+- [ ] Replace `border-slate-200` → `border-border`
+- [ ] Replace `text-slate-*` → `text-text-main` / `text-text-muted` / `text-text-secondary`
+- [ ] Ganti label status: "WAITING" → "Menunggu Survey", "IN PROGRESS" → "Proses Survey"
+- [ ] Ganti tombol action: gunakan style konsisten dengan `tasks/own.blade.php`
+- [ ] SLA countdown: ganti `<div data-start="...">Menghitung...</div>` dengan `<x-countdown-timer>` yang benar
+  - Basis: `customers.created_at`, batas: 1×24 jam
+- [ ] Tabel: tambah responsivitas — pada mobile, collapse ke card view bukan tabel 9 kolom
+
+**Acceptance Criteria:**
+- [ ] Tidak ada `bg-slate-*` / `text-slate-*` tersisa di file ini
+- [ ] Label status dalam Bahasa Indonesia
+- [ ] SLA countdown berfungsi dan reaktif (Alpine.js)
+- [ ] Halaman readable di mobile (lebar < 640px)
+
+---
+
+### S8.5-T002 — Refactor `customers/tabs/_survey.blade.php` ke Design System
+**Status**: Done
+**Tujuan**: Tab survey di halaman detail pelanggan masih full hardcoded `slate-*`. Localize badge status survey.
+
+**Checklist:**
+- [ ] Replace semua `bg-slate-*`, `text-slate-*`, `border-slate-*` → design system vars
+- [ ] Localize badge `survey_status`: `completed` → "Selesai", `failed` → "Tidak Layak", `pending` → "Menunggu"
+- [ ] Pastikan button "Lapor Hasil Survey" pakai style design system (bukan `bg-sky-600` hardcoded)
+
+**Acceptance Criteria:**
+- [ ] Tidak ada hardcoded slate colors
+- [ ] Badge status dalam Bahasa Indonesia
+- [ ] Visual konsisten dengan tab-tab lain di halaman `customers/show.blade.php`
+
+---
+
+### S8.5-T003 — Refactor `customers/tabs/_installation.blade.php` ke Design System
+**Status**: Done
+**Tujuan**: Tab pemasangan di halaman detail pelanggan, sama masalahnya dengan _survey.blade.php.
+
+**Checklist:**
+- [ ] Replace semua `bg-slate-*`, `text-slate-*`, `border-slate-*` → design system vars
+- [ ] Localize badge `installation_status`: `completed`/`failed`/`in_progress`/`scheduled` → Bahasa Indonesia
+- [ ] Button "Isi Data Pemasangan" dan "Isi Laporan Uji (Speedtest)" → design system style
+
+**Acceptance Criteria:**
+- [ ] Tidak ada hardcoded slate colors
+- [ ] Badge status dalam Bahasa Indonesia
+- [ ] Visual konsisten dengan tab lain
+
+---
+
+### S8.5-T004 — `capture="environment"` Merata di Semua Form Foto
+**Status**: Done
+**Tujuan**: Sekarang `capture="environment"` hanya ada di modal upload `tasks/own.blade.php`. Semua input foto di seluruh app untuk teknisi lapangan harus punya atribut ini agar kamera langsung terbuka di HP.
+
+**Checklist:**
+- [ ] Audit semua `<input type="file">` atau `accept="image/*"` di:
+  - `customers/tabs/_survey.blade.php`
+  - `customers/tabs/_installation.blade.php`
+  - Form laporan survey (`surveys/report.blade.php` atau sejenisnya)
+  - Form laporan pemasangan
+- [ ] Tambah `capture="environment"` pada setiap input foto yang belum punya
+- [ ] Verifikasi `tasks/own.blade.php` sudah benar (sudah ada)
+
+**Acceptance Criteria:**
+- [ ] Semua input foto untuk teknisi lapangan punya `capture="environment"`
+- [ ] Di browser mobile, klik input foto langsung buka kamera belakang
+
+---
+
+# Sprint 8.6 — SLA Waiting Phase Countdown
+
+## Tujuan Sprint 8.6
+Aktivasi countdown hitung mundur untuk dua fase waiting yang saat ini belum berfungsi benar:
+- `waiting_survey`: 1×24 jam dari `customers.created_at`
+- `waiting_installation`: 3×24 jam dari `tasks.completed_at` task survey selesai
+
+Komponen `x-countdown-timer` sudah ada — tinggal digunakan dengan benar.
+
+> **Referensi:** `docs/analisa-flow-baru-dan-sprint.md` — Sprint C
+> **Referensi aturan bisnis:** `docs/TASKS.md` S8.2-T001 (formula countdown sudah didokumentasikan)
+
+---
+
+### S8.6-T001 — SLA Countdown `waiting_survey` Aktif di Queue Survey
+**Status**: Done
+**Tujuan**: `surveys/queue.blade.php` punya placeholder `<div data-start="...">Menghitung...</div>` tapi tidak pakai `<x-countdown-timer>`. Harus diganti dengan komponen yang benar.
+
+**Checklist:**
+- [x] Di `surveys/queue.blade.php`, kolom "WAKTU (LIVE)": ganti placeholder dengan `<x-countdown-timer>`
+  - `deadline` = `$customer->created_at->addDay()->toIso8601String()` (1×24 jam)
+  - `total-seconds` = `86400`
+  - `label` = "Sisa Waktu Survey"
+  - `compact` = true (karena di dalam tabel/card)
+- [x] Di FOP Dashboard antrean survey: pastikan countdown sudah menggunakan formula yang sama (verifikasi dari S8.2-T001)
+- [x] Warna threshold ikuti aturan S8.2-T001 (>50% hijau, 25-50% kuning, <25% merah berkedip, overdue = TERLAMBAT)
+
+**Acceptance Criteria:**
+- [x] Countdown aktif dan menghitung mundur real-time di halaman queue survey
+- [x] Warna berubah sesuai threshold
+- [x] Label "TERLAMBAT" muncul jika sudah > 1×24 jam
+- [x] Tidak ada teks "Menghitung..." statis tersisa
+
+---
+
+### S8.6-T002 — SLA Countdown `waiting_installation` di Halaman Verifikasi
+**Status**: Done
+**Tujuan**: Setelah survey selesai dan status → `waiting_acc` → `waiting_installation`, ada SLA 3×24 jam dari `completed_at` task survey. Countdown ini harus tampil di halaman Verifikasi & Pemasangan.
+
+**Checklist:**
+- [x] Di `verifications/queue.blade.php`: ganti countdown placeholder dengan `<x-countdown-timer>`
+  - `deadline` = `$installation->started_at->addDays(3)->toIso8601String()` atau dari `tasks.completed_at` survey terkait
+  - `total-seconds` = `259200` (3 hari)
+  - `label` = "Sisa Waktu Pemasangan"
+- [x] Verifikasi data yang dipakai basis: `tasks.completed_at` dari task survey tipe `survey` yang `status = selesai` milik customer ini
+- [x] Tampilkan di FOP Dashboard kolom "Perlu Aksi FOP" juga (verifikasi dari S8.2-T001, mungkin sudah ada)
+
+**Acceptance Criteria:**
+- [x] Countdown 3×24 jam aktif di halaman verifikasi/pemasangan
+- [x] Basis countdown adalah waktu survey selesai (bukan waktu registrasi)
+- [x] Warna threshold konsisten
+- [x] Label "TERLAMBAT" muncul jika > 3×24 jam sejak survey selesai
+
+---
+
+### S8.6-T003 — Overdue Indicator di FOP Stat Cards & Badge
+**Status**: Done
+**Tujuan**: FOP perlu tahu berapa pelanggan yang sudah overdue SLA waiting agar bisa prioritaskan. Tambah indikator di stat cards FOP Dashboard.
+
+**Checklist:**
+- [ ] Warna merah/error saat ada overdue
+- [ ] FOP bisa langsung tahu prioritas tanpa scroll
+
+---
+
+# Sprint 8.7 — Kalender Scheduler FOP
+
+## Tujuan Sprint 8.7
+FOP saat ini hanya bisa lihat task hari ini di kanban. Tidak ada tampilan kalender untuk lihat jadwal mingguan/bulanan dan deteksi kepadatan jadwal per teknisi.
+
+> **Referensi:** `docs/analisa-flow-baru-dan-sprint.md` — Sprint D
+> **Sprint doc asli:** Sprint 2.3
+
+---
+
+### S8.7-T001 — Route & Controller Kalender FOP
+**Status**: Done
+**Tujuan**: Buat endpoint yang menyediakan data task terjadwal dalam format yang bisa dipakai kalender.
+
+**Checklist:**
+- [x] Tambah route `GET /fop/calendar` → `FopCalendarController::index()`
+- [x] Tambah route `GET /fop/calendar/events` → `FopCalendarController::events()` — return JSON array event (Pindah ke route web alih-alih api)
+- [x] Format JSON event: `{ id, title, start, end, color, extendedProps: { task_type, customer_name, technicians, status } }`
+- [x] Color-code: `survey` = `#3b82f6` (biru), `pemasangan` = `#f59e0b` (amber)
+- [x] Filter: hanya task di POP scope FOP login
+- [x] Parameter query: pakai `start` dan `end` (dukung query time frame dynamic FullCalendar)
+
+**Acceptance Criteria:**
+- [x] Endpoint `/fop/calendar/events` return data valid
+- [x] POP scope aman — tidak ada bocor data cabang lain
+- [x] Format event kompatibel untuk FullCalendar atau grid Blade
+
+---
+
+### S8.7-T002 — UI Kalender (Grid Blade atau FullCalendar)
+**Status**: Done
+**Tujuan**: Tampilkan kalender di halaman `/fop/calendar` dengan events dari S8.7-T001. Pilihan: FullCalendar.js via CDN/npm atau grid Blade manual (lebih ringan).
+
+**Rekomendasi:** Gunakan FullCalendar.js (npm `@fullcalendar/core` + `@fullcalendar/daygrid` + `@fullcalendar/timegrid`) karena sudah battle-tested untuk use case ini.
+
+**Checklist:**
+- [x] Install FullCalendar via npm atau load dari CDN
+- [x] Buat `resources/views/fop/calendar.blade.php`
+- [x] Init FullCalendar dengan `events` fetch dari `/api/fop/calendar/events`
+- [x] View default: `dayGridMonth` (bulanan), toggle ke `timeGridWeek` (mingguan)
+- [x] Color-code event: biru = survey, amber = pemasangan
+- [x] Header kalender: navigasi bulan (prev/next/today) + toggle view
+- [x] Link di sidebar FOP: "Kalender Jadwal"
+
+**Acceptance Criteria:**
+- [x] Kalender tampil dengan event survey dan pemasangan
+- [x] Color-code benar
+- [x] Navigasi bulan/minggu berfungsi
+- [x] Mobile-friendly (FullCalendar responsive by default)
+
+---
+
+### S8.7-T003 — Slide-Over Detail Task dari Klik Event Kalender
+**Status**: Done
+**Tujuan**: Saat FOP klik event di kalender, tampilkan slide-over berisi detail task (nama pelanggan, tim teknisi, status, SLA).
+
+**Checklist:**
+- [x] Data task tampil dengan benar
+- [x] Link ke task detail berfungsi
+
+---
+
+# Sprint 8.8 — Audit Log, Edge Cases & Notifikasi Pelanggan
+
+## Tujuan Sprint 8.8
+Menyelesaikan fitur-fitur edge case dan audit trail yang tercatat sebagai gap di analisa:
+- Tabel log transisi status pelanggan
+- Reassign teknisi tanpa reset status
+- Validasi konflik jadwal yang lebih ketat
+- Notifikasi ke pelanggan saat aktif
+
+> **Referensi:** `docs/analisa-flow-baru-dan-sprint.md` — Sprint E
+
+---
+
+### S8.8-T001 — Migrasi Tabel `customer_status_logs`
+**Status**: Done
+**Tujuan**: Setiap transisi status pelanggan saat ini tidak di-log ke tabel tersendiri. Hanya ada audit log generik. Tabel ini perlu ada untuk traceability bisnis (siapa yang ubah status kapan).
+
+**Checklist:**
+- [x] Buat migration `create_customer_status_logs_table`:
+  ```
+  id, customer_id, from_status, to_status, changed_by (user_id), note (nullable), created_at
+  ```
+- [x] Buat model `CustomerStatusLog` dengan relasi `belongsTo Customer` dan `belongsTo User` (changed_by)
+- [x] Tidak ada `updated_at` (immutable log)
+
+**Acceptance Criteria:**
+- [x] Migrasi berjalan tanpa error
+- [x] Model tersedia dengan relasi yang benar
+- [x] Field `note` nullable (untuk catatan kontekstual opsional)
+
+---
+
+### S8.8-T002 — Insert Log di `CustomerWorkflowService::transition()`
+**Status**: Done
+**Tujuan**: Setiap kali `CustomerWorkflowService::transition()` dipanggil, insert record ke `customer_status_logs`.
+
+**Checklist:**
+- [x] Di `CustomerWorkflowService::transition()`, setelah update status customer: insert ke `customer_status_logs`
+- [x] `changed_by` = `auth()->id()`
+- [x] `note` = parameter opsional yang sudah ada di signature `transition($customer, $status, $note = null)`
+- [x] Verifikasi semua caller `transition()` di codebase masih berfungsi
+
+**Acceptance Criteria:**
+- [x] Setiap transisi status tercatat di tabel
+- [x] `from_status` dan `to_status` akurat
+- [x] `changed_by` terisi dengan user yang melakukan aksi
+- [x] Tidak ada performance regression — insert sync cukup, tidak perlu queue
+
+---
+
+### S8.8-T003 — Fitur Reassign Teknisi Tanpa Reset Status Customer
+**Status**: In Progress
+**Tujuan**: Jika teknisi yang di-assign tidak bisa hadir, FOP harus bisa mengganti anggota tim task tanpa reset status customer ke fase sebelumnya.
+
+**Checklist:**
+- [ ] Buat endpoint `PATCH /tasks/{task}/team` → `TaskTeamController::update()`
+- [ ] Validasi: task harus `terjadwal` atau `in_progress` (tidak bisa reassign task `selesai`)
+- [ ] Logic: update atau replace record di `task_teams` untuk teknisi yang diganti
+- [ ] Broadcast `TaskScheduled` ke teknisi baru (notifikasi)
+- [ ] Broadcast ke teknisi lama bahwa mereka di-unassign (opsional: event `TaskUnassigned`)
+- [ ] Guard: permission `task.assign.team`
+- [ ] UI: tombol "Ganti Teknisi" di slide-over detail task FOP Dashboard
+
+**Acceptance Criteria:**
+- [ ] FOP bisa ganti teknisi tanpa mengubah status customer
+- [ ] Teknisi baru menerima notifikasi Reverb
+- [ ] Task history tidak hilang (log tersimpan)
+- [ ] Task tetap di kolom kanban yang sama setelah reassign
+
+---
+
+### S8.8-T004 — Validasi Konflik Jadwal Teknisi (Per Jam)
+**Status**: Done
+**Tujuan**: `TaskService::detectConflicts()` sudah ada tapi perlu diverifikasi apakah validasi bentrok jadwal per-jam sudah benar-benar mencegah double-booking teknisi di waktu yang sama.
+
+**Checklist:**
+- [x] Review `TaskService::detectConflicts()` — apakah logic overlap sudah benar?
+  - Konflik: teknisi A punya task mulai 09:00 SLA 120 menit, tidak boleh di-assign task lain yang mulai 09:30
+  - Bukan konflik: task mulai 11:30 (setelah 09:00 + 120 menit = 11:00)
+- [x] Jika logic belum benar: perbaiki formula overlap
+- [x] Verifikasi bahwa `detectConflicts()` dipanggil di semua path penjadwalan:
+  - `TaskController::store()` (buat task baru)
+  - `TaskController::schedule()` (penjadwalan dari antrean)
+  - S8.8-T003 reassign teknisi
+- [x] Return error yang informatif: "Teknisi [Nama] sudah ada task [Nomor] pada [Waktu]"
+- [x] UI: tampilkan error konflik di modal penjadwalan
+
+**Acceptance Criteria:**
+- [x] Double-booking teknisi di waktu yang overlap tidak bisa disimpan
+- [x] Error message spesifik menyebut teknisi dan task yang konflik
+- [x] Jika FOP punya alasan override, ada opsi `conflict_override` (field sudah ada di `tasks`)
+- [x] Validasi berjalan di semua path penjadwalan
+
+---
+
+### S8.8-T005 — Notifikasi ke Pelanggan Saat Status → Active
+**Status**: Done
+**Tujuan**: Setelah Admin memverifikasi dan status customer → `active`, pelanggan perlu diberitahu. Minimal via log dulu; Telegram bot sebagai enhancement.
+
+**Checklist:**
+- [x] Di `CustomerWorkflowService::transition()` atau `CustomerVerificationController`: saat `to_status = active`, trigger notifikasi
+- [x] Fase 1 (minimal): catat di `customer_status_logs` dengan note "Pelanggan diaktifkan — notifikasi manual"
+- [x] Fase 2 (enhancement): kirim pesan via Telegram bot ke nomor HP pelanggan jika konfigurasi Telegram tersedia
+  - Pesan: "Halo [Nama], layanan internet Anda telah aktif! CID: [CID]. Paket: [Nama Paket]. Terima kasih."
+- [x] Guard: hanya Admin yang bisa trigger aktivasi (sudah ada di S5.2)
+- [x] Jika Telegram bot belum dikonfigurasi: log pesan ke `customer_status_logs.note` saja, tidak error
+- [x] Admin mendapat feedback bahwa aktivasi berhasil (toast notification)
+
+**Acceptance Criteria:**
+- [x] Transisi ke `active` tercatat dengan baik di log
+- [x] Jika Telegram tersedia: pesan terkirim ke pelanggan
+- [x] Jika Telegram tidak tersedia: sistem tidak error, hanya skip notifikasi
+- [x] Admin mendapat feedback bahwa aktivasi berhasil (toast notification)
+
+---
+
+
+### S13-T009 — Test Matrix Advanced RBAC
+**Status**: In Progress  
+**Tujuan**: Membuat test lengkap untuk role, permission, scope, route, field sensitif, dan menu.  
+**Checklist**:
+- [ ] Test Owner bisa semua.
+- [ ] Test Atasan bisa dashboard/laporan.
+- [ ] Test Admin operasional.
+- [ ] Test NOC Pusat scope `all_pop`.
+- [ ] Test NOC Cabang scope `selected_pop`.
+- [ ] Test Helpdesk tidak bisa ubah nominal tagihan.
+- [ ] Test FOP bisa survey/pemasangan.
+- [ ] Test Teknisi tidak bisa pembayaran.
+- [ ] Test Sales hanya registrasi/follow-up.
+- [ ] Test POP Admin hanya POP yang dipilih.
+- [ ] Test direct URL forbidden.
+- [ ] Test field sensitive forbidden.
+- [ ] Test menu visibility.
+- [ ] Test button visibility.
+- [ ] Test POP scope tidak bocor.
+
+**Acceptance Criteria**:
+- [ ] Semua role baru memiliki test.
+- [ ] Scope `all_pop` teruji.
+- [ ] Scope `selected_pop` teruji.
+- [ ] Scope `pop_tree` teruji jika diterapkan.
+- [ ] Scope `assigned_only`/`own_created` teruji jika diterapkan.
+- [ ] Direct URL aman.
+- [ ] Field sensitif aman.
+- [ ] Semua test Advanced RBAC lulus.
+
+---
+
+### S13-T010 — Regression Test Setelah Advanced RBAC
+**Status**: Todo  
+**Tujuan**: Memastikan Advanced RBAC tidak merusak fitur lama.  
+**Checklist**:
+- [ ] Jalankan test login/auth.
+- [ ] Jalankan test POP.
+- [ ] Jalankan test paket internet.
+- [ ] Jalankan test pelanggan.
+- [ ] Jalankan test import.
+- [ ] Jalankan test aktivasi.
+- [ ] Jalankan test invoice.
+- [ ] Jalankan test payment.
+- [ ] Jalankan test dashboard.
+- [ ] Jalankan test laporan.
+- [ ] Jalankan test data teknis.
+- [ ] Jalankan test audit log.
+- [ ] Jalankan full test suite.
+- [ ] Jalankan `npm run build`.
+- [ ] Catat test yang gagal jika ada.
+
+**Acceptance Criteria**:
+- [ ] Fitur lama tetap berjalan.
+- [ ] Full test suite lulus atau failure tercatat jelas.
+- [ ] Build frontend lulus.
+- [ ] Tidak ada regression critical.
+- [ ] Catatan hasil test masuk `docs/TASKS.md`.
+
+---
+
+---
+
+# Sprint 14 — PRD Compliance Audit & Hardening
+
+## Tujuan Sprint 14
+Menguji apakah implementasi dari Sprint 1 sampai Sprint 13 benar-benar sesuai PRD, business rules, Advanced RBAC, POP scope, status flow, database rules, dan definition of done.  
+Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
+
+### S14-T001 — Audit Implementasi Terhadap PRD
+**Status**: Todo  
+**Tujuan**: Membandingkan seluruh implementasi Sprint 1–11 dengan PRD dan mencatat gap.  
+**Checklist**:
+- [ ] Audit modul Login.
+- [ ] Audit modul Advanced RBAC.
+- [ ] Audit modul POP/Cabang.
+- [ ] Audit modul Paket Internet.
+- [ ] Audit modul Input Manual Pelanggan.
+- [ ] Audit modul Import Excel/CSV.
+- [ ] Audit modul Import Legacy SQL.
+- [ ] Audit modul Validasi Kelengkapan Data.
+- [ ] Audit modul Aktivasi Layanan.
+- [ ] Audit modul Tagihan.
+- [ ] Audit modul Pembayaran.
+- [ ] Audit modul Dashboard.
+- [ ] Audit modul Laporan.
+- [ ] Audit modul Data Teknis.
+- [ ] Audit modul Audit Log.
+- [ ] Catat fitur yang sudah sesuai.
+- [ ] Catat fitur yang belum sesuai.
+- [ ] Catat fitur yang keluar scope jika ada.
+
+**Acceptance Criteria**:
+- [ ] Laporan audit PRD tersedia.
+- [ ] Semua modul MVP diaudit.
+- [ ] Advanced RBAC diaudit.
+- [ ] Gap implementasi tercatat.
+- [ ] Tidak ada asumsi tanpa bukti.
+- [ ] Rekomendasi perbaikan dibuat sebagai task kecil.
+
+---
+
+### S14-T002 — Audit POP Scope Semua Modul
+**Status**: Todo  
+**Tujuan**: Memastikan data cabang tidak bocor antar POP setelah Advanced RBAC.  
+**Checklist**:
+- [ ] Audit daftar pelanggan.
+- [ ] Audit detail pelanggan.
+- [ ] Audit import batch.
+- [ ] Audit invoice.
+- [ ] Audit payment.
+- [ ] Audit dashboard.
+- [ ] Audit laporan pelanggan.
+- [ ] Audit laporan tagihan.
+- [ ] Audit laporan pembayaran.
+- [ ] Audit laporan import.
+- [ ] Audit audit log jika perlu dibatasi.
+- [ ] Audit NOC `all_pop`.
+- [ ] Audit POP Admin `selected_pop`.
+- [ ] Audit Sales `own_created`.
+- [ ] Audit Teknisi `assigned_only` jika diterapkan.
+
+**Acceptance Criteria**:
+- [ ] `all_pop` benar-benar melihat semua.
+- [ ] `selected_pop` hanya melihat POP tertentu.
+- [ ] `pop_tree` hanya melihat parent-child POP yang valid.
+- [ ] `own_created` tidak melihat data user lain jika diterapkan.
+- [ ] `assigned_only` tidak melihat data tidak ditugaskan jika diterapkan.
+- [ ] Tidak ada query global bocor ke role cabang.
+
+---
+
+### S14-T003 — Audit Status Flow dan Constant/Enum
+**Status**: Todo  
+**Tujuan**: Memastikan status pelanggan, layanan, invoice, pembayaran, import, POP, dan paket tidak ditulis sembarangan.  
+**Checklist**:
+- [ ] Audit status kelengkapan pelanggan.
+- [ ] Audit status layanan pelanggan.
+- [ ] Audit status invoice.
+- [ ] Audit status payment.
+- [ ] Audit status import batch.
+- [ ] Audit status POP.
+- [ ] Audit status paket.
+- [ ] Pastikan status menggunakan constant/enum/helper jika tersedia.
+- [ ] Catat hardcoded string status yang berulang.
+- [ ] Buat task refactor jika ada status raw string berbahaya.
+- [ ] Tambahkan test transisi status penting.
+
+**Acceptance Criteria**:
+- [ ] Status sesuai `STATUS_FLOW.md`.
+- [ ] Tidak ada typo status.
+- [ ] Transisi status penting tervalidasi.
+- [ ] Pelanggan belum lengkap tidak bisa siap billing.
+- [ ] Payment ditolak tidak membuat invoice lunas.
+- [ ] Invoice batal tidak bisa dibayar.
+
+---
+
+### S14-T004 — Audit Database Constraint, Index, dan Relasi
+**Status**: Todo  
+**Tujuan**: Memastikan database sesuai `DATABASE_RULES.md` setelah Advanced RBAC.  
+**Checklist**:
+- [ ] Audit unique `users.email`.
+- [ ] Audit unique `features.code`.
+- [ ] Audit unique `actions.code`.
+- [ ] Audit unique `permissions.code`.
+- [ ] Audit unique `pops.pop_code`.
+- [ ] Audit unique `customers.registration_number`.
+- [ ] Audit unique `customers.cid`.
+- [ ] Audit unique `invoices.invoice_number`.
+- [ ] Audit unique `payments.payment_number`.
+- [ ] Audit invoice per customer dan periode.
+- [ ] Audit relasi feature parent-child.
+- [ ] Audit relasi permission ke feature/action.
+- [ ] Audit relasi role-permission.
+- [ ] Audit relasi user-role-scope.
+- [ ] Audit relasi customer ke POP.
+- [ ] Audit relasi invoice/payment.
+- [ ] Audit index untuk filter penting.
+- [ ] Audit snapshot harga layanan dan invoice.
+
+**Acceptance Criteria**:
+- [ ] Relasi utama sesuai aturan.
+- [ ] Unique constraint penting tersedia.
+- [ ] Index filter penting tersedia.
+- [ ] Advanced RBAC schema valid.
+- [ ] Invoice tidak dobel untuk customer dan periode sama.
+- [ ] Payment tidak berdiri tanpa invoice.
+- [ ] Snapshot harga tersedia.
+
+---
+
+### S14-T005 — Audit ID Numbering dan Race Condition
+**Status**: Todo  
+**Tujuan**: Memastikan ID Request dan CID aman, unik, berjalan per POP, dan tidak rawan duplikasi.  
+**Checklist**:
+- [ ] Audit format ID Request.
+- [ ] Audit format CID.
+- [ ] Audit sequence registration per POP.
+- [ ] Audit sequence CID per POP.
+- [ ] Audit generator ID Request.
+- [ ] Audit generator CID.
+- [ ] Pastikan ID tidak dibuat dengan `count(customers) + 1`.
+- [ ] Pastikan ada transaction/lock/retry jika diperlukan.
+- [ ] Test dua pelanggan POP sama.
+- [ ] Test dua pelanggan POP berbeda.
+- [ ] Test CID tidak dibuat sebelum aktivasi.
+- [ ] Test CID tidak dibuat dua kali.
+
+**Acceptance Criteria**:
+- [ ] ID Request unik.
+- [ ] CID unik.
+- [ ] Running number berjalan per POP.
+- [ ] Running number registration dan CID terpisah.
+- [ ] CID hanya dibuat saat aktivasi.
+- [ ] Tidak ada potensi duplikasi sederhana.
+
+---
+
+### S14-T006 — Audit Import Data Sesuai IMPORT_SPEC.md
+**Status**: Todo  
+**Tujuan**: Memastikan modul import Excel/CSV dan import legacy mengikuti spesifikasi import.  
+**Checklist**:
+- [ ] Audit template import.
+- [ ] Audit upload file.
+- [ ] Audit preview import.
+- [ ] Audit validasi field wajib.
+- [ ] Audit validasi duplikasi.
+- [ ] Audit validasi POP.
+- [ ] Audit validasi paket.
+- [ ] Audit validasi harga.
+- [ ] Audit validasi tanggal.
+- [ ] Audit validasi status layanan.
+- [ ] Audit import batch.
+- [ ] Audit import error.
+- [ ] Audit import legacy SQL.
+- [ ] Audit data valid masuk master pelanggan.
+- [ ] Audit data invalid tidak masuk master pelanggan.
+- [ ] Pastikan import tidak membuat invoice otomatis.
+- [ ] Pastikan import tidak membuat payment otomatis.
+
+**Acceptance Criteria**:
+- [ ] Import sesuai `IMPORT_SPEC.md`.
+- [ ] Import legacy terdokumentasi.
+- [ ] Data invalid ditolak.
+- [ ] Error import jelas.
+- [ ] Import batch tersimpan.
+- [ ] Data valid masuk struktur pelanggan yang sama.
+- [ ] Import tidak membuat invoice/payment otomatis di MVP.
+
+---
+
+### S14-T007 — Audit Detail Pelanggan Sesuai CUSTOMER_DETAIL_SPEC.md
+**Status**: Todo  
+**Tujuan**: Memastikan detail pelanggan sudah menjadi pusat data pelanggan sesuai PRD.  
+**Checklist**:
+- [ ] Audit tab Ringkasan.
+- [ ] Audit tab Identitas.
+- [ ] Audit tab Alamat.
+- [ ] Audit tab POP/Cabang.
+- [ ] Audit tab Paket & Layanan.
+- [ ] Audit tab Survey.
+- [ ] Audit tab Pemasangan.
+- [ ] Audit tab Modem/Perangkat.
+- [ ] Audit tab Billing.
+- [ ] Audit tab Tagihan.
+- [ ] Audit tab Pembayaran.
+- [ ] Audit tab Dokumen.
+- [ ] Audit tab Riwayat Perubahan.
+- [ ] Audit field yang belum lengkap.
+- [ ] Audit tombol aktivasi layanan.
+- [ ] Audit tombol buat tagihan.
+- [ ] Audit tombol input pembayaran.
+- [ ] Audit field sensitif perangkat.
+- [ ] Audit permission tiap tab.
+
+**Acceptance Criteria**:
+- [ ] Semua tab penting tersedia atau punya alasan jika ditunda.
+- [ ] Field belum lengkap terlihat.
+- [ ] Status kelengkapan terlihat.
+- [ ] Tombol aksi sesuai permission.
+- [ ] Field sensitif aman.
+- [ ] Admin/POP Admin tidak bisa membuka pelanggan di luar scope.
+
+---
+
+### S14-T008 — Audit Audit Log Semua Modul Penting
+**Status**: Todo  
+**Tujuan**: Memastikan audit log mencatat perubahan data penting.  
+**Checklist**:
+- [ ] Audit log perubahan pelanggan.
+- [ ] Audit log perubahan POP.
+- [ ] Audit log perubahan paket.
+- [ ] Audit log perubahan invoice.
+- [ ] Audit log perubahan payment.
+- [ ] Audit log perubahan user.
+- [ ] Audit log perubahan role.
+- [ ] Audit log perubahan permission.
+- [ ] Audit log perubahan feature/action.
+- [ ] Audit log perubahan user role scope.
+- [ ] Audit log perubahan data teknis.
+- [ ] Audit log import.
+- [ ] Audit halaman daftar audit log.
+- [ ] Audit permission Owner/Atasan/Admin.
+- [ ] Audit user biasa tidak bisa akses audit log.
+
+**Acceptance Criteria**:
+- [ ] Perubahan pelanggan tercatat.
+- [ ] Perubahan invoice tercatat.
+- [ ] Perubahan payment tercatat.
+- [ ] Perubahan role/permission tercatat.
+- [ ] Perubahan feature/action tercatat.
+- [ ] Perubahan user scope tercatat.
+- [ ] Import tercatat.
+- [ ] User biasa tidak dapat mengubah audit log.
+
+---
+
+### S14-T009 — Perbaiki Kegagalan Legacy CustomerEditTest
+**Status**: Todo  
+**Tujuan**: Memperbaiki 2 kegagalan lama pada `CustomerEditTest` terkait cleanup file dokumen pelanggan agar full test suite bersih.  
+**Checklist**:
+- [ ] Jalankan full test suite dan pastikan error terkini.
+- [ ] Identifikasi penyebab cleanup file dokumen pelanggan.
+- [ ] Perbaiki test atau storage handling tanpa merusak modul dokumen baru.
+- [ ] Pastikan tidak menghapus validasi dokumen.
+- [ ] Jalankan test `CustomerEditTest`.
+- [ ] Jalankan test dokumen pelanggan.
+- [ ] Jalankan full test suite.
+
+**Acceptance Criteria**:
+- [ ] `CustomerEditTest` lulus.
+- [ ] `CustomerDocumentTest` tetap lulus.
+- [ ] Full test suite lulus tanpa kegagalan legacy.
+- [ ] Tidak ada perubahan fitur di luar bugfix.
+- [ ] Tidak ada regression pada upload dokumen.
+
+---
+
+### S14-T010 — Full Regression Test dan Build Gate
+**Status**: Todo  
+**Tujuan**: Menjadikan test suite dan build sebagai gerbang sebelum project dianggap stabil.  
+**Checklist**:
+- [ ] Jalankan `php artisan test`.
+- [ ] Jalankan test dengan `VIEW_COMPILED_PATH` temp jika diperlukan.
+- [ ] Jalankan `npm run build`.
+- [ ] Catat total tests dan assertions.
+- [ ] Catat semua test yang gagal jika ada.
+- [ ] Pastikan kegagalan legacy sudah selesai.
+- [ ] Pastikan tidak ada broken route utama.
+- [ ] Pastikan tidak ada error build frontend.
+
+**Acceptance Criteria**:
+- [ ] Full test suite lulus.
+- [ ] `npm run build` lulus.
+- [ ] Tidak ada failed test yang diabaikan.
+- [ ] Catatan hasil test masuk `docs/TASKS.md`.
+- [ ] Project siap masuk UAT.
+
+---
+---
+
+# Sprint 15 — UAT, Operational Readiness, dan Final MVP Review
+
+## Tujuan Sprint 15
+Menguji MVP dari sudut pandang pengguna operasional: Owner, Atasan, Admin, NOC, Helpdesk, FOP, Teknisi, Sales, dan POP Admin.  
+Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak digunakan secara operasional.
+
+### S15-T001 — Buat Dataset UAT Realistis
+**Status**: Todo  
+**Tujuan**: Membuat data dummy/UAT realistis agar semua flow bisa diuji.  
+**Checklist**:
+- [ ] Buat minimal 1 POP Pusat.
+- [ ] Buat minimal 2 POP Cabang.
+- [ ] Buat minimal 1 Mini POP.
+- [ ] Buat user Owner.
+- [ ] Buat user Atasan.
+- [ ] Buat user Admin.
+- [ ] Buat user NOC Pusat dengan scope `all_pop`.
+- [ ] Buat user NOC Cabang dengan scope `selected_pop`.
+- [ ] Buat user Helpdesk.
+- [ ] Buat user FOP.
+- [ ] Buat user Teknisi.
+- [ ] Buat user Sales.
+- [ ] Buat user POP Admin.
+- [ ] Buat beberapa paket internet aktif.
+- [ ] Buat pelanggan lengkap.
+- [ ] Buat pelanggan belum lengkap.
+- [ ] Buat pelanggan aktif.
+- [ ] Buat pelanggan isolir.
+- [ ] Buat invoice belum bayar.
+- [ ] Buat invoice sebagian.
+- [ ] Buat invoice lunas.
+- [ ] Buat payment cash/transfer/qris.
+- [ ] Buat data survey, pemasangan, perangkat, dan dokumen.
+
+**Acceptance Criteria**:
+- [ ] Dataset UAT tersedia.
+- [ ] Semua role baru dapat diuji.
+- [ ] Semua scope utama dapat diuji.
+- [ ] Semua status utama dapat diuji.
+- [ ] Semua laporan memiliki data.
+- [ ] Dashboard menampilkan angka realistis.
+
+---
+
+### S15-T002 — UAT Flow Owner
+**Status**: Todo  
+**Tujuan**: Menguji Owner sebagai pemilik akses penuh sistem.  
+**Checklist**:
+- [ ] Login sebagai Owner.
+- [ ] Cek akses semua menu.
+- [ ] Cek kelola POP.
+- [ ] Cek kelola user.
+- [ ] Cek kelola role.
+- [ ] Cek kelola permission matrix.
+- [ ] Cek kelola feature/action jika tersedia.
+- [ ] Cek kelola paket.
+- [ ] Cek lihat semua pelanggan.
+- [ ] Cek lihat semua invoice.
+- [ ] Cek lihat semua payment.
+- [ ] Cek laporan semua cabang.
+- [ ] Cek audit log.
+- [ ] Cek field sensitif.
+
+**Acceptance Criteria**:
+- [ ] Owner dapat mengakses semua fitur MVP.
+- [ ] Owner dapat mengelola RBAC.
+- [ ] Owner dapat melihat semua POP.
+- [ ] Owner dapat melihat audit log.
+- [ ] Tidak ada menu utama MVP yang error.
+
+---
+
+### S15-T003 — UAT Flow Atasan
+**Status**: Todo  
+**Tujuan**: Menguji Atasan sebagai role monitoring, laporan, dan audit terbatas.  
+**Checklist**:
+- [ ] Login sebagai Atasan.
+- [ ] Cek dashboard.
+- [ ] Cek laporan pelanggan.
+- [ ] Cek laporan tagihan.
+- [ ] Cek laporan pembayaran.
+- [ ] Cek export laporan jika diizinkan.
+- [ ] Cek audit log jika diizinkan.
+- [ ] Cek tidak bisa mengubah role/permission jika tidak diberi izin.
+- [ ] Cek tidak bisa input pembayaran jika tidak diberi izin.
+- [ ] Cek tidak bisa mengubah data teknis jika tidak diberi izin.
+
+**Acceptance Criteria**:
+- [ ] Atasan dapat monitoring data.
+- [ ] Atasan dapat melihat laporan sesuai scope.
+- [ ] Atasan tidak bisa melakukan aksi operasional yang tidak diizinkan.
+- [ ] Atasan tidak bisa mengubah RBAC tanpa permission.
+
+---
+
+### S15-T004 — UAT Flow Admin
+**Status**: Todo  
+**Tujuan**: Menguji Admin sebagai role operasional utama.  
+**Checklist**:
+- [ ] Login sebagai Admin.
+- [ ] Cek kelola pelanggan.
+- [ ] Cek input pelanggan manual.
+- [ ] Cek import pelanggan jika diizinkan.
+- [ ] Cek validasi kelengkapan.
+- [ ] Cek aktivasi layanan.
+- [ ] Cek buat invoice.
+- [ ] Cek input pembayaran jika diizinkan.
+- [ ] Cek laporan operasional.
+- [ ] Cek scope `all_pop` atau `selected_pop` sesuai setting user.
+
+**Acceptance Criteria**:
+- [ ] Admin dapat melakukan operasional sesuai permission.
+- [ ] Admin tidak melewati scope data.
+- [ ] Admin tidak mendapat permission sensitif berlebihan.
+- [ ] Admin tidak bisa mengubah RBAC jika tidak diizinkan.
+
+---
+
+### S15-T005 — UAT Flow NOC Pusat dan NOC Cabang
+**Status**: Todo  
+**Tujuan**: Menguji role NOC dengan scope `all_pop` dan `selected_pop`.  
+**Checklist**:
+- [ ] Login sebagai NOC Pusat.
+- [ ] Pastikan NOC Pusat melihat semua POP.
+- [ ] Cek dashboard teknis/operasional yang diizinkan.
+- [ ] Cek daftar pelanggan semua POP jika permission mengizinkan.
+- [ ] Cek data perangkat jika permission mengizinkan.
+- [ ] Login sebagai NOC Cabang.
+- [ ] Pastikan NOC Cabang hanya melihat `selected_pop`.
+- [ ] Cek tidak bisa membuka pelanggan POP lain lewat URL.
+- [ ] Cek tidak bisa mencatat pembayaran jika tidak diizinkan.
+- [ ] Cek tidak bisa mengubah nominal tagihan.
+
+**Acceptance Criteria**:
+- [ ] NOC Pusat `all_pop` berjalan.
+- [ ] NOC Cabang `selected_pop` berjalan.
+- [ ] NOC tidak bocor scope POP.
+- [ ] NOC tidak bisa melakukan aksi billing/payment jika tidak diberi permission.
+
+---
+
+### S15-T006 — UAT Flow Helpdesk
+**Status**: Todo  
+**Tujuan**: Menguji Helpdesk sebagai role layanan pelanggan.  
+**Checklist**:
+- [ ] Login sebagai Helpdesk.
+- [ ] Cek daftar pelanggan sesuai scope.
+- [ ] Cek detail pelanggan.
+- [ ] Cek status layanan.
+- [ ] Cek status tagihan.
+- [ ] Cek status pembayaran.
+- [ ] Cek edit data kontak jika diizinkan.
+- [ ] Cek tidak bisa mengubah nominal tagihan.
+- [ ] Cek tidak bisa validasi pembayaran.
+- [ ] Cek tidak bisa melihat password teknis jika tidak diizinkan.
+- [ ] Cek tidak bisa menghapus pelanggan.
+
+**Acceptance Criteria**:
+- [ ] Helpdesk dapat membantu melihat data pelanggan.
+- [ ] Helpdesk dapat melihat status pembayaran.
+- [ ] Helpdesk tidak bisa mengubah nominal tagihan.
+- [ ] Helpdesk tidak bisa validasi pembayaran.
+- [ ] Helpdesk tidak bisa melihat field sensitif tanpa permission.
+
+---
+
+### S15-T007 — UAT Flow FOP
+**Status**: Todo  
+**Tujuan**: Menguji FOP sebagai role survey/pemasangan lapangan.  
+**Checklist**:
+- [ ] Login sebagai FOP.
+- [ ] Cek daftar pelanggan sesuai scope.
+- [ ] Cek data survey.
+- [ ] Cek update survey.
+- [ ] Cek data pemasangan.
+- [ ] Cek update pemasangan.
+- [ ] Cek upload foto survey/pemasangan.
+- [ ] Cek tidak bisa validasi pembayaran.
+- [ ] Cek tidak bisa membuat invoice jika tidak diizinkan.
+- [ ] Cek tidak bisa mengubah role/permission.
+
+**Acceptance Criteria**:
+- [ ] FOP dapat mengelola survey.
+- [ ] FOP dapat mengelola pemasangan.
+- [ ] FOP tidak bisa mengakses pembayaran.
+- [ ] FOP tidak bisa mengubah RBAC.
+- [ ] Scope FOP berjalan.
+
+---
+
+### S15-T008 — UAT Flow Teknisi
+**Status**: Todo  
+**Tujuan**: Menguji Teknisi hanya mengisi data teknis dan tidak bisa mengakses pembayaran.  
+**Checklist**:
+- [ ] Login sebagai Teknisi.
+- [ ] Cek daftar pelanggan yang diizinkan.
+- [ ] Cek isi survey jika permission tersedia.
+- [ ] Cek isi pemasangan jika permission tersedia.
+- [ ] Cek isi perangkat.
+- [ ] Cek upload foto teknis.
+- [ ] Cek field sensitif sesuai permission.
+- [ ] Cek tidak bisa membuka menu pembayaran.
+- [ ] Cek tidak bisa membuka route pembayaran via URL.
+- [ ] Cek tidak bisa mengubah nominal tagihan.
+- [ ] Cek tidak bisa mengakses laporan keuangan.
+
+**Acceptance Criteria**:
+- [ ] Teknisi dapat mengisi data teknis.
+- [ ] Teknisi tidak bisa mencatat pembayaran.
+- [ ] Teknisi tidak bisa mengubah nominal tagihan.
+- [ ] Teknisi tidak bisa mengakses laporan keuangan.
+- [ ] Field sensitif mengikuti permission.
+
+---
+
+### S15-T009 — UAT Flow Sales
+**Status**: Todo  
+**Tujuan**: Menguji Sales sebagai role registrasi/follow-up pelanggan dengan scope `own_created` atau `selected_pop`.  
+**Checklist**:
+- [ ] Login sebagai Sales.
+- [ ] Cek input calon pelanggan.
+- [ ] Cek ID Request dibuat.
+- [ ] Cek pelanggan yang dibuat sendiri terlihat.
+- [ ] Cek pelanggan user lain tidak terlihat jika scope `own_created`.
+- [ ] Cek `selected_pop` jika Sales dibatasi POP.
+- [ ] Cek tidak bisa aktivasi layanan jika tidak diberi permission.
+- [ ] Cek tidak bisa membuat invoice.
+- [ ] Cek tidak bisa input pembayaran.
+- [ ] Cek tidak bisa melihat laporan pembayaran.
+- [ ] Cek tidak bisa melihat field teknis sensitif.
+
+**Acceptance Criteria**:
+- [ ] Sales dapat input calon pelanggan.
+- [ ] Sales `own_created` berjalan jika diterapkan.
+- [ ] Sales `selected_pop` berjalan jika diterapkan.
+- [ ] Sales tidak bisa billing/payment.
+- [ ] Sales tidak bisa melihat data sensitif.
+
+---
+
+### S15-T010 — UAT Flow POP Admin
+**Status**: Todo  
+**Tujuan**: Menguji POP Admin sebagai admin operasional untuk POP tertentu.  
+**Checklist**:
+- [ ] Login sebagai POP Admin.
+- [ ] Pastikan scope `selected_pop` wajib.
+- [ ] Cek dashboard hanya POP sendiri.
+- [ ] Cek pelanggan hanya POP sendiri.
+- [ ] Cek detail pelanggan POP sendiri.
+- [ ] Cek tidak bisa membuka pelanggan POP lain lewat URL.
+- [ ] Cek invoice hanya POP sendiri.
+- [ ] Cek payment hanya POP sendiri.
+- [ ] Cek laporan hanya POP sendiri.
+- [ ] Cek export hanya POP sendiri.
+- [ ] Cek tidak bisa mengelola role global.
+- [ ] Cek tidak bisa melihat audit log global jika tidak diizinkan.
+
+**Acceptance Criteria**:
+- [ ] POP Admin tidak melihat data POP lain.
+- [ ] URL langsung tetap aman.
+- [ ] Export laporan tidak bocor.
+- [ ] POP scope benar di pelanggan, invoice, payment, dashboard, dan laporan.
+
+---
+
+### S15-T011 — UAT Flow Pelanggan Manual sampai Pembayaran
+**Status**: Todo  
+**Tujuan**: Menguji flow bisnis utama dari input pelanggan manual sampai pembayaran lunas.  
+**Checklist**:
+- [ ] Input pelanggan baru manual.
+- [ ] Pastikan ID Request dibuat.
+- [ ] Simpan pelanggan belum lengkap.
+- [ ] Lihat field yang belum lengkap.
+- [ ] Lengkapi data pelanggan.
+- [ ] Validasi kelengkapan menjadi lengkap.
+- [ ] Aktivasi layanan.
+- [ ] Pastikan CID dibuat.
+- [ ] Buat invoice manual.
+- [ ] Pastikan invoice belum dibayar.
+- [ ] Input pembayaran sebagian.
+- [ ] Pastikan invoice menjadi sebagian.
+- [ ] Input pelunasan.
+- [ ] Pastikan invoice menjadi lunas.
+- [ ] Cek pembayaran muncul di detail pelanggan.
+- [ ] Cek audit log.
+
+**Acceptance Criteria**:
+- [ ] Flow input pelanggan manual berhasil end-to-end.
+- [ ] ID Request dan CID sesuai aturan.
+- [ ] Pelanggan belum lengkap tidak bisa invoice.
+- [ ] Invoice dibuat dari pelanggan aktif.
+- [ ] Payment mengubah status invoice.
+- [ ] Audit log tercatat.
+
+---
+
+### S15-T012 — UAT Flow Import Pelanggan sampai Aktivasi
+**Status**: Todo  
+**Tujuan**: Menguji flow import pelanggan lama sampai pelanggan bisa diaktifkan.  
+**Checklist**:
+- [ ] Download template import.
+- [ ] Upload file import valid.
+- [ ] Upload file import invalid.
+- [ ] Cek preview data.
+- [ ] Cek data invalid ditolak.
+- [ ] Cek error import jelas.
+- [ ] Konfirmasi import data valid.
+- [ ] Cek data masuk master pelanggan.
+- [ ] Cek ID pelanggan lama tersimpan.
+- [ ] Cek ID Request sistem baru dibuat.
+- [ ] Cek hasil import bisa diedit manual.
+- [ ] Lengkapi data jika perlu.
+- [ ] Aktivasi layanan.
+- [ ] Pastikan CID dibuat.
+- [ ] Pastikan import tidak membuat invoice/payment otomatis.
+
+**Acceptance Criteria**:
+- [ ] Import berjalan sesuai spesifikasi.
+- [ ] Data invalid tidak masuk.
+- [ ] Data valid masuk master pelanggan.
+- [ ] Data hasil import bisa diedit.
+- [ ] Import tidak membuat invoice/payment otomatis.
+- [ ] Aktivasi setelah import berjalan.
+
+---
+
+### S15-T013 — Final Review MVP_SUCCESS_CHECKLIST.md
+**Status**: Todo  
+**Tujuan**: Mengecek seluruh MVP menggunakan checklist final.  
+**Checklist**:
+- [ ] Review checklist scope MVP.
+- [ ] Review checklist fitur post-MVP tidak dibuat.
+- [ ] Review checklist login/user.
+- [ ] Review checklist Advanced RBAC.
+- [ ] Review checklist POP/Cabang.
+- [ ] Review checklist ID numbering.
+- [ ] Review checklist paket.
+- [ ] Review checklist pelanggan manual.
+- [ ] Review checklist detail pelanggan.
+- [ ] Review checklist import.
+- [ ] Review checklist validasi kelengkapan.
+- [ ] Review checklist aktivasi.
+- [ ] Review checklist invoice.
+- [ ] Review checklist payment.
+- [ ] Review checklist dashboard.
+- [ ] Review checklist laporan.
+- [ ] Review checklist audit log.
+- [ ] Tandai item yang belum selesai.
+- [ ] Buat daftar bugfix/task lanjutan jika ada.
+
+**Acceptance Criteria**:
+- [ ] `MVP_SUCCESS_CHECKLIST.md` terisi.
+- [ ] Semua item critical terpenuhi.
+- [ ] Gap MVP tercatat jelas.
+- [ ] Keputusan MVP layak/tidak layak dibuat.
+
+---
+
+### S15-T014 — Release Readiness Checklist
+**Status**: Todo  
+**Tujuan**: Menyiapkan project agar layak dipindahkan ke staging/production internal.  
+**Checklist**:
+- [ ] Pastikan `.env.example` lengkap.
+- [ ] Pastikan migration berjalan dari nol.
+- [ ] Pastikan seeder dasar tersedia.
+- [ ] Pastikan role, feature, action, permission seeder tersedia.
+- [ ] Pastikan storage link/document upload siap.
+- [ ] Pastikan permission folder storage benar.
+- [ ] Pastikan full test suite lulus.
+- [ ] Pastikan `npm run build` lulus.
+- [ ] Pastikan tidak ada debug route berbahaya.
+- [ ] Pastikan tidak ada credential hardcoded.
+- [ ] Pastikan backup database minimal terdokumentasi.
+- [ ] Pastikan restore database minimal terdokumentasi.
+- [ ] Pastikan panduan deploy/staging tersedia.
+- [ ] Pastikan user owner awal tersedia.
+- [ ] Pastikan dokumen UAT tersedia.
+
+**Acceptance Criteria**:
+- [ ] Project siap staging.
+- [ ] Setup dari nol terdokumentasi.
+- [ ] Seeder RBAC baru berjalan.
+- [ ] Tidak ada credential hardcoded.
+- [ ] Test dan build lulus.
+- [ ] Deploy checklist tersedia.
+
+---
+---
+
+# Notes Sprint 11–13
+
+Sprint 11 sampai Sprint 15 adalah sprint lanjutan setelah fitur MVP utama selesai.
+
+**Aturan**:
+1. Jangan mengerjakan Sprint 11 sebelum **S8-T006 — Import Data Legacy sand_db_sandya.sql** selesai.
+2. Jangan membuat role per cabang seperti NOC Siman, NOC Jetis, atau Teknisi Siman.
+3. Gunakan pola **Role + Scope**.
+4. Contoh benar: Role NOC, Scope `all_pop`.
+5. Contoh benar: Role POP Admin, Scope `selected_pop`, POP Siman.
+6. Permission harus berbasis feature-action.
+7. Format permission: `{feature_code}.{action_code}`.
+8. Query data wajib mengikuti user scope.
+9. Route wajib dilindungi middleware permission.
+10. Menu disembunyikan bukan pengganti middleware.
+11. Field sensitif wajib dibatasi permission.
+12. Semua perubahan RBAC wajib masuk audit log.
+13. Jika ada bug ditemukan pada audit/UAT, buat task bugfix terpisah.
+14. Jika full test suite gagal, jangan lanjut release readiness.
+15. Jika MVP Success Checklist belum terpenuhi, MVP belum layak dianggap selesai.
+
+**Urutan setelah S10-T003 selesai**:
+1. Pindahkan S10-T003 ke Done.
+2. Jadikan **S11-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC** sebagai In Progress.
+3. Selesaikan Sprint 11 untuk dokumen dan desain Advanced RBAC.
+4. Lanjut Sprint 12 untuk database dan core engine.
+5. Lanjut Sprint 13 untuk UI, middleware, scope enforcement, dan tests.
+6. Lanjut Sprint 14 untuk PRD compliance audit dan hardening.
+7. Lanjut Sprint 15 untuk UAT dan release readiness.
+
+
+## Done
+
 ### Sprint 5 — Modul Import Excel/CSV Data Pelanggan Lama
-Status: In Progress
+Status: Done
 
 Tujuan:
 Membangun fitur mass-import pelanggan lama menggunakan format Excel/CSV agar migrasi data pelanggan lama bisa dilakukan cepat dengan validasi ketat.
 
-Scope:
-- Halaman UI untuk Upload File Import.
-- Endpoint Download Template Excel.
-- Validasi data format file (nomor hp duplicate, format salah, dsb).
-- Tampilan Preview / Review Data sebelum dimasukkan (Draft/Batch).
-- Logika penyimpanan multitable: `customers`, `customer_addresses`, `customer_services`.
-- Error log per baris gagal.
-- Integrasi status langsung menjadi Pelanggan Aktif/Siap Billing.
-
 Acceptance Criteria:
-- [ ] Admin dapat mengunduh format template.
-- [ ] Sistem memunculkan preview (valid & invalid) setelah diunggah.
-- [ ] Proses simpan memasukkan data valid ke database dengan sukses.
-- [ ] Pelanggan import masuk ke List Pelanggan Aktif.
+- [x] Admin dapat mengunduh format template.
+- [x] Sistem memunculkan preview (valid & invalid) setelah diunggah.
+- [x] Proses simpan memasukkan data valid ke database dengan sukses.
+- [x] Pelanggan import masuk ke List Pelanggan Aktif.
 
 ---
-
-### UX-VA001 — Halaman Penuh Verifikasi Admin (Proses Pemasangan + Pengujian + Aktivasi)
-Status: Done
-
-Sprint/Module: Verifikasi Admin — Workflow UX Polish
-
-Tujuan:
-Membuat halaman penuh Sub Menu Verifikasi Admin yang menampilkan data proses pemasangan, data pengujian speedtest, dan form aktivasi tagihan dalam satu halaman terstruktur dengan tab navigasi.
-
-Scope:
-- [x] Buat `verifications/admin.blade.php` — halaman tab 3-bagian: Proses Pemasangan, Pengujian, Verifikasi & Aktivasi.
-- [x] Tambah method `showAdmin` di `CustomerVerificationController`.
-- [x] Tambah route `GET /customers/{customer}/verification/admin`.
-- [x] Hilangkan Modal "Proses ke Tim" — tombol langsung POST konfirmasi native browser.
-- [x] Ganti tombol modal "Verifikasi & Aktivasi" di queue dengan link ke halaman penuh admin.blade.php.
-- [x] Hapus `finalVerifyModal` dari `queue.blade.php` (tidak lagi diperlukan).
-
-Acceptance Criteria:
-- [x] Admin dapat melihat detail data pemasangan (perangkat, ODP/OLT, durasi SLA) dari tab Proses Pemasangan.
-- [x] Admin dapat melihat data speedtest (download, upload, latency, packet loss, kesesuaian paket) dari tab Pengujian.
-- [x] Admin dapat mengisi form tagihan dan mengaktifkan pelanggan dari tab Verifikasi & Aktivasi.
-- [x] Tombol "Verifikasi" di queue langsung menuju halaman penuh (bukan modal).
-- [x] Modal finalVerify telah dihapus dari halaman queue.
-
----
-
-### Workflow-S4 — Modul Aktivasi & Tagihan + Polish
-Status: Done
-
-Tujuan:
-Pelanggan resmi aktif, masuk list Pelanggan, sistem siap produksi dengan tagihan pertama tergenerate.
-
-Scope:
-- `VerificationController@finalVerify` (action "Verifikasi").
-- Modal Buat Tagihan Manual → `invoices`.
-- Activation flow (Update `customer_services` dan `customers.status = active`).
-- Pelanggan masuk List Pelanggan utama.
-- Cron/job: auto-reminder countdown lewat batas waktu (Sudah ada di `Kernel.php` / Scheduler Laravel).
-- Testing end-to-end.
-
-Acceptance Criteria:
-- [x] Admin dapat melakukan verifikasi akhir dan menerbitkan tagihan pertama.
-- [x] Pelanggan statusnya berubah menjadi `active` (aktif) dan mendapatkan CID kompleks.
-- [x] Data layanan berubah status menjadi `aktif` dan tersimpan relasi invoice pertamanya.
-
----
-
-### Workflow-S3 — Modul Verifikasi Admin & Pemasangan
-Status: Done
-
-Tujuan:
-Alur 4-tahap di halaman Verifikasi (ACC → Proses Tim → Mulai Pasang → Verifikasi Admin).
-
-Scope:
-- Endpoint List Antrean Proses Verifikasi.
-- `VerificationController@processToTeam` (action "Proses ke Tim").
-- `InstallationController@start` (action "Start Proses") & broadcast event.
-- Frontend: Countdown pemasangan.
-- `InstallationController@complete` (action "Lapor Pemasangan").
-- Form Modal Data Perangkat & Speedtest → `customer_technical_details`.
-- Fitur SCAN QR (di-skip sesuai instruksi).
-- Audit log integration.
-
-Acceptance Criteria:
-- [x] Dari status `surveyed`, admin bisa proses sampai `verification_admin` dengan seluruh data perangkat & speedtest tersimpan di `customer_technical_details`.
-
----
-
-### Workflow-S2 — Modul Registrasi & Survey (Backend + Frontend)
-Status: Done
-
-Tujuan:
-Pelanggan bisa didaftarkan dan masuk antrian survey dengan countdown live.
-
-Scope:
-- `CustomerRegistrationController@store`: Multi-step form
-- Validasi form registrasi
-- Endpoint List Antrean Survey
-- `SurveyController@start` & `SurveyController@complete`
-- Event `SurveyStarted` & `SurveyCompleted` + Reverb
-- Frontend: Halaman List Antrean Survey
-- Frontend: Countdown component (Reverb)
-- Frontend: Form Antrian Survei modal
-- Frontend: Data Survey Pelanggan di Detail Pelanggan
-
-Acceptance Criteria:
-- [x] End-to-end bisa daftar pelanggan → antrian survey → tekan Survey Data → countdown jalan real-time → Lapor Data → status pindah ke Verifikasi Admin.
-
----
-
-### Workflow-S1 — Foundation: Schema + State Machine Service
-Status: Done
-
-Tujuan:
-Menyediakan pondasi database & state machine service untuk alur registrasi pelanggan.
-
-Scope:
-- Migration: tambah status baru ke `subscription_statuses` (`survey_in_progress`, `waiting_acc`, `installation_in_progress`, `verification_admin`).
-- Migration: tambah `started_at`, `completed_at` ke `customer_surveys` dan `customer_installations`.
-- Migration: tambah `contract_type` ke `customer_services`.
-- Buat `CustomerWorkflowService`.
-- Buat `WorkflowTransition` enum.
-- Unit test state machine.
-
-Acceptance Criteria:
-- [x] Migration jalan tanpa error.
-- [x] `CustomerWorkflowService::transition()` memiliki test coverage untuk seluruh alur happy path + reject path.
-
----
-
-## Master Data Tambahan
-
-### MD-001 — Master Data Distribusi
-Status: Done
-
-Tujuan:
-Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
-
-Scope:
-- Model & Migration `Distribution`.
-- Controller `DistributionController` (CRUD).
-- Views (index, create, edit) yang mengadopsi styling design system yang ada.
-- Relasi dengan `Pop`.
-- Navigasi di Sidebar.
-
-Acceptance Criteria:
-- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
-- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
-- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
-- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
-
-Catatan tambahan:
-- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
-
----
-
-## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
-
-### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
-1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
-2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
-3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
-
-Scope:
-- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
-- Model: update fillable `CustomerTechnicalDetail`.
-- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
-- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
-
-Acceptance Criteria:
-- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
-- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
-- [x] Migration berjalan tanpa error.
-- [x] Tidak ada data existing yang rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi 2 gap pada Data Survey:
-1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
-2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
-
-Acceptance Criteria:
-- [x] Petugas survey 1–3 dapat diisi dari daftar user.
-- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
-- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
-- [x] Data existing tidak rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi gap pada Laporan Aktivasi:
-- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
-
-Acceptance Criteria:
-- [x] `activated_by_user_id` tersimpan saat aktivasi.
-- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
-- [x] Data existing tidak rusak (nullable).
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi gap pada Data Pemasangan:
-- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
-
-Acceptance Criteria:
-- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
-- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
-- [x] Data existing tidak rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
-
-Scope:
-- Tambah field `other_fee` pada `customer_services`.
-- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
-- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
-- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
-- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
-
-Acceptance Criteria:
-- [x] `other_fee` tersimpan di `customer_services`.
-- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
-- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
-- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
-- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
-
-Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
-
----
-
----
-
-## Master Data Tambahan
-
-### MD-001 — Master Data Distribusi
-Status: Done
-
-Tujuan:
-Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
-
-Scope:
-- Model & Migration `Distribution`.
-- Controller `DistributionController` (CRUD).
-- Views (index, create, edit) yang mengadopsi styling design system yang ada.
-- Relasi dengan `Pop`.
-- Navigasi di Sidebar.
-
-Acceptance Criteria:
-- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
-- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
-- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
-- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
-
-Catatan tambahan:
-- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
-
----
-
-### MD-002 — Collapse & Expand Parent POP
-Status: Done
-
-Tujuan:
-Mempermudah maintenance data wilayah dengan menambahkan fitur collapse dan expand pada parent POP yang memiliki anak (cabang / mini POP) di tabel list Master POP.
-
-Scope:
-- Controller: Mengurutkan hasil query POP secara hirarki tree rekursif dan menyertakan tingkat kedalaman (`depth`).
-- View: Indentasi visual nama POP berdasarkan depth, konektor `└─` untuk child, tombol toggle chevron berotasi 90 derajat, dan vanilla JS untuk menyembunyikan/menampilkan child rows secara rekursif.
-
-Acceptance Criteria:
-- [x] Parent POP yang memiliki child menampilkan tombol chevron toggle.
-- [x] Mengklik tombol toggle menyembunyikan/menampilkan child rows di bawahnya secara interaktif & rekursif.
-- [x] Tampilan visual rapi dengan indentasi dan simbol konektor yang membedakan tingkat kedalaman.
-- [x] Test suite Pop CRUD dan relasi tetap lulus 100%.
-
-Tujuan:
-Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
-
-Scope:
-- Model & Migration `Distribution`.
-- Controller `DistributionController` (CRUD).
-- Views (index, create, edit) yang mengadopsi styling design system yang ada.
-- Relasi dengan `Pop`.
-- Navigasi di Sidebar.
-
-Acceptance Criteria:
-- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
-- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
-- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
-- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
-
-Catatan tambahan:
-- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
-
----
-
-## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
-
-### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
-1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
-2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
-3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
-
-Scope:
-- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
-- Model: update fillable `CustomerTechnicalDetail`.
-- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
-- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
-
-Acceptance Criteria:
-- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
-- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
-- [x] Migration berjalan tanpa error.
-- [x] Tidak ada data existing yang rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi 2 gap pada Data Survey:
-1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
-2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
-
-Acceptance Criteria:
-- [x] Petugas survey 1–3 dapat diisi dari daftar user.
-- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
-- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
-- [x] Data existing tidak rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi gap pada Laporan Aktivasi:
-- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
-
-Acceptance Criteria:
-- [x] `activated_by_user_id` tersimpan saat aktivasi.
-- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
-- [x] Data existing tidak rusak (nullable).
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Mengisi gap pada Data Pemasangan:
-- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
-
-Acceptance Criteria:
-- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
-- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
-- [x] Data existing tidak rusak.
-- [x] Test suite 182 passed, 0 failed.
-
----
-
-### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
-Status: Done
-
-Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
-
-Tujuan:
-Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
-
-Scope:
-- Tambah field `other_fee` pada `customer_services`.
-- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
-- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
-- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
-- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
-
-Acceptance Criteria:
-- [x] `other_fee` tersimpan di `customer_services`.
-- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
-- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
-- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
-- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
-
-Catatan Test:
-- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
-
----
-
-### MIG-EXE001 — Eksekusi Migrasi Data sand_db_sandya.sql
-Status: Done
-
-Tujuan:
-Mengeksekusi migrasi data riil secara otomatis ke dalam sistem berdasarkan `sand_db_sandya.sql` menggunakan custom Artisan command.
-
-Langkah:
-- [x] Implementasi `MigrateLegacyDataCommand.php`.
-- [x] Verifikasi Idempotensi (pencegahan duplikasi).
-- [x] Validasi data masuk dengan benar ke master pelanggan, paket, dan tagihan.
-
-### Backlog RBAC & User Management
-Status: Done
-
-Tujuan:
-Memecah kebutuhan `users`, `roles`, `permissions`, dan pembatasan data POP/customer/billing menjadi sprint kecil yang bisa dikerjakan bertahap.
-
-Rencana Pecahan Sprint:
-
-#### Sprint A — CRUD User Dasar
-- [x] Tambah user baru.
-- [x] Pilih role saat membuat user.
-- [x] Set status aktif/nonaktif user.
-- [x] Simpan email, phone, dan password user.
-- [x] Validasi data user dasar.
-
-#### Sprint B — Assign POP & Scope User
-- [x] Assign satu atau banyak POP ke user.
-- [x] Batasi akses Admin Cabang ke POP yang ditugaskan.
-- [x] Pertahankan akses penuh Owner/Admin.
-- [x] Pastikan filter query customer/invoice/payment memakai scope POP.
-
-#### Sprint C — Role & Permission Sederhana
-- [x] Pertahankan role Owner.
-- [x] Pertahankan role Admin.
-- [x] Pertahankan role Teknisi.
-- [x] Pastikan Teknisi tidak bisa akses billing/pembayaran.
-- [x] Pastikan Admin bisa akses penuh seperti Owner.
-
-#### Sprint D — UI Manajemen User
-- [x] Tambah halaman create/edit user.
-- [x] Tambah halaman daftar user yang lebih lengkap.
-- [x] Tambah form assign POP yang konsisten.
-- [x] Tambah test regresi untuk halaman user management.
-
-#### Sprint E — Audit & Hardening
-- [x] Audit log untuk create/update user.
-- [x] Audit log untuk assign POP.
-- [x] Rapikan pesan error dan validasi.
-- [x] Jalankan test coverage RBAC dan user management.
-
-### Backlog Import & Migrasi Pelanggan
-Status: In Progress
-
-Tujuan:
-Menjaga konteks pekerjaan migrasi pelanggan dan billing agar tetap jelas setelah RBAC/User Management selesai.
-
-Urutan pengerjaan wajib:
-
-#### Sprint I — Template & Mapping Import
-- [x] Template import Excel/CSV pelanggan yang benar-benar mengikuti field untuk pelanggan, detail, dan billing.
-- [x] Mapping kolom template disesuaikan dengan field master data baru dan field legacy.
-- [x] Struktur sheet/import section divalidasi supaya konsisten dengan alur import.
-
-#### Sprint II — Pipeline Import & Validasi
-- [x] Upload dan baca file import mengikuti template yang baru.
-- [x] Preview data sebelum import.
-- [x] Validasi field wajib, relasi master, dan duplikasi data.
-- [x] Error import ditulis dengan alasan yang jelas.
-
-#### Sprint III — Migrasi Data Nyata
-- [x] Uji migrasi data nyata dari `sand_db_sandya.sql` end-to-end.
-- [x] Pastikan data pelanggan, detail, layanan, billing, dan pembayaran terhubung sesuai mapping.
-- [x] Cocokkan hasil migrasi dengan data lama yang paling sering dipakai operasional.
-
-#### Sprint IV — Verifikasi Produksi & Hardening
-- [x] Verifikasi produksi dengan data real, termasuk edge case field kosong, relasi rusak, dan duplikasi.
-- [x] Siapkan checklist rollback/reimport jika ada data legacy yang gagal.
-- [x] Pastikan hasil migrasi layak dipakai untuk operasional terbatas.
-- [x] Jika masih ada modul MVP lain yang belum ditutup di task board, kerjakan sesuai urutan MVP terlebih dahulu.
-
-Catatan:
-- Role lama seperti `Admin Pusat`, `Admin Cabang`, `Finance/Kasir`, dan `Customer Service` tetap dipertahankan untuk kompatibilitas.
-- Pecahan sprint ini sengaja dibuat kecil agar pengembangan RBAC tidak bercampur dengan billing/import.
-
---- 
-
-## Done
 
 ### DS-DASH001 — Implementasi Desain Sistem pada Dashboard
 Status: Done
@@ -1240,82 +2609,6 @@ Membuat struktur database dan model untuk paket internet.
 
 Checklist:
 - [x] Gunakan tabel `internet_packages` sebagai sumber data Paket Internet.
-- [x] Tambahkan nama paket.
-- [x] Tambahkan kategori paket.
-- [x] Tambahkan kecepatan download.
-- [x] Tambahkan kecepatan upload.
-- [x] Tambahkan harga bulanan.
-- [x] Tambahkan PPN.
-- [x] Tambahkan diskon default.
-- [x] Tambahkan total harga.
-- [x] Tambahkan profile teknis.
-- [x] Tambahkan deskripsi.
-- [x] Tambahkan status aktif/nonaktif.
-
-Acceptance Criteria:
-- [x] Paket dapat disimpan di database.
-- [x] Paket memiliki harga bulanan.
-- [x] Paket memiliki kecepatan download dan upload.
-- [x] Paket memiliki status aktif/nonaktif.
-
----
-
-### S2-T005 — CRUD Master Paket Internet
-Status: Done
-
-Tujuan:
-Membuat halaman CRUD paket internet.
-
-Checklist:
-- [x] Buat halaman daftar paket.
-- [x] Buat halaman tambah paket.
-- [x] Buat halaman edit paket.
-- [x] Buat validasi field wajib.
-- [x] Buat fitur aktif/nonaktif paket.
-- [x] Pastikan paket aktif dapat dipilih di modul pelanggan nantinya.
-- [x] Pastikan paket nonaktif tidak dipilih untuk pelanggan baru.
-
-Acceptance Criteria:
-- [x] Paket dapat dibuat.
-- [x] Paket dapat diedit.
-- [x] Paket dapat dinonaktifkan.
-- [x] Harga paket dapat menjadi dasar tagihan.
-- [x] Paket aktif siap digunakan pada input pelanggan.
-
----
-
-### S2-T006 - POP Identifier Setting
-Status: Done
-
-Tujuan:
-Menambahkan aturan ID khusus berdasarkan POP.
-
-Checklist:
-- [x] Tambahkan field `pop_code` pada POP.
-- [x] Tambahkan field `registration_prefix` pada POP.
-- [x] Tambahkan field `cid_prefix` pada POP.
-- [x] Buat tabel sequence nomor per POP.
-- [x] Buat sequence untuk registration number.
-- [x] Buat sequence untuk CID.
-- [x] Pastikan nomor urut berjalan per POP.
-- [x] Pastikan nomor urut berjalan per jenis ID.
-- [x] Pastikan format ID sesuai aturan.
-
-Format:
-- ID Request: `{registration_prefix}-{pop_code}-{running_number}`
-- CID: `{cid_prefix}-{pop_code}-{running_number}`
-
-Contoh:
-- ID Request: `C-SMN-000001`
-- CID: `D-SMN-000001`
-
-Acceptance Criteria:
-- [x] Setiap POP memiliki kode POP.
-- [x] Setiap POP memiliki prefix ID Request.
-- [x] Setiap POP memiliki prefix CID.
-- [x] Sistem dapat membuat ID Request otomatis.
-- [x] Sistem dapat membuat CID otomatis.
-- [x] ID tidak boleh duplikat.
 - [x] Tambahkan nama paket.
 - [x] Tambahkan kategori paket.
 - [x] Tambahkan kecepatan download.
@@ -2408,8 +3701,10 @@ Acceptance Criteria:
 Catatan Test:
 - `php artisan test tests/Unit/PopCidGenerationTest.php` lulus.
 
+
+
 ### S10-T002 — Implement Customer Termination Logic
-Status: Todo
+Status: Done
 
 Sprint/Module: Sprint 10 — Complex CID & Termination Logic
 
@@ -2417,25 +3712,1394 @@ Tujuan:
 Implementasi backend untuk terminasi (pemutusan) layanan pelanggan.
 
 Acceptance Criteria:
-- [ ] Endpoint `POST /customers/{customer}/terminate` tersedia.
-- [ ] Status pelanggan berubah menjadi `terminated`.
-- [ ] Status layanan di `customer_services` berubah menjadi `berhenti`.
-- [ ] Audit log mencatat aksi terminasi.
-
-### S10-T003 — Update UI for Termination & ID Display Logic
-Status: Todo
-
-Sprint/Module: Sprint 10 — Complex CID & Termination Logic
-
-Tujuan:
-Menghubungkan tombol terminasi di UI ke backend dan mengatur logika tampilan ID.
-
-Acceptance Criteria:
-- [ ] Tombol terminasi di modal aksi pelanggan berfungsi.
-- [ ] UI menampilkan Request ID (customer_code) alih-alih CID jika pelanggan sudah terminasi.
-- [ ] Konfirmasi terminasi muncul sebelum eksekusi.
+- [x] Endpoint `POST /customers/{customer}/terminate` tersedia.
+- [x] Status pelanggan berubah menjadi `terminated`.
+- [x] Status layanan di `customer_services` berubah menjadi `berhenti`.
+- [x] Audit log mencatat aksi terminasi.
 
 ---
+
+### UX-VA001 — Halaman Penuh Verifikasi Admin (Proses Pemasangan + Pengujian + Aktivasi)
+Status: Done
+
+Sprint/Module: Verifikasi Admin — Workflow UX Polish
+
+Tujuan:
+Membuat halaman penuh Sub Menu Verifikasi Admin yang menampilkan data proses pemasangan, data pengujian speedtest, dan form aktivasi tagihan dalam satu halaman terstruktur dengan tab navigasi.
+
+Scope:
+- [x] Buat `verifications/admin.blade.php` — halaman tab 3-bagian: Proses Pemasangan, Pengujian, Verifikasi & Aktivasi.
+- [x] Tambah method `showAdmin` di `CustomerVerificationController`.
+- [x] Tambah route `GET /customers/{customer}/verification/admin`.
+- [x] Hilangkan Modal "Proses ke Tim" — tombol langsung POST konfirmasi native browser.
+- [x] Ganti tombol modal "Verifikasi & Aktivasi" di queue dengan link ke halaman penuh admin.blade.php.
+- [x] Hapus `finalVerifyModal` dari `queue.blade.php` (tidak lagi diperlukan).
+
+Acceptance Criteria:
+- [x] Admin dapat melihat detail data pemasangan (perangkat, ODP/OLT, durasi SLA) dari tab Proses Pemasangan.
+- [x] Admin dapat melihat data speedtest (download, upload, latency, packet loss, kesesuaian paket) dari tab Pengujian.
+- [x] Admin dapat mengisi form tagihan dan mengaktifkan pelanggan dari tab Verifikasi & Aktivasi.
+- [x] Tombol "Verifikasi" di queue langsung menuju halaman penuh (bukan modal).
+- [x] Modal finalVerify telah dihapus dari halaman queue.
+
+---
+
+### Workflow-S4 — Modul Aktivasi & Tagihan + Polish
+Status: Done
+
+Tujuan:
+Pelanggan resmi aktif, masuk list Pelanggan, sistem siap produksi dengan tagihan pertama tergenerate.
+
+Scope:
+- `VerificationController@finalVerify` (action "Verifikasi").
+- Modal Buat Tagihan Manual → `invoices`.
+- Activation flow (Update `customer_services` dan `customers.status = active`).
+- Pelanggan masuk List Pelanggan utama.
+- Cron/job: auto-reminder countdown lewat batas waktu (Sudah ada di `Kernel.php` / Scheduler Laravel).
+- Testing end-to-end.
+
+Acceptance Criteria:
+- [x] Admin dapat melakukan verifikasi akhir dan menerbitkan tagihan pertama.
+- [x] Pelanggan statusnya berubah menjadi `active` (aktif) dan mendapatkan CID kompleks.
+- [x] Data layanan berubah status menjadi `aktif` dan tersimpan relasi invoice pertamanya.
+
+---
+
+### Workflow-S3 — Modul Verifikasi Admin & Pemasangan
+Status: Done
+
+Tujuan:
+Alur 4-tahap di halaman Verifikasi (ACC → Proses Tim → Mulai Pasang → Verifikasi Admin).
+
+Scope:
+- Endpoint List Antrean Proses Verifikasi.
+- `VerificationController@processToTeam` (action "Proses ke Tim").
+- `InstallationController@start` (action "Start Proses") & broadcast event.
+- Frontend: Countdown pemasangan.
+- `InstallationController@complete` (action "Lapor Pemasangan").
+- Form Modal Data Perangkat & Speedtest → `customer_technical_details`.
+- Fitur SCAN QR (di-skip sesuai instruksi).
+- Audit log integration.
+
+Acceptance Criteria:
+- [x] Dari status `surveyed`, admin bisa proses sampai `verification_admin` dengan seluruh data perangkat & speedtest tersimpan di `customer_technical_details`.
+
+---
+
+### Workflow-S2 — Modul Registrasi & Survey (Backend + Frontend)
+Status: Done
+
+Tujuan:
+Pelanggan bisa didaftarkan dan masuk antrian survey dengan countdown live.
+
+Scope:
+- `CustomerRegistrationController@store`: Multi-step form
+- Validasi form registrasi
+- Endpoint List Antrean Survey
+- `SurveyController@start` & `SurveyController@complete`
+- Event `SurveyStarted` & `SurveyCompleted` + Reverb
+- Frontend: Halaman List Antrean Survey
+- Frontend: Countdown component (Reverb)
+- Frontend: Form Antrian Survei modal
+- Frontend: Data Survey Pelanggan di Detail Pelanggan
+
+Acceptance Criteria:
+- [x] End-to-end bisa daftar pelanggan → antrian survey → tekan Survey Data → countdown jalan real-time → Lapor Data → status pindah ke Verifikasi Admin.
+
+---
+
+### Workflow-S1 — Foundation: Schema + State Machine Service
+Status: Done
+
+Tujuan:
+Menyediakan pondasi database & state machine service untuk alur registrasi pelanggan.
+
+Scope:
+- Migration: tambah status baru ke `subscription_statuses` (`survey_in_progress`, `waiting_acc`, `installation_in_progress`, `verification_admin`).
+- Migration: tambah `started_at`, `completed_at` ke `customer_surveys` dan `customer_installations`.
+- Migration: tambah `contract_type` ke `customer_services`.
+- Buat `CustomerWorkflowService`.
+- Buat `WorkflowTransition` enum.
+- Unit test state machine.
+
+Acceptance Criteria:
+- [x] Migration jalan tanpa error.
+- [x] `CustomerWorkflowService::transition()` memiliki test coverage untuk seluruh alur happy path + reject path.
+
+---
+
+## Master Data Tambahan
+
+### MD-001 — Master Data Distribusi
+Status: Done
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
+
+### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
+1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
+2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
+3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
+
+Scope:
+- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
+- Model: update fillable `CustomerTechnicalDetail`.
+- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
+- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
+
+Acceptance Criteria:
+- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
+- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
+- [x] Migration berjalan tanpa error.
+- [x] Tidak ada data existing yang rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 2 gap pada Data Survey:
+1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
+2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
+
+Acceptance Criteria:
+- [x] Petugas survey 1–3 dapat diisi dari daftar user.
+- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
+- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Laporan Aktivasi:
+- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
+
+Acceptance Criteria:
+- [x] `activated_by_user_id` tersimpan saat aktivasi.
+- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
+- [x] Data existing tidak rusak (nullable).
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Data Pemasangan:
+- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
+
+Acceptance Criteria:
+- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
+- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
+
+Scope:
+- Tambah field `other_fee` pada `customer_services`.
+- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
+- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
+- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
+- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
+
+Acceptance Criteria:
+- [x] `other_fee` tersimpan di `customer_services`.
+- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
+- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
+- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
+- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
+
+---
+
+---
+
+## Master Data Tambahan
+
+### MD-001 — Master Data Distribusi
+Status: Done
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+### MD-002 — Collapse & Expand Parent POP
+Status: Done
+
+Tujuan:
+Mempermudah maintenance data wilayah dengan menambahkan fitur collapse dan expand pada parent POP yang memiliki anak (cabang / mini POP) di tabel list Master POP.
+
+Scope:
+- Controller: Mengurutkan hasil query POP secara hirarki tree rekursif dan menyertakan tingkat kedalaman (`depth`).
+- View: Indentasi visual nama POP berdasarkan depth, konektor `└─` untuk child, tombol toggle chevron berotasi 90 derajat, dan vanilla JS untuk menyembunyikan/menampilkan child rows secara rekursif.
+
+Acceptance Criteria:
+- [x] Parent POP yang memiliki child menampilkan tombol chevron toggle.
+- [x] Mengklik tombol toggle menyembunyikan/menampilkan child rows di bawahnya secara interaktif & rekursif.
+- [x] Tampilan visual rapi dengan indentasi dan simbol konektor yang membedakan tingkat kedalaman.
+- [x] Test suite Pop CRUD dan relasi tetap lulus 100%.
+
+Tujuan:
+Menambahkan master data untuk Distribusi (sub-area di bawah POP/Cabang) sesuai permintaan.
+
+Scope:
+- Model & Migration `Distribution`.
+- Controller `DistributionController` (CRUD).
+- Views (index, create, edit) yang mengadopsi styling design system yang ada.
+- Relasi dengan `Pop`.
+- Navigasi di Sidebar.
+
+Acceptance Criteria:
+- [x] Tabel `distributions` dibuat (id, code, description, pop_id).
+- [x] Form Create/Edit memiliki input kode, deskripsi, dan dropdown POP/Cabang.
+- [x] Menu Master Distribusi muncul di sidebar di bawah Master POP.
+- [x] Dokumentasi rancangan selesai di `docs/Rancangan-Master-Distribusi.md`.
+
+Catatan tambahan:
+- Seeder Jetis sudah menyiapkan POP induk `C`, mini POP `C1/C2/C3`, dan distribusi `X4A-X4H` sesuai pemetaan cabang dan mini POP yang disepakati.
+
+---
+
+## Sprint 9 — Kelengkapan Detail Pelanggan (Gap Fix)
+
+### S9-T001 — Fix Gap Data Teknis: OLT Number, OLT Slot, VLAN di Technical Detail
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 3 gap field teknis yang ditemukan pada analisis kesesuaian Detail Pelanggan:
+1. `olt_number` (Nomor OLT) belum ada di `customer_technical_details`.
+2. `olt_slot` (Slot OLT) — migration ada tapi kosong, kolom tidak pernah dibuat.
+3. `vlan` di detail teknis (saat ini hanya di `customer_devices`, belum di `customer_technical_details`).
+
+Scope:
+- Migration: tambah `olt_number`, `olt_slot`, `vlan` ke `customer_technical_details`.
+- Model: update fillable `CustomerTechnicalDetail`.
+- View: tampilkan field baru di tab Perangkat (bagian Detail Teknis Tambahan).
+- Form modal device: tambah field input OLT Number, OLT Slot, VLAN (di sisi technical detail).
+
+Acceptance Criteria:
+- [x] Field `olt_number`, `olt_slot`, `vlan` tersimpan di `customer_technical_details`.
+- [x] Tab Perangkat menampilkan Nomor OLT, Slot OLT, VLAN dari detail teknis.
+- [x] Migration berjalan tanpa error.
+- [x] Tidak ada data existing yang rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T002 — Fix Gap Survey: Multi-Petugas Terstruktur & Foto Rumah Terpisah
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi 2 gap pada Data Survey:
+1. `surveyors` masih string bebas — perlu field terstruktur untuk 1–3 petugas survey.
+2. Foto rumah pelanggan belum terpisah dari foto survey lapangan/ODP.
+
+Acceptance Criteria:
+- [x] Petugas survey 1–3 dapat diisi dari daftar user.
+- [x] Foto rumah pelanggan tersimpan terpisah dari foto ODP/survey lapangan.
+- [x] Tab Survey menampilkan nama petugas ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T003 — Fix Gap Aktivasi: Relasi User ID pada Petugas Aktivasi
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Laporan Aktivasi:
+- `activated_by_name` hanya menyimpan nama string. Tambah `activated_by_user_id` untuk traceability.
+
+Acceptance Criteria:
+- [x] `activated_by_user_id` tersimpan saat aktivasi.
+- [x] Detail pelanggan tab Paket & Layanan menampilkan waktu dan petugas aktivasi.
+- [x] Data existing tidak rusak (nullable).
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T004 — Fix Gap Pemasangan: Multi-Teknisi Terstruktur
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Mengisi gap pada Data Pemasangan:
+- `technicians` masih string bebas — perlu field terstruktur untuk 2–3 teknisi pemasangan.
+
+Acceptance Criteria:
+- [x] Teknisi pemasangan ke-2 dan ke-3 dapat dipilih dari daftar user.
+- [x] Tab Pemasangan menampilkan nama teknisi ke-2 dan ke-3 jika diisi.
+- [x] Data existing tidak rusak.
+- [x] Test suite 182 passed, 0 failed.
+
+---
+
+### S9-T005 — Fix Billing Cycle: Pindahkan Biaya Lain di Luar Standar ke Rincian Biaya Bulanan
+Status: Done
+
+Sprint/Module: Sprint 9 — Kelengkapan Detail Pelanggan
+
+Tujuan:
+Menyesuaikan implementasi billing agar `biaya lain di luar standar` legacy tidak diperlakukan sebagai biaya invoice terpisah, tetapi sebagai bagian dari rincian biaya bulanan dan `billing cycle`.
+
+Scope:
+- Tambah field `other_fee` pada `customer_services`.
+- Tampilkan `other_fee` di blok `Rincian Biaya Bulanan & Billing Cycle`.
+- Pastikan preview create/edit customer menghitung total bulanan termasuk `other_fee`.
+- Saat migrasi legacy, mapping `BIAYALAINLAIN` masuk ke layanan pelanggan.
+- Invoice tetap menyimpan histori total tagihan legacy tanpa double count.
+
+Acceptance Criteria:
+- [x] `other_fee` tersimpan di `customer_services`.
+- [x] `other_fee` tampil di breakdown biaya bulanan pelanggan.
+- [x] Create/edit customer menghitung total bulanan dengan `other_fee`.
+- [x] Migrasi legacy mengisi `other_fee` dari `BIAYALAINLAIN`.
+- [x] Test validasi billing, import legacy, dan detail pelanggan lulus.
+
+Catatan Test:
+- `VIEW_COMPILED_PATH=%TEMP%\\whusnet-test-views php artisan test tests/Feature/RealDataMigrationTest.php tests/Feature/InvoiceCreateTest.php tests/Feature/PaymentInputTest.php tests/Feature/CustomerDetailTest.php` lulus: 13 tests, 232 assertions.
+
+---
+
+### MIG-EXE001 — Eksekusi Migrasi Data sand_db_sandya.sql
+Status: Done
+
+Tujuan:
+Mengeksekusi migrasi data riil secara otomatis ke dalam sistem berdasarkan `sand_db_sandya.sql` menggunakan custom Artisan command.
+
+Langkah:
+- [x] Implementasi `MigrateLegacyDataCommand.php`.
+- [x] Verifikasi Idempotensi (pencegahan duplikasi).
+- [x] Validasi data masuk dengan benar ke master pelanggan, paket, dan tagihan.
+
+### Backlog RBAC & User Management
+Status: Done
+
+Tujuan:
+Memecah kebutuhan `users`, `roles`, `permissions`, dan pembatasan data POP/customer/billing menjadi sprint kecil yang bisa dikerjakan bertahap.
+
+Rencana Pecahan Sprint:
+
+#### Sprint A — CRUD User Dasar
+- [x] Tambah user baru.
+- [x] Pilih role saat membuat user.
+- [x] Set status aktif/nonaktif user.
+- [x] Simpan email, phone, dan password user.
+- [x] Validasi data user dasar.
+
+#### Sprint B — Assign POP & Scope User
+- [x] Assign satu atau banyak POP ke user.
+- [x] Batasi akses Admin Cabang ke POP yang ditugaskan.
+- [x] Pertahankan akses penuh Owner/Admin.
+- [x] Pastikan filter query customer/invoice/payment memakai scope POP.
+
+#### Sprint C — Role & Permission Sederhana
+- [x] Pertahankan role Owner.
+- [x] Pertahankan role Admin.
+- [x] Pertahankan role Teknisi.
+- [x] Pastikan Teknisi tidak bisa akses billing/pembayaran.
+- [x] Pastikan Admin bisa akses penuh seperti Owner.
+
+#### Sprint D — UI Manajemen User
+- [x] Tambah halaman create/edit user.
+- [x] Tambah halaman daftar user yang lebih lengkap.
+- [x] Tambah form assign POP yang konsisten.
+- [x] Tambah test regresi untuk halaman user management.
+
+#### Sprint E — Audit & Hardening
+- [x] Audit log untuk create/update user.
+- [x] Audit log untuk assign POP.
+- [x] Rapikan pesan error dan validasi.
+- [x] Jalankan test coverage RBAC dan user management.
+
+### Backlog Import & Migrasi Pelanggan
+Status: Done
+
+Tujuan:
+Menjaga konteks pekerjaan migrasi pelanggan dan billing agar tetap jelas setelah RBAC/User Management selesai.
+
+Urutan pengerjaan wajib:
+
+#### Sprint I — Template & Mapping Import
+- [x] Template import Excel/CSV pelanggan yang benar-benar mengikuti field untuk pelanggan, detail, dan billing.
+- [x] Mapping kolom template disesuaikan dengan field master data baru dan field legacy.
+- [x] Struktur sheet/import section divalidasi supaya konsisten dengan alur import.
+
+#### Sprint II — Pipeline Import & Validasi
+- [x] Upload dan baca file import mengikuti template yang baru.
+- [x] Preview data sebelum import.
+- [x] Validasi field wajib, relasi master, dan duplikasi data.
+- [x] Error import ditulis dengan alasan yang jelas.
+
+#### Sprint III — Migrasi Data Nyata
+- [x] Uji migrasi data nyata dari `sand_db_sandya.sql` end-to-end.
+- [x] Pastikan data pelanggan, detail, layanan, billing, dan pembayaran terhubung sesuai mapping.
+- [x] Cocokkan hasil migrasi dengan data lama yang paling sering dipakai operasional.
+
+#### Sprint IV — Verifikasi Produksi & Hardening
+- [x] Verifikasi produksi dengan data real, termasuk edge case field kosong, relasi rusak, dan duplikasi.
+- [x] Siapkan checklist rollback/reimport jika ada data legacy yang gagal.
+- [x] Pastikan hasil migrasi layak dipakai untuk operasional terbatas.
+- [x] Jika masih ada modul MVP lain yang belum ditutup di task board, kerjakan sesuai urutan MVP terlebih dahulu.
+
+Catatan:
+- Role lama seperti `Admin Pusat`, `Admin Cabang`, `Finance/Kasir`, dan `Customer Service` tetap dipertahankan untuk kompatibilitas.
+- Pecahan sprint ini sengaja dibuat kecil agar pengembangan RBAC tidak bercampur dengan billing/import.
+
+--- 
+
+
+# Sprint 12 — Advanced RBAC Database & Core Engine
+
+## Tujuan Sprint 12
+Mengimplementasikan pondasi database dan core engine Advanced RBAC: feature tree, action, permission generator, role matrix, user role scope, dan helper effective permission.  
+Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI matrix penuh.
+
+---
+
+### S11-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC
+**Status**: Done  
+**Tujuan**: Merapikan `docs/TASKS.md` agar tidak ada duplikasi sprint/task, format konsisten, dan roadmap Advanced RBAC masuk dengan urutan yang benar.  
+**Checklist**:
+- [x] Hapus duplikasi Sprint 2 yang muncul berulang.
+- [x] Pastikan Sprint 1 sampai Sprint 8 tetap sesuai status terakhir.
+- [x] Pastikan hanya S8-T006 — Import Data Legacy sand_db_sandya.sql yang berstatus In Progress selama task tersebut belum selesai.
+- [x] Tambahkan Sprint 11 sampai Sprint 15 sebagai roadmap baru.
+- [x] Pastikan semua task Sprint 11+ berstatus Todo.
+- [x] Rapikan heading sprint.
+- [x] Rapikan format Checklist.
+- [x] Rapikan format Acceptance Criteria.
+- [x] Tambahkan catatan bahwa Advanced RBAC dikerjakan setelah S8-T006 selesai.
+- [x] Tambahkan catatan bahwa AI hanya boleh mengerjakan task In Progress.
+
+**Acceptance Criteria**:
+- [x] Tidak ada task duplikat.
+- [x] Tidak ada sprint duplikat.
+- [x] Hanya satu task berstatus In Progress.
+- [x] Sprint 11+ tersedia sebagai roadmap lanjutan.
+- [x] AI dapat membaca task aktif dengan jelas.
+
+---
+
+### S11-T002 — Update docs/RBAC_MATRIX.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Mengubah dokumen RBAC dari role sederhana menjadi hierarchical feature-based RBAC.  
+**Checklist**:
+- [x] Tambahkan role baru: Owner.
+- [x] Tambahkan role baru: Atasan.
+- [x] Tambahkan role baru: Admin.
+- [x] Tambahkan role baru: NOC.
+- [x] Tambahkan role baru: Helpdesk.
+- [x] Tambahkan role baru: FOP.
+- [x] Tambahkan role baru: Teknisi.
+- [x] Tambahkan role baru: Sales.
+- [x] Tambahkan role baru: POP Admin.
+- [x] Tambahkan konsep Feature Tree.
+- [x] Tambahkan konsep Action Permission.
+- [x] Tambahkan konsep User Scope.
+- [x] Tambahkan aturan bahwa Role tidak boleh dibuat per cabang.
+- [x] Tambahkan aturan bahwa Scope menentukan cakupan data.
+- [x] Tambahkan contoh NOC Pusat: role NOC, scope all_pop.
+- [x] Tambahkan contoh POP Admin Siman: role POP Admin, scope selected_pop.
+- [x] Tambahkan matrix permission per role.
+- [x] Tambahkan field-level permission untuk data sensitif.
+- [x] Tambahkan aturan route middleware.
+- [x] Tambahkan aturan query POP scope.
+
+**Acceptance Criteria**:
+- [x] `docs/RBAC_MATRIX.md` menjelaskan role baru.
+- [x] `docs/RBAC_MATRIX.md` menjelaskan feature tree.
+- [x] `docs/RBAC_MATRIX.md` menjelaskan action permission.
+- [x] `docs/RBAC_MATRIX.md` menjelaskan user scope.
+- [x] Role dan scope dipisahkan dengan jelas.
+- [x] Tidak ada rekomendasi membuat role per cabang.
+- [x] Permission NOC, Helpdesk, FOP, Teknisi, Sales, POP Admin tertulis jelas.
+
+---
+
+### S11-T003 — Update docs/DATABASE_RULES.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Menambahkan aturan database untuk feature tree, action, permission berbasis feature-action, dan user role scope.  
+**Checklist**:
+- [x] Tambahkan aturan tabel `features`.
+- [x] Tambahkan aturan tabel `actions`.
+- [x] Tambahkan aturan perubahan tabel `permissions`.
+- [x] Tambahkan aturan tabel `role_permissions`.
+- [x] Tambahkan aturan tabel `user_role_scopes`.
+- [x] Tambahkan aturan optional `user_permission_overrides`.
+- [x] Tambahkan unique constraint `features.code`.
+- [x] Tambahkan unique constraint `actions.code`.
+- [x] Tambahkan unique constraint `permissions.code`.
+- [x] Tambahkan unique constraint kombinasi `feature_id` dan `action_id`.
+- [x] Tambahkan aturan scope type.
+- [x] Tambahkan aturan `all_pop`.
+- [x] Tambahkan aturan `selected_pop`.
+- [x] Tambahkan aturan `pop_tree`.
+- [x] Tambahkan aturan `assigned_only`.
+- [x] Tambahkan aturan `own_created`.
+- [x] Tambahkan larangan membuat ID permission tidak konsisten.
+- [x] Tambahkan larangan hardcode permission string sembarangan.
+
+**Acceptance Criteria**:
+- [x] `docs/DATABASE_RULES.md` memuat tabel `features`.
+- [x] `docs/DATABASE_RULES.md` memuat tabel `actions`.
+- [x] `docs/DATABASE_RULES.md` memuat tabel `user_role_scopes`.
+- [x] Aturan permission `{feature_code}.{action_code}` tertulis jelas.
+- [x] Aturan scope user tertulis jelas.
+- [x] Aturan migrasi dari RBAC lama ke RBAC baru tertulis jelas.
+
+---
+
+### S11-T004 — Update docs/BUSINESS_RULES.md untuk Role dan Scope Baru
+**Status**: Done  
+**Tujuan**: Memastikan aturan bisnis project memahami role baru dan batasan scope data.  
+**Checklist**:
+- [x] Tambahkan aturan Owner.
+- [x] Tambahkan aturan Atasan.
+- [x] Tambahkan aturan Admin.
+- [x] Tambahkan aturan NOC.
+- [x] Tambahkan aturan Helpdesk.
+- [x] Tambahkan aturan FOP.
+- [x] Tambahkan aturan Teknisi.
+- [x] Tambahkan aturan Sales.
+- [x] Tambahkan aturan POP Admin.
+- [x] Tambahkan aturan NOC Pusat bisa scope semua POP.
+- [x] Tambahkan aturan NOC Cabang hanya selected POP.
+- [x] Tambahkan aturan POP Admin wajib selected POP.
+- [x] Tambahkan aturan Sales bisa own_created atau selected_pop.
+- [x] Tambahkan aturan Teknisi bisa selected_pop atau assigned_only.
+- [x] Tambahkan larangan Teknisi mengakses pembayaran.
+- [x] Tambahkan larangan Helpdesk mengubah nominal tagihan.
+- [x] Tambahkan larangan Sales mengakses laporan pembayaran.
+- [x] Tambahkan larangan POP Admin melihat POP lain.
+
+**Acceptance Criteria**:
+- [x] Business rules role baru tersedia.
+- [x] Scope data per role tertulis jelas.
+- [x] Larangan role sensitif tertulis jelas.
+- [x] NOC Pusat, POP Admin, Teknisi, Sales memiliki aturan akses yang jelas.
+
+---
+
+### S11-T005 — Update docs/PAGE_STRUCTURE.md untuk UI Role, Feature, Permission, dan Scope
+**Status**: Done  
+**Tujuan**: Menambahkan struktur halaman untuk Advanced RBAC.  
+**Checklist**:
+- [x] Tambahkan halaman Feature Management.
+- [x] Tambahkan halaman Action Management.
+- [x] Tambahkan halaman Permission Matrix.
+- [x] Tambahkan halaman Role Permission Matrix.
+- [x] Tambahkan halaman User Role Scope.
+- [x] Tambahkan struktur form tambah user dengan role dan scope.
+- [x] Tambahkan struktur preview effective permission.
+- [x] Tambahkan struktur permission matrix tree.
+- [x] Tambahkan aturan menu berdasarkan feature permission.
+- [x] Tambahkan aturan tombol berdasarkan action permission.
+- [x] Tambahkan aturan field sensitif berdasarkan permission sensitive.
+- [x] Tambahkan empty state untuk feature tree.
+- [x] Tambahkan role akses halaman Advanced RBAC.
+
+**Acceptance Criteria**:
+- [x] Struktur halaman Advanced RBAC tersedia.
+- [x] Struktur form tambah/edit user dengan role dan scope tersedia.
+- [x] Struktur permission matrix berbasis feature tree tersedia.
+- [x] Struktur preview effective permission tersedia.
+- [x] Role yang boleh mengelola RBAC tertulis jelas.
+
+---
+
+### S11-T006 — Update docs/DEFINITION_OF_DONE.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Menambahkan standar task selesai untuk Advanced RBAC.  
+**Checklist**:
+- [x] Tambahkan DoD untuk Feature Tree.
+- [x] Tambahkan DoD untuk Action Permission.
+- [x] Tambahkan DoD untuk Permission Generator.
+- [x] Tambahkan DoD untuk Role Permission Matrix.
+- [x] Tambahkan DoD untuk User Role Scope.
+- [x] Tambahkan DoD untuk User Form Role Scope.
+- [x] Tambahkan DoD untuk Effective Permission Preview.
+- [x] Tambahkan DoD untuk Middleware Feature Action Permission.
+- [x] Tambahkan DoD untuk POP Scope Helper.
+- [x] Tambahkan DoD untuk Sidebar berbasis permission.
+- [x] Tambahkan DoD untuk test Advanced RBAC.
+- [x] Tambahkan larangan menandai task Done jika route belum aman.
+- [x] Tambahkan larangan menandai task Done jika POP scope bocor.
+- [x] Tambahkan larangan menandai task Done jika user bisa akses URL langsung tanpa permission.
+
+**Acceptance Criteria**:
+- [x] DoD Advanced RBAC tersedia.
+- [x] Setiap task Advanced RBAC punya standar selesai.
+- [x] Route middleware menjadi syarat Done.
+- [x] POP scope menjadi syarat Done.
+- [x] Test RBAC menjadi syarat Done.
+
+---
+
+### S11-T007 — Update docs/MVP_SUCCESS_CHECKLIST.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Menambahkan checklist final MVP untuk Advanced RBAC.  
+**Checklist**:
+- [x] Tambahkan checklist role baru tersedia.
+- [x] Tambahkan checklist feature tree tersedia.
+- [x] Tambahkan checklist action tersedia.
+- [x] Tambahkan checklist permission berbasis feature-action tersedia.
+- [x] Tambahkan checklist user role scope tersedia.
+- [x] Tambahkan checklist NOC Pusat all_pop.
+- [x] Tambahkan checklist POP Admin selected_pop.
+- [x] Tambahkan checklist Teknisi tidak bisa pembayaran.
+- [x] Tambahkan checklist Helpdesk tidak bisa ubah nominal tagihan.
+- [x] Tambahkan checklist Sales tidak bisa laporan pembayaran.
+- [x] Tambahkan checklist route direct access aman.
+- [x] Tambahkan checklist field sensitive aman.
+- [x] Tambahkan checklist POP scope tidak bocor.
+
+**Acceptance Criteria**:
+- [x] MVP checklist memuat Advanced RBAC.
+- [x] Checklist role baru tersedia.
+- [x] Checklist scope baru tersedia.
+- [x] Checklist permission feature-action tersedia.
+- [x] Checklist keamanan RBAC tersedia.
+
+---
+
+### S11-T008 — Update docs/DAILY_PROMPTS.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Menambahkan prompt khusus Advanced RBAC agar AI tidak salah membangun role, permission, dan scope.  
+**Checklist**:
+- [x] Tambahkan Prompt Advanced RBAC Scope Check.
+- [x] Tambahkan Prompt Feature Tree.
+- [x] Tambahkan Prompt Action Permission.
+- [x] Tambahkan Prompt Permission Generator.
+- [x] Tambahkan Prompt Role Matrix.
+- [x] Tambahkan Prompt User Role Scope.
+- [x] Tambahkan Prompt User Form Role Scope.
+- [x] Tambahkan Prompt Middleware Permission.
+- [x] Tambahkan Prompt POP Scope.
+- [x] Tambahkan Prompt RBAC Test.
+- [x] Tambahkan prompt cegah role per cabang.
+- [x] Tambahkan prompt cegah permission hardcode sembarangan.
+
+**Acceptance Criteria**:
+- [x] Prompt Advanced RBAC tersedia.
+- [x] Prompt mengunci role dan scope tetap terpisah.
+- [x] Prompt melarang role per cabang.
+- [x] Prompt mewajibkan scope check sebelum coding.
+
+---
+
+### S11-T009 — Update AGENTS.md untuk Advanced RBAC
+**Status**: Done  
+**Tujuan**: Memastikan AI Agent membaca dan mengikuti aturan Advanced RBAC.  
+**Checklist**:
+- [x] Tambahkan Advanced RBAC ke Required Reading.
+- [x] Tambahkan aturan role tidak boleh dibuat per cabang.
+- [x] Tambahkan aturan role dan scope harus dipisah.
+- [x] Tambahkan aturan permission berbasis feature-action.
+- [x] Tambahkan aturan format permission.
+- [x] Tambahkan aturan scope `all_pop`.
+- [x] Tambahkan aturan scope `selected_pop`.
+- [x] Tambahkan aturan scope `pop_tree`.
+- [x] Tambahkan aturan scope `assigned_only`.
+- [x] Tambahkan aturan scope `own_created`.
+- [x] Tambahkan stop condition jika AI ingin membuat role cabang seperti NOC Siman.
+- [x] Tambahkan stop condition jika AI ingin memberi permission langsung ke user tanpa alasan.
+- [x] Tambahkan stop condition jika perubahan RBAC bisa membocorkan data POP.
+
+**Acceptance Criteria**:
+- [x] `AGENTS.md` memahami Advanced RBAC.
+- [x] AI dilarang membuat role per cabang.
+- [x] AI wajib memakai role + scope.
+- [x] AI wajib memakai permission berbasis feature-action.
+- [x] Stop condition Advanced RBAC tersedia.
+
+---
+
+### S12-T001 — Migration dan Model Feature Tree
+**Status**: Done  
+**Tujuan**: Membuat struktur fitur utama, cabang fitur, dan mini fitur.  
+**Checklist**:
+- [x] Buat tabel `features`.
+- [x] Tambahkan field `parent_id`.
+- [x] Tambahkan field `code`.
+- [x] Tambahkan field `name`.
+- [x] Tambahkan field `type`.
+- [x] Tambahkan field `sort_order`.
+- [x] Tambahkan field `is_active`.
+- [x] Tambahkan unique constraint `code`.
+- [x] Tambahkan index `parent_id`.
+- [x] Tambahkan index `type`.
+- [x] Buat model `Feature`.
+- [x] Buat relasi parent.
+- [x] Buat relasi children.
+- [x] Buat helper membaca feature tree.
+
+**Acceptance Criteria**:
+- [x] Feature dapat disimpan.
+- [x] Feature dapat bertingkat.
+- [x] Feature utama, sub feature, dan mini feature tersedia.
+- [x] Feature code unique.
+- [x] Relasi parent-child berjalan.
+
+---
+
+### S12-T002 — Seeder Feature Tree Awal
+**Status**: Done  
+**Tujuan**: Mengisi data feature tree awal sesuai fitur MVP dan Advanced RBAC.  
+**Checklist**:
+- [x] Seed feature Dashboard.
+- [x] Seed feature POP/Cabang.
+- [x] Seed feature User Management.
+- [x] Seed feature Role & Permission.
+- [x] Seed feature Paket Internet.
+- [x] Seed feature Pelanggan.
+- [x] Seed feature Pelanggan > Daftar Pelanggan.
+- [x] Seed feature Pelanggan > Detail Pelanggan.
+- [x] Seed feature Detail Pelanggan > Identitas.
+- [x] Seed feature Detail Pelanggan > Alamat.
+- [x] Seed feature Detail Pelanggan > POP/Cabang.
+- [x] Seed feature Detail Pelanggan > Paket & Layanan.
+- [x] Seed feature Detail Pelanggan > Billing.
+- [x] Seed feature Detail Pelanggan > Tagihan.
+- [x] Seed feature Detail Pelanggan > Pembayaran.
+- [x] Seed feature Detail Pelanggan > Survey.
+- [x] Seed feature Detail Pelanggan > Pemasangan.
+- [x] Seed feature Detail Pelanggan > Perangkat.
+- [x] Seed feature Detail Pelanggan > Dokumen.
+- [x] Seed feature Import Pelanggan.
+- [x] Seed feature Billing.
+- [x] Seed feature Billing > Tagihan.
+- [x] Seed feature Billing > Pembayaran.
+- [x] Seed feature Laporan.
+- [x] Seed feature Audit Log.
+
+**Acceptance Criteria**:
+- [x] Feature tree awal tersedia dari seeder.
+- [x] Semua fitur MVP masuk feature tree.
+- [x] Detail pelanggan memiliki mini feature.
+- [x] Billing memiliki sub feature Tagihan dan Pembayaran.
+- [x] Tidak ada feature post-MVP yang aktif.
+
+---
+
+### S12-T003 — Migration, Model, dan Seeder Action Permission
+**Status**: Done  
+**Tujuan**: Membuat daftar action yang bisa dipasang ke feature.  
+**Checklist**:
+- [x] Buat tabel `actions`.
+- [x] Tambahkan field `code`.
+- [x] Tambahkan field `name`.
+- [x] Tambahkan field `description`.
+- [x] Tambahkan unique constraint `code`.
+- [x] Buat model `Action`.
+- [x] Seed action `view`.
+- [x] Seed action `create`.
+- [x] Seed action `update`.
+- [x] Seed action `delete`.
+- [x] Seed action `import`.
+- [x] Seed action `export`.
+- [x] Seed action `print`.
+- [x] Seed action `approve`.
+- [x] Seed action `reject`.
+- [x] Seed action `activate`.
+- [x] Seed action `deactivate`.
+- [x] Seed action `assign`.
+- [x] Seed action `validate`.
+- [x] Seed action `cancel`.
+- [x] Seed action `upload`.
+- [x] Seed action `download`.
+- [x] Seed action `view_sensitive`.
+- [x] Seed action `update_sensitive`.
+
+**Acceptance Criteria**:
+- [x] Action CRUD tersedia.
+- [x] Action bisnis tersedia.
+- [x] Action sensitive tersedia.
+- [x] Action code unique.
+- [x] Action dapat digunakan untuk permission generator.
+
+---
+
+### S12-T004 — Refactor Permission Menjadi Feature-Action Permission
+**Status**: Done  
+**Tujuan**: Mengubah permission agar berbasis kombinasi feature dan action.  
+**Checklist**:
+- [x] Tambahkan `feature_id` ke tabel `permissions`.
+- [x] Tambahkan `action_id` ke tabel `permissions`.
+- [x] Pastikan field `code` tersedia dan unique.
+- [x] Format permission: `{feature_code}.{action_code}`.
+- [x] Contoh: `customers.view`.
+- [x] Contoh: `customers.detail.identity.update`.
+- [x] Contoh: `customers.detail.devices.view_sensitive`.
+- [x] Buat relasi permission ke feature.
+- [x] Buat relasi permission ke action.
+- [x] Buat generator permission.
+- [x] Cegah permission duplikat.
+- [x] Pastikan permission lama dapat dimigrasikan atau digantikan aman.
+
+**Acceptance Criteria**:
+- [x] Permission terhubung ke feature.
+- [x] Permission terhubung ke action.
+- [x] Permission code konsisten.
+- [x] Permission tidak duplikat.
+- [x] Permission lama tidak merusak login/akses existing.
+
+---
+
+### S12-T005 — Permission Generator dari Feature dan Action
+**Status**: Done  
+**Tujuan**: Membuat service/command untuk menghasilkan permission dari feature dan action.  
+**Checklist**:
+- [x] Buat service `PermissionGeneratorService`.
+- [x] Buat command `php artisan rbac:generate-permissions`.
+- [x] Generate permission hanya untuk kombinasi feature-action yang valid.
+- [x] Jangan generate semua action untuk semua feature jika tidak relevan.
+- [x] Buat konfigurasi allowed actions per feature.
+- [x] Pastikan permission code unique.
+- [x] Pastikan generator idempotent.
+- [x] Tampilkan summary permission dibuat/dilewati.
+- [x] Tambahkan test generator.
+
+**Acceptance Criteria**:
+- [x] Command generator berjalan tanpa error.
+- [x] Permission dibuat sesuai feature-action.
+- [x] Generator bisa dijalankan berulang tanpa duplikasi.
+- [x] Permission post-MVP tidak dibuat aktif.
+- [x] Test generator lulus.
+
+---
+
+### S12-T006 — Role Migration dan Seeder Role Baru
+**Status**: Done  
+**Tujuan**: Menambahkan role baru dan mengatur migrasi dari role lama ke role baru.  
+**Checklist**:
+- [x] Tambahkan role Owner.
+- [x] Tambahkan role Atasan.
+- [x] Tambahkan role Admin.
+- [x] Tambahkan role NOC.
+- [x] Tambahkan role Helpdesk.
+- [x] Tambahkan role FOP.
+- [x] Tambahkan role Teknisi.
+- [x] Tambahkan role Sales.
+- [x] Tambahkan role POP Admin.
+- [x] Mapping role lama Admin Pusat ke Admin dengan scope `all_pop`.
+- [x] Mapping role lama Admin Cabang ke POP Admin dengan scope `selected_pop`.
+- [x] Mapping role lama Customer Service ke Helpdesk.
+- [x] Mapping role lama Finance/Kasir ke role yang disepakati.
+- [x] Pastikan role lama tidak langsung dihapus sebelum migrasi aman.
+- [x] Tambahkan catatan migrasi role.
+
+**Acceptance Criteria**:
+- [x] Role baru tersedia.
+- [x] Role lama memiliki strategi migrasi.
+- [x] User existing tidak kehilangan akses login.
+- [x] Mapping role lama terdokumentasi.
+- [x] Tidak ada role per cabang.
+
+**Catatan**: Untuk Finance/Kasir, tentukan keputusan:
+- Opsi A: dimasukkan ke role Admin dengan permission pembayaran.
+- Opsi B: tetap dipertahankan sebagai role tambahan.
+- Opsi C: dibuat role Kasir jika bisnis masih butuh pemisahan pembayaran.
+*AI wajib meminta konfirmasi sebelum menghapus atau mengganti total role Finance/Kasir.*
+
+---
+
+### S12-T007 — Role Permission Matrix Seeder
+**Status**: Done  
+**Tujuan**: Membuat mapping permission default untuk setiap role baru.  
+**Checklist**:
+- [x] Buat mapping permission Owner.
+- [x] Buat mapping permission Atasan.
+- [x] Buat mapping permission Admin.
+- [x] Buat mapping permission NOC.
+- [x] Buat mapping permission Helpdesk.
+- [x] Buat mapping permission FOP.
+- [x] Buat mapping permission Teknisi.
+- [x] Buat mapping permission Sales.
+- [x] Buat mapping permission POP Admin.
+- [x] Pastikan Owner memiliki semua permission.
+- [x] Pastikan Atasan fokus dashboard/laporan/audit terbatas.
+- [x] Pastikan Admin fokus operasional.
+- [x] Pastikan NOC fokus monitoring dan teknis jaringan.
+- [x] Pastikan Helpdesk fokus layanan pelanggan.
+- [x] Pastikan FOP fokus survey/pemasangan lapangan.
+- [x] Pastikan Teknisi fokus survey/pemasangan/perangkat.
+- [x] Pastikan Sales fokus registrasi/follow-up.
+- [x] Pastikan POP Admin fokus operasional POP.
+- [x] Pastikan Teknisi tidak mendapat payment permission.
+- [x] Pastikan Helpdesk tidak mendapat update nominal tagihan.
+- [x] Pastikan Sales tidak mendapat laporan pembayaran.
+
+**Acceptance Criteria**:
+- [x] Setiap role memiliki permission default.
+- [x] Permission role sesuai matrix.
+- [x] Tidak ada permission berlebihan pada role teknis/sales/helpdesk.
+- [x] Seeder role permission idempotent.
+- [x] Test role permission lulus.
+
+---
+
+### S12-T008 — Migration dan Model User Role Scope
+**Status**: Done  
+**Tujuan**: Memisahkan role dari cakupan data user.  
+**Checklist**:
+- [x] Buat tabel `user_role_scopes`.
+- [x] Tambahkan `user_id`.
+- [x] Tambahkan `role_id`.
+- [x] Tambahkan `scope_type`.
+- [x] Tambahkan tabel `user_role_scope_targets` untuk multiple pop.
+- [x] Tambahkan index `user_id`.
+- [x] Tambahkan index `role_id`.
+- [x] Tambahkan index `pop_id`.
+- [x] Tambahkan validasi scope type via Enum.
+- [x] Buat model `UserRoleScope`.
+- [x] Buat relasi user ke user role scope.
+- [x] Buat relasi role ke user role scope.
+- [x] Buat relasi POP ke user role scope.
+- [x] Migrasikan `user_pops` lama jika diperlukan.
+
+**Scope Type**:
+`all_pop`, `selected_pop`, `pop_tree`, `assigned_only`, `own_created`
+
+**Acceptance Criteria**:
+- [x] User dapat memiliki role dengan scope.
+- [x] Role dan scope terpisah.
+- [x] NOC Pusat dapat dibuat dengan role NOC dan scope `all_pop`.
+- [x] POP Admin dapat dibuat dengan role POP Admin dan scope `selected_pop`.
+- [x] Tidak perlu membuat role per cabang.
+
+---
+
+### S12-T009 — Effective Permission dan Effective Scope Service
+**Status**: Done  
+**Tujuan**: Membuat service untuk menghitung permission dan scope efektif user.  
+**Checklist**:
+- [x] Buat `EffectiveAccessService`.
+- [x] Buat method membaca role user.
+- [x] Buat method membaca permission role.
+- [x] Buat method membaca scope user.
+- [x] Buat method `userCan($permissionCode)`.
+- [x] Buat method `userCan($featureCode, $actionCode)`.
+- [x] Buat method `getAllowedPopIds($user)`.
+- [x] Dukung scope `all_pop`.
+- [x] Dukung scope `selected_pop`.
+- [x] Dukung scope `pop_tree`.
+- [x] Dukung scope `assigned_only` jika data assignment tersedia.
+- [x] Dukung scope `own_created` jika data `created_by` tersedia.
+- [x] Tambahkan cache jika diperlukan.
+- [x] Tambahkan test service.
+
+**Acceptance Criteria**:
+- [x] Permission efektif user dapat dihitung.
+- [x] Scope efektif user dapat dihitung.
+- [x] NOC `all_pop` melihat semua POP.
+- [x] POP Admin `selected_pop` hanya melihat POP tertentu.
+- [x] Service dapat digunakan middleware dan query.
+
+---
+
+### S12-T010 — Backward Compatibility RBAC Lama
+**Status**: Done  
+**Tujuan**: Menjaga agar sistem tetap berjalan selama transisi dari RBAC lama ke Advanced RBAC.  
+**Checklist**:
+- [x] Audit middleware permission lama.
+- [x] Audit helper permission lama.
+- [x] Buat adapter dari permission lama ke permission baru jika diperlukan.
+- [x] Pastikan route existing tidak langsung rusak.
+- [x] Pastikan menu existing masih tampil sesuai permission.
+- [x] Pastikan user existing masih bisa login.
+- [x] Pastikan role lama tidak dihapus sebelum mapping selesai.
+- [x] Tambahkan test login user existing.
+- [x] Tambahkan test akses halaman existing.
+
+**Acceptance Criteria**:
+- [x] User existing tetap bisa login.
+- [x] Route existing tetap aman.
+- [x] Tidak ada breaking change besar.
+- [x] RBAC lama bisa berjalan selama migrasi.
+- [x] Transisi ke RBAC baru terdokumentasi.
+
+---
+---
+
+# Sprint 13 — Advanced RBAC UI, Middleware, Scope Enforcement & Tests
+
+## Tujuan Sprint 13
+Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permission matrix, middleware feature-action, sidebar, tombol aksi, POP scope query, dan test keamanan.
+
+### S13-T001 — Form Tambah/Edit User dengan Role dan Scope
+**Status**: Done  
+**Tujuan**: Mengubah form tambah/edit user agar bisa memilih role dan scope data.  
+**Checklist**:
+- [x] Tambahkan pilihan role baru.
+- [x] Tambahkan pilihan scope type.
+- [x] Jika role Owner, default scope `all_pop`.
+- [x] Jika role NOC, boleh `all_pop`, `selected_pop`, atau `pop_tree`.
+- [x] Jika role POP Admin, wajib `selected_pop`.
+- [x] Jika role Teknisi, boleh `selected_pop` atau `assigned_only`.
+- [x] Jika role Sales, boleh `selected_pop` atau `own_created`.
+- [x] Jika scope `selected_pop`, POP wajib dipilih.
+- [x] Jika scope `pop_tree`, POP parent wajib dipilih.
+- [x] Jika scope `all_pop`, POP tidak wajib.
+- [x] Validasi kombinasi role dan scope.
+- [x] Simpan ke `user_role_scopes`.
+- [x] Tampilkan error jika kombinasi tidak valid.
+
+**Acceptance Criteria**:
+- [x] Admin dapat membuat user dengan role dan scope.
+- [x] NOC Pusat bisa dibuat dengan scope `all_pop`.
+- [x] POP Admin tidak bisa dibuat tanpa POP.
+- [x] Teknisi bisa dibatasi `selected_pop`/`assigned_only`.
+- [x] Sales bisa dibatasi `own_created`/`selected_pop`.
+- [x] Validasi role-scope berjalan.
+
+---
+
+### S13-T002 — Effective Permission Preview Saat Tambah/Edit User
+**Status**: Done  
+**Tujuan**: Menampilkan ringkasan akses user sebelum disimpan.  
+**Checklist**:
+- [x] Tampilkan role yang dipilih.
+- [x] Tampilkan scope yang dipilih.
+- [x] Tampilkan POP yang dipilih jika ada.
+- [x] Tampilkan ringkasan fitur yang bisa diakses.
+- [x] Tampilkan ringkasan action penting.
+- [x] Tampilkan warning jika scope `all_pop`.
+- [x] Tampilkan warning jika role dan scope tidak cocok.
+- [x] Tampilkan warning jika role memiliki permission sensitif.
+- [x] Tampilkan contoh data yang bisa dilihat user.
+- [x] Jangan izinkan simpan jika preview menunjukkan konfigurasi invalid.
+
+**Acceptance Criteria**:
+- [x] Admin dapat melihat hak akses sebelum user disimpan.
+- [x] Scope `all_pop` terlihat jelas.
+- [x] Scope `selected_pop` terlihat jelas.
+- [x] Permission sensitif terlihat jelas.
+- [x] Konfigurasi invalid ditolak.
+
+---
+
+### S13-T003 — Permission Matrix UI Berbasis Feature Tree
+**Status**: Done  
+**Tujuan**: Membuat halaman role permission matrix berbasis fitur bertingkat.  
+**Checklist**:
+- [x] Buat halaman daftar role.
+- [x] Buat halaman matrix permission role.
+- [x] Tampilkan feature tree expand/collapse.
+- [x] Tampilkan kolom action.
+- [x] Tampilkan checkbox permission.
+- [x] Tampilkan fitur utama.
+- [x] Tampilkan cabang fitur.
+- [x] Tampilkan mini fitur.
+- [x] Simpan perubahan ke `role_permissions`.
+- [x] Batasi akses hanya Owner atau role yang diizinkan.
+- [x] Catat perubahan role permission ke audit log.
+- [x] Cegah role biasa mengubah permission.
+- [x] Tambahkan test update role permission.
+
+**Acceptance Criteria**:
+- [x] Permission dapat diatur per role.
+- [x] Matrix berbasis feature tree.
+- [x] Mini fitur dapat punya permission sendiri.
+- [x] Perubahan permission masuk audit log.
+- [x] Hanya role berwenang yang bisa mengubah matrix.
+
+---
+
+### S13-T004 — Middleware Feature-Action Permission
+**Status**: Done  
+**Tujuan**: Mengamankan route dengan permission berbasis feature dan action.  
+**Checklist**:
+- [x] Buat middleware feature-action permission.
+- [x] Dukung pengecekan dengan permission code.
+- [x] Dukung pengecekan dengan feature code dan action code.
+- [x] Terapkan ke route dashboard.
+- [x] Terapkan ke route pelanggan.
+- [x] Terapkan ke route import.
+- [x] Terapkan ke route invoice.
+- [x] Terapkan ke route payment.
+- [x] Terapkan ke route laporan.
+- [x] Terapkan ke route audit log.
+- [x] Return forbidden jika tidak punya permission.
+- [x] Tambahkan test direct URL access.
+
+**Acceptance Criteria**:
+- [x] Route dicek backend.
+- [x] User tanpa permission mendapat forbidden.
+- [x] Menu disembunyikan bukan satu-satunya proteksi.
+- [x] Direct URL access aman.
+- [x] Test middleware lulus.
+
+---
+
+### S13-T005 — POP Scope Query Enforcement
+**Status**: Done  
+**Tujuan**: Memastikan query data mengikuti scope user.  
+**Checklist**:
+- [x] Buat helper `applyUserScope`.
+- [x] Terapkan ke daftar pelanggan.
+- [x] Terapkan ke detail pelanggan.
+- [x] Terapkan ke invoice.
+- [x] Terapkan ke payment.
+
+**Acceptance Criteria**:
+- [x] Data pelanggan terisolasi per POP.
+- [x] Role `Owner` dan `Admin` bisa melihat semua data.
+- [x] User dengan scope `all_pop` melihat semua data.
+- [x] Transaksi (invoice/payment) juga dibatasi sesuai POP.
+
+---
+
+
+### S13-T006 — Sidebar dan Tombol Aksi Berdasarkan Feature Permission
+**Status**: Done  
+**Tujuan**: Menampilkan menu dan tombol aksi sesuai permission user.  
+**Checklist**:
+- [x] Sidebar membaca permission user.
+- [x] Menu utama tampil jika user punya permission `view` pada fitur utama.
+- [x] Submenu tampil jika user punya permission pada sub fitur.
+- [x] Tombol create tampil jika punya permission `create`.
+- [x] Tombol edit tampil jika punya permission `update`.
+- [x] Tombol delete tampil jika punya permission `delete`.
+- [x] Tombol import tampil jika punya permission `import`.
+- [x] Tombol export tampil jika punya permission `export`.
+- [x] Tombol print tampil jika punya permission `print`.
+- [x] Tombol activate tampil jika punya permission `activate`.
+- [x] Tombol validate tampil jika punya permission `validate`.
+- [x] Field sensitive tampil jika punya permission `view_sensitive`.
+- [x] Pastikan route tetap aman walaupun tombol disembunyikan.
+
+**Acceptance Criteria**:
+- [x] Menu sesuai permission.
+- [x] Tombol aksi sesuai permission.
+- [x] Field sensitive sesuai permission.
+- [x] User tanpa permission tidak melihat tombol.
+- [x] Route tetap dilindungi middleware.
+
+---
+
+### S13-T007 — Protect Sensitive Fields dengan Permission
+**Status**: Done  
+**Tujuan**: Mengamankan field sensitif seperti PPPoE, WiFi, IP, VLAN, dan data teknis.  
+**Checklist**:
+- [x] Audit field sensitif perangkat.
+- [x] Terapkan permission `view_sensitive`.
+- [x] Terapkan permission `update_sensitive`.
+- [x] Sembunyikan password PPPoE dari role tanpa permission.
+- [x] Sembunyikan password WiFi dari role tanpa permission.
+- [x] Sembunyikan IP/VLAN jika dianggap sensitif.
+- [x] Cegah update field sensitif via request langsung.
+- [x] Test Finance tidak bisa lihat password teknis.
+- [x] Test Helpdesk tidak bisa lihat password teknis.
+- [x] Test Teknisi dengan permission bisa lihat/update jika diizinkan.
+
+**Acceptance Criteria**:
+- [x] Field sensitif aman di UI.
+- [x] Field sensitif aman dari request langsung.
+- [x] Role tanpa permission tidak bisa melihat password teknis.
+- [x] Role tanpa permission tidak bisa mengubah field sensitif.
+- [x] Test sensitive field lulus.
+
+---
+
+### S13-T008 — Audit Log untuk Perubahan RBAC
+**Status**: Done  
+**Tujuan**: Mencatat semua perubahan role, permission, feature, action, dan user scope.  
+**Checklist**:
+- [x] Catat create/update feature.
+- [x] Catat create/update action.
+- [x] Catat generate permission.
+- [x] Catat perubahan role permission.
+- [x] Catat perubahan user role scope.
+- [x] Catat perubahan role user.
+- [x] Catat user pelaku.
+- [x] Catat waktu perubahan.
+- [x] Catat old values dan new values jika memungkinkan.
+- [x] Tampilkan di audit log.
+- [x] Batasi akses audit log ke Owner/Atasan sesuai permission.
+
+**Acceptance Criteria**:
+- [ ] Perubahan RBAC tercatat.
+- [ ] Perubahan scope user tercatat.
+- [ ] Perubahan permission role tercatat.
+- [ ] Audit log dapat dilihat role berwenang.
+- [ ] User biasa tidak bisa menghapus audit log.
+
+---
+
+### S13-T008.1 — Modul Task Management (FOP & Teknisi)
+**Status**: Done  
+**Tujuan**: Membangun modul penjadwalan dan eksekusi tugas lapangan untuk FOP (koordinator) dan Teknisi, lengkap dengan database, permission, policy, controller, API, dan UI kalender/dashboard.  
+
+**Konteks**:
+- FOP membuat, menjadwalkan, dan mengassign task ke tim teknisi.
+- Teknisi mengerjakan task di lapangan: mulai, isi checklist, upload bukti, selesai/pending.
+- Semua access control via permission dinamis (`$user->can('task.xxx')`), tidak ada hardcode role.
+- Lifecycle: Draft → Terjadwal → In Progress → Selesai (atau Dibatalkan / Pending).
+- Integrasi: tabel `customers`, `pops`, RBAC existing, Telegram bot (notifikasi async via queue).
+
+**Checklist**:
+
+#### Database
+- [x] Migration `tasks` (id, customer_id, pop_id, task_type, title, description, status, scheduled_at, started_at, completed_at, cancelled_at, fop_id, sla_minutes, conflict_override, created_by, updated_by)
+- [x] Migration `task_teams` (id, task_id, user_id, role_in_task)
+- [x] Migration `task_checklist_templates` (id, task_type, item, is_required, sort_order)
+- [x] Migration `task_checklists` (id, task_id, template_id, item, is_required, is_checked, checked_by, checked_at)
+- [x] Migration `task_evidences` (id, task_id, uploaded_by, file_path, caption, created_at)
+
+#### Enums & Models
+- [x] Enum `TaskType` (survey, pemasangan, maintenance, ambil_modem, relokasi)
+- [x] Enum `TaskStatus` (draft, terjadwal, in_progress, selesai, dibatalkan, pending)
+- [x] Model `Task` dengan relasi customer, pop, fop, teamMembers, checklists, evidences
+- [x] Model `TaskTeam`
+- [x] Model `TaskChecklistTemplate`
+- [x] Model `TaskChecklist`
+- [x] Model `TaskEvidence`
+- [x] Trait `HasPopScope` sudah tersedia — apply ke Model `Task`
+
+#### Permissions & Seeder
+- [x] Seed permission FOP: `task.create`, `task.schedule`, `task.view.all`, `task.edit`, `task.cancel`, `task.assign.team`, `task.report.view`, `task.conflict.override`
+- [x] Seed permission Teknisi: `task.view.own`, `task.status.start`, `task.status.complete`, `task.status.pending`, `task.checklist.update`, `task.evidence.upload`
+- [x] Assign permission ke role FOP dan Teknisi via seeder
+
+#### Policy
+- [x] `TaskPolicy` — semua method via `$user->can()`, tidak ada `hasRole()`
+- [x] `before()` untuk owner/wildcard permission
+- [x] Guard: viewAll, viewOwn, create, edit, cancel, assignTeam, schedule, conflictOverride, statusStart, statusComplete, statusPending, updateChecklist, uploadEvidence
+
+#### Controller & Routes
+- [x] `TaskController` (index/FOP view, indexOwn/Teknisi, create, store, show, edit, update, cancel)
+- [x] `TaskStatusController` (start, complete, pending)
+- [x] `TaskChecklistController` (update checklist item)
+- [x] `TaskEvidenceController` (upload bukti)
+- [x] Route group dengan middleware permission masing-masing
+- [x] API endpoint JSON untuk kalender (filter tanggal, POP, tipe)
+
+#### Jobs & Notifikasi
+- [x] `SendTaskNotificationJob` (queue, kirim Telegram ke anggota tim saat task dibuat/dijadwal ulang)
+
+#### UI — FOP Dashboard
+- [x] Halaman kalender/timeline (harian, mingguan, bulanan) — task card berwarna per tipe
+- [x] Panel Ringkasan Hari Ini (total, selesai, pending, dibatalkan)
+- [x] Panel Tim Aktif (avatar, jumlah task hari ini)
+- [x] Popup detail task (checklist progress, foto, info tim)
+- [x] Form buat task baru (tipe, CID pelanggan, jadwal, assign 1–3 teknisi, validasi konflik)
+- [x] Warning konflik jadwal teknisi + bypass jika punya `task.conflict.override`
+- [x] Tombol Edit & Cancel task sesuai permission
+
+#### UI — Teknisi Dashboard (mobile-first)
+- [x] Halaman daftar task hari ini (hanya task milik teknisi yang login)
+- [x] Tombol Mulai (guard: `task.status.start`)
+- [x] Checklist items — centang per item (guard: `task.checklist.update`)
+- [x] Upload foto bukti (guard: `task.evidence.upload`)
+- [x] Tombol Selesai — hanya aktif jika semua checklist wajib tercentang DAN minimal 1 foto ada
+- [x] Tombol Pending (guard: `task.status.pending`)
+
+#### Business Rules
+- [x] Maksimal 4 task aktif per tim per hari (validasi di service)
+- [x] SLA enforcement: Survey ≤ 120 mnt, Instalasi ≤ 240 mnt, Maintenance ≤ 180 mnt
+- [x] Task hanya bisa dibuat untuk pelanggan dengan `status = 'active'` atau `siap_billing`
+- [x] Satu teknisi tidak boleh overlap jadwal (kecuali ada `task.conflict.override`)
+- [x] Foto wajib ada sebelum Selesai
+- [x] Semua perubahan status masuk audit log
+
+**Acceptance Criteria**:
+- [x] FOP bisa membuat, menjadwalkan, dan assign task via kalender.
+- [x] Teknisi hanya melihat task yang ia terdaftar sebagai anggota tim.
+- [x] Lifecycle task (Draft → Selesai/Dibatalkan/Pending) berjalan sesuai permission.
+- [x] Konflik jadwal terdeteksi; bypass hanya untuk yang punya `task.conflict.override`.
+- [x] Tombol Selesai teknisi terkunci sampai semua checklist wajib + 1 foto ada.
+- [x] Notifikasi Telegram dikirim async saat task dibuat/dijadwal ulang.
+- [x] Semua route dilindungi middleware permission; tidak ada hardcode nama role.
+- [x] POP scope berlaku: FOP/Teknisi hanya lihat task di POP yang di-assign.
+- [x] UI kalender FOP sesuai referensi layout (lihat screenshot brief).
+- [x] Audit log tercatat untuk setiap perubahan status task.
+
+**Status**: Done
+
+**Risiko**:
+- Konflik validasi jadwal overlap bisa kompleks — dibuat sederhana dulu (cek overlap exact time).
+- Telegram bot async membutuhkan queue worker berjalan.
+
+---
+
+
+
+
 
 ## Blocked
 Belum ada.
@@ -2485,9 +5149,9 @@ Tujuan:
 Menghubungkan tombol terminasi di UI ke backend dan mengatur logika tampilan ID.
 
 Acceptance Criteria:
-- [ ] Tombol terminasi di modal aksi pelanggan berfungsi.
-- [ ] UI menampilkan Request ID (customer_code) alih-alih CID jika pelanggan sudah terminasi.
-- [ ] Konfirmasi terminasi muncul sebelum eksekusi.
+- [x] Tombol terminasi di modal aksi pelanggan berfungsi.
+- [x] UI menampilkan Request ID (customer_code) alih-alih CID jika pelanggan sudah terminasi.
+- [x] Konfirmasi terminasi muncul sebelum eksekusi.
 
 ---
 
@@ -2524,3 +5188,7 @@ Setelah task selesai:
 3. Tambahkan catatan hasil test.
 
 ---
+
+
+
+
