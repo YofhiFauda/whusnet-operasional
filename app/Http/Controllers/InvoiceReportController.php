@@ -17,7 +17,7 @@ class InvoiceReportController extends Controller
         $user = auth()->user();
 
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -42,7 +42,7 @@ class InvoiceReportController extends Controller
 
         // Base query
         $query = Invoice::with(['customer', 'pop', 'internetPackage'])
-            ->forUser();
+            ->applyUserScope();
 
         // Menerapkan filters
         if ($popId !== '') {
@@ -109,7 +109,7 @@ class InvoiceReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -130,7 +130,7 @@ class InvoiceReportController extends Controller
 
         // Query data tanpa pagination
         $query = Invoice::with(['customer', 'pop', 'internetPackage'])
-            ->forUser();
+            ->applyUserScope();
 
         if ($popId !== '') {
             $query->where('pop_id', $popId);

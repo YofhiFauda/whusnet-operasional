@@ -293,6 +293,8 @@ protected $signature = 'app:import-legacy-sql
 
         // Sheet 2: customers
         $customersSheet = [];
+        $usedCustomerCodes = [];
+        
         foreach ($penggunaRows as $row) {
             // Filter: skip internal users starting with PG
             if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
@@ -349,10 +351,19 @@ protected $signature = 'app:import-legacy-sql
             $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
             $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'] . '1');
 
+            $candidateCode = $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '';
+            if ($candidateCode !== '') {
+                if (isset($usedCustomerCodes[$candidateCode]) || \App\Models\Customer::where('customer_code', $candidateCode)->exists()) {
+                    $candidateCode = ''; // Duplicate found, clear it so it gets auto-generated later
+                } else {
+                    $usedCustomerCodes[$candidateCode] = true;
+                }
+            }
+
             $customersSheet[] = [
                 'old_customer_id' => $row['IDPENGGUNA'],
                 'old_request_id' => $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '',
-                'customer_code' => $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '',
+                'customer_code' => $candidateCode,
                 'branch_pop_code' => $legacyPop['pop_code'],
                 'full_name' => $fullName,
                 'phone' => $row['HP'] ?? '',
@@ -696,11 +707,27 @@ protected $signature = 'app:import-legacy-sql
             $q->where('name', 'Owner');
         })->first();
 
+        if (!$admin) {
+            $admin = User::first();
+        }
+
+        if (!$admin) {
+            // Create a system user if none exists
+            $admin = User::create([
+                'name' => 'System Admin',
+                'username' => 'system',
+                'email' => 'system@whusnet.local',
+                'password' => bcrypt('password'),
+                'status' => 'active',
+            ]);
+            $this->info("Created a fallback System Admin user.");
+        }
+
         if ($admin) {
             \Illuminate\Support\Facades\Auth::login($admin);
             $this->info("Logged in programmatically as: " . $admin->name);
         } else {
-            $this->warn("No Owner user found. Migration might fail audit log validation.");
+            $this->warn("No user found. Migration might fail audit log validation.");
         }
 
         $this->info("Validating import data via internal controller call...");

@@ -30,7 +30,7 @@ class UserPopScopeTest extends TestCase
 
     public function test_customer_invoice_and_payment_scopes_follow_assigned_pop_ids(): void
     {
-        $role = Role::where('name', 'Admin Cabang')->firstOrFail();
+        $role = Role::where('name', 'POP Admin')->firstOrFail();
         $user = User::factory()->create([
             'status' => 'active',
             'role_id' => $role->id,
@@ -38,14 +38,24 @@ class UserPopScopeTest extends TestCase
 
         $popA = $this->createPop('POP-SCOPE-A', 'SCA', 'POP Scope A');
         $popB = $this->createPop('POP-SCOPE-B', 'SCB', 'POP Scope B');
-        $user->pops()->sync([$popA->id]);
+        
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         $customerA = $this->createCustomerBundle($popA, 'Customer Scope A', 'C-SCOPE-A', 'INV-SCOPE-A', 'PAY-SCOPE-A');
         $customerB = $this->createCustomerBundle($popB, 'Customer Scope B', 'C-SCOPE-B', 'INV-SCOPE-B', 'PAY-SCOPE-B');
 
-        $customerNames = Customer::forUser($user)->pluck('full_name')->all();
-        $invoiceNumbers = Invoice::forUser($user)->pluck('invoice_number')->all();
-        $paymentNumbers = Payment::forUser($user)->pluck('payment_number')->all();
+        $customerNames = Customer::applyUserScope($user)->pluck('full_name')->all();
+        $invoiceNumbers = Invoice::applyUserScope($user)->pluck('invoice_number')->all();
+        $paymentNumbers = Payment::applyUserScope($user)->pluck('payment_number')->all();
 
         $this->assertContains('Customer Scope A', $customerNames);
         $this->assertNotContains('Customer Scope B', $customerNames);
@@ -65,9 +75,9 @@ class UserPopScopeTest extends TestCase
         $this->createCustomerBundle($popA, 'Owner Scope A', 'C-OWN-A', 'INV-OWN-A', 'PAY-OWN-A');
         $this->createCustomerBundle($popB, 'Owner Scope B', 'C-OWN-B', 'INV-OWN-B', 'PAY-OWN-B');
 
-        $this->assertCount(2, Customer::forUser($owner)->get());
-        $this->assertCount(2, Invoice::forUser($owner)->get());
-        $this->assertCount(2, Payment::forUser($owner)->get());
+        $this->assertCount(2, Customer::applyUserScope($owner)->get());
+        $this->assertCount(2, Invoice::applyUserScope($owner)->get());
+        $this->assertCount(2, Payment::applyUserScope($owner)->get());
     }
 
     protected function createPop(string $code, string $popCode, string $name): Pop

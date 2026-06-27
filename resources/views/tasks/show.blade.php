@@ -223,15 +223,53 @@
             @if($task->teamMembers->count() > 0)
             <div class="flex flex-wrap gap-2">
                 @foreach($task->teamMembers as $member)
-                <div class="flex items-center gap-2.5 bg-background border border-border rounded-md px-3 py-2">
+                <div class="flex items-center gap-2.5 bg-background border border-border rounded-md px-3 py-2 w-full sm:w-auto">
                     <div class="h-7 w-7 rounded-full bg-primary-soft flex items-center justify-center text-xs font-bold shrink-0"
                          style="color:var(--color-primary)">
                         {{ strtoupper(substr($member->user?->name ?? '?', 0, 2)) }}
                     </div>
-                    <div>
-                        <p class="text-xs font-semibold text-text-main">{{ $member->user?->name ?? 'User dihapus' }}</p>
+                    <div class="flex-1 min-w-0 pr-4">
+                        <p class="text-xs font-semibold text-text-main truncate">{{ $member->user?->name ?? 'User dihapus' }}</p>
                         <p class="text-[10px] text-text-muted capitalize">{{ $member->role_in_task }}</p>
                     </div>
+                    @can('task.assign.team')
+                        @if(in_array($task->status->value, ['terjadwal', 'in_progress']))
+                            <button type="button" 
+                                x-data="" 
+                                x-on:click="$dispatch('open-modal', 'swap-technician-{{ $member->user_id }}')" 
+                                class="text-xs text-primary hover:underline whitespace-nowrap">
+                                Ganti
+                            </button>
+                            
+                            <x-ui.modal name="swap-technician-{{ $member->user_id }}" title="Ganti Teknisi" maxWidth="sm">
+                                <form action="{{ route('tasks.team.update', $task) }}" method="POST">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="old_user_id" value="{{ $member->user_id }}">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium mb-1">Pilih Teknisi Pengganti</label>
+                                        <select name="new_user_id" class="w-full rounded-md border-border text-sm focus:border-primary focus:ring-primary" required>
+                                            <option value="">-- Pilih Teknisi --</option>
+                                            @foreach(\App\Models\User::whereHas('role', fn($q) => $q->where('code', 'teknisi'))->where('id', '!=', $member->user_id)->orderBy('name')->get() as $tek)
+                                                <option value="{{ $tek->id }}">{{ $tek->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium mb-1">Jadwal Pelaksanaan (Opsional)</label>
+                                        <input type="datetime-local" name="scheduled_at" 
+                                               value="{{ $task->scheduled_at ? $task->scheduled_at->format('Y-m-d\TH:i') : '' }}" 
+                                               class="w-full border border-border rounded-md px-3 py-2 text-sm text-text-main bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition">
+                                        <p class="text-[11px] text-text-muted mt-1">Biarkan default atau kosongkan jika tidak ingin mengubah jadwal.</p>
+                                    </div>
+                                    <div class="flex justify-end gap-2">
+                                        <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'swap-technician-{{ $member->user_id }}')">Batal</x-ui.button>
+                                        <x-ui.button type="submit" variant="primary">Simpan</x-ui.button>
+                                    </div>
+                                </form>
+                            </x-ui.modal>
+                        @endif
+                    @endcan
                 </div>
                 @endforeach
             </div>
@@ -240,73 +278,50 @@
             @endif
         </div>
 
-        @can('task.assign.team')
-        @if(in_array($task->status->value, ['terjadwal', 'in_progress']))
-        <div class="px-5 py-4 border-t border-border bg-surface-muted/30">
-            <h4 class="text-xs font-semibold text-text-main mb-3">Ubah Tim Teknisi</h4>
-            <form action="{{ route('tasks.team.update', $task) }}" method="POST" class="space-y-3">
-                @csrf
-                @method('PATCH')
-                
-                @php
-                    // Ambil list teknisi (Sederhana untuk MVP)
-                    $availableTeknisi = \App\Models\User::whereHas('role', fn($q) => $q->where('code', 'teknisi'))->orderBy('name')->get();
-                    $currentTeamIds = $task->teamMembers->pluck('user_id')->toArray();
-                @endphp
-                
-                <div>
-                    <label class="block text-xs text-text-muted mb-1">Pilih Teknisi Baru</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        @foreach($availableTeknisi as $tek)
-                        <label class="flex items-center gap-2 p-2 border rounded-md cursor-pointer hover:bg-surface transition-colors {{ in_array($tek->id, $currentTeamIds) ? 'bg-primary-soft/10 border-primary/30' : 'border-border' }}">
-                            <input type="checkbox" name="technicians[]" value="{{ $tek->id }}" 
-                                   class="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                                   {{ in_array($tek->id, $currentTeamIds) ? 'checked' : '' }}>
-                            <span class="text-sm font-medium text-text-main">{{ $tek->name }}</span>
-                        </label>
-                        @endforeach
-                    </div>
-                    @error('technicians')
-                        <p class="text-xs text-error mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-                
-                @error('conflict')
-                <div class="rounded-md bg-error/10 p-4 border border-error/20">
-                    <div class="flex">
-                        <div class="ml-3">
-                            <h3 class="text-sm font-medium text-error">Konflik Jadwal Terdeteksi</h3>
-                            <div class="mt-2 text-sm text-error/90">
-                                {!! $message !!}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                @can('task.conflict_override')
-                <div class="flex items-start">
-                    <div class="flex h-6 items-center">
-                        <input id="conflict_override" name="conflict_override" type="checkbox" value="1"
-                               class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
-                    </div>
-                    <div class="ml-3 text-sm leading-6">
-                        <label for="conflict_override" class="font-medium text-text-main">Override Konflik</label>
-                        <p class="text-text-muted">Lanjutkan menyimpan tugas meskipun terdapat konflik jadwal (risiko teknisi ganda).</p>
-                    </div>
-                </div>
-                @endcan
-                @enderror
-                
-                <div class="flex justify-end">
-                    <button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm ring-1 ring-inset ring-primary hover:bg-primary/5">
-                        Simpan Perubahan Tim
-                    </button>
-                </div>
-            </form>
-        </div>
-        @endif
-        @endcan
     </div>
+
+    {{-- ══ Audit Log (History) ════════════════════════════════════════ --}}
+    @if(auth()->user()->hasRole(['owner', 'admin', 'fop']))
+    <div class="bg-surface border border-border rounded-lg mt-4">
+        <div class="px-5 py-3 border-b border-border">
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Riwayat Status (Audit Log)</p>
+        </div>
+        <div class="px-5 py-4">
+            @if($task->auditLogs && $task->auditLogs->count() > 0)
+            <div class="relative border-l border-border ml-3 space-y-6">
+                @foreach($task->auditLogs as $log)
+                <div class="relative pl-5">
+                    {{-- Timeline node --}}
+                    <div class="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-border border-2 border-surface"></div>
+                    <div class="mb-1 flex items-center justify-between">
+                        <p class="text-xs font-semibold capitalize" style="color:var(--color-text-main)">
+                            {{ str_replace('_', ' ', $log->action) }}
+                        </p>
+                        <span class="text-[10px] text-text-muted font-mono">{{ $log->created_at->format('d M Y, H:i') }}</span>
+                    </div>
+                    <p class="text-[11px] text-text-secondary">Oleh: <span class="font-medium text-text-main">{{ $log->user?->name ?? 'System' }}</span></p>
+                    
+                    @if($log->action === 'cancelled' && isset($log->new_values['cancel_reason']))
+                    <div class="mt-1 p-2 bg-error-bg/20 border border-error-border rounded-md">
+                        <p class="text-[10px] text-error font-medium">Alasan: {{ $log->new_values['cancel_reason'] }}</p>
+                    </div>
+                    @elseif($log->action === 'rejected' && isset($log->new_values['reject_reason']))
+                    <div class="mt-1 p-2 bg-error-bg/20 border border-error-border rounded-md">
+                        <p class="text-[10px] text-error font-medium">Alasan: {{ $log->new_values['reject_reason'] }}</p>
+                    </div>
+                    @elseif($log->action === 'completed' && isset($log->new_values['status']))
+                    <div class="mt-1 text-[10px] text-success font-medium">Task ditandai selesai oleh teknisi.</div>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+            @else
+            <p class="text-sm text-text-muted">Belum ada riwayat aktivitas.</p>
+            @endif
+        </div>
+    </div>
+    @endif
+
 
     {{-- ══ Checklist ════════════════════════════════════════════════ --}}
     @if($task->checklists->count() > 0)
@@ -537,7 +552,192 @@
         @endcan
     </div>
     @endif
+
+    {{-- ══ Action Buttons (FOP Manage) ════════════════════════════════ --}}
+    @if(in_array($task->status->value, ['pending', 'terjadwal']))
+    @if(auth()->user()->can('fopReject', $task) || auth()->user()->can('fopPending', $task) || auth()->user()->can('schedule', $task))
+    <div class="bg-surface border border-border rounded-lg p-5 mt-4 flex items-center justify-between">
+        <div>
+            <h4 class="text-sm font-semibold text-text-main mb-1">Manajemen Task (FOP)</h4>
+            <p class="text-xs text-text-secondary">Kelola task sebelum mulai dikerjakan oleh teknisi.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            @if($task->status->value === 'pending')
+                @can('schedule', $task)
+                <button x-data @click="$dispatch('open-modal', 'schedule-task')"
+                        class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md text-white transition-colors hover:brightness-110"
+                        style="background:var(--color-primary)">
+                    Jadwalkan Task
+                </button>
+                @endcan
+                @can('fopReject', $task)
+                <button x-data @click="$dispatch('open-modal', 'fop-reject-task-pending')"
+                        class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md border bg-white transition-colors hover:bg-error/5"
+                        style="border-color:var(--color-error-border); color:var(--color-error)">
+                    Reject Task
+                </button>
+                @endcan
+            @endif
+
+            @if($task->status->value === 'terjadwal')
+                @can('fopPending', $task)
+                <button x-data @click="$dispatch('open-modal', 'fop-pending-task')"
+                        class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md border bg-white transition-colors hover:bg-warning/5"
+                        style="border-color:var(--color-warning-border); color:var(--color-warning)">
+                    Set Pending
+                </button>
+                @endcan
+            @endif
+        </div>
+    </div>
+    @endif
+    @endif
+
+    {{-- ══ Action Buttons (FOP Review) ════════════════════════════════ --}}
+    @if($task->status->value === 'selesai' && $task->fop_review_status === 'pending')
+    @can('review', $task)
+    <div class="bg-surface border border-primary-border rounded-lg p-5 mt-4 flex items-center justify-between" style="background:var(--color-primary-soft)">
+        <div>
+            <h4 class="text-sm font-semibold text-text-main mb-1">Review FOP</h4>
+            <p class="text-xs text-text-secondary">Task ini telah diselesaikan oleh teknisi dan menunggu persetujuan Anda.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button x-data @click="$dispatch('open-modal', 'reject-task')"
+                    class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md border bg-white transition-colors"
+                    style="border-color:var(--color-error-border); color:var(--color-error)">
+                Reject (Kembalikan ke Teknisi)
+            </button>
+            <form action="{{ route('tasks.review', $task) }}" method="POST">
+                @csrf
+                <input type="hidden" name="action" value="approve">
+                <button type="submit"
+                        class="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-md text-white transition-colors"
+                        style="background:var(--color-primary)">
+                    Approve Task
+                </button>
+            </form>
+        </div>
+    </div>
+    @endcan
+    @endif
 </div>
+
+{{-- ══ Schedule Task Modal ═════════════════════════════════════════ --}}
+@can('schedule', $task)
+@if($task->status->value === 'pending')
+<x-ui.modal name="schedule-task" title="Jadwalkan Task" maxWidth="md">
+    <form action="{{ route('tasks.schedule', $task) }}" method="POST">
+        @csrf
+        <div class="space-y-4 p-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Tanggal & Waktu</label>
+                <input type="datetime-local" name="scheduled_at" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary" required>
+            </div>
+
+            @php
+                $availableTeknisi = \App\Models\User::whereHas('role', fn($q) => $q->where('code', 'teknisi'))->orderBy('name')->get();
+            @endphp
+            <div>
+                <label class="block text-sm font-medium mb-1">Tim Teknisi (1-3)</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    @foreach($availableTeknisi as $tek)
+                    <label class="flex items-center gap-2 p-2 border rounded-md cursor-pointer hover:bg-surface transition-colors border-border">
+                        <input type="checkbox" name="team_member_ids[]" value="{{ $tek->id }}" class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-text-main">{{ $tek->name }}</span>
+                    </label>
+                    @endforeach
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1">Checklist Poin (per baris / koma)</label>
+                <textarea name="checklist_items" rows="4"
+                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                          placeholder="Verifikasi KTP&#10;Cek Sinyal&#10;Foto Lokasi"
+                          required></textarea>
+                <p class="text-xs text-gray-500 mt-1">Pisahkan dengan baris baru atau koma</p>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'schedule-task')">
+                Batal
+            </x-ui.button>
+            <x-ui.button type="submit" variant="primary">
+                Jadwalkan
+            </x-ui.button>
+        </div>
+    </form>
+</x-ui.modal>
+@endif
+@endcan
+
+{{-- ══ FOP Reject Pending Task Modal ═════════════════════════════════ --}}
+@can('fopReject', $task)
+<x-ui.modal name="fop-reject-task-pending" title="Reject Pending Task" maxWidth="sm">
+    <p class="text-sm text-text-secondary mb-4">
+        Task ini belum dijadwalkan dan akan tetap berstatus <span class="font-semibold text-text-main">Pending</span>, namun dengan keterangan reject.
+    </p>
+    <form action="{{ route('tasks.fop-reject', $task) }}" method="POST">
+        @csrf
+        <x-ui.textarea name="reject_reason" rows="3" placeholder="Alasan reject task..." required />
+        <x-slot name="footer">
+            <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'fop-reject-task-pending')">
+                Batal
+            </x-ui.button>
+            <x-ui.button type="submit" variant="danger">
+                Reject Task
+            </x-ui.button>
+        </x-slot>
+    </form>
+</x-ui.modal>
+@endcan
+
+{{-- ══ FOP Set Pending Scheduled Task Modal ═══════════════════════════ --}}
+@can('fopPending', $task)
+<x-ui.modal name="fop-pending-task" title="Set Task Menjadi Pending" maxWidth="sm">
+    <p class="text-sm text-text-secondary mb-4">
+        Task ini akan diubah statusnya dari <span class="font-semibold text-text-main">Terjadwal</span> menjadi <span class="font-semibold text-text-main">Pending</span>. Tim teknisi yang sudah di-assign tidak akan terhapus.
+    </p>
+    <form action="{{ route('tasks.fop-pending', $task) }}" method="POST">
+        @csrf
+        <x-ui.textarea name="pending_reason" rows="3" placeholder="Alasan mengapa di-pending..." required />
+        <x-slot name="footer">
+            <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'fop-pending-task')">
+                Batal
+            </x-ui.button>
+            <x-ui.button type="submit" style="background:var(--color-warning); color:white; border-color:transparent">
+                Set Pending
+            </x-ui.button>
+        </x-slot>
+    </form>
+</x-ui.modal>
+@endcan
+
+
+{{-- ══ FOP Reject Modal ══════════════════════════════════════════════ --}}
+@can('review', $task)
+<x-ui.modal name="reject-task" title="Reject Laporan Task" maxWidth="sm">
+    <p class="text-sm text-text-secondary mb-4">
+        Task ini akan dikembalikan ke status <span class="font-semibold text-text-main">In Progress</span>. 
+        Teknisi harus memperbaiki laporan berdasarkan alasan reject.
+    </p>
+    <form action="{{ route('tasks.review', $task) }}" method="POST">
+        @csrf
+        <input type="hidden" name="action" value="reject">
+        <x-ui.textarea name="reason" rows="3" placeholder="Alasan reject (misal: Foto bukti kurang jelas)..." required />
+        <x-slot name="footer">
+            <x-ui.button type="button" variant="secondary"
+                         x-on:click="$dispatch('close-modal', 'reject-task')">
+                Batal
+            </x-ui.button>
+            <x-ui.button type="submit" variant="danger">
+                Konfirmasi Reject
+            </x-ui.button>
+        </x-slot>
+    </form>
+</x-ui.modal>
+@endcan
 
 {{-- ══ Cancel Modal ══════════════════════════════════════════════════ --}}
 @can('cancel', $task)
@@ -989,7 +1189,7 @@ $taskData = [
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-medium text-text-secondary mb-1">Foto Kontrak <span style="color:var(--color-error)">*</span></label>
-                        <input type="file" accept="image/*" @change="handleContractUpload($event.target)" class="w-full text-sm">
+                        <input type="file" accept="image/*" capture="environment" @change="handleContractUpload($event.target)" class="w-full text-sm">
                         <p x-show="form.contract_file" class="text-xs mt-1" style="color:var(--color-success)">✓ File dipilih</p>
                     </div>
                     <div>

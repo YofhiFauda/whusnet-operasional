@@ -28,23 +28,26 @@ class SurveyStarted implements ShouldBroadcast
     }
 
     /**
-     * Get the channels the event should broadcast on.
+     * Broadcast ke channel FOP yang bertanggung jawab atas POP customer ini.
+     * Channel fop.{pop_id} digunakan agar FOP Dashboard bisa refresh kanban real-time.
      *
      * @return array<int, \Illuminate\Broadcasting\Channel>
      */
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('customer.' . $this->customer->id . '.workflow'),
+            new PrivateChannel('fop.' . $this->customer->pop_id),
         ];
     }
 
     public function broadcastWith(): array
     {
         return [
-            'id' => $this->customer->id,
-            'status' => $this->customer->status,
-            'started_at' => $this->startedAt,
+            'customer_id'   => $this->customer->id,
+            'customer_name' => $this->customer->full_name,
+            'status'        => $this->customer->status,
+            'pop_id'        => $this->customer->pop_id,
+            'started_at'    => $this->startedAt,
         ];
     }
 }

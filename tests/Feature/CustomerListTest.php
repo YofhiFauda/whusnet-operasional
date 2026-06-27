@@ -68,7 +68,7 @@ class CustomerListTest extends TestCase
             'phone' => '08122222222',
             'registration_date' => '2026-06-11',
             'pop_id' => $pop1->id,
-            'status' => 'registered',
+            'status' => 'suspended',
             'data_completeness_status' => 'draft',
         ]);
 
@@ -92,8 +92,8 @@ class CustomerListTest extends TestCase
 
     public function test_branch_admin_only_sees_assigned_pop_customers(): void
     {
-        // Get Admin Cabang role
-        $branchAdminRole = Role::where('name', 'Admin Cabang')->firstOrFail();
+        // Get POP Admin role
+        $branchAdminRole = Role::where('name', 'POP Admin')->firstOrFail();
 
         // Create Admin Cabang User
         $adminCabang = User::factory()->create([
@@ -125,6 +125,17 @@ class CustomerListTest extends TestCase
         // Assign Admin to POP 1 only
         $adminCabang->pops()->attach($pop1->id);
 
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $adminCabang->id,
+            'role_id' => $branchAdminRole->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop1->id,
+        ]);
+
         // Create customers
         $c1 = Customer::create([
             'customer_code' => 'C-PON1-000001',
@@ -133,7 +144,7 @@ class CustomerListTest extends TestCase
             'phone' => '08122222222',
             'registration_date' => '2026-06-11',
             'pop_id' => $pop1->id,
-            'status' => 'registered',
+            'status' => 'suspended',
             'data_completeness_status' => 'draft',
         ]);
 
@@ -172,7 +183,7 @@ class CustomerListTest extends TestCase
             'phone' => '08111111111',
             'registration_date' => '2026-06-11',
             'pop_id' => $pop->id,
-            'status' => 'registered',
+            'status' => 'suspended',
             'identity_number' => '3502999999999999',
             'data_completeness_status' => 'draft',
         ]);
@@ -246,7 +257,7 @@ class CustomerListTest extends TestCase
             'phone' => '08111111111',
             'registration_date' => '2026-06-11',
             'pop_id' => $pop1->id,
-            'status' => 'registered',
+            'status' => 'suspended',
             'data_completeness_status' => 'draft',
         ]);
 
@@ -284,7 +295,7 @@ class CustomerListTest extends TestCase
             'phone' => '08111111111',
             'registration_date' => '2026-06-11',
             'pop_id' => $pop->id,
-            'status' => 'registered',
+            'status' => 'suspended',
             'data_completeness_status' => 'draft',
         ]);
 

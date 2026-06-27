@@ -15,16 +15,18 @@ class RoleTest extends TestCase
     {
         $this->seed(RoleSeeder::class);
 
-        $this->assertSame(7, Role::query()->count());
+        $this->assertSame(9, Role::query()->count());
 
         $expectedRoles = [
             'Owner',
+            'Atasan',
             'Admin',
-            'Admin Pusat',
-            'Admin Cabang',
-            'Finance/Kasir',
+            'NOC',
+            'Helpdesk',
+            'FOP',
             'Teknisi',
-            'Customer Service',
+            'Sales',
+            'POP Admin',
         ];
 
         foreach ($expectedRoles as $roleName) {
@@ -45,7 +47,7 @@ class RoleTest extends TestCase
         $admin = Role::where('name', 'Admin')->firstOrFail();
         $this->assertEquals('Admin Operasional (Akses Penuh)', $admin->description);
 
-        $cs = Role::where('name', 'Customer Service')->firstOrFail();
-        $this->assertEquals('Layanan Pelanggan dan Kontak', $cs->description);
+        $cs = Role::where('name', 'Helpdesk')->firstOrFail();
+        $this->assertEquals('Layanan Pelanggan dan Bantuan', $cs->description);
     }
 }

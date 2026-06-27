@@ -16,8 +16,22 @@ class DashboardController extends Controller
     /**
      * Display the operational dashboard.
      */
-    public function index(Request $request): View
+    public function index(Request $request)
     {
+        if (auth()->user()->hasRole('fop')) {
+            return redirect()->route('fop.dashboard');
+        }
+
+        if (!auth()->user()->hasPermission('dashboard.view')) {
+            if (auth()->user()->hasPermission('task.view.own')) {
+                return redirect()->route('tasks.own');
+            }
+            if (auth()->user()->hasPermission('customers.view')) {
+                return redirect()->route('customers.index');
+            }
+            abort(403, 'Unauthorized action.');
+        }
+
         $popId = $request->query('pop_id', '');
         $periodFrom = $this->normalizePeriod($request->query('period_from')) ?? now()->format('Y-m');
         $periodTo = $this->normalizePeriod($request->query('period_to')) ?? $periodFrom;
@@ -105,21 +119,21 @@ class DashboardController extends Controller
     private function scopedCustomerQuery(string|int|null $popId)
     {
         return Customer::query()
-            ->forUser()
+            ->applyUserScope()
             ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
     }
 
     private function scopedInvoiceQuery(string|int|null $popId)
     {
         return Invoice::query()
-            ->forUser()
+            ->applyUserScope()
             ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
     }
 
     private function scopedPaymentQuery(string|int|null $popId)
     {
         return Payment::query()
-            ->forUser()
+            ->applyUserScope()
             ->when($popId !== null && $popId !== '', fn ($query) => $query->where('pop_id', $popId));
     }
 

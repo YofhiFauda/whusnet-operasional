@@ -22,18 +22,22 @@
 <div class="flex justify-between items-center mb-6">
     <h3 class="text-slate-800 text-sm font-semibold uppercase tracking-wider">Kelola Daftar Pelanggan</h3>
     <div class="flex gap-2">
+        @if(auth()->user()->hasPermission('customers.import.view'))
         <a href="/customers/import" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-md transition-colors inline-flex items-center gap-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500/25 cursor-pointer">
             <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             <span>Import Pelanggan</span>
         </a>
+        @endif
+        @if(auth()->user()->hasPermission('customers.create'))
         <a href="/customers/create" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-4 rounded-md transition-colors inline-flex items-center gap-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500/25 cursor-pointer">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             <span>Tambah Pelanggan</span>
         </a>
+        @endif
     </div>
 </div>
 
@@ -110,13 +114,14 @@
     <div class="border-b border-slate-200 bg-slate-50 px-6 py-3 flex flex-wrap gap-2 items-center justify-between">
         <div class="flex flex-wrap gap-1">
             <a href="{{ request()->fullUrlWithQuery(['status' => '']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === '' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
-                Semua <span class="ml-1 px-1.5 py-0.25 bg-white/25 text-white rounded-full text-[10px] data-text">{{ $totalCustomers }}</span>
+                Semua <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === '' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $totalCustomers }}</span>
             </a>
-            @foreach($subscriptionStatuses as $subscriptionStatus)
-                <a href="{{ request()->fullUrlWithQuery(['status' => $subscriptionStatus->code]) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === $subscriptionStatus->code ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
-                    {{ $subscriptionStatus->name }} <span class="ml-1 px-1.5 py-0.25 bg-white/25 rounded-full text-[10px] data-text">{{ $statusCounts[$subscriptionStatus->code] ?? 0 }}</span>
-                </a>
-            @endforeach
+            <a href="{{ request()->fullUrlWithQuery(['status' => 'active']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === 'active' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
+                Active <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === 'active' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $statusCounts['active'] ?? 0 }}</span>
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['status' => 'suspended']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === 'suspended' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
+                Suspend <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === 'suspended' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $statusCounts['suspended'] ?? 0 }}</span>
+            </a>
         </div>
     </div>
     @else
@@ -430,8 +435,12 @@
         <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
             <div class="flex gap-2">
                 <button onclick="triggerDetail()" class="text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded transition-colors cursor-pointer">Detail</button>
+                @if(auth()->user()->hasPermission('customers.update'))
                 <button onclick="triggerEdit()" class="text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition-colors cursor-pointer">Edit</button>
+                @endif
+                @if(auth()->user()->hasPermission('customers.delete'))
                 <button onclick="triggerTerminate()" class="text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition-colors cursor-pointer">Putus Langganan</button>
+                @endif
             </div>
             <button onclick="closeActionsModal()" class="text-xs font-medium text-slate-500 hover:text-slate-700 cursor-pointer">Tutup</button>
         </div>

@@ -28,20 +28,22 @@ class MiddlewarePermissionTest extends TestCase
         config()->set('view.compiled', $compiledPath);
 
         // Seed roles and permissions for tests
+        $this->seed(\Database\Seeders\FeatureSeeder::class);
+        $this->seed(\Database\Seeders\ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
 
         // Register temporary testing routes to verify specific permission requirements
-        Route::middleware(['web', 'auth', 'permission:create_payments'])->get('/test-simulasi-pembayaran', function () {
+        Route::middleware(['web', 'auth', 'permission:payments.create'])->get('/test-simulasi-pembayaran', function () {
             return response('pembayaran-ok');
         });
 
-        Route::middleware(['web', 'auth', 'permission:fill_device'])->get('/test-simulasi-perangkat-modem', function () {
+        Route::middleware(['web', 'auth', 'permission:customers.detail.devices.update'])->get('/test-simulasi-perangkat-modem', function () {
             return response('device-ok');
         });
 
-        Route::middleware(['web', 'auth', 'permission:create_invoices'])->get('/test-simulasi-tagihan', function () {
+        Route::middleware(['web', 'auth', 'permission:invoices.create'])->get('/test-simulasi-tagihan', function () {
             return response('tagihan-ok');
         });
     }
@@ -54,8 +56,8 @@ class MiddlewarePermissionTest extends TestCase
 
     public function test_user_without_required_permission_gets_403_forbidden(): void
     {
-        // Customer Service doesn't have 'import_customers' permission by default
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
+        // Helpdesk doesn't have 'customers.import.import' permission by default
+        $csRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
         ]);
@@ -66,8 +68,8 @@ class MiddlewarePermissionTest extends TestCase
 
     public function test_user_with_required_permission_can_access_route(): void
     {
-        // Customer Service has 'view_customers' permission
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
+        // Helpdesk has 'customers.view' permission
+        $csRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
         ]);
@@ -83,8 +85,8 @@ class MiddlewarePermissionTest extends TestCase
             'role_id' => $ownerRole->id,
         ]);
 
-        // Access pop management which requires 'view_pop'
-        $response = $this->actingAs($user)->get('/master/wilayah');
+        // Access pop management which requires 'pops.view'
+        $response = $this->actingAs($user)->get('/master/pop');
         $response->assertStatus(200);
     }
 
@@ -95,7 +97,7 @@ class MiddlewarePermissionTest extends TestCase
             'role_id' => $adminRole->id,
         ]);
 
-        $this->actingAs($admin)->get('/master/wilayah')->assertStatus(200);
+        $this->actingAs($admin)->get('/master/pop')->assertStatus(200);
         $this->actingAs($admin)->get('/users')->assertStatus(200);
         $this->actingAs($admin)->get('/customers/import')->assertStatus(200);
         $this->actingAs($admin)->get('/invoices')->assertStatus(200);
@@ -104,7 +106,7 @@ class MiddlewarePermissionTest extends TestCase
 
     public function test_acceptance_criteria_teknisi_cannot_access_payments(): void
     {
-        // CS/Teknisi/any role that doesn't have create_payments
+        // Teknisi doesn't have payments.create
         $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $teknisiRole->id,
@@ -128,7 +130,7 @@ class MiddlewarePermissionTest extends TestCase
 
     public function test_acceptance_criteria_finance_cannot_access_modem_devices(): void
     {
-        $financeRole = Role::where('name', 'Finance/Kasir')->firstOrFail();
+        $financeRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $financeRole->id,
         ]);
@@ -140,7 +142,7 @@ class MiddlewarePermissionTest extends TestCase
 
     public function test_acceptance_criteria_customer_service_cannot_edit_invoice_nominal(): void
     {
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
+        $csRole = Role::where('name', 'Teknisi')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
         ]);

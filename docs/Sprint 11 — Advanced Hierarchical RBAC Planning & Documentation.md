@@ -1,6 +1,6 @@
-# Sprint 9 — Advanced Hierarchical RBAC Planning & Documentation
+﻿# Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation
 
-## Tujuan Sprint 9
+## Tujuan Sprint 11
 Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarchical RBAC yang mendukung:
 - **Role utama**: Owner, Atasan, Admin, NOC, Helpdesk, FOP, Teknisi, Sales, POP Admin.
 - **Feature Tree**: fitur utama, cabang fitur, mini fitur.
@@ -13,15 +13,15 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC
+### S11-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Merapikan `docs/TASKS.md` agar tidak ada duplikasi sprint/task, format konsisten, dan roadmap Advanced RBAC masuk dengan urutan yang benar.  
 **Checklist**:
 - [ ] Hapus duplikasi Sprint 2 yang muncul berulang.
 - [ ] Pastikan Sprint 1 sampai Sprint 8 tetap sesuai status terakhir.
 - [ ] Pastikan hanya S8-T006 — Import Data Legacy sand_db_sandya.sql yang berstatus In Progress selama task tersebut belum selesai.
-- [ ] Tambahkan Sprint 9 sampai Sprint 13 sebagai roadmap baru.
-- [ ] Pastikan semua task Sprint 9+ berstatus Todo.
+- [ ] Tambahkan Sprint 11 sampai Sprint 15 sebagai roadmap baru.
+- [ ] Pastikan semua task Sprint 11+ berstatus Todo.
 - [ ] Rapikan heading sprint.
 - [ ] Rapikan format Checklist.
 - [ ] Rapikan format Acceptance Criteria.
@@ -32,12 +32,12 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 - [ ] Tidak ada task duplikat.
 - [ ] Tidak ada sprint duplikat.
 - [ ] Hanya satu task berstatus In Progress.
-- [ ] Sprint 9+ tersedia sebagai roadmap lanjutan.
+- [ ] Sprint 11+ tersedia sebagai roadmap lanjutan.
 - [ ] AI dapat membaca task aktif dengan jelas.
 
 ---
 
-### S9-T002 — Update docs/RBAC_MATRIX.md untuk Advanced RBAC
+### S11-T002 — Update docs/RBAC_MATRIX.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Mengubah dokumen RBAC dari role sederhana menjadi hierarchical feature-based RBAC.  
 **Checklist**:
@@ -73,7 +73,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T003 — Update docs/DATABASE_RULES.md untuk Advanced RBAC
+### S11-T003 — Update docs/DATABASE_RULES.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Menambahkan aturan database untuk feature tree, action, permission berbasis feature-action, dan user role scope.  
 **Checklist**:
@@ -106,7 +106,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T004 — Update docs/BUSINESS_RULES.md untuk Role dan Scope Baru
+### S11-T004 — Update docs/BUSINESS_RULES.md untuk Role dan Scope Baru
 **Status**: Todo  
 **Tujuan**: Memastikan aturan bisnis project memahami role baru dan batasan scope data.  
 **Checklist**:
@@ -137,7 +137,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T005 — Update docs/PAGE_STRUCTURE.md untuk UI Role, Feature, Permission, dan Scope
+### S11-T005 — Update docs/PAGE_STRUCTURE.md untuk UI Role, Feature, Permission, dan Scope
 **Status**: Todo  
 **Tujuan**: Menambahkan struktur halaman untuk Advanced RBAC.  
 **Checklist**:
@@ -164,7 +164,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T006 — Update docs/DEFINITION_OF_DONE.md untuk Advanced RBAC
+### S11-T006 — Update docs/DEFINITION_OF_DONE.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Menambahkan standar task selesai untuk Advanced RBAC.  
 **Checklist**:
@@ -192,7 +192,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T007 — Update docs/MVP_SUCCESS_CHECKLIST.md untuk Advanced RBAC
+### S11-T007 — Update docs/MVP_SUCCESS_CHECKLIST.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Menambahkan checklist final MVP untuk Advanced RBAC.  
 **Checklist**:
@@ -219,7 +219,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T008 — Update docs/DAILY_PROMPTS.md untuk Advanced RBAC
+### S11-T008 — Update docs/DAILY_PROMPTS.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Menambahkan prompt khusus Advanced RBAC agar AI tidak salah membangun role, permission, dan scope.  
 **Checklist**:
@@ -244,7 +244,7 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 
 ---
 
-### S9-T009 — Update AGENTS.md untuk Advanced RBAC
+### S11-T009 — Update AGENTS.md untuk Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Memastikan AI Agent membaca dan mengikuti aturan Advanced RBAC.  
 **Checklist**:
@@ -272,13 +272,13 @@ Meningkatkan desain RBAC dari role-permission sederhana menjadi Advanced Hierarc
 ---
 ---
 
-# Sprint 10 — Advanced RBAC Database & Core Engine
+# Sprint 12 — Advanced RBAC Database & Core Engine
 
-## Tujuan Sprint 10
+## Tujuan Sprint 12
 Mengimplementasikan pondasi database dan core engine Advanced RBAC: feature tree, action, permission generator, role matrix, user role scope, dan helper effective permission.  
 Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI matrix penuh.
 
-### S10-T001 — Migration dan Model Feature Tree
+### S12-T001 — Migration dan Model Feature Tree
 **Status**: Todo  
 **Tujuan**: Membuat struktur fitur utama, cabang fitur, dan mini fitur.  
 **Checklist**:
@@ -306,7 +306,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T002 — Seeder Feature Tree Awal
+### S12-T002 — Seeder Feature Tree Awal
 **Status**: Todo  
 **Tujuan**: Mengisi data feature tree awal sesuai fitur MVP dan Advanced RBAC.  
 **Checklist**:
@@ -345,7 +345,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T003 — Migration, Model, dan Seeder Action Permission
+### S12-T003 — Migration, Model, dan Seeder Action Permission
 **Status**: Todo  
 **Tujuan**: Membuat daftar action yang bisa dipasang ke feature.  
 **Checklist**:
@@ -383,7 +383,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T004 — Refactor Permission Menjadi Feature-Action Permission
+### S12-T004 — Refactor Permission Menjadi Feature-Action Permission
 **Status**: Todo  
 **Tujuan**: Mengubah permission agar berbasis kombinasi feature dan action.  
 **Checklist**:
@@ -409,7 +409,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T005 — Permission Generator dari Feature dan Action
+### S12-T005 — Permission Generator dari Feature dan Action
 **Status**: Todo  
 **Tujuan**: Membuat service/command untuk menghasilkan permission dari feature dan action.  
 **Checklist**:
@@ -432,7 +432,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T006 — Role Migration dan Seeder Role Baru
+### S12-T006 — Role Migration dan Seeder Role Baru
 **Status**: Todo  
 **Tujuan**: Menambahkan role baru dan mengatur migrasi dari role lama ke role baru.  
 **Checklist**:
@@ -467,7 +467,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T007 — Role Permission Matrix Seeder
+### S12-T007 — Role Permission Matrix Seeder
 **Status**: Todo  
 **Tujuan**: Membuat mapping permission default untuk setiap role baru.  
 **Checklist**:
@@ -502,7 +502,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T008 — Migration dan Model User Role Scope
+### S12-T008 — Migration dan Model User Role Scope
 **Status**: Todo  
 **Tujuan**: Memisahkan role dari cakupan data user.  
 **Checklist**:
@@ -533,7 +533,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T009 — Effective Permission dan Effective Scope Service
+### S12-T009 — Effective Permission dan Effective Scope Service
 **Status**: Todo  
 **Tujuan**: Membuat service untuk menghitung permission dan scope efektif user.  
 **Checklist**:
@@ -561,7 +561,7 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 
 ---
 
-### S10-T010 — Backward Compatibility RBAC Lama
+### S12-T010 — Backward Compatibility RBAC Lama
 **Status**: Todo  
 **Tujuan**: Menjaga agar sistem tetap berjalan selama transisi dari RBAC lama ke Advanced RBAC.  
 **Checklist**:
@@ -585,12 +585,12 @@ Sprint ini mulai menyentuh database dan core logic, tetapi belum fokus ke UI mat
 ---
 ---
 
-# Sprint 11 — Advanced RBAC UI, Middleware, Scope Enforcement & Tests
+# Sprint 13 — Advanced RBAC UI, Middleware, Scope Enforcement & Tests
 
-## Tujuan Sprint 11
+## Tujuan Sprint 13
 Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permission matrix, middleware feature-action, sidebar, tombol aksi, POP scope query, dan test keamanan.
 
-### S11-T001 — Form Tambah/Edit User dengan Role dan Scope
+### S13-T001 — Form Tambah/Edit User dengan Role dan Scope
 **Status**: Todo  
 **Tujuan**: Mengubah form tambah/edit user agar bisa memilih role dan scope data.  
 **Checklist**:
@@ -618,7 +618,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T002 — Effective Permission Preview Saat Tambah/Edit User
+### S13-T002 — Effective Permission Preview Saat Tambah/Edit User
 **Status**: Todo  
 **Tujuan**: Menampilkan ringkasan akses user sebelum disimpan.  
 **Checklist**:
@@ -642,7 +642,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T003 — Permission Matrix UI Berbasis Feature Tree
+### S13-T003 — Permission Matrix UI Berbasis Feature Tree
 **Status**: Todo  
 **Tujuan**: Membuat halaman role permission matrix berbasis fitur bertingkat.  
 **Checklist**:
@@ -669,7 +669,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T004 — Middleware Feature-Action Permission
+### S13-T004 — Middleware Feature-Action Permission
 **Status**: Todo  
 **Tujuan**: Mengamankan route dengan permission berbasis feature dan action.  
 **Checklist**:
@@ -695,7 +695,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T005 — POP Scope Query Enforcement
+### S13-T005 — POP Scope Query Enforcement
 **Status**: Todo  
 **Tujuan**: Memastikan query data mengikuti scope user.  
 **Checklist**:
@@ -725,7 +725,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T006 — Sidebar dan Tombol Aksi Berdasarkan Feature Permission
+### S13-T006 — Sidebar dan Tombol Aksi Berdasarkan Feature Permission
 **Status**: Todo  
 **Tujuan**: Menampilkan menu dan tombol aksi sesuai permission user.  
 **Checklist**:
@@ -752,7 +752,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T007 — Protect Sensitive Fields dengan Permission
+### S13-T007 — Protect Sensitive Fields dengan Permission
 **Status**: Todo  
 **Tujuan**: Mengamankan field sensitif seperti PPPoE, WiFi, IP, VLAN, dan data teknis.  
 **Checklist**:
@@ -776,7 +776,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T008 — Audit Log untuk Perubahan RBAC
+### S13-T008 — Audit Log untuk Perubahan RBAC
 **Status**: Todo  
 **Tujuan**: Mencatat semua perubahan role, permission, feature, action, dan user scope.  
 **Checklist**:
@@ -801,7 +801,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T009 — Test Matrix Advanced RBAC
+### S13-T009 — Test Matrix Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Membuat test lengkap untuk role, permission, scope, route, field sensitif, dan menu.  
 **Checklist**:
@@ -833,7 +833,7 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 
 ---
 
-### S11-T010 — Regression Test Setelah Advanced RBAC
+### S13-T010 — Regression Test Setelah Advanced RBAC
 **Status**: Todo  
 **Tujuan**: Memastikan Advanced RBAC tidak merusak fitur lama.  
 **Checklist**:
@@ -863,13 +863,13 @@ Menerapkan Advanced RBAC ke UI dan keamanan aplikasi: form tambah user, permissi
 ---
 ---
 
-# Sprint 12 — PRD Compliance Audit & Hardening
+# Sprint 14 — PRD Compliance Audit & Hardening
 
-## Tujuan Sprint 12
-Menguji apakah implementasi dari Sprint 1 sampai Sprint 11 benar-benar sesuai PRD, business rules, Advanced RBAC, POP scope, status flow, database rules, dan definition of done.  
+## Tujuan Sprint 14
+Menguji apakah implementasi dari Sprint 1 sampai Sprint 13 benar-benar sesuai PRD, business rules, Advanced RBAC, POP scope, status flow, database rules, dan definition of done.  
 Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
-### S12-T001 — Audit Implementasi Terhadap PRD
+### S14-T001 — Audit Implementasi Terhadap PRD
 **Status**: Todo  
 **Tujuan**: Membandingkan seluruh implementasi Sprint 1–11 dengan PRD dan mencatat gap.  
 **Checklist**:
@@ -902,7 +902,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T002 — Audit POP Scope Semua Modul
+### S14-T002 — Audit POP Scope Semua Modul
 **Status**: Todo  
 **Tujuan**: Memastikan data cabang tidak bocor antar POP setelah Advanced RBAC.  
 **Checklist**:
@@ -932,7 +932,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T003 — Audit Status Flow dan Constant/Enum
+### S14-T003 — Audit Status Flow dan Constant/Enum
 **Status**: Todo  
 **Tujuan**: Memastikan status pelanggan, layanan, invoice, pembayaran, import, POP, dan paket tidak ditulis sembarangan.  
 **Checklist**:
@@ -958,7 +958,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T004 — Audit Database Constraint, Index, dan Relasi
+### S14-T004 — Audit Database Constraint, Index, dan Relasi
 **Status**: Todo  
 **Tujuan**: Memastikan database sesuai `DATABASE_RULES.md` setelah Advanced RBAC.  
 **Checklist**:
@@ -992,7 +992,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T005 — Audit ID Numbering dan Race Condition
+### S14-T005 — Audit ID Numbering dan Race Condition
 **Status**: Todo  
 **Tujuan**: Memastikan ID Request dan CID aman, unik, berjalan per POP, dan tidak rawan duplikasi.  
 **Checklist**:
@@ -1019,7 +1019,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T006 — Audit Import Data Sesuai IMPORT_SPEC.md
+### S14-T006 — Audit Import Data Sesuai IMPORT_SPEC.md
 **Status**: Todo  
 **Tujuan**: Memastikan modul import Excel/CSV dan import legacy mengikuti spesifikasi import.  
 **Checklist**:
@@ -1052,7 +1052,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T007 — Audit Detail Pelanggan Sesuai CUSTOMER_DETAIL_SPEC.md
+### S14-T007 — Audit Detail Pelanggan Sesuai CUSTOMER_DETAIL_SPEC.md
 **Status**: Todo  
 **Tujuan**: Memastikan detail pelanggan sudah menjadi pusat data pelanggan sesuai PRD.  
 **Checklist**:
@@ -1086,7 +1086,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T008 — Audit Audit Log Semua Modul Penting
+### S14-T008 — Audit Audit Log Semua Modul Penting
 **Status**: Todo  
 **Tujuan**: Memastikan audit log mencatat perubahan data penting.  
 **Checklist**:
@@ -1118,7 +1118,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T009 — Perbaiki Kegagalan Legacy CustomerEditTest
+### S14-T009 — Perbaiki Kegagalan Legacy CustomerEditTest
 **Status**: Todo  
 **Tujuan**: Memperbaiki 2 kegagalan lama pada `CustomerEditTest` terkait cleanup file dokumen pelanggan agar full test suite bersih.  
 **Checklist**:
@@ -1139,7 +1139,7 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 
 ---
 
-### S12-T010 — Full Regression Test dan Build Gate
+### S14-T010 — Full Regression Test dan Build Gate
 **Status**: Todo  
 **Tujuan**: Menjadikan test suite dan build sebagai gerbang sebelum project dianggap stabil.  
 **Checklist**:
@@ -1162,13 +1162,13 @@ Sprint ini fokus audit, test, dan hardening. Bukan membuat fitur besar baru.
 ---
 ---
 
-# Sprint 13 — UAT, Operational Readiness, dan Final MVP Review
+# Sprint 15 — UAT, Operational Readiness, dan Final MVP Review
 
-## Tujuan Sprint 13
+## Tujuan Sprint 15
 Menguji MVP dari sudut pandang pengguna operasional: Owner, Atasan, Admin, NOC, Helpdesk, FOP, Teknisi, Sales, dan POP Admin.  
 Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak digunakan secara operasional.
 
-### S13-T001 — Buat Dataset UAT Realistis
+### S15-T001 — Buat Dataset UAT Realistis
 **Status**: Todo  
 **Tujuan**: Membuat data dummy/UAT realistis agar semua flow bisa diuji.  
 **Checklist**:
@@ -1206,7 +1206,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T002 — UAT Flow Owner
+### S15-T002 — UAT Flow Owner
 **Status**: Todo  
 **Tujuan**: Menguji Owner sebagai pemilik akses penuh sistem.  
 **Checklist**:
@@ -1234,7 +1234,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T003 — UAT Flow Atasan
+### S15-T003 — UAT Flow Atasan
 **Status**: Todo  
 **Tujuan**: Menguji Atasan sebagai role monitoring, laporan, dan audit terbatas.  
 **Checklist**:
@@ -1257,7 +1257,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T004 — UAT Flow Admin
+### S15-T004 — UAT Flow Admin
 **Status**: Todo  
 **Tujuan**: Menguji Admin sebagai role operasional utama.  
 **Checklist**:
@@ -1280,7 +1280,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T005 — UAT Flow NOC Pusat dan NOC Cabang
+### S15-T005 — UAT Flow NOC Pusat dan NOC Cabang
 **Status**: Todo  
 **Tujuan**: Menguji role NOC dengan scope `all_pop` dan `selected_pop`.  
 **Checklist**:
@@ -1303,7 +1303,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T006 — UAT Flow Helpdesk
+### S15-T006 — UAT Flow Helpdesk
 **Status**: Todo  
 **Tujuan**: Menguji Helpdesk sebagai role layanan pelanggan.  
 **Checklist**:
@@ -1328,7 +1328,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T007 — UAT Flow FOP
+### S15-T007 — UAT Flow FOP
 **Status**: Todo  
 **Tujuan**: Menguji FOP sebagai role survey/pemasangan lapangan.  
 **Checklist**:
@@ -1352,7 +1352,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T008 — UAT Flow Teknisi
+### S15-T008 — UAT Flow Teknisi
 **Status**: Todo  
 **Tujuan**: Menguji Teknisi hanya mengisi data teknis dan tidak bisa mengakses pembayaran.  
 **Checklist**:
@@ -1377,7 +1377,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T009 — UAT Flow Sales
+### S15-T009 — UAT Flow Sales
 **Status**: Todo  
 **Tujuan**: Menguji Sales sebagai role registrasi/follow-up pelanggan dengan scope `own_created` atau `selected_pop`.  
 **Checklist**:
@@ -1402,7 +1402,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T010 — UAT Flow POP Admin
+### S15-T010 — UAT Flow POP Admin
 **Status**: Todo  
 **Tujuan**: Menguji POP Admin sebagai admin operasional untuk POP tertentu.  
 **Checklist**:
@@ -1427,7 +1427,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T011 — UAT Flow Pelanggan Manual sampai Pembayaran
+### S15-T011 — UAT Flow Pelanggan Manual sampai Pembayaran
 **Status**: Todo  
 **Tujuan**: Menguji flow bisnis utama dari input pelanggan manual sampai pembayaran lunas.  
 **Checklist**:
@@ -1458,7 +1458,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T012 — UAT Flow Import Pelanggan sampai Aktivasi
+### S15-T012 — UAT Flow Import Pelanggan sampai Aktivasi
 **Status**: Todo  
 **Tujuan**: Menguji flow import pelanggan lama sampai pelanggan bisa diaktifkan.  
 **Checklist**:
@@ -1488,7 +1488,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T013 — Final Review MVP_SUCCESS_CHECKLIST.md
+### S15-T013 — Final Review MVP_SUCCESS_CHECKLIST.md
 **Status**: Todo  
 **Tujuan**: Mengecek seluruh MVP menggunakan checklist final.  
 **Checklist**:
@@ -1520,7 +1520,7 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 
 ---
 
-### S13-T014 — Release Readiness Checklist
+### S15-T014 — Release Readiness Checklist
 **Status**: Todo  
 **Tujuan**: Menyiapkan project agar layak dipindahkan ke staging/production internal.  
 **Checklist**:
@@ -1551,12 +1551,12 @@ Sprint ini memastikan aplikasi tidak hanya lulus test teknis, tetapi juga layak 
 ---
 ---
 
-# Notes Sprint 9–13
+# Notes Sprint 11–13
 
-Sprint 9 sampai Sprint 13 adalah sprint lanjutan setelah fitur MVP utama selesai.
+Sprint 11 sampai Sprint 15 adalah sprint lanjutan setelah fitur MVP utama selesai.
 
 **Aturan**:
-1. Jangan mengerjakan Sprint 9 sebelum **S8-T006 — Import Data Legacy sand_db_sandya.sql** selesai.
+1. Jangan mengerjakan Sprint 11 sebelum **S8-T006 — Import Data Legacy sand_db_sandya.sql** selesai.
 2. Jangan membuat role per cabang seperti NOC Siman, NOC Jetis, atau Teknisi Siman.
 3. Gunakan pola **Role + Scope**.
 4. Contoh benar: Role NOC, Scope `all_pop`.
@@ -1572,11 +1572,11 @@ Sprint 9 sampai Sprint 13 adalah sprint lanjutan setelah fitur MVP utama selesai
 14. Jika full test suite gagal, jangan lanjut release readiness.
 15. Jika MVP Success Checklist belum terpenuhi, MVP belum layak dianggap selesai.
 
-**Urutan setelah S8-T006 selesai**:
-1. Pindahkan S8-T006 ke Done.
-2. Jadikan **S9-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC** sebagai In Progress.
-3. Selesaikan Sprint 9 untuk dokumen dan desain Advanced RBAC.
-4. Lanjut Sprint 10 untuk database dan core engine.
-5. Lanjut Sprint 11 untuk UI, middleware, scope enforcement, dan tests.
-6. Lanjut Sprint 12 untuk PRD compliance audit dan hardening.
-7. Lanjut Sprint 13 untuk UAT dan release readiness.
+**Urutan setelah S10-T002 selesai**:
+1. Pindahkan S10-T002 ke Done.
+2. Jadikan **S11-T001 — Normalisasi docs/TASKS.md dan Tambahkan Roadmap Advanced RBAC** sebagai In Progress.
+3. Selesaikan Sprint 11 untuk dokumen dan desain Advanced RBAC.
+4. Lanjut Sprint 12 untuk database dan core engine.
+5. Lanjut Sprint 13 untuk UI, middleware, scope enforcement, dan tests.
+6. Lanjut Sprint 14 untuk PRD compliance audit dan hardening.
+7. Lanjut Sprint 15 untuk UAT dan release readiness.

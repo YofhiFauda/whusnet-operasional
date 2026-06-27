@@ -94,7 +94,7 @@ class CustomerActivationTest extends TestCase
 
     public function test_unauthorized_user_cannot_activate_customer(): void
     {
-        $csRole = Role::query()->where('name', 'Customer Service')->firstOrFail();
+        $csRole = Role::query()->where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
             'status' => 'active',

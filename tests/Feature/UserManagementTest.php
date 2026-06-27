@@ -54,7 +54,7 @@ class UserManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('Manajemen User & POP');
         $response->assertSee('User Operasional', false);
-        $response->assertSee('Assign POP', false);
+        $response->assertSee('Atur Cabang', false);
         $response->assertSee($pop->name, false);
     }
 
@@ -143,7 +143,7 @@ class UserManagementTest extends TestCase
         $response = $this->get(route('users.pops.edit', $user));
 
         $response->assertOk();
-        $response->assertSee('Assign POP/Cabang');
+        $response->assertSee('Assign POP');
         $response->assertSee('Petugas POP', false);
     }
 }

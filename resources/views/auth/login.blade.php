@@ -33,16 +33,7 @@
         <!-- Form Card -->
         <x-ui.card class="p-8 shadow-large">
             
-            <!-- Global Alert Errors -->
-            @if ($errors->any())
-                <x-ui.alert-banner type="error" title="Gagal masuk:" class="mb-6">
-                    <ul class="list-disc list-inside mt-1 space-y-0.5">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </x-ui.alert-banner>
-            @endif
+            <!-- Global Alert Errors handled by Toast -->
 
             <form action="{{ route('login') }}" method="POST" class="space-y-6">
                 @csrf
@@ -97,6 +88,34 @@
                     Masuk ke Sistem
                 </x-ui.button>
             </form>
+
+            @if(app()->environment('local'))
+            <!-- Development Login Helper -->
+            <div class="mt-8 pt-6 border-t border-border-main">
+                <p class="text-xs font-semibold text-text-muted mb-3 text-center uppercase tracking-wider">Development Login Helper</p>
+                <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                    @foreach(\App\Models\User::with('role')->get() as $devUser)
+                    <x-ui.button 
+                        type="button" 
+                        variant="outline" 
+                        class="h-auto py-2 px-2 flex flex-col items-center justify-center gap-0.5 hover:border-primary hover:text-primary transition-colors"
+                        onclick="fillLogin('{{ $devUser->email }}', 'password')"
+                        title="Login sebagai {{ $devUser->name }}"
+                    >
+                        <span class="text-xs font-semibold">{{ $devUser->role->name ?? 'User Tanpa Role' }}</span>
+                        <span class="text-[10px] opacity-70 truncate w-full text-center">{{ $devUser->email }}</span>
+                    </x-ui.button>
+                    @endforeach
+                </div>
+            </div>
+            
+            <script>
+                function fillLogin(email, password) {
+                    document.getElementById('email').value = email;
+                    document.getElementById('password').value = password;
+                }
+            </script>
+            @endif
         </x-ui.card>
 
         <!-- Footer Text -->
@@ -105,5 +124,6 @@
         </p>
     </div>
 
+    <x-toast />
 </body>
 </html>

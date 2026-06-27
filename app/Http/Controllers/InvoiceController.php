@@ -19,7 +19,7 @@ class InvoiceController extends Controller
         $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
 
         $query = Invoice::query()
-            ->forUser()
+            ->applyUserScope()
             ->with(['customer', 'pop', 'customerService', 'internetPackage'])
             ->latest('issue_date')
             ->latest('id');
@@ -89,7 +89,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice): View
     {
         abort_unless(
-            Invoice::query()->forUser()->whereKey($invoice->id)->exists(),
+            Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
             403,
             'Anda tidak memiliki akses ke tagihan POP ini.'
         );

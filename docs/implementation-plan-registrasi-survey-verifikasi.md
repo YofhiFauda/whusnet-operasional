@@ -219,7 +219,11 @@ Estimasi: **4 sprint @ 1 minggu** (asumsi 1 developer fokus). Sequencing wajib m
 1. **Sebenarnya untuk melihat kecepatan waktu survey, pemasangan, dan aktivasi jadi dari pada tekan action di web mending di SCAN. Namun fitur tersebut masih belum di implementasikan lebih jauh jadi untuk sekarang diabaikan saja**
 2. **untuk Sekarang owner saja sudah cukup, karena nanti ada pengembangan RBAC**
 3. **Masuk Kedalam Halaman List Pelanggan Gagal**
-4. **Untuk durasi standar countdown survey & pemasangan mengikuti ketentuan yang berlaku di internal kami yaitu survey 2x24 jam dan pemasangan 2x24 jam, dan Sebetulnya Countdown ini untuk melihat seberapa cepat teknisi melakukan survey, laporan survey, pemasangan, laporan pemasangan, dan aktivasi, serta membantu mengejar target waktu**
+4. **Untuk durasi standar countdown mengikuti ketentuan internal yang berlaku:**
+   - **Countdown Survey: 1×24 jam** sejak pelanggan didaftarkan — survey harus sudah dilakukan.
+   - **Countdown Verifikasi/Pemasangan: 3×24 jam** sejak survey selesai — harus sudah diverifikasi dan dipasang.
+   - *(Catatan: aturan lama 2×24 jam untuk keduanya telah diperbarui per keputusan bisnis.)*
+   - Countdown ini untuk melihat seberapa cepat teknisi melakukan survey, laporan survey, pemasangan, laporan pemasangan, dan aktivasi, serta membantu mengejar target waktu.
 
 ---
 

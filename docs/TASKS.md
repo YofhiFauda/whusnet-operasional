@@ -1,9 +1,9 @@
 ## Status Project Saat Ini
-Current Sprint: **Sprint 8.9** (Koreksi Architecture Task Management)
-Current Module: Task Management Refactor — Central List, FOP Quality Gate, Checklist Scheduling
-Current Task: S8.9-T002 — FOP Reject/Pending Actions di Task Detail
+Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
+Current Module: Task Notification History & Management
+Current Task: S8.10-T003 — FOP Notification Dashboard
 
-> **Sprint 8.9 Tasks:** T001 (Done), T002 (In Progress), T003–T006 (To Do)
+> **Sprint 8.9 Tasks:** T001–T006 (Done)
 > **Sebelumnya:** Sprint 8.4 SELESAI, Sprint 8.5–8.8 ada issues (Calendar unnecessary, Missing Quality Gate, Missing Checklist)
 > **Analisa Koreksi:** `memory/S8_architecture_correction.md` — Reinterpretasi brief, architecture breakdown, action items
 
@@ -59,7 +59,7 @@ Restruktur task management workflow sesuai brief yang benar:
 ---
 
 ### S8.9-T002 — FOP Reject/Pending Actions di Task Detail
-**Status**: In Progress
+**Status**: Done
 **Tujuan**: Implementasi button "Reject" dan "Pending" untuk FOP pada pending task, dan "Approve/Reject/Pending" saat review task yang sudah `selesai` oleh teknisi.
 
 **File dibuat/diubah:**
@@ -103,18 +103,18 @@ FOP Reject (selesai task):
 ```
 
 **Acceptance Criteria**:
-- [ ] FOP bisa reject pending task dengan alasan
-- [ ] FOP bisa pending scheduled task dengan alasan
-- [ ] FOP bisa approve/reject/pending task yang sudah selesai oleh teknisi
-- [ ] Task status & fop_review_status tercatat di DB
-- [ ] Customer status hanya auto-update saat FOP approve (bukan saat teknisi submit)
-- [ ] Permission gate: hanya role FOP (atau authorized user) bisa trigger action ini
+- [x] FOP bisa reject pending task dengan alasan
+- [x] FOP bisa pending scheduled task dengan alasan
+- [x] FOP bisa approve/reject/pending task yang sudah selesai oleh teknisi
+- [x] Task status & fop_review_status tercatat di DB
+- [x] Customer status hanya auto-update saat FOP approve (bukan saat teknisi submit)
+- [x] Permission gate: hanya role FOP (atau authorized user) bisa trigger action ini
 
 ---
 
 ### S8.9-T003 — Checklist Input saat Task Scheduling
-**Status**: To Do
-**Tujuan**: Saat FOP jadwalkan task (via TaskController::schedule), tambah form untuk input checklist template yang akan di-check oleh teknisi saat eksekusi.
+**Status**: Done
+**Tujuan**: Saat FOP jadwalkan task (via TaskController::schedule), tambah form untuk input checklist template yang akan di-check oleh teknisi saat eksekusi. 
 
 **File dibuat/diubah:**
 - `app/Http/Controllers/TaskController.php` — modifikasi `schedule()` untuk accept checklist_template input
@@ -148,17 +148,17 @@ Teknisi Complete (TaskSurveyReportController::store):
 ```
 
 **Acceptance Criteria**:
-- [ ] FOP bisa input checklist template saat jadwalkan task
-- [ ] Checklist items tersimpan sebagai JSON di `tasks.checklist_template`
-- [ ] Task detail menampilkan checklist (untuk FOP & teknisi)
-- [ ] Teknisi bisa check/uncheck items saat task in_progress
-- [ ] Teknisi tidak bisa submit laporan sampai semua checklist done
-- [ ] Checklist items immutable (tidak bisa edit setelah scheduled)
+- [x] FOP bisa input checklist template saat jadwalkan task
+- [x] Checklist items tersimpan sebagai JSON di `tasks.checklist_template` (ATAU langsung direct record di task_checklists)
+- [x] Task detail menampilkan checklist (untuk FOP & teknisi)
+- [x] Teknisi bisa check/uncheck items saat task in_progress
+- [x] Teknisi tidak bisa submit laporan sampai semua checklist done
+- [x] Checklist items immutable (tidak bisa edit setelah scheduled)
 
 ---
 
 ### S8.9-T004 — Refactor TaskSurveyReportController & TaskInstallationReportController (No Auto-Update)
-**Status**: To Do
+**Status**: Done
 **Tujuan**: Modifikasi kedua controller agar submit laporan tidak langsung auto-update customer status. Sebaliknya, set task status = selesai + fop_review_status = pending, tunggu FOP approve.
 
 **File diubah:**
@@ -185,34 +185,32 @@ AFTER (Correct):
 ```
 
 **Acceptance Criteria**:
-- [ ] Teknisi submit laporan tidak trigger customer workflow transition
-- [ ] Task status = selesai, fop_review_status = pending after submit
-- [ ] FOP approve di `TaskController::review()` trigger customer transition
-- [ ] FOP reject restore task ke in_progress (atau pending) + revert customer status
+- [x] Teknisi submit laporan tidak trigger customer workflow transition
+- [x] Task status = selesai, fop_review_status = pending after submit
+- [x] FOP approve di `TaskController::review()` trigger customer transition
+- [x] FOP reject restore task ke in_progress (atau pending) + revert customer status
 
 ---
 
 ### S8.9-T005 — Refactor TaskController::schedule() untuk Accept Checklist
-**Status**: To Do
+**Status**: Done
 **Tujuan**: Update schedule action untuk handle checklist_template input.
 
 **File diubah:**
-- `app/Http/Controllers/TaskController.php` — update `schedule()` method
-- `routes/web.php` — ensure POST route ada
-- Validation: checklist items tidak boleh kosong (optional tapi recommended)
+- `app/Http/Controllers/TaskController.php` — update `schedule()` method (Sudah diselesaikan secara bersamaan pada implementasi S8.9-T003).
 
 **Acceptance Criteria**:
-- [ ] Schedule form accept checklist input
-- [ ] Checklist template saved to DB
-- [ ] Teknisi see checklist saat task detail
-- [ ] Laporan submit require checklist complete
+- [x] Schedule form accept checklist input (Done di T003)
+- [x] Checklist template saved to DB (Done di T003)
+- [x] Teknisi see checklist saat task detail (Done di T003)
+- [x] Laporan submit require checklist complete (Done di T003)
 
 ---
 
 ## Sprint 8.9B — Cleanup & Refactor (Optional/Later)
 
 ### S8.9-T006 — DELETE S8.7 FOP Calendar (atau Refactor ke List)
-**Status**: To Do
+**Status**: Done
 **Tujuan**: Remove calendar route/controller jika tidak diperlukan, atau refactor jadi list view. Clarify dengan user.
 
 **Decision pending:**
@@ -239,17 +237,13 @@ Setelah S8.9 DONE, prioritaskan Tier 1 berikut untuk skalabilitas enterprise dan
 **Tujuan:** Catat setiap perubahan task (siapa, apa, kapan) dan implementasi notifikasi real-time.
 
 **Tasks:**
-- **S8.10-T001:** Audit Trail Model & Logging
-  - Track: task created, scheduled, rejected, approved, reassigned
-  - Fields: user_id, action, old_values, new_values, timestamp, IP, user_agent
-  - View: Audit log di task detail (FOP only)
 
-- **S8.10-T002:** Notification System
+- [x] **S8.10-T002:** Notification System
   - Events: task_assigned, task_rejected, task_approved, checklist_updated
-  - Channels: database (in-app), email, Webhook (Slack/Teams optional)
+  - Channels: database (in-app), Reverb (Real-time Broadcast)
   - Delivery: queue-based (async)
 
-- **S8.10-T003:** FOP Notification Dashboard
+- [/] **S8.10-T003:** FOP Notification Dashboard (In Progress)
   - View notification history
   - Filter: by date, by action, by user
   - Mark as read/unread
@@ -767,20 +761,20 @@ Memperbaiki dua kesalahan kritis pada flow onboarding baru:
 - Seharusnya: hanya Admin/Helpdesk yang bisa tekan ini, FOP tidak
 
 **Checklist:**
-- [ ] Buat atau repurpose controller method: pindahkan logic `processToTim` ke `CustomerVerificationController` atau buat `AccProcessController`
-- [ ] Update permission check: hanya role Admin/Helpdesk yang bisa akses endpoint ini
-- [ ] UI: tampilkan button "Proses ke TIM" di halaman Verifikasi & Pemasangan (bukan FOP Dashboard)
-- [ ] FOP Dashboard: hapus atau sembunyikan button "Proses ke TIM" dari kolom "Perlu Aksi FOP"
-- [ ] FOP Dashboard: kolom "Perlu Aksi FOP" tetap menampilkan pelanggan `waiting_acc` sebagai informasi, tapi tanpa button aksi
-- [ ] Update route di `routes/web.php` — middleware permission disesuaikan
-- [ ] Update `docs/analisa-flow-baru-dan-sprint.md` setelah selesai
+- [x] Buat atau repurpose controller method: pindahkan logic `processToTim` ke `CustomerVerificationController` atau buat `AccProcessController`
+- [x] Update permission check: hanya role Admin/Helpdesk yang bisa akses endpoint ini
+- [x] UI: tampilkan button "Proses ke TIM" di halaman Verifikasi & Pemasangan (bukan FOP Dashboard)
+- [x] FOP Dashboard: hapus atau sembunyikan button "Proses ke TIM" dari kolom "Perlu Aksi FOP"
+- [x] FOP Dashboard: kolom "Perlu Aksi FOP" tetap menampilkan pelanggan `waiting_acc` sebagai informasi, tapi tanpa button aksi
+- [x] Update route di `routes/web.php` — middleware permission disesuaikan
+- [x] Update `docs/analisa-flow-baru-dan-sprint.md` setelah selesai
 
 **Acceptance Criteria:**
-- [ ] Admin/Helpdesk bisa tekan "Proses ke TIM" dari halaman Verifikasi & Pemasangan
-- [ ] FOP tidak bisa akses endpoint processToTim (403 jika coba langsung)
-- [ ] FOP Dashboard masih menampilkan daftar `waiting_acc` sebagai info saja
-- [ ] Status customer berubah ke `waiting_installation` setelah Admin/Helpdesk konfirmasi
-- [ ] Task pemasangan otomatis masuk Antrean Tiket FOP
+- [x] Admin/Helpdesk bisa tekan "Proses ke TIM" dari halaman Verifikasi & Pemasangan
+- [x] FOP tidak bisa akses endpoint processToTim (403 jika coba langsung)
+- [x] FOP Dashboard masih menampilkan daftar `waiting_acc` sebagai info saja
+- [x] Status customer berubah ke `waiting_installation` setelah Admin/Helpdesk konfirmasi
+- [x] Task pemasangan otomatis masuk Antrean Tiket FOP
 
 ---
 
@@ -794,22 +788,22 @@ Memperbaiki dua kesalahan kritis pada flow onboarding baru:
 - Teknisi di lapangan pakai HP, tidak tahu harus ke halaman survey queue
 
 **Checklist:**
-- [ ] Di `tasks/own.blade.php`: tambah button **"Mulai Survey"** pada task card yang `status = terjadwal` dan `task_type = survey`
+- [x] Di `tasks/own.blade.php`: tambah button **"Mulai Survey"** pada task card yang `status = terjadwal` dan `task_type = survey`
   - Button trigger POST ke `route('customers.survey.start', $task->customer_id)`
   - Setelah sukses: task status → `in_progress`, customer status → `survey_in_progress`
   - Button berubah menjadi "Laporan Survey" (slide-over sudah ada)
-- [ ] Di `tasks/show.blade.php`: tambah button "Mulai Survey" dengan logic yang sama
-- [ ] Guard: hanya anggota tim task tersebut yang bisa tekan (validasi `$task->teamMembers->pluck('user_id')->contains(auth()->id())`)
-- [ ] Guard: permission `customers.detail.survey.update`
-- [ ] Pastikan `CustomerSurveyController::start()` atau `TaskStatusController` menangani transisi dengan benar
+- [x] Di `tasks/show.blade.php`: tambah button "Mulai Survey" dengan logic yang sama
+- [x] Guard: hanya anggota tim task tersebut yang bisa tekan (validasi `$task->teamMembers->pluck('user_id')->contains(auth()->id())`)
+- [x] Guard: permission `customers.detail.survey.update`
+- [x] Pastikan `CustomerSurveyController::start()` atau `TaskStatusController` menangani transisi dengan benar
 
 **Acceptance Criteria:**
-- [ ] Teknisi bisa tekan "Mulai Survey" langsung dari `tasks/own.blade.php`
-- [ ] Customer status berubah ke `survey_in_progress`
-- [ ] Task status berubah ke `in_progress`
-- [ ] Countdown SLA eksekusi mulai berjalan
-- [ ] Button berganti ke "Laporan Survey" (slide-over existing)
-- [ ] Teknisi yang bukan anggota tim tidak bisa tekan (403 atau button hidden)
+- [x] Teknisi bisa tekan "Mulai Survey" langsung dari `tasks/own.blade.php`
+- [x] Customer status berubah ke `survey_in_progress`
+- [x] Task status berubah ke `in_progress`
+- [x] Countdown SLA eksekusi mulai berjalan
+- [x] Button berganti ke "Laporan Survey" (slide-over existing)
+- [x] Teknisi yang bukan anggota tim tidak bisa tekan (403 atau button hidden)
 
 ---
 
@@ -818,19 +812,19 @@ Memperbaiki dua kesalahan kritis pada flow onboarding baru:
 **Tujuan**: Sama dengan S8.4-T002 tapi untuk fase pemasangan. Sekarang "Mulai Pasang" tidak ada di `tasks/own.blade.php` — harus ditambahkan agar alur teknisi konsisten.
 
 **Checklist:**
-- [ ] Di `tasks/own.blade.php`: tambah button **"Mulai Pemasangan"** pada task card yang `status = terjadwal` dan `task_type = pemasangan`
+- [x] Di `tasks/own.blade.php`: tambah button **"Mulai Pemasangan"** pada task card yang `status = terjadwal` dan `task_type = pemasangan`
   - Button trigger endpoint yang mengubah customer → `installation_in_progress` dan task → `in_progress`
   - Setelah sukses: button berganti ke "Laporan Pemasangan" (slide-over existing sudah ada)
-- [ ] Di `tasks/show.blade.php`: tambah button dengan logic yang sama
-- [ ] Guard: hanya anggota tim task tersebut + permission `customers.detail.installation.update`
-- [ ] Verifikasi customer status valid (`waiting_installation`) sebelum mulai
+- [x] Di `tasks/show.blade.php`: tambah button dengan logic yang sama
+- [x] Guard: hanya anggota tim task tersebut + permission `customers.detail.installation.update`
+- [x] Verifikasi customer status valid (`waiting_installation`) sebelum mulai
 
 **Acceptance Criteria:**
-- [ ] Teknisi bisa tekan "Mulai Pemasangan" dari `tasks/own.blade.php`
-- [ ] Customer status berubah ke `installation_in_progress`
-- [ ] Task status berubah ke `in_progress`
-- [ ] Button berganti ke "Laporan Pemasangan"
-- [ ] Countdown SLA eksekusi mulai berjalan
+- [x] Teknisi bisa tekan "Mulai Pemasangan" dari `tasks/own.blade.php`
+- [x] Customer status berubah ke `installation_in_progress`
+- [x] Task status berubah ke `in_progress`
+- [x] Button berganti ke "Laporan Pemasangan"
+- [x] Countdown SLA eksekusi mulai berjalan
 
 ---
 
@@ -846,23 +840,79 @@ Memperbaiki dua kesalahan kritis pada flow onboarding baru:
 - Referensi: `docs/analisa-flow-baru-dan-sprint.md` — Bagian 6
 
 **Checklist:**
-- [ ] Di `DashboardController::index()`, tambah early return untuk role FOP **sebelum** block `if (!hasPermission('dashboard.view'))`:
+- [x] Di `DashboardController::index()`, tambah early return untuk role FOP **sebelum** block `if (!hasPermission('dashboard.view'))`:
   ```php
   if (auth()->user()->hasRole('fop')) {
       return redirect()->route('fop.dashboard');
   }
   ```
-- [ ] Verifikasi redirect tidak loop (route `fop.dashboard` punya middleware `permission:task.view.all` yang FOP miliki)
-- [ ] Pastikan FOP yang juga punya role lain (edge case) tidak terdampak negatif
+- [x] Verifikasi redirect tidak loop (route `fop.dashboard` punya middleware `permission:task.view.all` yang FOP miliki)
+- [x] Pastikan FOP yang juga punya role lain (edge case) tidak terdampak negatif
 
 **Acceptance Criteria:**
-- [ ] FOP login → langsung ke `/fop` (FOP Dashboard)
-- [ ] Teknisi login → tetap ke `/tasks-saya` (tidak berubah)
-- [ ] Admin/Owner/Helpdesk login → tetap ke dashboard billing (tidak berubah)
-- [ ] Tidak ada redirect loop
+- [x] FOP login → langsung ke `/fop` (FOP Dashboard)
+- [x] Teknisi login → tetap ke `/tasks-saya` (tidak berubah)
+- [x] Admin/Owner/Helpdesk login → tetap ke dashboard billing (tidak berubah)
+- [x] Tidak ada redirect loop
 
 **File yang diubah:**
 - `app/Http/Controllers/DashboardController.php` — tambah 3 baris di atas baris 19
+
+---
+
+### S8.4-T005 — RBAC Dinamis untuk Workflow Transitions
+**Status**: Done
+**Tujuan**: Infrastructure untuk membuat workflow transitions (pending → scheduled → in_progress → selesai, etc.) configurable via database RBAC daripada hardcoded di enum. Memungkinkan role/permission berubah tanpa code deploy. Specific focus: "Proses ke Tim" action dapat di-assign ke berbagai roles (FOP, Admin, Helpdesk) lewat database configuration.
+
+**Konteks masalah:**
+- Saat ini workflow transitions & allowed actions hardcoded di `WorkflowTransition.php` enum dan controller policies
+- Jika role permissions berubah (misal: Admin baru bisa schedule), perlu update code + deploy
+- MVP scope awal tidak memerlukan ini, tapi user menginginkan fleksibilitas RBAC-dynamic untuk future-proof
+- `S8.4-T001` mengubah aktor "Proses ke Tim" dari FOP ke Admin/Helpdesk — ini membuktikan kebutuhan akan flexibility
+- Later: role changes akan frequent, perlu system yang configurable via DB
+
+**Checklist:**
+- [x] Create migration `create_workflow_transition_permissions_table`:
+  ```
+  id, from_status, to_status, permission_name, created_at
+  ```
+- [x] Create Model `WorkflowTransitionPermission` dengan relationships ke `Role` (many-to-many via pivot)
+- [x] Update `Role` model: add `hasMany WorkflowTransitionPermission`
+- [x] Create Seeder `WorkflowTransitionPermissionSeeder`:
+  - Map existing transitions: `pending → scheduled` = `task.schedule`
+  - Map: `pending → rejected` = `task.reject`
+  - Map: `pending → pending` = `task.pending`
+  - Map: `scheduled → in_progress` = `task.start`
+  - Map: `in_progress → selesai` = `task.complete`
+  - Map: `selesai → approved` = `task.approve` (FOP review)
+  - Map: `selesai → rejected` = `task.reject` (FOP review)
+- [x] Update `TaskPolicy`:
+  - Change from hardcoded `->hasRole('fop')` checks
+  - Fetch rule dynamically: `WorkflowTransitionPermission::where('from_status', $task->status)->where('to_status', $newStatus)->first()`
+  - Check: `$user->hasPermission($rule->permission_name)`
+- [x] Update `TaskController` methods (`schedule()`, `reject()`, `approve()`, etc.):
+  - Use `$this->authorize()` with updated policies
+  - Keep existing logic, only change auth check
+- [x] Ensure `Pop` scope still applied (multi-POP isolation)
+- [x] Add seeder call ke `DatabaseSeeder`
+
+**Acceptance Criteria:**
+- [x] "Proses ke Tim" action available untuk Admin, Helpdesk, FOP (configured in seeder)
+- [x] Permission check validates against `workflow_transition_permissions` table
+- [x] Role change (add/remove `task.schedule` from Admin) reflected in UI without deploy
+- [x] S8.4-T001 flow works: Admin/Helpdesk dapat "Proses ke Tim" tanpa code change
+- [x] No breaking changes to existing TaskPolicy behavior
+- [x] POP scope enforced (tidak bisa cross-assign task antar POP)
+- [x] Tests pass for all transition scenarios
+
+**File yang diubah:**
+- `database/migrations/xxxx_create_workflow_transition_permissions_table.php` (baru)
+- `app/Models/WorkflowTransitionPermission.php` (baru)
+- `app/Models/Role.php` — add relationship
+- `database/seeders/WorkflowTransitionPermissionSeeder.php` (baru)
+- `database/seeders/DatabaseSeeder.php` — add call
+- `app/Policies/TaskPolicy.php` — refactor checks
+- `app/Http/Controllers/TaskController.php` — minimal change (authorization stays)
 
 ---
 
@@ -1128,23 +1178,23 @@ Menyelesaikan fitur-fitur edge case dan audit trail yang tercatat sebagai gap di
 ---
 
 ### S8.8-T003 — Fitur Reassign Teknisi Tanpa Reset Status Customer
-**Status**: In Progress
+**Status**: Done
 **Tujuan**: Jika teknisi yang di-assign tidak bisa hadir, FOP harus bisa mengganti anggota tim task tanpa reset status customer ke fase sebelumnya.
 
 **Checklist:**
-- [ ] Buat endpoint `PATCH /tasks/{task}/team` → `TaskTeamController::update()`
-- [ ] Validasi: task harus `terjadwal` atau `in_progress` (tidak bisa reassign task `selesai`)
-- [ ] Logic: update atau replace record di `task_teams` untuk teknisi yang diganti
-- [ ] Broadcast `TaskScheduled` ke teknisi baru (notifikasi)
-- [ ] Broadcast ke teknisi lama bahwa mereka di-unassign (opsional: event `TaskUnassigned`)
-- [ ] Guard: permission `task.assign.team`
-- [ ] UI: tombol "Ganti Teknisi" di slide-over detail task FOP Dashboard
+- [x] Buat endpoint `PATCH /tasks/{task}/team` → `TaskTeamController::update()`
+- [x] Validasi: task harus `terjadwal` atau `in_progress` (tidak bisa reassign task `selesai`)
+- [x] Logic: update atau replace record di `task_teams` untuk teknisi yang diganti
+- [x] Broadcast `TaskScheduled` ke teknisi baru (notifikasi)
+- [x] Broadcast ke teknisi lama bahwa mereka di-unassign (opsional: event `TaskUnassigned`)
+- [x] Guard: permission `task.assign.team`
+- [x] UI: tombol "Ganti Teknisi" di slide-over detail task FOP Dashboard
 
 **Acceptance Criteria:**
-- [ ] FOP bisa ganti teknisi tanpa mengubah status customer
-- [ ] Teknisi baru menerima notifikasi Reverb
-- [ ] Task history tidak hilang (log tersimpan)
-- [ ] Task tetap di kolom kanban yang sama setelah reassign
+- [x] FOP bisa ganti teknisi tanpa mengubah status customer
+- [x] Teknisi baru menerima notifikasi Reverb
+- [x] Task history tidak hilang (log tersimpan)
+- [x] Task tetap di kolom kanban yang sama setelah reassign
 
 ---
 
@@ -1194,8 +1244,10 @@ Menyelesaikan fitur-fitur edge case dan audit trail yang tercatat sebagai gap di
 ---
 
 
+
+
 ### S13-T009 — Test Matrix Advanced RBAC
-**Status**: In Progress  
+**Status**: TODO  
 **Tujuan**: Membuat test lengkap untuk role, permission, scope, route, field sensitif, dan menu.  
 **Checklist**:
 - [ ] Test Owner bisa semua.

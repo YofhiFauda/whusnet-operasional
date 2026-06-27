@@ -25,6 +25,47 @@ class DashboardTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_user_without_dashboard_permission_is_blocked(): void
+    {
+        $emptyRole = Role::create([
+            'name' => 'No Dashboard Role',
+            'guard_name' => 'web',
+            'description' => 'No dashboard access',
+        ]);
+        
+        $user = User::factory()->create([
+            'role_id' => $emptyRole->id,
+            'status' => 'active',
+        ]);
+        
+        $response = $this->actingAs($user)->get('/');
+        $response->assertStatus(403);
+    }
+
+    public function test_user_without_dashboard_but_with_own_tasks_permission_is_redirected_to_own_tasks(): void
+    {
+        $role = Role::create([
+            'name' => 'Technician No Dashboard',
+            'guard_name' => 'web',
+            'description' => 'Technician with own task view',
+        ]);
+        
+        $taskOwnPerm = \App\Models\Permission::firstOrCreate([
+            'code' => 'task.view.own',
+        ], [
+            'name' => 'Lihat Task Sendiri',
+        ]);
+        $role->permissions()->attach($taskOwnPerm->id);
+        
+        $user = User::factory()->create([
+            'role_id' => $role->id,
+            'status' => 'active',
+        ]);
+        
+        $response = $this->actingAs($user)->get('/');
+        $response->assertRedirect(route('tasks.own'));
+    }
+
     public function test_authenticated_user_can_access_dashboard(): void
     {
         $ownerRole = Role::where('name', 'Owner')->firstOrFail();
@@ -70,7 +111,7 @@ class DashboardTest extends TestCase
     {
         // CS Role permissions: view_pop, view_packages, create_customers, edit_customers, view_customers
         // CS role has NO 'import_customers' permission by default, but has view/create
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
+        $csRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
             'status' => 'active',
@@ -92,12 +133,16 @@ class DashboardTest extends TestCase
 
     public function test_restricted_user_with_no_permissions_hides_entire_dropdowns(): void
     {
-        // Let's create a custom role with zero permissions
+        // Let's create a custom role with zero permissions except dashboard.view
         $emptyRole = Role::create([
             'name' => 'Empty Role',
             'guard_name' => 'web',
             'description' => 'Role with no permissions',
         ]);
+        $dashboardViewPerm = \App\Models\Permission::where('code', 'dashboard.view')->first();
+        if ($dashboardViewPerm) {
+            $emptyRole->permissions()->attach($dashboardViewPerm->id);
+        }
 
         $user = User::factory()->create([
             'role_id' => $emptyRole->id,
@@ -117,7 +162,7 @@ class DashboardTest extends TestCase
 
     public function test_admin_cabang_only_sees_assigned_pop_data(): void
     {
-        $adminCabangRole = Role::where('name', 'Admin Cabang')->firstOrFail();
+        $adminCabangRole = Role::where('name', 'POP Admin')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $adminCabangRole->id,
             'status' => 'active',
@@ -146,6 +191,16 @@ class DashboardTest extends TestCase
 
         // Assign popA to the user
         $user->pops()->attach($popA->id);
+
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $adminCabangRole->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         // Clear existing customers to have clean assertion counts
         \App\Models\Customer::query()->delete();

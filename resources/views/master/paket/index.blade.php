@@ -4,11 +4,7 @@
 @section('page_title', 'Master Internet Package')
 
 @section('content')
-@if(session('success'))
-<div class="mb-6 bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg shadow-sm">
-    <span class="text-sm font-medium text-emerald-800">{{ session('success') }}</span>
-</div>
-@endif
+{{-- Flash messages ditangani otomatis oleh global Component Toast (<x-toast />) --}}
 
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

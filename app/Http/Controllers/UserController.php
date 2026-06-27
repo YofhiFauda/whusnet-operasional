@@ -6,9 +6,12 @@ use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\Pop;
 use App\Models\User;
+use App\Models\UserRoleScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
+use App\Services\UserScopeManagementService;
 
 class UserController extends Controller
 {
@@ -91,20 +94,21 @@ class UserController extends Controller
 
     public function create()
     {
-        $roles = Role::orderBy('name')->get();
-        $pops = Pop::orderBy('name')->get();
+        $roles   = Role::orderBy('name')->get();
+        $popTree = $this->buildPopTree();
 
-        return view('users.create', compact('roles', 'pops'));
+        return view('users.create', compact('roles', 'popTree'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, UserScopeManagementService $scopeService)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'role_id' => ['required', 'exists:roles,id'],
+            'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
@@ -117,12 +121,37 @@ class UserController extends Controller
             'status.in' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
             'role_id.required' => 'Role user wajib dipilih.',
             'role_id.exists' => 'Role user yang dipilih tidak valid.',
+            'scope_type.required' => 'Scope wilayah data wajib dipilih.',
+            'scope_type.in' => 'Tipe scope tidak valid. Pilih Seluruh POP, Cabang POP, atau Distribusi POP.',
             'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
             'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
             'password.required' => 'Password user wajib diisi.',
             'password.min' => 'Password user minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
         ]);
+
+        $validator->after(function ($validator) use ($request) {
+            if ($request->role_id && $request->scope_type) {
+                $role = Role::find($request->role_id);
+                if ($role) {
+                    $scopeType = $request->scope_type;
+
+                    if ($role->code === 'owner' && $scopeType !== 'all_pop') {
+                        $validator->errors()->add('scope_type', 'Role Owner wajib menggunakan scope Seluruh POP.');
+                    } elseif ($role->code === 'atasan' && $scopeType !== 'all_pop') {
+                        $validator->errors()->add('scope_type', 'Role Atasan wajib menggunakan scope Seluruh POP.');
+                    } elseif ($role->code === 'pop_admin' && $scopeType !== 'selected_pop') {
+                        $validator->errors()->add('scope_type', 'Role Admin POP wajib menggunakan scope Cabang POP.');
+                    }
+
+                    if ($scopeType === 'selected_pop' && empty($request->pop_ids)) {
+                        $validator->errors()->add('pop_ids', 'Minimal 1 POP target wajib dipilih untuk scope ini.');
+                    }
+                }
+            }
+        });
+
+        $validated = $validator->validate();
 
         $user = User::create([
             'name' => $validated['name'],
@@ -133,7 +162,7 @@ class UserController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $user->pops()->sync($validated['pop_ids'] ?? []);
+        $scopeService->syncUserRoleScope($user, $validated['scope_type'], $validated['pop_ids'] ?? []);
 
         AuditLog::create([
             'user_id' => auth()->id(),
@@ -141,10 +170,7 @@ class UserController extends Controller
             'action' => 'create',
             'auditable_type' => User::class,
             'auditable_id' => $user->id,
-            'new_values' => array_merge(
-                $user->only(['name', 'email', 'phone', 'status', 'role_id']),
-                ['pop_ids' => $this->popIdValues($user)]
-            ),
+            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id']),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'created_at' => now(),
@@ -155,20 +181,21 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $roles = Role::orderBy('name')->get();
-        $pops = Pop::orderBy('name')->get();
+        $roles   = Role::orderBy('name')->get();
+        $popTree = $this->buildPopTree();
 
-        return view('users.edit', compact('user', 'roles', 'pops'));
+        return view('users.edit', compact('user', 'roles', 'popTree'));
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, User $user, UserScopeManagementService $scopeService)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'role_id' => ['required', 'exists:roles,id'],
+            'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
@@ -181,14 +208,38 @@ class UserController extends Controller
             'status.in' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
             'role_id.required' => 'Role user wajib dipilih.',
             'role_id.exists' => 'Role user yang dipilih tidak valid.',
+            'scope_type.required' => 'Scope wilayah data wajib dipilih.',
+            'scope_type.in' => 'Tipe scope tidak valid. Pilih Seluruh POP, Cabang POP, atau Distribusi POP.',
             'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
             'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
             'password.min' => 'Password user minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
         ]);
 
+        $validator->after(function ($validator) use ($request) {
+            if ($request->role_id && $request->scope_type) {
+                $role = Role::find($request->role_id);
+                if ($role) {
+                    $scopeType = $request->scope_type;
+
+                    if ($role->code === 'owner' && $scopeType !== 'all_pop') {
+                        $validator->errors()->add('scope_type', 'Role Owner wajib menggunakan scope Seluruh POP.');
+                    } elseif ($role->code === 'atasan' && $scopeType !== 'all_pop') {
+                        $validator->errors()->add('scope_type', 'Role Atasan wajib menggunakan scope Seluruh POP.');
+                    } elseif ($role->code === 'pop_admin' && $scopeType !== 'selected_pop') {
+                        $validator->errors()->add('scope_type', 'Role Admin POP wajib menggunakan scope Cabang POP.');
+                    }
+
+                    if ($scopeType === 'selected_pop' && empty($request->pop_ids)) {
+                        $validator->errors()->add('pop_ids', 'Minimal 1 POP target wajib dipilih untuk scope ini.');
+                    }
+                }
+            }
+        });
+
+        $validated = $validator->validate();
+
         $oldValues = $user->only(['name', 'email', 'phone', 'status', 'role_id']);
-        $oldValues['pop_ids'] = $user->pops()->pluck('pops.id')->map(fn ($id) => (int) $id)->values()->all();
 
         $user->fill([
             'name' => $validated['name'],
@@ -203,7 +254,7 @@ class UserController extends Controller
         }
 
         $user->save();
-        $user->pops()->sync($validated['pop_ids'] ?? []);
+        $scopeService->syncUserRoleScope($user, $validated['scope_type'], $validated['pop_ids'] ?? []);
 
         AuditLog::create([
             'user_id' => auth()->id(),
@@ -212,10 +263,7 @@ class UserController extends Controller
             'auditable_type' => User::class,
             'auditable_id' => $user->id,
             'old_values' => $oldValues,
-            'new_values' => array_merge(
-                $user->only(['name', 'email', 'phone', 'status', 'role_id']),
-                ['pop_ids' => $this->popIdValues($user)]
-            ),
+            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id']),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'created_at' => now(),
@@ -226,8 +274,8 @@ class UserController extends Controller
 
     public function editPops(User $user)
     {
-        $pops = Pop::orderBy('name')->get();
-        return view('users.edit_pops', compact('user', 'pops'));
+        $popTree = $this->buildPopTree();
+        return view('users.edit_pops', compact('user', 'popTree'));
     }
 
     public function updatePops(Request $request, User $user)
@@ -244,6 +292,9 @@ class UserController extends Controller
         $newPopIds = collect($validated['pop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
 
         $user->pops()->sync($validated['pop_ids'] ?? []);
+
+        // Clear access cache
+        app(\App\Services\EffectiveAccessService::class)->clearCache($user);
 
         if ($oldPopIds !== $newPopIds) {
             AuditLog::create([
@@ -263,15 +314,84 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'POP assignment updated successfully.');
     }
 
-    /**
-     * @return array<int, int>
-     */
-    private function popIdValues(User $user): array
+
+
+    public function previewAccess(Request $request)
     {
-        return $user->pops()
-            ->pluck('pops.id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        $roleId = $request->input('role_id');
+        $scopeType = $request->input('scope_type');
+        $popIds = $request->input('pop_ids', []);
+
+        if (!$roleId) {
+            return response()->json(['error' => 'Role tidak dipilih'], 400);
+        }
+
+        $role = Role::with(['permissions.feature', 'permissions.action'])->find($roleId);
+        if (!$role) {
+            return response()->json(['error' => 'Role tidak valid'], 400);
+        }
+
+        $featuresSummary = [];
+        $sensitiveActions = [];
+
+        foreach ($role->permissions as $permission) {
+            $featureName = $permission->feature->name ?? 'Global';
+            $actionName = $permission->action->name ?? '';
+            $actionCode = $permission->action->code ?? '';
+
+            if (!isset($featuresSummary[$featureName])) {
+                $featuresSummary[$featureName] = [];
+            }
+            $featuresSummary[$featureName][] = ucfirst($actionName);
+
+            if (in_array($actionCode, ['view_sensitive', 'update_sensitive', 'delete', 'cancel', 'reject', 'void'])) {
+                $sensitiveActions[] = "Dapat melakukan $actionName pada data $featureName";
+            }
+        }
+
+        $formattedFeatures = [];
+        if ($role->code === 'owner' || $role->name === 'Owner') {
+            $formattedFeatures[] = "Semua Fitur (Akses Penuh / Full Access)";
+            $sensitiveActions[] = "Dapat melakukan SEMUA tindakan sensitif (Bypass Akses)";
+        } else {
+            foreach ($featuresSummary as $feature => $actions) {
+                $actionsStr = implode(', ', array_unique($actions));
+                $formattedFeatures[] = "$feature ($actionsStr)";
+            }
+            if (empty($formattedFeatures)) {
+                $formattedFeatures[] = "Belum ada hak akses (Permission) yang diatur untuk jabatan ini. Silakan atur di menu Role & Permission.";
+            }
+        }
+
+        $popNames = [];
+        if (in_array($scopeType, ['selected_pop', 'pop_tree']) && !empty($popIds)) {
+            $popNames = Pop::whereIn('id', $popIds)->pluck('name')->toArray();
+        }
+
+        return response()->json([
+            'role_name' => $role->name,
+            'is_system' => $role->is_system,
+            'scope_type' => $scopeType,
+            'scope_label' => \App\Enums\ScopeType::tryFrom($scopeType)?->label() ?? $scopeType,
+            'pops' => $popNames,
+            'features' => $formattedFeatures,
+            'sensitive_actions' => array_unique($sensitiveActions),
+        ]);
+    }
+
+    /**
+     * Build a hierarchical POP tree for the view.
+     * Root POPs (parent_id = null) with up to 2 levels of children eager-loaded.
+     */
+    private function buildPopTree()
+    {
+        return Pop::with(['children' => function ($q) {
+            $q->orderBy('name')->with(['children' => function ($q2) {
+                $q2->orderBy('name');
+            }]);
+        }])
+        ->whereNull('parent_id')
+        ->orderBy('name')
+        ->get();
     }
 }

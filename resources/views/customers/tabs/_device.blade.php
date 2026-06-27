@@ -3,7 +3,7 @@
         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Data Perangkat Pelanggan</h3>
         <p class="text-xs text-slate-500 mt-0.5">Informasi modem, ONT, router, PPPoE, WiFi, ODP, VLAN, dan catatan teknis.</p>
     </div>
-    @can('fill_device')
+    @can('customers.detail.devices.update')
         <button onclick="openDeviceModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -16,7 +16,7 @@
 @php
     $device = $customer->customerDevice;
     $technicalDetail = $customer->customerTechnicalDetail;
-    $canViewSensitiveDeviceFields = auth()->user()->hasPermission('fill_device');
+    $canViewSensitiveDeviceFields = auth()->user()->hasPermission('customers.detail.devices.view_sensitive');
     $maskSensitive = fn ($value) => $canViewSensitiveDeviceFields ? ($value ?: '-') : ($value ? '********' : '-');
 @endphp
 
@@ -50,11 +50,11 @@
                 </div>
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">IP Address</span>
-                    <span class="font-semibold text-slate-800 font-mono">{{ $device->ip_address ?: '-' }}</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $maskSensitive($device->ip_address) }}</span>
                 </div>
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">VLAN ID</span>
-                    <span class="font-semibold text-slate-800 font-mono">{{ $device->vlan_id ?: '-' }}</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $maskSensitive($device->vlan_id) }}</span>
                 </div>
             </div>
             <div class="space-y-3">
@@ -133,11 +133,11 @@
                     </div>
                     <div class="flex justify-between border-b border-slate-50 py-1">
                         <span class="text-slate-500">IP Address</span>
-                        <span class="font-semibold text-slate-800 font-mono">{{ $technicalDetail?->ip_address ?? $customer->ip_address ?? '-' }}</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $maskSensitive($technicalDetail?->ip_address ?? $customer->ip_address) }}</span>
                     </div>
                     <div class="flex justify-between border-b border-slate-50 py-1">
                         <span class="text-slate-500">VLAN ID</span>
-                        <span class="font-semibold text-slate-800 font-mono">{{ $customer->vlan_id ?? '-' }}</span>
+                        <span class="font-semibold text-slate-800 font-mono">{{ $maskSensitive($customer->vlan_id) }}</span>
                     </div>
                 </div>
                 <div class="space-y-3">
@@ -239,7 +239,7 @@
                 </div>
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">VLAN (Teknis Jaringan)</span>
-                    <span class="font-semibold text-slate-800 font-mono">{{ $tech->vlan ?: '-' }}</span>
+                    <span class="font-semibold text-slate-800 font-mono">{{ $maskSensitive($tech->vlan) }}</span>
                 </div>
             </div>
         </div>
@@ -345,7 +345,7 @@
                 </div>
                 <div>
                     <label for="pppoe_password" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password PPPoE</label>
-                    <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $device?->pppoe_password) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="pppoe_password" id="pppoe_password" value="{{ $canViewSensitiveDeviceFields ? old('pppoe_password', $device?->pppoe_password) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : '' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="wifi_ssid" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">SSID WiFi</label>
@@ -353,15 +353,15 @@
                 </div>
                 <div>
                     <label for="wifi_password" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password WiFi</label>
-                    <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $device?->wifi_password) }}" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="wifi_password" id="wifi_password" value="{{ $canViewSensitiveDeviceFields ? old('wifi_password', $device?->wifi_password) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : '' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="ip_address" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">IP Address</label>
-                    <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $device?->ip_address ?? $technicalDetail?->ip_address ?? $customer->ip_address) }}" placeholder="192.168.1.1" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="ip_address" id="ip_address" value="{{ $canViewSensitiveDeviceFields ? old('ip_address', $device?->ip_address ?? $technicalDetail?->ip_address ?? $customer->ip_address) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : 'placeholder=192.168.1.1' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="vlan_id" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">VLAN ID</label>
-                    <input type="number" name="vlan_id" id="vlan_id" value="{{ old('vlan_id', $device?->vlan_id ?? $customer->vlan_id) }}" min="1" max="4094" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="vlan_id" id="vlan_id" value="{{ $canViewSensitiveDeviceFields ? old('vlan_id', $device?->vlan_id ?? $customer->vlan_id) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : '' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="odp" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ODP</label>
@@ -385,7 +385,7 @@
                 </div>
                 <div>
                     <label for="tech_vlan" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">VLAN (Jaringan)</label>
-                    <input type="text" name="tech_vlan" id="tech_vlan" value="{{ old('tech_vlan', $technicalDetail?->vlan) }}" placeholder="Contoh: 100" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                    <input type="text" name="tech_vlan" id="tech_vlan" value="{{ $canViewSensitiveDeviceFields ? old('tech_vlan', $technicalDetail?->vlan) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : 'placeholder=Contoh:\ 100' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
                 <div>
                     <label for="signal_rx_power" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman (dBm)</label>

@@ -4,24 +4,7 @@
 @section('page_title', 'Master POP / Cabang')
 
 @section('content')
-<!-- Notification Alerts -->
-@if(session('success'))
-<div class="mb-6 bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg shadow-sm flex items-center gap-3">
-    <svg class="h-5 w-5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    <span class="text-sm font-medium text-emerald-800">{{ session('success') }}</span>
-</div>
-@endif
-
-@if(session('error'))
-<div class="mb-6 bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg shadow-sm flex items-center gap-3">
-    <svg class="h-5 w-5 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-    <span class="text-sm font-medium text-rose-800">{{ session('error') }}</span>
-</div>
-@endif
+<!-- Notification Alerts handled by global Component Toast (<x-toast />) -->
 
 <!-- Header Stats Bar -->
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6 shadow-sm">

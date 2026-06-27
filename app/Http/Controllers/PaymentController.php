@@ -28,7 +28,7 @@ class PaymentController extends Controller
         $allowedStatuses = ['pending', 'valid', 'ditolak'];
 
         $query = Payment::query()
-            ->forUser()
+            ->applyUserScope()
             ->with(['invoice', 'customer', 'pop', 'receiver'])
             ->latest('payment_date')
             ->latest('id');
@@ -97,7 +97,7 @@ class PaymentController extends Controller
     public function show(Payment $payment): View
     {
         abort_unless(
-            Payment::query()->forUser()->whereKey($payment->id)->exists(),
+            Payment::query()->applyUserScope()->whereKey($payment->id)->exists(),
             403,
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
@@ -206,7 +206,7 @@ class PaymentController extends Controller
     private function authorizeInvoiceAccess(Invoice $invoice): void
     {
         abort_unless(
-            Invoice::query()->forUser()->whereKey($invoice->id)->exists(),
+            Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
             403,
             'Anda tidak memiliki akses ke tagihan POP ini.'
         );

@@ -66,16 +66,7 @@ class RolePermissionTest extends TestCase
     {
         $ownerRole = Role::create([
             'name' => 'Owner',
-            'guard_name' => 'web',
-        ]);
-
-        $adminRole = Role::create([
-            'name' => 'Admin',
-            'guard_name' => 'web',
-        ]);
-
-        $adminPusatRole = Role::create([
-            'name' => 'Admin Pusat',
+            'code' => 'owner',
             'guard_name' => 'web',
         ]);
 
@@ -83,28 +74,20 @@ class RolePermissionTest extends TestCase
             'role_id' => $ownerRole->id,
         ]);
 
-        $adminPusatUser = User::factory()->create([
-            'role_id' => $adminPusatRole->id,
-        ]);
-
-        $adminUser = User::factory()->create([
-            'role_id' => $adminRole->id,
-        ]);
-
-        // Owner, Admin, and Admin Pusat should return true for any permission, even if it doesn't exist in the database
+        // Owner should return true for any permission, even if it doesn't exist in the database
         $this->assertTrue($ownerUser->hasPermission('non_existent_permission'));
-        $this->assertTrue($adminUser->hasPermission('non_existent_permission'));
-        $this->assertTrue($adminPusatUser->hasPermission('non_existent_permission'));
     }
 
     public function test_has_permission_helper_for_other_roles_based_on_pivot(): void
     {
         $csRole = Role::create([
             'name' => 'Customer Service',
+            'code' => 'helpdesk',
             'guard_name' => 'web',
         ]);
 
         $permission = Permission::create([
+            'code' => 'view_customers',
             'name' => 'view_customers',
             'module' => 'Pelanggan',
         ]);
@@ -120,6 +103,7 @@ class RolePermissionTest extends TestCase
         $csRole->permissions()->attach($permission->id);
         
         // Clear relations cache or reload user role relation
+        app(\App\Services\EffectiveAccessService::class)->clearCache($csUser);
         $csUser->load('role.permissions');
 
         $this->assertTrue($csUser->hasPermission('view_customers'));
@@ -138,34 +122,34 @@ class RolePermissionTest extends TestCase
     public function test_role_permission_seeder_maps_permissions_correctly(): void
     {
         // Seed Roles, Permissions, and their relationships
+        $this->seed(\Database\Seeders\FeatureSeeder::class);
+        $this->seed(\Database\Seeders\ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
 
-        // Find CS role and verify it has specific permissions
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
-        $csPermissions = $csRole->permissions->pluck('name')->toArray();
+        // Find Helpdesk role and verify it has specific permissions
+        $csRole = Role::where('name', 'Helpdesk')->firstOrFail();
+        $csPermissions = $csRole->permissions->pluck('code')->toArray();
 
-        $this->assertContains('view_customers', $csPermissions);
-        $this->assertContains('create_customers', $csPermissions);
-        $this->assertNotContains('create_payments', $csPermissions);
-        $this->assertNotContains('view_reports_all', $csPermissions);
+        $this->assertContains('customers.view', $csPermissions);
+        $this->assertContains('customers.create', $csPermissions);
+        $this->assertNotContains('roles.create', $csPermissions);
 
         // Find Teknisi role and verify permissions
         $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
-        $teknisiPermissions = $teknisiRole->permissions->pluck('name')->toArray();
+        $teknisiPermissions = $teknisiRole->permissions->pluck('code')->toArray();
 
-        $this->assertContains('fill_survey', $teknisiPermissions);
-        $this->assertContains('fill_installation', $teknisiPermissions);
-        $this->assertNotContains('create_payments', $teknisiPermissions);
-        $this->assertNotContains('manage_pop', $teknisiPermissions);
+        $this->assertContains('customers.detail.survey.update', $teknisiPermissions);
+        $this->assertContains('customers.detail.installation.update', $teknisiPermissions);
+        $this->assertNotContains('payments.create', $teknisiPermissions);
 
         $adminRole = Role::where('name', 'Admin')->firstOrFail();
-        $adminPermissions = $adminRole->permissions->pluck('name')->toArray();
+        $adminPermissions = $adminRole->permissions->pluck('code')->toArray();
 
-        $this->assertContains('manage_pop', $adminPermissions);
-        $this->assertContains('manage_users', $adminPermissions);
-        $this->assertContains('create_payments', $adminPermissions);
+        $this->assertContains('pops.create', $adminPermissions);
+        $this->assertContains('users.create', $adminPermissions);
+        $this->assertContains('payments.create', $adminPermissions);
     }
 
     public function test_role_semantics_cover_owner_admin_and_teknisi(): void

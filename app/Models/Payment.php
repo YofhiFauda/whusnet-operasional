@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Payment extends Model
 {
+    use \App\Traits\HasPopScope;
     protected $fillable = [
         'payment_number',
         'old_payment_id',
@@ -123,29 +124,7 @@ class Payment extends Model
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
     }
 
-    /**
-     * Scope a query to payments from POPs accessible by the user.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \App\Models\User|null $user
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeForUser($query, $user = null)
-    {
-        $user = $user ?? auth()->user();
 
-        if (!$user) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($user->hasFullAccess()) {
-            return $query;
-        }
-
-        $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
-
-        return $query->whereIn('pop_id', $assignedPopIds);
-    }
 
     /**
      * @return array<string, mixed>

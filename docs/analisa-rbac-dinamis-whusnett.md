@@ -1,9 +1,9 @@
-# Analisa: RBAC Dinamis (Feature–Action–Scope) untuk WHUSNET Admin Payment
+﻿# Analisa: RBAC Dinamis (Feature–Action–Scope) untuk WHUSNET Admin Payment
 
 **Project:** WHUSNET Admin Payment
 **Topik:** Desain Role & Permission dinamis agar perubahan role/akses tidak memerlukan perubahan kode
 **Tanggal:** 20 Juni 2026
-**Berdasarkan:** Diskusi RBAC + `spesifikasi-pop-distribusi-cid.md` + `implementation-plan-registrasi-survey-verifikasi.md` + roadmap `Qwen_markdown` (Sprint 9–13 Advanced RBAC)
+**Berdasarkan:** Diskusi RBAC + `spesifikasi-pop-distribusi-cid.md` + `implementation-plan-registrasi-survey-verifikasi.md` + roadmap `Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md` (Sprint 11–13 Advanced RBAC)
 
 ---
 
@@ -13,7 +13,7 @@ Pertanyaan awal: apakah alur sistem (siapa boleh melakukan apa) bisa diatur lewa
 
 Kekhawatiran yang muncul selama diskusi:
 1. Ada alur proses yang terasa "pasti hardcode" (contoh: registrasi → survey → FOP menjadwalkan teknisi).
-2. Role di project ini **belum final** — ada kemungkinan tambah/kurang role di kemudian hari (lihat daftar role di `Qwen_markdown`: Owner, Atasan, Admin, NOC, Helpdesk, FOP, Teknisi, Sales, POP Admin).
+2. Role di project ini **belum final** — ada kemungkinan tambah/kurang role di kemudian hari (lihat daftar role di `Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md`: Owner, Atasan, Admin, NOC, Helpdesk, FOP, Teknisi, Sales, POP Admin).
 3. Kalau role belum pasti, apakah RBAC dinamis tetap mungkin diterapkan?
 
 **Kesimpulan inti:** Bisa, dan justru kondisi "role belum pasti" adalah alasan **utama** untuk pakai RBAC dinamis, bukan alasan untuk hardcode.
@@ -75,7 +75,7 @@ Scope = wilayah data mana yang terlihat    → FOP ini hanya untuk Cabang Jetis
 
 Satu user = kombinasi (1 atau lebih) Role + 1 Scope assignment.
 
-Contoh dari `Qwen_markdown`:
+Contoh dari `Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md`:
 ```
 User: NOC Pusat   | Role: NOC       | Scope: all_pop
 User: Admin Siman | Role: POP Admin | Scope: selected_pop (POP Siman)
@@ -285,11 +285,11 @@ Prinsip: kode hanya berubah saat ada **kapabilitas/logic baru**, bukan saat ada 
 
 ---
 
-## 9. Kaitan dengan Aturan dari `Qwen_markdown` (Sprint 9–13)
+## 9. Kaitan dengan Aturan dari `Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md` (Sprint 11–13)
 
 Dokumen roadmap Advanced RBAC sudah menetapkan aturan yang selaras dengan analisa ini, di antaranya:
 
-- Role tidak boleh dibuat per cabang (lihat Notes Sprint 9–13, poin 2).
+- Role tidak boleh dibuat per cabang (lihat Notes Sprint 11–13, poin 2).
 - Format permission wajib `{feature_code}.{action_code}` (poin 7).
 - Query data wajib mengikuti user scope (poin 8) — dipenuhi lewat Global Scope di §7.4.
 - Route wajib dilindungi middleware permission (poin 9) — dipenuhi di §7.2.
@@ -304,9 +304,9 @@ Advanced RBAC ini dijadwalkan dikerjakan **setelah** S8-T006 (Import Data Legacy
 ## 10. Langkah Lanjutan yang Direkomendasikan
 
 1. Selesaikan dulu **Sprint 1** di `implementation-plan-registrasi-survey-verifikasi.md` (state machine + `CustomerWorkflowService`) — ini fondasi tempat permission akan menempel.
-2. Saat menulis Controller di Sprint 2–4, langsung pasang middleware `permission:{code}` di setiap route sejak awal — boleh sementara pakai daftar permission hardcode sebagai placeholder, lalu di Sprint 9+ tinggal diarahkan ke sumber database tanpa mengubah signature middleware maupun route.
+2. Saat menulis Controller di Sprint 2–4, langsung pasang middleware `permission:{code}` di setiap route sejak awal — boleh sementara pakai daftar permission hardcode sebagai placeholder, lalu di Sprint 11+ tinggal diarahkan ke sumber database tanpa mengubah signature middleware maupun route.
 3. Jawab eksplisit **Open Question #2** (siapa boleh tekan "Proses ke Tim" vs "Verifikasi" vs "Survey Data") — jawaban ini langsung menjadi isi awal seeder `role_permissions` (lihat tabel di §6).
-4. Lanjutkan ke Sprint 9–13 sesuai roadmap `Qwen_markdown` untuk implementasi penuh Feature Tree, Action Permission, dan User Scope di database + UI.
+4. Lanjutkan ke Sprint 11–13 sesuai roadmap `Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md` untuk implementasi penuh Feature Tree, Action Permission, dan User Scope di database + UI.
 
 ---
 

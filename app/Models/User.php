@@ -8,6 +8,9 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\UserPop;
+use App\Models\UserRoleScope;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -49,20 +52,36 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
+    public function userPops(): HasMany
+    {
+        return $this->hasMany(UserPop::class);
+    }
+
+    public function roleScopes(): HasMany
+    {
+        return $this->hasMany(UserRoleScope::class);
+    }
+
+    /**
+     * Check if the user has a specific role by code.
+     */
+    public function hasRole(string|array $roles): bool
+    {
+        $roleCode = $this->role?->code;
+        if (!$roleCode) {
+            return false;
+        }
+
+        $rolesArray = is_array($roles) ? $roles : func_get_args();
+        return in_array($roleCode, $rolesArray, true);
+    }
+
     /**
      * Check if the user has a specific permission.
      */
     public function hasPermission(string $permission): bool
     {
-        if (!$this->role) {
-            return false;
-        }
-
-        if ($this->hasFullAccess()) {
-            return true;
-        }
-
-        return $this->role->permissions()->where('name', $permission)->exists();
+        return app(\App\Services\EffectiveAccessService::class)->userCan($this, $permission);
     }
 
     /**
@@ -70,7 +89,7 @@ class User extends Authenticatable
      */
     public function hasFullAccess(): bool
     {
-        return (bool) $this->role?->isFullAccessRole();
+        return $this->hasPermission('*');
     }
 
     /**
@@ -78,7 +97,7 @@ class User extends Authenticatable
      */
     public function isTechnician(): bool
     {
-        return (bool) $this->role?->isTechnicianRole();
+        return $this->hasRole('teknisi');
     }
 
     /**

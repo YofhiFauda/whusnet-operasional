@@ -20,7 +20,7 @@
         </div>
         
         <!-- Body (Scrollable) -->
-        <div id="global-dialog-body" class="px-6 py-5 overflow-y-auto text-sm text-slate-600">
+        <div id="global-dialog-body" class="px-6 py-5 overflow-y-auto text-sm text-slate-600 whitespace-pre-line">
             <!-- Message or Custom Form HTML gets injected here -->
         </div>
         
@@ -33,142 +33,134 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const container = document.getElementById('global-dialog-container');
-        const box = document.getElementById('global-dialog-box');
-        const titleEl = document.getElementById('global-dialog-title');
-        const bodyEl = document.getElementById('global-dialog-body');
-        const footerEl = document.getElementById('global-dialog-footer');
-        const iconContainer = document.getElementById('global-dialog-icon-container');
+    window.Dialog = {
+        isOpen: false,
+        onCloseCallback: null,
+        get container() { return document.getElementById('global-dialog-container'); },
+        get box() { return document.getElementById('global-dialog-box'); },
+        get titleEl() { return document.getElementById('global-dialog-title'); },
+        get bodyEl() { return document.getElementById('global-dialog-body'); },
+        get footerEl() { return document.getElementById('global-dialog-footer'); },
+        get iconContainer() { return document.getElementById('global-dialog-icon-container'); },
+        
+        show(options) {
+            const container = this.container;
+            const box = this.box;
+            const titleEl = this.titleEl;
+            const bodyEl = this.bodyEl;
+            const footerEl = this.footerEl;
+            const iconContainer = this.iconContainer;
 
-        window.Dialog = {
-            isOpen: false,
+            if (!container || this.isOpen) return;
             
-            /**
-             * options: {
-             *   title: string,
-             *   message?: string,
-             *   contentHtml?: string, // For custom forms or content
-             *   icon?: 'success'|'error'|'warning'|'info'|null,
-             *   buttons?: Array<{ 
-             *      text: string, 
-             *      type: 'primary'|'secondary'|'danger'|'submit', 
-             *      onClick?: function, 
-             *      formId?: string 
-             *   }>,
-             *   onClose?: function
-             * }
-             */
-            show(options) {
-                if (this.isOpen) return;
-                
-                // Set Title
-                titleEl.innerText = options.title || 'Dialog';
-                
-                // Set Icon (if any)
-                iconContainer.className = 'hidden flex-shrink-0 p-1.5 rounded-full';
-                iconContainer.innerHTML = '';
-                if (options.icon) {
-                    iconContainer.classList.remove('hidden');
-                    if (options.icon === 'warning') {
-                        iconContainer.classList.add('text-amber-500', 'bg-amber-50');
-                        iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
-                    } else if (options.icon === 'error') {
-                        iconContainer.classList.add('text-rose-500', 'bg-rose-50');
-                        iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
-                    } else if (options.icon === 'success') {
-                        iconContainer.classList.add('text-emerald-500', 'bg-emerald-50');
-                        iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
-                    } else if (options.icon === 'info') {
-                        iconContainer.classList.add('text-sky-500', 'bg-sky-50');
-                        iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
-                    }
-                }
-                
-                // Set Body
-                if (options.contentHtml) {
-                    bodyEl.innerHTML = options.contentHtml;
-                } else if (options.message) {
-                    bodyEl.innerHTML = `<p>${options.message}</p>`;
-                } else {
-                    bodyEl.innerHTML = '';
-                }
-                
-                // Set Footer Buttons
-                footerEl.innerHTML = '';
-                if (options.buttons && options.buttons.length > 0) {
-                    options.buttons.forEach(btn => {
-                        const btnEl = document.createElement('button');
-                        
-                        // Professional design button classes
-                        let baseClasses = 'px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer ';
-                        
-                        if (btn.type === 'primary' || btn.type === 'submit') {
-                            baseClasses += 'bg-sky-600 hover:bg-sky-700 text-white focus:ring-sky-500 active:scale-95';
-                        } else if (btn.type === 'danger') {
-                            baseClasses += 'bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500 active:scale-95';
-                        } else {
-                            // Secondary
-                            baseClasses += 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-500 active:scale-95';
-                        }
-                        
-                        btnEl.className = baseClasses;
-                        btnEl.innerText = btn.text;
-                        
-                        if (btn.type === 'submit') {
-                            btnEl.type = 'submit';
-                            if (btn.formId) {
-                                btnEl.setAttribute('form', btn.formId);
-                            }
-                        } else {
-                            btnEl.type = 'button';
-                        }
-                        
-                        if (typeof btn.onClick === 'function') {
-                            btnEl.addEventListener('click', (e) => btn.onClick(e, this));
-                        } else if (!btn.type || btn.type === 'secondary') {
-                            // default close behavior for secondary if no onClick
-                            btnEl.addEventListener('click', () => this.close());
-                        }
-                        
-                        footerEl.appendChild(btnEl);
-                    });
-                } else {
-                    // Default Close Button
-                    const closeBtn = document.createElement('button');
-                    closeBtn.type = 'button';
-                    closeBtn.className = 'px-4 py-2 text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none active:scale-95 cursor-pointer';
-                    closeBtn.innerText = 'Tutup';
-                    closeBtn.addEventListener('click', () => this.close());
-                    footerEl.appendChild(closeBtn);
-                }
-                
-                this.onCloseCallback = options.onClose;
-                
-                // Show Dialog
-                container.classList.remove('hidden');
-                // Force reflow
-                void container.offsetWidth;
-                container.classList.remove('opacity-0');
-                box.classList.remove('scale-95', 'opacity-0');
-                
-                this.isOpen = true;
-            },
+            // Set Title
+            titleEl.innerText = options.title || 'Dialog';
             
-            close() {
-                if (!this.isOpen) return;
-                
-                container.classList.add('opacity-0');
-                box.classList.add('scale-95', 'opacity-0');
-                
-                setTimeout(() => {
-                    container.classList.add('hidden');
-                    if (typeof this.onCloseCallback === 'function') {
-                        this.onCloseCallback();
-                    }
-                    this.isOpen = false;
-                }, 300);
+            // Set Icon (if any)
+            iconContainer.className = 'hidden flex-shrink-0 p-1.5 rounded-full';
+            iconContainer.innerHTML = '';
+            if (options.icon) {
+                iconContainer.classList.remove('hidden');
+                if (options.icon === 'warning') {
+                    iconContainer.classList.add('text-amber-500', 'bg-amber-50');
+                    iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
+                } else if (options.icon === 'error') {
+                    iconContainer.classList.add('text-rose-500', 'bg-rose-50');
+                    iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+                } else if (options.icon === 'success') {
+                    iconContainer.classList.add('text-emerald-500', 'bg-emerald-50');
+                    iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+                } else if (options.icon === 'info') {
+                    iconContainer.classList.add('text-sky-500', 'bg-sky-50');
+                    iconContainer.innerHTML = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+                }
             }
-        };
-    });
+            
+            // Set Body
+            if (options.contentHtml) {
+                bodyEl.innerHTML = options.contentHtml;
+            } else if (options.message) {
+                bodyEl.innerHTML = `<p>${options.message}</p>`;
+            } else {
+                bodyEl.innerHTML = '';
+            }
+            
+            // Set Footer Buttons
+            footerEl.innerHTML = '';
+            if (options.buttons && options.buttons.length > 0) {
+                options.buttons.forEach(btn => {
+                    const btnEl = document.createElement('button');
+                    
+                    // Professional design button classes
+                    let baseClasses = 'px-4 py-2 text-sm font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer ';
+                    
+                    if (btn.type === 'primary' || btn.type === 'submit') {
+                        baseClasses += 'bg-sky-600 hover:bg-sky-700 text-white focus:ring-sky-500 active:scale-95';
+                    } else if (btn.type === 'danger') {
+                        baseClasses += 'bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500 active:scale-95';
+                    } else {
+                        // Secondary
+                        baseClasses += 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-500 active:scale-95';
+                    }
+                    
+                    btnEl.className = baseClasses;
+                    btnEl.innerText = btn.text;
+                    
+                    if (btn.type === 'submit') {
+                        btnEl.type = 'submit';
+                        if (btn.formId) {
+                            btnEl.setAttribute('form', btn.formId);
+                        }
+                    } else {
+                        btnEl.type = 'button';
+                    }
+                    
+                    if (typeof btn.onClick === 'function') {
+                        btnEl.addEventListener('click', (e) => btn.onClick(e, this));
+                    } else if (!btn.type || btn.type === 'secondary') {
+                        // default close behavior for secondary if no onClick
+                        btnEl.addEventListener('click', () => this.close());
+                    }
+                    
+                    footerEl.appendChild(btnEl);
+                });
+            } else {
+                // Default Close Button
+                const closeBtn = document.createElement('button');
+                closeBtn.type = 'button';
+                closeBtn.className = 'px-4 py-2 text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none active:scale-95 cursor-pointer';
+                closeBtn.innerText = 'Tutup';
+                closeBtn.addEventListener('click', () => this.close());
+                footerEl.appendChild(closeBtn);
+            }
+            
+            this.onCloseCallback = options.onClose;
+            
+            // Show Dialog
+            container.classList.remove('hidden');
+            // Force reflow
+            void container.offsetWidth;
+            container.classList.remove('opacity-0');
+            box.classList.remove('scale-95', 'opacity-0');
+            
+            this.isOpen = true;
+        },
+        
+        close() {
+            const container = this.container;
+            const box = this.box;
+            if (!this.isOpen || !container || !box) return;
+            
+            container.classList.add('opacity-0');
+            box.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                container.classList.add('hidden');
+                if (typeof this.onCloseCallback === 'function') {
+                    this.onCloseCallback();
+                }
+                this.isOpen = false;
+            }, 300);
+        }
+    };
 </script>

@@ -100,7 +100,7 @@ class PaymentAuditLogTest extends TestCase
     public function test_owner_and_admin_pusat_can_see_payment_audit_log_on_payment_detail(): void
     {
         $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
-        $adminPusatRole = Role::where('name', 'Admin Pusat')->firstOrFail();
+        $adminPusatRole = Role::where('name', 'Admin')->firstOrFail();
         $adminPusat = User::factory()->create([
             'role_id' => $adminPusatRole->id,
             'status' => 'active',

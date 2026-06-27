@@ -13,7 +13,7 @@ class CustomerDocumentController extends Controller
 {
     public function store(Request $request, Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('upload_customer_documents'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.documents.upload'), 403);
         $this->authorizeCustomerAccess($customer);
 
         $validated = $request->validate([
@@ -57,7 +57,7 @@ class CustomerDocumentController extends Controller
 
     public function show(CustomerDocument $document): StreamedResponse
     {
-        abort_unless(auth()->user()->hasPermission('view_customer_documents'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.documents.view'), 403);
         $this->authorizeCustomerAccess($document->customer);
 
         abort_unless(Storage::disk('local')->exists($document->file_path), 404);
@@ -67,6 +67,6 @@ class CustomerDocumentController extends Controller
 
     private function authorizeCustomerAccess(Customer $customer): void
     {
-        abort_unless(Customer::query()->forUser()->whereKey($customer->id)->exists(), 403);
+        abort_unless(Customer::query()->applyUserScope()->whereKey($customer->id)->exists(), 403);
     }
 }

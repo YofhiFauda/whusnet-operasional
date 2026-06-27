@@ -59,7 +59,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Customer extends Model
 {
-    use RecordsAuditLogs, HasFactory;
+    use RecordsAuditLogs, HasFactory, \App\Traits\HasPopScope;
 
     protected string $auditModule = 'Data Pelanggan';
 
@@ -203,6 +203,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
      * Get the latest survey.
      * 
      * @return HasOne<CustomerSurvey, $this>
@@ -339,28 +347,7 @@ class Customer extends Model
         return 'ID';
     }
 
-    /**
-     * Scope a query to only include customers from POPs accessible by the user.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \App\Models\User|null $user
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeForUser($query, $user = null)
-    {
-        $user = $user ?? auth()->user();
 
-        if (!$user) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($user->hasFullAccess()) {
-            return $query;
-        }
-
-        $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
-        return $query->whereIn('pop_id', $assignedPopIds);
-    }
 
     /**
      * Determine workflow stages progress.

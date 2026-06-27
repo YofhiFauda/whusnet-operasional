@@ -7,6 +7,9 @@
 
     <title>@yield('title', 'Whusnet Operasional')</title>
 
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -36,7 +39,8 @@
             </div>
 
             <!-- Navigation Links -->
-            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+                @if(auth()->user()->hasPermission('dashboard.view'))
                 <!-- Dashboard Link -->
                 <a href="/" title="Dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('/') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
                     <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -44,8 +48,9 @@
                     </svg>
                     <span class="sidebar-text">Dashboard</span>
                 </a>
+                @endif
 
-                @if(auth()->user()->hasPermission('view_users') || auth()->user()->hasPermission('manage_users') || auth()->user()->hasPermission('view_audit_logs'))
+                @if(auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('users.create') || auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasPermission('roles.view'))
                 <!-- SETTINGS Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-settings', 'chevron-settings')" title="Sistem" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -56,18 +61,23 @@
                             </svg>
                             <span class="sidebar-text">SISTEM</span>
                         </span>
-                        <svg id="chevron-settings" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('users*') || Request::is('audit-logs*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <svg id="chevron-settings" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('users*') || Request::is('audit-logs*') || Request::is('roles*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
                     <!-- Submenu -->
-                    <div id="submenu-settings" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('users*') || Request::is('audit-logs*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('view_users'))
+                    <div id="submenu-settings" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('users*') || Request::is('audit-logs*') || Request::is('roles*') ? '' : 'hidden' }}">
+                        @if(auth()->user()->hasPermission('users.view'))
                             <a href="/users" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('users*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Manajemen User & POP
                             </a>
                         @endif
-                        @if(auth()->user()->hasPermission('view_audit_logs'))
+                        @if(auth()->user()->hasPermission('roles.view'))
+                            <a href="{{ route('roles.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('roles*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Role & Permission
+                            </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('audit_logs.view'))
                             <a href="{{ route('audit-logs.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('audit-logs*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Audit Log
                             </a>
@@ -76,7 +86,7 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('view_customers') || auth()->user()->hasPermission('create_customers') || auth()->user()->hasPermission('import_customers'))
+                @if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.create'))
                 <!-- PELANGGAN Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')" title="Pelanggan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -92,12 +102,12 @@
                     </button>
                     <!-- Submenu -->
                     <div id="submenu-pelanggan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('create_customers'))
+                        @if(auth()->user()->hasPermission('customers.create'))
                             <a href="/customers/create" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Registrasi Pelanggan
                             </a>
                         @endif
-                        @if(auth()->user()->hasPermission('view_customers'))
+                        @if(auth()->user()->hasPermission('customers.view'))
                             <div class="pt-2 pb-1">
                                 <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Onboarding</p>
                             </div>
@@ -117,8 +127,8 @@
                             <div class="pt-2 pb-1">
                                 <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</p>
                             </div>
-                            <a href="/customers?status=active" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                List Pelanggan Aktif
+                            <a href="/customers" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                List Pelanggan
                             </a>
                             <a href="/customers?status_group=failed" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'failed' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 List Pelanggan Gagal
@@ -127,7 +137,7 @@
                                 List Pelanggan Putus
                             </a>
                         @endif
-                        @if(auth()->user()->hasPermission('import_customers'))
+                        @if(auth()->user()->hasPermission('customers.import.import'))
                             <div class="pt-2 pb-1">
                                 <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Data</p>
                             </div>
@@ -139,7 +149,56 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('view_invoices'))
+                @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own'))
+                {{-- TASK MANAGEMENT --}}
+                <div>
+                    @if(auth()->user()->hasPermission('task.view.all'))
+                    {{-- FOP / Admin: tampilkan sebagai dropdown collapsible --}}
+                    <button onclick="toggleSubmenu('submenu-tasks', 'chevron-tasks')" title="Task Management" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                            <span class="sidebar-text">TASK</span>
+                        </span>
+                        <svg id="chevron-tasks" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('tasks*') || Request::is('fop*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div id="submenu-tasks" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('tasks*') || Request::is('fop*') ? '' : 'hidden' }}">
+                        <a href="{{ route('fop.dashboard') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop.dashboard') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            FOP Dashboard
+                        </a>
+
+                        <a href="{{ route('tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Daftar Semua Task
+                        </a>
+                        @if(auth()->user()->hasPermission('task.create'))
+                        <a href="{{ route('tasks.create') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Buat Task Baru
+                        </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('task.view.own'))
+                        <a href="{{ route('tasks.own') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.own') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Task Saya
+                        </a>
+                        @endif
+                    </div>
+                    @else
+                    {{-- Teknisi: hanya punya task.view.own — tampilkan sebagai direct link tanpa dropdown --}}
+                    <a href="{{ route('tasks.own') }}"
+                       title="Task Saya"
+                       class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.own') || Request::routeIs('tasks.own.card-partial') ? 'bg-slate-800/50 text-sky-400' : 'text-slate-300' }}">
+                        <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                        <span class="sidebar-text">TASK SAYA</span>
+                    </a>
+                    @endif
+                </div>
+                @endif
+
+                @if(auth()->user()->hasPermission('invoices.view'))
                 <!-- TAGIHAN Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')" title="Tagihan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -168,7 +227,7 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('view_payments'))
+                @if(auth()->user()->hasPermission('payments.view'))
                 <!-- Payment Link -->
                 <a href="{{ route('payments.index') }}" title="Pembayaran" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('payments*') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
                     <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -178,7 +237,7 @@
                 </a>
                 @endif
 
-                @if(auth()->user()->hasPermission('view_reports_all') || auth()->user()->hasPermission('view_reports_own_pop'))
+                @if(auth()->user()->hasPermission('reports.view'))
                 <!-- LAPORAN Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')" title="Laporan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -210,7 +269,7 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('view_pop') || auth()->user()->hasPermission('view_packages'))
+                @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view'))
                 <!-- Master Data Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-master', 'chevron-master')" title="Master Data" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -226,7 +285,7 @@
                     </button>
                     <!-- Submenu -->
                     <div id="submenu-master" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('master*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('view_pop'))
+                        @if(auth()->user()->hasPermission('pops.view'))
                             <a href="/master/wilayah" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/wilayah') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Data Wilayah
                             </a>
@@ -237,7 +296,7 @@
                                 Master Distribusi
                             </a>
                         @endif
-                        @if(auth()->user()->hasPermission('view_packages'))
+                        @if(auth()->user()->hasPermission('packages.view'))
                             <a href="/master/paket" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/paket*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Paket Internet
                             </a>
@@ -280,11 +339,16 @@
                 </svg>
                 <span>WHUS<span class="text-sky-500">NET</span></span>
             </a>
-            <button onclick="toggleSidebar()" class="p-2 rounded hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-            </button>
+            <div class="flex items-center gap-1">
+                <div class="text-slate-800">
+                    <x-notification-dropdown />
+                </div>
+                <button onclick="toggleSidebar()" class="p-2 rounded hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <!-- Main Content Area -->
@@ -302,6 +366,7 @@
                     <h2 class="text-lg font-semibold text-text-main">@yield('page_title', 'Dashboard')</h2>
                 </div>
                 <div class="flex items-center gap-4">
+                    <x-notification-dropdown />
                     <span class="text-xs text-text-muted data-text">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
                     <div class="h-8 w-px bg-border"></div>
                     <div class="flex items-center gap-2 text-sm text-text-secondary">
@@ -501,6 +566,7 @@
     </script>
     
     @yield('scripts')
+    @stack('scripts')
     <x-toast />
     <x-dialog />
 </body>

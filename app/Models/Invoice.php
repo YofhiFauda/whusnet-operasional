@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
-    use RecordsAuditLogs;
+    use RecordsAuditLogs, \App\Traits\HasPopScope;
 
     protected string $auditModule = 'Tagihan';
 
@@ -120,27 +120,5 @@ class Invoice extends Model
         return $this->hasMany(Payment::class);
     }
 
-    /**
-     * Scope a query to invoices from POPs accessible by the user.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \App\Models\User|null $user
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeForUser($query, $user = null)
-    {
-        $user = $user ?? auth()->user();
 
-        if (!$user) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        if ($user->hasFullAccess()) {
-            return $query;
-        }
-
-        $assignedPopIds = $user->pops()->pluck('pops.id')->toArray();
-
-        return $query->whereIn('pop_id', $assignedPopIds);
-    }
 }

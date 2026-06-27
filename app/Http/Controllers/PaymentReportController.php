@@ -17,7 +17,7 @@ class PaymentReportController extends Controller
         $user = auth()->user();
 
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -47,7 +47,7 @@ class PaymentReportController extends Controller
 
         // Base query
         $query = Payment::with(['customer', 'pop', 'invoice', 'receiver'])
-            ->forUser(auth()->user());
+            ->applyUserScope(auth()->user());
 
         // Menerapkan filters
         if ($popId !== '') {
@@ -108,7 +108,7 @@ class PaymentReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -134,7 +134,7 @@ class PaymentReportController extends Controller
 
         // Query data tanpa pagination
         $query = Payment::with(['customer', 'pop', 'invoice', 'receiver'])
-            ->forUser(auth()->user());
+            ->applyUserScope(auth()->user());
 
         if ($popId !== '') {
             $query->where('pop_id', $popId);

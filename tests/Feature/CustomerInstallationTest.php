@@ -120,7 +120,7 @@ class CustomerInstallationTest extends TestCase
     public function test_unauthorized_user_cannot_fill_installation(): void
     {
         $pop = $this->createPop('SMN3');
-        $finance = $this->createUserWithRole('Finance/Kasir');
+        $finance = $this->createUserWithRole('Helpdesk');
 
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-003',

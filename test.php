@@ -1,0 +1,1 @@
+<?php require 'vendor/autoload.php'; \ = require_once 'bootstrap/app.php'; \->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); try { App\Models\Role::create(['name' => 'Tester', 'code' => 'tester', 'description' => 'Test Role']); echo 'Success'; } catch (\Exception \) { echo \->getMessage(); }

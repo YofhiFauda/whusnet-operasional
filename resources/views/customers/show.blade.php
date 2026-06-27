@@ -15,7 +15,7 @@
         <h1 class="text-xl font-bold text-slate-800 tracking-tight">Detail Pelanggan: {{ $customer->full_name }}</h1>
     </div>
     <div class="flex gap-2">
-        @can('validate_customer_data')
+        @can('customers.detail.installation.activate')
             @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active')
                 <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengaktifkan layanan untuk pelanggan ini?', this);">
                     @csrf
@@ -667,7 +667,7 @@
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
                     </div>
-                    @can('create_invoices')
+                    @can('invoices.create')
                         @if((in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing') && $customer->customerService)
                             <button onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm cursor-pointer focus:outline-none">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -704,7 +704,7 @@
                                 @foreach($customer->invoices as $invoice)
                                     <tr class="hover:bg-slate-50/50 transition-colors">
                                         <td class="px-4 py-3 font-mono font-bold text-slate-800">
-                                            @can('view_invoices')
+                                            @can('invoices.view')
                                                 <a href="{{ route('invoices.show', $invoice->id) }}" class="text-sky-700 hover:text-sky-900">{{ $invoice->invoice_number }}</a>
                                             @else
                                                 {{ $invoice->invoice_number }}
@@ -753,7 +753,7 @@
             </div>
 
             <!-- Modal Pembuatan Tagihan Manual -->
-            @can('create_invoices')
+            @can('invoices.create')
                 @if((in_array($customer->status, ['active', 'suspended']) || $customer->data_completeness_status === 'siap_billing') && $customer->customerService)
                     @php
                         $defaultPeriod = now()->format('Y-m');
@@ -964,7 +964,7 @@
                                     <tr class="hover:bg-slate-50/50 transition-colors">
                                         <td class="px-4 py-3 font-mono font-bold text-slate-800">{{ $payment->payment_number }}</td>
                                         <td class="px-4 py-3 font-mono">
-                                            @can('view_invoices')
+                                            @can('invoices.view')
                                                 <a href="{{ route('invoices.show', $payment->invoice_id) }}" class="text-sky-700 hover:text-sky-900">{{ $payment->invoice->invoice_number ?? '-' }}</a>
                                             @else
                                                 {{ $payment->invoice->invoice_number ?? '-' }}
@@ -1025,7 +1025,7 @@
                                 </div>
                                 <div>
                                     <label for="document_file" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">File</label>
-                                    <input type="file" name="document_file" id="document_file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
+                                    <input type="file" name="document_file" id="document_file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*,application/pdf" capture="environment" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
                                     <p class="text-[10px] text-slate-400 mt-1">Format: JPG, PNG, WEBP, PDF. Maksimal 4 MB.</p>
                                 </div>
                                 <div>
@@ -1325,3 +1325,4 @@
     }
 </script>
 @endsection
+

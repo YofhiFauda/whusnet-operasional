@@ -12,7 +12,7 @@ class CustomerSurveyController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->hasPermission('view_customers'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.view'), 403);
 
         $query = Customer::with(['village.district', 'latestSurvey.technician'])
             ->where('status', 'waiting_survey')
@@ -32,15 +32,24 @@ class CustomerSurveyController extends Controller
         return view('surveys.queue', compact('customers'));
     }
 
-    public function start(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
+    public function start(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService, \App\Services\TaskService $taskService)
     {
-        abort_unless(auth()->user()->hasPermission('fill_survey'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
 
         if ($customer->status !== 'waiting_survey') {
             return redirect()->back()->with('error', 'Status pelanggan tidak valid untuk memulai survey.');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $workflowService) {
+        $task = \App\Models\Task::where('customer_id', $customer->id)
+            ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+            ->where('status', \App\Enums\TaskStatus::TERJADWAL->value)
+            ->first();
+
+        if ($task) {
+            abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $workflowService, $taskService, $task) {
             $survey = $customer->latestSurvey()->first();
             
             if (!$survey) {
@@ -53,6 +62,10 @@ class CustomerSurveyController extends Controller
             $survey->save();
 
             $workflowService->transition($customer, \App\Enums\WorkflowTransition::SURVEY_IN_PROGRESS, 'Mulai proses survey lapangan');
+
+            if ($task) {
+                $taskService->start($task, auth()->user());
+            }
         });
 
         // Trigger Event SurveyStarted
@@ -67,7 +80,7 @@ class CustomerSurveyController extends Controller
 
     public function report(Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('fill_survey'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
 
         if ($customer->status !== 'survey_in_progress') {
             return redirect()->route('surveys.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan survey.');
@@ -83,7 +96,7 @@ class CustomerSurveyController extends Controller
 
     public function store(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
     {
-        abort_unless(auth()->user()->hasPermission('fill_survey'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
 
         $validated = $request->validate([
             'survey_status'           => 'required|string|in:pending,completed,failed',

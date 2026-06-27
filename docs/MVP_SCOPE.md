@@ -155,6 +155,13 @@ Fitur berikut harus ditunda sampai MVP stabil:
 11. Aplikasi mobile teknisi.
 12. Multi-company.
 13. Laporan keuangan kompleks.
+14. Relasi 1-to-Many untuk Layanan Pelanggan (Multiple Subscriptions per Account).
+15. Deposit & Wallet (Penyimpanan saldo *overpayment* pelanggan).
+16. Customer Portal / Self-Service App.
+17. Auto-Prorate (Perhitungan prorata hari aktif secara otomatis pada tagihan perdana).
+18. Denda Keterlambatan & Pajak Dinamis (Late Fees & Multi-Tier Taxes).
+19. Automated Reconciliation (Rekonsiliasi otomatis pelunasan via Webhook).
+20. General Ledger (Buku Besar Akuntansi / Chart of Accounts).
 
 ## Aturan Scope
 AI tidak boleh menambahkan fitur di luar MVP.

@@ -127,17 +127,7 @@
             <!-- FORM BODY -->
             <div class="p-6 md:p-8 flex-1">
                 
-                <!-- Errors Block -->
-                @if ($errors->any())
-                <div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-xs rounded-md p-4 space-y-1">
-                    <span class="font-bold block">Terdapat Kesalahan Input! Mohon koreksi kesalahan berikut:</span>
-                    <ul class="list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-                @endif
+                <!-- Errors Block ditangani otomatis oleh global Component Toast (x-toast) -->
 
                 <!-- STEP 1 PANEL: Data Diri (Read-Only) -->
                 <div id="step-panel-1" class="step-panel space-y-6">
@@ -261,7 +251,7 @@
                             </div>
 
                             <div class="mt-4">
-                                <input type="file" name="house_photo" id="house_photo" accept="image/*" class="hidden" onchange="onFileChange('house_photo')">
+                                <input type="file" name="house_photo" id="house_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('house_photo')">
                                 <label for="house_photo" class="block w-full text-center bg-sky-50 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 text-sky-700 text-xs font-bold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih Foto Rumah
                                 </label>
@@ -292,7 +282,7 @@
                             </div>
 
                             <div class="mt-4">
-                                <input type="file" name="survey_photo" id="survey_photo" accept="image/*" class="hidden" onchange="onFileChange('survey_photo')">
+                                <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
                                 <label for="survey_photo" class="block w-full text-center bg-sky-50 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 text-sky-700 text-xs font-bold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih Foto ODP
                                 </label>
@@ -642,3 +632,4 @@
     }
 </script>
 @endsection
+

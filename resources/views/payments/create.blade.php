@@ -30,11 +30,7 @@
         <form action="{{ route('invoices.payments.store', $invoice->id) }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
             @csrf
 
-            @if($errors->any())
-                <div class="rounded-md border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
-                    {{ $errors->first() }}
-                </div>
-            @endif
+            {{-- Validation errors ditangani otomatis oleh global Component Toast (<x-toast />) --}}
 
             <div>
                 <label for="payment_date" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Bayar</label>
@@ -60,7 +56,7 @@
 
             <div>
                 <label for="proof_file" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bukti Pembayaran</label>
-                <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.pdf"
+                <input type="file" name="proof_file" id="proof_file" accept=".jpg,.jpeg,.png,.pdf" capture="environment"
                        class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
                 <p class="text-[10px] text-slate-500 mt-1">Opsional. Format: JPG, PNG, atau PDF maksimal 2 MB.</p>
             </div>
@@ -181,3 +177,4 @@
     </div>
 </div>
 @endsection
+

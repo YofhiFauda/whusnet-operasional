@@ -87,7 +87,7 @@ class AuditLogGeneralTest extends TestCase
         $this->assertSame('Customer Audit', $customerLog->old_values['full_name']);
         $this->assertSame('Customer Audit Updated', $customerLog->new_values['full_name']);
 
-        $role = Role::where('name', 'Customer Service')->firstOrFail();
+        $role = Role::where('name', 'Helpdesk')->firstOrFail();
         $role->update(['description' => 'Role audit updated']);
 
         $this->assertDatabaseHas('audit_logs', [
@@ -188,7 +188,7 @@ class AuditLogGeneralTest extends TestCase
     public function test_owner_and_admin_pusat_can_view_audit_log_page(): void
     {
         $adminPusat = User::factory()->create([
-            'role_id' => Role::where('name', 'Admin Pusat')->firstOrFail()->id,
+            'role_id' => Role::where('name', 'Admin')->firstOrFail()->id,
             'status' => 'active',
         ]);
 
@@ -219,7 +219,7 @@ class AuditLogGeneralTest extends TestCase
     public function test_non_owner_admin_pusat_cannot_view_audit_log_page(): void
     {
         $finance = User::factory()->create([
-            'role_id' => Role::where('name', 'Finance/Kasir')->firstOrFail()->id,
+            'role_id' => Role::where('name', 'Helpdesk')->firstOrFail()->id,
             'status' => 'active',
         ]);
 

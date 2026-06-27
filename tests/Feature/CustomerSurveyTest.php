@@ -104,7 +104,7 @@ class CustomerSurveyTest extends TestCase
         ]);
 
         $finance = User::factory()->create();
-        $financeRole = Role::where('name', 'Finance/Kasir')->first();
+        $financeRole = Role::where('name', 'Helpdesk')->first();
         $finance->role_id = $financeRole->id;
         $finance->save();
 

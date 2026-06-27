@@ -34,8 +34,8 @@ class ReportImportTest extends TestCase
 
     public function test_user_without_permission_cannot_access_reports(): void
     {
-        // Customer Service has no report permission by default
-        $csRole = Role::where('name', '=', 'Customer Service', 'and')->firstOrFail();
+        // Teknisi has no report permission by default
+        $csRole = Role::where('name', '=', 'Teknisi', 'and')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
             'status' => 'active',
@@ -60,7 +60,7 @@ class ReportImportTest extends TestCase
         ]);
 
         $otherAdmin = User::factory()->create([
-            'role_id' => Role::where('name', '=', 'Admin Pusat', 'and')->value('id'),
+            'role_id' => Role::where('name', '=', 'Admin', 'and')->value('id'),
             'status' => 'active',
         ]);
 
@@ -94,7 +94,7 @@ class ReportImportTest extends TestCase
 
     public function test_admin_cabang_only_sees_own_uploaded_batches(): void
     {
-        $adminCabangRole = Role::where('name', '=', 'Admin Cabang', 'and')->firstOrFail();
+        $adminCabangRole = Role::where('name', '=', 'POP Admin', 'and')->firstOrFail();
         $userA = User::factory()->create([
             'role_id' => $adminCabangRole->id,
             'status' => 'active',

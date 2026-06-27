@@ -53,7 +53,7 @@ class InvoiceListTest extends TestCase
 
     public function test_admin_cabang_only_sees_assigned_pop_invoices(): void
     {
-        $role = Role::where('name', 'Admin Cabang')->firstOrFail();
+        $role = Role::where('name', 'POP Admin')->firstOrFail();
         $adminCabang = User::factory()->create([
             'status' => 'active',
             'role_id' => $role->id,

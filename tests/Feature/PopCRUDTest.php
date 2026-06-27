@@ -68,8 +68,8 @@ class PopCRUDTest extends TestCase
      */
     public function test_user_with_view_only_gets_403_on_manage_actions(): void
     {
-        // Customer Service has view_pop but not manage_pop
-        $csRole = Role::where('name', 'Customer Service')->firstOrFail();
+        // Helpdesk has view_pop but not manage_pop
+        $csRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $user = User::factory()->create([
             'role_id' => $csRole->id,
             'status' => 'active',

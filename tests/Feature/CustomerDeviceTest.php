@@ -101,7 +101,7 @@ class CustomerDeviceTest extends TestCase
     public function test_finance_cannot_fill_customer_device(): void
     {
         $pop = $this->createPop('DEV3');
-        $finance = $this->createUserWithRole('Finance/Kasir');
+        $finance = $this->createUserWithRole('Helpdesk');
         $customer = $this->createCustomer($pop, 'TEST-DEV-003');
 
         $response = $this->actingAs($finance)
@@ -118,7 +118,7 @@ class CustomerDeviceTest extends TestCase
     public function test_customer_service_cannot_see_sensitive_device_fields(): void
     {
         $pop = $this->createPop('DEV4');
-        $customerService = $this->createUserWithRole('Customer Service');
+        $customerService = $this->createUserWithRole('Helpdesk');
         $customer = $this->createCustomer($pop, 'TEST-DEV-004');
 
         $customer->customerDevice()->create([

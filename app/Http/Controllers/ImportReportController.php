@@ -18,7 +18,7 @@ class ImportReportController extends Controller
         $user = auth()->user();
 
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -91,7 +91,7 @@ class ImportReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -114,7 +114,7 @@ class ImportReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 

@@ -5,108 +5,248 @@ namespace Database\Seeders;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Get all permissions
+        // Dynamically generate permissions first from config/rbac.php
+        app(\App\Services\PermissionGeneratorService::class)->generate();
+
+        $permissionsByRole = [
+            'owner' => ['*'], // Owner gets all permissions
+
+            'atasan' => [
+                'dashboard.view',
+                'pops.view',
+                'users.view',
+                'roles.view',
+                'packages.view',
+                'customers.view',
+                'customers.detail.survey.view',
+                'customers.detail.installation.view',
+                'customers.detail.devices.view',
+                'invoices.view',
+                'invoices.print',
+                'payments.view',
+                'payments.print',
+                'reports.view',
+                'reports.export',
+                'audit_logs.view',
+                'audit_logs.export', // assuming audit_logs has export
+            ],
+
+            'admin' => [
+                'dashboard.view',
+                'pops.*',
+                'users.*',
+                'roles.*',
+                'packages.*',
+                'customers.view',
+                'customers.create',
+                'customers.update',
+                'customers.delete',
+                'customers.import.*',
+                'customers.detail.*', // Access to all detail sections
+                'invoices.*', // Ex: view, create, update, delete, cancel, print
+                'payments.*', // Ex: view, create, update, validate, reject, print
+                'reports.*',
+                'audit_logs.view',
+                'audit_logs.export',
+            ],
+
+            'noc' => [
+                'dashboard.view',
+                'pops.view',
+                'packages.view',
+                'customers.view',
+                'customers.detail.identity.view',
+                'customers.detail.address.view',
+                'customers.detail.packages.view',
+                'customers.detail.survey.view',
+                'customers.detail.survey.update',
+                'customers.detail.survey.validate',
+                'customers.detail.installation.view',
+                'customers.detail.installation.update',
+                'customers.detail.installation.validate',
+                'customers.detail.installation.activate',
+                'customers.detail.devices.view',
+                'customers.detail.devices.update',
+                'customers.detail.devices.view_sensitive',
+                'customers.detail.devices.update_sensitive',
+                'customers.detail.documents.view',
+                'customers.detail.documents.download',
+                'invoices.view',
+                'invoices.print',
+                'payments.print', // Based on matrix
+            ],
+
+            'helpdesk' => [
+                'dashboard.view',
+                'pops.view',
+                'packages.view',
+                'customers.view',
+                'customers.create',
+                'customers.update',
+                'customers.detail.identity.view',
+                'customers.detail.identity.update',
+                'customers.detail.address.view',
+                'customers.detail.address.update',
+                'customers.detail.packages.view',
+                'customers.detail.packages.update',
+                'customers.detail.survey.view',
+                'customers.detail.installation.view',
+                'customers.detail.devices.view',
+                'customers.detail.documents.view',
+                'customers.detail.documents.upload',
+                'customers.detail.documents.download',
+                'invoices.view',
+                'invoices.create',
+                'invoices.print',
+                'payments.view',
+                'payments.create',
+                'payments.print',
+                'reports.view',
+                'reports.export',
+            ],
+
+            'fop' => [
+                'dashboard.view',
+                'customers.view',
+                'customers.detail.identity.view',
+                'customers.detail.address.view',
+                'customers.detail.packages.view',
+                'customers.detail.survey.view',
+                'customers.detail.survey.update',
+                'customers.detail.survey.validate',
+                'customers.detail.installation.view',
+                'customers.detail.installation.update',
+                'customers.detail.installation.activate',
+                'customers.detail.devices.view',
+                'customers.detail.devices.update',
+                'customers.detail.documents.view',
+                'customers.detail.documents.upload',
+                'customers.detail.documents.download',
+            ],
+
+            'teknisi' => [
+                'dashboard.view',
+                'customers.view',
+                'customers.detail.identity.view',
+                'customers.detail.address.view',
+                'customers.detail.packages.view',
+                'customers.detail.survey.view',
+                'customers.detail.survey.update',
+                'customers.detail.installation.view',
+                'customers.detail.installation.update',
+                'customers.detail.installation.activate',
+                'customers.detail.devices.view',
+                'customers.detail.devices.update',
+                'customers.detail.devices.view_sensitive',
+                'customers.detail.devices.update_sensitive',
+                'customers.detail.documents.view',
+                'customers.detail.documents.upload',
+                'customers.detail.documents.download',
+            ],
+
+            'sales' => [
+                'dashboard.view',
+                'customers.view',
+                'customers.create',
+                'customers.update',
+                'customers.detail.identity.view',
+                'customers.detail.identity.update',
+                'customers.detail.address.view',
+                'customers.detail.address.update',
+                'customers.detail.packages.view',
+                'customers.detail.packages.update',
+                'customers.detail.documents.view',
+                'customers.detail.documents.upload',
+                'customers.detail.documents.download',
+            ],
+
+            'pop_admin' => [
+                'dashboard.view',
+                'pops.view',
+                'packages.view',
+                'customers.view',
+                'customers.create',
+                'customers.update',
+                'customers.import.*',
+                'customers.detail.*', // Except sensitive devices, we will subtract below
+                'invoices.view',
+                'invoices.create',
+                'invoices.print',
+                'payments.view',
+                'payments.create',
+                'payments.validate',
+                'payments.reject',
+                'payments.print',
+                'reports.view',
+                'reports.export',
+            ],
+        ];
+
+        // Retrieve all available permissions grouped by feature
         $allPermissions = Permission::all();
+        $allPermissionCodes = $allPermissions->pluck('code')->toArray();
 
-        // 1. Owner, Admin, & Admin Pusat (Full Access)
-        $ownerRole = Role::where('name', 'Owner')->first();
-        $adminRole = Role::where('name', 'Admin')->first();
-        $adminPusatRole = Role::where('name', 'Admin Pusat')->first();
+        foreach ($permissionsByRole as $roleCode => $wantedPermissions) {
+            $role = Role::where('code', $roleCode)->first();
+            if (!$role) {
+                continue;
+            }
 
-        if ($ownerRole) {
-            $ownerRole->permissions()->sync($allPermissions->pluck('id'));
-        }
+            $finalPermissionCodes = [];
 
-        if ($adminRole) {
-            $adminRole->permissions()->sync($allPermissions->pluck('id'));
-        }
+            if (in_array('*', $wantedPermissions)) {
+                $finalPermissionCodes = $allPermissionCodes;
+            } else {
+                foreach ($wantedPermissions as $wp) {
+                    if (str_ends_with($wp, '.*')) {
+                        $prefix = substr($wp, 0, -2);
+                        // Add all permissions starting with prefix
+                        foreach ($allPermissionCodes as $ap) {
+                            if (str_starts_with($ap, $prefix)) {
+                                $finalPermissionCodes[] = $ap;
+                            }
+                        }
+                    } else {
+                        if (in_array($wp, $allPermissionCodes)) {
+                            $finalPermissionCodes[] = $wp;
+                        } else {
+                            Log::warning("Seeder: Permission {$wp} not found in database for role {$roleCode}");
+                        }
+                    }
+                }
+            }
 
-        if ($adminPusatRole) {
-            $adminPusatRole->permissions()->sync($allPermissions->pluck('id'));
-        }
+            // Remove sensitive permissions for pop_admin based on matrix
+            if ($roleCode === 'pop_admin') {
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
+                    return !in_array($code, [
+                        'customers.detail.devices.view_sensitive',
+                        'customers.detail.devices.update_sensitive'
+                    ]);
+                });
+            }
 
-        // 2. Admin Cabang Permissions
-        $adminCabangRole = Role::where('name', 'Admin Cabang')->first();
-        if ($adminCabangRole) {
-            $adminCabangPermissions = [
-                'view_pop',
-                'view_users',
-                'view_roles',
-                'view_packages',
-                'create_customers',
-                'edit_customers',
-                'view_customers',
-                'validate_customer_data',
-                'create_invoices',
-                'view_invoices',
-                'view_payments',
-                'fill_survey',
-                'fill_installation',
-                'fill_device',
-                'view_customer_documents',
-                'upload_customer_documents',
-                'view_reports_own_pop',
-            ];
-            $permissionIds = Permission::whereIn('name', $adminCabangPermissions)->pluck('id');
-            $adminCabangRole->permissions()->sync($permissionIds);
-        }
+            // Also for admin, matrix says no sensitive access, except if specified.
+            if ($roleCode === 'admin') {
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
+                    return !in_array($code, [
+                        'customers.detail.devices.view_sensitive',
+                        'customers.detail.devices.update_sensitive'
+                    ]);
+                });
+            }
 
-        // 3. Finance/Kasir Permissions
-        $financeRole = Role::where('name', 'Finance/Kasir')->first();
-        if ($financeRole) {
-            $financePermissions = [
-                'view_pop',
-                'view_packages',
-                'view_customers',
-                'create_invoices',
-                'view_invoices',
-                'create_payments',
-                'view_payments',
-                'edit_payments',
-                'view_reports_own_pop',
-            ];
-            $permissionIds = Permission::whereIn('name', $financePermissions)->pluck('id');
-            $financeRole->permissions()->sync($permissionIds);
-        }
+            $finalPermissionCodes = array_unique($finalPermissionCodes);
+            $permissionIds = $allPermissions->whereIn('code', $finalPermissionCodes)->pluck('id')->toArray();
 
-        // 4. Teknisi Permissions
-        $teknisiRole = Role::where('name', 'Teknisi')->first();
-        if ($teknisiRole) {
-            $teknisiPermissions = [
-                'view_pop',
-                'view_packages',
-                'view_customers',
-                'fill_survey',
-                'fill_installation',
-                'fill_device',
-                'view_customer_documents',
-                'upload_customer_documents',
-            ];
-            $permissionIds = Permission::whereIn('name', $teknisiPermissions)->pluck('id');
-            $teknisiRole->permissions()->sync($permissionIds);
-        }
-
-        // 5. Customer Service Permissions
-        $csRole = Role::where('name', 'Customer Service')->first();
-        if ($csRole) {
-            $csPermissions = [
-                'view_pop',
-                'view_packages',
-                'create_customers',
-                'edit_customers',
-                'view_customers',
-                'view_customer_documents',
-            ];
-            $permissionIds = Permission::whereIn('name', $csPermissions)->pluck('id');
-            $csRole->permissions()->sync($permissionIds);
+            // Sync efficiently
+            $role->permissions()->sync($permissionIds);
         }
     }
 }

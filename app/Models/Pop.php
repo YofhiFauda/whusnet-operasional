@@ -5,6 +5,9 @@ namespace App\Models;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Models\Customer;
 use App\Models\Distribution;
+use App\Models\PopSequence;
+use App\Models\User;
+use App\Models\UserRoleScopeTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use LogicException;
     
 #[Fillable([
@@ -72,6 +76,11 @@ class Pop extends Model
     public function children(): HasMany
     {
         return $this->hasMany(Pop::class, 'parent_id');
+    }
+
+    public function userRoleScopeTargets(): HasMany
+    {
+        return $this->hasMany(UserRoleScopeTarget::class);
     }
 
     /**

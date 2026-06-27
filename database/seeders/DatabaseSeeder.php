@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use Database\Seeders\JetisPopSeeder;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -21,37 +19,40 @@ class DatabaseSeeder extends Seeder
         // $this->call(JetisPopSeeder::class);
         $this->call(SubscriptionStatusSeeder::class);
         $this->call(InternetPackageSeeder::class);
+        $this->call(FeatureSeeder::class);
+        $this->call(ActionSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(PermissionSeeder::class);
         $this->call(RolePermissionSeeder::class);
         // $this->call(CustomerSeeder::class);
-        // $this->call(UserSeeder::class);
+        $this->call(UserSeeder::class);
+        $this->call(WorkflowTransitionPermissionSeeder::class);
 
         // User::factory(10)->create();
 
-        $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
-        $adminRole = \App\Models\Role::where('name', 'Admin')->first();
+        // $ownerRole = \App\Models\Role::where('name', 'Owner')->first();
+        // $adminRole = \App\Models\Role::where('name', 'Admin')->first();
 
-        User::updateOrCreate([
-            'email' => 'owner@whusnet.net',
-        ], [
-            'name' => 'Owner Whusnet',
-            'email_verified_at' => now(),
-            'phone' => '081234567890',
-            'password' => bcrypt('password'),
-            'status' => 'active',
-            'role_id' => $ownerRole ? $ownerRole->id : null,
-        ]);
+        // User::updateOrCreate([
+        //     'email' => 'owner@whusnet.net',
+        // ], [
+        //     'name' => 'Owner Whusnet',
+        //     'email_verified_at' => now(),
+        //     'phone' => '081234567890',
+        //     'password' => bcrypt('password'),
+        //     'status' => 'active',
+        //     'role_id' => $ownerRole ? $ownerRole->id : null,
+        // ]);
 
-        User::updateOrCreate([
-            'email' => 'admin@whusnet.net',
-        ], [
-            'name' => 'Admin Whusnet',
-            'email_verified_at' => now(),
-            'phone' => '081234567890',
-            'password' => bcrypt('password'),
-            'status' => 'active',
-            'role_id' => $adminRole ? $adminRole->id : null,
-        ]);
+        // User::updateOrCreate([
+        //     'email' => 'admin@whusnet.net',
+        // ], [
+        //     'name' => 'Admin Whusnet',
+        //     'email_verified_at' => now(),
+        //     'phone' => '081234567890',
+        //     'password' => bcrypt('password'),
+        //     'status' => 'active',
+        //     'role_id' => $adminRole ? $adminRole->id : null,
+        // ]);
     }
 }

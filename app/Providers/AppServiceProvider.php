@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Carbon\Carbon;
 use App\Models\Permission;
+use App\Models\Task;
+use App\Policies\TaskPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Carbon::setLocale('id');
+
+        // Register Policies
+        Gate::policy(Task::class, TaskPolicy::class);
 
         // Register Blade Directives for formatting
         \Illuminate\Support\Facades\Blade::directive('rupiah', function ($expression) {
@@ -53,9 +58,16 @@ class AppServiceProvider extends ServiceProvider
             if (app()->runningInConsole() === false || app()->runningUnitTests()) {
                 $permissions = Permission::all();
                 foreach ($permissions as $permission) {
-                    Gate::define($permission->name, function ($user) use ($permission) {
-                        return $user->hasPermission($permission->name);
-                    });
+                    if ($permission->code) {
+                        Gate::define($permission->code, function ($user) use ($permission) {
+                            return $user->hasPermission($permission->code);
+                        });
+                    }
+                    if ($permission->name) {
+                        Gate::define($permission->name, function ($user) use ($permission) {
+                            return $user->hasPermission($permission->name);
+                        });
+                    }
                 }
             }
         } catch (\Exception $e) {

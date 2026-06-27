@@ -302,7 +302,7 @@ class InvoiceCreateTest extends TestCase
 
     public function test_admin_cabang_can_only_create_invoice_for_assigned_pop()
     {
-        $role = Role::where('name', 'Admin Cabang')->firstOrFail();
+        $role = Role::where('name', 'POP Admin')->firstOrFail();
         $user = User::factory()->create(['role_id' => $role->id]);
 
         $pop1 = Pop::create(['code' => 'POP-1', 'pop_code' => 'P1', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'POP 1', 'type' => 'cabang', 'status' => 'active']);

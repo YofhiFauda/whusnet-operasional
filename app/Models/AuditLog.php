@@ -51,4 +51,27 @@ class AuditLog extends Model
     {
         return $this->morphTo();
     }
+
+    /**
+     * Log an action manually.
+     */
+    public static function log(
+        Model $model,
+        string $action,
+        ?array $oldValues = null,
+        ?array $newValues = null
+    ): self {
+        return self::create([
+            'user_id' => auth()->id(),
+            'module' => class_basename($model),
+            'action' => $action,
+            'auditable_type' => $model->getMorphClass(),
+            'auditable_id' => $model->getKey(),
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'created_at' => now(),
+        ]);
+    }
 }

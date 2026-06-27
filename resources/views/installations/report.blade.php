@@ -159,17 +159,7 @@
             <!-- FORM BODY -->
             <div class="p-6 md:p-8 flex-1">
                 
-                <!-- Errors Block -->
-                @if ($errors->any())
-                <div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-xs rounded-md p-4 space-y-1">
-                    <span class="font-bold block">Terdapat Kesalahan Input! Mohon koreksi kesalahan berikut:</span>
-                    <ul class="list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-                @endif
+                <!-- Errors Block ditangani otomatis oleh global Component Toast (x-toast) -->
 
                 <!-- STEP 1 PANEL: Data Diri (Read-Only) -->
                 <div id="step-panel-1" class="step-panel space-y-6">
@@ -482,15 +472,15 @@
                         <div class="md:col-span-2 mt-4 border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label for="installation_photo" class="block mb-2 uppercase tracking-wide">FOTO PEMASANGAN LAPANGAN <span class="text-red-500">*</span></label>
-                                <input type="file" name="installation_photo" id="installation_photo" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+                                <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
                             </div>
                             <div>
                                 <label for="contract_photo" class="block mb-2 uppercase tracking-wide">FOTO KONTRAK <span class="text-red-500">*</span></label>
-                                <input type="file" name="contract_photo" id="contract_photo" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+                                <input type="file" name="contract_photo" id="contract_photo" accept="image/*" capture="environment" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
                             </div>
                             <div>
                                 <label for="signature_photo" class="block mb-2 uppercase tracking-wide">FOTO TTD PELANGGAN <span class="text-red-500">*</span></label>
-                                <input type="file" name="signature_photo" id="signature_photo" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+                                <input type="file" name="signature_photo" id="signature_photo" accept="image/*" capture="environment" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
                             </div>
                         </div>
 
@@ -543,7 +533,7 @@
 
                         <div class="md:col-span-2 mt-2">
                             <label class="block mb-2 uppercase tracking-wide">FOTO HASIL SPEEDTEST <span class="text-red-500">*</span></label>
-                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" required>
+                            <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100" required>
                         </div>
                     </div>
                 </div>
@@ -874,3 +864,4 @@
     }
 </script>
 @endsection
+

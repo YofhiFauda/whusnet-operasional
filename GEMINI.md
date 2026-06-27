@@ -28,6 +28,10 @@ Sebelum mengerjakan task apa pun, AI wajib membaca file berikut:
 6. `docs/DATABASE_CONCEPT.md`
 7. `docs/PROMPTS.md`
 8. `docs/TOMORROW_START.md`
+9. `docs/Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md`
+10. `docs/RBAC_MATRIX.md`
+11. `docs/analisa-rbac-dinamis-whusnett.md`
+12. `docs/AGENT_EXECUTION_GUIDEE.md`
 
 Jika tersedia, baca juga PRD asli di:
 - `docs/PRD.md`

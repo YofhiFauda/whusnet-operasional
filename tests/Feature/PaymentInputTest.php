@@ -33,7 +33,7 @@ class PaymentInputTest extends TestCase
 
     public function test_finance_can_record_partial_payment_and_invoice_becomes_sebagian(): void
     {
-        $role = Role::where('name', 'Finance/Kasir')->firstOrFail();
+        $role = Role::where('name', 'Admin')->firstOrFail();
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-1', 'PAY1', 'POP Payment 1');
         $finance->pops()->attach($pop->id);
@@ -72,7 +72,7 @@ class PaymentInputTest extends TestCase
     {
         Storage::fake('public');
 
-        $role = Role::where('name', 'Finance/Kasir')->firstOrFail();
+        $role = Role::where('name', 'Admin')->firstOrFail();
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-2', 'PAY2', 'POP Payment 2');
         $finance->pops()->attach($pop->id);

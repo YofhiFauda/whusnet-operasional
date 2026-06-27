@@ -126,17 +126,7 @@
             <!-- FORM BODY -->
             <div class="p-6 md:p-8 flex-1">
                 
-                <!-- Errors Block -->
-                @if ($errors->any())
-                <div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-xs rounded-md p-4 space-y-1">
-                    <span class="font-bold block">Pembaruan Gagal! Mohon koreksi kesalahan berikut:</span>
-                    <ul class="list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-                @endif
+                <!-- Errors Block ditangani otomatis oleh global Component Toast (<x-toast />) -->
 
                 <!-- STEP 1 PANEL: Data Diri & Wilayah -->
                 <div id="step-panel-1" class="step-panel space-y-6">
@@ -289,7 +279,7 @@
                             </div>
 
                             <div class="mt-4">
-                                <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" class="hidden" onchange="onFileChange('foto_ktp')" @if($customer->foto_ktp) data-populated="true" @endif>
+                                <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')" @if($customer->foto_ktp) data-populated="true" @endif>
                                 <label for="foto_ktp" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih File
                                 </label>
@@ -328,7 +318,7 @@
                             </div>
 
                             <div class="mt-4">
-                                <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" class="hidden" onchange="onFileChange('foto_rumah')" @if($customer->foto_rumah) data-populated="true" @endif>
+                                <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')" @if($customer->foto_rumah) data-populated="true" @endif>
                                 <label for="foto_rumah" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih File
                                 </label>
@@ -376,7 +366,7 @@
                             </div>
 
                             <div class="mt-4">
-                                <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/*,application/pdf" class="hidden" onchange="onFileChange('foto_kontrak')" @if($customer->foto_kontrak) data-populated="true" @endif>
+                                <input type="file" name="foto_kontrak" id="foto_kontrak" accept="image/*,application/pdf" capture="environment" class="hidden" onchange="onFileChange('foto_kontrak')" @if($customer->foto_kontrak) data-populated="true" @endif>
                                 <label for="foto_kontrak" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih File
                                 </label>
@@ -1035,3 +1025,4 @@
     }
 </script>
 @endsection
+

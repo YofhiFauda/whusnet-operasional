@@ -15,10 +15,27 @@ class CheckPermission
      */
     public function handle(Request $request, Closure $next, string $permission): Response
     {
-        if (!auth()->check() || !auth()->user()->hasPermission($permission)) {
+        if (!auth()->check()) {
             abort(403, 'Unauthorized action.');
         }
 
-        return $next($request);
+        $user = auth()->user();
+        
+        // Support full-access bypass
+        if ($user->hasPermission('*')) {
+            return $next($request);
+        }
+
+        // Support multi-permission OR logic via pipe separator (e.g. 'customers.view|customers.create')
+        $permissions = explode('|', $permission);
+        
+        foreach ($permissions as $perm) {
+            // Check via EffectiveAccessService
+            if ($user->hasPermission(trim($perm))) {
+                return $next($request);
+            }
+        }
+
+        abort(403, 'Unauthorized action.');
     }
 }

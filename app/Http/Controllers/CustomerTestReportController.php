@@ -11,7 +11,7 @@ class CustomerTestReportController extends Controller
 {
     public function store(Request $request, Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('fill_installation'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
         $validated = $request->validate([
             'test_date'                => 'required|date',

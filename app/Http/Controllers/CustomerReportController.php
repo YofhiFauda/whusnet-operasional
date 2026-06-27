@@ -19,7 +19,7 @@ class CustomerReportController extends Controller
         $user = auth()->user();
         
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -43,7 +43,7 @@ class CustomerReportController extends Controller
 
         // Query customers menggunakan scope forUser
         $query = Customer::with(['pop', 'internetPackage', 'subscriptionStatus'])
-            ->forUser();
+            ->applyUserScope();
 
         // Menerapkan filters
         if ($popId !== '') {
@@ -93,7 +93,7 @@ class CustomerReportController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $user = auth()->user();
-        if (!$user->hasPermission('view_reports_all') && !$user->hasPermission('view_reports_own_pop')) {
+        if (!$user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -113,7 +113,7 @@ class CustomerReportController extends Controller
 
         // Query data tanpa pagination
         $query = Customer::with(['pop', 'internetPackage', 'subscriptionStatus'])
-            ->forUser();
+            ->applyUserScope();
 
         if ($popId !== '') {
             $query->where('pop_id', $popId);

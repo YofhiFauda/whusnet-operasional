@@ -34,15 +34,15 @@ class CustomerController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
-        // Default to 'active' if neither 'status' nor 'status_group' are present in the query string
-        $status = $request->has('status') ? trim((string) $request->query('status')) : ($statusGroup !== '' ? '' : 'active');
+        // Default to empty string '' (Semua active & suspend) if not specified
+        $status = $request->query('status', '');
         $districtId = $request->query('district_id', '');
         $packageId = $request->query('package_id', '');
         $popId = $request->query('pop_id', '');
         $completenessStatus = $request->query('completeness_status', '');
 
         $query = Customer::query()
-            ->forUser()
+            ->applyUserScope()
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress']);
 
         // Search filter
@@ -51,7 +51,7 @@ class CustomerController extends Controller
                 $q->where('full_name', 'like', "%{$search}%")
                   ->orWhere('customer_code', 'like', "%{$search}%")
                   ->orWhere('old_customer_id', 'like', "%{$search}%")
-                                    ->orWhere('old_request_id', 'like', "%{$search}%")
+                  ->orWhere('old_request_id', 'like', "%{$search}%")
                   ->orWhere('cid', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%")
@@ -74,6 +74,9 @@ class CustomerController extends Controller
             if (!empty($statuses)) {
                 $query->whereIn('status', $statuses);
             }
+        } else {
+            // Default view shows only active & suspended customers
+            $query->whereIn('status', ['active', 'suspended']);
         }
 
         // District filter
@@ -108,12 +111,13 @@ class CustomerController extends Controller
             ->get();
 
         // Customer count by status (for badge list / submenus)
-        $statusCounts = Customer::forUser()->selectRaw('status, count(*) as count')
+        $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
-        $totalCustomers = Customer::forUser()->count();
+        // Total is active + suspended customers
+        $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
 
         return view('customers.index', compact(
             'customers', 
@@ -274,6 +278,21 @@ class CustomerController extends Controller
                 session()->flash('warning', 'Data pelanggan disimpan sebagai "' . ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])) . '", tetapi masih memerlukan data berikut agar Lengkap: ' . implode(', ', $missingLabels));
             }
 
+            // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey)
+            $year  = date('Y');
+            $count = \App\Models\Task::whereYear('created_at', $year)->count() + 1;
+            \App\Models\Task::create([
+                'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                'task_type'   => \App\Enums\TaskType::SURVEY->value,
+                'title'       => 'Survey Calon Pelanggan: ' . $customer->full_name,
+                'description' => 'Tiket survey baru untuk alamat: ' . ($validated['address'] ?? '-'),
+                'pop_id'      => $customer->pop_id,
+                'customer_id' => $customer->id,
+                'status'      => \App\Enums\TaskStatus::PENDING->value,
+                'created_by'  => auth()->id() ?? 1,
+                'updated_by'  => auth()->id() ?? 1,
+            ]);
+
             return $customer;
         });
 
@@ -285,7 +304,7 @@ class CustomerController extends Controller
      */
     public function assignSurvey(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
     {
-        abort_unless(auth()->user()->hasPermission('edit_customers'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.update'), 403);
 
         $validated = $request->validate([
             'technician_id' => 'required|exists:users,id',
@@ -566,7 +585,7 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('edit_customers'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.delete'), 403);
         
         \Illuminate\Support\Facades\DB::transaction(function() use ($customer) {
             $customer->delete();
@@ -2456,12 +2475,12 @@ class CustomerController extends Controller
         }
 
         // 1. Authorization checks
-        if (!auth()->user()->hasPermission('create_invoices')) {
+        if (!auth()->user()->hasPermission('invoices.create')) {
             abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
         }
 
         // Scope check for user's assigned POPs
-        if (!Customer::query()->forUser()->where('id', $customer->id)->exists()) {
+        if (!Customer::query()->applyUserScope()->where('id', $customer->id)->exists()) {
             abort(403, 'Anda tidak memiliki akses ke data pelanggan di POP ini.');
         }
 

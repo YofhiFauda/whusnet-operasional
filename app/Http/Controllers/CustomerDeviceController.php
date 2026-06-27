@@ -11,7 +11,7 @@ class CustomerDeviceController extends Controller
 {
     public function store(Request $request, Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('fill_device'), 403);
+        // The route middleware permission:customers.devices.create|customers.devices.update already handles authorization.
 
         // Validasi field perangkat (customer_devices)
         $deviceValidated = $request->validate([
@@ -40,6 +40,14 @@ class CustomerDeviceController extends Controller
             'olt_port'   => 'nullable|string|max:50',
             'tech_vlan'  => 'nullable|string|max:20',
         ]);
+
+        if (!auth()->user()->hasPermission('customers.detail.devices.update_sensitive')) {
+            unset($deviceValidated['pppoe_password']);
+            unset($deviceValidated['wifi_password']);
+            unset($deviceValidated['ip_address']);
+            unset($deviceValidated['vlan_id']);
+            unset($techValidated['tech_vlan']);
+        }
 
          $deviceValidated['customer_id'] = $customer->id;
 

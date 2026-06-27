@@ -13,12 +13,21 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerInstallationController extends Controller
 {
-    public function start(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
+    public function start(Request $request, Customer $customer, CustomerWorkflowService $workflowService, \App\Services\TaskService $taskService)
     {
-        abort_unless(auth()->user()->hasPermission('fill_installation'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
         if ($customer->status !== 'waiting_installation') {
             return redirect()->back()->with('error', 'Pelanggan tidak dalam status menunggu pemasangan.');
+        }
+
+        $task = \App\Models\Task::where('customer_id', $customer->id)
+            ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+            ->where('status', \App\Enums\TaskStatus::TERJADWAL->value)
+            ->first();
+
+        if ($task) {
+            abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
         }
 
         try {
@@ -33,7 +42,11 @@ class CustomerInstallationController extends Controller
                 ]);
             }
 
-            $workflowService->transition($customer, 'installation_in_progress');
+            $workflowService->transition($customer, 'installation_in_progress', 'Mulai proses pemasangan lapangan');
+
+            if ($task) {
+                $taskService->start($task, auth()->user());
+            }
 
             // Broadcast Event
             broadcast(new InstallationStarted($customer))->toOthers();
@@ -49,7 +62,7 @@ class CustomerInstallationController extends Controller
 
     public function report(Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('fill_installation'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
         if (!in_array($customer->status, ['installation_in_progress', 'revision_installation'])) {
             return redirect()->route('verifications.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan pemasangan.');
@@ -67,7 +80,7 @@ class CustomerInstallationController extends Controller
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
     {
-        abort_unless(auth()->user()->hasPermission('fill_installation'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
         $validated = $request->validate([
             // Device info

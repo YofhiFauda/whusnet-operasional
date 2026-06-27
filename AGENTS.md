@@ -28,6 +28,10 @@ Sebelum mengerjakan task apa pun, AI wajib membaca file berikut:
 6. `docs/DATABASE_CONCEPT.md`
 7. `docs/PROMPTS.md`
 8. `docs/TOMORROW_START.md`
+9. `docs/Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation.md`
+10. `docs/RBAC_MATRIX.md`
+11. `docs/analisa-rbac-dinamis-whusnett.md`
+12. `docs/AGENT_EXECUTION_GUIDEE.md`
 
 Jika tersedia, baca juga PRD asli di:
 - `docs/PRD.md`
@@ -46,7 +50,7 @@ AI tidak boleh:
 ## MVP Development Order
 Urutan development wajib:
 
-1. Login
+1. Login    
 2. User Management
 3. Role
 4. Permission
@@ -152,7 +156,7 @@ Hindari:
 - membuat tabel yang tidak diperlukan MVP,
 - mencampur banyak modul dalam satu task.
 
-## Database Rules
+## DATABASE RULES
 Database harus mengikuti konsep:
 
 - users
@@ -161,6 +165,8 @@ Database harus mengikuti konsep:
 - role_permissions
 - pops
 - user_pops
+- user_role_scopes
+- user_role_scope_targets
 - internet_packages
 - customers
 - customer_addresses
@@ -185,28 +191,33 @@ Jangan membuat tabel post-MVP seperti:
 
 kecuali user secara eksplisit memutuskan masuk post-MVP.
 
-## RBAC Rules
-Minimal role:
-
+## RBAC RULES (Advanced Hierarchical RBAC)
+Minimal role seeder wajib:
 1. Owner
-2. Admin Pusat
-3. Admin Cabang
-4. Finance/Kasir
-5. Teknisi
-6. Customer Service
+2. Atasan
+3. Admin
+4. NOC
+5. Helpdesk
+6. FOP
+7. Teknisi
+8. Sales
+9. Admin POP
 
-Aturan utama:
-
-- Owner memiliki akses penuh.
-- Admin Pusat dapat mengelola semua cabang.
-- Admin Cabang hanya melihat POP/cabang yang ditugaskan.
-- Finance/Kasir fokus pada tagihan dan pembayaran.
-- Teknisi fokus pada data survey, pemasangan, dan perangkat.
-- Customer Service hanya boleh melihat data pelanggan dan mengubah data kontak terbatas.
-- Teknisi tidak boleh mencatat pembayaran.
-- Finance tidak boleh mengubah data modem.
-- CS tidak boleh mengubah nominal tagihan.
-- Admin cabang tidak boleh melihat data cabang lain.
+Aturan Utama Advanced RBAC:
+1. **Pemisahan Role & Scope:** Role menentukan *kapabilitas fungsi* (aksi apa yang bisa dilakukan) sedangkan Scope menentukan *wilayah data* (data POP/cabang mana yang bisa dilihat).
+2. **Larangan Role per Cabang:** Dilarang keras membuat role baru per cabang (seperti `NOC Ponorogo`, `Teknisi Siman`). Role cukup didefinisikan satu kali secara global, dan batasi wilayah datanya menggunakan User Scope.
+3. **Format Permission:** Seluruh permission wajib berformat string lowercase `{feature_code}.{action_code}` (e.g., `customers.view`, `customers.detail.devices.view_sensitive`).
+4. **Definisi User Scope Types:**
+   - `all_pop`: Akses data di seluruh POP tanpa batas (nasional).
+   - `selected_pop`: Akses terbatas hanya pada daftar POP yang dipilih di target scope.
+   - `pop_tree`: Akses pada POP utama beserta seluruh Mini POP (sub-POP) di bawahnya secara hierarkis.
+   - `assigned_only`: Hanya mengakses data tugas/pelanggan yang ditugaskan ke ID user tersebut.
+   - `own_created`: Hanya mengakses data pelanggan yang didaftarkan oleh ID user tersebut.
+5. **Larangan Hak Akses Khusus:**
+   - Teknisi tidak boleh mencatat pembayaran / keuangan.
+   - Admin POP tidak boleh melihat data pelanggan di luar POP scopenya.
+   - Helpdesk tidak boleh mengubah nominal tagihan terbit.
+   - Sales tidak boleh mengakses laporan keuangan/pembayaran.
 
 ## Customer Data Rules
 Pelanggan boleh disimpan walaupun belum lengkap.
@@ -295,14 +306,17 @@ Catatan jika ada.
 
 ## Next Task
 Task berikutnya sesuai `docs/TASKS.md`.
-Stop Condition
+```
 
+## Stop Condition
 AI wajib berhenti dan bertanya jika:
-
-Requirement ambigu.
-Task menyentuh modul di luar sprint aktif.
-Ada conflict antara PRD dan instruksi user.
-Ada kebutuhan membuat fitur post-MVP.
-Perubahan berpotensi merusak data penting.
+1. Requirement ambigu.
+2. Task menyentuh modul di luar sprint aktif.
+3. Ada conflict antara PRD/desain dan instruksi user.
+4. Ada kebutuhan membuat fitur post-MVP.
+5. Perubahan berpotensi merusak data penting (misal menghapus history saat user di-delete).
+6. **Mencoba membuat role per cabang** (seperti NOC Ponorogo, dsb).
+7. **Memberi permission langsung ke user** tanpa melalui matrix role (kecuali fitur override terverifikasi).
+8. **Ada potensi kebocoran data POP scope** (seperti query data tanpa pembatasan scope POP).
 
 

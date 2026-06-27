@@ -93,7 +93,7 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC3');
-        $finance = $this->createUserWithRole('Finance/Kasir');
+        $finance = $this->createUserWithRole('Atasan');
         $technician = $this->createUserWithRole('Teknisi');
         $customer = $this->createCustomer($pop, 'TEST-DOC-003');
 
@@ -110,7 +110,7 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC4');
-        $finance = $this->createUserWithRole('Finance/Kasir');
+        $finance = $this->createUserWithRole('Atasan');
         $technician = $this->createUserWithRole('Teknisi');
         $customer = $this->createCustomer($pop, 'TEST-DOC-004');
 
@@ -130,7 +130,7 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC5');
-        $customerService = $this->createUserWithRole('Customer Service');
+        $customerService = $this->createUserWithRole('NOC');
         $customer = $this->createCustomer($pop, 'TEST-DOC-005');
 
         $response = $this->actingAs($customerService)

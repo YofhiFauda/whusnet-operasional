@@ -1,31 +1,37 @@
 @php
-    $isEdit = isset($user);
-    $selectedPopIds = collect(old('pop_ids', isset($user) ? $user->pops->pluck('id')->all() : []))->map(fn ($id) => (int) $id)->all();
+    $isEdit           = isset($user);
+    $currentRoleScope = $isEdit ? collect($user->roleScopes)->where('role_id', $user->role_id)->first() : null;
+    $currentScopeType = old('scope_type', $currentRoleScope->scope_type->value ?? 'selected_pop');
+    $selectedPopIds   = collect(old('pop_ids', $currentRoleScope ? $currentRoleScope->getTargetPopIds() : []))->map(fn ($id) => (int) $id)->all();
 @endphp
 
 <div class="grid gap-4 md:grid-cols-2">
     <div>
         <label for="name" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Nama</label>
-        <input id="name" name="name" type="text" value="{{ old('name', $user->name ?? '') }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <input id="name" name="name" type="text" value="{{ old('name', $user->name ?? '') }}"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
         <label for="email" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Email</label>
-        <input id="email" name="email" type="email" value="{{ old('email', $user->email ?? '') }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <input id="email" name="email" type="email" value="{{ old('email', $user->email ?? '') }}"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('email')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
         <label for="phone" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Phone</label>
-        <input id="phone" name="phone" type="text" value="{{ old('phone', $user->phone ?? '') }}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <input id="phone" name="phone" type="text" value="{{ old('phone', $user->phone ?? '') }}"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
         <label for="status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
-        <select id="status" name="status" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
-            <option value="active" @selected(old('status', $user->status ?? 'active') === 'active')>Aktif</option>
+        <select id="status" name="status"
+                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="active"   @selected(old('status', $user->status ?? 'active') === 'active')>Aktif</option>
             <option value="inactive" @selected(old('status', $user->status ?? 'active') === 'inactive')>Nonaktif</option>
         </select>
         @error('status')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
@@ -33,44 +39,295 @@
 
     <div>
         <label for="role_id" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Role</label>
-        <select id="role_id" name="role_id" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <select id="role_id" name="role_id"
+                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
             <option value="">Pilih Role</option>
             @foreach($roles as $role)
-                <option value="{{ $role->id }}" @selected((string) old('role_id', $user->role_id ?? '') === (string) $role->id)>{{ $role->name }}</option>
+                <option value="{{ $role->id }}"
+                        data-code="{{ $role->code }}"
+                        @selected((string) old('role_id', $user->role_id ?? '') === (string) $role->id)>
+                    {{ $role->name }}
+                </option>
             @endforeach
         </select>
         @error('role_id')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">{{ $isEdit ? 'Password Baru' : 'Password' }}</label>
-        <input id="password" name="password" type="password" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <label for="scope_type" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+            Wilayah Kerja (Scope)
+        </label>
+        <select id="scope_type" name="scope_type"
+                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="all_pop"      @selected($currentScopeType === 'all_pop')>Seluruh POP</option>
+            <option value="selected_pop" @selected($currentScopeType === 'selected_pop' || $currentScopeType === 'pop_tree')>Cabang POP</option>
+        </select>
+        <p id="scope_description" class="mt-1 text-xs text-slate-400"></p>
+        @error('scope_type')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+    </div>
+
+    <div>
+        <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+            {{ $isEdit ? 'Password Baru' : 'Password' }}
+        </label>
+        <input id="password" name="password" type="password"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('password')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">{{ $isEdit ? 'Konfirmasi Password Baru' : 'Konfirmasi Password' }}</label>
-        <input id="password_confirmation" name="password_confirmation" type="password" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+            {{ $isEdit ? 'Konfirmasi Password Baru' : 'Konfirmasi Password' }}
+        </label>
+        <input id="password_confirmation" name="password_confirmation" type="password"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
     </div>
 </div>
 
-<div class="border-t border-slate-200 pt-4">
-    <div class="mb-3">
-        <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Assign POP/Cabang</label>
-        <p class="mt-1 text-xs text-slate-400">Kosongkan jika user belum perlu dibatasi POP tertentu. Owner/Admin tetap full-access.</p>
-    </div>
-
-    <div class="grid gap-2 md:grid-cols-2">
-        @foreach($pops as $pop)
-            <label class="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-                <input type="checkbox" name="pop_ids[]" value="{{ $pop->id }}" @checked(in_array($pop->id, $selectedPopIds, true)) class="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                <span class="block">
-                    <span class="block font-medium text-slate-800">{{ $pop->name }}</span>
-                    <span class="block text-xs text-slate-500">{{ $pop->code }} · {{ ucfirst(str_replace('_', ' ', $pop->type)) }}</span>
-                </span>
+{{-- ============================================================ --}}
+{{-- POP TREE PICKER — Tampil hanya jika scope butuh pilih POP    --}}
+{{-- ============================================================ --}}
+<div id="pop_selection_container" class="border-t border-slate-200 pt-4">
+    <div class="mb-2 flex items-start justify-between gap-3">
+        <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                Pilih Cabang / POP Target
             </label>
-        @endforeach
+            <p class="mt-1 text-xs text-slate-400" id="pop_selection_hint">
+                Pilih cabang yang dapat diakses user ini.
+            </p>
+        </div>
+        @error('pop_ids')
+            <p class="text-xs text-rose-600 flex-shrink-0">{{ $message }}</p>
+        @enderror
     </div>
-    @error('pop_ids')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-    @error('pop_ids.*')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+
+    <x-ui.pop-tree-picker
+        :popTree="$popTree"
+        :selected="$selectedPopIds"
+        name="pop_ids[]"
+        id="pop-tree-user"
+    />
 </div>
+
+{{-- ============================================================ --}}
+{{-- MODAL PREVIEW ACCESS                                         --}}
+{{-- ============================================================ --}}
+<div id="previewAccessModal"
+     class="fixed inset-0 z-50 hidden overflow-y-auto"
+     aria-labelledby="preview-modal-title"
+     role="dialog"
+     aria-modal="true">
+    <!-- Backdrop overlay -->
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="closePreviewModal()"></div>
+
+    <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+        <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+        <div class="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle relative z-10">
+            <div class="bg-white px-6 pb-4 pt-5">
+                <h3 class="text-lg font-semibold text-slate-900" id="preview-modal-title">Review Konfigurasi Akses</h3>
+                <p class="mt-1 text-sm text-slate-500">Periksa kembali tingkat akses dan wilayah data sebelum menyimpan.</p>
+
+                <div class="mt-4 rounded-md bg-slate-50 p-4 border border-slate-200">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="block text-xs font-semibold uppercase text-slate-500">Role</span>
+                            <span class="block text-sm font-medium text-slate-900" id="previewRoleName">—</span>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-semibold uppercase text-slate-500">Scope Data</span>
+                            <span class="block text-sm font-medium text-slate-900" id="previewScopeLabel">—</span>
+                        </div>
+                        <div class="col-span-2" id="previewPopContainer" style="display:none;">
+                            <span class="block text-xs font-semibold uppercase text-slate-500">Wilayah Cabang (POP)</span>
+                            <span class="block text-sm font-medium text-slate-900" id="previewPopNames">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="previewWarningAllPop" class="mt-3 rounded-md bg-rose-50 p-3 border border-rose-200" style="display:none;">
+                    <p class="text-sm font-medium text-rose-800">Peringatan: Akses Seluruh POP</p>
+                    <p class="mt-0.5 text-xs text-rose-700">User ini akan memiliki akses ke seluruh data POP/Cabang tanpa batasan wilayah.</p>
+                </div>
+
+                <div class="mt-4">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-2 border-b pb-1">Akses Modul</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1 max-h-40 overflow-y-auto" id="previewFeaturesList"></ul>
+                </div>
+
+                <div id="previewSensitiveContainer" class="mt-3" style="display:none;">
+                    <h4 class="text-sm font-semibold text-amber-600 mb-2 border-b border-amber-200 pb-1">Akses Sensitif</h4>
+                    <ul class="list-disc pl-5 text-sm text-amber-700 space-y-1" id="previewSensitiveList"></ul>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-2 border-t border-slate-200">
+                <button type="button" onclick="closePreviewModal()"
+                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    Batal
+                </button>
+                <button type="button" onclick="submitForm()"
+                        class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                    Konfirmasi & Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const roleSelect   = document.getElementById('role_id');
+    const scopeSelect  = document.getElementById('scope_type');
+    const popContainer = document.getElementById('pop_selection_container');
+    const scopeDesc    = document.getElementById('scope_description');
+    const popHint      = document.getElementById('pop_selection_hint');
+
+    // Deskripsi tiap scope
+    const scopeDescriptions = {
+        'all_pop':      'Akses ke seluruh POP tanpa batasan wilayah.',
+        'selected_pop': 'Akses ke Cabang POP yang dipilih beserta Mini POP dan semua distribusi di bawahnya secara otomatis.',
+    };
+
+    // Hint teks pada pilihan POP per scope
+    const popHints = {
+        'selected_pop': 'Pilih Cabang POP. Mini POP dan semua distribusi di bawah cabang yang dipilih akan otomatis tercakup.',
+    };
+
+    // Scope yang diizinkan per role code
+    const validScopes = {
+        'owner':     ['all_pop'],
+        'atasan':    ['all_pop'],
+        'admin':     ['all_pop', 'selected_pop'],
+        'noc':       ['all_pop', 'selected_pop'],
+        'helpdesk':  ['selected_pop'],
+        'fop':       ['selected_pop'],
+        'teknisi':   ['selected_pop'],
+        'sales':     ['selected_pop'],
+        'pop_admin': ['selected_pop'],
+    };
+
+    function updateScopeOptions() {
+        const roleCode      = roleSelect.options[roleSelect.selectedIndex]?.getAttribute('data-code') ?? '';
+        const allowedScopes = validScopes[roleCode] ?? ['all_pop', 'selected_pop'];
+
+        for (const opt of scopeSelect.options) {
+            const allowed = allowedScopes.includes(opt.value);
+            opt.style.display = allowed ? '' : 'none';
+            opt.disabled = !allowed;
+        }
+
+        // Jika nilai saat ini tidak lagi valid, pilih yang pertama valid
+        if (scopeSelect.options[scopeSelect.selectedIndex]?.disabled) {
+            for (const opt of scopeSelect.options) {
+                if (!opt.disabled) { opt.selected = true; break; }
+            }
+        }
+
+        updatePopContainer();
+    }
+
+    function updatePopContainer() {
+        const scope    = scopeSelect.value;
+        const needsPop = scope === 'selected_pop';
+
+        // Tampilkan/sembunyikan POP picker
+        popContainer.style.display = needsPop ? 'block' : 'none';
+
+        // Update deskripsi scope
+        if (scopeDesc) {
+            scopeDesc.textContent = scopeDescriptions[scope] ?? '';
+        }
+
+        // Update hint pada POP picker
+        if (popHint && needsPop) {
+            popHint.textContent = popHints[scope] ?? '';
+        }
+    }
+
+    roleSelect.addEventListener('change', updateScopeOptions);
+    scopeSelect.addEventListener('change', updatePopContainer);
+
+    // Init
+    updateScopeOptions();
+});
+
+// ---- Preview Access Modal ----
+window.openPreviewModal = function () {
+    const roleId    = document.getElementById('role_id').value;
+    const scopeType = document.getElementById('scope_type').value;
+    const popIds    = [...document.querySelectorAll('input[name="pop_ids[]"]:checked')].map(el => el.value);
+
+    if (!roleId) {
+        Toast.warning('Pilih Role', 'Silakan pilih Role terlebih dahulu.');
+        return;
+    }
+
+    const btn = document.getElementById('btnReviewAccess');
+    if (btn) { btn.disabled = true; btn.textContent = 'Memuat...'; }
+
+    fetch('{{ route("users.preview-access") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+        body: JSON.stringify({ role_id: roleId, scope_type: scopeType, pop_ids: popIds }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (btn) { btn.disabled = false; btn.textContent = 'Review Access'; }
+        if (data.error) { Toast.error('Error', data.error); return; }
+
+        document.getElementById('previewRoleName').textContent  = data.role_name;
+        document.getElementById('previewScopeLabel').textContent = data.scope_label;
+
+        const popBox = document.getElementById('previewPopContainer');
+        if (data.pops?.length) {
+            popBox.style.display = 'block';
+            document.getElementById('previewPopNames').textContent = data.pops.join(', ');
+        } else {
+            popBox.style.display = 'none';
+        }
+
+        document.getElementById('previewWarningAllPop').style.display = data.scope_type === 'all_pop' ? 'block' : 'none';
+
+        const fl = document.getElementById('previewFeaturesList');
+        fl.innerHTML = '';
+        (data.features ?? []).forEach(f => { const li = document.createElement('li'); li.textContent = f; fl.appendChild(li); });
+
+        const sc = document.getElementById('previewSensitiveContainer');
+        const sl = document.getElementById('previewSensitiveList');
+        if (data.sensitive_actions?.length) {
+            sc.style.display = 'block';
+            sl.innerHTML = '';
+            data.sensitive_actions.forEach(sa => { const li = document.createElement('li'); li.textContent = sa; sl.appendChild(li); });
+        } else {
+            sc.style.display = 'none';
+        }
+
+        document.getElementById('previewAccessModal').classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    })
+    .catch(() => {
+        if (btn) { btn.disabled = false; btn.textContent = 'Review Access'; }
+        Toast.error('Error', 'Gagal memuat preview akses.');
+    });
+};
+
+window.closePreviewModal = function () {
+    document.getElementById('previewAccessModal').classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+};
+
+window.submitForm = function () {
+    document.getElementById('userForm').submit();
+};
+
+// Close modal on Escape key press
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('previewAccessModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closePreviewModal();
+        }
+    }
+});
+</script>

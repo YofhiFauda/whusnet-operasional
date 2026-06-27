@@ -18,6 +18,11 @@ use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\CustomerVerificationController;
 use App\Http\Controllers\CustomerInstallationController;
+use App\Http\Controllers\CustomerSurveyController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskStatusController;
+use App\Http\Controllers\TaskChecklistController;
+use App\Http\Controllers\TaskEvidenceController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -29,34 +34,50 @@ Route::middleware('guest')->group(function () {
 // Authenticated Admin Routes
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
-
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.markRead');
+    Route::post('/notifications/{id}/unread', [\App\Http\Controllers\NotificationController::class, 'markAsUnread'])->name('notifications.markUnread');
+
+    // Role & Permission Management
+    Route::middleware('permission:roles.view|roles.update')->group(function () {
+        Route::get('/roles', [\App\Http\Controllers\RolePermissionController::class, 'index'])->name('roles.index');
+        Route::post('/roles', [\App\Http\Controllers\RolePermissionController::class, 'store'])->name('roles.store')->middleware('permission:roles.create');
+        Route::put('/roles/{role}', [\App\Http\Controllers\RolePermissionController::class, 'updateRole'])->name('roles.update_role')->middleware('permission:roles.update');
+        Route::delete('/roles/{role}', [\App\Http\Controllers\RolePermissionController::class, 'destroy'])->name('roles.destroy')->middleware('permission:roles.delete');
+        Route::get('/roles/{role}/matrix', [\App\Http\Controllers\RolePermissionController::class, 'matrix'])->name('roles.matrix');
+        Route::put('/roles/{role}/matrix', [\App\Http\Controllers\RolePermissionController::class, 'update'])->name('roles.update');
+    });
+
     // User Management
-    Route::middleware('permission:view_users')->group(function () {
+    Route::middleware('permission:users.view')->group(function () {
         Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
     });
 
-    Route::middleware('permission:manage_users')->group(function () {
+    Route::middleware('permission:users.create|users.update')->group(function () {
         Route::get('/users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create');
         Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store');
         Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
         Route::get('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'editPops'])->name('users.pops.edit');
         Route::put('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'updatePops'])->name('users.pops.update');
+        Route::post('/users/preview-access', [\App\Http\Controllers\UserController::class, 'previewAccess'])->name('users.preview-access');
     });
 
     // Customers Management - Static Routes First
-    Route::middleware('permission:view_customers')->group(function () {
+    Route::middleware('permission:customers.view')->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     });
 
-    Route::middleware('permission:create_customers')->group(function () {
+    Route::middleware('permission:customers.create')->group(function () {
         Route::get('/customers/create', [CustomerController::class, 'create'])->name('customers.create');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     });
 
-    Route::middleware('permission:import_customers')->group(function () {
+    Route::middleware('permission:customers.import')->group(function () {
         Route::get('/customers/import', [CustomerController::class, 'importForm'])->name('customers.import');
         Route::get('/customers/import/history', [CustomerController::class, 'importHistory'])->name('customers.import.history');
         Route::get('/customers/import/history/{batch}', [CustomerController::class, 'importBatchDetail'])->name('customers.import.batch-detail');
@@ -66,118 +87,130 @@ Route::middleware('auth')->group(function () {
     });
 
     // Customers Management - Dynamic Routes Last
-    Route::middleware('permission:edit_customers')->group(function () {
+    Route::middleware('permission:customers.update')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::post('/customers/{customer}/terminate', [\App\Http\Controllers\CustomerTerminationController::class, '__invoke'])->name('customers.terminate');
     });
 
-    Route::middleware('permission:validate_customer_data')->group(function () {
+    Route::middleware('permission:customers.detail.installation.activate')->group(function () {
         Route::post('/customers/{customer}/activate', [CustomerController::class, 'activate'])->name('customers.activate');
     });
 
-    Route::middleware('permission:create_invoices')->group(function () {
+    Route::middleware('permission:invoices.create')->group(function () {
         Route::post('/customers/{customer}/invoices/manual', [CustomerController::class, 'storeManualInvoice'])->name('customers.invoices.manual');
     });
 
-    Route::middleware('permission:view_invoices')->group(function () {
+    Route::middleware('permission:invoices.view')->group(function () {
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/lunas', [InvoiceController::class, 'lunas'])->name('invoices.lunas');
         Route::get('/invoices/belum-lunas', [InvoiceController::class, 'belumLunas'])->name('invoices.belum-lunas');
         Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     });
 
-    Route::middleware('permission:view_payments')->group(function () {
+    Route::middleware('permission:payments.view')->group(function () {
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     });
 
-    Route::middleware('permission:view_audit_logs')->group(function () {
+    Route::middleware('permission:audit_logs.view')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     });
 
-    Route::middleware('permission:create_payments')->group(function () {
+    Route::middleware('permission:payments.create')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
     });
 
-    Route::middleware('permission:view_customers')->group(function () {
+    Route::middleware('permission:customers.view')->group(function () {
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
         Route::get('/customers/{customer}/payment-info', [CustomerController::class, 'paymentInfo'])->name('customers.payment-info');
     });
 
     // Master Data
-    Route::middleware('permission:view_pop')->group(function () {
+    Route::middleware('permission:pops.view')->group(function () {
         Route::get('/master/wilayah', [RegionController::class, 'index'])->name('master.wilayah.index');
     });
 
     // POP Management - Static Routes First
-    Route::middleware('permission:manage_pop')->group(function () {
+    Route::middleware('permission:pops.view')->group(function () {
+        Route::get('/master/pop', [PopController::class, 'index'])->name('master.pop.index');
+    });
+
+    Route::middleware('permission:pops.create|pops.update')->group(function () {
         Route::get('/master/pop/create', [PopController::class, 'create'])->name('master.pop.create');
         Route::post('/master/pop', [PopController::class, 'store'])->name('master.pop.store');
     });
 
-    Route::middleware('permission:view_pop')->group(function () {
-        Route::get('/master/pop', [PopController::class, 'index'])->name('master.pop.index');
+    // POP Management - Dynamic Routes Last
+    Route::middleware('permission:pops.view')->group(function () {
+        Route::get('/master/pop/{pop}', [PopController::class, 'show'])->name('master.pop.show');
     });
 
-    // POP Management - Dynamic Routes Last
-    Route::middleware('permission:manage_pop')->group(function () {
+    Route::middleware('permission:pops.create|pops.update')->group(function () {
         Route::get('/master/pop/{pop}/edit', [PopController::class, 'edit'])->name('master.pop.edit');
         Route::put('/master/pop/{pop}', [PopController::class, 'update'])->name('master.pop.update');
         Route::post('/master/pop/{pop}/toggle', [PopController::class, 'toggleStatus'])->name('master.pop.toggle');
     });
 
-    Route::middleware('permission:view_pop')->group(function () {
-        Route::get('/master/pop/{pop}', [PopController::class, 'show'])->name('master.pop.show');
-    });
-
     // Distribusi
-    Route::middleware('permission:manage_pop')->group(function () {
-        Route::resource('/master/distribusi', DistributionController::class)->except(['show'])->names('master.distribusi');
+    Route::middleware('permission:pops.view')->group(function () {
+        Route::get('/master/distribusi', [DistributionController::class, 'index'])->name('master.distribusi.index');
     });
 
-    Route::middleware('permission:view_packages')->group(function () {
+    Route::middleware('permission:pops.create|pops.update')->group(function () {
+        Route::get('/master/distribusi/create', [DistributionController::class, 'create'])->name('master.distribusi.create');
+        Route::post('/master/distribusi', [DistributionController::class, 'store'])->name('master.distribusi.store');
+        Route::get('/master/distribusi/{distribution}/edit', [DistributionController::class, 'edit'])->name('master.distribusi.edit');
+        Route::put('/master/distribusi/{distribution}', [DistributionController::class, 'update'])->name('master.distribusi.update');
+    });
+
+    Route::middleware('permission:pops.delete')->group(function () {
+        Route::delete('/master/distribusi/{distribusi}', [DistributionController::class, 'destroy'])->name('master.distribusi.destroy');
+    });
+
+    Route::middleware('permission:packages.view')->group(function () {
         Route::get('/master/status-langganan', [SubscriptionStatusController::class, 'index'])->name('master.status-langganan.index');
     });
 
     // Paket Internet Management - Static Routes First
-    Route::middleware('permission:manage_packages')->group(function () {
+    Route::middleware('permission:packages.create|packages.update')->group(function () {
         Route::get('/master/paket/create', [InternetPackageController::class, 'create'])->name('master.paket.create');
         Route::post('/master/paket', [InternetPackageController::class, 'store'])->name('master.paket.store');
     });
 
-    Route::middleware('permission:view_packages')->group(function () {
+    Route::middleware('permission:packages.view')->group(function () {
         Route::get('/master/paket', [InternetPackageController::class, 'index'])->name('master.paket.index');
     });
 
     // Paket Internet Management - Dynamic Routes Last
-    Route::middleware('permission:manage_packages')->group(function () {
+    Route::middleware('permission:packages.create|packages.update')->group(function () {
         Route::get('/master/paket/{paket}/edit', [InternetPackageController::class, 'edit'])->name('master.paket.edit');
         Route::put('/master/paket/{paket}', [InternetPackageController::class, 'update'])->name('master.paket.update');
         Route::post('/master/paket/{paket}/toggle', [InternetPackageController::class, 'toggleStatus'])->name('master.paket.toggle');
     });
 
-    Route::middleware('permission:fill_survey')->group(function () {
-        Route::get('/surveys/queue', [\App\Http\Controllers\CustomerSurveyController::class, 'index'])->name('surveys.queue');
-        Route::get('/customers/{customer}/survey/report', [\App\Http\Controllers\CustomerSurveyController::class, 'report'])->name('customers.survey.report');
-        Route::post('/customers/{customer}/survey/start', [\App\Http\Controllers\CustomerSurveyController::class, 'start'])->name('customers.survey.start');
-        Route::post('/customers/{customer}/survey', [\App\Http\Controllers\CustomerSurveyController::class, 'store'])->name('customers.survey.store');
+    Route::middleware('permission:customers.detail.survey.view|customers.detail.survey.update')->group(function () {
+        Route::get('/surveys/queue', [CustomerSurveyController::class, 'index'])->name('surveys.queue');
+        Route::get('/customers/{customer}/survey/report', [CustomerSurveyController::class, 'report'])->name('customers.survey.report');
+        Route::post('/customers/{customer}/survey/start', [CustomerSurveyController::class, 'start'])->name('customers.survey.start');
+        Route::post('/customers/{customer}/survey', [CustomerSurveyController::class, 'store'])->name('customers.survey.store');
     });
 
-    Route::middleware('permission:edit_customers')->group(function () {
-        Route::post('/customers/{customer}/assign-survey', [\App\Http\Controllers\CustomerController::class, 'assignSurvey'])->name('customers.assign-survey');
+    Route::middleware('permission:customers.update')->group(function () {
+        Route::post('/customers/{customer}/assign-survey', [CustomerController::class, 'assignSurvey'])->name('customers.assign-survey');
     });
 
-    Route::middleware('permission:fill_installation')->group(function () {
-        Route::get('/verifications/queue', [\App\Http\Controllers\CustomerVerificationController::class, 'index'])->name('verifications.queue');
-        Route::get('/customers/{customer}/installation/report', [\App\Http\Controllers\CustomerInstallationController::class, 'report'])->name('customers.installation.report');
-        Route::post('/customers/{customer}/installation/start', [\App\Http\Controllers\CustomerInstallationController::class, 'start'])->name('customers.installation.start');
-        Route::post('/customers/{customer}/installation', [\App\Http\Controllers\CustomerInstallationController::class, 'store'])->name('customers.installation.store');
-        Route::post('/customers/{customer}/test-report', [\App\Http\Controllers\CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
+    Route::middleware('permission:customers.detail.installation.view|customers.detail.installation.update')->group(function () {
+        Route::get('/verifications/queue', [CustomerVerificationController::class, 'index'])->name('verifications.queue');
+        Route::get('/customers/{customer}/installation/report', [CustomerInstallationController::class, 'report'])->name('customers.installation.report');
+        Route::post('/customers/{customer}/installation/start', [CustomerInstallationController::class, 'start'])->name('customers.installation.start');
+        Route::post('/customers/{customer}/installation', [CustomerInstallationController::class, 'store'])->name('customers.installation.store');
+        Route::post('/customers/{customer}/test-report', [CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
     });
 
-    Route::middleware('permission:edit_customers')->group(function () {
+    Route::middleware('permission:customers.detail.installation.validate')->group(function () {
         Route::get('/verifications/{customer}/admin', [CustomerVerificationController::class, 'showAdmin'])->name('customers.verification.admin');
         Route::post('/verifications/{customer}/process-to-team', [CustomerVerificationController::class, 'processToTeam'])->name('customers.verification.process-to-team');
         Route::post('/verifications/{customer}/final', [CustomerVerificationController::class, 'finalVerify'])->name('customers.verification.final');
@@ -185,28 +218,116 @@ Route::middleware('auth')->group(function () {
         Route::post('/verifications/{customer}/reject', [CustomerVerificationController::class, 'reject'])->name('customers.verification.reject');
     });
 
-    Route::middleware('permission:fill_device')->group(function () {
+    Route::middleware('permission:customers.detail.devices.create|customers.detail.devices.update')->group(function () {
         Route::post('/customers/{customer}/device', [CustomerDeviceController::class, 'store'])->name('customers.device.store');
     });
 
-    Route::middleware('permission:upload_customer_documents')->group(function () {
+    Route::middleware('permission:customers.detail.documents.upload')->group(function () {
         Route::post('/customers/{customer}/documents', [CustomerDocumentController::class, 'store'])->name('customers.documents.store');
     });
 
-    Route::middleware('permission:view_customer_documents')->group(function () {
+    Route::middleware('permission:customers.detail.documents.view')->group(function () {
         Route::get('/customer-documents/{document}', [CustomerDocumentController::class, 'show'])->name('customers.documents.show');
     });
 
     // Reports Management
-    Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
-    Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
-    Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
-    Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
-    Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
-    Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
-    Route::get('/reports/imports', [\App\Http\Controllers\ImportReportController::class, 'index'])->name('reports.imports.index');
-    Route::get('/reports/imports/{batch}', [\App\Http\Controllers\ImportReportController::class, 'show'])->name('reports.imports.show');
-    Route::get('/reports/imports/{batch}/export', [\App\Http\Controllers\ImportReportController::class, 'export'])->name('reports.imports.export');
+    Route::middleware('permission:reports.view')->group(function () {
+        Route::get('/reports/customers', [CustomerReportController::class, 'index'])->name('reports.customers.index');
+        Route::get('/reports/customers/export', [CustomerReportController::class, 'export'])->name('reports.customers.export');
+        Route::get('/reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices.index');
+        Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
+        Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
+        Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
+        Route::get('/reports/imports', [\App\Http\Controllers\ImportReportController::class, 'index'])->name('reports.imports.index');
+        Route::get('/reports/imports/{batch}', [\App\Http\Controllers\ImportReportController::class, 'show'])->name('reports.imports.show');
+        Route::get('/reports/imports/{batch}/export', [\App\Http\Controllers\ImportReportController::class, 'export'])->name('reports.imports.export');
+    });
+
+    // ── FOP Dashboard ────────────────────────────────────────────
+
+    Route::middleware('permission:task.view.all')->group(function () {
+        Route::get('/fop', [\App\Http\Controllers\FopDashboardController::class, 'index'])->name('fop.dashboard');
+        Route::get('/api/fop/pipeline', [\App\Http\Controllers\FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
+    });
+
+    // ── Task Management ──────────────────────────────────────────
+
+    // FOP: Lihat semua task & kalender
+    Route::middleware('permission:task.view.all')->group(function () {
+        Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
+        Route::get('/api/tasks/calendar', [TaskController::class, 'calendarData'])->name('tasks.calendar.data');
+        Route::match(['get', 'post'], '/api/tasks/check-conflict', [TaskController::class, 'checkConflict'])->name('tasks.check-conflict');
+    });
+
+    // FOP: Buat task
+    Route::middleware('permission:task.create')->group(function () {
+        Route::get('/tasks/create', [TaskController::class, 'create'])->name('tasks.create');
+        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
+        Route::get('/api/tasks/search-customers', [TaskController::class, 'searchCustomers'])->name('tasks.search-customers');
+    });
+
+    // FOP: Edit, cancel task
+    Route::middleware('permission:task.edit')->group(function () {
+        Route::get('/tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
+        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+    });
+
+    Route::middleware('permission:task.schedule|task.assign.team|task.edit')->group(function () {
+        Route::post('/tasks/{task}/schedule', [TaskController::class, 'schedule'])->name('tasks.schedule');
+        Route::patch('/tasks/{task}/team', [\App\Http\Controllers\TaskTeamController::class, 'update'])->name('tasks.team.update');
+    });
+
+    Route::middleware('permission:task.cancel')->group(function () {
+        Route::post('/tasks/{task}/cancel', [TaskController::class, 'cancel'])->name('tasks.cancel');
+    });
+
+    // Task detail — FOP (view.all) atau Teknisi (view.own + member)
+    Route::middleware('permission:task.view.all|task.view.own')->group(function () {
+        Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    });
+
+    // FOP: Review actions
+    Route::middleware('permission:task.view.all')->group(function () {
+        Route::post('/tasks/{task}/review', [TaskController::class, 'review'])->name('tasks.review');
+        Route::post('/tasks/{task}/fop-reject', [TaskController::class, 'reject'])->name('tasks.fop-reject');
+        Route::post('/tasks/{task}/fop-pending', [TaskController::class, 'pending'])->name('tasks.fop-pending');
+    });
+
+    // Teknisi: Dashboard task sendiri
+    Route::middleware('permission:task.view.own')->group(function () {
+        Route::get('/tasks-saya', [TaskController::class, 'indexOwn'])->name('tasks.own');
+        // Endpoint partial HTML — digunakan Echo listener untuk inject task card baru tanpa reload
+        Route::get('/tasks-saya/partial/{task}', [TaskController::class, 'cardPartial'])->name('tasks.own.card-partial');
+    });
+
+    // Teknisi: Transisi status
+    Route::middleware('permission:task.status.start')->group(function () {
+        Route::post('/tasks/{task}/start', [TaskStatusController::class, 'start'])->name('tasks.start');
+    });
+
+    Route::middleware('permission:task.status.complete')->group(function () {
+        Route::post('/tasks/{task}/complete', [TaskStatusController::class, 'complete'])->name('tasks.complete');
+        Route::post('/tasks/{task}/survey-report', [\App\Http\Controllers\TaskSurveyReportController::class, 'store'])->name('tasks.survey-report.store');
+        Route::post('/tasks/{task}/install-report', [\App\Http\Controllers\TaskInstallationReportController::class, 'store'])->name('tasks.install-report.store');
+    });
+
+    Route::middleware('permission:task.status.pending')->group(function () {
+        Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
+    });
+
+    // Teknisi: Checklist
+    Route::middleware('permission:task.checklist.update')->group(function () {
+        Route::patch('/tasks/{task}/checklists/{checklist}', [TaskChecklistController::class, 'update'])->name('tasks.checklists.update');
+    });
+
+    // Teknisi: Upload bukti
+    Route::middleware('permission:task.evidence.upload')->group(function () {
+        Route::post('/tasks/{task}/evidences', [TaskEvidenceController::class, 'store'])->name('tasks.evidences.store');
+    });
+
+    Route::middleware('permission:task.edit')->group(function () {
+        Route::delete('/tasks/{task}/evidences/{evidence}', [TaskEvidenceController::class, 'destroy'])->name('tasks.evidences.destroy');
+    });
 
     // Location APIs (used in forms)
     Route::get('/api/districts/{district}/villages', function (\App\Models\District $district) {
@@ -216,3 +337,4 @@ Route::middleware('auth')->group(function () {
         return response()->json($city->districts()->orderBy('name')->get());
     });
 });
+

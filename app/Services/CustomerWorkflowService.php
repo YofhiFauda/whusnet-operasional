@@ -62,6 +62,43 @@ class CustomerWorkflowService
                     'user_agent' => request() ? request()->userAgent() : null,
                     'created_at' => now(),
                 ]);
+
+                \App\Models\CustomerStatusLog::create([
+                    'customer_id' => $customer->id,
+                    'from_status' => $currentStatusStr,
+                    'to_status'   => $nextStatus->value,
+                    'changed_by'  => Auth::id(), // Akan mereturn null secara otomatis jika di-run dari scheduler/CLI (OK)
+                    'note'        => $note,
+                ]);
+
+                // Sentralisasi Tiket: Auto-create Task antrean Pemasangan
+                if ($nextStatus->value === 'waiting_installation') {
+                    $existingTask = \App\Models\Task::where('customer_id', $customer->id)
+                        ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                        ->whereIn('status', [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::TERJADWAL->value, \App\Enums\TaskStatus::IN_PROGRESS->value])
+                        ->exists();
+
+                    if (! $existingTask) {
+                        $year  = date('Y');
+                        $count = \App\Models\Task::whereYear('created_at', $year)->count() + 1;
+                        \App\Models\Task::create([
+                            'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                            'task_type'   => \App\Enums\TaskType::PEMASANGAN->value,
+                            'title'       => 'Pemasangan Baru: ' . $customer->full_name,
+                            'description' => 'Tiket instalasi perangkat untuk alamat: ' . ($customer->address ?? '-'),
+                            'pop_id'      => $customer->pop_id,
+                            'customer_id' => $customer->id,
+                            'status'      => \App\Enums\TaskStatus::PENDING->value,
+                            'created_by'  => Auth::id() ?? 1,
+                            'updated_by'  => Auth::id() ?? 1,
+                        ]);
+                    }
+                }
+
+                // S8.8-T005: Trigger notifikasi ke pelanggan setelah status Active
+                if ($nextStatus->value === 'active') {
+                    \App\Jobs\SendCustomerActivationNotification::dispatch($customer, Auth::id());
+                }
             }
 
             return $saved;
