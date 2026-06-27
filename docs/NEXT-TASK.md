@@ -145,15 +145,13 @@
 
 ## 📋 SUMMARY TABEL
 
-| Sprint | Task | Status | Prioritas | Owner | Est. Hari |
-|--------|------|--------|-----------|-------|-----------|
-| S8.5 | T001: Design system surveys/queue | ❌ | 🔴 HIGH | - | 2-3 hari |
-| S8.5 | T002: Design system _survey tab | ❌ | 🔴 HIGH | - | 1-2 hari |
-| S8.5 | T003: Design system _installation tab | ❌ | 🔴 HIGH | - | 1-2 hari |
-| S8.5 | T004: capture="environment" all forms | ❌ | 🔴 HIGH | - | 1 hari |
-| S8.6 | T003: Overdue indicator stat cards | ❌ | 🔴 HIGH | - | 1 hari |
-| S8.7 | CLARIFY: Delete calendar atau tetap? | ⚠️ | 🟡 MEDIUM | USER | — |
-| S8.9 | VERIFY: T004 No auto-update flow | ⚠️ | 🟡 MEDIUM | DEV | 1 hari |
+| Sprint | Task | Status | Prioritas | Owner | Effort |
+|--------|------|--------|-----------|-------|--------|
+| S8.5 | T001-T004: Design System UI | ✅ | 🔴 HIGH | DONE | 5-6 hrs |
+| S8.6 | T003: Overdue Indicator | ✅ | 🔴 HIGH | DONE | 1 hr |
+| S8.7 | Calendar Scheduler (Implemented) | ✅ | 🟡 MEDIUM | DONE | 3-4 hrs |
+| S8.9-T004 | No Auto-Update Verify | ✅ | 🔴 HIGH | VERIFIED | 1 hr |
+| S14-S15 | Audit Compliance & UAT | ❌ | 🟡 MEDIUM | TODO | 25 days |
 
 
 **Total effort estimate (bulan ini):**

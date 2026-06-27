@@ -23,7 +23,10 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskChecklistController;
 use App\Http\Controllers\TaskEvidenceController;
+use App\Http\Controllers\FopDashboardController;
+use App\Http\Controllers\FopCalendarController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Carbon;
 
 // Guest Routes
 Route::middleware('guest')->group(function () {
@@ -247,6 +250,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.view.all')->group(function () {
         Route::get('/fop', [\App\Http\Controllers\FopDashboardController::class, 'index'])->name('fop.dashboard');
+        Route::get('/fop/calendar', [\App\Http\Controllers\FopCalendarController::class, 'index'])->name('fop.calendar');
         Route::get('/api/fop/pipeline', [\App\Http\Controllers\FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
