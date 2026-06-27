@@ -84,7 +84,7 @@
 ### Sprint 8.6 — SLA Waiting Phase Countdown
 
 #### S8.6-T003 — Overdue Indicator di FOP Stat Cards
-**Status:** ❌ BELUM DIKERJAKAN  
+**Status:** ✅ SELESAI  
 **Deskripsi:**
 - FOP perlu tahu berapa pelanggan yang sudah overdue SLA waiting untuk prioritaskan
 - Tambah indikator di stat cards FOP Dashboard (atau badge merah di kolom antrean)

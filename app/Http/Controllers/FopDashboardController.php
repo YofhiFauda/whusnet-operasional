@@ -160,14 +160,22 @@ class FopDashboardController extends Controller
             });
 
         // ── Stat cards ──────────────────────────────────────────────
-        
+
+        // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
         $overdueSurvey = Customer::when(!empty($allowedPopIds), fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
-            ->where('created_at', '<', Carbon::now()->subDay())
+            ->whereRaw('DATE_ADD(created_at, INTERVAL 1 DAY) < NOW()')
             ->count();
 
+        // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
+        // Join dengan task survey terbaru yang selesai untuk ambil completed_at
         $overdueInstallation = Customer::when(!empty($allowedPopIds), fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin'])
+            ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
+            ->whereHas('tasks', function ($q) {
+                $q->where('task_type', 'survey')
+                  ->where('status', 'selesai')
+                  ->whereRaw('DATE_ADD(completed_at, INTERVAL 3 DAY) < NOW()');
+            })
             ->count();
 
         $stats = [
