@@ -169,7 +169,7 @@ class TaskInstallationReportController extends Controller
  
         return response()->json([
             'success' => true,
-            'message' => 'Laporan pemasangan berhasil disimpan. Status pelanggan berpindah ke Verifikasi Admin.',
+            'message' => 'Laporan pemasangan berhasil disimpan. Menunggu approval FOP untuk lanjut ke Verifikasi Admin.',
         ]);
     }
  

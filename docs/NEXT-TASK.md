@@ -104,7 +104,7 @@
 ### Verifikasi & Testing
 
 #### VERIFY: S8.9-T004 — Teknisi Laporan Tidak Auto-Update Customer Status
-**Status:** ⚠️ PERLU VERIFIKASI  
+**Status:** ✅ VERIFIED  
 **Deskripsi:**
 - S8.9-T004 claims teknisi laporan **tidak** auto-update customer status
 - Sebaliknya: Task status = `selesai`, `fop_review_status = pending` (waiting FOP approve)
