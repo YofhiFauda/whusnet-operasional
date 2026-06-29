@@ -71,10 +71,12 @@ class CustomerWorkflowService
                     'note'        => $note,
                 ]);
 
-                // Sentralisasi Tiket: Auto-create Task antrean Pemasangan
-                if ($nextStatus->value === 'waiting_installation') {
+                // Sentralisasi Tiket: Auto-create Task antrean Survey & Pemasangan
+                if (in_array($nextStatus->value, ['waiting_survey', 'waiting_installation'])) {
+                    $taskType = $nextStatus->value === 'waiting_survey' ? \App\Enums\TaskType::SURVEY->value : \App\Enums\TaskType::PEMASANGAN->value;
+                    $titlePrefix = $nextStatus->value === 'waiting_survey' ? 'Survey Pelanggan: ' : 'Pemasangan Baru: ';
                     $existingTask = \App\Models\Task::where('customer_id', $customer->id)
-                        ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                        ->where('task_type', $taskType)
                         ->whereIn('status', [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::TERJADWAL->value, \App\Enums\TaskStatus::IN_PROGRESS->value])
                         ->exists();
 
@@ -83,10 +85,10 @@ class CustomerWorkflowService
                         $count = \App\Models\Task::whereYear('created_at', $year)->count() + 1;
                         \App\Models\Task::create([
                             'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                            'task_type'   => \App\Enums\TaskType::PEMASANGAN->value,
-                            'title'       => 'Pemasangan Baru: ' . $customer->full_name,
-                            'description' => 'Tiket instalasi perangkat untuk alamat: ' . ($customer->address ?? '-'),
-                            'pop_id'      => $customer->pop_id,
+                            'task_type'   => $taskType,
+                            'title'       => $titlePrefix . $customer->full_name,
+                            'description' => null,
+                            'pop_id'      => $customer->pop_id ?? 1,
                             'customer_id' => $customer->id,
                             'status'      => \App\Enums\TaskStatus::PENDING->value,
                             'created_by'  => Auth::id() ?? 1,

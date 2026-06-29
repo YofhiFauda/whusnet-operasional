@@ -285,7 +285,7 @@ class CustomerController extends Controller
                 'task_number' => sprintf('TASK-%s-%04d', $year, $count),
                 'task_type'   => \App\Enums\TaskType::SURVEY->value,
                 'title'       => 'Survey Calon Pelanggan: ' . $customer->full_name,
-                'description' => 'Tiket survey baru untuk alamat: ' . ($validated['address'] ?? '-'),
+                'description' => null,
                 'pop_id'      => $customer->pop_id,
                 'customer_id' => $customer->id,
                 'status'      => \App\Enums\TaskStatus::PENDING->value,
