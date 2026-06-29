@@ -367,11 +367,11 @@
                         <p class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--color-text-muted)">INFO PELANGGAN & LOKASI</p>
                         <div class="space-y-2">
                             <div class="text-xs border-b pb-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">Lokasi</span>
-                                <p class="font-medium mt-0.5" style="color:var(--color-text-main)" x-text="selectedTask?.location || '—'"></p>
+                                <span style="color:var(--color-text-muted)">Alamat Lengkap</span>
+                                <p class="font-medium mt-0.5 leading-relaxed" style="color:var(--color-text-main)" x-text="selectedTask?.customer_address || '—'"></p>
                             </div>
                             <div class="text-xs border-b pb-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">POP</span>
+                                <span style="color:var(--color-text-muted)">POP / Cabang</span>
                                 <p class="font-medium mt-0.5" style="color:var(--color-text-main)" x-text="selectedTask?.pop_name || '—'"></p>
                             </div>
                             <div class="text-xs">
