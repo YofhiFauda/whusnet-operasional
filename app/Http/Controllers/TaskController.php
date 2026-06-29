@@ -244,20 +244,23 @@ class TaskController extends Controller
         $this->authorize('schedule', $task);
 
         $validated = $request->validate([
-            'scheduled_at'      => 'required|date|after:now',
+            'scheduled_at'      => 'required|date',
             'team_member_ids'   => 'required|array|min:1|max:3',
             'team_member_ids.*' => 'exists:users,id',
             'conflict_override' => 'nullable|boolean',
-            'checklist_items'   => 'required|string',
+            'checklist_items'   => 'required',
+            'sla_minutes'       => 'nullable|integer|min:1',
+            'team_name'         => 'nullable|string|max:100',
         ]);
 
         $user = auth()->user();
+        $slaMinutes = !empty($validated['sla_minutes']) ? (int) $validated['sla_minutes'] : TaskType::from($task->task_type->value)->slaMinutes();
 
         // Validasi konflik jadwal
         $conflicts = $this->taskService->detectConflicts(
             $validated['team_member_ids'],
             $validated['scheduled_at'],
-            TaskType::from($task->task_type->value)->slaMinutes(),
+            $slaMinutes,
             $task->id
         );
 
@@ -295,7 +298,7 @@ class TaskController extends Controller
     {
         $this->authorize('view', $task);
 
-        $task->load(['customer', 'pop', 'fop', 'teamMembers.user', 'checklists.checkedByUser', 'evidences.uploader']);
+        $task->load(['customer.village', 'customer.district', 'customer.city', 'pop', 'fop', 'teamMembers.user', 'checklists.checkedByUser', 'evidences.uploader']);
 
         return view('tasks.show', compact('task'));
     }

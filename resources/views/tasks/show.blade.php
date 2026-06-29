@@ -198,6 +198,19 @@
                     <span class="text-text-secondary leading-relaxed">{{ $task->description }}</span>
                 </div>
                 @endif
+                @if($task->customer)
+                <div class="flex gap-3 sm:col-span-2 border-b border-border pb-3">
+                    <span class="text-text-muted w-32 shrink-0 text-xs pt-0.5">Alamat Lengkap</span>
+                    <span class="text-text-secondary leading-relaxed">
+                        {{ implode(', ', array_filter([
+                            $task->customer->address,
+                            $task->customer->village?->name,
+                            $task->customer->district?->name,
+                            $task->customer->city?->name,
+                        ])) ?: '—' }}
+                    </span>
+                </div>
+                @endif
                 @if($task->pending_reason)
                 <div class="flex gap-3 sm:col-span-2">
                     <span class="text-text-muted w-32 shrink-0 text-xs pt-0.5">Alasan Pending</span>
