@@ -207,6 +207,8 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+[x-cloak] { display: none !important; }
+
 /* Sidebar Collapse Styles */
 @media (min-width: 768px) {
   #sidebar {
