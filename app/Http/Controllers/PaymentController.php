@@ -24,6 +24,7 @@ class PaymentController extends Controller
         $dateTo = trim((string) $request->query('date_to', ''));
         $method = trim((string) $request->query('method', ''));
         $status = trim((string) $request->query('status', ''));
+        $invoiceType = trim((string) $request->query('invoice_type', ''));
         $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
         $allowedStatuses = ['pending', 'valid', 'ditolak'];
 
@@ -74,6 +75,12 @@ class PaymentController extends Controller
             $query->where('payment_status', $status);
         }
 
+        if ($invoiceType !== '') {
+            $query->whereHas('invoice', function ($invoiceQuery) use ($invoiceType) {
+                $invoiceQuery->where('invoice_type', $invoiceType);
+            });
+        }
+
         $payments = $query->paginate(10)->withQueryString();
         $pops = Pop::forUser()->orderBy('name')->get();
 
@@ -86,6 +93,7 @@ class PaymentController extends Controller
             'dateTo',
             'method',
             'status',
+            'invoiceType',
             'allowedMethods',
             'allowedStatuses'
         ));
@@ -154,7 +162,13 @@ class PaymentController extends Controller
 
         $proofPath = null;
         if ($request->hasFile('proof_file')) {
-            $proofPath = $request->file('proof_file')->store('payments', 'public');
+            $invoice->loadMissing('customer');
+            $proofPath = \App\Services\FileUploadService::uploadPaymentProof(
+                $request->file('proof_file'),
+                $invoice->customer,
+                $invoice->invoice_type?->value,
+                $validated['payment_date']
+            );
         }
 
         $payment = DB::transaction(function () use ($invoice, $validated, $proofPath): Payment {

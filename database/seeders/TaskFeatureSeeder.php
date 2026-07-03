@@ -65,15 +65,6 @@ class TaskFeatureSeeder extends Seeder
         // ─── 4. Permissions FOP ──────────────────────────────────────
 
         $fopPermDefs = [
-            ['code' => 'tasks.view',             'name' => 'Lihat Semua Task (Legacy)'],
-            ['code' => 'tasks.create',           'name' => 'Buat Task (Legacy)'],
-            ['code' => 'tasks.update',           'name' => 'Edit Task (Legacy)'],
-            ['code' => 'tasks.cancel',           'name' => 'Batalkan Task (Legacy)'],
-            ['code' => 'tasks.schedule',         'name' => 'Jadwalkan Task (Legacy)'],
-            ['code' => 'tasks.assign',           'name' => 'Assign Tim (Legacy)'],
-            ['code' => 'tasks.export',           'name' => 'Lihat Laporan (Legacy)'],
-            ['code' => 'tasks.override',         'name' => 'Override Konflik (Legacy)'],
-
             ['code' => 'task.view.all',          'name' => 'Lihat Semua Task'],
             ['code' => 'task.create',            'name' => 'Buat Task'],
             ['code' => 'task.edit',              'name' => 'Edit Task'],
@@ -106,19 +97,12 @@ class TaskFeatureSeeder extends Seeder
         // ─── 5. Permissions Teknisi ──────────────────────────────────
 
         $teknisiPermDefs = [
-            ['code' => 'tasks.view_own',         'name' => 'Lihat Task Sendiri (Legacy)'],
-            ['code' => 'tasks.status_start',     'name' => 'Mulai Task (Legacy)'],
-            ['code' => 'tasks.status_complete',  'name' => 'Selesaikan Task (Legacy)'],
-            ['code' => 'tasks.status_pending',   'name' => 'Pending Task (Legacy)'],
-            ['code' => 'tasks.checklist_update', 'name' => 'Update Checklist (Legacy)'],
-            ['code' => 'tasks.evidence_upload',  'name' => 'Upload Bukti Foto (Legacy)'],
-
             ['code' => 'task.view.own',          'name' => 'Lihat Task Sendiri'],
             ['code' => 'task.status.start',      'name' => 'Mulai Task'],
             ['code' => 'task.status.complete',   'name' => 'Selesaikan Task'],
-            ['code' => 'task.status.pending',    'name' => 'Pending Task'],
             ['code' => 'task.checklist.update',  'name' => 'Update Checklist'],
             ['code' => 'task.evidence.upload',   'name' => 'Upload Bukti Foto'],
+            ['code' => 'task.status.pending',    'name' => 'Laporan Nanti'],
         ];
 
         $teknisiPermIds = [];

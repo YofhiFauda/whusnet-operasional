@@ -19,6 +19,20 @@ class TaskStatusController extends Controller
     {
         $this->authorize('statusStart', $task);
 
+        $memberIds = $task->teamMembers()->pluck('user_id')->toArray();
+        if (!in_array(auth()->id(), $memberIds)) {
+            $memberIds[] = auth()->id();
+        }
+
+        $activeTask = Task::where('id', '!=', $task->id)
+            ->where('status', \App\Enums\TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
+            ->first();
+
+        if ($activeTask) {
+            return back()->with('error', "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+        }
+
         $this->taskService->start($task, auth()->user());
 
         return back()->with('success', "Task [{$task->task_number}] dimulai.");

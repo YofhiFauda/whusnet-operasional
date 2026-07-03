@@ -2,8 +2,8 @@
 @php
     // Kumpulkan task survey in_progress agar data-nya bisa dipakai Alpine.js
     $surveyTasksData = $tasks->filter(fn($t) =>
-        $t->status->value === 'in_progress' &&
-        $t->task_type->value === 'survey'
+        in_array($t->status->value, ['in_progress', 'pending']) &&
+        $t->task_type->value === 'SURVEY'
     )->map(fn($t) => [
         'id'            => $t->id,
         'customer_name' => $t->customer?->full_name ?? $t->title,
@@ -13,13 +13,13 @@
         'evidence_count'=> $t->evidences->count(),
         'can_complete'  => $t->canComplete(),
         'evidence_url'  => route('tasks.evidences.store', $t),
-        'submit_url'    => route('tasks.survey-report.store', $t),
+        'submit_url'    => route('customers.survey.store', $t->customer_id),
     ])->values()->toArray();
 
     // Kumpulkan task pemasangan in_progress agar data-nya bisa dipakai Alpine.js
     $installTasksData = $tasks->filter(fn($t) =>
-        $t->status->value === 'in_progress' &&
-        $t->task_type->value === 'pemasangan'
+        in_array($t->status->value, ['in_progress', 'pending']) &&
+        $t->task_type->value === 'PSB'
     )->map(fn($t) => [
         'id'            => $t->id,
         'customer_name' => $t->customer?->full_name ?? $t->title,
@@ -30,7 +30,7 @@
         'evidence_count'=> $t->evidences->count(),
         'can_complete'  => $t->canComplete(),
         'evidence_url'  => route('tasks.evidences.store', $t),
-        'submit_url'    => route('tasks.install-report.store', $t),
+        'submit_url'    => route('customers.installation.store', $t->customer_id),
     ])->values()->toArray();
 
     $packages = \App\Models\InternetPackage::active()->orderBy('name')->get();
@@ -202,7 +202,7 @@
                         ? "{$actualHours} jam {$actualRemMins} menit"
                         : "{$actualRemMins} menit";
                     $isOverSla       = $actualMinutes > $task->sla_minutes;
-                    $typeLabel       = $task->task_type->value === 'pemasangan' ? 'Pemasangan' : 'Survey';
+                    $typeLabel       = $task->task_type->value === 'PSB' ? 'Pemasangan' : 'Survey';
                 @endphp
                 <div class="mt-2 flex items-center gap-1.5">
                     <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -223,25 +223,6 @@
                 </div>
                 @endif
 
-                {{-- Checklist progress --}}
-                @if($task->checklists->count() > 0)
-                <div class="mt-3">
-                    @php
-                        $done  = $task->checklists->where('is_checked', true)->count();
-                        $total = $task->checklists->count();
-                        $pct   = $total > 0 ? round($done / $total * 100) : 0;
-                    @endphp
-                    <div class="flex items-center justify-between text-[11px] text-text-muted mb-1">
-                        <span>Checklist</span>
-                        <span class="font-mono">{{ $done }}/{{ $total }}</span>
-                    </div>
-                    <div class="h-1.5 bg-border rounded-full overflow-hidden">
-                        <div class="h-full rounded-full transition-all"
-                             style="background:var(--color-success); width:{{ $pct }}%"></div>
-                    </div>
-                </div>
-                @endif
-
                 {{-- Tombol aksi --}}
                 <div class="flex items-center gap-2 mt-4 pt-3 border-t border-border">
                     <a href="{{ route('tasks.show', $task) }}"
@@ -250,7 +231,7 @@
                     </a>
 
                     @if($task->status->value === 'terjadwal')
-                        @if($task->task_type->value === 'survey')
+                        @if($task->task_type->value === 'SURVEY')
                             @if(auth()->user()->hasPermission('customers.detail.survey.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                             <form action="{{ route('customers.survey.start', $task->customer_id) }}" method="POST" class="flex-1">
                                 @csrf
@@ -261,7 +242,7 @@
                                 </button>
                             </form>
                             @endif
-                        @elseif($task->task_type->value === 'pemasangan')
+                        @elseif($task->task_type->value === 'PSB')
                             @if(auth()->user()->hasPermission('customers.detail.installation.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                             <form action="{{ route('customers.installation.start', $task->customer_id) }}" method="POST" class="flex-1">
                                 @csrf
@@ -279,7 +260,7 @@
                                 <button type="submit"
                                         class="w-full text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
                                         style="background:var(--color-warning)">
-                                    Mulai Task
+                                    {{ $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value ? 'Mulai Maintenance' : 'Mulai Task' }}
                                 </button>
                             </form>
                             @endcan
@@ -287,32 +268,25 @@
                     @endif
 
                     @can('statusComplete', $task)
-                    @if($task->status->value === 'in_progress')
-                    @if($task->task_type->value === 'survey')
-                    <button type="button"
-                            @click="openSurveyReport({{ $task->id }})"
-                            class="flex-1 text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                    @if(in_array($task->status->value, ['in_progress', 'pending']))
+                    @if($task->task_type->value === 'SURVEY')
+                    <button type="button" @click="$dispatch('open-survey-report', { taskId: {{ $task->id }} })"
+                            class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
                             style="background:var(--color-success)">
                         Isi Laporan
                     </button>
-                    @elseif($task->task_type->value === 'pemasangan')
-                    <button type="button"
-                            @click="openInstallReport({{ $task->id }})"
-                            class="flex-1 text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                    @elseif($task->task_type->value === 'PSB')
+                    <button type="button" @click="$dispatch('open-install-report', { taskId: {{ $task->id }} })"
+                            class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
                             style="background:var(--color-success)">
                         Isi Laporan
                     </button>
                     @else
-                    {{-- Non-survey & non-pemasangan: tombol Selesai langsung --}}
-                    <form action="{{ route('tasks.complete', $task) }}" method="POST" class="flex-1">
-                        @csrf
-                        <button type="submit"
-                                @if(!$task->canComplete()) disabled @endif
-                                class="w-full text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                                style="{{ $task->canComplete() ? 'background:var(--color-success)' : 'background:var(--color-surface-muted); color:var(--color-text-disabled); cursor:not-allowed' }}">
-                            Selesai
-                        </button>
-                    </form>
+                    <a href="{{ route('tasks.maintenance.report', $task) }}"
+                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                       style="background:var(--color-success)">
+                        Isi Laporan
+                    </a>
                     @endif
                     @endif
                     @endcan
@@ -366,6 +340,7 @@
 
 {{-- ══ Slide-Over: Laporan Survey Multi-Step ════════════════════════════ --}}
 <div x-data="surveyReportWizard({{ json_encode($surveyTasksData) }})"
+     @open-survey-report.window="openSurveyReport($event.detail.taskId)"
      x-show="open"
      x-cloak
      class="fixed inset-0 z-50 flex"
@@ -676,6 +651,7 @@
 
 {{-- ══ Slide-Over: Laporan Pemasangan Multi-Step ════════════════════════ --}}
 <div x-data="installReportWizard({{ json_encode($installTasksData) }})"
+     @open-install-report.window="openInstallReport($event.detail.taskId)"
      x-show="open"
      x-cloak
      class="fixed inset-0 z-50 flex"

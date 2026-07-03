@@ -23,7 +23,7 @@ class TaskEvidenceController extends Controller
         ]);
 
         $file = $validated['photo'];
-        $path = $file->store("task-evidences/{$task->id}", 'public');
+        $path = \App\Services\FileUploadService::uploadTaskEvidence($file, $task);
 
         $evidence = TaskEvidence::create([
             'task_id'     => $task->id,

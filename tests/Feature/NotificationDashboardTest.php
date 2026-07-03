@@ -149,12 +149,12 @@ class NotificationDashboardTest extends TestCase
         // Test filter by type = info
         $response = $this->actingAs($this->fopUser)->get('/notifications?type=info');
         $response->assertSee('Info Alert');
-        $response->assertDontSee('Success Alert');
+        $response->assertViewHas('notifications', fn ($notifs) => $notifs->count() === 1 && $notifs->first()->data['title'] === 'Info Alert');
 
         // Test filter by type = success
         $response = $this->actingAs($this->fopUser)->get('/notifications?type=success');
         $response->assertSee('Success Alert');
-        $response->assertDontSee('Info Alert');
+        $response->assertViewHas('notifications', fn ($notifs) => $notifs->count() === 1 && $notifs->first()->data['title'] === 'Success Alert');
     }
 
     public function test_can_toggle_notification_read_unread_status(): void

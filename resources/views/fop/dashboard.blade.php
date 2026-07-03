@@ -3,7 +3,7 @@
 @section('title', 'FOP Dashboard')
 
 @section('content')
-<div x-data="fopDashboardHandler()" class="flex flex-col gap-6 px-6 py-5">
+<div x-data="fopDashboardHandler()" class="flex flex-col gap-5 px-4 py-6 max-w-screen-2xl mx-auto">
 
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
     <div class="flex items-center justify-between">
@@ -29,7 +29,7 @@
 
     {{-- ══ Stat Cards ═══════════════════════════════════════════════ --}}
     <div id="stat-cards-container" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="bg-surface border border-border rounded-lg px-4 py-3">
+        <div class="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Antrean Survey</p>
             <div class="flex items-center gap-2 mt-1">
                 <p class="text-2xl font-bold font-mono text-text-main">{{ $stats['antrian_survey'] }}</p>
@@ -41,7 +41,7 @@
             </div>
             <p class="text-[11px] text-text-muted mt-0.5">Belum disurvey</p>
         </div>
-        <div class="bg-surface border border-border rounded-lg px-4 py-3">
+        <div class="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Perlu Aksi FOP</p>
             <div class="flex items-center gap-2 mt-1">
                 <p class="text-2xl font-bold font-mono" style="color:var(--color-warning)">{{ $stats['perlu_aksi_fop'] }}</p>
@@ -53,12 +53,12 @@
             </div>
             <p class="text-[11px] text-text-muted mt-0.5">Menunggu verifikasi</p>
         </div>
-        <div class="bg-surface border border-border rounded-lg px-4 py-3">
+        <div class="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Sedang Berjalan</p>
             <p class="text-2xl font-bold font-mono mt-1" style="color:var(--color-info)">{{ $stats['berjalan'] }}</p>
             <p class="text-[11px] text-text-muted mt-0.5">Task aktif hari ini</p>
         </div>
-        <div class="bg-surface border border-border rounded-lg px-4 py-3">
+        <div class="bg-white border border-slate-200 rounded px-4 py-3 shadow-sm">
             <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Selesai Hari Ini</p>
             <p class="text-2xl font-bold font-mono mt-1" style="color:var(--color-success)">{{ $stats['selesai_hari_ini'] }}</p>
             <p class="text-[11px] text-text-muted mt-0.5">Task selesai</p>
@@ -71,7 +71,7 @@
         <div id="kanban-pipeline-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
             {{-- Kolom 0: Antrean Tiket (Belum Dijadwalkan) --}}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-border flex items-center justify-between bg-surface-muted">
                     <span class="text-xs font-semibold text-text-secondary">Antrean Tiket</span>
                     <span class="text-xs font-mono font-semibold text-text-secondary">
@@ -106,7 +106,7 @@
             </div>
 
             {{-- Kolom 1: Terjadwal --}}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-border flex items-center justify-between"
                      style="background:var(--color-info-bg)">
                     <span class="text-xs font-semibold" style="color:var(--color-info)">Terjadwal</span>
@@ -124,7 +124,7 @@
             </div>
 
             {{-- Kolom 2: Sedang Berjalan — aktifkan countdown SLA Eksekusi --}}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-border flex items-center justify-between"
                      style="background:var(--color-warning-bg)">
                     <span class="text-xs font-semibold" style="color:var(--color-warning)">Sedang Berjalan</span>
@@ -142,7 +142,7 @@
             </div>
 
             {{-- Kolom 3: Perlu Aksi FOP — countdown Verifikasi 3×24 jam --}}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-border flex items-center justify-between"
                      style="background:#FFF7ED; border-bottom-color:#FDBA74">
                     <span class="text-xs font-semibold" style="color:#C2410C">Perlu Aksi FOP</span>
@@ -190,7 +190,7 @@
             </div>
 
             {{-- Kolom 4: Selesai --}}
-            <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-border flex items-center justify-between"
                      style="background:var(--color-success-bg)">
                     <span class="text-xs font-semibold" style="color:var(--color-success)">Selesai</span>
@@ -216,30 +216,30 @@
             <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Antrean Survey</p>
             <span class="text-xs text-text-muted">Hitung mundur 1×24 jam sejak registrasi</span>
         </div>
-        <div id="antrian-survey-container" class="bg-surface border border-border rounded-lg overflow-hidden">
+        <div id="antrian-survey-container" class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
             @if($surveyQueue->count() > 0)
-            <table class="w-full text-sm">
+            <table class="w-full text-[11px]">
                 <thead class="bg-surface-muted">
                     <tr>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Pelanggan</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">POP</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Terdaftar</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Pelanggan</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">POP</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Terdaftar</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">
                             Sisa Waktu Survey
                         </th>
-                        <th class="px-4 py-2.5"></th>
+                        <th class="px-3 py-2"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
                     @foreach($surveyQueue as $item)
                     <tr class="hover:bg-surface-muted transition-colors">
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             <p class="font-medium text-text-main">{{ $item['name'] }}</p>
-                            <p class="text-[11px] font-mono text-text-muted">{{ $item['cid'] }}</p>
+                            <p class="text-[10px] font-mono text-text-muted">{{ $item['cid'] }}</p>
                         </td>
-                        <td class="px-4 py-3 text-text-secondary text-xs">{{ $item['pop_name'] }}</td>
-                        <td class="px-4 py-3 text-text-muted text-xs">{{ $item['registered_at'] }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2 text-text-secondary text-[11px]">{{ $item['pop_name'] }}</td>
+                        <td class="px-3 py-2 text-text-muted text-[11px]">{{ $item['registered_at'] }}</td>
+                        <td class="px-3 py-2">
                             {{-- Countdown Survey 1×24 jam — aktif --}}
                             <x-countdown-timer
                                 deadline="{{ $item['deadline_iso'] }}"
@@ -247,7 +247,7 @@
                                 label="Sisa Survey"
                             />
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="px-3 py-2 text-right">
                             <a href="{{ route('customers.show', $item['id']) }}"
                                class="text-xs font-medium px-2.5 py-1 border border-border rounded-md bg-surface hover:bg-surface-muted text-text-secondary transition-colors">
                                 Detail
@@ -260,6 +260,62 @@
             @else
             <div class="flex items-center justify-center py-10 text-text-muted">
                 <p class="text-sm">Tidak ada pelanggan dalam antrean survey.</p>
+            </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- ══ Daftar Tim Gabungan / Otomatis ════════════════════════════ --}}
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Daftar Tim Gabungan (Hari Ini)</p>
+            <span class="text-xs text-text-muted">Menampilkan task aktif dengan >1 teknisi</span>
+        </div>
+        <div id="tim-gabungan-container" class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden mb-6">
+            @if(isset($activeTeams) && $activeTeams->count() > 0)
+            <table class="w-full text-[11px]">
+                <thead class="bg-surface-muted">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Nama Tim</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Anggota Tim</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tugas (Task)</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Alamat Penugasan</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    @foreach($activeTeams as $team)
+                    <tr class="hover:bg-surface-muted transition-colors">
+                        <td class="px-3 py-2">
+                            <span class="font-bold text-primary bg-primary-soft px-2 py-1 rounded-md">{{ $team['team_name'] }}</span>
+                        </td>
+                        <td class="px-3 py-2">
+                            <ul class="list-disc list-inside text-text-main">
+                                @foreach($team['members'] as $member)
+                                    <li>{{ $member }}</li>
+                                @endforeach
+                            </ul>
+                        </td>
+                        <td class="px-3 py-2">
+                            <p class="font-medium text-text-main">{{ $team['task_title'] }}</p>
+                            <span class="text-[10px] uppercase font-bold text-text-muted">{{ $team['task_type'] }}</span>
+                        </td>
+                        <td class="px-3 py-2 text-text-secondary truncate max-w-[200px]" title="{{ $team['address'] }}">
+                            {{ Str::limit($team['address'], 40) }}
+                        </td>
+                        <td class="px-3 py-2">
+                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
+                                  style="background:var(--color-{{ $team['status_color'] }}-bg); color:var(--color-{{ $team['status_color'] }}); border:1px solid var(--color-{{ $team['status_color'] }}-border)">
+                                {{ $team['status'] }}
+                            </span>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            @else
+            <div class="flex items-center justify-center py-6 text-text-muted">
+                <p class="text-sm">Tidak ada Tim Gabungan yang aktif/terjadwal hari ini.</p>
             </div>
             @endif
         </div>
@@ -278,51 +334,51 @@
                 Refresh
             </button>
         </div>
-        <div id="status-teknisi-container" class="bg-surface border border-border rounded-lg overflow-hidden">
+        <div id="status-teknisi-container" class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
             @if($teknisiList->count() > 0)
-            <table class="w-full text-sm">
+            <table class="w-full text-[11px]">
                 <thead class="bg-surface-muted">
                     <tr>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Teknisi</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Status</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Task Aktif Hari Ini</th>
-                        <th class="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Lokasi Terakhir</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Teknisi</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Status</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Task Aktif Hari Ini</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Lokasi Terakhir</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
                     @foreach($teknisiList as $tek)
                     <tr class="hover:bg-surface-muted transition-colors">
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-2.5">
-                                <div class="h-7 w-7 rounded-full bg-primary-soft flex items-center justify-center text-xs font-bold shrink-0"
+                        <td class="px-3 py-2">
+                            <div class="flex items-center gap-2">
+                                <div class="h-6 w-6 rounded-full bg-primary-soft flex items-center justify-center text-[10px] font-bold shrink-0"
                                      style="color:var(--color-primary)">
                                     {{ $tek['initials'] }}
                                 </div>
                                 <span class="font-medium text-text-main">{{ $tek['name'] }}</span>
                             </div>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             @if($tek['status'] === 'aktif')
-                                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                                       style="background:var(--color-success-bg); color:var(--color-success); border:1px solid var(--color-success-border)">
                                     <span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>
                                     Aktif
                                 </span>
                             @elseif($tek['status'] === 'terjadwal')
-                                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                                <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                                       style="background:var(--color-info-bg); color:var(--color-info); border:1px solid var(--color-info-border)">
                                     Terjadwal
                                 </span>
                             @else
-                                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-border text-text-muted">
+                                <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-border text-text-muted">
                                     Standby
                                 </span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-xs font-mono text-text-secondary">
+                        <td class="px-3 py-2 text-[11px] font-mono text-text-secondary">
                             {{ $tek['task_count'] }} task
                         </td>
-                        <td class="px-4 py-3 text-xs text-text-secondary">
+                        <td class="px-3 py-2 text-[11px] text-text-secondary">
                             {{ $tek['location'] }}
                         </td>
                     </tr>
@@ -488,7 +544,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                ['stat-cards-container', 'kanban-pipeline-container', 'antrian-survey-container', 'status-teknisi-container'].forEach(id => {
+                ['stat-cards-container', 'kanban-pipeline-container', 'antrian-survey-container', 'tim-gabungan-container', 'status-teknisi-container'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
                     if (el && newEl) el.innerHTML = newEl.innerHTML;

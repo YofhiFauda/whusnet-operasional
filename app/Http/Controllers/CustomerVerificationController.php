@@ -78,7 +78,7 @@ class CustomerVerificationController extends Controller
         return view('verifications.admin', compact('customer'));
     }
 
-    public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService, \App\Services\TaskService $taskService)
+    public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
 
@@ -89,95 +89,47 @@ class CustomerVerificationController extends Controller
             'Status customer tidak valid untuk diproses ke TIM.'
         );
 
-        // Validasi input
-        $validated = $request->validate([
-            'technician_id'     => 'required|exists:users,id',
-            'scheduled_at'      => 'required|date|after:now',
-            'notes'             => 'nullable|string|max:2000',
-            'conflict_override' => 'nullable|boolean',
-        ]);
-
-        $technicianId = $validated['technician_id'];
-        $scheduledAt = \Illuminate\Support\Carbon::parse($validated['scheduled_at']);
-
-        // Fallback Conflict Validation
-        $conflictUserIds = $taskService->detectConflicts(
-            [$technicianId],
-            $validated['scheduled_at'],
-            \App\Enums\TaskType::PEMASANGAN->slaMinutes()
-        );
-
-        if ($conflictUserIds->isNotEmpty() && !($validated['conflict_override'] ?? false)) {
-            return back()
-                ->withInput()
-                ->withErrors(['conflict' => 'Terdapat konflik jadwal pada teknisi terpilih. Gunakan override konflik jika diizinkan.'])
-                ->with('conflict_user_ids', $conflictUserIds)
-                ->with('active_customer_id', $customer->id);
-        }
-
-        if ($conflictUserIds->isNotEmpty() && ($validated['conflict_override'] ?? false)) {
-            abort_unless(
-                auth()->user()->hasPermission('task.conflict.override'),
-                403,
-                'Anda tidak memiliki hak akses override konflik.'
-            );
-        }
-
         try {
             DB::beginTransaction();
 
-            // A. Create Task tipe Pemasangan
-            $taskData = [
-                'task_type'         => \App\Enums\TaskType::PEMASANGAN->value,
-                'customer_id'       => $customer->id,
-                'pop_id'            => $customer->pop_id,
-                'title'             => 'Pemasangan Baru - ' . $customer->full_name,
-                'description'       => $validated['notes'] ?? null,
-                'scheduled_at'      => $validated['scheduled_at'],
-                'team_member_ids'   => [$technicianId],
-                'conflict_override' => (bool) ($validated['conflict_override'] ?? false),
-            ];
-            $taskService->create($taskData, auth()->user());
-
-            // B. Create/Update record di customer_installations
+            // A. Create/Update record di customer_installations
             $installation = $customer->installations()
                 ->whereIn('installation_status', ['scheduled', 'in_progress'])
                 ->latest()
                 ->first();
 
-            $scheduledDate = $scheduledAt->toDateString();
-            $scheduledTime = $scheduledAt->toTimeString();
-
-            if ($installation) {
-                $installation->update([
-                    'technician_id'       => $technicianId,
-                    'scheduled_date'      => $scheduledDate,
-                    'scheduled_time'      => $scheduledTime,
-                    'installation_note'   => $validated['notes'] ?? null,
-                    'fop_id'              => auth()->id(),
-                    'assigned_at'         => now(),
-                ]);
-            } else {
+            if (!$installation) {
                 $customer->installations()->create([
-                    'technician_id'       => $technicianId,
-                    'scheduled_date'      => $scheduledDate,
-                    'scheduled_time'      => $scheduledTime,
                     'installation_status' => 'scheduled',
-                    'installation_note'   => $validated['notes'] ?? null,
                     'fop_id'              => auth()->id(),
                     'assigned_at'         => now(),
                 ]);
             }
 
-            // C. Transition Customer status to waiting_installation
-            $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_INSTALLATION, 'Diproses ke TIM Pemasangan');
+            // B. Transition Customer status to waiting_installation
+            // Ini secara otomatis membuat Task Pemasangan dengan status 'pending' di CustomerWorkflowService
+            $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_INSTALLATION, 'Survey disetujui. Diproses ke TIM Pemasangan');
+
+            // C. Otomatis setujui (approve) Task Survey yang terkait
+            $surveyTask = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+                ->where('fop_review_status', 'pending')
+                ->latest()
+                ->first();
+            if ($surveyTask) {
+                $surveyTask->update([
+                    'fop_review_status' => 'approved',
+                    'updated_by' => auth()->id(),
+                ]);
+            }
 
             DB::commit();
 
-            return redirect()->back()->with('success', 'Berhasil diproses ke tim Teknisi Pemasangan.');
+            return redirect()->back()->with('success', 'Survey berhasil disetujui. Pelanggan beralih ke status Menunggu Pemasangan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withInput()->withErrors(['error' => 'Gagal memproses: ' . $e->getMessage()]);
+            return redirect()->back()->with('error', 'Gagal memproses: ' . $e->getMessage());
         }
     }
 
@@ -217,6 +169,7 @@ class CustomerVerificationController extends Controller
 
             $invoice = \App\Models\Invoice::create([
                 'invoice_number' => $invoiceNumber,
+                'invoice_type' => \App\Enums\InvoiceType::AWAL->value,
                 'customer_id' => $customer->id,
                 'pop_id' => $customer->pop_id,
                 'customer_service_id' => $service->id,
@@ -301,6 +254,20 @@ class CustomerVerificationController extends Controller
                 // Ignore telegram errors
             }
 
+            // Otomatis setujui (approve) Task Pemasangan yang terkait
+            $installTask = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+                ->where('fop_review_status', 'pending')
+                ->latest()
+                ->first();
+            if ($installTask) {
+                $installTask->update([
+                    'fop_review_status' => 'approved',
+                    'updated_by' => auth()->id(),
+                ]);
+            }
+
             DB::commit();
 
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
@@ -321,7 +288,22 @@ class CustomerVerificationController extends Controller
             DB::beginTransaction();
             
             $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, 'Ditolak: ' . $request->reason);
-            
+
+            // Otomatis tolak (reject) Task Survey yang terkait
+            $surveyTask = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+                ->where('fop_review_status', 'pending')
+                ->latest()
+                ->first();
+            if ($surveyTask) {
+                $surveyTask->update([
+                    'fop_review_status' => 'rejected',
+                    'reject_reason' => $request->reason,
+                    'updated_by' => auth()->id(),
+                ]);
+            }
+
             DB::commit();
             return redirect()->back()->with('success', 'Pelanggan berhasil ditolak.');
         } catch (\Exception $e) {
@@ -351,7 +333,23 @@ class CustomerVerificationController extends Controller
             }
 
             $workflowService->transition($customer, \App\Enums\WorkflowTransition::REVISION_INSTALLATION, 'Revisi Pemasangan: ' . $request->reason);
-            
+
+            // Otomatis kembalikan (revert) Task Pemasangan yang terkait ke status In Progress
+            $installTask = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+                ->where('fop_review_status', 'pending')
+                ->latest()
+                ->first();
+            if ($installTask) {
+                $installTask->update([
+                    'status' => \App\Enums\TaskStatus::IN_PROGRESS->value,
+                    'fop_review_status' => 'rejected',
+                    'reject_reason' => $request->reason,
+                    'updated_by' => auth()->id(),
+                ]);
+            }
+
             DB::commit();
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan dikembalikan ke antrean pemasangan untuk revisi.');
         } catch (\Exception $e) {

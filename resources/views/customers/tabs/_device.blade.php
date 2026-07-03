@@ -18,6 +18,15 @@
     $technicalDetail = $customer->customerTechnicalDetail;
     $canViewSensitiveDeviceFields = auth()->user()->hasPermission('customers.detail.devices.view_sensitive');
     $maskSensitive = fn ($value) => $canViewSensitiveDeviceFields ? ($value ?: '-') : ($value ? '********' : '-');
+    $passiveDeviceTypeLabels = [
+        'splitter_odp' => 'Splitter / ODP',
+        'kabel_dropcore' => 'Kabel Dropcore / FO',
+        'patch_cord' => 'Patch Cord / Fast Connector',
+        'media_converter' => 'Media Converter',
+        'antena_radio' => 'Antena / Radio Grid',
+        'aksesoris_pasang' => 'Aksesoris Pemasangan (Klem/Isolasi/Paku)',
+        'lainnya' => 'Lainnya',
+    ];
 @endphp
 
 @if($device)
@@ -124,6 +133,18 @@
                         <span class="font-semibold text-slate-800">{{ $technicalDetail?->passive_device ?: '-' }}</span>
                     </div>
                     <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Jenis Perangkat Pasif</span>
+                        <span class="font-semibold text-slate-800">{{ $passiveDeviceTypeLabels[$technicalDetail?->passive_device_type] ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Jumlah / Panjang</span>
+                        <span class="font-semibold text-slate-800">{{ $technicalDetail?->passive_device_qty ?: '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
+                        <span class="text-slate-500">Catatan Perangkat Pasif</span>
+                        <span class="font-semibold text-slate-800">{{ $technicalDetail?->passive_device_note ?: '-' }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-50 py-1">
                         <span class="text-slate-500">Serial Number</span>
                         <span class="font-semibold text-slate-800 font-mono">{{ $technicalDetail?->router_or_ont_serial ?? $customer->ont_sn ?? '-' }}</span>
                     </div>
@@ -202,6 +223,18 @@
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">Perangkat Pasif (Outdoor)</span>
                     <span class="font-semibold text-slate-800">{{ $tech->passive_device ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Jenis Perangkat Pasif</span>
+                    <span class="font-semibold text-slate-800">{{ $passiveDeviceTypeLabels[$tech->passive_device_type] ?? '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Jumlah / Panjang</span>
+                    <span class="font-semibold text-slate-800">{{ $tech->passive_device_qty ?: '-' }}</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-50 py-1">
+                    <span class="text-slate-500">Catatan Perangkat Pasif</span>
+                    <span class="font-semibold text-slate-800">{{ $tech->passive_device_note ?: '-' }}</span>
                 </div>
                 <div class="flex justify-between border-b border-slate-50 py-1">
                     <span class="text-slate-500">Nomor Cabang (IDCABANG)</span>
@@ -387,8 +420,57 @@
                     <label for="tech_vlan" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">VLAN (Jaringan)</label>
                     <input type="text" name="tech_vlan" id="tech_vlan" value="{{ $canViewSensitiveDeviceFields ? old('tech_vlan', $technicalDetail?->vlan) : '' }}" {{ !$canViewSensitiveDeviceFields ? 'placeholder=********' : 'placeholder=Contoh:\ 100' }} class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                 </div>
+
+                {{-- === SECTION: Detail Teknis Tambahan (dari gap migrasi) === --}}
+                <div class="md:col-span-2 pt-3 mt-3 border-t border-slate-200">
+                    <h4 class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-3">Detail Teknis Tambahan</h4>
+                </div>
+
                 <div>
-                    <label for="signal_rx_power" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman (dBm)</label>
+                    <label for="passive_device" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Perangkat Pasif (Merk/Tipe)</label>
+                    <input type="text" name="passive_device" id="passive_device" value="{{ old('passive_device', $technicalDetail?->passive_device) }}" placeholder="Contoh: Antena Grid 25dBi" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                </div>
+                <div>
+                    <label for="passive_device_type" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jenis Perangkat Pasif</label>
+                    <select name="passive_device_type" id="passive_device_type" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                        <option value="">Pilih jenis</option>
+                        @foreach($passiveDeviceTypeLabels as $value => $label)
+                            <option value="{{ $value }}" {{ old('passive_device_type', $technicalDetail?->passive_device_type) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="passive_device_qty" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jumlah / Panjang</label>
+                    <input type="text" name="passive_device_qty" id="passive_device_qty" value="{{ old('passive_device_qty', $technicalDetail?->passive_device_qty) }}" placeholder="Contoh: 150 meter / 1 pasang" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="passive_device_note" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Catatan Detail Perangkat Pasif</label>
+                    <input type="text" name="passive_device_note" id="passive_device_note" value="{{ old('passive_device_note', $technicalDetail?->passive_device_note) }}" placeholder="Contoh: Dropcore 90m + Router ZTE 1 + Klem dan isolasi" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs">
+                </div>
+                <div>
+                    <label for="router_number" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Router / MAC</label>
+                    <input type="text" name="router_number" id="router_number" value="{{ old('router_number', $technicalDetail?->router_number) }}" placeholder="Contoh: RTR-001" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="branch_number" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Cabang (IDCABANG)</label>
+                    <input type="text" name="branch_number" id="branch_number" value="{{ old('branch_number', $technicalDetail?->branch_number) }}" placeholder="Contoh: CB001" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="pop_number" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor POP (IDWILAYAH)</label>
+                    <input type="text" name="pop_number" id="pop_number" value="{{ old('pop_number', $technicalDetail?->pop_number) }}" placeholder="Contoh: WL0001" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="initial_attenuation" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman Awal (dBm)</label>
+                    <input type="text" name="initial_attenuation" id="initial_attenuation_dev" value="{{ old('initial_attenuation', $technicalDetail?->initial_attenuation) }}" placeholder="-19.50" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                <div>
+                    <label for="actual_attenuation" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman Aktual (dBm)</label>
+                    <input type="text" name="actual_attenuation" id="actual_attenuation_dev" value="{{ old('actual_attenuation', $technicalDetail?->actual_attenuation) }}" placeholder="-21.20" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
+                </div>
+                {{-- === END SECTION: Detail Teknis Tambahan === --}}
+
+                <div>
+                    <label for="signal_rx_power" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Redaman Perangkat (dBm)</label>
                     @php
                         $sigPower = old('signal_rx_power', $device?->signal_rx_power);
                         if (!$device && $technicalDetail) {

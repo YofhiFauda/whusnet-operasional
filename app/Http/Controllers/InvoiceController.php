@@ -16,6 +16,7 @@ class InvoiceController extends Controller
         $billingPeriod = trim((string) $request->query('billing_period', ''));
         $status = trim((string) $request->query('status', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
+        $invoiceType = trim((string) $request->query('invoice_type', ''));
         $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
 
         $query = Invoice::query()
@@ -48,6 +49,10 @@ class InvoiceController extends Controller
             $query->where('billing_period', $billingPeriod);
         }
 
+        if ($invoiceType !== '') {
+            $query->where('invoice_type', $invoiceType);
+        }
+
         if ($statusGroup === 'lunas') {
             $query->where('invoice_status', 'lunas');
         } elseif ($statusGroup === 'belum_lunas') {
@@ -67,6 +72,7 @@ class InvoiceController extends Controller
             'billingPeriod',
             'status',
             'statusGroup',
+            'invoiceType',
             'allowedStatuses'
         ));
     }

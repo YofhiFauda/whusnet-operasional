@@ -34,7 +34,7 @@ class CustomerTestReportController extends Controller
         }
 
         if ($request->hasFile('speedtest_photo')) {
-            $validated['speedtest_photo'] = $request->file('speedtest_photo')->store('test_reports', 'public');
+            $validated['speedtest_photo'] = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('speedtest_photo'), $customer, 'speedtest');
         }
 
         CustomerTechnicalDetail::updateOrCreate(

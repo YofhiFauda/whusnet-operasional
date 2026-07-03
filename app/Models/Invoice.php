@@ -17,6 +17,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'invoice_number',
+        'invoice_type',
         'old_invoice_id',
         'old_cost_id',
         'old_request_id',
@@ -48,6 +49,7 @@ class Invoice extends Model
     protected function casts(): array
     {
         return [
+            'invoice_type' => \App\Enums\InvoiceType::class,
             'issue_date' => 'date',
             'due_date' => 'date',
             'subtotal' => 'decimal:2',

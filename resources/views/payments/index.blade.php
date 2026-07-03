@@ -52,6 +52,16 @@
         </div>
 
         <div>
+            <label for="invoice_type" class="block text-xs font-semibold text-slate-500 mb-2">JENIS TAGIHAN</label>
+            <select name="invoice_type" id="invoice_type" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                <option value="">Semua Jenis</option>
+                <option value="awal" {{ ($invoiceType ?? '') === 'awal' ? 'selected' : '' }}>Tagihan Awal (PSB)</option>
+                <option value="bulanan" {{ ($invoiceType ?? '') === 'bulanan' ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
+                <option value="reaktivasi" {{ ($invoiceType ?? '') === 'reaktivasi' ? 'selected' : '' }}>Tagihan Reaktivasi</option>
+            </select>
+        </div>
+
+        <div>
             <label for="status" class="block text-xs font-semibold text-slate-500 mb-2">STATUS</label>
             <select name="status" id="status" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                 <option value="">Semua Status</option>
@@ -102,7 +112,14 @@
                         <td class="px-6 py-3.5 text-center text-slate-400 data-text">{{ ($payments->currentPage() - 1) * $payments->perPage() + $loop->iteration }}</td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
                             <a href="{{ route('payments.show', $payment->id) }}" class="font-mono font-bold text-sky-700 hover:text-sky-900">{{ $payment->payment_number }}</a>
-                            <div class="text-[10px] text-slate-400 mt-0.5">{{ $payment->receiver->name ?? '-' }}</div>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                @if($payment->old_payment_id)
+                                <span title="Data Migrasi (ID Bayar Lama: {{ $payment->old_payment_id }})" class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-sky-50 text-sky-700 border-sky-200">
+                                    Migrasi #{{ $payment->old_payment_id }}
+                                </span>
+                                @endif
+                                <span class="text-[10px] text-slate-400">{{ $payment->receiver->name ?? '-' }}</span>
+                            </div>
                         </td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
                             @if($payment->invoice)

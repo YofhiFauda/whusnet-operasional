@@ -35,10 +35,19 @@ class CustomerDeviceController extends Controller
 
         // Validasi field teknis jaringan (customer_technical_details)
         $techValidated = $request->validate([
-            'olt_number' => 'nullable|string|max:50',
-            'olt_slot'   => 'nullable|string|max:20',
-            'olt_port'   => 'nullable|string|max:50',
-            'tech_vlan'  => 'nullable|string|max:20',
+            'olt_number'          => 'nullable|string|max:50',
+            'olt_slot'            => 'nullable|string|max:20',
+            'olt_port'            => 'nullable|string|max:50',
+            'tech_vlan'           => 'nullable|string|max:20',
+            'passive_device'      => 'nullable|string|max:150',
+            'passive_device_type' => 'nullable|string|in:splitter_odp,kabel_dropcore,patch_cord,media_converter,antena_radio,aksesoris_pasang,lainnya',
+            'passive_device_qty'  => 'nullable|string|max:50',
+            'passive_device_note' => 'nullable|string|max:255',
+            'branch_number'       => 'nullable|string|max:50',
+            'pop_number'          => 'nullable|string|max:50',
+            'router_number'       => 'nullable|string|max:50',
+            'initial_attenuation' => 'nullable|string|max:50',
+            'actual_attenuation'  => 'nullable|string|max:50',
         ]);
 
         if (!auth()->user()->hasPermission('customers.detail.devices.update_sensitive')) {
@@ -60,10 +69,19 @@ class CustomerDeviceController extends Controller
         CustomerTechnicalDetail::updateOrCreate(
             ['customer_id' => $customer->id],
             [
-                'olt_number' => $techValidated['olt_number'] ?? null,
-                'olt_slot'   => $techValidated['olt_slot'] ?? null,
-                'olt_port'   => $techValidated['olt_port'] ?? null,
-                'vlan'       => $techValidated['tech_vlan'] ?? null,
+                'olt_number'          => $techValidated['olt_number'] ?? null,
+                'olt_slot'            => $techValidated['olt_slot'] ?? null,
+                'olt_port'            => $techValidated['olt_port'] ?? null,
+                'vlan'                => $techValidated['tech_vlan'] ?? null,
+                'passive_device'      => $techValidated['passive_device'] ?? null,
+                'passive_device_type' => $techValidated['passive_device_type'] ?? null,
+                'passive_device_qty'  => $techValidated['passive_device_qty'] ?? null,
+                'passive_device_note' => $techValidated['passive_device_note'] ?? null,
+                'branch_number'       => $techValidated['branch_number'] ?? null,
+                'pop_number'          => $techValidated['pop_number'] ?? null,
+                'router_number'       => $techValidated['router_number'] ?? null,
+                'initial_attenuation' => $techValidated['initial_attenuation'] ?? null,
+                'actual_attenuation'  => $techValidated['actual_attenuation'] ?? null,
             ]
         );
 

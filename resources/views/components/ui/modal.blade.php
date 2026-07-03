@@ -26,11 +26,12 @@
     aria-labelledby="modal-title" role="dialog" aria-modal="true"
 >
     <!-- Overlay -->
-    <div x-show="show" x-transition.opacity class="fixed inset-0 bg-text-main/50 transition-opacity"></div>
+    <div x-show="show" x-transition.opacity @click="show = false" class="fixed inset-0 bg-text-main/50 transition-opacity"></div>
 
-    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+    <div @click.self="show = false" class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <!-- Modal Panel -->
         <div 
+            @click.stop
             x-show="show"
             x-transition:enter="ease-out duration-normal"
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -39,7 +40,6 @@
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             class="relative transform overflow-hidden rounded-lg bg-surface text-left shadow-md transition-all w-full {{ $maxWidthClass }} sm:my-8 border border-border"
-            @click.outside="show = false"
         >
             <div class="px-4 py-4 border-b border-border flex justify-between items-center bg-surface-muted">
                 <h3 class="text-lg font-semibold text-text-main" id="modal-title">{{ $title }}</h3>

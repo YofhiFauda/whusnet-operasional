@@ -1,0 +1,652 @@
+
+
+
+            // Global Scroll Lock Helper (Consolidated)
+            window.toggleBodyScroll = function (disable) {
+                if (disable) {
+                    const scrollY = window.scrollY;
+                    document.body.dataset.scrollY = scrollY;
+                    document.documentElement.style.overflow = 'hidden';
+                    document.body.style.overflow = 'hidden';
+                    document.body.style.position = 'fixed';
+                    document.body.style.top = `-${scrollY}px`;
+                    document.body.style.width = '100%';
+                } else {
+                    const scrollY = document.body.dataset.scrollY || '0';
+                    document.documentElement.style.overflow = '';
+                    document.body.style.overflow = '';
+                    document.body.style.position = '';
+                    document.body.style.top = '';
+                    document.body.style.width = '';
+                    window.scrollTo(0, parseInt(scrollY));
+                }
+            };
+
+            // ─────────────────────────────────────────────────────────
+            // NOTIFICATION BADGE COUNTER
+            // ─────────────────────────────────────────────────────────
+            function updateNotificationBadge() {
+                const url = document.querySelector('meta[name="notif-unread-url"]')?.content;
+                if (!url) return;
+                fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        const count = data.count || 0;
+                        const badges = [
+                            document.getElementById('notif-count-desktop'),
+                            document.getElementById('notif-count-mobile'),
+                            document.getElementById('notif-count-sidebar')
+                        ];
+                        badges.forEach(badge => {
+                            if (!badge) return;
+
+                            // Update text content
+                            badge.textContent = count > 99 ? '99+' : count;
+
+                            // Show/Hide badge based on count
+                            if (count > 0) {
+                                badge.classList.remove('badge-hidden');
+                            } else {
+                                badge.classList.add('badge-hidden');
+                            }
+                        });
+                    })
+                    .catch(() => { });
+            }
+            // Call on page load
+            document.addEventListener('DOMContentLoaded', () => updateNotificationBadge());
+
+            function toggleMobileSidebar() {
+                const sidebar = document.getElementById('mobile-sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (!sidebar) return;
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+                document.body.style.overflow = sidebar.classList.contains('-translate-x-full') ? '' : 'hidden';
+            }
+
+            function toggleDesktopSidebar() {
+                const sidebar = document.getElementById('mobile-sidebar');
+                if (!sidebar) return;
+                sidebar.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('sidebar-collapsed'));
+            }
+
+            function togglePengeluaranLain() {
+                const menu = document.getElementById('pengeluaran-lain-menu');
+                const chevron = document.getElementById('pengeluaran-lain-chevron');
+                if (!menu) return;
+
+                // If sidebar is collapsed, expanding this menu might look weird, so let's uncollapse sidebar first if needed
+                const sidebar = document.getElementById('mobile-sidebar');
+                if (sidebar && sidebar.classList.contains('sidebar-collapsed') && window.innerWidth >= 768) {
+                    toggleDesktopSidebar();
+                }
+
+                menu.classList.toggle('hidden');
+                chevron && chevron.classList.toggle('rotate-180');
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const sidebar = document.getElementById('mobile-sidebar');
+                if (sidebar && localStorage.getItem('sidebar-collapsed') === 'true') {
+                    if (window.innerWidth >= 768) {
+                        sidebar.classList.add('sidebar-collapsed');
+                    }
+                }
+
+                if (typeof NProgress !== 'undefined') {
+                    NProgress.configure({ showSpinner: false, minimum: 0.1 });
+                    NProgress.done();
+                }
+                lucide.createIcons();
+
+                // ── PROFILE DROPDOWN LOGIC ──
+                window.toggleProfileDropdown = function (e) {
+                    if (e) e.stopPropagation();
+                    const dropdown = document.getElementById('profileDropdown');
+                    if (dropdown) {
+                        dropdown.classList.toggle('hidden');
+                    }
+                };
+
+
+                const dropdown = document.getElementById('profileDropdown');
+                if (dropdown) {
+                    dropdown.addEventListener('click', (e) => e.stopPropagation());
+                    document.addEventListener('click', () => dropdown.classList.add('hidden'));
+                }
+
+                // ── SIDEBAR PROFILE DROPDOWN (Admin/Atasan/Owner) ──
+                window.toggleSidebarProfile = function (e) {
+                    if (e) e.stopPropagation();
+                    const dd = document.getElementById('sidebarProfileDropdown');
+                    const chev = document.getElementById('sidebarProfileChevron');
+                    if (dd) {
+                        dd.classList.toggle('hidden');
+                        if (chev) chev.classList.toggle('rotate-180');
+                    }
+                };
+                const sidebarDD = document.getElementById('sidebarProfileDropdown');
+                if (sidebarDD) {
+                    sidebarDD.addEventListener('click', (e) => e.stopPropagation());
+                    document.addEventListener('click', () => {
+                        sidebarDD.classList.add('hidden');
+                        document.getElementById('sidebarProfileChevron')?.classList.remove('rotate-180');
+                    });
+                }
+
+            });
+
+            window.addEventListener('beforeunload', () => {
+                if (typeof NProgress !== 'undefined') NProgress.start();
+            });
+
+            // ─────────────────────────────────────────────────────────
+            // BANK ACCOUNTS MANAGEMENT LOGIC
+            // ─────────────────────────────────────────────────────────
+            const bankAccountsModal = document.getElementById('bankAccountsModal');
+            const bankAccountsContent = document.getElementById('bankAccountsModalContent');
+
+            function openBankAccountsModal(userId) {
+                document.getElementById('target_user_id').value = userId;
+                bankAccountsModal.classList.remove('hidden');
+                window.toggleBodyScroll(true);
+                setTimeout(() => {
+                    bankAccountsContent.classList.add('animate-modal');
+                    bankAccountsContent.classList.remove('scale-95', 'opacity-0');
+                    bankAccountsContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                fetchBankAccounts(userId);
+            }
+
+            function closeBankAccountsModal() {
+                bankAccountsContent.classList.remove('animate-modal');
+                bankAccountsContent.classList.add('scale-95', 'opacity-0');
+                bankAccountsContent.classList.remove('scale-100', 'opacity-100');
+                window.toggleBodyScroll(false);
+                setTimeout(() => {
+                    bankAccountsModal.classList.add('hidden');
+                    hideBankAccountForm();
+                }, 300);
+            }
+
+            function fetchBankAccounts(userId) {
+                const list = document.getElementById('bankAccountsList');
+                const loading = document.getElementById('bankAccountsLoading');
+                const empty = document.getElementById('bankAccountsEmpty');
+
+                list.classList.add('hidden');
+                loading.classList.remove('hidden');
+                empty.classList.add('hidden');
+
+                fetch(`/user-bank-accounts/${userId}`)
+                    .then(r => r.json())
+                    .then(accounts => {
+                        loading.classList.add('hidden');
+                        list.innerHTML = '';
+
+                        if (accounts.length === 0) {
+                            empty.classList.remove('hidden');
+                            return;
+                        }
+
+                        list.classList.remove('hidden');
+                        accounts.forEach((acc, index) => {
+                            const card = `
+                        <div class="stagger-item group bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/5 transition-all flex items-center justify-between cursor-pointer active:scale-[0.98]" 
+                             style="animation-delay: ${index * 0.05}s"
+                             onclick='showBankAccountForm(${JSON.stringify(acc)})'>
+                            <div class="flex items-center gap-3 sm:gap-4 overflow-hidden">
+                                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 flex items-center justify-center transition-colors shrink-0">
+                                    <i data-lucide="landmark" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <span class="text-[9px] font-black bg-slate-800 text-white px-1.5 py-0.5 rounded uppercase tracking-widest shrink-0">${acc.bank_name}</span>
+                                        <h4 class="text-sm font-black text-slate-800 tracking-tight truncate">${acc.account_number}</h4>
+                                    </div>
+                                    <p class="text-[10px] sm:text-xs font-bold text-slate-400 uppercase truncate">${acc.account_name}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 sm:gap-2 shrink-0 ml-2">
+                                <button onclick="event.stopPropagation(); deleteBankAccount(${acc.id})" 
+                                        class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-all active:scale-90"
+                                        title="Hapus Rekening">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                            list.insertAdjacentHTML('beforeend', card);
+                        });
+                        lucide.createIcons();
+                    });
+            }
+
+            function showBankAccountForm(data = null) {
+                const container = document.getElementById('bankAccountFormContainer');
+                const footer = document.getElementById('modalFooter');
+                const list = document.getElementById('bankAccountsListContainer');
+                const title = document.getElementById('formTitle');
+                const submitBtnText = document.querySelector('#saveAccountBtn span');
+
+                document.getElementById('bank_account_id').value = data ? data.id : '';
+                document.getElementById('modal_bank_name').value = data ? data.bank_name : '';
+                document.getElementById('modal_account_number').value = data ? data.account_number : '';
+                document.getElementById('modal_account_name').value = data ? data.account_name : '';
+
+                title.textContent = data ? 'Edit Rekening' : 'Tambah Rekening Baru';
+                submitBtnText.textContent = data ? 'Update Rekening' : 'Simpan Rekening';
+
+                list.classList.add('hidden');
+                footer.classList.add('hidden');
+                container.classList.remove('hidden');
+            }
+
+            function hideBankAccountForm() {
+                document.getElementById('bankAccountFormContainer').classList.add('hidden');
+                document.getElementById('modalFooter').classList.remove('hidden');
+                document.getElementById('bankAccountsListContainer').classList.remove('hidden');
+                document.getElementById('bankAccountForm').reset();
+            }
+
+            function saveBankAccount(e) {
+                e.preventDefault();
+                const id = document.getElementById('bank_account_id').value;
+                const userId = document.getElementById('target_user_id').value;
+                const url = id ? `/user-bank-accounts/${id}` : '/user-bank-accounts';
+                const method = id ? 'PUT' : 'POST';
+
+                const btn = document.getElementById('saveAccountBtn');
+                const originalContent = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = `<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>`;
+
+                fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        bank_name: document.getElementById('modal_bank_name').value,
+                        account_number: document.getElementById('modal_account_number').value,
+                        account_name: document.getElementById('modal_account_name').value
+                    })
+                })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) {
+                            hideBankAccountForm();
+                            fetchBankAccounts(userId);
+                        } else {
+                            alert('Gagal menyimpan rekening: ' + (res.message || 'Error tidak diketahui'));
+                        }
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalContent;
+                        lucide.createIcons();
+                    });
+            }
+
+            function deleteBankAccount(id) {
+                const isAdmin = {{ Auth::user()->canManageUsers() ? 'true' : 'false' }};
+                const currentUserId = {{ Auth::id() }};
+                const targetUserId = document.getElementById('target_user_id').value;
+
+                // If admin and deleting someone else's account, ask for reason
+                if (isAdmin && currentUserId != targetUserId) {
+                    document.getElementById('delete_target_id').value = id;
+                    document.getElementById('deleteAccountReasonModal').classList.remove('hidden');
+                } else {
+                    if (confirm('Apakah Anda yakin ingin menghapus rekening ini?')) {
+                        executeDelete(id);
+                    }
+                }
+            }
+
+            function closeDeleteReasonModal() {
+                document.getElementById('deleteAccountReasonModal').classList.add('hidden');
+                document.getElementById('delete_reason').value = '';
+            }
+
+            function confirmDeleteAccount(e) {
+                e.preventDefault();
+                const id = document.getElementById('delete_target_id').value;
+                const reason = document.getElementById('delete_reason').value;
+                executeDelete(id, reason);
+            }
+
+            function executeDelete(id, reason = null) {
+                const userId = document.getElementById('target_user_id').value;
+                const body = reason ? JSON.stringify({ reason }) : null;
+
+                fetch(`/user-bank-accounts/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: body
+                })
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success) {
+                            closeDeleteReasonModal();
+                            fetchBankAccounts(userId);
+                        } else {
+                            alert('Gagal menghapus rekening');
+                        }
+                    });
+            }
+
+// ─────────────────────────────────────────────────────────
+// REAL-TIME BROADCASTING LISTENERS (LARAVEL ECHO)
+// ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.Echo !== 'undefined') {
+        const userId = Number({{ Auth::id() ?? 'null' }});
+        const userRole = "{{ trim((string) Auth::user()->role) }}".toLowerCase();
+        const canSubscribeGlobal = {{ Auth::user()->canManageStatus() ? 'true' : 'false' }};
+        const canSubscribeManagementNotifications = ['owner', 'atasan'].includes(userRole);
+
+        if (!userId) {
+            console.warn('[Echo] Real-time subscription skipped: authenticated user id is missing.');
+            return;
+        }
+
+        const subscribePrivate = (channelName) => {
+            try {
+                const channel = window.Echo.private(channelName);
+
+                if (channel && typeof channel.error === 'function') {
+                    channel.error((error) => {
+                        console.warn(`[Echo] Private channel auth failed: ${channelName}`, error);
+                    });
+                }
+
+                return channel;
+            } catch (error) {
+                console.warn(`[Echo] Private channel subscription failed: ${channelName}`, error);
+                return null;
+            }
+        };
+
+        // ── Toast Queue System ──
+        const toastQueue = [];
+        let isProcessingQueue = false;
+        const MAX_TOASTS = 3;
+        const TOAST_DURATION = 6000; // 6 Detik
+
+        const processToastQueue = () => {
+            if (isProcessingQueue || toastQueue.length === 0) return;
+
+            const currentToasts = document.querySelectorAll('.realtime-toast-item').length;
+            if (currentToasts >= MAX_TOASTS) {
+                setTimeout(processToastQueue, 1000);
+                return;
+            }
+
+            isProcessingQueue = true;
+            const { title, message, theme, iconName } = toastQueue.shift();
+            renderToast(title, message, theme, iconName);
+
+            setTimeout(() => {
+                isProcessingQueue = false;
+                processToastQueue();
+            }, 1000); // Jeda 1 detik antar toast
+        };
+
+        const showRealtimeToast = (title, message, theme, iconName) => {
+            toastQueue.push({ title, message, theme, iconName });
+            processToastQueue();
+        };
+
+        const renderToast = (title, message, theme, iconName) => {
+            const toastId = 'toast-' + Date.now();
+
+            let container = document.getElementById('toast-container-stack');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container-stack';
+                container.className = 'fixed top-24 right-0 sm:right-6 md:right-8 z-[110] flex flex-col gap-3 pointer-events-none items-center sm:items-end w-full sm:max-w-sm px-4 sm:px-0';
+                document.body.appendChild(container);
+            }
+
+            // HTML Toast Baru: Flat design, border tegas, glassmorphism, progress bar
+            const html = `
+            <div id="${toastId}" class="realtime-toast-item group relative overflow-hidden pointer-events-auto flex items-start w-full sm:w-auto sm:min-w-[340px] bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/80 opacity-0 translate-x-12 scale-95 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
+                
+                <!-- Icon Area (Flat Colors) -->
+                <div class="flex-shrink-0 w-12 h-12 m-3 rounded-lg flex items-center justify-center ${theme.iconBg} ${theme.iconText}">
+                    <i data-lucide="${iconName || 'bell'}" class="w-6 h-6"></i>
+                </div>
+                
+                <!-- Text Content -->
+                <div class="flex-1 min-w-0 py-3 pr-2">
+                    <h3 class="text-sm font-bold text-slate-800 mb-0.5 leading-tight">${title}</h3>
+                    <p class="text-[13px] text-slate-500 font-medium leading-snug">${message}</p>
+                </div>
+                
+                <!-- Close Button -->
+                <button type="button" class="flex-shrink-0 m-2 bg-transparent text-slate-400 hover:text-slate-800 rounded-lg p-1.5 hover:bg-slate-100 transition-colors" 
+                    onclick="const el = document.getElementById('${toastId}'); if(el){ el.classList.remove('opacity-100', 'translate-x-0', 'scale-100'); el.classList.add('opacity-0', 'translate-x-12', 'scale-95'); setTimeout(()=>el.remove(), 500); }">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Animated Progress Bar -->
+                <div class="absolute bottom-0 left-0 h-[3px] ${theme.barBg} w-full transition-all ease-linear" id="progress-${toastId}" style="transition-duration: ${TOAST_DURATION}ms;"></div>
+            </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', html);
+            const el = document.getElementById(toastId);
+            const progress = document.getElementById(`progress-${toastId}`);
+
+            if (!el) return;
+
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+            // Animasi Masuk (Slide & Scale)
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (!el) return;
+                    el.classList.remove('opacity-0', 'translate-x-12', 'scale-95');
+                    el.classList.add('opacity-100', 'translate-x-0', 'scale-100');
+                    
+                    // Trigger Progress Bar
+                    if(progress) {
+                        progress.style.width = '0%';
+                    }
+                });
+            });
+
+            // Animasi Keluar Otomatis
+            setTimeout(() => {
+                const liveEl = document.getElementById(toastId);
+                if (liveEl) {
+                    liveEl.classList.remove('opacity-100', 'translate-x-0', 'scale-100');
+                    liveEl.classList.add('opacity-0', 'translate-x-12', 'scale-95');
+                    setTimeout(() => { const r = document.getElementById(toastId); if (r) r.remove(); }, 500);
+                }
+            }, TOAST_DURATION);
+        };
+
+        // ── Tema Warna Flat / Minimalist ──
+        const THEMES = {
+            success: { iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', barBg: 'bg-emerald-500' },
+            error: { iconBg: 'bg-rose-100', iconText: 'text-rose-600', barBg: 'bg-rose-500' },
+            info: { iconBg: 'bg-blue-100', iconText: 'text-blue-600', barBg: 'bg-blue-500' },
+            warning: { iconBg: 'bg-amber-100', iconText: 'text-amber-600', barBg: 'bg-amber-500' },
+            purple: { iconBg: 'bg-purple-100', iconText: 'text-purple-600', barBg: 'bg-purple-500' },
+        };
+
+        window.showToast = (message, type = 'success') => {
+            let theme = THEMES.success;
+            let iconName = 'check-circle';
+            let title = 'Berhasil';
+
+            if (type === 'error') {
+                theme = THEMES.error; iconName = 'alert-circle'; title = 'Gagal';
+            } else if (type === 'info') {
+                theme = THEMES.info; iconName = 'info'; title = 'Informasi';
+            } else if (type === 'warning') {
+                theme = THEMES.warning; iconName = 'alert-triangle'; title = 'Peringatan';
+            }
+
+            showRealtimeToast(title, message, theme, iconName);
+        };
+
+        @if(session('notification'))
+            window.showToast(@json(session('notification')), 'success');
+        @endif
+
+        @if(session('success'))
+            window.showToast(@json(session('success')), 'success');
+        @endif
+
+        @if(session('error'))
+            window.showToast(@json(session('error')), 'error');
+        @endif
+
+        // ── Listener NOTIFIKASI SYSTEM ──
+        const notificationChannel = subscribePrivate(`notifications.${userId}`);
+        if (notificationChannel) {
+            notificationChannel
+            .listen('.notification.received', (e) => {
+                // console.log('🔔 [NOTIF] Notification Received:', e);
+                if (typeof updateNotificationBadge === 'function') updateNotificationBadge();
+
+                let theme = THEMES.purple;
+                let iconName = 'bell';
+
+                if (e.type === 'ocr_status') {
+                    const isSuccess = e.title.toLowerCase().includes('berhasil');
+                    theme = isSuccess ? THEMES.success : THEMES.error;
+                    iconName = isSuccess ? 'sparkles' : 'alert-triangle';
+                } else if (e.type === 'transaction_status') {
+                    const titleLower = e.title.toLowerCase();
+                    if (titleLower.includes('cash siap')) {
+                        theme = THEMES.warning; iconName = 'banknote';
+                    } else if (titleLower.includes('disetujui owner')) {
+                        theme = THEMES.success; iconName = 'check-circle';
+                    } else if (titleLower.includes('disetujui')) {
+                        theme = THEMES.info; iconName = 'clipboard-check';
+                    } else if (titleLower.includes('diproses')) {
+                        theme = THEMES.info; iconName = 'clock';
+                    } else if (titleLower.includes('selesai')) {
+                        theme = THEMES.success; iconName = 'check-circle';
+                    } else if (titleLower.includes('ditolak')) {
+                        theme = THEMES.error; iconName = 'x-circle';
+                    }
+                } else if (e.type === 'owner_approval') {
+                    theme = THEMES.purple; iconName = 'shield-check';
+                }
+
+                showRealtimeToast(e.title, e.message, theme, iconName);
+            });
+        }
+
+        // ── Define Realtime Handlers ──
+        window.handleRealtimeTransactionCreation = function (transaction) {
+            // console.log('🆕 [REALTIME] Transaction Created:', transaction);
+            if (typeof SearchEngine !== 'undefined' && SearchEngine.addTransaction) {
+                SearchEngine.addTransaction(transaction);
+            }
+        };
+
+        window.handleRealtimeTransactionUpdate = function (transaction) {
+            // console.log('🔄 [REALTIME] Transaction Updated:', transaction);
+            if (typeof SearchEngine !== 'undefined' && SearchEngine.updateTransaction) {
+                SearchEngine.updateTransaction(transaction);
+            }
+        };
+
+        window.handleRealtimeTransactionDeletion = function (data) {
+            // console.log('🗑️ [REALTIME] Transaction Deleted:', data);
+            if (typeof SearchEngine !== 'undefined' && SearchEngine.deleteTransaction) {
+                SearchEngine.deleteTransaction(data.id);
+            }
+        };
+
+        // ── STRATEGY: Role-Based Channel Subscription ──
+        // Teknisi: Only personal channel (transactions.{userId})
+        // Admin/Owner/Atasan: Both personal + global channel (transactions)
+        
+        // 1. Personal Channel - ALL ROLES (for their own transactions)
+        const personalTransactionChannel = subscribePrivate(`transactions.${userId}`);
+        if (personalTransactionChannel) {
+            personalTransactionChannel
+            .listen('.transaction.created', (e) => {
+                // console.log('📥 [PERSONAL] Transaction Created:', e);
+                if (e.transaction) window.handleRealtimeTransactionCreation(e.transaction);
+            })
+            .listen('.transaction.updated', (e) => {
+                // console.log('📥 [PERSONAL] Transaction Updated:', e);
+                if (e.transaction) window.handleRealtimeTransactionUpdate(e.transaction);
+            });
+        }
+
+        // 2. OCR Channel - ALL ROLES (for OCR processing updates)
+        const ocrChannel = subscribePrivate(`ocr.${userId}`);
+        if (ocrChannel) {
+            ocrChannel
+            .listen('.ocr.updated', (e) => {
+                // console.log('📥 [OCR] Status Updated:', e);
+                if (e.payload && e.payload.transaction) window.handleRealtimeTransactionUpdate(e.payload.transaction);
+            });
+        }
+
+        // 3. Global Channel - ONLY for Admin/Owner/Atasan (to see all transactions)
+        if (canSubscribeGlobal) {
+            const globalTransactionChannel = subscribePrivate('transactions');
+            if (globalTransactionChannel) {
+                globalTransactionChannel
+                .listen('.transaction.created', (e) => {
+                    // console.log('📡 [GLOBAL] Transaction Created:', e);
+                    // Only add if it's NOT from current user (to avoid duplicate from personal channel)
+                    if (e.transaction && e.transaction.submitted_by !== userId) {
+                        window.handleRealtimeTransactionCreation(e.transaction);
+                    }
+                })
+                .listen('.transaction.updated', (e) => {
+                    // console.log('📡 [GLOBAL] Transaction Updated:', e);
+                    // Only update if it's NOT from current user (to avoid duplicate from personal channel)
+                    if (e.transaction && e.transaction.submitted_by !== userId) {
+                        window.handleRealtimeTransactionUpdate(e.transaction);
+                    }
+                })
+                .listen('.transaction.deleted', (e) => {
+                    // console.log('📡 [GLOBAL] Transaction Deleted:', e);
+                    if (e.id) window.handleRealtimeTransactionDeletion(e);
+                });
+            }
+        }
+
+        if (canSubscribeManagementNotifications) {
+            const managementNotificationChannel = subscribePrivate('notifications.management');
+            if (managementNotificationChannel) {
+                managementNotificationChannel
+                .listen('PriceAnomalyDetected', (e) => {
+                    // console.log('Price Anomaly Detected:', e);
+                    const msg = `Item "${e.item_name}" melebihi harga referensi (+${e.excess_percentage}%). <br><a href="${e.url}" class="text-blue-600 font-bold hover:underline mt-1 inline-block">Review Sekarang →</a>`;
+                    
+                    showRealtimeToast('⚠️ Anomali Harga!', msg, THEMES.error, 'alert-circle');
+
+                    if (typeof fetchNotifications === 'function') fetchNotifications();
+                });
+            }
+        }
+    }
+});
+        

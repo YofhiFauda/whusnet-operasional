@@ -30,16 +30,38 @@ class CustomerInstallationController extends Controller
             abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
         }
 
+        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [];
+        if (!in_array(auth()->id(), $memberIds)) {
+            $memberIds[] = auth()->id();
+        }
+
+        $activeTask = \App\Models\Task::where('status', \App\Enums\TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
+            ->when($task, fn ($q) => $q->where('id', '!=', $task->id))
+            ->first();
+
+        if ($activeTask) {
+            return redirect()->back()->with('error', "Tidak dapat memulai pemasangan karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+        }
+
         try {
             DB::beginTransaction();
 
             $installation = $customer->installations()->latest()->first();
 
+            $updateData = [
+                'started_at' => now(),
+                'start_time' => now()->toTimeString(),
+                'installation_status' => 'in_progress',
+            ];
+            if ($task) {
+                $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+            }
+
             if ($installation) {
-                $installation->update([
-                    'started_at' => now(),
-                    'installation_status' => 'in_progress'
-                ]);
+                $installation->update($updateData);
+            } else {
+                $customer->installations()->create($updateData);
             }
 
             $workflowService->transition($customer, 'installation_in_progress', 'Mulai proses pemasangan lapangan');
@@ -163,15 +185,15 @@ class CustomerInstallationController extends Controller
 
             if ($installation) {
                 if ($request->hasFile('installation_photo')) {
-                    $photoPath = $request->file('installation_photo')->store('installations', 'public');
+                    $photoPath = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('installation_photo'), $customer, 'pemasangan');
                     $installation->installation_photo = $photoPath;
                 }
                 if ($request->hasFile('contract_photo')) {
-                    $contractPath = $request->file('contract_photo')->store('contracts', 'public');
+                    $contractPath = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('contract_photo'), $customer, 'kontrak');
                     $installation->contract_photo = $contractPath;
                 }
                 if ($request->hasFile('signature_photo')) {
-                    $signaturePath = $request->file('signature_photo')->store('signatures', 'public');
+                    $signaturePath = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('signature_photo'), $customer, 'ttd');
                     $installation->signature_photo = $signaturePath;
                 }
                 $installation->installation_note = $validated['installation_note'] ?? null;
@@ -182,11 +204,20 @@ class CustomerInstallationController extends Controller
                     $installation->started_at = $validated['started_at'];
                 }
 
-                if ($validated['installation_status'] === 'completed') {
-                    $installation->completed_at = !empty($validated['completed_at'])
-                        ? $validated['completed_at']
+                $task = \App\Models\Task::where('customer_id', $customer->id)
+                    ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                    ->first();
+                if ($task && !$installation->fop_id) {
+                    $installation->fop_id = $task->fop_id ?? $task->created_by;
+                }
+
+                if (!$installation->completed_at) {
+                    $completedAt = !empty($validated['completed_at'])
+                        ? \Illuminate\Support\Carbon::parse($validated['completed_at'])
                         : now();
-                    $installation->finished_date = now()->toDateString();
+                    $installation->completed_at = $completedAt;
+                    $installation->finished_date = $completedAt->toDateString();
+                    $installation->end_time = $completedAt->toTimeString();
                 }
 
                 $installation->save();
@@ -195,7 +226,7 @@ class CustomerInstallationController extends Controller
             // Save technical details
             $speedtestPhoto = null;
             if ($request->hasFile('speedtest_photo')) {
-                $speedtestPhoto = $request->file('speedtest_photo')->store('speedtests', 'public');
+                $speedtestPhoto = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('speedtest_photo'), $customer, 'speedtest');
             }
 
             CustomerTechnicalDetail::updateOrCreate(
@@ -243,6 +274,21 @@ class CustomerInstallationController extends Controller
             );
 
             if ($validated['installation_status'] === 'completed') {
+                // Selesaikan task pemasangan jika ada
+                $task = \App\Models\Task::where('customer_id', $customer->id)
+                    ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                    ->whereIn('status', [\App\Enums\TaskStatus::IN_PROGRESS->value, \App\Enums\TaskStatus::PENDING->value])
+                    ->first();
+                
+                if ($task) {
+                    $task->checklists()->where('is_checked', false)->update([
+                        'is_checked' => true,
+                        'checked_at' => now(),
+                        'checked_by' => auth()->id(),
+                    ]);
+                    app(\App\Services\TaskService::class)->complete($task, auth()->user());
+                }
+
                 $workflowService->transition($customer, 'installed');
                 // Then move to verification_admin
                 $workflowService->transition($customer, 'verification_admin');

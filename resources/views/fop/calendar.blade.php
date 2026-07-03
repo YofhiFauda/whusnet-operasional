@@ -9,49 +9,59 @@
     $totalAllChecklists       = collect($tasksMap)->sum('checklist_total');
 @endphp
 
-<div x-data="fopCalendarHandler()" class="flex flex-col gap-0">
+<div x-data="fopCalendarHandler('{{ $viewMode }}')" class="flex flex-col gap-0">
 
-    {{-- ══ PAGE HEADER (naked — no card per Design.md §1.7) ═════════ --}}
+    {{-- ══ PAGE HEADER ═══════════════════════════════════════════════ --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div class="flex items-center gap-3">
-            <svg class="h-6 w-6 shrink-0" style="color:var(--color-primary)" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                 style="background:var(--color-primary-soft)">
+                <svg class="h-5 w-5" style="color:var(--color-primary)" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h18M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            </div>
             <div>
-                <h1 class="text-xl font-bold text-text-main leading-tight">FOP — Task Scheduler</h1>
-                <p class="text-xs text-text-muted mt-0.5">{{ $startDate->translatedFormat('d F Y') }} — {{ $endDate->translatedFormat('d F Y') }}</p>
+                <div class="flex items-center gap-2.5">
+                    <h1 class="text-lg font-bold text-text-main leading-tight">FOP — Task Scheduler</h1>
+                    <span class="hidden sm:inline-block text-xs font-medium px-2 py-0.5 rounded-full" style="background:var(--color-background); border:1px solid var(--color-border); color:var(--color-text-muted)">
+                        {{ now()->translatedFormat('l, d M Y') }}
+                    </span>
+                </div>
+                <p class="text-xs mt-0.5" style="color:var(--color-text-muted)">{{ $startDate->translatedFormat('d M') }} — {{ $endDate->translatedFormat('d M Y') }}</p>
             </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
             {{-- Progress checklist pill --}}
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium" style="background:var(--color-surface); border-color:var(--color-border); color:var(--color-text-secondary)">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium"
+                 style="background:var(--color-surface); border-color:var(--color-border); color:var(--color-text-secondary)">
                 <span class="w-2 h-2 rounded-full" style="background:var(--color-success)"></span>
-                Progress checklist <strong class="ml-1 font-mono" style="color:var(--color-text-main)">{{ $totalCompletedChecklists }}/{{ $totalAllChecklists }}</strong>
+                Progress checklist
+                <strong class="font-mono" style="color:var(--color-text-main)">{{ $totalCompletedChecklists }}/{{ $totalAllChecklists }}</strong>
             </div>
 
             {{-- Mode toggle --}}
             <div class="inline-flex rounded-lg p-0.5 border" style="background:var(--color-background); border-color:var(--color-border)">
                 <button @click="viewMode = 'weekly'"
-                        :class="viewMode === 'weekly' ? 'text-white shadow-sm font-semibold' : 'font-medium'"
                         :style="viewMode === 'weekly' ? 'background:var(--color-primary); color:#fff' : 'color:var(--color-text-muted)'"
-                        class="px-3 py-1 rounded-md text-xs transition-all cursor-pointer">
+                        class="px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer">
                     Mingguan
                 </button>
                 <button @click="viewMode = 'monthly'"
-                        :class="viewMode === 'monthly' ? 'font-semibold' : 'font-medium'"
                         :style="viewMode === 'monthly' ? 'background:var(--color-primary); color:#fff' : 'color:var(--color-text-muted)'"
-                        class="px-3 py-1 rounded-md text-xs transition-all cursor-pointer">
+                        class="px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer">
                     Bulanan
                 </button>
             </div>
+            {{-- PHP viewMode: init value for Alpine --}}
+            {{-- viewMode init ditangani di x-data --}}
 
             {{-- Action button --}}
-            @if(auth()->user()->hasPermission('task.create') || auth()->user()->hasPermission('task.schedule') || auth()->user()->hasPermission('task.assign.team') || auth()->user()->hasPermission('tasks.create') || auth()->user()->hasPermission('tasks.assign'))
+            @if(auth()->user()->hasPermission('task.create') || auth()->user()->hasPermission('task.schedule') || auth()->user()->hasPermission('task.assign.team'))
                 <button @click="openScheduleModal('{{ Carbon\Carbon::now()->format('Y-m-d') }}')"
-                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-white font-semibold text-xs shadow-sm cursor-pointer transition-all"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-white font-semibold text-xs shadow-sm cursor-pointer transition-all"
                         style="background:var(--color-primary)">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                     + Jadwalkan Task
@@ -60,23 +70,6 @@
         </div>
     </div>
 
-    {{-- Alerts --}}
-    @if(session('success'))
-        <div class="mb-4 p-3 rounded-lg flex items-center justify-between text-sm" style="background:#F0FDF4; border:1px solid #BBF7D0; color:var(--color-success)">
-            <div class="flex items-center gap-2">
-                <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                <span class="text-xs font-medium">{!! session('success') !!}</span>
-            </div>
-            <button @click="$el.parentElement.remove()" class="ml-4 cursor-pointer" style="color:var(--color-success)">&times;</button>
-        </div>
-    @endif
-    @if($errors->any())
-        <div class="mb-4 p-3 rounded-lg flex items-start justify-between" style="background:#FEF2F2; border:1px solid #FECACA; color:var(--color-error)">
-            <ul class="text-xs space-y-0.5">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-            <button @click="$el.parentElement.remove()" class="ml-4 cursor-pointer" style="color:var(--color-error)">&times;</button>
-        </div>
-    @endif
-
     {{-- ══ MAIN 2-COLUMN LAYOUT ══════════════════════════════════════ --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
@@ -84,98 +77,126 @@
         <div class="lg:col-span-3 space-y-4">
 
             {{-- RINGKASAN HARI INI --}}
-            <div class="rounded-lg border" style="background:var(--color-surface); border-color:var(--color-border)">
-                <div class="px-4 pt-3 pb-2 border-b" style="border-color:var(--color-border)">
+            <div class="rounded-xl border overflow-hidden" style="background:var(--color-surface); border-color:var(--color-border)">
+                <div class="px-4 pt-3 pb-2 border-b flex items-center gap-2" style="border-color:var(--color-border)">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-primary)"></span>
                     <p class="text-[11px] font-bold uppercase tracking-widest" style="color:var(--color-text-muted)">RINGKASAN HARI INI</p>
                 </div>
-                <div class="grid grid-cols-2 divide-x divide-y" style="--tw-divide-opacity:1">
-                    <div class="p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider" style="color:var(--color-text-muted)">Total task</p>
-                        <p class="text-2xl font-bold font-mono mt-0.5" style="color:var(--color-text-main)">{{ $stats['total'] }}</p>
+                <div class="grid grid-cols-2">
+                    <div class="p-3.5 border-r border-b" style="border-color:var(--color-border)">
+                        <p class="text-[10px] font-medium uppercase tracking-wider" style="color:var(--color-text-muted)">Total task</p>
+                        <p class="text-2xl font-bold font-mono mt-1 leading-none" style="color:var(--color-text-main)">{{ $stats['total'] }}</p>
                     </div>
-                    <div class="p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider" style="color:var(--color-text-muted)">Selesai</p>
-                        <p class="text-2xl font-bold font-mono mt-0.5" style="color:var(--color-success)">{{ $stats['completed'] }}</p>
+                    <div class="p-3.5 border-b" style="border-color:var(--color-border)">
+                        <p class="text-[10px] font-medium uppercase tracking-wider" style="color:var(--color-text-muted)">Selesai</p>
+                        <p class="text-2xl font-bold font-mono mt-1 leading-none" style="color:var(--color-success)">{{ $stats['completed'] }}</p>
                     </div>
-                    <div class="p-3 border-t" style="border-color:var(--color-border)">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider" style="color:var(--color-text-muted)">Pending</p>
-                        <p class="text-2xl font-bold font-mono mt-0.5" style="color:var(--color-warning)">{{ $stats['pending'] }}</p>
+                    <div class="p-3.5 border-r" style="border-color:var(--color-border)">
+                        <p class="text-[10px] font-medium uppercase tracking-wider" style="color:var(--color-text-muted)">Pending</p>
+                        <p class="text-2xl font-bold font-mono mt-1 leading-none" style="color:var(--color-warning)">{{ $stats['pending'] }}</p>
                     </div>
-                    <div class="p-3 border-t" style="border-color:var(--color-border)">
-                        <p class="text-[10px] font-semibold uppercase tracking-wider" style="color:var(--color-text-muted)">Dibatalkan</p>
-                        <p class="text-2xl font-bold font-mono mt-0.5" style="color:var(--color-error)">{{ $stats['cancelled'] }}</p>
+                    <div class="p-3.5">
+                        <p class="text-[10px] font-medium uppercase tracking-wider" style="color:var(--color-text-muted)">Dibatalkan</p>
+                        <p class="text-2xl font-bold font-mono mt-1 leading-none" style="color:var(--color-error)">{{ $stats['cancelled'] }}</p>
                     </div>
                 </div>
             </div>
 
             {{-- TIM AKTIF --}}
-            <div class="rounded-lg border" style="background:var(--color-surface); border-color:var(--color-border)">
+            @php
+                $teamPalette = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16'];
+            @endphp
+            <div class="rounded-xl border" style="background:var(--color-surface); border-color:var(--color-border)">
                 <div class="px-4 pt-3 pb-2 border-b flex items-center justify-between" style="border-color:var(--color-border)">
-                    <p class="text-[11px] font-bold uppercase tracking-widest" style="color:var(--color-text-muted)">TIM AKTIF</p>
-                    <span class="text-[10px] font-mono px-2 py-0.5 rounded-full" style="background:var(--color-background); color:var(--color-text-muted); border:1px solid var(--color-border)">{{ $activeTeams->count() }} Tim</span>
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-success)"></span>
+                        <p class="text-[11px] font-bold uppercase tracking-widest" style="color:var(--color-text-muted)">TIM AKTIF</p>
+                    </div>
+                    <span class="text-[10px] font-mono px-2 py-0.5 rounded-full" style="background:var(--color-background); color:var(--color-text-muted); border:1px solid var(--color-border)">{{ $activeTeams->count() }}</span>
                 </div>
-                <div class="p-3 space-y-2 max-h-80 overflow-y-auto">
+                <div class="p-2 space-y-1.5 max-h-72 overflow-y-auto">
                     @forelse($activeTeams as $team)
+                        @php
+                            $isTeamActive = $team['status'] === 'active' && !empty($team['activeTask']);
+                            $activeTaskType = $isTeamActive ? $team['activeTask']->task_type->value : null;
+                            
+                            $teamBorder = match($activeTaskType) {
+                                'survey'      => '#0284C7',
+                                'pemasangan'  => '#16A34A',
+                                'maintenance' => '#D97706',
+                                'ambil_modem' => '#DB2777',
+                                default       => 'var(--color-border)',
+                            };
+                            
+                            $tc = $teamPalette[$loop->index % count($teamPalette)];
+                        @endphp
                         <div @click="selectTeam({{ $team['id'] }})"
-                             :class="selectedTeamId === {{ $team['id'] }} ? 'ring-2' : ''"
-                             :style="selectedTeamId === {{ $team['id'] }} ? 'ring-color:var(--color-primary); background:var(--color-primary-soft)' : ''"
-                             class="p-3 rounded-lg border cursor-pointer transition-all group"
-                             style="border-color:var(--color-border)">
-                            <div class="flex items-center justify-between gap-2">
-                                {{-- Avatars --}}
-                                <div class="flex -space-x-1.5 overflow-hidden shrink-0">
-                                    @foreach($team['avatars'] as $avatar)
-                                        <div class="inline-flex h-7 w-7 rounded-full items-center justify-center text-[10px] font-bold text-white ring-2 ring-white"
-                                             style="background:var(--color-primary)" title="{{ $avatar['name'] }}">
-                                            {{ $avatar['initials'] }}
-                                        </div>
-                                    @endforeach
-                                    @if($team['extraCount'] > 0)
-                                        <div class="inline-flex h-7 w-7 rounded-full items-center justify-center text-[9px] font-bold ring-2 ring-white"
-                                             style="background:var(--color-surface-muted); color:var(--color-text-muted)">
-                                            +{{ $team['extraCount'] }}
-                                        </div>
-                                    @endif
-                                </div>
+                             :class="selectedTeamId === {{ $team['id'] }} ? 'ring-2 ring-primary ring-offset-1' : ''"
+                             class="p-2.5 rounded-lg border cursor-pointer transition-all"
+                             style="background:var(--color-surface); border-color:{{ $teamBorder }}">
+                            <div class="flex items-center gap-2.5">
+                                {{-- Team color dot --}}
+                                <span class="w-2 h-2 rounded-full shrink-0 mt-px" style="background:{{ $tc }}"></span>
 
                                 {{-- Info --}}
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-xs font-bold truncate" style="color:var(--color-text-main)">{{ $team['name'] }}</p>
+                                    <p class="text-xs font-bold leading-tight truncate" style="color:var(--color-text-main)">{{ $team['name'] }}</p>
                                     <p class="text-[11px] mt-0.5" style="color:var(--color-text-muted)">
                                         <span style="color:var(--color-text-secondary); font-weight:600">{{ $team['taskCount'] }}</span> task hari ini ·
                                         <span style="color:var(--color-success); font-weight:600">{{ $team['completedCount'] }}</span> selesai
                                     </p>
                                 </div>
 
-                                {{-- Status dot --}}
-                                <span class="w-2.5 h-2.5 rounded-full shrink-0"
+                                {{-- Avatars --}}
+                                <div class="flex -space-x-1.5 overflow-hidden shrink-0">
+                                    @foreach(array_slice($team['avatars'], 0, 2) as $avatar)
+                                        <div class="inline-flex h-6 w-6 rounded-full items-center justify-center text-[9px] font-bold text-white ring-2 ring-white"
+                                             style="background:{{ $tc }}" title="{{ $avatar['name'] }}">
+                                            {{ $avatar['initials'] }}
+                                        </div>
+                                    @endforeach
+                                    @if($team['extraCount'] > 0)
+                                        <div class="inline-flex h-6 w-6 rounded-full items-center justify-center text-[8px] font-bold ring-2 ring-white"
+                                             style="background:var(--color-background); color:var(--color-text-muted); border:1px solid var(--color-border)">
+                                            +{{ $team['extraCount'] }}
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- Status indicator --}}
+                                <span class="w-2 h-2 rounded-full shrink-0"
                                       style="{{ $team['status'] === 'active' ? 'background:var(--color-success)' : 'background:var(--color-border)' }}"
                                       title="{{ $team['status'] === 'active' ? 'Sedang bertugas' : 'Standby' }}"></span>
                             </div>
                         </div>
                     @empty
-                        <p class="text-xs text-center py-4" style="color:var(--color-text-muted)">Tidak ada tim aktif periode ini</p>
+                        <p class="text-xs text-center py-5" style="color:var(--color-text-muted)">Tidak ada tim aktif periode ini</p>
                     @endforelse
                 </div>
             </div>
 
             {{-- KETERANGAN --}}
-            <div class="rounded-lg border" style="background:var(--color-surface); border-color:var(--color-border)">
-                <div class="px-4 pt-3 pb-2 border-b" style="border-color:var(--color-border)">
+            <div class="rounded-xl border" style="background:var(--color-surface); border-color:var(--color-border)">
+                <div class="px-4 pt-3 pb-2 border-b flex items-center gap-2" style="border-color:var(--color-border)">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-text-muted)"></span>
                     <p class="text-[11px] font-bold uppercase tracking-widest" style="color:var(--color-text-muted)">KETERANGAN</p>
                 </div>
-                <div class="p-3 grid grid-cols-2 gap-2">
-                    <div class="flex items-center gap-2 text-xs" style="color:var(--color-text-secondary)">
-                        <span class="w-3 h-3 rounded shrink-0" style="background:#BAE6FD"></span> Survey
+                <div class="p-3 space-y-2">
+                    <div class="flex items-center gap-2.5 text-xs" style="color:var(--color-text-secondary)">
+                        <span class="w-3 h-3 rounded shrink-0" style="background:#e2f1f8; border:1px solid #0284C7"></span>
+                        Survey
                     </div>
-                    <div class="flex items-center gap-2 text-xs" style="color:var(--color-text-secondary)">
-                        <span class="w-3 h-3 rounded shrink-0" style="background:#BBF7D0"></span> Pemasangan
+                    <div class="flex items-center gap-2.5 text-xs" style="color:var(--color-text-secondary)">
+                        <span class="w-3 h-3 rounded shrink-0" style="background:#e8f8ee; border:1px solid #16A34A"></span>
+                        Pemasangan
                     </div>
-                    <div class="flex items-center gap-2 text-xs" style="color:var(--color-text-secondary)">
-                        <span class="w-3 h-3 rounded shrink-0" style="background:#FDE68A"></span> Maintenance
+                    <div class="flex items-center gap-2.5 text-xs" style="color:var(--color-text-secondary)">
+                        <span class="w-3 h-3 rounded shrink-0" style="background:#fef7db; border:1px solid #D97706"></span>
+                        Maintenance
                     </div>
-                    <div class="flex items-center gap-2 text-xs" style="color:var(--color-text-secondary)">
-                        <span class="w-3 h-3 rounded shrink-0" style="background:#FBCFE8"></span> Ambil modem
+                    <div class="flex items-center gap-2.5 text-xs" style="color:var(--color-text-secondary)">
+                        <span class="w-3 h-3 rounded shrink-0" style="background:#fdeaf2; border:1px solid #DB2777"></span>
+                        Ambil Modem
                     </div>
                 </div>
             </div>
@@ -185,45 +206,53 @@
         {{-- ══ AREA KALENDER UTAMA (9 cols) ═════════════════════════ --}}
         <div class="lg:col-span-9 flex flex-col gap-4">
 
-            {{-- Navigation bar --}}
-            <div class="flex items-center justify-between rounded-lg px-4 py-3 border" style="background:var(--color-surface); border-color:var(--color-border)">
-                <a href="{{ route('fop.calendar', ['start_date' => $startDate->copy()->subWeek()->toDateString()]) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border cursor-pointer"
+            {{-- ══ WEEKLY VIEW ════════════════════════════════════════ --}}
+            <div x-show="viewMode === 'weekly'" x-cloak class="flex flex-col gap-4">
+
+            {{-- Weekly Navigation bar --}}
+            <div class="flex items-center justify-between rounded-xl px-4 py-3 border shadow-sm" style="background:var(--color-surface); border-color:var(--color-border)">
+                <a href="{{ route('fop.calendar', ['start_date' => $startDate->copy()->subWeek()->toDateString(), 'view_mode' => 'weekly']) }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer hover:shadow-sm"
                    style="background:var(--color-background); border-color:var(--color-border); color:var(--color-text-secondary)">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
                     Prev
                 </a>
 
-                <span class="text-sm font-bold font-mono" style="color:var(--color-text-main)">
-                    {{ $startDate->translatedFormat('d M') }} – {{ $endDate->translatedFormat('d M Y') }}
-                </span>
+                <div class="text-center">
+                    <span class="text-sm font-bold" style="color:var(--color-text-main)">
+                        {{ $startDate->translatedFormat('d M') }} – {{ $endDate->translatedFormat('d M Y') }}
+                    </span>
+                    @if($startDate->weekOfYear === now()->weekOfYear && $startDate->year === now()->year)
+                        <span class="block text-[10px] font-medium mt-0.5" style="color:var(--color-primary)">Minggu Ini</span>
+                    @endif
+                </div>
 
-                <a href="{{ route('fop.calendar', ['start_date' => $startDate->copy()->addWeek()->toDateString()]) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border cursor-pointer"
+                <a href="{{ route('fop.calendar', ['start_date' => $startDate->copy()->addWeek()->toDateString(), 'view_mode' => 'weekly']) }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer hover:shadow-sm"
                    style="background:var(--color-background); border-color:var(--color-border); color:var(--color-text-secondary)">
                     Next
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
                 </a>
             </div>
 
             {{-- 7-Day Grid --}}
-            <div class="grid grid-cols-1 md:grid-cols-7 gap-0 rounded-lg border overflow-hidden" style="border-color:var(--color-border)">
+            <div class="grid grid-cols-1 md:grid-cols-7 gap-0 rounded-xl border overflow-hidden shadow-sm" style="border-color:var(--color-border)">
 
                 {{-- Column headers --}}
                 @foreach($days as $dayKey => $dayData)
                     @php $isToday = $dayData['date']->isToday(); @endphp
-                    <div class="border-b border-r last:border-r-0 text-center py-2.5 px-1"
+                    <div class="border-b border-r last:border-r-0 text-center py-3 px-1"
                          style="border-color:var(--color-border); {{ $isToday ? 'background:var(--color-primary-soft)' : 'background:var(--color-background)' }}">
-                        <p class="text-[10px] font-bold uppercase tracking-wider {{ $isToday ? '' : '' }}"
+                        <p class="text-[10px] font-bold uppercase tracking-widest"
                            style="{{ $isToday ? 'color:var(--color-primary)' : 'color:var(--color-text-muted)' }}">
                             {{ $dayData['dayName'] }}
                         </p>
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-mono font-bold mt-0.5"
-                              style="{{ $isToday ? 'background:var(--color-primary); color:#fff' : 'color:var(--color-text-main)' }}">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-mono font-bold mt-1"
+                              style="{{ $isToday ? 'background:var(--color-primary); color:#fff; box-shadow:0 2px 8px rgba(var(--color-primary-rgb),0.35)' : 'color:var(--color-text-main)' }}">
                             {{ $dayData['dayNum'] }}
                         </span>
                     </div>
@@ -232,68 +261,67 @@
                 {{-- Task cells per day --}}
                 @foreach($days as $dayKey => $dayData)
                     @php $isToday = $dayData['date']->isToday(); @endphp
-                    <div class="border-r last:border-r-0 flex flex-col min-h-[300px]" style="border-color:var(--color-border); background:var(--color-surface)">
+                    <div class="border-r last:border-r-0 flex flex-col min-h-[280px]"
+                         style="border-color:var(--color-border); {{ $isToday ? 'background:#FAFEFF' : 'background:var(--color-surface)' }}">
 
                         {{-- Tasks list --}}
-                        <div class="p-1.5 flex-1 space-y-1.5 overflow-y-auto max-h-[420px]">
+                        <div class="p-1.5 flex-1 space-y-1.5 overflow-y-auto max-h-[400px]">
                             @forelse($dayData['tasks'] as $task)
                                 @php
                                     $typeVal = $task->task_type->value;
-                                    [$bg, $border, $text, $badgeBg, $badgeText] = match($typeVal) {
-                                        'survey'      => ['#F0F9FF', '#BAE6FD', '#0369A1', '#DBEAFE', '#1D4ED8'],
-                                        'pemasangan'  => ['#F0FDF4', '#BBF7D0', '#15803D', '#DCFCE7', '#166534'],
-                                        'maintenance' => ['#FFFBEB', '#FDE68A', '#B45309', '#FEF3C7', '#92400E'],
-                                        'ambil_modem' => ['#FDF4FF', '#F5D0FE', '#9333EA', '#FAE8FF', '#7E22CE'],
-                                        default       => ['#F8FAFC', '#E2E8F0', '#475569', '#F1F5F9', '#334155'],
+                                    [$bg, $border, $badgeBg, $badgeText] = match($typeVal) {
+                                        'survey'      => ['#e2f1f8', '#0284C7', '#0369A1', '#FFFFFF'],
+                                        'pemasangan'  => ['#e8f8ee', '#16A34A', '#15803D', '#FFFFFF'],
+                                        'maintenance' => ['#fef7db', '#D97706', '#B45309', '#FFFFFF'],
+                                        'ambil_modem' => ['#fdeaf2', '#DB2777', '#9D174D', '#FFFFFF'],
+                                        default       => ['#CBD5E1', '#475569', '#334155', '#FFFFFF'],
                                     };
                                     $teamNames = $task->teamMembers->map(fn($m) => explode(' ', $m->user?->name ?? '?')[0])->join(', ');
-                                @endphp
+                                 @endphp
 
                                 <div @click="openTaskDetail({{ $task->id }})"
-                                     :class="selectedTaskId === {{ $task->id }} ? 'ring-2' : ''"
-                                     :style="selectedTaskId === {{ $task->id }} ? 'ring-color:var(--color-primary)' : ''"
-                                     class="p-2 rounded border cursor-pointer transition-all text-left group"
-                                     style="background:{{ $bg }}; border-color:{{ $border }}">
+                                     :style="selectedTaskId === {{ $task->id }} ? 'border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); background:{{ $bg }}' : 'background:{{ $bg }}; border-color:{{ $border }}'"
+                                     class="p-2 rounded-lg border cursor-pointer transition-all text-left hover:shadow-sm">
 
-                                    <div class="flex items-start justify-between gap-1 mb-1">
-                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                    <div class="flex items-start justify-between gap-1 mb-1.5">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase leading-tight"
                                               style="background:{{ $badgeBg }}; color:{{ $badgeText }}">
                                             {{ $task->task_type->label() }}
                                         </span>
                                         @if($task->scheduled_at)
-                                            <span class="text-[10px] font-mono shrink-0" style="color:{{ $text }}; opacity:.8">
+                                            <span class="text-[9px] font-mono shrink-0 font-semibold" style="color:var(--color-text-secondary)">
                                                 {{ $task->scheduled_at->format('H:i') }}
                                             </span>
                                         @endif
                                     </div>
 
-                                    <p class="text-xs font-bold leading-snug line-clamp-2" style="color:{{ $text }}">
-                                        {{ $task->title }}
+                                    <p class="text-[11px] font-bold leading-snug line-clamp-2" style="color:var(--color-text-main)">
+                                        {{ $task->customer?->full_name ?? $task->title }}
                                     </p>
 
                                     @if($teamNames)
-                                        <p class="text-[10px] mt-1 truncate" style="color:{{ $text }}; opacity:.75">{{ $teamNames }}</p>
+                                        <p class="text-[9px] mt-1 truncate" style="color:var(--color-text-secondary); opacity:0.85">{{ $teamNames }}</p>
                                     @endif
                                 </div>
                             @empty
-                                <div class="h-full flex items-start justify-center pt-6">
-                                    <span class="text-[11px] font-mono" style="color:var(--color-border)">—</span>
+                                <div class="h-full flex items-start justify-center pt-8">
+                                    <span class="text-[11px]" style="color:var(--color-border)">·</span>
                                 </div>
                             @endforelse
                         </div>
 
                         {{-- + Task quick add --}}
                         <div class="p-1.5 border-t" style="border-color:var(--color-border)">
-                            @if(auth()->user()->hasPermission('task.create') || auth()->user()->hasPermission('task.schedule') || auth()->user()->hasPermission('task.assign.team') || auth()->user()->hasPermission('tasks.create') || auth()->user()->hasPermission('tasks.assign'))
+                            @if(auth()->user()->hasPermission('task.create') || auth()->user()->hasPermission('task.schedule') || auth()->user()->hasPermission('task.assign.team'))
                                 <button type="button" @click="openScheduleModal('{{ $dayKey }}')"
-                                        class="w-full py-1.5 rounded border border-dashed text-[11px] font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                                        class="w-full py-1.5 rounded-lg border border-dashed text-[10px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer"
                                         style="border-color:var(--color-border); color:var(--color-text-muted)"
-                                        onmouseover="this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)'"
-                                        onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-muted)'">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        onmouseover="this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)';this.style.background='var(--color-primary-soft)'"
+                                        onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-muted)';this.style.background='transparent'">
+                                    <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                                     </svg>
-                                    + Task
+                                    Task
                                 </button>
                             @endif
                         </div>
@@ -301,114 +329,253 @@
                 @endforeach
             </div>
 
-            {{-- ══ DETAIL PANEL (di bawah kalender, muncul saat task diklik) ══ --}}
+            </div>{{-- /weekly view --}}
+
+            {{-- ══ MONTHLY VIEW ═══════════════════════════════════════ --}}
+            <div x-show="viewMode === 'monthly'" x-cloak class="flex flex-col gap-4">
+
+            {{-- Monthly Navigation bar --}}
+            <div class="flex items-center justify-between rounded-xl px-4 py-3 border shadow-sm" style="background:var(--color-surface); border-color:var(--color-border)">
+                <a href="{{ route('fop.calendar', ['start_date' => $prevMonthStart, 'view_mode' => 'monthly']) }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer hover:shadow-sm"
+                   style="background:var(--color-background); border-color:var(--color-border); color:var(--color-text-secondary)">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Prev
+                </a>
+                <div class="text-center">
+                    <span class="text-sm font-bold" style="color:var(--color-text-main)">{{ $monthName }}</span>
+                    @if($monthStart->month === now()->month && $monthStart->year === now()->year)
+                        <span class="block text-[10px] font-medium mt-0.5" style="color:var(--color-primary)">Bulan Ini</span>
+                    @endif
+                </div>
+                <a href="{{ route('fop.calendar', ['start_date' => $nextMonthStart, 'view_mode' => 'monthly']) }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer hover:shadow-sm"
+                   style="background:var(--color-background); border-color:var(--color-border); color:var(--color-text-secondary)">
+                    Next
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                </a>
+            </div>
+
+            {{-- Monthly Calendar Grid --}}
+            <div class="rounded-xl border overflow-hidden shadow-sm" style="border-color:var(--color-border)">
+
+                {{-- Day-of-week headers --}}
+                <div class="grid grid-cols-7" style="background:var(--color-background)">
+                    @foreach(['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] as $dow)
+                        <div class="text-center py-2.5 border-b border-r last:border-r-0 text-[10px] font-bold uppercase tracking-widest"
+                             style="border-color:var(--color-border); color:var(--color-text-muted)">
+                              {{ $dow }}
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Calendar weeks --}}
+                @php $calendarChunks = array_chunk(array_values($calendarDays), 7); @endphp
+
+                @foreach($calendarChunks as $weekIdx => $week)
+                    @php $isLastWeek = $weekIdx === (count($calendarChunks) - 1); @endphp
+                    <div class="grid grid-cols-7">
+                        @foreach($week as $dayData)
+                            @php
+                                $isToday      = $dayData['isToday'];
+                                $inMonth      = $dayData['isCurrentMonth'];
+                                $dayTasks     = $dayData['tasks'];
+                                $taskCount    = $dayData['taskCount'];
+                                $visibleTasks = $dayTasks->take(3);
+                                $moreCount    = max(0, $taskCount - 3);
+                            @endphp
+
+                            <div class="group border-r last:border-r-0 min-h-[110px] flex flex-col {{ $isLastWeek ? '' : 'border-b' }} transition-all duration-200"
+                                 style="border-color:var(--color-border); background:{{ $isToday ? '#F0F9FF' : ($inMonth ? 'var(--color-surface)' : 'var(--color-background)') }}; {{ !$inMonth ? 'opacity: 0.5;' : '' }}"
+                                 onmouseover="{{ !$inMonth ? 'this.style.opacity=1' : '' }}"
+                                 onmouseout="{{ !$inMonth ? 'this.style.opacity=0.5' : '' }}">
+
+                                {{-- Day number --}}
+                                <div class="px-2 pt-2 pb-1 flex items-center justify-between">
+                                    <span class="inline-flex items-center justify-center text-xs font-bold rounded-full w-6 h-6"
+                                          style="{{ $isToday
+                                              ? 'background:var(--color-primary); color:#fff; box-shadow:0 1px 6px rgba(0,0,0,.2)'
+                                              : ($inMonth ? 'color:var(--color-text-main)' : 'color:var(--color-border)') }}">
+                                        {{ $dayData['dayNum'] }}
+                                    </span>
+                                    @if($taskCount > 0 && $inMonth)
+                                        <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                                              style="background:var(--color-background); color:var(--color-text-muted); border:1px solid var(--color-border)">
+                                            {{ $taskCount }}
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- Task pills --}}
+                                <div class="px-1.5 pb-1.5 flex-1 space-y-1 flex flex-col">
+                                    <div class="space-y-1">
+                                        @foreach($visibleTasks as $mTask)
+                                            @php
+                                                $mtv = $mTask->task_type->value;
+                                                [$mbg, $mbd, $mtxt] = match($mtv) {
+                                                    'survey'      => ['#e2f1f8', '#0284C7', '#075985'],
+                                                    'pemasangan'  => ['#e8f8ee', '#16A34A', '#166534'],
+                                                    'maintenance' => ['#fef7db', '#D97706', '#92400E'],
+                                                    'ambil_modem' => ['#fdeaf2', '#DB2777', '#9D174D'],
+                                                    default       => ['#CBD5E1', '#475569', '#1E293B'],
+                                                };
+                                            @endphp
+                                            <div @click="openTaskDetail({{ $mTask->id }})"
+                                                 :style="selectedTaskId === {{ $mTask->id }} ? 'border-color: var(--color-primary); box-shadow: 0 0 0 1.5px var(--color-primary); background:{{ $mbg }}' : 'background:{{ $mbg }}; border-color:{{ $mbd }}'"
+                                                 class="flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer transition-all hover:opacity-80 truncate">
+                                                @if($mTask->scheduled_at)
+                                                    <span class="text-[9px] font-mono shrink-0 font-bold" style="color:{{ $mtxt }}">{{ $mTask->scheduled_at->format('H:i') }}</span>
+                                                    <span class="text-[8px] shrink-0" style="color:var(--color-text-secondary); opacity:.4">·</span>
+                                                @endif
+                                                <span class="text-[9px] font-bold truncate leading-tight" style="color:var(--color-text-main)">
+                                                    {{ $mTask->customer?->full_name ?? $mTask->title }}
+                                                </span>
+                                            </div>
+                                        @endforeach
+
+                                        @if($moreCount > 0)
+                                            <span class="block text-[9px] font-semibold px-1.5 py-0.5 cursor-default"
+                                                  style="color:var(--color-primary)">
+                                                +{{ $moreCount }} lainnya
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    @if($inMonth)
+                                        @if(auth()->user()->hasPermission('task.create') || auth()->user()->hasPermission('task.schedule') || auth()->user()->hasPermission('task.assign.team'))
+                                        <div class="mt-auto pt-1">
+                                            <button @click="openScheduleModal('{{ $dayData['date']->format('Y-m-d') }}')"
+                                                    class="w-full text-center py-1 rounded border border-dashed text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center justify-center gap-1"
+                                                    style="border-color:var(--color-border); color:var(--color-text-muted)"
+                                                    onmouseover="this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)';this.style.background='var(--color-primary-soft)'"
+                                                    onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-muted)';this.style.background='transparent'">
+                                                <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                Task
+                                            </button>
+                                        </div>
+                                        @endif
+                                    @endif
+                                </div>
+
+                            </div>
+                        @endforeach
+                    </div>
+                @endforeach
+
+            </div>{{-- /monthly grid --}}
+
+            </div>{{-- /monthly view --}}
+
+            {{-- ══ DETAIL PANEL ══ --}}
             <div x-show="selectedTaskId" x-cloak
                  x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 translate-y-2"
+                 x-transition:enter-start="opacity-0 translate-y-3"
                  x-transition:enter-end="opacity-100 translate-y-0"
-                 class="rounded-lg border relative"
+                 class="rounded-xl border shadow-sm overflow-hidden"
                  style="background:var(--color-surface); border-color:var(--color-border)">
 
-                {{-- Header detail --}}
-                <div class="px-5 py-3 border-b flex items-center justify-between" style="border-color:var(--color-border)">
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-bold" style="color:var(--color-text-main)" x-text="selectedTask?.title"></span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                {{-- Header --}}
+                <div class="px-5 py-3.5 border-b flex items-center justify-between gap-3" style="border-color:var(--color-border); background:var(--color-background)">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--color-text-muted)">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <span class="text-sm font-bold truncate" style="color:var(--color-text-main)" x-text="selectedTask?.customer_name + ' — ' + (selectedTask?.task_type_label || '')"></span>
+                        <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold"
                               style="background:var(--color-primary-soft); color:var(--color-primary)"
                               x-text="selectedTask?.status_label"></span>
                     </div>
-                    <button @click="selectedTaskId = null; selectedTask = null"
-                            class="p-1.5 rounded cursor-pointer transition-colors"
-                            style="color:var(--color-text-muted)"
-                            onmouseover="this.style.background='var(--color-background)'"
-                            onmouseout="this.style.background='transparent'">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a :href="`/tasks/${selectedTask?.id}`"
+                           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
+                           style="border-color:var(--color-border); color:var(--color-text-secondary); background:var(--color-surface)"
+                           onmouseover="this.style.background='var(--color-background)'"
+                           onmouseout="this.style.background='var(--color-surface)'">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            Detail
+                        </a>
+                        <button @click="selectedTaskId = null; selectedTask = null"
+                                class="p-1.5 rounded-lg cursor-pointer transition-colors"
+                                style="color:var(--color-text-muted)"
+                                onmouseover="this.style.background='var(--color-background)'"
+                                onmouseout="this.style.background='transparent'">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
-                {{-- Detail body: 3 columns --}}
-                <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x" style="--tw-divide-opacity:1; border-color:var(--color-border)">
+                {{-- Body: 2 columns (info + checklist) --}}
+                <div class="grid grid-cols-1 md:grid-cols-5">
 
-                    {{-- Kolom 1: Info utama --}}
-                    <div class="p-5 space-y-3">
-                        <p class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--color-text-muted)">INFO TASK</p>
-                        <div class="space-y-2">
-                            <div class="flex justify-between text-xs">
-                                <span style="color:var(--color-text-muted)">Tim</span>
-                                <span class="font-semibold text-right" style="color:var(--color-text-main)" x-text="selectedTask?.team_names || '—'"></span>
-                            </div>
-                            <div class="flex justify-between text-xs border-t pt-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">Teknisi</span>
-                                <span class="font-semibold text-right" style="color:var(--color-text-main)" x-text="selectedTask?.team_names || '—'"></span>
-                            </div>
-                            <div class="flex justify-between text-xs border-t pt-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">Jadwal</span>
-                                <span class="font-mono text-right" style="color:var(--color-text-main)" x-text="selectedTask?.scheduled_at || '—'"></span>
-                            </div>
-                            <div class="flex justify-between text-xs border-t pt-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">Tipe</span>
-                                <span class="font-semibold uppercase text-right" style="color:var(--color-text-main)" x-text="selectedTask?.task_type_label || '—'"></span>
-                            </div>
-                        </div>
-                        <div class="pt-2">
-                            <a :href="`/tasks/${selectedTask?.id}`"
-                               class="inline-flex items-center gap-1 text-xs font-semibold underline"
-                               style="color:var(--color-primary)">
-                                Buka Halaman Task
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                            </a>
-                        </div>
-                    </div>
+                    {{-- Kiri: Info fields (3/5) --}}
+                    <div class="md:col-span-3 p-5 border-b md:border-b-0 md:border-r" style="border-color:var(--color-border)">
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-3.5">
 
-                    {{-- Kolom 2: Lokasi & pelanggan --}}
-                    <div class="p-5 space-y-3">
-                        <p class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--color-text-muted)">INFO PELANGGAN & LOKASI</p>
-                        <div class="space-y-2">
-                            <div class="text-xs border-b pb-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">Alamat Lengkap</span>
-                                <p class="font-medium mt-0.5 leading-relaxed" style="color:var(--color-text-main)" x-text="selectedTask?.customer_address || '—'"></p>
+                            <div>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:var(--color-text-muted)">Teknisi</p>
+                                <p class="text-sm font-semibold" style="color:var(--color-text-main)" x-text="selectedTask?.team_names || '—'"></p>
                             </div>
-                            <div class="text-xs border-b pb-2" style="border-color:var(--color-border)">
-                                <span style="color:var(--color-text-muted)">POP / Cabang</span>
-                                <p class="font-medium mt-0.5" style="color:var(--color-text-main)" x-text="selectedTask?.pop_name || '—'"></p>
+
+                            <div>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:var(--color-text-muted)">Jadwal</p>
+                                <p class="text-sm font-mono font-semibold" style="color:var(--color-text-main)" x-text="selectedTask?.scheduled_at || '—'"></p>
                             </div>
-                            <div class="text-xs">
-                                <span style="color:var(--color-text-muted)">No. Pelanggan</span>
-                                <p class="font-mono font-medium mt-0.5" style="color:var(--color-text-main)" x-text="selectedTask?.customer_number || '—'"></p>
+
+                            <div class="col-span-2">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:var(--color-text-muted)">Lokasi</p>
+                                <p class="text-sm font-medium leading-relaxed" style="color:var(--color-text-main)" x-text="selectedTask?.customer_address || '—'"></p>
                             </div>
+
+                            <div>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:var(--color-text-muted)">POP</p>
+                                <p class="text-sm font-medium" style="color:var(--color-text-main)" x-text="selectedTask?.pop_name || '—'"></p>
+                            </div>
+
+                            <div>
+                                <p class="text-[10px] font-semibold uppercase tracking-wider mb-1" style="color:var(--color-text-muted)">No. Pelanggan</p>
+                                <p class="text-sm font-mono font-semibold" style="color:var(--color-text-main)" x-text="selectedTask?.customer_number || '—'"></p>
+                            </div>
+
                         </div>
                     </div>
 
-                    {{-- Kolom 3: Checklist progress --}}
-                    <div class="p-5 space-y-3">
+                    {{-- Kanan: Checklist (2/5) --}}
+                    <div class="md:col-span-2 p-5 flex flex-col gap-3">
                         <div class="flex items-center justify-between">
-                            <p class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--color-text-muted)">PROGRESS CHECKLIST</p>
-                            <span class="text-xs font-mono font-bold" style="color:var(--color-success)"
+                            <p class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--color-text-muted)">Progress Checklist</p>
+                            <span class="text-xs font-mono font-bold px-2 py-0.5 rounded-full"
+                                  style="background:var(--color-success-bg); color:var(--color-success)"
                                   x-text="`${selectedTask?.checklist_completed || 0}/${selectedTask?.checklist_total || 0}`"></span>
                         </div>
 
-                        <div class="w-full rounded-full h-1.5 overflow-hidden" style="background:var(--color-background)">
+                        <div class="w-full rounded-full h-2 overflow-hidden" style="background:var(--color-background)">
                             <div class="h-full rounded-full transition-all duration-500"
                                  style="background:var(--color-success)"
-                                 :style="`width: ${(selectedTask?.checklist_completed || 0) / (selectedTask?.checklist_total || 1) * 100}%`"></div>
+                                 :style="`width: ${(selectedTask?.checklist_completed || 0) / Math.max(selectedTask?.checklist_total || 1, 1) * 100}%`"></div>
                         </div>
 
-                        <div class="space-y-1.5 max-h-36 overflow-y-auto">
+                        <div class="space-y-1 flex-1 overflow-y-auto" style="max-height:140px">
                             <template x-if="selectedTask && selectedTask.checklists && selectedTask.checklists.length > 0">
                                 <template x-for="item in selectedTask.checklists" :key="item.id">
-                                    <div class="flex items-start gap-2 py-1.5 border-b text-xs"
-                                         style="border-color:var(--color-border)">
+                                    <label class="flex items-start gap-2 py-1.5 border-b text-xs cursor-pointer"
+                                           style="border-color:var(--color-border)">
                                         <input type="checkbox"
                                                :checked="item.is_checked"
                                                @change="toggleChecklist(selectedTask.id, item)"
-                                               class="mt-0.5 cursor-pointer rounded"
+                                               class="mt-0.5 cursor-pointer rounded shrink-0"
                                                style="accent-color:var(--color-success)">
                                         <span :class="item.is_checked ? 'line-through' : ''"
                                               :style="item.is_checked ? 'color:var(--color-text-muted)' : 'color:var(--color-text-main)'"
                                               x-text="item.item"></span>
-                                    </div>
+                                    </label>
                                 </template>
                             </template>
                             <template x-if="!selectedTask || !selectedTask.checklists || selectedTask.checklists.length === 0">
@@ -431,7 +598,7 @@
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
 
-        <div class="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
+        <div class="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden rounded-2xl shadow-2xl"
              style="background:var(--color-surface); border:1px solid var(--color-border)"
              @click.outside="closeScheduleModal()">
 
@@ -604,7 +771,7 @@
 
 @push('scripts')
 <script>
-function fopCalendarHandler() {
+function fopCalendarHandler(initViewMode) {
     const fallbackTemplates = {
         'survey':      ['Cek koordinat lokasi & ODP terdekat', 'Pengukuran jarak tarik kabel dropcore', 'Cek redaman & kapasitas port ODP', 'Foto dokumentasi lokasi pelanggan'],
         'pemasangan':  ['Penarikan kabel dropcore dari ODP ke rumah', 'Pemasangan roset & konektor fiber', 'Instalasi & aktivasi Modem ONT/Router', 'Edukasi penggunaan internet ke pelanggan', 'Foto bukti speedtest & modem'],
@@ -621,7 +788,7 @@ function fopCalendarHandler() {
         selectedTeamId:   null,
         selectedTaskId:   null,
         selectedTask:     null,
-        viewMode:         'weekly',
+        viewMode:         initViewMode || 'weekly',
         showScheduleModal: false,
 
         scheduleForm: {

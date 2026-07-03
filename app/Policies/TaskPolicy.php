@@ -83,6 +83,9 @@ class TaskPolicy
      */
     public function schedule(User $user, Task $task): bool
     {
+        if ($user->hasPermission('task.schedule') || $user->hasPermission('task.assign.team') || $user->hasPermission('task.create') || $user->hasPermission('task.edit')) {
+            return $task->status->isEditable();
+        }
         return $this->canTransitionTo($user, $task, 'terjadwal') && $task->status->isEditable();
     }
 
@@ -123,7 +126,7 @@ class TaskPolicy
      */
     public function fopReject(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'rejected') && $task->status->value === 'pending';
+        return $user->hasPermission('task.reject') && $task->status->value === 'pending';
     }
 
     /**
@@ -131,7 +134,7 @@ class TaskPolicy
      */
     public function fopPending(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'pending') && in_array($task->status->value, ['terjadwal', 'in_progress']);
+        return $user->hasPermission('task.status.pending') && in_array($task->status->value, ['terjadwal', 'in_progress']);
     }
 
     /**
@@ -149,7 +152,15 @@ class TaskPolicy
      */
     public function statusStart(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'in_progress') && $task->isMember($user->id);
+        $canTransition = $this->canTransitionTo($user, $task, 'in_progress');
+        
+        $statusValue = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
+
+        if (!$canTransition && ($user->hasPermission('task.status.start') || $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value)) {
+            $canTransition = in_array($statusValue, ['terjadwal', 'pending']);
+        }
+
+        return $canTransition && $task->isMember($user->id);
     }
 
     /**
@@ -157,7 +168,11 @@ class TaskPolicy
      */
     public function statusComplete(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'selesai') && $task->isMember($user->id);
+        $canTransition = $this->canTransitionTo($user, $task, 'selesai');
+        if (!$canTransition && $task->status === \App\Enums\TaskStatus::PENDING && in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])) {
+            $canTransition = true;
+        }
+        return $canTransition && $task->isMember($user->id);
     }
 
     /**
@@ -165,7 +180,7 @@ class TaskPolicy
      */
     public function statusPending(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'pending') && $task->isMember($user->id);
+        return $user->hasPermission('task.status.pending') && $task->isMember($user->id);
     }
 
     /**
@@ -173,7 +188,7 @@ class TaskPolicy
      */
     public function updateChecklist(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.checklist.update') && $task->isMember($user->id);
+        return $task->isMember($user->id) || $user->hasPermission('task.checklist.update') || $user->hasPermission('task.edit');
     }
 
     /**

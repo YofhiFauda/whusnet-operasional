@@ -173,12 +173,7 @@
                     @endcan
                 </div>
 
-                {{-- Batas 4 task/tim --}}
-                <div x-show="teamLimitWarning"
-                     class="mb-3 px-3 py-2 rounded-md border text-xs"
-                     style="background:var(--color-error-bg); border-color:var(--color-error-border); color:var(--color-error)">
-                    Tim ini sudah memiliki 4 task aktif pada tanggal tersebut.
-                </div>
+
 
                 <div class="border border-border rounded-md divide-y divide-border overflow-hidden">
                     @forelse($teknisiList as $teknisi)

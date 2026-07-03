@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\DB;
 
 class TaskService
 {
-    private const MAX_ACTIVE_TASKS_PER_TEAM_PER_DAY = 4;
-
     // ─── Pembuatan Task ──────────────────────────────────────────
 
     /**
@@ -128,20 +126,37 @@ class TaskService
      */
     public function scheduleTask(Task $task, array $data, User $actor): Task
     {
+        $schedulableStatuses = [
+            TaskStatus::PENDING,
+            TaskStatus::DRAFT,
+            TaskStatus::WAITING_SURVEY,
+            TaskStatus::WAITING_INSTALLATION,
+            TaskStatus::WAITING_INSTALLATIONS,
+        ];
         abort_unless(
-            $task->status === TaskStatus::PENDING,
+            in_array($task->status, $schedulableStatuses),
             422,
-            'Hanya tiket dalam antrean (Pending) yang dapat dijadwalkan.'
+            'Hanya tiket dalam antrean yang dapat dijadwalkan.'
         );
 
         return DB::transaction(function () use ($task, $data, $actor) {
             $oldValues = $task->toArray();
 
-            $task->update([
+            $updateData = [
                 'scheduled_at' => $data['scheduled_at'],
                 'status'       => TaskStatus::TERJADWAL->value,
                 'updated_by'   => $actor->id,
-            ]);
+            ];
+            if (!empty($data['sla_minutes'])) {
+                $updateData['sla_minutes'] = (int) $data['sla_minutes'];
+            }
+            if (!empty($data['team_name'])) {
+                $title = $task->title;
+                if (!str_starts_with($title, '[')) {
+                    $updateData['title'] = '[' . trim($data['team_name']) . '] ' . $title;
+                }
+            }
+            $task->update($updateData);
 
             $memberIds = $data['team_member_ids'] ?? [];
             $task->teamMembers()->delete();
@@ -154,13 +169,19 @@ class TaskService
             }
 
             // Parse checklist
-            $items = array_filter(
-                array_map('trim',
-                    preg_split('/[\r\n,]+/', $data['checklist_items'] ?? '')
-                )
-            );
+            $rawItems = $data['checklist_items'] ?? [];
+            if (is_array($rawItems)) {
+                $items = array_filter(array_map('trim', $rawItems));
+            } else {
+                $items = array_filter(
+                    array_map('trim',
+                        preg_split('/[\r\n]+/', (string) $rawItems)
+                    )
+                );
+            }
             
             $sort = 1;
+            $task->checklists()->delete();
             foreach ($items as $item) {
                 \App\Models\TaskChecklist::create([
                     'task_id' => $task->id,
@@ -192,6 +213,28 @@ class TaskService
             'Task hanya bisa dimulai dari status Terjadwal.'
         );
 
+        abort_unless(
+            $task->scheduled_at && !$task->scheduled_at->startOfDay()->isFuture(),
+            422,
+            'Task hanya bisa dimulai pada atau setelah hari yang dijadwalkan.'
+        );
+
+        $memberIds = $task->teamMembers()->pluck('user_id')->toArray();
+        if (!in_array($actor->id, $memberIds)) {
+            $memberIds[] = $actor->id;
+        }
+
+        $activeTask = Task::where('id', '!=', $task->id)
+            ->where('status', TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
+            ->first();
+
+        abort_if(
+            $activeTask !== null,
+            422,
+            "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu."
+        );
+
         $task->update([
             'status'     => TaskStatus::IN_PROGRESS->value,
             'started_at' => now(),
@@ -211,16 +254,23 @@ class TaskService
     public function complete(Task $task, User $actor): Task
     {
         abort_unless(
-            $task->status === TaskStatus::IN_PROGRESS,
+            in_array($task->status, [TaskStatus::IN_PROGRESS, TaskStatus::PENDING]),
             422,
-            'Task hanya bisa diselesaikan dari status In Progress.'
+            'Task hanya bisa diselesaikan dari status In Progress atau Pending.'
         );
 
         abort_unless(
             $task->canComplete(),
             422,
-            'Semua checklist wajib harus dicentang dan minimal 1 foto bukti harus diupload.'
+            'Syarat penyelesaian task belum terpenuhi.'
         );
+
+        // Otomatis tandai checklist selesai jika masih ada yang belum dicentang
+        $task->checklists()->where('is_checked', false)->update([
+            'is_checked' => true,
+            'checked_at' => now(),
+            'checked_by' => $actor->id,
+        ]);
 
         $task->update([
             'status'            => TaskStatus::SELESAI->value,
@@ -268,11 +318,41 @@ class TaskService
             'Task hanya bisa di-pending dari status In Progress.'
         );
 
-        $task->update([
-            'status'         => TaskStatus::PENDING->value,
-            'pending_reason' => $reason,
-            'updated_by'     => $actor->id,
-        ]);
+        DB::transaction(function () use ($task, $reason, $actor) {
+            $task->update([
+                'status'         => TaskStatus::PENDING->value,
+                'pending_reason' => $reason,
+                'updated_by'     => $actor->id,
+            ]);
+
+            // Stop the timer on CustomerSurvey or CustomerInstallation if task type is survey or pemasangan
+            if ($task->customer_id) {
+                if ($task->task_type === \App\Enums\TaskType::SURVEY) {
+                    $survey = \App\Models\CustomerSurvey::where('customer_id', $task->customer_id)
+                        ->latest()
+                        ->first();
+                    if ($survey && $survey->started_at && !$survey->completed_at) {
+                        $completedAt = now();
+                        $survey->completed_at = $completedAt;
+                        $survey->duration_minutes = $survey->started_at->diffInMinutes($completedAt);
+                        $survey->end_date = $completedAt->toDateString();
+                        $survey->end_time = $completedAt->toTimeString();
+                        $survey->save();
+                    }
+                } elseif ($task->task_type === \App\Enums\TaskType::PEMASANGAN) {
+                    $installation = \App\Models\CustomerInstallation::where('customer_id', $task->customer_id)
+                        ->latest()
+                        ->first();
+                    if ($installation && $installation->started_at && !$installation->completed_at) {
+                        $completedAt = now();
+                        $installation->completed_at = $completedAt;
+                        $installation->end_time = $completedAt->toTimeString();
+                        $installation->finished_date = $completedAt->toDateString();
+                        $installation->save();
+                    }
+                }
+            }
+        });
 
         return $task->refresh();
     }
@@ -350,29 +430,19 @@ class TaskService
         $conflicts = $this->detectConflicts($userIdsToCheck, $targetScheduledAt, (int) $task->sla_minutes, $task->id);
         if (count($conflicts) > 0) {
             $conflict = collect($conflicts)->first();
-            throw new \Exception("Teknisi memiliki jadwal yang bentrok: Task {$conflict['task_number']} pada {$conflict['scheduled_at']}.");
-        }
-
-        // Validate max active tasks limit
-        $scheduleDate = Carbon::parse($targetScheduledAt)->format('Y-m-d');
-        if ($scheduleChanged) {
-            if (!$this->teamCanAddTask($userIdsToCheck, $scheduleDate)) {
-                throw new \Exception("Tim ini sudah memiliki " . self::MAX_ACTIVE_TASKS_PER_TEAM_PER_DAY . " task aktif pada tanggal tersebut.");
-            }
-        } else {
-            if (!$this->teamCanAddTask([$newUserId], $scheduleDate)) {
-                throw new \Exception("Teknisi baru sudah memiliki " . self::MAX_ACTIVE_TASKS_PER_TEAM_PER_DAY . " task aktif pada tanggal tersebut.");
-            }
+            $taskNum = $conflict?->task?->task_number ?? 'Task';
+            $sched = $conflict?->task?->scheduled_at ?? $targetScheduledAt;
+            throw new \Exception("Teknisi memiliki jadwal yang bentrok: {$taskNum} pada {$sched}.");
         }
 
         // Check if old user is in the team
-        $teamMember = $task->teamMembers()->where('user_id', $oldUserId)->first();
-        if (!$teamMember) {
+        $hasMember = $task->teamMembers()->where('user_id', $oldUserId)->exists();
+        if (!$hasMember) {
             throw new \Exception("Teknisi lama tidak ditemukan dalam tim task ini.");
         }
 
         // Update the team member ID
-        $teamMember->update(['user_id' => $newUserId]);
+        $task->teamMembers()->where('user_id', $oldUserId)->update(['user_id' => $newUserId]);
 
         // If schedule changed, update task's scheduled_at
         if ($scheduleChanged) {
@@ -386,10 +456,12 @@ class TaskService
             ]);
         }
 
-        // Log the change
-        $reassigner = \App\Models\User::find($reassignerId);
-        $oldUser = \App\Models\User::find($oldUserId);
-        $newUser = \App\Models\User::find($newUserId);
+        // Log the change — batch-load all relevant users to avoid N+1
+        $allUserIds = array_unique(array_filter(array_merge([$reassignerId, $oldUserId, $newUserId], $otherUserIds)));
+        $usersById = \App\Models\User::whereIn('id', $allUserIds)->get()->keyBy('id');
+        $reassigner = $usersById->get($reassignerId);
+        $oldUser = $usersById->get($oldUserId);
+        $newUser = $usersById->get($newUserId);
 
         \App\Models\AuditLog::log(
             $task,
@@ -435,10 +507,10 @@ class TaskService
         // Notify remaining team members if schedule changed
         if ($scheduleChanged && count($otherUserIds) > 0) {
             $formattedTime = Carbon::parse($targetScheduledAt)->format('d M Y H:i');
+            $url = route('tasks.show', $task->id);
             foreach ($otherUserIds as $otherId) {
-                $otherUser = \App\Models\User::find($otherId);
+                $otherUser = $usersById->get($otherId);
                 if ($otherUser) {
-                    $url = route('tasks.show', $task->id);
                     $otherUser->notify(new \App\Notifications\AppNotification(
                         title: 'Jadwal Task Diperbarui: ' . $task->task_number,
                         message: "Jadwal task diubah ke {$formattedTime}.",
@@ -493,17 +565,11 @@ class TaskService
     }
 
     /**
-     * Validasi batas 4 task aktif per tim per hari.
-     * Returns true jika masih bisa ditambah.
+     * Validasi batas task aktif per tim per hari (dihilangkan batas hariannya).
      */
     public function teamCanAddTask(array $userIds, string $date): bool
     {
-        $activeCount = Task::where('scheduled_at', 'like', Carbon::parse($date)->format('Y-m-d') . '%')
-            ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $userIds))
-            ->count();
-
-        return $activeCount < self::MAX_ACTIVE_TASKS_PER_TEAM_PER_DAY;
+        return true;
     }
 
     // ─── Helper ──────────────────────────────────────────────────
@@ -511,7 +577,10 @@ class TaskService
     private function generateTaskNumber(): string
     {
         $year  = date('Y');
-        $count = Task::whereYear('created_at', $year)->count() + 1;
+        $count = Task::whereBetween('created_at', [
+            Carbon::createFromDate($year)->startOfYear(),
+            Carbon::createFromDate($year)->endOfYear(),
+        ])->count() + 1;
         return sprintf('TASK-%s-%04d', $year, $count);
     }
 

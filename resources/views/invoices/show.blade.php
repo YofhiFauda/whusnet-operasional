@@ -44,9 +44,16 @@
                 <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Informasi Tagihan</h2>
                 <p class="text-xs text-slate-500 mt-1">Snapshot tagihan berdasarkan layanan pelanggan saat invoice dibuat.</p>
             </div>
-            <span class="px-2.5 py-1 text-xs font-bold rounded-full border {{ $badgeClass }}">
-                {{ ucwords(str_replace('_', ' ', $invoice->invoice_status)) }}
-            </span>
+            <div class="flex items-center gap-2">
+                @if($invoice->invoice_type)
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-indigo-50 text-indigo-700 border-indigo-100">
+                    {{ $invoice->invoice_type->label() }}
+                </span>
+                @endif
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full border {{ $badgeClass }}">
+                    {{ ucwords(str_replace('_', ' ', $invoice->invoice_status)) }}
+                </span>
+            </div>
         </div>
 
         <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5 text-sm">
@@ -75,6 +82,35 @@
                 <p class="text-slate-900 mt-1">{{ $invoice->pop->name ?? '-' }}</p>
             </div>
         </div>
+
+        @if($invoice->old_invoice_id || $invoice->old_cost_id || $invoice->old_request_id)
+        <div class="border-t border-slate-100 bg-sky-50/50 p-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-bold">i</span>
+                <h3 class="text-xs font-bold text-sky-900 uppercase tracking-wider">Audit Visibilitas Data Migrasi</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                @if($invoice->old_invoice_id)
+                <div>
+                    <span class="text-slate-500 block">ID Invoice Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $invoice->old_invoice_id }}</span>
+                </div>
+                @endif
+                @if($invoice->old_cost_id)
+                <div>
+                    <span class="text-slate-500 block">ID Biaya Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $invoice->old_cost_id }}</span>
+                </div>
+                @endif
+                @if($invoice->old_request_id)
+                <div>
+                    <span class="text-slate-500 block">ID Permintaan Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $invoice->old_request_id }}</span>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
 
         <div class="border-t border-slate-100 p-6">
             <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">Rincian Biaya</h3>

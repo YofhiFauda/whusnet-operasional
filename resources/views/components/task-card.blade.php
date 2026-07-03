@@ -126,8 +126,60 @@
 
     </a>
 @else
+    {{-- SLA Priority calculation (survey & pemasangan only) --}}
+    @php
+        $slaBarColor  = null;
+        $slaBadgeBg   = null;
+        $slaBadgeTxt  = null;
+        $slaPctLabel  = null;
+        $showSlaBadge = in_array($taskArr['task_type'], ['survey', 'pemasangan'])
+                        && in_array($taskArr['status'], ['terjadwal', 'in_progress', 'pending', 'selesai'])
+                        && ($taskArr['sla_minutes'] ?? 0) > 0;
+
+        if ($showSlaBadge) {
+            $slaMin = (int) $taskArr['sla_minutes'];
+
+            if ($taskArr['status'] === 'terjadwal') {
+                // Belum mulai — SLA penuh
+                $slaBarColor = 'var(--color-success)';
+                $slaBadgeBg  = 'var(--color-success-bg)';
+                $slaBadgeTxt = 'var(--color-success)';
+                $slaPctLabel = '100%';
+            } elseif (!empty($taskArr['started_at'])) {
+                $startTime   = \Carbon\Carbon::parse($taskArr['started_at']);
+                $endTime     = !empty($taskArr['completed_at'])
+                                ? \Carbon\Carbon::parse($taskArr['completed_at'])
+                                : now();
+                $elapsedMin  = (int) $startTime->diffInMinutes($endTime, false);
+                $pct         = (($slaMin - $elapsedMin) / $slaMin) * 100;
+
+                if ($pct >= 75) {
+                    $slaBarColor = 'var(--color-success)';
+                    $slaBadgeBg  = 'var(--color-success-bg)';
+                    $slaBadgeTxt = 'var(--color-success)';
+                } elseif ($pct >= 25) {
+                    $slaBarColor = 'var(--color-warning)';
+                    $slaBadgeBg  = 'var(--color-warning-bg)';
+                    $slaBadgeTxt = 'var(--color-warning)';
+                } else {
+                    $slaBarColor = 'var(--color-error)';
+                    $slaBadgeBg  = 'var(--color-error-bg)';
+                    $slaBadgeTxt = 'var(--color-error)';
+                }
+
+                $pctRounded  = round($pct);
+                $slaPctLabel = $pctRounded > 0 ? "{$pctRounded}%" : 'Lewat';
+            }
+        }
+    @endphp
+
     {{-- List row card (new, minimal) --}}
-    <div class="bg-surface border border-border rounded-lg p-3 hover:shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="bg-surface border border-border rounded-lg overflow-hidden hover:shadow-sm transition-all flex">
+        {{-- SLA priority stripe --}}
+        @if($slaBarColor)
+        <div class="w-1 shrink-0" style="background:{{ $slaBarColor }}"></div>
+        @endif
+        <div class="flex-1 p-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex-1">
             <div class="flex items-center gap-2 mb-1">
                 <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-surface-muted text-text-secondary border border-border">
@@ -173,10 +225,12 @@
         </div>
 
         <div class="flex flex-col md:items-end gap-2 shrink-0">
-            @if($taskArr['is_over_sla'] && !in_array($taskArr['status'], ['selesai', 'dibatalkan']))
-                <span class="text-[10px] font-semibold px-2 py-1 rounded"
-                      style="background:var(--color-error-bg); color:var(--color-error)">
-                    SLA Lewat
+            {{-- SLA Priority Badge --}}
+            @if($showSlaBadge && $slaBadgeBg)
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1"
+                      style="background:{{ $slaBadgeBg }}; color:{{ $slaBadgeTxt }}; border-color:{{ $slaBarColor }}">
+                    <span class="inline-block w-1.5 h-1.5 rounded-full" style="background:{{ $slaBarColor }}"></span>
+                    SLA {{ $slaPctLabel }}
                 </span>
             @endif
 
@@ -201,5 +255,6 @@
                 </svg>
             </a>
         </div>
+        </div>{{-- /flex-1 inner --}}
     </div>
 @endif

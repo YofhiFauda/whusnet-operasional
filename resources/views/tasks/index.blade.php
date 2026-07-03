@@ -32,7 +32,8 @@
             <div>
                 <label class="block text-xs font-semibold text-text-muted uppercase tracking-widest mb-1.5">Status</label>
                 <select name="status" class="w-full text-sm border border-border rounded bg-background px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none">
-                    <option value="">Semua Status</option>
+                    <option value="">Semua Status Aktif</option>
+                    <option value="all" {{ request('status') === 'all' ? 'selected' : '' }}>Semua Status (Termasuk Selesai & Batal)</option>
                     @foreach($statuses as $status)
                         <option value="{{ $status->value }}" {{ request('status') === $status->value ? 'selected' : '' }}>{{ $status->label() }}</option>
                     @endforeach

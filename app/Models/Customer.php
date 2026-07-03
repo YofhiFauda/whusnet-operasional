@@ -210,6 +210,11 @@ class Customer extends Model
         return $this->hasMany(Task::class);
     }
 
+    public function fopTasks(): HasMany
+    {
+        return $this->hasMany(FopTask::class);
+    }
+
     /**
      * Get the latest survey.
      * 

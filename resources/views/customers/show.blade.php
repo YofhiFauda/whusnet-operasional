@@ -202,6 +202,7 @@
             <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Tagihan</button>
             <button onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Pembayaran</button>
             <button onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Dokumen</button>
+            <button onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Riwayat Ticketing</button>
             <button onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Riwayat Perubahan</button>
             @if($customer->customerTechnicalDetail)
             <button onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer whitespace-nowrap">Detail Teknis Lama</button>
@@ -1085,15 +1086,14 @@
                 @endif
             </div>
 
-            <!-- Tab 10: Riwayat Perubahan -->
+            <!-- Tab: Riwayat Ticketing -->
+            <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6">
+                @include('customers.tabs._riwayat_ticketing')
+            </div>
+
+            <!-- Tab: Riwayat Perubahan -->
             <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6">
-                <div class="py-12 text-center text-slate-400">
-                    <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h4 class="text-sm font-semibold text-slate-700">Belum ada riwayat perubahan data</h4>
-                    <p class="text-xs text-slate-500 mt-1">Audit log umum (Sprint 8) belum aktif pada sistem operasional.</p>
-                </div>
+                @include('customers.tabs._riwayat_perubahan')
             </div>
 
             @if($customer->customerTechnicalDetail)

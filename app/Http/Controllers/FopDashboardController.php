@@ -77,7 +77,7 @@ class FopDashboardController extends Controller
                   ->orderByDesc('completed_at')
                   ->limit(1);
             },
-            'teamMembers.user',
+            'tasks.teamMembers.user',
         ])
         ->when(!empty($allowedPopIds), fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
         ->whereIn('status', ['waiting_acc', 'surveyed'])
@@ -172,7 +172,7 @@ class FopDashboardController extends Controller
         $overdueInstallation = Customer::when(!empty($allowedPopIds), fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
             ->whereHas('tasks', function ($q) {
-                $q->where('task_type', 'survey')
+                $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
                   ->where('status', 'selesai')
                   ->whereRaw('DATE_ADD(completed_at, INTERVAL 3 DAY) < NOW()');
             })
@@ -191,6 +191,32 @@ class FopDashboardController extends Controller
         // ── Teknisi di POP yang sama (static, real-time di T009) ────
         $teknisiList = $this->getTeknisiList($user, $allowedPopIds, $today);
 
+        // ── Tim Gabungan Aktif Hari Ini ──────────────────────────────
+        $activeTeams = Task::with(['customer', 'pop', 'teamMembers.user'])
+            ->applyUserScope($user)
+            ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+            ->whereDate('scheduled_at', $today)
+            ->has('teamMembers', '>', 1)
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(function ($task) {
+                $teamName = 'Tim Gabungan';
+                if (preg_match('/^\[(.*?)\]/', $task->title, $matches)) {
+                    $teamName = $matches[1];
+                }
+
+                return [
+                    'task_id'       => $task->id,
+                    'team_name'     => $teamName,
+                    'members'       => $task->teamMembers->map(fn($m) => $m->user?->name)->filter()->toArray(),
+                    'task_title'    => preg_replace('/^\[.*?\]\s*/', '', $task->title),
+                    'task_type'     => $task->task_type->label(),
+                    'address'       => $task->customer?->address ?? '—',
+                    'status'        => $task->status->label(),
+                    'status_color'  => $task->status->value === TaskStatus::IN_PROGRESS->value ? 'warning' : 'info',
+                ];
+            });
+
         // ── POPs untuk filter (opsional) ────────────────────────────
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
 
@@ -199,6 +225,7 @@ class FopDashboardController extends Controller
             'surveyQueue',
             'stats',
             'teknisiList',
+            'activeTeams',
             'pops',
         ));
     }

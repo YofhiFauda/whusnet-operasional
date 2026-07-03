@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(CustomerSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(WorkflowTransitionPermissionSeeder::class);
+        $this->call(TaskFeatureSeeder::class);
 
         // User::factory(10)->create();
 

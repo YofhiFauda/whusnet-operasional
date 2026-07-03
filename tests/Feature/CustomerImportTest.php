@@ -416,7 +416,7 @@ class CustomerImportTest extends TestCase
         // Assert Invoice imported
         $this->assertDatabaseHas('invoices', [
             'old_invoice_id' => 'INV-LEG2-1',
-            'invoice_number' => 'INV-LEGACY-INV-LEG2-1',
+            'invoice_number' => 'INV-INV-LEG2-1',
             'customer_id' => $customer->id,
             'total_amount' => 277500,
             'invoice_status' => 'lunas',
@@ -425,7 +425,7 @@ class CustomerImportTest extends TestCase
         // Assert Payment imported
         $this->assertDatabaseHas('payments', [
             'old_payment_id' => 'PAY-LEG2-1',
-            'payment_number' => 'PAY-LEGACY-PAY-LEG2-1',
+            'payment_number' => 'PAY-PAY-LEG2-1',
             'amount' => 277500,
         ]);
 

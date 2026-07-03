@@ -24,7 +24,7 @@ Weekly calendar grid view untuk FOP task scheduling dan team management.
 │  Tim Aktif   │  Calendar Grid     │Det │
 │  (Sidebar)   │  (7 columns)       │ail │
 │              │                    │Pan │
-│              │  Sen Sel Rab Kam   │ el │
+│              │  Sen Sel Rab Kam   │ el │  
 │              │  [T] [T] [T] [T]   │    │
 │              │  ... ... ... ...    │    │
 └──────────────┴────────────────────┴────┘

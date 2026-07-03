@@ -41,7 +41,15 @@ class TaskController extends Controller
 
         // Filter: Status
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            if ($request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+        } else {
+            // Default (first visit or selecting empty "Semua Status Aktif"): Exclude Selesai & Dibatalkan
+            $query->whereNotIn('status', [
+                \App\Enums\TaskStatus::SELESAI->value,
+                \App\Enums\TaskStatus::DIBATALKAN->value
+            ]);
         }
 
         // Filter: Tipe
@@ -109,9 +117,12 @@ class TaskController extends Controller
         $user = auth()->user();
         $today = Carbon::today();
 
-        $tasks = Task::with(['customer', 'pop', 'checklists', 'evidences', 'fop'])
+        $tasks = Task::with(['customer', 'pop', 'checklists', 'evidences', 'fop', 'teamMembers'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
-            ->whereDate('scheduled_at', $today)
+            ->where(function ($q) use ($today) {
+                $q->whereDate('scheduled_at', $today)
+                  ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value]);
+            })
             ->orderBy('scheduled_at')
             ->get();
 
@@ -119,6 +130,7 @@ class TaskController extends Controller
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->whereDate('scheduled_at', '>', $today)
             ->whereIn('status', [TaskStatus::TERJADWAL->value])
+            ->whereNotIn('id', $tasks->pluck('id'))
             ->orderBy('scheduled_at')
             ->limit(5)
             ->get();
@@ -142,7 +154,7 @@ class TaskController extends Controller
 
         abort_if(!$isMember, 403, 'Anda bukan anggota task ini.');
 
-        $task->load(['customer', 'pop', 'checklists', 'evidences']);
+        $task->load(['customer', 'pop', 'checklists', 'evidences', 'teamMembers']);
 
         return view('tasks.partials.own-card', compact('task'));
     }
@@ -219,14 +231,6 @@ class TaskController extends Controller
                 // Cek apakah user punya izin override
                 $this->authorize('conflictOverride', Task::class);
             }
-
-            // Validasi batas 4 task/tim/hari
-            $scheduleDate = Carbon::parse($scheduledAt)->format('Y-m-d');
-            if (!$this->taskService->teamCanAddTask($memberIds, $scheduleDate)) {
-                return back()->withInput()->withErrors([
-                    'team' => 'Tim ini sudah memiliki ' . self::MAX_LIMIT_LABEL . ' task aktif pada tanggal tersebut.',
-                ]);
-            }
         }
 
         $task = $this->taskService->create($validated, $user);
@@ -279,16 +283,10 @@ class TaskController extends Controller
             $this->authorize('conflictOverride', Task::class);
         }
 
-        $scheduleDate = Carbon::parse($validated['scheduled_at'])->format('Y-m-d');
-        if (!$this->taskService->teamCanAddTask($validated['team_member_ids'], $scheduleDate)) {
-            return back()->withErrors([
-                'team' => 'Tim ini sudah memiliki ' . self::MAX_LIMIT_LABEL . ' task aktif pada tanggal tersebut.',
-            ]);
-        }
 
         $this->taskService->scheduleTask($task, $validated, $user);
 
-        return redirect()->back()->with('success', "Tiket [{$task->task_number}] berhasil dijadwalkan ke tim teknisi.");
+        return redirect()->back(fallback: route('fop.calendar'))->with('success', "Tiket [{$task->task_number}] berhasil dijadwalkan ke tim teknisi.");
     }
 
     /**
@@ -298,9 +296,33 @@ class TaskController extends Controller
     {
         $this->authorize('view', $task);
 
-        $task->load(['customer.village', 'customer.district', 'customer.city', 'pop', 'fop', 'teamMembers.user', 'checklists.checkedByUser', 'evidences.uploader']);
+        $task->load([
+            'customer.village',
+            'customer.district',
+            'customer.city',
+            'customer.customerAddress',
+            'customer.customerService.internetPackage',
+            'customer.latestSurvey',
+            'customer.customerDevice',
+            'customer.customerTechnicalDetail',
+            'pop',
+            'fop',
+            'teamMembers.user',
+            'checklists.checkedByUser',
+            'evidences.uploader',
+        ]);
 
-        return view('tasks.show', compact('task'));
+        $recentMaintenanceTasks = collect();
+        if ($task->customer_id) {
+            $recentMaintenanceTasks = Task::where('customer_id', $task->customer_id)
+                ->where('id', '!=', $task->id)
+                ->where('task_type', TaskType::MAINTENANCE->value)
+                ->latest('scheduled_at')
+                ->take(3)
+                ->get();
+        }
+
+        return view('tasks.show', compact('task', 'recentMaintenanceTasks'));
     }
 
     /**
@@ -447,22 +469,28 @@ class TaskController extends Controller
         $q    = $request->query('q', '');
         $user = auth()->user();
 
-        $customers = Customer::applyUserScope($user)
+        $customers = Customer::with('village')->applyUserScope($user)
             ->where(function ($query) use ($q) {
                 $query->where('full_name', 'like', "%{$q}%")
                       ->orWhere('cid', 'like', "%{$q}%")
                       ->orWhere('customer_code', 'like', "%{$q}%");
             })
             ->whereIn('status', ['active', 'siap_billing'])
-            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id')
+            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id', 'village_id')
             ->limit(10)
             ->get();
 
-        return response()->json($customers->map(fn ($c) => [
-            'id'       => $c->id,
-            'label'    => "{$c->full_name} — {$c->cid}",
-            'pop_id'   => $c->pop_id,
-        ]));
+        return response()->json($customers->map(function ($c) {
+            $desa = $c->village ? strtoupper($c->village->name) : 'NODESA';
+            $cid = $c->cid ?: $c->customer_code;
+            $nama = strtoupper($c->full_name);
+            
+            return [
+                'id'       => $c->id,
+                'label'    => "{$cid}_{$desa}_{$nama}",
+                'pop_id'   => $c->pop_id,
+            ];
+        }));
     }
 
     /**
@@ -729,6 +757,7 @@ class TaskController extends Controller
 
     private function notifyTeamMembers(Task $task, string $title, string $message, string $type = 'info'): void
     {
+        $task->loadMissing('teamMembers.user');
         $url = route('tasks.show', $task->id);
         foreach ($task->teamMembers as $member) {
             if ($member->user) {
@@ -743,8 +772,6 @@ class TaskController extends Controller
             }
         }
     }
-
-    private const MAX_LIMIT_LABEL = '4';
 }
 
 

@@ -1,11 +1,13 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
-Current Module: Task Notification History & Management
-Current Task: S8.10-T003 — FOP Notification Dashboard
+Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1 & BATCH 2)
+Current Task: MIGRASI-T002 — Perbaikan Tagihan Legacy BATCH 2 (Done)
 
+> **S8.10-T003 (FOP Notification Dashboard):** ⏸️ PAUSED — Siap dilanjutkan setelah BATCH 1 & BATCH 2 selesai
 > **Sprint 8.9 Tasks:** T001–T006 (Done)
 > **Sebelumnya:** Sprint 8.4 SELESAI, Sprint 8.5–8.8 ada issues (Calendar unnecessary, Missing Quality Gate, Missing Checklist)
 > **Analisa Koreksi:** `memory/S8_architecture_correction.md` — Reinterpretasi brief, architecture breakdown, action items
+> **Analisa Migrasi:** `docs/ANALISA_KELENGKAPAN_MIGRASI_jetis_db.MD` — Gap field teknis yang belum terimplementasi
 
 ---
 

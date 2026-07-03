@@ -30,17 +30,55 @@ class FopCalendarController extends Controller
         $allowedPopIds = $this->accessService->getAllowedPopIds($user);
 
         // Default: minggu ini
+        $viewMode  = $request->input('view_mode', 'weekly');
         $startDate = Carbon::parse($request->input('start_date', Carbon::now()->startOfWeek(Carbon::MONDAY)));
         $endDate   = $startDate->copy()->endOfWeek(Carbon::SUNDAY);
 
-        // ── Summary Stats ────────────────────────────────────────────
+        // ── Monthly boundaries ────────────────────────────────────────
+        $monthStart     = $startDate->copy()->startOfMonth();
+        $monthEnd       = $monthStart->copy()->endOfMonth();
+        $monthName      = $monthStart->translatedFormat('F Y');
+        $prevMonthStart = $monthStart->copy()->subMonth()->format('Y-m-d');
+        $nextMonthStart = $monthStart->copy()->addMonth()->format('Y-m-d');
+
+        // ── Load semua task bulan ini sekali (bulk query) ─────────────
+        $allMonthTasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'pop', 'teamMembers.user', 'checklists'])
+            ->applyUserScope($user)
+            ->whereBetween('scheduled_at', [$monthStart->copy()->startOfDay(), $monthEnd->copy()->endOfDay()])
+            ->orderBy('scheduled_at')
+            ->get();
+
+        $monthTasksByDate = $allMonthTasks->groupBy(fn($t) => $t->scheduled_at->format('Y-m-d'));
+
+        // ── Calendar grid dengan padding minggu (Senin–Minggu) ────────
+        $calendarStart = $monthStart->copy()->startOfWeek(Carbon::MONDAY);
+        $calendarEnd   = $monthEnd->copy()->endOfWeek(Carbon::SUNDAY);
+        $calendarDays  = [];
+        $cur           = $calendarStart->copy();
+        while ($cur->lte($calendarEnd)) {
+            $dk = $cur->format('Y-m-d');
+            $calendarDays[$dk] = [
+                'date'           => $cur->copy(),
+                'dayNum'         => $cur->day,
+                'isCurrentMonth' => $cur->month === $monthStart->month,
+                'isToday'        => $cur->isToday(),
+                'tasks'          => $monthTasksByDate->get($dk, collect()),
+                'taskCount'      => $monthTasksByDate->get($dk, collect())->count(),
+            ];
+            $cur->addDay();
+        }
+
+        // ── Summary Stats (scope ke minggu aktif) ─────────────────────
+        $statsStart = $viewMode === 'monthly' ? $monthStart : $startDate;
+        $statsEnd   = $viewMode === 'monthly' ? $monthEnd   : $endDate;
+
         $totalTasks  = Task::applyUserScope($user)
-            ->whereBetween('scheduled_at', [$startDate, $endDate])
+            ->whereBetween('scheduled_at', [$statsStart, $statsEnd])
             ->count();
 
         $completedTasks = Task::applyUserScope($user)
             ->where('status', TaskStatus::SELESAI->value)
-            ->whereBetween('scheduled_at', [$startDate, $endDate])
+            ->whereBetween('scheduled_at', [$statsStart, $statsEnd])
             ->count();
 
         $pendingTasks = Task::applyUserScope($user)
@@ -49,7 +87,7 @@ class FopCalendarController extends Controller
 
         $cancelledTasks = Task::applyUserScope($user)
             ->where('status', TaskStatus::DIBATALKAN->value)
-            ->whereBetween('scheduled_at', [$startDate, $endDate])
+            ->whereBetween('scheduled_at', [$statsStart, $statsEnd])
             ->count();
 
         $stats = [
@@ -59,65 +97,59 @@ class FopCalendarController extends Controller
             'cancelled' => $cancelledTasks,
         ];
 
-        // ── Calendar Days (7 hari: Senin - Minggu) ────────────────────
+        // ── Calendar Days (weekly — dari bulk month data) ──────────────
         $days = [];
         for ($i = 0; $i < 7; $i++) {
-            $date = $startDate->copy()->addDays($i);
+            $date   = $startDate->copy()->addDays($i);
             $dayKey = $date->format('Y-m-d');
-
-            $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'pop', 'teamMembers.user', 'checklists'])
-                ->applyUserScope($user)
-                ->whereDate('scheduled_at', $date)
-                ->orderBy('scheduled_at')
-                ->get();
+            $tasks  = $monthTasksByDate->get($dayKey, collect());
 
             $days[$dayKey] = [
-                'date'       => $date,
-                'dayName'    => $date->translatedFormat('D'), // Sen, Sel, dll
-                'dayNum'     => $date->day,
-                'tasks'      => $tasks,
-                'taskCount'  => $tasks->count(),
+                'date'      => $date,
+                'dayName'   => $date->translatedFormat('D'),
+                'dayNum'    => $date->day,
+                'tasks'     => $tasks,
+                'taskCount' => $tasks->count(),
             ];
         }
 
-        // ── Build TasksMap untuk UI Interaktif Tanpa Reload ────────────
+        // ── Build TasksMap (semua task bulan untuk detail panel) ───────
         $tasksMap = [];
-        foreach ($days as $dayData) {
-            foreach ($dayData['tasks'] as $task) {
-                $checklists = $task->checklists->map(fn($c) => [
-                    'id'         => $c->id,
-                    'item'       => $c->item,
-                    'is_checked' => (bool) $c->is_checked,
-                ])->toArray();
+        foreach ($allMonthTasks as $task) {
+            $checklists = $task->checklists->map(fn($c) => [
+                'id'         => $c->id,
+                'item'       => $c->item,
+                'is_checked' => (bool) $c->is_checked,
+            ])->toArray();
 
-                $teamNames = $task->teamMembers->map(fn($m) => $m->user?->name ?? '?')->join(' • ');
+            $teamNames = $task->teamMembers->map(fn($m) => $m->user?->name ?? '?')->join(' • ');
 
-                $tasksMap[$task->id] = [
-                    'id'                  => $task->id,
-                    'task_number'         => $task->task_number,
-                    'title'               => $task->title,
-                    'task_type'           => $task->task_type->value,
-                    'task_type_label'     => $task->task_type->label(),
-                    'status'              => $task->status->value,
-                    'status_label'        => $task->status->label(),
-                    'customer_name'       => $task->customer?->full_name ?? '—',
-                    'customer_number'     => $task->customer?->customer_code ?? ($task->task_number ?? '—'),
-                    'pop_name'            => $task->pop?->name ?? '—',
-                    'location'            => $task->customer?->address ?? '—',
-                    'customer_address'    => implode(', ', array_filter([
-                        $task->customer?->address,
-                        $task->customer?->village?->name,
-                        $task->customer?->district?->name,
-                        $task->customer?->city?->name,
-                    ])) ?: '—',
-                    'scheduled_at'        => $task->scheduled_at ? $task->scheduled_at->translatedFormat('l d M • H:i') : '—',
-                    'time_only'           => $task->scheduled_at ? $task->scheduled_at->format('H:i') : '—',
-                    'team_names'          => $teamNames ?: 'Belum ditugaskan',
-                    'checklist_completed' => $task->checklists->where('is_checked', true)->count(),
-                    'checklist_total'     => $task->checklists->count(),
-                    'checklists'          => $checklists,
-                ];
-            }
+            $tasksMap[$task->id] = [
+                'id'                  => $task->id,
+                'customer_id'         => $task->customer_id,
+                'task_number'         => $task->task_number,
+                'title'               => $task->title,
+                'task_type'           => $task->task_type->value,
+                'task_type_label'     => $task->task_type->label(),
+                'status'              => $task->status->value,
+                'status_label'        => $task->status->label(),
+                'customer_name'       => $task->customer?->full_name ?? '—',
+                'customer_number'     => $task->customer?->customer_code ?? ($task->task_number ?? '—'),
+                'pop_name'            => $task->pop?->name ?? '—',
+                'location'            => $task->customer?->address ?? '—',
+                'customer_address'    => implode(', ', array_filter([
+                    $task->customer?->address,
+                    $task->customer?->village?->name,
+                    $task->customer?->district?->name,
+                    $task->customer?->city?->name,
+                ])) ?: '—',
+                'scheduled_at'        => $task->scheduled_at ? $task->scheduled_at->translatedFormat('l d M • H:i') : '—',
+                'time_only'           => $task->scheduled_at ? $task->scheduled_at->format('H:i') : '—',
+                'team_names'          => $teamNames ?: 'Belum ditugaskan',
+                'checklist_completed' => $task->checklists->where('is_checked', true)->count(),
+                'checklist_total'     => $task->checklists->count(),
+                'checklists'          => $checklists,
+            ];
         }
 
         // ── Auto-Sync Pelanggan waiting_survey & waiting_installation ke Antrean Task ──
@@ -207,7 +239,7 @@ class FopCalendarController extends Controller
         $defaultChecklistsMap = \App\Models\TaskChecklistTemplate::where('is_active', true)
             ->orderBy('sort_order')
             ->get()
-            ->groupBy('task_type')
+            ->groupBy(fn($template) => $template->task_type->value)
             ->map(fn($group) => $group->pluck('item')->toArray())
             ->toArray();
 
@@ -227,7 +259,13 @@ class FopCalendarController extends Controller
             'tasksMap',
             'pendingQueue',
             'teknisiList',
-            'defaultChecklistsMap'
+            'defaultChecklistsMap',
+            'viewMode',
+            'calendarDays',
+            'monthStart',
+            'monthName',
+            'prevMonthStart',
+            'nextMonthStart'
         ));
     }
 

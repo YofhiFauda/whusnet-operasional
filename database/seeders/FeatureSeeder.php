@@ -75,6 +75,12 @@ class FeatureSeeder extends Seeder
                 'type' => FeatureType::ROOT,
                 'sort_order' => 10,
             ],
+            [
+                'code' => 'fop_tasks',
+                'name' => 'Task FOP',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 11,
+            ],
         ];
 
         $rootFeatureIds = [];

@@ -176,26 +176,34 @@ class CustomerController extends Controller
         $validated['customer_status'] = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
 
         $fotoKtp = $request->file('foto_ktp');
-        if ($fotoKtp instanceof UploadedFile) {
-            $validated['foto_ktp'] = $fotoKtp->store('documents', 'public');
-        }
+        unset($validated['foto_ktp']);
         $fotoRumah = $request->file('foto_rumah');
-        if ($fotoRumah instanceof UploadedFile) {
-            $validated['foto_rumah'] = $fotoRumah->store('documents', 'public');
-        }
+        unset($validated['foto_rumah']);
         $fotoKontrak = $request->file('foto_kontrak');
-        if ($fotoKontrak instanceof UploadedFile) {
-            $validated['foto_kontrak'] = $fotoKontrak->store('documents', 'public');
-        }
+        unset($validated['foto_kontrak']);
 
         // Generate customer_code via POP sequence generator
         $pop = Pop::findOrFail($validated['pop_id']);
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = \Illuminate\Support\Facades\DB::transaction(function() use ($validated) {
+        $customer = \Illuminate\Support\Facades\DB::transaction(function() use ($validated, $fotoKtp, $fotoRumah, $fotoKontrak) {
             // 1. Create customer record
             $customer = Customer::create($validated);
+
+            $updates = [];
+            if ($fotoKtp instanceof UploadedFile) {
+                $updates['foto_ktp'] = \App\Services\FileUploadService::uploadCustomerRegistrationDoc($fotoKtp, $customer, 'ktp');
+            }
+            if ($fotoRumah instanceof UploadedFile) {
+                $updates['foto_rumah'] = \App\Services\FileUploadService::uploadSurveyPhoto($fotoRumah, $customer, 'house');
+            }
+            if ($fotoKontrak instanceof UploadedFile) {
+                $updates['foto_kontrak'] = \App\Services\FileUploadService::uploadInstallationPhoto($fotoKontrak, $customer, 'kontrak');
+            }
+            if (!empty($updates)) {
+                $customer->update($updates);
+            }
 
             // 2. Create customer address
             $cityName = null;
@@ -439,13 +447,13 @@ class CustomerController extends Controller
 
         // Handle new uploads
         if ($request->hasFile('foto_ktp')) {
-            $validated['foto_ktp'] = $request->file('foto_ktp')->store('documents', 'public');
+            $validated['foto_ktp'] = \App\Services\FileUploadService::uploadCustomerRegistrationDoc($request->file('foto_ktp'), $customer, 'ktp');
         }
         if ($request->hasFile('foto_rumah')) {
-            $validated['foto_rumah'] = $request->file('foto_rumah')->store('documents', 'public');
+            $validated['foto_rumah'] = \App\Services\FileUploadService::uploadSurveyPhoto($request->file('foto_rumah'), $customer, 'house');
         }
         if ($request->hasFile('foto_kontrak')) {
-            $validated['foto_kontrak'] = $request->file('foto_kontrak')->store('documents', 'public');
+            $validated['foto_kontrak'] = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
         \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated) {
@@ -693,6 +701,59 @@ class CustomerController extends Controller
             ],
         ];
 
+        // 1. Audit Logs untuk Riwayat Perubahan Data Pelanggan
+        $auditableConditions = [
+            [\App\Models\Customer::class, $customer->id],
+        ];
+        if ($customer->customerAddress) {
+            $auditableConditions[] = [\App\Models\CustomerAddress::class, $customer->customerAddress->id];
+        }
+        if ($customer->customerService) {
+            $auditableConditions[] = [\App\Models\CustomerService::class, $customer->customerService->id];
+        }
+        if ($customer->customerDevice) {
+            $auditableConditions[] = [\App\Models\CustomerDevice::class, $customer->customerDevice->id];
+        }
+        if ($customer->customerTechnicalDetail) {
+            $auditableConditions[] = [\App\Models\CustomerTechnicalDetail::class, $customer->customerTechnicalDetail->id];
+        }
+
+        $auditLogs = \App\Models\AuditLog::with('user.role')
+            ->where(function ($q) use ($auditableConditions) {
+                foreach ($auditableConditions as $index => $condition) {
+                    $method = $index === 0 ? 'where' : 'orWhere';
+                    $q->$method(function ($sub) use ($condition) {
+                        $sub->where('auditable_type', $condition[0])
+                            ->where('auditable_id', $condition[1]);
+                    });
+                }
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $statusLogs = \App\Models\CustomerStatusLog::with('user.role')
+            ->where('customer_id', $customer->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // 2. Tasks & FopTasks untuk Riwayat Ticketing
+        $customerTasks = $customer->tasks()
+            ->with([
+                'teamMembers.user', 
+                'checklists', 
+                'evidences', 
+                'creator', 
+                'fop', 
+                'auditLogs.user.role'
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $customerFopTasks = $customer->fopTasks()
+            ->with(['technicians', 'village', 'pop'])
+            ->orderBy('task_date', 'desc')
+            ->get();
+
         // Daftar user aktif untuk dropdown petugas (survey, pemasangan)
         $activeUsers = \App\Models\User::where('status', 'active')
             ->orderBy('name')
@@ -704,7 +765,11 @@ class CustomerController extends Controller
             'displayIdLabel',
             'completeness',
             'timeline',
-            'activeUsers'
+            'activeUsers',
+            'auditLogs',
+            'statusLogs',
+            'customerTasks',
+            'customerFopTasks'
         ));
     }
 
@@ -1672,7 +1737,7 @@ class CustomerController extends Controller
                     $monthlyPrice = (float)($row['monthly_price'] ?? $package->monthly_price);
                     $ppnPercent = 0.00; // Legacy data uses 0% PPN
                     $otherFee = (float)($row['other_fee'] ?? 0);
-                    $totalBill = $monthlyPrice + $otherFee; // No PPN for legacy, but keep biaya lain-lain in billing cycle
+                    $totalBill = $monthlyPrice; // Biaya bulanan hanya berdasarkan dari Harga paket, biaya diluar standar (other_fee) tidak masuk ke tagihan bulanan rutin
 
                     $customer = Customer::findOrFail($customerId);
                     $serviceStatus = $this->mapLegacyServiceStatus($row['service_status'] ?? $row['request_status'] ?? null);
@@ -1892,11 +1957,12 @@ class CustomerController extends Controller
                         continue;
                     }
 
-                    $invoiceNumber = 'INV-LEGACY-' . $legacyInvoiceId;
+                    $invoiceNumber = 'INV-' . $legacyInvoiceId;
                     $totalAmount = (float)$row['total_amount'];
 
                     $invoice = Invoice::create([
                         'invoice_number' => $invoiceNumber,
+                        'invoice_type' => \App\Enums\InvoiceType::BULANAN->value,
                         'old_invoice_id' => $legacyInvoiceId,
                         'old_cost_id' => $row['old_cost_id'] ?? null,
                         'old_request_id' => $row['old_request_id'] ?? null,
@@ -1952,7 +2018,7 @@ class CustomerController extends Controller
                     }
 
                     $invoice = Invoice::findOrFail($invoiceId);
-                    $paymentNumber = 'PAY-LEGACY-' . $row['old_payment_id'];
+                    $paymentNumber = 'PAY-' . $row['old_payment_id'];
                     $amount = (float)$row['amount'];
 
                     $payment = Payment::create([
@@ -2561,6 +2627,7 @@ class CustomerController extends Controller
 
             $newInvoice = \App\Models\Invoice::create([
                 'invoice_number'          => $invoiceNumber,
+                'invoice_type'            => ($extraInstallationFee > 0 || $prorateAmount > 0) ? \App\Enums\InvoiceType::AWAL->value : \App\Enums\InvoiceType::BULANAN->value,
                 'customer_id'             => $customer->id,
                 'pop_id'                  => $customer->pop_id,
                 'customer_service_id'     => $service->id,

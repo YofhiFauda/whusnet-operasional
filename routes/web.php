@@ -18,6 +18,7 @@ use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\CustomerVerificationController;
 use App\Http\Controllers\CustomerInstallationController;
+use App\Http\Controllers\CustomerTestReportController;
 use App\Http\Controllers\CustomerSurveyController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskStatusController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\TaskChecklistController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopCalendarController;
+use App\Http\Controllers\FopTaskController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 
@@ -249,9 +251,9 @@ Route::middleware('auth')->group(function () {
     // ── FOP Dashboard ────────────────────────────────────────────
 
     Route::middleware('permission:task.view.all')->group(function () {
-        Route::get('/fop', [\App\Http\Controllers\FopDashboardController::class, 'index'])->name('fop.dashboard');
-        Route::get('/fop/calendar', [\App\Http\Controllers\FopCalendarController::class, 'index'])->name('fop.calendar');
-        Route::get('/api/fop/pipeline', [\App\Http\Controllers\FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
+        Route::get('/fop', [FopDashboardController::class, 'index'])->name('fop.dashboard');
+        Route::get('/fop/calendar', [FopCalendarController::class, 'index'])->name('fop.calendar');
+        Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
     // ── Task Management ──────────────────────────────────────────
@@ -304,16 +306,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/tasks-saya/partial/{task}', [TaskController::class, 'cardPartial'])->name('tasks.own.card-partial');
     });
 
-    // Teknisi: Transisi status
-    Route::middleware('permission:task.status.start')->group(function () {
-        Route::post('/tasks/{task}/start', [TaskStatusController::class, 'start'])->name('tasks.start');
-    });
+    // Teknisi: Transisi status (Authorisasi ditangani di Controller menggunakan TaskPolicy)
+    Route::post('/tasks/{task}/start', [TaskStatusController::class, 'start'])->name('tasks.start');
 
-    Route::middleware('permission:task.status.complete')->group(function () {
-        Route::post('/tasks/{task}/complete', [TaskStatusController::class, 'complete'])->name('tasks.complete');
-        Route::post('/tasks/{task}/survey-report', [\App\Http\Controllers\TaskSurveyReportController::class, 'store'])->name('tasks.survey-report.store');
-        Route::post('/tasks/{task}/install-report', [\App\Http\Controllers\TaskInstallationReportController::class, 'store'])->name('tasks.install-report.store');
-    });
+    Route::post('/tasks/{task}/complete', [TaskStatusController::class, 'complete'])->name('tasks.complete');
+    
+    // Maintenance Report
+    Route::get('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
+    Route::post('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
 
     Route::middleware('permission:task.status.pending')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
@@ -331,6 +331,20 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.edit')->group(function () {
         Route::delete('/tasks/{task}/evidences/{evidence}', [TaskEvidenceController::class, 'destroy'])->name('tasks.evidences.destroy');
+    });
+
+    // FOP: Task FOP (Custom)
+    Route::middleware('permission:fop_tasks.view')->group(function () {
+        Route::get('/fop-tasks', [FopTaskController::class, 'index'])->name('fop-tasks.index');
+    });
+    Route::middleware('permission:fop_tasks.create')->group(function () {
+        Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');
+    });
+    Route::middleware('permission:fop_tasks.update')->group(function () {
+        Route::put('/fop-tasks/{fop_task}', [FopTaskController::class, 'update'])->name('fop-tasks.update');
+    });
+    Route::middleware('permission:fop_tasks.delete')->group(function () {
+        Route::delete('/fop-tasks/{fop_task}', [FopTaskController::class, 'destroy'])->name('fop-tasks.destroy');
     });
 
     // Location APIs (used in forms)

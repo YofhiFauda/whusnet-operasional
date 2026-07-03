@@ -49,6 +49,20 @@ class CustomerSurveyController extends Controller
             abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
         }
 
+        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [];
+        if (!in_array(auth()->id(), $memberIds)) {
+            $memberIds[] = auth()->id();
+        }
+
+        $activeTask = \App\Models\Task::where('status', \App\Enums\TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
+            ->when($task, fn ($q) => $q->where('id', '!=', $task->id))
+            ->first();
+
+        if ($activeTask) {
+            return redirect()->back()->with('error', "Tidak dapat memulai survey karena teknisi sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu.");
+        }
+
         \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $workflowService, $taskService, $task) {
             $survey = $customer->latestSurvey()->first();
             
@@ -59,6 +73,9 @@ class CustomerSurveyController extends Controller
             
             $survey->survey_status = 'pending'; // Or 'in_progress' if we add it to the enum
             $survey->started_at = now();
+            if ($task) {
+                $survey->fop_id = $task->fop_id ?? $task->created_by;
+            }
             $survey->save();
 
             $workflowService->transition($customer, \App\Enums\WorkflowTransition::SURVEY_IN_PROGRESS, 'Mulai proses survey lapangan');
@@ -118,11 +135,11 @@ class CustomerSurveyController extends Controller
         unset($validated['difficulty_level']);
 
         if ($request->hasFile('survey_photo')) {
-            $validated['survey_photo'] = $request->file('survey_photo')->store('surveys', 'public');
+            $validated['survey_photo'] = \App\Services\FileUploadService::uploadSurveyPhoto($request->file('survey_photo'), $customer, 'odp');
         }
 
         if ($request->hasFile('house_photo')) {
-            $validated['house_photo'] = $request->file('house_photo')->store('surveys/house', 'public');
+            $validated['house_photo'] = \App\Services\FileUploadService::uploadSurveyPhoto($request->file('house_photo'), $customer, 'house');
         }
 
         \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated, $workflowService) {
@@ -134,22 +151,70 @@ class CustomerSurveyController extends Controller
 
             $survey->fill($validated);
             
-            if ($validated['survey_status'] === 'completed') {
+            $task = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+                ->first();
+
+            if (!$survey->completed_at) {
                 $completedAt = now();
                 $survey->completed_at = $completedAt;
-                
+                $survey->end_date = $completedAt->toDateString();
+                $survey->end_time = $completedAt->toTimeString();
                 if ($survey->started_at) {
                     $survey->duration_minutes = $survey->started_at->diffInMinutes($completedAt);
                     $survey->survey_date = $survey->started_at->toDateString();
                     $survey->start_time = $survey->started_at->toTimeString();
-                    $survey->end_date = $completedAt->toDateString();
-                    $survey->end_time = $completedAt->toTimeString();
+                } else {
+                    $survey->survey_date = $completedAt->toDateString();
+                    $survey->start_time = $completedAt->toTimeString();
                 }
             }
+
+            $survey->technician_id = auth()->id();
+
+            $surveyorsText = null;
+            if ($task) {
+                $survey->fop_id = $task->fop_id ?? $task->created_by;
+                
+                $teamMembers = $task->teamMembers()->orderBy('id')->get();
+                $currentUserId = auth()->id();
+                
+                $memberIndex = 1;
+                foreach ($teamMembers as $idx => $member) {
+                    if ($member->user_id == $currentUserId) {
+                        $memberIndex = $idx + 1;
+                        break;
+                    }
+                }
+                
+                $surveyorsText = "Petugas Survey {$memberIndex} - " . auth()->user()->name;
+                
+                $otherMembers = $teamMembers->filter(fn($m) => $m->user_id != $currentUserId)->values();
+                if ($otherMembers->isNotEmpty()) {
+                    $survey->surveyor_2_id = $otherMembers[0]->user_id;
+                }
+                if ($otherMembers->count() > 1) {
+                    $survey->surveyor_3_id = $otherMembers[1]->user_id;
+                }
+            } else {
+                $surveyorsText = "Petugas Survey 1 - " . auth()->user()->name;
+            }
+
+            $survey->surveyors = $surveyorsText;
             
             $survey->save();
 
             if ($validated['survey_status'] === 'completed' && $customer->status === 'survey_in_progress') {
+                // Selesaikan task survey jika ada
+                if ($task) {
+                    $task->checklists()->where('is_checked', false)->update([
+                        'is_checked' => true,
+                        'checked_at' => now(),
+                        'checked_by' => auth()->id(),
+                    ]);
+                    app(\App\Services\TaskService::class)->complete($task, auth()->user());
+                }
+
                 $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_ACC, 'Survey lapangan selesai dilaporkan');
                 try {
                     event(new \App\Events\SurveyCompleted($customer));

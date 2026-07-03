@@ -21,10 +21,17 @@ class CustomerDocumentController extends Controller
             'document_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
         ]);
 
-        $path = $request->file('document_file')->store(
-            'customer-documents/' . $customer->id,
-            'local'
-        );
+        $file = $request->file('document_file');
+        $type = $validated['document_type'];
+
+        $path = match ($type) {
+            'ktp' => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
+            'rumah' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
+            'survey' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
+            'kontrak' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),
+            'pemasangan' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'pemasangan'),
+            default => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, $type),
+        };
 
         $document = CustomerDocument::create([
             'customer_id' => $customer->id,
@@ -59,6 +66,10 @@ class CustomerDocumentController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.documents.view'), 403);
         $this->authorizeCustomerAccess($document->customer);
+
+        if (Storage::disk('public')->exists($document->file_path)) {
+            return Storage::disk('public')->response($document->file_path);
+        }
 
         abort_unless(Storage::disk('local')->exists($document->file_path), 404);
 

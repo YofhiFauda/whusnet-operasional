@@ -4,7 +4,8 @@
 @section('page_title', 'Master Distribusi')
 
 @section('content')
-<!-- Notification Alerts handled by global Component Toast (<x-toast />) -->
+{{-- Notification Alerts handled by global Component Toast (<x-toast/>) --}}
+
 
 <!-- Header Stats Bar -->
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6 shadow-sm">

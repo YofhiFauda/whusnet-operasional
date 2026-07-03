@@ -72,6 +72,35 @@
             </div>
         </div>
 
+        @if($payment->old_payment_id || $payment->old_transaction_id || $payment->old_request_id)
+        <div class="border-t border-slate-100 bg-sky-50/50 p-6">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-600 text-white text-[10px] font-bold">i</span>
+                <h3 class="text-xs font-bold text-sky-900 uppercase tracking-wider">Audit Visibilitas Data Migrasi</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                @if($payment->old_payment_id)
+                <div>
+                    <span class="text-slate-500 block">ID Bayar Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $payment->old_payment_id }}</span>
+                </div>
+                @endif
+                @if($payment->old_transaction_id)
+                <div>
+                    <span class="text-slate-500 block">ID Transaksi Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $payment->old_transaction_id }}</span>
+                </div>
+                @endif
+                @if($payment->old_request_id)
+                <div>
+                    <span class="text-slate-500 block">ID Permintaan Lama:</span>
+                    <span class="font-mono font-bold text-slate-800">{{ $payment->old_request_id }}</span>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
         <div class="border-t border-slate-100 p-6">
             <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Catatan Pembayaran</h3>
             <p class="text-sm text-slate-700">{{ $payment->note ?: 'Tidak ada catatan.' }}</p>

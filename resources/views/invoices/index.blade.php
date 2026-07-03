@@ -51,6 +51,16 @@
         </div>
 
         <div>
+            <label for="invoice_type" class="block text-xs font-semibold text-slate-500 mb-2">JENIS TAGIHAN</label>
+            <select name="invoice_type" id="invoice_type" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                <option value="">Semua Jenis</option>
+                <option value="awal" {{ ($invoiceType ?? '') === 'awal' ? 'selected' : '' }}>Tagihan Awal (PSB)</option>
+                <option value="bulanan" {{ ($invoiceType ?? '') === 'bulanan' ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
+                <option value="reaktivasi" {{ ($invoiceType ?? '') === 'reaktivasi' ? 'selected' : '' }}>Tagihan Reaktivasi</option>
+            </select>
+        </div>
+
+        <div>
             <label for="status" class="block text-xs font-semibold text-slate-500 mb-2">STATUS</label>
             <select name="status" id="status" class="w-full font-sans text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                 <option value="">Semua Status</option>
@@ -105,7 +115,19 @@
                         <td class="px-6 py-3.5 text-center text-slate-400 data-text">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $loop->iteration }}</td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
                             <a href="{{ route('invoices.show', $invoice->id) }}" class="font-mono font-bold text-sky-700 hover:text-sky-900">{{ $invoice->invoice_number }}</a>
-                            <div class="text-[10px] text-slate-400 mt-0.5">Jatuh tempo {{ optional($invoice->due_date)->format('d/m/Y') }}</div>
+                            <div class="flex items-center flex-wrap gap-1.5 mt-1">
+                                @if($invoice->old_invoice_id || $invoice->old_cost_id)
+                                <span title="Data Migrasi (ID Lama: {{ $invoice->old_invoice_id ?: $invoice->old_cost_id }})" class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-sky-50 text-sky-700 border-sky-200">
+                                    Migrasi #{{ $invoice->old_invoice_id ?: $invoice->old_cost_id }}
+                                </span>
+                                @endif
+                                @if($invoice->invoice_type)
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-indigo-50 text-indigo-700 border-indigo-100">
+                                    {{ $invoice->invoice_type->label() }}
+                                </span>
+                                @endif
+                                <span class="text-[10px] text-slate-400">Tempo {{ optional($invoice->due_date)->format('d/m/Y') }}</span>
+                            </div>
                         </td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
                             <div class="font-semibold text-slate-900">{{ $invoice->customer->full_name ?? '-' }}</div>

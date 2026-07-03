@@ -21,6 +21,30 @@ class CustomerDeviceTest extends TestCase
         $this->seed(\Database\Seeders\RoleSeeder::class);
         $this->seed(\Database\Seeders\PermissionSeeder::class);
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+
+        // RolePermissionSeeder does not reliably attach the device permissions used
+        // by this test suite (same gap worked around in CustomerDeviceSensitiveFieldTest),
+        // so attach them explicitly to keep these tests deterministic.
+        $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
+        $this->attachPermission($teknisiRole, 'customers.view');
+        $this->attachPermission($teknisiRole, 'customers.detail.devices.view');
+        $this->attachPermission($teknisiRole, 'customers.detail.devices.create');
+        $this->attachPermission($teknisiRole, 'customers.detail.devices.update');
+        $this->attachPermission($teknisiRole, 'customers.detail.devices.view_sensitive');
+        $this->attachPermission($teknisiRole, 'customers.detail.devices.update_sensitive');
+
+        $helpdeskRole = Role::where('name', 'Helpdesk')->firstOrFail();
+        $this->attachPermission($helpdeskRole, 'customers.view');
+        $this->attachPermission($helpdeskRole, 'customers.detail.devices.view');
+    }
+
+    private function attachPermission(Role $role, string $code): void
+    {
+        $permission = \App\Models\Permission::firstOrCreate(
+            ['code' => $code],
+            ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']
+        );
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
     }
 
     public function test_technician_can_fill_customer_device(): void
@@ -47,6 +71,10 @@ class CustomerDeviceTest extends TestCase
                 'signal_rx_power' => -18.75,
                 'connection_mode' => 'pppoe',
                 'technical_note' => 'Perangkat terpasang dan koneksi normal.',
+                'passive_device' => 'Antena Grid 25dBi',
+                'passive_device_type' => 'antena_radio',
+                'passive_device_qty' => '1',
+                'passive_device_note' => 'Dipasang di tiang belakang rumah',
             ]);
 
         $response->assertStatus(302);
@@ -59,6 +87,29 @@ class CustomerDeviceTest extends TestCase
             'pppoe_password' => 'secret-pppoe',
             'wifi_password' => 'secret-wifi',
         ]);
+        $this->assertDatabaseHas('customer_technical_details', [
+            'customer_id' => $customer->id,
+            'passive_device_type' => 'antena_radio',
+            'passive_device_qty' => '1',
+            'passive_device_note' => 'Dipasang di tiang belakang rumah',
+        ]);
+    }
+
+    public function test_invalid_passive_device_type_is_rejected(): void
+    {
+        $pop = $this->createPop('DEV6');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-DEV-006');
+
+        $response = $this->actingAs($technician)
+            ->from(route('customers.show', $customer->id))
+            ->post(route('customers.device.store', $customer->id), [
+                'device_type' => 'ont',
+                'passive_device_type' => 'not_a_real_category',
+            ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHasErrors(['passive_device_type']);
     }
 
     public function test_device_data_is_visible_on_customer_detail(): void

@@ -248,6 +248,9 @@
 @endif
 
 @can('fill_installation')
+@php
+    $latestInst = $customer->installations()->latest()->first();
+@endphp
 <div id="installation-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-lg shadow-xl border border-border w-full max-w-2xl overflow-hidden transform transition-all">
         <div class="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -265,19 +268,19 @@
                     <label class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Status Pemasangan</label>
                     <div class="flex flex-wrap gap-4">
                         <label class="inline-flex items-center">
-                            <input type="radio" name="installation_status" value="scheduled" style="accent-color:var(--color-info)" checked>
+                            <input type="radio" name="installation_status" value="scheduled" style="accent-color:var(--color-info)" {{ !$latestInst || $latestInst->installation_status === 'scheduled' ? 'checked' : '' }}>
                             <span class="ml-2 text-xs text-text-main">Terjadwal</span>
                         </label>
                         <label class="inline-flex items-center">
-                            <input type="radio" name="installation_status" value="in_progress" style="accent-color:var(--color-info)">
+                            <input type="radio" name="installation_status" value="in_progress" style="accent-color:var(--color-info)" {{ $latestInst && $latestInst->installation_status === 'in_progress' ? 'checked' : '' }}>
                             <span class="ml-2 text-xs text-text-main">Proses</span>
                         </label>
                         <label class="inline-flex items-center">
-                            <input type="radio" name="installation_status" value="completed" style="accent-color:var(--color-info)">
+                            <input type="radio" name="installation_status" value="completed" style="accent-color:var(--color-info)" {{ $latestInst && $latestInst->installation_status === 'completed' ? 'checked' : '' }}>
                             <span class="ml-2 text-xs text-text-main">Selesai</span>
                         </label>
                         <label class="inline-flex items-center">
-                            <input type="radio" name="installation_status" value="failed" style="accent-color:var(--color-info)">
+                            <input type="radio" name="installation_status" value="failed" style="accent-color:var(--color-info)" {{ $latestInst && $latestInst->installation_status === 'failed' ? 'checked' : '' }}>
                             <span class="ml-2 text-xs text-text-main">Gagal</span>
                         </label>
                     </div>
@@ -285,43 +288,43 @@
 
                 <div>
                     <label for="scheduled_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Jadwal</label>
-                    <input type="date" name="scheduled_date" id="scheduled_date" value="{{ date('Y-m-d') }}" required
+                    <input type="date" name="scheduled_date" id="scheduled_date" value="{{ $latestInst && $latestInst->scheduled_date ? $latestInst->scheduled_date->format('Y-m-d') : date('Y-m-d') }}" required
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="scheduled_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Jam Jadwal</label>
-                    <input type="time" name="scheduled_time" id="scheduled_time" value="09:00"
+                    <input type="time" name="scheduled_time" id="scheduled_time" value="{{ $latestInst && $latestInst->scheduled_time ? substr($latestInst->scheduled_time, 0, 5) : '09:00' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="start_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Mulai Pemasangan</label>
-                    <input type="time" name="start_time" id="start_time"
+                    <input type="time" name="start_time" id="start_time" value="{{ $latestInst && $latestInst->start_time ? substr($latestInst->start_time, 0, 5) : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="end_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Selesai Pemasangan</label>
-                    <input type="time" name="end_time" id="end_time"
+                    <input type="time" name="end_time" id="end_time" value="{{ $latestInst && $latestInst->end_time ? substr($latestInst->end_time, 0, 5) : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="finished_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Selesai (Aktual)</label>
-                    <input type="date" name="finished_date" id="finished_date"
+                    <input type="date" name="finished_date" id="finished_date" value="{{ $latestInst && $latestInst->finished_date ? $latestInst->finished_date->format('Y-m-d') : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="fop_id_inst" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">ID FOP / Penugasan</label>
-                    <input type="text" name="fop_id" id="fop_id_inst" placeholder="FOP-2026-..."
+                    <input type="text" name="fop_id" id="fop_id_inst" placeholder="FOP-2026-..." value="{{ $latestInst ? $latestInst->fop_id : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
                 <div>
                     <label for="assigned_at_inst" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Penugasan Pemasangan</label>
-                    <input type="datetime-local" name="assigned_at" id="assigned_at_inst"
+                    <input type="datetime-local" name="assigned_at" id="assigned_at_inst" value="{{ $latestInst && $latestInst->assigned_at ? $latestInst->assigned_at->format('Y-m-d\TH:i') : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
                 </div>
 
@@ -329,10 +332,10 @@
                     <label for="installation_technician_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Teknisi 1 (Utama)</label>
                     <select name="technician_id" id="installation_technician_id" required
                             class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
-                        <option value="{{ auth()->id() }}">{{ auth()->user()->name }} (Saya)</option>
+                        <option value="{{ auth()->id() }}" {{ $latestInst && $latestInst->technician_id == auth()->id() ? 'selected' : '' }}>{{ auth()->user()->name }} (Saya)</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers->where('id', '!=', auth()->id()) as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                <option value="{{ $u->id }}" {{ $latestInst && $latestInst->technician_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                             @endforeach
                         @endif
                     </select>
@@ -345,7 +348,7 @@
                         <option value="">— Tidak ada —</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                <option value="{{ $u->id }}" {{ $latestInst && $latestInst->technician_2_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                             @endforeach
                         @endif
                     </select>
@@ -358,7 +361,7 @@
                         <option value="">— Tidak ada —</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                <option value="{{ $u->id }}" {{ $latestInst && $latestInst->technician_3_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                             @endforeach
                         @endif
                     </select>
@@ -366,14 +369,14 @@
 
                 <div class="md:col-span-2">
                     <label for="technicians" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Nama Tim Teknisi (Opsional)</label>
-                    <input type="text" name="technicians" id="technicians" placeholder="Contoh: Tim Pemasangan - Budi, Andi"
+                    <input type="text" name="technicians" id="technicians" placeholder="Contoh: Tim Pemasangan - Budi, Andi" value="{{ $latestInst ? $latestInst->technicians : '' }}"
                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
                 </div>
 
                 <div class="md:col-span-2">
                     <label for="installation_note" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Catatan Pemasangan</label>
                     <textarea name="installation_note" id="installation_note" rows="3" placeholder="Tuliskan catatan pemasangan pelanggan..."
-                              class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs"></textarea>
+                              class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">{{ $latestInst ? $latestInst->installation_note : '' }}</textarea>
                 </div>
 
                 <div class="md:col-span-2">

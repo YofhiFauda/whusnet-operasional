@@ -43,19 +43,39 @@
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                     <div class="space-y-3">
+                        @php
+                            $currentSurveyorNum = 1;
+                            if ($survey->surveyors && preg_match('/Petugas Survey (\d+)/i', $survey->surveyors, $matches)) {
+                                $currentSurveyorNum = (int)$matches[1];
+                            }
+                        @endphp
                         <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey 1</span>
+                            <span class="text-text-muted">Petugas Survey {{ $currentSurveyorNum }} (Submitter)</span>
                             <span class="font-semibold text-text-main">{{ $survey->technician->name ?? $survey->surveyors ?? '-' }}</span>
                         </div>
                         @if($survey->surveyor2 || $survey->surveyor_2_id)
+                        @php
+                            $s2Num = $currentSurveyorNum == 1 ? 2 : 1;
+                            if ($currentSurveyorNum == 3) {
+                                $s2Num = 1;
+                            }
+                        @endphp
                         <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey 2</span>
+                            <span class="text-text-muted">Petugas Survey {{ $s2Num }}</span>
                             <span class="font-semibold text-text-main">{{ $survey->surveyor2->name ?? '-' }}</span>
                         </div>
                         @endif
                         @if($survey->surveyor3 || $survey->surveyor_3_id)
+                        @php
+                            $s3Num = 3;
+                            if ($currentSurveyorNum == 3) {
+                                $s3Num = 2;
+                            } elseif ($currentSurveyorNum == 2) {
+                                $s3Num = 3;
+                            }
+                        @endphp
                         <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey 3</span>
+                            <span class="text-text-muted">Petugas Survey {{ $s3Num }}</span>
                             <span class="font-semibold text-text-main">{{ $survey->surveyor3->name ?? '-' }}</span>
                         </div>
                         @endif

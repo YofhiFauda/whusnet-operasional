@@ -35,6 +35,7 @@ class RolePermissionSeeder extends Seeder
                 'reports.export',
                 'audit_logs.view',
                 'audit_logs.export', // assuming audit_logs has export
+                'fop_tasks.view',
             ],
 
             'admin' => [
@@ -54,6 +55,7 @@ class RolePermissionSeeder extends Seeder
                 'reports.*',
                 'audit_logs.view',
                 'audit_logs.export',
+                'fop_tasks.*',
             ],
 
             'noc' => [
@@ -128,6 +130,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.view',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
+                'fop_tasks.*',
             ],
 
             'teknisi' => [

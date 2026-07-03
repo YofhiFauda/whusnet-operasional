@@ -163,5 +163,12 @@ return [
             ActionCode::VIEW->value, 
             ActionCode::EXPORT->value
         ],
+
+        'fop_tasks' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value
+        ],
     ],
 ];

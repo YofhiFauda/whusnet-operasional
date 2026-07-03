@@ -72,16 +72,6 @@
                                 class="text-text-muted hover:text-text-secondary font-medium underline-offset-2 hover:underline transition-colors">
                             Hapus Semua
                         </button>
-                        <span class="text-text-disabled hidden sm:inline">|</span>
-                        <button type="button" onclick="expandAll()"
-                                class="text-text-muted hover:text-text-secondary font-medium transition-colors hidden sm:inline">
-                            Buka Semua
-                        </button>
-                        <span class="text-text-disabled hidden sm:inline">|</span>
-                        <button type="button" onclick="collapseAll()"
-                                class="text-text-muted hover:text-text-secondary font-medium transition-colors hidden sm:inline">
-                            Tutup Semua
-                        </button>
                     </div>
                 </div>
             </div>
@@ -324,28 +314,6 @@
     function deselectAll() {
         document.querySelectorAll('.perm-checkbox').forEach(cb => { cb.checked = false; });
         updatePermCount();
-    }
-
-    // Expand semua accordion menggunakan Alpine.js
-    function expandAll() {
-        document.querySelectorAll('[x-data]').forEach(el => {
-            if (el._x_dataStack) {
-                const data = el._x_dataStack[0];
-                if ('expanded' in data) data.expanded = true;
-                if ('childExpanded' in data) data.childExpanded = true;
-            }
-        });
-    }
-
-    // Collapse semua accordion
-    function collapseAll() {
-        document.querySelectorAll('[x-data]').forEach(el => {
-            if (el._x_dataStack) {
-                const data = el._x_dataStack[0];
-                if ('expanded' in data) data.expanded = false;
-                if ('childExpanded' in data) data.childExpanded = false;
-            }
-        });
     }
 
     // Toggle semua permission dalam satu feature

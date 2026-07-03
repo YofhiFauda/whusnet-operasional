@@ -10,6 +10,22 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    <!-- NProgress -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof NProgress !== 'undefined') {
+                NProgress.configure({ showSpinner: false, minimum: 0.1 });
+                NProgress.done();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (typeof NProgress !== 'undefined') NProgress.start();
+        });
+    </script>
+
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -173,6 +189,12 @@
                         <a href="{{ route('fop.calendar') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop.calendar') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                             FOP Calendar Scheduler
                         </a>
+
+                        @if(auth()->user()->hasPermission('fop_tasks.view'))
+                        <a href="{{ route('fop-tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Task FOP
+                        </a>
+                        @endif
 
                         <a href="{{ route('tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                             Daftar Semua Task
@@ -440,6 +462,7 @@
                     { text: 'Lanjutkan', type: 'primary', onClick: () => {
                         window.Dialog.close();
                         if (formElement && formElement.submit) {
+                            if (typeof NProgress !== 'undefined') NProgress.start();
                             formElement.submit();
                         }
                     }}
@@ -457,6 +480,7 @@
                     { text: 'Ya, Hapus', type: 'danger', onClick: () => {
                         window.Dialog.close();
                         if (formElement && formElement.submit) {
+                            if (typeof NProgress !== 'undefined') NProgress.start();
                             formElement.submit();
                         }
                     }}
@@ -559,7 +583,10 @@
                 message: customMessage || `Apakah Anda yakin ingin ${actionWord} data ini?`,
                 icon: icon,
                 buttons: [
-                    { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                    { text: 'Batal', type: 'secondary', onClick: () => {
+                        window.Dialog.close();
+                        if (typeof NProgress !== 'undefined') NProgress.done();
+                    }},
                     { text: confirmText, type: confirmType, onClick: () => {
                         window.Dialog.close();
                         form.submit();

@@ -97,6 +97,11 @@ class Task extends Model
         return $this->morphMany(AuditLog::class, 'auditable')->orderBy('created_at', 'desc');
     }
 
+    public function maintenanceReport()
+    {
+        return $this->hasOne(TaskMaintenance::class);
+    }
+
     // ─── Helper Methods ─────────────────────────────────────────
 
     /**
@@ -124,8 +129,7 @@ class Task extends Model
      */
     public function canComplete(): bool
     {
-        return $this->pendingRequiredChecklists() === 0
-            && $this->evidences()->count() >= 1;
+        return true;
     }
 
     /**

@@ -8,3 +8,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 \Illuminate\Support\Facades\Schedule::command('check:countdown --minutes=60')->everyFiveMinutes();
+\Illuminate\Support\Facades\Schedule::command('fop:reset-cancelled-tasks')->dailyAt('00:01');
