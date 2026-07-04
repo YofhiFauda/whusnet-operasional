@@ -245,6 +245,13 @@ class RolePermissionSeeder extends Seeder
                 });
             }
 
+            // FOP tidak boleh ubah Tipe Task lewat wildcard fop_tasks.* — harus di-grant eksplisit.
+            if ($roleCode === 'fop') {
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
+                    return $code !== 'fop_tasks.update_sensitive';
+                });
+            }
+
             $finalPermissionCodes = array_unique($finalPermissionCodes);
             $permissionIds = $allPermissions->whereIn('code', $finalPermissionCodes)->pluck('id')->toArray();
 

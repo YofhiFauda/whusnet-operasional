@@ -168,7 +168,8 @@ return [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
-            ActionCode::DELETE->value
+            ActionCode::DELETE->value,
+            ActionCode::UPDATE_SENSITIVE->value
         ],
     ],
 ];

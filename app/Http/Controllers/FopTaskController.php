@@ -84,19 +84,16 @@ class FopTaskController extends Controller
         $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
             return [$category->value => $category->label()];
         })->toArray();
-        
-        // // Let's normalize keys
-        // $categories = [
-        //     'MTN' => 'Ticket Gangguan',
-        //     'C-REQ' => 'Customer Request',
-        //     'O-REQ' => 'Management Request for Office',
-        //     'PSB' => 'Data Pemasangan (proses ke tim)',
-        //     'Survey' => 'Data Survey',
-        //     'DEAC' => 'dari putus langganan dengan status Belum diambil',
-        //     'INFR REQ' => 'Request yang termasuk dalam Infastructur',
-        // ];
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories'));
+        // Tipe task yang boleh dipakai utk tambah task manual — Survey & Pemasangan Baru
+        // dikecualikan karena wajib lewat Registrasi Pelanggan (auto-sync).
+        $manualCategories = collect($categories)
+            ->except($this->autoOnlyCategoryValues())
+            ->toArray();
+
+        $canEditFopTaskType = auth()->user()->hasPermission('fop_tasks.update_sensitive');
+
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType'));
     }
 
     /**
@@ -107,7 +104,7 @@ class FopTaskController extends Controller
         $this->authorizeAccess();
 
         $validated = $request->validate([
-            'category' => ['required', 'string', Rule::enum(TaskType::class)],
+            'category' => ['required', 'string', Rule::in($this->manualCategoryValues())],
             'task_date' => ['required', 'date'],
             'tugas' => ['required', 'string', 'max:255'],
             'village_id' => ['required', 'exists:villages,id'],
@@ -215,6 +212,11 @@ class FopTaskController extends Controller
             'pending_reason.required_if' => 'Alasan pending wajib diisi jika status Pending.',
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
         ]);
+
+        // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task.
+        if (!auth()->user()->hasPermission('fop_tasks.update_sensitive')) {
+            unset($validated['category']);
+        }
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
             $oldValues = $fopTask->load('technicians')->toArray();
@@ -325,6 +327,26 @@ class FopTaskController extends Controller
 
             return redirect()->route('fop-tasks.index')->with('success', "Task FOP {$fopTask->task_number} berhasil dihapus.");
         });
+    }
+
+    /**
+     * Tipe task yang hanya boleh muncul via auto-sync Registrasi Pelanggan,
+     * tidak boleh dipilih manual saat tambah Task FOP.
+     */
+    private function autoOnlyCategoryValues(): array
+    {
+        return [TaskType::SURVEY->value, TaskType::PEMASANGAN->value];
+    }
+
+    /**
+     * Tipe task yang boleh dipilih manual saat tambah Task FOP.
+     */
+    private function manualCategoryValues(): array
+    {
+        return array_diff(
+            array_column(TaskType::cases(), 'value'),
+            $this->autoOnlyCategoryValues()
+        );
     }
 
     /**

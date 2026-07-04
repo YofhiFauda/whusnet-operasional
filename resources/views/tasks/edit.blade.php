@@ -35,17 +35,34 @@
 
         <div class="bg-surface border border-border rounded-lg divide-y divide-border">
 
-            {{-- Tipe (read-only) --}}
+            {{-- Tipe --}}
+            @can('editType', $task)
+            <div class="p-5">
+                <label for="task_type" class="block text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">
+                    Tipe Task <span class="text-error normal-case tracking-normal font-normal">*</span>
+                </label>
+                <select name="task_type" id="task_type" required
+                        class="w-full border border-border rounded-md px-3 py-2 text-sm text-text-main bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition">
+                    @foreach($types as $type)
+                    <option value="{{ $type['value'] }}" {{ old('task_type', $task->task_type->value) === $type['value'] ? 'selected' : '' }}>
+                        {{ $type['label'] }}
+                    </option>
+                    @endforeach
+                </select>
+                <p class="mt-1.5 text-[11px] text-text-muted">Survey &amp; Pemasangan Baru tidak tersedia di sini.</p>
+            </div>
+            @else
             <div class="p-5">
                 <label class="block text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">Tipe Task</label>
                 <div class="flex items-center gap-2">
                     <span class="text-xs font-semibold px-3 py-1.5 rounded-md border {{ $task->task_type->cardClasses() }}">
                         {{ $task->task_type->label() }}
                     </span>
-                    <span class="text-xs text-text-muted">Tipe tidak dapat diubah setelah task dibuat.</span>
+                    <span class="text-xs text-text-muted">Anda tidak punya izin ubah tipe task.</span>
                 </div>
                 <input type="hidden" name="task_type" value="{{ $task->task_type->value }}">
             </div>
+            @endcan
 
             {{-- Judul --}}
             <div class="p-5">

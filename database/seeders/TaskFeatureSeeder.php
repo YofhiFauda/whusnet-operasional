@@ -68,6 +68,7 @@ class TaskFeatureSeeder extends Seeder
             ['code' => 'task.view.all',          'name' => 'Lihat Semua Task'],
             ['code' => 'task.create',            'name' => 'Buat Task'],
             ['code' => 'task.edit',              'name' => 'Edit Task'],
+            ['code' => 'task.edit.type',         'name' => 'Ubah Tipe Task'],
             ['code' => 'task.cancel',            'name' => 'Batalkan Task'],
             ['code' => 'task.schedule',          'name' => 'Jadwalkan Task'],
             ['code' => 'task.assign.team',       'name' => 'Assign Tim'],
@@ -121,10 +122,17 @@ class TaskFeatureSeeder extends Seeder
         }
 
         // ─── 6. Assign permission ke role FOP ────────────────────────
+        // task.edit.type SENGAJA tidak di-assign default ke role manapun.
+        // Owner/Admin assign manual lewat halaman Role & Permission bila diperlukan.
 
         $fopRole = Role::where('code', 'fop')->first();
         if ($fopRole) {
-            $fopRole->permissions()->syncWithoutDetaching($fopPermIds);
+            $fopAutoAssignIds = collect($fopPermDefs)
+                ->reject(fn ($pd) => $pd['code'] === 'task.edit.type')
+                ->map(fn ($pd) => Permission::where('code', $pd['code'])->first()?->id)
+                ->filter()
+                ->all();
+            $fopRole->permissions()->syncWithoutDetaching($fopAutoAssignIds);
         }
 
         // ─── 7. Assign permission ke role Teknisi ────────────────────

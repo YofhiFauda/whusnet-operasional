@@ -38,7 +38,7 @@
                                x-model="taskType"
                                @change="onTypeChange()"
                                class="sr-only peer"
-                               {{ old('task_type', 'survey') === $type['value'] ? 'checked' : '' }}>
+                               {{ old('task_type', $types[0]['value'] ?? '') === $type['value'] ? 'checked' : '' }}>
                         <div class="border-2 border-border rounded-md px-3 py-2.5 text-center text-xs font-semibold transition-all
                                     peer-checked:border-primary peer-checked:bg-primary-soft peer-checked:text-primary-hover
                                     hover:border-border-strong text-text-secondary">
@@ -50,6 +50,9 @@
                 {{-- SLA hint --}}
                 <p class="mt-2 text-[11px] text-text-muted">
                     SLA: <span x-text="slaLabel" class="font-semibold text-text-secondary"></span>
+                </p>
+                <p class="mt-1.5 text-[11px] text-text-muted">
+                    Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan, tidak tersedia di sini.
                 </p>
             </div>
 
@@ -280,7 +283,7 @@ function taskCreateForm() {
     const SLA_LABEL = { survey: 'Survey ≤ 2 jam', pemasangan: 'Instalasi ≤ 4 jam', maintenance: 'Maintenance ≤ 3 jam', ambil_modem: '≤ 1 jam', relokasi: '≤ 4 jam' };
 
     return {
-        taskType:           '{{ old('task_type', 'survey') }}',
+        taskType:           '{{ old('task_type', $types[0]['value'] ?? '') }}',
         selectedPopId:      '{{ old('pop_id') }}',
         scheduledAt:        '{{ old('scheduled_at') }}',
         selectedMembers:    [],

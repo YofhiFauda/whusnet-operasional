@@ -268,12 +268,20 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Tipe Task <span class="text-red-500">*</span></label>
-                                <select name="category" x-model="modal.data.category" required class="w-full text-sm border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <select name="category" x-model="modal.data.category"
+                                        :disabled="modal.isEdit && !canEditCategory"
+                                        required
+                                        class="w-full text-sm border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500">
                                     <option value="">Pilih Tipe</option>
-                                    @foreach($categories as $key => $val)
-                                        <option value="{{ $key }}">{{ $key }} - {{ $val }}</option>
-                                    @endforeach
+                                    <template x-for="[key, val] in Object.entries(availableCategories)" :key="key">
+                                        <option :value="key" x-text="key + ' - ' + val"></option>
+                                    </template>
                                 </select>
+                                <template x-if="modal.isEdit && !canEditCategory">
+                                    <input type="hidden" name="category" :value="modal.data.category">
+                                </template>
+                                <p class="mt-1 text-[10px] text-slate-400" x-show="modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
+                                <p class="mt-1 text-[10px] text-slate-400" x-show="!modal.isEdit">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-slate-700 mb-1">Tanggal & Waktu <span class="text-red-500">*</span></label>
@@ -425,6 +433,14 @@
                 techs: []
             },
             techniciansData: {!! json_encode($technicians->map(fn($t) => ['id' => $t->id, 'name' => $t->name])->toArray()) !!},
+
+            allCategoriesData: @json($categories),
+            manualCategoriesData: @json($manualCategories),
+            canEditCategory: @json($canEditFopTaskType),
+
+            get availableCategories() {
+                return this.modal.isEdit ? this.allCategoriesData : this.manualCategoriesData;
+            },
 
             getTechName(id) {
                 const tech = this.techniciansData.find(t => t.id == id);

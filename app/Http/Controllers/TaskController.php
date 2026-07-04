@@ -171,7 +171,7 @@ class TaskController extends Controller
         $user       = auth()->user();
         $pops       = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $teknisiList = $this->getTeknisiForUser($user);
-        $types      = TaskType::options();
+        $types      = $this->manualTaskTypeOptions();
 
         // Pre-fill customer jika ada query ?customer_id=
         $customer = null;
@@ -193,7 +193,7 @@ class TaskController extends Controller
         $validated = $request->validate([
             'customer_id'       => 'nullable|exists:customers,id',
             'pop_id'            => 'required|exists:pops,id',
-            'task_type'         => 'required|in:' . implode(',', array_column(TaskType::cases(), 'value')),
+            'task_type'         => 'required|in:' . implode(',', $this->manualTaskTypeValues()),
             'title'             => 'required|string|max:255',
             'description'       => 'nullable|string|max:2000',
             'scheduled_at'      => 'nullable|date|after:now',
@@ -336,7 +336,7 @@ class TaskController extends Controller
         $user        = auth()->user();
         $pops        = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $teknisiList = $this->getTeknisiForUser($user);
-        $types       = TaskType::options();
+        $types       = $this->manualTaskTypeOptions();
 
         $task->load(['customer', 'teamMembers.user']);
 
@@ -354,11 +354,19 @@ class TaskController extends Controller
         $validated = $request->validate([
             'title'             => 'sometimes|required|string|max:255',
             'description'       => 'nullable|string|max:2000',
+            'task_type'         => 'sometimes|required|in:' . implode(',', $this->manualTaskTypeValues()),
             'scheduled_at'      => 'sometimes|required|date',
             'team_member_ids'   => 'sometimes|array|min:1|max:3',
             'team_member_ids.*' => 'exists:users,id',
             'conflict_override' => 'nullable|boolean',
         ]);
+
+        // Jika tipe task berubah, perlu izin editType
+        if (isset($validated['task_type']) && $validated['task_type'] !== $task->task_type->value) {
+            $this->authorize('editType', $task);
+        } else {
+            unset($validated['task_type']);
+        }
 
         // Jika jadwal berubah, perlu izin schedule
         if (isset($validated['scheduled_at'])) {
@@ -655,6 +663,29 @@ class TaskController extends Controller
     }
 
     // ─── Private Helpers ─────────────────────────────────────────
+
+    /**
+     * Tipe task yang boleh dipakai untuk pembuatan/edit task manual.
+     * SURVEY & PEMASANGAN dikecualikan — hanya boleh dibuat otomatis
+     * lewat alur Registrasi Pelanggan (CustomerController::store()).
+     */
+    private function manualTaskTypeValues(): array
+    {
+        return array_diff(
+            array_column(TaskType::cases(), 'value'),
+            [TaskType::SURVEY->value, TaskType::PEMASANGAN->value]
+        );
+    }
+
+    private function manualTaskTypeOptions(): array
+    {
+        $excluded = [TaskType::SURVEY->value, TaskType::PEMASANGAN->value];
+
+        return collect(TaskType::options())
+            ->reject(fn ($t) => in_array($t['value'], $excluded))
+            ->values()
+            ->all();
+    }
 
     private function taskToCalendarItem(Task $task): array
     {

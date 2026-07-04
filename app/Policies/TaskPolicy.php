@@ -79,6 +79,14 @@ class TaskPolicy
     }
 
     /**
+     * Mengubah tipe task pada form edit.
+     */
+    public function editType(User $user, Task $task): bool
+    {
+        return $user->hasPermission('task.edit.type') && $task->status->isEditable();
+    }
+
+    /**
      * Menjadwalkan atau menjadwal ulang task.
      */
     public function schedule(User $user, Task $task): bool
