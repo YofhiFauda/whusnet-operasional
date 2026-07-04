@@ -64,6 +64,20 @@ class InvoiceController extends Controller
         $invoices = $query->paginate(10)->withQueryString();
         $pops = Pop::forUser()->orderBy('name')->get();
 
+        // Ringkasan tunggakan (independen dari filter/search di atas), supaya
+        // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.
+        $unpaidBase = Invoice::query()
+            ->applyUserScope()
+            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+
+        $unpaidAwalTotal = (clone $unpaidBase)
+            ->whereIn('invoice_type', ['awal', 'reaktivasi'])
+            ->sum('remaining_amount');
+
+        $unpaidBulananTotal = (clone $unpaidBase)
+            ->where('invoice_type', 'bulanan')
+            ->sum('remaining_amount');
+
         return view('invoices.index', compact(
             'invoices',
             'pops',
@@ -73,7 +87,9 @@ class InvoiceController extends Controller
             'status',
             'statusGroup',
             'invoiceType',
-            'allowedStatuses'
+            'allowedStatuses',
+            'unpaidAwalTotal',
+            'unpaidBulananTotal'
         ));
     }
 

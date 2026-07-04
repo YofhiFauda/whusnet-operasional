@@ -126,7 +126,7 @@
             <!-- FORM BODY -->
             <div class="p-6 md:p-8 flex-1">
                 
-                <!-- Errors Block ditangani otomatis oleh global Component Toast (<x-toast />) -->
+                <!-- Errors Block ditangani otomatis oleh global Component Toast (x-toast) -->
 
                 <!-- STEP 1 PANEL: Data Diri & Wilayah -->
                 <div id="step-panel-1" class="step-panel space-y-6">

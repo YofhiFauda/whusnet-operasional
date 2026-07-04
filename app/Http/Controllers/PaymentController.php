@@ -136,17 +136,25 @@ class PaymentController extends Controller
     /**
      * Store payment and update invoice paid/remaining amounts.
      */
-    public function store(Request $request, Invoice $invoice): RedirectResponse
+    public function store(Request $request, Invoice $invoice): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $this->authorizeInvoiceAccess($invoice);
 
         if ($invoice->invoice_status === 'lunas') {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Tagihan ini sudah lunas.'], 422);
+            }
+
             return redirect()
                 ->route('invoices.show', $invoice->id)
                 ->withErrors(['amount' => 'Tagihan ini sudah lunas.']);
         }
 
         if ($invoice->invoice_status === 'batal') {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Tagihan yang batal tidak dapat menerima pembayaran.'], 422);
+            }
+
             return redirect()
                 ->route('invoices.show', $invoice->id)
                 ->withErrors(['amount' => 'Tagihan yang batal tidak dapat menerima pembayaran.']);
@@ -212,9 +220,100 @@ class PaymentController extends Controller
             return $payment;
         });
 
+        if ($request->expectsJson()) {
+            $payment->invoice->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Pembayaran {$payment->payment_number} berhasil dicatat.",
+                'payment' => [
+                    'payment_number' => $payment->payment_number,
+                    'amount' => (float) $payment->amount,
+                ],
+                'invoice' => [
+                    'id' => $payment->invoice->id,
+                    'invoice_status' => $payment->invoice->invoice_status,
+                    'paid_amount' => (float) $payment->invoice->paid_amount,
+                    'remaining_amount' => (float) $payment->invoice->remaining_amount,
+                ],
+            ]);
+        }
+
         return redirect()
             ->route('invoices.show', $invoice->id)
             ->with('success', "Pembayaran {$payment->payment_number} berhasil dicatat.");
+    }
+
+    /**
+     * Bayar massal: lunasi banyak invoice sekaligus (nominal = sisa tagihan
+     * masing-masing) dari list global /invoices — dipakai kolektor untuk
+     * menyetorkan banyak pembayaran bulanan flat sekaligus, tanpa buka invoice
+     * satu-satu.
+     */
+    public function bulkStore(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'invoice_ids' => 'required|array|min:1',
+            'invoice_ids.*' => 'integer',
+            'payment_date' => 'required|date',
+            'payment_method' => 'required|in:cash,transfer,qris,lainnya',
+            'note' => 'nullable|string|max:1000',
+        ]);
+
+        $invoices = Invoice::query()
+            ->applyUserScope()
+            ->whereIn('id', $validated['invoice_ids'])
+            ->whereNotIn('invoice_status', ['lunas', 'batal'])
+            ->get();
+
+        $paid = 0;
+        $failed = 0;
+
+        foreach ($invoices as $invoice) {
+            try {
+                DB::transaction(function () use ($invoice, $validated) {
+                    $lockedInvoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+
+                    $amount = round((float) $lockedInvoice->remaining_amount, 2);
+                    if ($amount <= 0) {
+                        throw new \RuntimeException('Sisa tagihan sudah nol.');
+                    }
+
+                    $paidAmount = round((float) $lockedInvoice->paid_amount + $amount, 2);
+                    $remainingAmount = max(0, round((float) $lockedInvoice->total_amount - $paidAmount, 2));
+
+                    Payment::create([
+                        'payment_number' => $this->generatePaymentNumber($validated['payment_date']),
+                        'invoice_id' => $lockedInvoice->id,
+                        'customer_id' => $lockedInvoice->customer_id,
+                        'pop_id' => $lockedInvoice->pop_id,
+                        'payment_date' => $validated['payment_date'],
+                        'payment_method' => $validated['payment_method'],
+                        'amount' => $amount,
+                        'received_by' => auth()->id(),
+                        'payment_status' => 'valid',
+                        'note' => $validated['note'] ?? 'Pembayaran massal',
+                    ]);
+
+                    $lockedInvoice->update([
+                        'paid_amount' => $paidAmount,
+                        'remaining_amount' => $remainingAmount,
+                        'invoice_status' => $remainingAmount <= 0 ? 'lunas' : 'sebagian',
+                    ]);
+                });
+
+                $paid++;
+            } catch (\Throwable $e) {
+                $failed++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$paid} tagihan berhasil dibayar" . ($failed > 0 ? ", {$failed} gagal" : '') . '.',
+            'paid' => $paid,
+            'failed' => $failed,
+        ]);
     }
 
     private function authorizeInvoiceAccess(Invoice $invoice): void

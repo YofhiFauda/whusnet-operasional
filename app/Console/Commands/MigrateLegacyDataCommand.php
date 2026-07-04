@@ -81,6 +81,7 @@ protected $signature = 'app:import-legacy-sql
         $riwayatBarangRows = $this->parseTableData($sql, 'riwayatstatus_penggunabarang');
         $buktiLunasRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksilunas');
         $buktiPemasanganRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksipemasangan');
+        $riwayatPelangganRows = $this->parseTableData($sql, 'riwayat_pelanggan');
 
         $this->info("Parsed counts:");
         $this->line("- cabang: " . count($cabangRows));
@@ -98,6 +99,27 @@ protected $signature = 'app:import-legacy-sql
         $this->line("- riwayatstatus_penggunabarang: " . count($riwayatBarangRows));
         $this->line("- apikeuangan_buktitransaksilunas: " . count($buktiLunasRows));
         $this->line("- apikeuangan_buktitransaksipemasangan: " . count($buktiPemasanganRows));
+        $this->line("- riwayat_pelanggan: " . count($riwayatPelangganRows));
+
+        // Real activation timestamp map: IDPERMINTAAN => earliest "Berhasil Active"
+        // TGLTINDAKAN. prosedure_permintaan_wifi's own TGL_AKTIFPUTUS/TGLSELESAI/
+        // TGLDIACC are frequently '0000-00-00' or blank, but this status-history
+        // table almost always has the real event that flipped the customer active.
+        $activationLogByRequest = [];
+        foreach ($riwayatPelangganRows as $row) {
+            if (($row['STATUSTINDAKAN'] ?? '') !== 'Berhasil Active') {
+                continue;
+            }
+            $requestId = $row['IDPERMINTAAN'] ?? '';
+            $tgl = $row['TGLTINDAKAN'] ?? '';
+            if ($requestId === '' || empty($tgl)) {
+                continue;
+            }
+            $existing = $activationLogByRequest[$requestId] ?? null;
+            if ($existing === null || strcmp($tgl, $existing) < 0) {
+                $activationLogByRequest[$requestId] = $tgl;
+            }
+        }
 
         // Asset map: IDPERMINTAAN => { brand_label, mac, serial } sourced from the
         // real device-rental history tables, used as fallback when
@@ -490,12 +512,39 @@ protected $signature = 'app:import-legacy-sql
                 continue;
             }
 
-            $actDate = now()->format('Y-m-d');
-            if (!empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
+            // Fallback chain through progressively earlier/less-specific legacy
+            // date fields. Deliberately does NOT default to now() when none of
+            // these exist — a silently "today" activation_date makes a decades-
+            // old customer look like they just activated this month, which
+            // fools any code that reasons about "billed this activation period"
+            // (e.g. GenerateMonthlyInvoicesCommand's double-bill guard).
+            $actDate = null;
+            $isZeroDate = fn($v) => empty($v) || str_starts_with((string) $v, '0000-00-00');
+            if (!$isZeroDate($row['TGL_AKTIFPUTUS'] ?? null)) {
                 $actDate = $row['TGL_AKTIFPUTUS'];
-            } elseif (!empty($row['TGLSELESAI'])) {
+            } elseif (!$isZeroDate($row['TGLSELESAI'] ?? null)) {
                 try {
                     $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            } elseif (!$isZeroDate($row['TGLDIPROSES'] ?? null)) {
+                try {
+                    $actDate = \Carbon\Carbon::parse($row['TGLDIPROSES'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            } elseif (!$isZeroDate($row['TGLDIACC'] ?? null)) {
+                try {
+                    $actDate = \Carbon\Carbon::parse($row['TGLDIACC'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
+            }
+
+            // Last resort: riwayat_pelanggan's "Berhasil Active" status-change log.
+            // prosedure_permintaan_wifi's own date fields are often blank/zero, but
+            // this history table almost always has the real event timestamp.
+            if ($actDate === null && !empty($activationLogByRequest[$row['IDPERMINTAAN'] ?? ''])) {
+                try {
+                    $actDate = \Carbon\Carbon::parse($activationLogByRequest[$row['IDPERMINTAAN']])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
@@ -824,6 +873,14 @@ protected $signature = 'app:import-legacy-sql
         // Sheet 6: payments
         $paymentsSheet = [];
         foreach ($buktiRows as $row) {
+            // BAYAR=0 rows are activation/log placeholders, not real payments
+            // (legacy system logs the billing event itself before money is
+            // actually collected) — skip so we don't create a phantom "Valid"
+            // Rp 0 payment against the invoice.
+            if ((int) ($row['BAYAR'] ?? 0) <= 0) {
+                continue;
+            }
+
             $reqCust = $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
             $invCust = $invoiceToCustomerMap[$row['IDTRANSAKSI'] ?? ''] ?? '';
             $cust = $invCust ?: $reqCust;

@@ -3,8 +3,12 @@
 namespace App\Providers;
 
 use Carbon\Carbon;
+use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Task;
+use App\Observers\InvoiceObserver;
+use App\Observers\PaymentObserver;
 use App\Policies\TaskPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +34,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Register Policies
         Gate::policy(Task::class, TaskPolicy::class);
+
+        // Centralized invoice/payment guards — applies to every insert path
+        // (controllers, artisan commands, future API), not just one controller.
+        Invoice::observe(InvoiceObserver::class);
+        Payment::observe(PaymentObserver::class);
 
         // Register Blade Directives for formatting
         \Illuminate\Support\Facades\Blade::directive('rupiah', function ($expression) {

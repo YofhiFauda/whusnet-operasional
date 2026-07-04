@@ -688,60 +688,101 @@
                 </div>
 
                 @if($customer->invoices && $customer->invoices->count() > 0)
-                    <div class="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
-                        <table class="w-full text-left border-collapse text-xs">
-                            <thead>
-                                <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider text-[10px]">
-                                    <th class="px-4 py-3">No. Tagihan</th>
-                                    <th class="px-4 py-3">Periode</th>
-                                    <th class="px-4 py-3">Tanggal Terbit</th>
-                                    <th class="px-4 py-3">Jatuh Tempo</th>
-                                    <th class="px-4 py-3 text-right">Total Tagihan</th>
-                                    <th class="px-4 py-3 text-center">Status</th>
-                                    <th class="px-4 py-3">Dibuat Oleh</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 text-slate-700">
-                                @foreach($customer->invoices as $invoice)
-                                    <tr class="hover:bg-slate-50/50 transition-colors">
-                                        <td class="px-4 py-3 font-mono font-bold text-slate-800">
-                                            @can('invoices.view')
-                                                <a href="{{ route('invoices.show', $invoice->id) }}" class="text-sky-700 hover:text-sky-900">{{ $invoice->invoice_number }}</a>
-                                            @else
-                                                {{ $invoice->invoice_number }}
-                                            @endcan
-                                        </td>
-                                        <td class="px-4 py-3 font-mono">{{ $invoice->billing_period }}</td>
-                                        <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->issue_date) }}</td>
-                                        <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->due_date) }}</td>
-                                        <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format($invoice->total_amount, 2, ',', '.') }}</td>
-                                        <td class="px-4 py-3 text-center">
-                                            @php
-                                                $statusClass = match($invoice->invoice_status) {
-                                                    'lunas' => 'bg-green-50 text-green-700 border-green-200',
-                                                    'sebagian' => 'bg-blue-50 text-blue-700 border-blue-200',
-                                                    'belum_dibayar' => 'bg-amber-50 text-amber-700 border-amber-200',
-                                                    'batal' => 'bg-red-50 text-red-700 border-red-200',
-                                                    default => 'bg-slate-50 text-slate-700 border-slate-200',
-                                                };
-                                                $statusLabel = match($invoice->invoice_status) {
-                                                    'lunas' => 'Lunas',
-                                                    'sebagian' => 'Sebagian',
-                                                    'belum_dibayar' => 'Belum Dibayar',
-                                                    'batal' => 'Batal',
-                                                    default => ucwords(str_replace('_', ' ', $invoice->invoice_status)),
-                                                };
-                                            @endphp
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusClass }}">
-                                                {{ $statusLabel }}
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 text-slate-500">{{ $invoice->creator->name ?? 'System' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    @php
+                        $invoicesAwal = $customer->invoices->filter(fn($inv) => in_array($inv->invoice_type?->value, ['awal', 'reaktivasi'], true));
+                        $invoicesBulanan = $customer->invoices->filter(fn($inv) => $inv->invoice_type?->value === 'bulanan');
+                    @endphp
+
+                    @foreach ([
+                        ['title' => 'Tagihan Awal / Registrasi', 'rows' => $invoicesAwal, 'badge' => 'bg-orange-50 text-orange-700 border-orange-200'],
+                        ['title' => 'Tagihan Bulanan', 'rows' => $invoicesBulanan, 'badge' => 'bg-sky-50 text-sky-700 border-sky-200'],
+                    ] as $group)
+                        <div class="{{ !$loop->first ? 'mt-6' : '' }}">
+                            <h4 class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">{{ $group['title'] }} ({{ $group['rows']->count() }})</h4>
+                            @if($group['rows']->count() > 0)
+                                <div class="overflow-x-auto border border-slate-200 rounded-lg shadow-sm">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider text-[10px]">
+                                                <th class="px-4 py-3">No. Tagihan</th>
+                                                <th class="px-4 py-3">Jenis</th>
+                                                <th class="px-4 py-3">Periode</th>
+                                                <th class="px-4 py-3">Tanggal Terbit</th>
+                                                <th class="px-4 py-3">Jatuh Tempo</th>
+                                                <th class="px-4 py-3 text-right">Total Tagihan</th>
+                                                <th class="px-4 py-3 text-center">Status</th>
+                                                <th class="px-4 py-3">Dibuat Oleh</th>
+                                                @can('payments.create')
+                                                    <th class="px-4 py-3 text-center">Aksi</th>
+                                                @endcan
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                                            @foreach($group['rows'] as $invoice)
+                                                <tr class="hover:bg-slate-50/50 transition-colors" id="invoice-row-{{ $invoice->id }}">
+                                                    <td class="px-4 py-3 font-mono font-bold text-slate-800">
+                                                        @can('invoices.view')
+                                                            <a href="{{ route('invoices.show', $invoice->id) }}" class="text-sky-700 hover:text-sky-900">{{ $invoice->invoice_number }}</a>
+                                                        @else
+                                                            {{ $invoice->invoice_number }}
+                                                        @endcan
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $group['badge'] }}">
+                                                            {{ $invoice->invoice_type?->label() ?? ucfirst((string) $invoice->invoice_type) }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3 font-mono">{{ $invoice->billing_period }}</td>
+                                                    <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->issue_date) }}</td>
+                                                    <td class="px-4 py-3">{{ \App\Support\IndonesianDate::date($invoice->due_date) }}</td>
+                                                    <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format($invoice->total_amount, 2, ',', '.') }}</td>
+                                                    <td class="px-4 py-3 text-center">
+                                                        @php
+                                                            $statusClass = match($invoice->invoice_status) {
+                                                                'lunas' => 'bg-green-50 text-green-700 border-green-200',
+                                                                'sebagian' => 'bg-blue-50 text-blue-700 border-blue-200',
+                                                                'belum_dibayar' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                                                'batal' => 'bg-red-50 text-red-700 border-red-200',
+                                                                default => 'bg-slate-50 text-slate-700 border-slate-200',
+                                                            };
+                                                            $statusLabel = match($invoice->invoice_status) {
+                                                                'lunas' => 'Lunas',
+                                                                'sebagian' => 'Sebagian',
+                                                                'belum_dibayar' => 'Belum Dibayar',
+                                                                'batal' => 'Batal',
+                                                                default => ucwords(str_replace('_', ' ', $invoice->invoice_status)),
+                                                            };
+                                                        @endphp
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusClass }}" id="invoice-status-badge-{{ $invoice->id }}" data-badge-style="tag">
+                                                            {{ $statusLabel }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-slate-500">{{ $invoice->creator->name ?? 'System' }}</td>
+                                                    @can('payments.create')
+                                                        <td class="px-4 py-3 text-center">
+                                                            @if(!in_array($invoice->invoice_status, ['lunas', 'batal']))
+                                                                <button type="button"
+                                                                        onclick="openQuickPaymentModal({{ $invoice->id }}, '{{ $invoice->invoice_number }}', {{ (float) $invoice->remaining_amount }})"
+                                                                        class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer">
+                                                                    Bayar
+                                                                </button>
+                                                            @else
+                                                                <span class="text-slate-300 text-[10px]">—</span>
+                                                            @endif
+                                                        </td>
+                                                    @endcan
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="py-6 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg text-xs">
+                                    Belum ada {{ strtolower($group['title']) }}.
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
                 @else
                     <div class="py-12 text-center text-slate-400 bg-slate-50/20 border border-dashed border-slate-200 rounded-lg">
                         <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -841,6 +882,19 @@
                                                class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-mono">
                                     </div>
 
+                                    <div>
+                                        <label for="invoice_type" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                            Jenis Tagihan
+                                            <span class="text-slate-400 font-normal normal-case">— pilih manual, jangan andalkan tebakan sistem</span>
+                                        </label>
+                                        <select name="invoice_type" id="invoice_type" required
+                                                class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 text-xs font-semibold">
+                                            <option value="bulanan" {{ $customer->invoices->count() > 0 ? 'selected' : '' }}>Tagihan Bulanan Rutin</option>
+                                            <option value="awal" {{ $customer->invoices->count() === 0 ? 'selected' : '' }}>Tagihan Awal (PSB)</option>
+                                            <option value="reaktivasi">Tagihan Reaktivasi</option>
+                                        </select>
+                                    </div>
+
                                     <!-- Biaya Tambahan Di Luar Standar -->
                                     <div class="border-t border-slate-100 pt-4">
                                         <div class="flex items-center justify-between mb-3">
@@ -936,6 +990,8 @@
                     </div>
                 @endif
             @endcan
+
+            @include('partials.quick-payment-modal')
 
             <!-- Tab 8: Pembayaran -->
             <div id="tab-content-pembayaran" class="tab-content hidden space-y-6">

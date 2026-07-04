@@ -126,6 +126,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:payments.create')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::post('/invoices/bulk-pay', [PaymentController::class, 'bulkStore'])->name('invoices.payments.bulk-store');
     });
 
     Route::middleware('permission:customers.view')->group(function () {

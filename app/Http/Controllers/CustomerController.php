@@ -1264,7 +1264,7 @@ class CustomerController extends Controller
                 'monthly_price' => $package instanceof InternetPackage ? $package->monthly_price : ($package['monthly_price'] ?? 0),
                 'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float)$row['other_fee'] : 0,
                 'service_status' => $serviceStatus,
-                'activation_date' => $this->normalizeLegacyDate($row['activation_date'] ?? $row['finished_at'] ?? null) ?? now()->format('Y-m-d'),
+                'activation_date' => $this->normalizeLegacyDate($row['activation_date'] ?? $row['finished_at'] ?? null),
                 'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null),
                 'status_row' => $statusRow,
                 'errors' => $errors,
@@ -1761,7 +1761,12 @@ class CustomerController extends Controller
                         'ppn' => $ppnPercent,
                         'other_fee' => $otherFee > 0 ? $otherFee : null,
                         'total_monthly_bill' => $totalBill,
-                        'activation_date' => $row['activation_date'] ?? now()->format('Y-m-d'),
+                        // No fallback to now() here: a fabricated "activated today" date
+                        // makes a decades-old migrated customer look freshly activated,
+                        // which fools anything reasoning about "billed this activation
+                        // period" (e.g. GenerateMonthlyInvoicesCommand's double-bill guard).
+                        // Leave it null if the legacy dump genuinely has no date for it.
+                        'activation_date' => $row['activation_date'] ?? null,
                         'due_date' => $row['due_date'] ?? null,
                         'service_status' => $serviceStatus,
                         'billing_status' => ($serviceStatus === 'active') ? 'active' : 'inactive',
@@ -2564,6 +2569,7 @@ class CustomerController extends Controller
             'billing_period'          => 'required|date_format:Y-m',
             'issue_date'              => 'required|date',
             'due_date'                => 'required|date|after_or_equal:issue_date',
+            'invoice_type'            => ['required', \Illuminate\Validation\Rule::enum(\App\Enums\InvoiceType::class)],
             'prorate_amount'          => 'nullable|numeric|min:0',
             'extra_cable_fee'         => 'nullable|numeric|min:0',
             'extra_installation_fee'  => 'nullable|numeric|min:0',
@@ -2573,6 +2579,7 @@ class CustomerController extends Controller
         $billingPeriod        = $validated['billing_period'];
         $issueDate            = $validated['issue_date'];
         $dueDate              = $validated['due_date'];
+        $invoiceType          = \App\Enums\InvoiceType::from($validated['invoice_type']);
         $prorateAmount        = (float)($validated['prorate_amount'] ?? 0);
         $extraCableFee        = (float)($validated['extra_cable_fee'] ?? 0);
         $extraInstallationFee = (float)($validated['extra_installation_fee'] ?? 0);
@@ -2589,20 +2596,23 @@ class CustomerController extends Controller
             return redirect()->back()->withErrors(['error' => 'Pelanggan tidak memiliki layanan aktif.']);
         }
 
-        // Cek invoice dobel untuk periode yang sama
+        // Cek invoice dobel untuk periode + jenis tagihan yang sama (bukan
+        // seluruh periode, karena AWAL dan BULANAN sah muncul bersamaan di
+        // periode yang sama — misal saat reaktivasi).
         $exists = \App\Models\Invoice::where('customer_id', $customer->id)
             ->where('billing_period', $billingPeriod)
+            ->where('invoice_type', $invoiceType->value)
             ->exists();
 
         if ($exists) {
-            return redirect()->back()->withErrors(['billing_period' => "Tagihan untuk periode {$billingPeriod} sudah pernah dibuat untuk pelanggan ini."]);
+            return redirect()->back()->withErrors(['billing_period' => "Tagihan {$invoiceType->label()} untuk periode {$billingPeriod} sudah pernah dibuat untuk pelanggan ini."]);
         }
 
         // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
         $periodCode = str_replace('-', '', $billingPeriod);
         
         $invoice = \Illuminate\Support\Facades\DB::transaction(function () use (
-            $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode,
+            $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode, $invoiceType,
             $prorateAmount, $extraCableFee, $extraInstallationFee, $extraPoleFee
         ) {
             $lastInvoice = \App\Models\Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
@@ -2636,7 +2646,7 @@ class CustomerController extends Controller
 
             $newInvoice = \App\Models\Invoice::create([
                 'invoice_number'          => $invoiceNumber,
-                'invoice_type'            => ($extraInstallationFee > 0 || $prorateAmount > 0) ? \App\Enums\InvoiceType::AWAL->value : \App\Enums\InvoiceType::BULANAN->value,
+                'invoice_type'            => $invoiceType->value,
                 'customer_id'             => $customer->id,
                 'pop_id'                  => $customer->pop_id,
                 'customer_service_id'     => $service->id,
