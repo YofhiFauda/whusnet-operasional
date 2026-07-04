@@ -1960,9 +1960,18 @@ class CustomerController extends Controller
                     $invoiceNumber = 'INV-' . $legacyInvoiceId;
                     $totalAmount = (float)$row['total_amount'];
 
+                    // Legacy data mixes biaya pasang (install) & biaya bulanan into one
+                    // record; MigrateLegacyDataCommand now splits it into two invoice
+                    // rows (suffixed -AWAL/-BULANAN) and tags each with the real type.
+                    $invoiceType = \App\Enums\InvoiceType::tryFrom((string)($row['invoice_type'] ?? ''))
+                        ?? \App\Enums\InvoiceType::BULANAN;
+                    $subtotal = $invoiceType === \App\Enums\InvoiceType::AWAL
+                        ? (float) ($row['installation_fee'] ?? 0) + (float) ($row['other_fee'] ?? 0) + (float) ($row['prorate_amount'] ?? 0)
+                        : ($row['monthly_fee'] ?? $service->monthly_price);
+
                     $invoice = Invoice::create([
                         'invoice_number' => $invoiceNumber,
-                        'invoice_type' => \App\Enums\InvoiceType::BULANAN->value,
+                        'invoice_type' => $invoiceType->value,
                         'old_invoice_id' => $legacyInvoiceId,
                         'old_cost_id' => $row['old_cost_id'] ?? null,
                         'old_request_id' => $row['old_request_id'] ?? null,
@@ -1973,7 +1982,7 @@ class CustomerController extends Controller
                         'billing_period' => $row['billing_period'],
                         'issue_date' => $this->normalizeLegacyDate($row['issue_date'] ?? null) ?? now()->format('Y-m-d'),
                         'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null) ?? now()->addDays(10)->format('Y-m-d'),
-                        'subtotal' => $row['monthly_fee'] ?? $service->monthly_price,
+                        'subtotal' => $subtotal,
                         'discount' => 0.00,
                         'ppn' => 0.00, // Legacy invoices use 0% PPN
                         'total_amount' => $totalAmount,

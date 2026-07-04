@@ -52,9 +52,35 @@ protected $signature = 'app:import-legacy-sql
         $laporanRows = $this->parseTableData($sql, 'laporan_pemasangan_wifi');
         $biayaRows = $this->parseTableData($sql, 'biaya_tagihan');
         $buktiRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksitagihan');
+        // Legacy apikeuangan_buktitransaksitagihan has the same retry/duplicate-submit
+        // bug as biaya_tagihan: the same request gets dozens of near-identical proof
+        // rows (same IDPERMINTAAN, same BAYAR, seconds/minutes apart, same day) —
+        // different IDUNIQ/IDTRANSAKSI each time, so naive dedup-by-id misses it.
+        // Collapse to one row per (request, amount, day) before it's used anywhere.
+        $buktiDedupSeen = [];
+        $dedupedBuktiRows = [];
+        foreach ($buktiRows as $row) {
+            $dateOnly = '';
+            try {
+                $dateOnly = \Carbon\Carbon::parse($row['INSERTED_AT'] ?? '')->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+            $signature = ($row['IDPERMINTAAN'] ?? '') . '|' . (int) ($row['BAYAR'] ?? 0) . '|' . $dateOnly;
+            if (isset($buktiDedupSeen[$signature])) {
+                continue;
+            }
+            $buktiDedupSeen[$signature] = true;
+            $dedupedBuktiRows[] = $row;
+        }
+        $buktiRows = $dedupedBuktiRows;
         $surveyRows = $this->parseTableData($sql, 'survey_pemasangan_wifi');
         $oltRows = $this->parseTableData($sql, 'olt_slot_register');
         $distribusiRows = $this->parseTableData($sql, 'kode_kontrol_distribusi');
+        $barangRows = $this->parseTableData($sql, 'barang');
+        $merkBarangRows = $this->parseTableData($sql, 'merk_barang');
+        $riwayatBarangRows = $this->parseTableData($sql, 'riwayatstatus_penggunabarang');
+        $buktiLunasRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksilunas');
+        $buktiPemasanganRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksipemasangan');
 
         $this->info("Parsed counts:");
         $this->line("- cabang: " . count($cabangRows));
@@ -67,6 +93,65 @@ protected $signature = 'app:import-legacy-sql
         $this->line("- survey_pemasangan_wifi: " . count($surveyRows));
         $this->line("- olt_slot_register: " . count($oltRows));
         $this->line("- kode_kontrol_distribusi: " . count($distribusiRows));
+        $this->line("- barang: " . count($barangRows));
+        $this->line("- merk_barang: " . count($merkBarangRows));
+        $this->line("- riwayatstatus_penggunabarang: " . count($riwayatBarangRows));
+        $this->line("- apikeuangan_buktitransaksilunas: " . count($buktiLunasRows));
+        $this->line("- apikeuangan_buktitransaksipemasangan: " . count($buktiPemasanganRows));
+
+        // Asset map: IDPERMINTAAN => { brand_label, mac, serial } sourced from the
+        // real device-rental history tables, used as fallback when
+        // laporan_pemasangan_wifi's own MACADDR_ROOTER/SNROOTER_FIBER are empty.
+        $barangByCode = [];
+        foreach ($barangRows as $row) {
+            if (!empty($row['KODEBARANG'])) {
+                $barangByCode[$row['KODEBARANG']] = $row;
+            }
+        }
+        $merkBarangById = [];
+        foreach ($merkBarangRows as $row) {
+            if (!empty($row['IDMERK'])) {
+                $merkBarangById[$row['IDMERK']] = $row;
+            }
+        }
+        $assetByRequest = [];
+        foreach ($riwayatBarangRows as $row) {
+            $requestId = $row['IDPERMINTAAN'] ?? '';
+            if ($requestId === '' || isset($assetByRequest[$requestId])) {
+                continue;
+            }
+            $barang = $barangByCode[$row['KODEBARANG'] ?? ''] ?? null;
+            $merk = $merkBarangById[$barang['MERKBARANG'] ?? ''] ?? null;
+            $assetByRequest[$requestId] = [
+                'brand_label' => trim((string) ($row['MERKBARANG'] ?? '')),
+                'mac' => $barang['MACADDRESS'] ?? '',
+                'serial' => $merk['SERIALNUMBER'] ?? '',
+            ];
+        }
+
+        // Payment-truth map: IDTRANSAKSI => first (oldest) real payment proof row,
+        // sourced from apikeuangan_buktitransaksilunas which has the real payment
+        // method/receiver/note (unlike apikeuangan_buktitransaksitagihan).
+        $lunasByTransaction = [];
+        foreach ($buktiLunasRows as $row) {
+            $transactionId = $row['IDTRANSAKSI'] ?? '';
+            if ($transactionId === '') {
+                continue;
+            }
+            $existing = $lunasByTransaction[$transactionId] ?? null;
+            if ($existing === null || strcmp((string) $row['TGLBAYAR'], (string) $existing['TGLBAYAR']) < 0) {
+                $lunasByTransaction[$transactionId] = $row;
+            }
+        }
+
+        // Installation-fee payment map: IDPERMINTAAN (actually holds the invoice code, e.g. IN000006) => TGLBAYAR
+        $installationPaidAt = [];
+        foreach ($buktiPemasanganRows as $row) {
+            $invoiceCode = $row['IDPERMINTAAN'] ?? '';
+            if ($invoiceCode !== '' && !isset($installationPaidAt[$invoiceCode])) {
+                $installationPaidAt[$invoiceCode] = $row['TGLBAYAR'] ?? null;
+            }
+        }
 
         if (empty($paketRows) && empty($penggunaRows)) {
             $this->error("No data parsed. Make sure the SQL format matches.");
@@ -547,27 +632,38 @@ protected $signature = 'app:import-legacy-sql
                 }
             }
 
+            // Fallback to real device-rental asset data when the installation
+            // report itself left MAC/serial empty (very common in legacy data).
+            $asset = $assetByRequest[$row['IDPERMINTAAN'] ?? ''] ?? null;
+            $ontSn = $row['SNROOTER_FIBER'] ?: ($asset['serial'] ?? '');
+            $routerMac = $row['MACADDR_ROOTER'] ?: ($asset['mac'] ?? '');
+            $note = trim((string) ($row['KETERANGAN'] ?? ''));
+            if (!empty($asset['brand_label']) && !str_contains($note, $asset['brand_label'])) {
+                $assetNote = 'Perangkat: ' . $asset['brand_label'] . ' (dari data aset migrasi)';
+                $note = $note !== '' ? $note . ' | ' . $assetNote : $assetNote;
+            }
+
             $technicalSheet[] = [
                 'old_report_id' => $row['IDREPORT'],
                 'old_customer_id' => $row['IDPENGGUNA'] ?? '',
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'connection_type' => $row['JENIS'] ?: 'KABEL',
-                'ont_sn' => $row['SNROOTER_FIBER'] ?? '',
+                'ont_sn' => $ontSn,
                 'ip_address' => $row['IPADDR'] ?? '',
                 'odp_code' => $row['NOMOR_ODP'] ?? '',
                 'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
                 'olt_code' => $oltCode,
                 'olt_port' => $oltPort,
                 'vlan_id' => '',
-                
+
                 // Full Device & Technical Fields mapping
                 'ssid' => $row['SSID'] ?? '',
                 'antenna_mac' => $row['MACADDR_ANTENA'] ?? '',
-                'router_mac' => $row['MACADDR_ROOTER'] ?? '',
+                'router_mac' => $routerMac,
                 'wireless_signal' => $row['SIGNAL_WIRELESS'] ?? '',
                 'fiber_signal' => $row['SIGNAL_KABEL'] ?? '',
                 'location_source' => $row['LOKASIPEMANCAR'] ?? '',
-                'note' => $row['KETERANGAN'] ?? '',
+                'note' => $note,
                 'form_photo' => $row['FOTOFORMULIR'] ?? '',
                 'signed_form_photo' => $row['FOTOTTDFORMULIR'] ?? '',
                 'router_photo' => $row['FOTOROOTER'] ?? '',
@@ -577,7 +673,7 @@ protected $signature = 'app:import-legacy-sql
                 'passive_device' => $row['BRG_OUTDOOR'] ?? '',
                 'branch_number' => $penggunaMap[$row['IDPENGGUNA']]['IDCABANG'] ?? '',
                 'pop_number' => $penggunaMap[$row['IDPENGGUNA']]['IDWILAYAH'] ?? '',
-                'router_number' => $row['MACADDR_ROOTER'] ?? '',
+                'router_number' => $routerMac,
                 'initial_attenuation' => $this->cleanDecimal(is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null), -999.99, 999.99),
                 'actual_attenuation' => $this->cleanDecimal(is_numeric($actualAttenuation) ? (float)$actualAttenuation : null, -999.99, 999.99),
                 'test_date' => $reqDate,
@@ -593,9 +689,59 @@ protected $signature = 'app:import-legacy-sql
             ];
         }
 
+        // Legacy `biaya_tagihan` sometimes has the exact same billing row inserted
+        // many times back to back (retry/duplicate-submit bug: same customer,
+        // same request, same fee amounts, seconds/minutes apart, same day).
+        // Collapse those to one canonical row (the earliest) and remap every
+        // duplicate's own IDBIAYA to it, so a payment tied to a duplicate's code
+        // still lands on the surviving invoice instead of an invoice we never
+        // generate.
+        $canonicalCostId = [];
+        $dedupSeen = [];
+        foreach ($biayaRows as $row) {
+            $dateOnly = '';
+            try {
+                $dateOnly = \Carbon\Carbon::parse($row['TGLINSERT'] ?? '')->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+            $signature = implode('|', [
+                $row['IDPELANGGAN'] ?? '',
+                $row['IDPERMINTAAN'] ?? '',
+                $row['BIAYAPASANG'] ?? '',
+                $row['BIAYABULANAN'] ?? '',
+                $row['BIAYALAINLAIN'] ?? '',
+                $dateOnly,
+            ]);
+            if (!isset($dedupSeen[$signature])) {
+                $dedupSeen[$signature] = $row['IDBIAYA'];
+            }
+            $canonicalCostId[$row['IDBIAYA']] = $dedupSeen[$signature];
+        }
+
+        // Sum of apikeuangan_buktitransaksitagihan.BAYAR per cost id (IDTRANSAKSI,
+        // falling back to IDPERMINTAAN), used below to grab the amount legacy
+        // admins actually collected instead of recomputing it.
+        $costPaymentMap = [];
+        foreach ($buktiRows as $row) {
+            $costId = $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'];
+            if ($costId === '') {
+                continue;
+            }
+            $costId = $canonicalCostId[$costId] ?? $costId;
+            $costPaymentMap[$costId] = ($costPaymentMap[$costId] ?? 0) + (int) ($row['BAYAR'] ?? 0);
+        }
+
         // Sheet 5: invoices
         $invoicesSheet = [];
+        // IDBIAYA => 'awal' | 'bulanan', so the payments loop below can route each
+        // buktiRow to the invoice actually generated for its cost id.
+        $invoiceTypeByCostId = [];
         foreach ($biayaRows as $row) {
+            // Skip duplicate rows collapsed into an earlier canonical row.
+            if (($canonicalCostId[$row['IDBIAYA']] ?? $row['IDBIAYA']) !== $row['IDBIAYA']) {
+                continue;
+            }
+
             // Filter: skip internal users
             $cust = $row['IDPELANGGAN'] ?? $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
             if (!str_starts_with($cust, 'PE')) {
@@ -613,40 +759,66 @@ protected $signature = 'app:import-legacy-sql
             $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
             $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
 
-            // Find package price for monthly fee verification
-            $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN']);
-            $pkgPrice = 0;
-            if ($req && !empty($req['IDPAKET'])) {
-                $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
-                $pkgPrice = (int) ($pkg['HARGA'] ?? 0);
-            }
-
+            $costId = $row['IDBIAYA'];
+            $installationFee = (int) ($row['BIAYAPASANG'] ?? 0);
+            $otherFee = (int) ($row['BIAYALAINLAIN'] ?? 0);
             $monthlyFee = (int) ($row['BIAYABULANAN'] ?? 0);
-            $prorateAmount = null;
-            if ($pkgPrice > 0 && $monthlyFee < $pkgPrice) {
-                $prorateAmount = $monthlyFee;
-            }
 
-            $invoicesSheet[] = [
-                'old_invoice_id' => $row['IDBIAYA'],
-                'old_cost_id' => $row['IDBIAYA'],
+            $baseInvoice = [
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'old_customer_id' => $row['IDPELANGGAN'] ?: $cust,
                 'billing_period' => $billingPeriod,
-                'total_amount' => (int) ($row['TOTALBIAYA'] ?? 0),
                 'issue_date' => $issueDate,
                 'due_date' => $dueDate,
-                'monthly_fee' => $monthlyFee,
                 'status' => 'belum_dibayar',
-                
-                // Extended breakdown fields
-                'installation_fee' => (int) ($row['BIAYAPASANG'] ?? 0),
-                'other_fee' => (int) ($row['BIAYALAINLAIN'] ?? 0),
-                'prorate_amount' => $prorateAmount,
                 'extra_cable_fee' => 0,
                 'extra_installation_fee' => 0,
                 'extra_pole_fee' => 0,
             ];
+
+            // `biaya_tagihan` doubles as both the one-time PSB/registration bill
+            // (rows with BIAYAPASANG/BIAYALAINLAIN) and, for long-standing
+            // customers, a genuine recurring monthly billing log (rows without
+            // those fees). Only the registration row bundles a possibly-prorated
+            // first month; regular rows are always flat.
+            $isRegistrationRow = $installationFee > 0 || $otherFee > 0;
+
+            if ($isRegistrationRow) {
+                $billedTotal = $installationFee + $otherFee + $monthlyFee;
+
+                // Legacy admins hand-prorate the registration bill and never write
+                // that number back into biaya_tagihan — grab what was actually
+                // collected (tagihan proof + pemasangan proof) as the real total
+                // instead of recomputing pasang + lainlain + bulanan.
+                $paidFromTagihan = $costPaymentMap[$costId] ?? 0;
+                $paidFromPasang = ($installationPaidAt[$costId] ?? null) !== null ? $installationFee : 0;
+                $actualPaid = $paidFromTagihan + $paidFromPasang;
+                $totalAmount = $actualPaid > 0 ? $actualPaid : $billedTotal;
+
+                $invoiceTypeByCostId[$costId] = 'awal';
+                $invoicesSheet[] = array_merge($baseInvoice, [
+                    'old_invoice_id' => $costId . '-AWAL',
+                    'old_cost_id' => $costId . '-AWAL',
+                    'invoice_type' => 'awal',
+                    'total_amount' => $totalAmount,
+                    'monthly_fee' => null,
+                    'installation_fee' => $installationFee,
+                    'other_fee' => $otherFee,
+                    'prorate_amount' => $totalAmount < $billedTotal ? $totalAmount : null,
+                ]);
+            } elseif ($monthlyFee > 0) {
+                $invoiceTypeByCostId[$costId] = 'bulanan';
+                $invoicesSheet[] = array_merge($baseInvoice, [
+                    'old_invoice_id' => $costId . '-BULANAN',
+                    'old_cost_id' => $costId . '-BULANAN',
+                    'invoice_type' => 'bulanan',
+                    'total_amount' => $monthlyFee,
+                    'monthly_fee' => $monthlyFee,
+                    'installation_fee' => 0,
+                    'other_fee' => 0,
+                    'prorate_amount' => null,
+                ]);
+            }
         }
 
         // Sheet 6: payments
@@ -677,18 +849,76 @@ protected $signature = 'app:import-legacy-sql
                 }
             }
 
+            // Enrich with the real payment proof (method/receiver/note) from
+            // apikeuangan_buktitransaksilunas, keyed by the same invoice/transaction code.
+            $lunas = $lunasByTransaction[$row['IDTRANSAKSI'] ?? ''] ?? null;
+
+            $costId = $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'];
+            $costId = $canonicalCostId[$costId] ?? $costId;
+            // Route to whichever invoice was actually generated for this cost id
+            // (registration/AWAL vs. flat recurring/BULANAN); default to BULANAN
+            // when the cost id wasn't seen in Sheet 5 (e.g. filtered-out row).
+            $invoiceType = strtoupper($invoiceTypeByCostId[$costId] ?? 'bulanan');
+
             $paymentsSheet[] = [
                 'old_payment_id' => $row['IDUNIQ'],
-                'old_invoice_id' => $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'],
+                'old_invoice_id' => $costId . '-' . $invoiceType,
                 'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'old_customer_id' => $cust,
                 'billing_period' => $billingPeriod,
                 'amount' => (int) ($row['BAYAR'] ?? 0),
                 'payment_date' => $payDate,
+                'payment_method' => $lunas['JENISPEMBAYARAN'] ?? 'cash',
+                'received_by_old' => $this->resolveLegacyUserLabel($lunas['IDPENERIMA'] ?? '', $penggunaMap),
+                'deposited_by_old' => $this->resolveLegacyUserLabel($lunas['IDPENYETOR'] ?? '', $penggunaMap),
+                'note' => trim((string) ($lunas['KET'] ?? '')),
+                'status' => 'valid',
+            ];
+        }
+
+        // Sheet 6b: installation-fee payments, sourced from
+        // apikeuangan_buktitransaksipemasangan which the legacy system never
+        // mixed into the recurring monthly billing proof table. Always the AWAL
+        // invoice — this table only ever records the PSB installation payment.
+        foreach ($biayaRows as $row) {
+            // Skip duplicate rows collapsed into an earlier canonical row.
+            if (($canonicalCostId[$row['IDBIAYA']] ?? $row['IDBIAYA']) !== $row['IDBIAYA']) {
+                continue;
+            }
+
+            $invoiceCode = $row['IDBIAYA'];
+            $paidAt = $installationPaidAt[$invoiceCode] ?? null;
+            $installationFee = (int) ($row['BIAYAPASANG'] ?? 0);
+
+            if ($paidAt === null || $installationFee <= 0) {
+                continue;
+            }
+
+            $cust = $row['IDPELANGGAN'] ?? '';
+            if (!str_starts_with($cust, 'PE')) {
+                continue;
+            }
+
+            $payDate = now()->format('Y-m-d');
+            try {
+                $payDate = \Carbon\Carbon::parse($paidAt)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+
+            $paymentsSheet[] = [
+                'old_payment_id' => $invoiceCode . '-PASANG',
+                'old_invoice_id' => $invoiceCode . '-AWAL',
+                'old_transaction_id' => $invoiceCode,
+                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
+                'old_customer_id' => $cust,
+                'billing_period' => \Carbon\Carbon::parse($payDate)->format('Y-m'),
+                'amount' => $installationFee,
+                'payment_date' => $payDate,
                 'payment_method' => 'cash',
                 'received_by_old' => '',
                 'deposited_by_old' => '',
+                'note' => 'Pembayaran biaya pasang (migrasi)',
                 'status' => 'valid',
             ];
         }
