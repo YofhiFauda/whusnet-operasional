@@ -281,11 +281,6 @@ class CustomerInstallationController extends Controller
                     ->first();
                 
                 if ($task) {
-                    $task->checklists()->where('is_checked', false)->update([
-                        'is_checked' => true,
-                        'checked_at' => now(),
-                        'checked_by' => auth()->id(),
-                    ]);
                     app(\App\Services\TaskService::class)->complete($task, auth()->user());
                 }
 

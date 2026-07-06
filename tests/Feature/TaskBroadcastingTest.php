@@ -11,7 +11,6 @@ use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
-use App\Models\TaskChecklist;
 use App\Models\TaskEvidence;
 use App\Models\User;
 use App\Services\TaskService;
@@ -103,15 +102,6 @@ class TaskBroadcastingTest extends TestCase
             'sla_minutes' => 120,
             'created_by' => $this->fopUser->id,
             'updated_by' => $this->fopUser->id,
-        ]);
-
-        TaskChecklist::create([
-            'task_id' => $task->id,
-            'item' => 'Cek Kabel',
-            'is_required' => true,
-            'is_checked' => true,
-            'checked_at' => now(),
-            'sort_order' => 1,
         ]);
 
         TaskEvidence::create([

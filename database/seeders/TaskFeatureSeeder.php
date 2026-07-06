@@ -66,13 +66,12 @@ class TaskFeatureSeeder extends Seeder
 
         $fopPermDefs = [
             ['code' => 'task.view.all',          'name' => 'Lihat Semua Task'],
-            ['code' => 'task.create',            'name' => 'Buat Task'],
+            ['code' => 'task.lookup',            'name' => 'Pencarian Pelanggan & Cek Konflik (Utility API)'],
             ['code' => 'task.edit',              'name' => 'Edit Task'],
             ['code' => 'task.edit.type',         'name' => 'Ubah Tipe Task'],
             ['code' => 'task.cancel',            'name' => 'Batalkan Task'],
-            ['code' => 'task.schedule',          'name' => 'Jadwalkan Task'],
+            ['code' => 'task.schedule',          'name' => 'Ubah Jadwal Task (via Edit)'],
             ['code' => 'task.assign.team',       'name' => 'Assign Tim'],
-            ['code' => 'task.report.view',       'name' => 'Lihat Laporan'],
             ['code' => 'task.conflict.override', 'name' => 'Override Konflik'],
             ['code' => 'task.reject',            'name' => 'Tolak Task'],
             ['code' => 'task.approve',           'name' => 'Setujui Task'],
@@ -101,7 +100,6 @@ class TaskFeatureSeeder extends Seeder
             ['code' => 'task.view.own',          'name' => 'Lihat Task Sendiri'],
             ['code' => 'task.status.start',      'name' => 'Mulai Task'],
             ['code' => 'task.status.complete',   'name' => 'Selesaikan Task'],
-            ['code' => 'task.checklist.update',  'name' => 'Update Checklist'],
             ['code' => 'task.evidence.upload',   'name' => 'Upload Bukti Foto'],
             ['code' => 'task.status.pending',    'name' => 'Laporan Nanti'],
         ];

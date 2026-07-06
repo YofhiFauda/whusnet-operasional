@@ -207,11 +207,6 @@ class CustomerSurveyController extends Controller
             if ($validated['survey_status'] === 'completed' && $customer->status === 'survey_in_progress') {
                 // Selesaikan task survey jika ada
                 if ($task) {
-                    $task->checklists()->where('is_checked', false)->update([
-                        'is_checked' => true,
-                        'checked_at' => now(),
-                        'checked_by' => auth()->id(),
-                    ]);
                     app(\App\Services\TaskService::class)->complete($task, auth()->user());
                 }
 

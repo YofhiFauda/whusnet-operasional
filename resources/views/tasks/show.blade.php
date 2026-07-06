@@ -8,7 +8,7 @@
     {{-- ══ Breadcrumb ═══════════════════════════════════════════════ --}}
     <nav class="flex items-center gap-1.5 text-xs text-text-muted">
         @can('viewAll', \App\Models\Task::class)
-        <a href="{{ route('tasks.index') }}" class="hover:text-primary transition-colors">Task</a>
+        <a href="{{ auth()->user()->hasPermission('task.view.own') ? route('tasks.own') : route('fop.dashboard') }}" class="hover:text-primary transition-colors">Task</a>
         @else
         <a href="{{ route('tasks.own') }}" class="hover:text-primary transition-colors">Task Saya</a>
         @endcan
@@ -961,7 +961,7 @@
 
     {{-- ══ Action Buttons (FOP Manage) ════════════════════════════════ --}}
     @if(in_array($task->status->value, ['pending', 'terjadwal']))
-    @if(auth()->user()->can('fopReject', $task) || auth()->user()->can('fopPending', $task) || auth()->user()->can('schedule', $task))
+    @if(auth()->user()->can('fopReject', $task) || auth()->user()->can('fopPending', $task))
     <div class="bg-surface border border-border rounded-lg p-5 mt-4 flex items-center justify-between shadow-sm">
         <div>
             <h4 class="text-sm font-semibold text-text-main mb-1">Manajemen Task (FOP)</h4>
@@ -969,13 +969,6 @@
         </div>
         <div class="flex items-center gap-3">
             @if($task->status->value === 'pending')
-                @can('schedule', $task)
-                <button x-data @click="$dispatch('open-modal', 'schedule-task')"
-                        class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md text-white transition-colors hover:brightness-110"
-                        style="background:var(--color-primary)">
-                    Jadwalkan Task
-                </button>
-                @endcan
                 @can('fopReject', $task)
                 <button x-data @click="$dispatch('open-modal', 'fop-reject-task-pending')"
                         class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-md border bg-white transition-colors hover:bg-error/5"
@@ -1027,56 +1020,6 @@
     @endcan
     @endif
 </div>
-
-{{-- ══ Schedule Task Modal ═════════════════════════════════════════ --}}
-@can('schedule', $task)
-@if($task->status->value === 'pending')
-<x-ui.modal name="schedule-task" title="Jadwalkan Task" maxWidth="md">
-    <form action="{{ route('tasks.schedule', $task) }}" method="POST">
-        @csrf
-        <div class="space-y-4 p-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Tanggal & Waktu</label>
-                <input type="datetime-local" name="scheduled_at" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary" required>
-            </div>
-
-            @php
-                $availableTeknisi = \App\Models\User::whereHas('role', fn($q) => $q->where('code', 'teknisi'))->orderBy('name')->get();
-            @endphp
-            <div>
-                <label class="block text-sm font-medium mb-1">Tim Teknisi (1-3)</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                    @foreach($availableTeknisi as $tek)
-                    <label class="flex items-center gap-2 p-2 border rounded-md cursor-pointer hover:bg-surface transition-colors border-border">
-                        <input type="checkbox" name="team_member_ids[]" value="{{ $tek->id }}" class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-text-main">{{ $tek->name }}</span>
-                    </label>
-                    @endforeach
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium mb-1">Checklist Poin (per baris / koma)</label>
-                <textarea name="checklist_items" rows="4"
-                          class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
-                          placeholder="Verifikasi KTP&#10;Cek Sinyal&#10;Foto Lokasi"
-                          required></textarea>
-                <p class="text-xs text-gray-500 mt-1">Pisahkan dengan baris baru atau koma</p>
-            </div>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 px-4 py-3 bg-gray-50 border-t border-gray-200">
-            <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'schedule-task')">
-                Batal
-            </x-ui.button>
-            <x-ui.button type="submit" variant="primary">
-                Jadwalkan
-            </x-ui.button>
-        </div>
-    </form>
-</x-ui.modal>
-@endif
-@endcan
 
 {{-- ══ FOP Reject Pending Task Modal ═════════════════════════════════ --}}
 @can('fopReject', $task)

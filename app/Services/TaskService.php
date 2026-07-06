@@ -9,8 +9,6 @@ use App\Events\TaskScheduled;
 use App\Events\TaskStarted;
 use App\Jobs\SendTaskNotificationJob;
 use App\Models\Task;
-use App\Models\TaskChecklist;
-use App\Models\TaskChecklistTemplate;
 use App\Models\TaskTeam;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -21,7 +19,7 @@ class TaskService
     // ─── Pembuatan Task ──────────────────────────────────────────
 
     /**
-     * Buat task baru beserta tim dan checklist dari template.
+     * Buat task baru beserta tim.
      *
      * @param array $data   Validated data dari TaskRequest
      * @param User  $actor  User yang membuat task (FOP)
@@ -60,18 +58,6 @@ class TaskService
                     'task_id'      => $task->id,
                     'user_id'      => $userId,
                     'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
-                ]);
-            }
-
-            // Salin checklist dari template
-            $templates = TaskChecklistTemplate::forType($taskType);
-            foreach ($templates as $template) {
-                TaskChecklist::create([
-                    'task_id'     => $task->id,
-                    'template_id' => $template->id,
-                    'item'        => $template->item,
-                    'is_required' => $template->is_required,
-                    'sort_order'  => $template->sort_order,
                 ]);
             }
 
@@ -121,85 +107,6 @@ class TaskService
         });
     }
 
-    /**
-     * Jadwalkan tiket dari antrean (status pending → terjadwal).
-     */
-    public function scheduleTask(Task $task, array $data, User $actor): Task
-    {
-        $schedulableStatuses = [
-            TaskStatus::PENDING,
-            TaskStatus::DRAFT,
-            TaskStatus::WAITING_SURVEY,
-            TaskStatus::WAITING_INSTALLATION,
-            TaskStatus::WAITING_INSTALLATIONS,
-        ];
-        abort_unless(
-            in_array($task->status, $schedulableStatuses),
-            422,
-            'Hanya tiket dalam antrean yang dapat dijadwalkan.'
-        );
-
-        return DB::transaction(function () use ($task, $data, $actor) {
-            $oldValues = $task->toArray();
-
-            $updateData = [
-                'scheduled_at' => $data['scheduled_at'],
-                'status'       => TaskStatus::TERJADWAL->value,
-                'updated_by'   => $actor->id,
-            ];
-            if (!empty($data['sla_minutes'])) {
-                $updateData['sla_minutes'] = (int) $data['sla_minutes'];
-            }
-            if (!empty($data['team_name'])) {
-                $title = $task->title;
-                if (!str_starts_with($title, '[')) {
-                    $updateData['title'] = '[' . trim($data['team_name']) . '] ' . $title;
-                }
-            }
-            $task->update($updateData);
-
-            $memberIds = $data['team_member_ids'] ?? [];
-            $task->teamMembers()->delete();
-            foreach ($memberIds as $index => $userId) {
-                TaskTeam::create([
-                    'task_id'      => $task->id,
-                    'user_id'      => $userId,
-                    'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
-                ]);
-            }
-
-            // Parse checklist
-            $rawItems = $data['checklist_items'] ?? [];
-            if (is_array($rawItems)) {
-                $items = array_filter(array_map('trim', $rawItems));
-            } else {
-                $items = array_filter(
-                    array_map('trim',
-                        preg_split('/[\r\n]+/', (string) $rawItems)
-                    )
-                );
-            }
-            
-            $sort = 1;
-            $task->checklists()->delete();
-            foreach ($items as $item) {
-                \App\Models\TaskChecklist::create([
-                    'task_id' => $task->id,
-                    'item' => $item,
-                    'is_checked' => false,
-                    'is_required' => true,
-                    'sort_order' => $sort++
-                ]);
-            }
-
-            $this->notifyTeam($task, 'Tiket antrean baru dijadwalkan untuk Anda', 'created');
-
-            \App\Models\AuditLog::log($task, 'scheduled', $oldValues, $task->toArray());
-
-            return $task->refresh();
-        });
-    }
-
     // ─── Transisi Status ─────────────────────────────────────────
 
     /**
@@ -229,11 +136,12 @@ class TaskService
             ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
             ->first();
 
-        abort_if(
-            $activeTask !== null,
-            422,
-            "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu."
-        );
+        if ($activeTask !== null) {
+            abort(
+                422,
+                "Tidak dapat memulai task karena teknisi dalam tim sedang mengerjakan task lain [{$activeTask->task_number}]. Selesaikan atau laporkan (pending) task sebelumnya terlebih dahulu."
+            );
+        }
 
         $task->update([
             'status'     => TaskStatus::IN_PROGRESS->value,
@@ -249,7 +157,6 @@ class TaskService
 
     /**
      * Teknisi menandai task selesai.
-     * Syarat: semua checklist wajib tercentang + min 1 foto bukti.
      */
     public function complete(Task $task, User $actor): Task
     {
@@ -264,13 +171,6 @@ class TaskService
             422,
             'Syarat penyelesaian task belum terpenuhi.'
         );
-
-        // Otomatis tandai checklist selesai jika masih ada yang belum dicentang
-        $task->checklists()->where('is_checked', false)->update([
-            'is_checked' => true,
-            'checked_at' => now(),
-            'checked_by' => $actor->id,
-        ]);
 
         $task->update([
             'status'            => TaskStatus::SELESAI->value,
@@ -380,26 +280,10 @@ class TaskService
         return $task->refresh();
     }
 
-    // ─── Checklist & Bukti ───────────────────────────────────────
-
-    /**
-     * Teknisi centang/uncentang satu item checklist.
-     */
-    public function updateChecklist(TaskChecklist $checklist, bool $isChecked, User $actor): TaskChecklist
-    {
-        $checklist->update([
-            'is_checked' => $isChecked,
-            'checked_by' => $isChecked ? $actor->id : null,
-            'checked_at' => $isChecked ? now() : null,
-        ]);
-
-        return $checklist->refresh();
-    }
-
     // ─── Validasi Konflik ────────────────────────────────────────
 
     /**
-     * Reassign a technician while preserving checklist progress.
+     * Reassign a technician.
      */
     public function reassignTeam(Task $task, int $oldUserId, int $newUserId, int $reassignerId, ?string $newScheduledAt = null): void
     {

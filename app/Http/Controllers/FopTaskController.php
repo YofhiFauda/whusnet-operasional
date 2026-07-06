@@ -88,7 +88,7 @@ class FopTaskController extends Controller
         // Tipe task yang boleh dipakai utk tambah task manual — Survey & Pemasangan Baru
         // dikecualikan karena wajib lewat Registrasi Pelanggan (auto-sync).
         $manualCategories = collect($categories)
-            ->except($this->autoOnlyCategoryValues())
+            ->except(TaskType::autoOnlyValues())
             ->toArray();
 
         $canEditFopTaskType = auth()->user()->hasPermission('fop_tasks.update_sensitive');
@@ -104,7 +104,7 @@ class FopTaskController extends Controller
         $this->authorizeAccess();
 
         $validated = $request->validate([
-            'category' => ['required', 'string', Rule::in($this->manualCategoryValues())],
+            'category' => ['required', 'string', Rule::in(TaskType::manualValues())],
             'task_date' => ['required', 'date'],
             'tugas' => ['required', 'string', 'max:255'],
             'village_id' => ['required', 'exists:villages,id'],
@@ -327,26 +327,6 @@ class FopTaskController extends Controller
 
             return redirect()->route('fop-tasks.index')->with('success', "Task FOP {$fopTask->task_number} berhasil dihapus.");
         });
-    }
-
-    /**
-     * Tipe task yang hanya boleh muncul via auto-sync Registrasi Pelanggan,
-     * tidak boleh dipilih manual saat tambah Task FOP.
-     */
-    private function autoOnlyCategoryValues(): array
-    {
-        return [TaskType::SURVEY->value, TaskType::PEMASANGAN->value];
-    }
-
-    /**
-     * Tipe task yang boleh dipilih manual saat tambah Task FOP.
-     */
-    private function manualCategoryValues(): array
-    {
-        return array_diff(
-            array_column(TaskType::cases(), 'value'),
-            $this->autoOnlyCategoryValues()
-        );
     }
 
     /**

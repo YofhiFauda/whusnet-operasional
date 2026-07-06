@@ -102,4 +102,32 @@ enum TaskType: string
             'label' => $t->label(),
         ])->toArray();
     }
+
+    /**
+     * Tipe yang hanya boleh muncul via auto-sync Registrasi Pelanggan —
+     * gak boleh dipilih manual saat buat/edit task (baik di /tasks maupun /fop-tasks).
+     */
+    public static function autoOnlyValues(): array
+    {
+        return [self::SURVEY->value, self::PEMASANGAN->value];
+    }
+
+    /**
+     * Tipe yang boleh dipilih manual (semua tipe kecuali autoOnlyValues()).
+     */
+    public static function manualValues(): array
+    {
+        return array_diff(array_column(self::cases(), 'value'), self::autoOnlyValues());
+    }
+
+    /**
+     * Options (value+label) yang boleh dipilih manual — dipakai dropdown create/edit.
+     */
+    public static function manualOptions(): array
+    {
+        return collect(self::options())
+            ->reject(fn ($t) => in_array($t['value'], self::autoOnlyValues()))
+            ->values()
+            ->all();
+    }
 }

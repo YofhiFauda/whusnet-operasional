@@ -82,11 +82,6 @@ class Task extends Model
         return $this->hasMany(TaskTeam::class);
     }
 
-    public function checklists(): HasMany
-    {
-        return $this->hasMany(TaskChecklist::class)->orderBy('sort_order');
-    }
-
     public function evidences(): HasMany
     {
         return $this->hasMany(TaskEvidence::class);
@@ -113,19 +108,7 @@ class Task extends Model
     }
 
     /**
-     * Jumlah checklist wajib yang belum tercentang.
-     */
-    public function pendingRequiredChecklists(): int
-    {
-        return $this->checklists()
-            ->where('is_required', true)
-            ->where('is_checked', false)
-            ->count();
-    }
-
-    /**
-     * Apakah task boleh di-mark Selesai:
-     * semua checklist wajib sudah dicentang DAN minimal 1 bukti foto ada.
+     * Apakah task boleh di-mark Selesai.
      */
     public function canComplete(): bool
     {

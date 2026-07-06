@@ -68,12 +68,6 @@ class TaskMaintenanceController extends Controller
             ]);
 
             // Selesaikan task
-            $task->checklists()->where('is_checked', false)->update([
-                'is_checked' => true,
-                'checked_at' => now(),
-                'checked_by' => auth()->id(),
-            ]);
-
             $taskService->complete($task, auth()->user());
 
             DB::commit();

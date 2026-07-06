@@ -124,34 +124,9 @@
                             </div>
                         </div>
 
-                        <!-- Checklists & Evidences -->
-                        @if($task->checklists->count() > 0 || $task->evidences->count() > 0)
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                @if($task->checklists->count() > 0)
-                                    <div class="bg-white p-4 rounded-xl border border-slate-200">
-                                        <h5 class="text-xs font-bold text-slate-800 mb-2.5 flex items-center gap-1.5">
-                                            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                            Checklist Pekerjaan
-                                        </h5>
-                                        <ul class="space-y-2 text-xs">
-                                            @foreach($task->checklists as $chk)
-                                                <li class="flex items-start gap-2">
-                                                    <span class="mt-0.5 {{ $chk->is_checked ? 'text-emerald-600' : 'text-slate-300' }}">
-                                                        @if($chk->is_checked)
-                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                                                        @else
-                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd" /></svg>
-                                                        @endif
-                                                    </span>
-                                                    <span class="{{ $chk->is_checked ? 'text-slate-800 font-medium' : 'text-slate-500' }}">
-                                                        {{ $chk->item_name }}
-                                                    </span>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endif
-
+                        <!-- Evidences -->
+                        @if($task->evidences->count() > 0)
+                            <div class="grid grid-cols-1 gap-4">
                                 @if($task->evidences->count() > 0)
                                     <div class="bg-white p-4 rounded-xl border border-slate-200">
                                         <h5 class="text-xs font-bold text-slate-800 mb-2.5 flex items-center gap-1.5">

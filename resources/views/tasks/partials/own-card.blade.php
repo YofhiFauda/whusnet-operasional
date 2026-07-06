@@ -2,7 +2,7 @@
     ══ Partial: Satu Task Card untuk Dashboard Teknisi ══════════════════
     Digunakan oleh TaskController::cardPartial() → GET /tasks-saya/partial/{task}
     Diambil via fetch() dari Echo listener saat TaskScheduled event diterima.
-    $task : App\Models\Task (loaded dengan customer, pop, checklists, evidences)
+    $task : App\Models\Task (loaded dengan customer, pop, evidences)
 --}}
 @php
     $barColor = match($task->status->value) {

@@ -56,6 +56,7 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.view',
                 'audit_logs.export',
                 'fop_tasks.*',
+                'task.lookup', // dipakai modal /fop-tasks (autocomplete pelanggan + cek konflik)
             ],
 
             'noc' => [

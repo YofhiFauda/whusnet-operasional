@@ -22,10 +22,8 @@ use App\Http\Controllers\CustomerTestReportController;
 use App\Http\Controllers\CustomerSurveyController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskStatusController;
-use App\Http\Controllers\TaskChecklistController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\FopDashboardController;
-use App\Http\Controllers\FopCalendarController;
 use App\Http\Controllers\FopTaskController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
@@ -253,23 +251,14 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.view.all')->group(function () {
         Route::get('/fop', [FopDashboardController::class, 'index'])->name('fop.dashboard');
-        Route::get('/fop/calendar', [FopCalendarController::class, 'index'])->name('fop.calendar');
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
     // ── Task Management ──────────────────────────────────────────
 
-    // FOP: Lihat semua task & kalender
-    Route::middleware('permission:task.view.all')->group(function () {
-        Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
-        Route::get('/api/tasks/calendar', [TaskController::class, 'calendarData'])->name('tasks.calendar.data');
+    // FOP: utility API — cek konflik jadwal (form edit task) & cari pelanggan (modal /fop-tasks)
+    Route::middleware('permission:task.lookup')->group(function () {
         Route::match(['get', 'post'], '/api/tasks/check-conflict', [TaskController::class, 'checkConflict'])->name('tasks.check-conflict');
-    });
-
-    // FOP: Buat task
-    Route::middleware('permission:task.create')->group(function () {
-        Route::get('/tasks/create', [TaskController::class, 'create'])->name('tasks.create');
-        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
         Route::get('/api/tasks/search-customers', [TaskController::class, 'searchCustomers'])->name('tasks.search-customers');
     });
 
@@ -280,7 +269,6 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:task.schedule|task.assign.team|task.edit')->group(function () {
-        Route::post('/tasks/{task}/schedule', [TaskController::class, 'schedule'])->name('tasks.schedule');
         Route::patch('/tasks/{task}/team', [\App\Http\Controllers\TaskTeamController::class, 'update'])->name('tasks.team.update');
     });
 
@@ -318,11 +306,6 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.status.pending')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
-    });
-
-    // Teknisi: Checklist
-    Route::middleware('permission:task.checklist.update')->group(function () {
-        Route::patch('/tasks/{task}/checklists/{checklist}', [TaskChecklistController::class, 'update'])->name('tasks.checklists.update');
     });
 
     // Teknisi: Upload bukti

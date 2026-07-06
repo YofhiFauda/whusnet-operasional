@@ -58,11 +58,13 @@ class TaskPolicy
     }
 
     /**
-     * Membuat task baru.
+     * Akses utility API terkait task: pencarian pelanggan & cek konflik jadwal.
+     * (Dulu dipakai utk gate form "Buat Task" — form itu sudah dihapus,
+     * permission ini sekarang murni utility API.)
      */
-    public function create(User $user): bool
+    public function lookup(User $user): bool
     {
-        return $user->can('task.create');
+        return $user->can('task.lookup');
     }
 
     /**
@@ -91,7 +93,7 @@ class TaskPolicy
      */
     public function schedule(User $user, Task $task): bool
     {
-        if ($user->hasPermission('task.schedule') || $user->hasPermission('task.assign.team') || $user->hasPermission('task.create') || $user->hasPermission('task.edit')) {
+        if ($user->hasPermission('task.schedule') || $user->hasPermission('task.assign.team') || $user->hasPermission('task.edit')) {
             return $task->status->isEditable();
         }
         return $this->canTransitionTo($user, $task, 'terjadwal') && $task->status->isEditable();
@@ -119,14 +121,6 @@ class TaskPolicy
     public function conflictOverride(User $user): bool
     {
         return $user->hasPermission('task.conflict.override');
-    }
-
-    /**
-     * Melihat laporan task.
-     */
-    public function viewReport(User $user): bool
-    {
-        return $user->hasPermission('task.report.view');
     }
 
     /**
@@ -189,14 +183,6 @@ class TaskPolicy
     public function statusPending(User $user, Task $task): bool
     {
         return $user->hasPermission('task.status.pending') && $task->isMember($user->id);
-    }
-
-    /**
-     * Update item checklist.
-     */
-    public function updateChecklist(User $user, Task $task): bool
-    {
-        return $task->isMember($user->id) || $user->hasPermission('task.checklist.update') || $user->hasPermission('task.edit');
     }
 
     /**

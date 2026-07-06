@@ -7,9 +7,6 @@ use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Task;
-use App\Models\TaskChecklist;
-use App\Models\TaskChecklistTemplate;
-use App\Models\TaskEvidence;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\TaskService;
@@ -23,89 +20,6 @@ class TaskController extends Controller
 {
     public function __construct(private readonly TaskService $taskService) {}
 
-    // ─── FOP Dashboard — Kalender ────────────────────────────────
-
-    /**
-     * Central List Task View — Menggantikan Kalender FOP.
-     * Menampilkan list task dengan fitur filter, sort, dan pagination.
-     * Guard: task.view.all
-     */
-    public function index(Request $request): View
-    {
-        $this->authorize('viewAll', Task::class);
-
-        $user = auth()->user();
-
-        $query = Task::with(['customer', 'pop', 'teamMembers.user', 'checklists'])
-            ->applyUserScope($user);
-
-        // Filter: Status
-        if ($request->filled('status')) {
-            if ($request->status !== 'all') {
-                $query->where('status', $request->status);
-            }
-        } else {
-            // Default (first visit or selecting empty "Semua Status Aktif"): Exclude Selesai & Dibatalkan
-            $query->whereNotIn('status', [
-                \App\Enums\TaskStatus::SELESAI->value,
-                \App\Enums\TaskStatus::DIBATALKAN->value
-            ]);
-        }
-
-        // Filter: Tipe
-        if ($request->filled('type')) {
-            $query->where('task_type', $request->type);
-        }
-
-        // Filter: Range Tanggal
-        if ($request->filled('date_start') && $request->filled('date_end')) {
-            $query->whereBetween('scheduled_at', [
-                Carbon::parse($request->date_start)->startOfDay(),
-                Carbon::parse($request->date_end)->endOfDay()
-            ]);
-        } elseif ($request->filled('date_start')) {
-            $query->whereDate('scheduled_at', '>=', $request->date_start);
-        } elseif ($request->filled('date_end')) {
-            $query->whereDate('scheduled_at', '<=', $request->date_end);
-        }
-
-        // Search: Task Number / Customer
-        if ($request->filled('search')) {
-            $q = $request->search;
-            $query->where(function($qBuilder) use ($q) {
-                $qBuilder->where('task_number', 'like', "%{$q}%")
-                         ->orWhereHas('customer', function($cq) use ($q) {
-                             $cq->where('full_name', 'like', "%{$q}%")
-                                ->orWhere('cid', 'like', "%{$q}%");
-                         });
-            });
-        }
-
-        // Sorting
-        switch ($request->query('sort', 'date_desc')) {
-            case 'status':
-                $query->orderBy('status');
-                break;
-            case 'type':
-                $query->orderBy('task_type');
-                break;
-            case 'date_asc':
-                $query->orderBy('scheduled_at', 'asc');
-                break;
-            case 'date_desc':
-            default:
-                $query->orderBy('scheduled_at', 'desc');
-                break;
-        }
-
-        $tasks = $query->paginate(20)->withQueryString();
-
-        $types = TaskType::cases();
-        $statuses = TaskStatus::cases();
-
-        return view('tasks.index', compact('tasks', 'types', 'statuses'));
-    }
-
     /**
      * Dashboard Teknisi — hanya task di mana user terdaftar sebagai anggota.
      * Guard: task.view.own
@@ -117,7 +31,7 @@ class TaskController extends Controller
         $user = auth()->user();
         $today = Carbon::today();
 
-        $tasks = Task::with(['customer', 'pop', 'checklists', 'evidences', 'fop', 'teamMembers'])
+        $tasks = Task::with(['customer', 'pop', 'evidences', 'fop', 'teamMembers'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where(function ($q) use ($today) {
                 $q->whereDate('scheduled_at', $today)
@@ -154,140 +68,11 @@ class TaskController extends Controller
 
         abort_if(!$isMember, 403, 'Anda bukan anggota task ini.');
 
-        $task->load(['customer', 'pop', 'checklists', 'evidences', 'teamMembers']);
+        $task->load(['customer', 'pop', 'evidences', 'teamMembers']);
 
         return view('tasks.partials.own-card', compact('task'));
     }
 
-
-    /**
-     * Form buat task baru.
-     * Guard: task.create
-     */
-    public function create(Request $request): View
-    {
-        $this->authorize('create', Task::class);
-
-        $user       = auth()->user();
-        $pops       = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
-        $teknisiList = $this->getTeknisiForUser($user);
-        $types      = $this->manualTaskTypeOptions();
-
-        // Pre-fill customer jika ada query ?customer_id=
-        $customer = null;
-        if ($request->filled('customer_id')) {
-            $customer = Customer::find($request->customer_id);
-        }
-
-        return view('tasks.create', compact('pops', 'teknisiList', 'types', 'customer'));
-    }
-
-    /**
-     * Simpan task baru.
-     * Guard: task.create
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $this->authorize('create', Task::class);
-
-        $validated = $request->validate([
-            'customer_id'       => 'nullable|exists:customers,id',
-            'pop_id'            => 'required|exists:pops,id',
-            'task_type'         => 'required|in:' . implode(',', $this->manualTaskTypeValues()),
-            'title'             => 'required|string|max:255',
-            'description'       => 'nullable|string|max:2000',
-            'scheduled_at'      => 'nullable|date|after:now',
-            'team_member_ids'   => 'nullable|array|max:3',
-            'team_member_ids.*' => 'exists:users,id',
-            'conflict_override' => 'nullable|boolean',
-        ]);
-
-        $user = auth()->user();
-
-        $memberIds   = $validated['team_member_ids'] ?? [];
-        $scheduledAt = $validated['scheduled_at'] ?? null;
-
-        if (!empty($memberIds) && !empty($scheduledAt)) {
-            // Validasi konflik jadwal
-            $conflicts = $this->taskService->detectConflicts(
-                $memberIds,
-                $scheduledAt,
-                TaskType::from($validated['task_type'])->slaMinutes()
-            );
-
-            if ($conflicts->isNotEmpty() && !($validated['conflict_override'] ?? false)) {
-                $messages = $conflicts->map(function ($team) {
-                    $endStr = Carbon::parse($team->task->scheduled_at)->addMinutes($team->task->sla_minutes)->format('H:i');
-                    return "• {$team->user->name}: Task \"{$team->task->task_number} {$team->task->task_type->label()}\" jam {$team->task->scheduled_at->format('H:i')}-{$endStr}";
-                })->implode('<br>');
-
-                return back()
-                    ->withInput()
-                    ->withErrors(['conflict' => 'Konflik jadwal terdeteksi:<br>' . $messages . '<br><br>Tick "Override konflik" jika ingin lanjut.'])
-                    ->with('conflict_user_ids', $conflicts->pluck('user_id')->unique()->toArray());
-            }
-
-            if ($conflicts->isNotEmpty() && ($validated['conflict_override'] ?? false)) {
-                // Cek apakah user punya izin override
-                $this->authorize('conflictOverride', Task::class);
-            }
-        }
-
-        $task = $this->taskService->create($validated, $user);
-
-        return redirect()
-            ->route('tasks.show', $task)
-            ->with('success', "Task [{$task->task_number}] berhasil dibuat.");
-    }
-
-    /**
-     * Jadwalkan tiket antrean ke tim teknisi.
-     */
-    public function schedule(Request $request, Task $task): RedirectResponse
-    {
-        $this->authorize('schedule', $task);
-
-        $validated = $request->validate([
-            'scheduled_at'      => 'required|date',
-            'team_member_ids'   => 'required|array|min:1|max:3',
-            'team_member_ids.*' => 'exists:users,id',
-            'conflict_override' => 'nullable|boolean',
-            'checklist_items'   => 'required',
-            'sla_minutes'       => 'nullable|integer|min:1',
-            'team_name'         => 'nullable|string|max:100',
-        ]);
-
-        $user = auth()->user();
-        $slaMinutes = !empty($validated['sla_minutes']) ? (int) $validated['sla_minutes'] : TaskType::from($task->task_type->value)->slaMinutes();
-
-        // Validasi konflik jadwal
-        $conflicts = $this->taskService->detectConflicts(
-            $validated['team_member_ids'],
-            $validated['scheduled_at'],
-            $slaMinutes,
-            $task->id
-        );
-
-        if ($conflicts->isNotEmpty() && !($validated['conflict_override'] ?? false)) {
-            $messages = $conflicts->map(function ($team) {
-                $endStr = Carbon::parse($team->task->scheduled_at)->addMinutes($team->task->sla_minutes)->format('H:i');
-                return "• {$team->user->name}: Task \"{$team->task->task_number} {$team->task->task_type->label()}\" jam {$team->task->scheduled_at->format('H:i')}-{$endStr}";
-            })->implode('<br>');
-
-            return back()
-                ->withErrors(['conflict' => 'Konflik jadwal terdeteksi:<br>' . $messages . '<br><br>Tick "Override konflik" jika ingin lanjut.'])
-                ->with('conflict_user_ids', $conflicts->pluck('user_id')->unique()->toArray());
-        }
-
-        if ($conflicts->isNotEmpty() && ($validated['conflict_override'] ?? false)) {
-            $this->authorize('conflictOverride', Task::class);
-        }
-
-
-        $this->taskService->scheduleTask($task, $validated, $user);
-
-        return redirect()->back(fallback: route('fop.calendar'))->with('success', "Tiket [{$task->task_number}] berhasil dijadwalkan ke tim teknisi.");
-    }
 
     /**
      * Detail task.
@@ -308,7 +93,6 @@ class TaskController extends Controller
             'pop',
             'fop',
             'teamMembers.user',
-            'checklists.checkedByUser',
             'evidences.uploader',
         ]);
 
@@ -336,7 +120,7 @@ class TaskController extends Controller
         $user        = auth()->user();
         $pops        = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $teknisiList = $this->getTeknisiForUser($user);
-        $types       = $this->manualTaskTypeOptions();
+        $types       = TaskType::manualOptions();
 
         $task->load(['customer', 'teamMembers.user']);
 
@@ -354,7 +138,7 @@ class TaskController extends Controller
         $validated = $request->validate([
             'title'             => 'sometimes|required|string|max:255',
             'description'       => 'nullable|string|max:2000',
-            'task_type'         => 'sometimes|required|in:' . implode(',', $this->manualTaskTypeValues()),
+            'task_type'         => 'sometimes|required|in:' . implode(',', TaskType::manualValues()),
             'scheduled_at'      => 'sometimes|required|date',
             'team_member_ids'   => 'sometimes|array|min:1|max:3',
             'team_member_ids.*' => 'exists:users,id',
@@ -418,61 +202,19 @@ class TaskController extends Controller
         $this->taskService->cancel($task, auth()->user(), $validated['cancel_reason']);
 
         return redirect()
-            ->route('tasks.index')
+            ->route('fop.dashboard')
             ->with('success', "Task [{$task->task_number}] berhasil dibatalkan.");
     }
 
     // ─── API Endpoints ───────────────────────────────────────────
 
     /**
-     * JSON: data task untuk kalender (filter by date range + pop + type).
-     * Guard: task.view.all
-     */
-    public function calendarData(Request $request): JsonResponse
-    {
-        $this->authorize('viewAll', Task::class);
-
-        $validated = $request->validate([
-            'start'    => 'required|date',
-            'end'      => 'required|date|after_or_equal:start',
-            'pop_id'   => 'nullable|exists:pops,id',
-            'type'     => 'nullable|in:' . implode(',', array_column(TaskType::cases(), 'value')),
-            'team_ids' => 'nullable|array',
-        ]);
-
-        $user = auth()->user();
-
-        $query = Task::with(['customer', 'pop', 'teamMembers.user'])
-            ->applyUserScope($user)
-            ->whereBetween('scheduled_at', [
-                Carbon::parse($validated['start'])->startOfDay(),
-                Carbon::parse($validated['end'])->endOfDay(),
-            ]);
-
-        if (!empty($validated['pop_id'])) {
-            $query->where('pop_id', $validated['pop_id']);
-        }
-
-        if (!empty($validated['type'])) {
-            $query->where('task_type', $validated['type']);
-        }
-
-        if (!empty($validated['team_ids'])) {
-            $query->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $validated['team_ids']));
-        }
-
-        $tasks = $query->orderBy('scheduled_at')->get();
-
-        return response()->json($tasks->map(fn (Task $t) => $this->taskToCalendarItem($t)));
-    }
-
-    /**
-     * JSON: cari pelanggan by CID/nama untuk autocomplete saat buat task.
-     * Guard: task.create
+     * JSON: cari pelanggan by CID/nama untuk autocomplete (dipakai modal /fop-tasks).
+     * Guard: task.lookup
      */
     public function searchCustomers(Request $request): JsonResponse
     {
-        $this->authorize('create', Task::class);
+        $this->authorize('lookup', Task::class);
 
         $q    = $request->query('q', '');
         $user = auth()->user();
@@ -502,11 +244,12 @@ class TaskController extends Controller
     }
 
     /**
-     * JSON: cek konflik jadwal sebelum simpan task (dipakai form JS).
+     * JSON: cek konflik jadwal (dipakai form edit task).
+     * Guard: task.lookup
      */
     public function checkConflict(Request $request): JsonResponse
     {
-        $this->authorize('create', Task::class);
+        $this->authorize('lookup', Task::class);
 
         $validated = $request->validate([
             'user_ids'     => 'required|array',
@@ -663,60 +406,6 @@ class TaskController extends Controller
     }
 
     // ─── Private Helpers ─────────────────────────────────────────
-
-    /**
-     * Tipe task yang boleh dipakai untuk pembuatan/edit task manual.
-     * SURVEY & PEMASANGAN dikecualikan — hanya boleh dibuat otomatis
-     * lewat alur Registrasi Pelanggan (CustomerController::store()).
-     */
-    private function manualTaskTypeValues(): array
-    {
-        return array_diff(
-            array_column(TaskType::cases(), 'value'),
-            [TaskType::SURVEY->value, TaskType::PEMASANGAN->value]
-        );
-    }
-
-    private function manualTaskTypeOptions(): array
-    {
-        $excluded = [TaskType::SURVEY->value, TaskType::PEMASANGAN->value];
-
-        return collect(TaskType::options())
-            ->reject(fn ($t) => in_array($t['value'], $excluded))
-            ->values()
-            ->all();
-    }
-
-    private function taskToCalendarItem(Task $task): array
-    {
-        return [
-            'id'            => $task->id,
-            'task_number'   => $task->task_number,
-            'title'         => $task->title,
-            'task_type'     => $task->task_type->value,
-            'task_type_label' => $task->task_type->label(),
-            'card_classes'  => $task->task_type->cardClasses(),
-            'status'        => $task->status->value,
-            'status_label'  => $task->status->label(),
-            'scheduled_at'  => $task->scheduled_at?->toIso8601String(),
-            'scheduled_time' => $task->scheduled_at?->format('H:i'),
-            'customer_name' => $task->customer?->full_name ?? '-',
-            'customer_cid'  => $task->customer?->display_id ?? '-',
-            'pop_name'      => $task->pop?->name ?? '-',
-            'team'          => $task->teamMembers->map(fn ($tm) => [
-                'id'     => $tm->user_id,
-                'name'   => $tm->user?->name,
-                'initials' => $this->initials($tm->user?->name ?? ''),
-                'role'   => $tm->role_in_task,
-            ]),
-            'checklist_total'    => $task->checklists->count(),
-            'checklist_done'     => $task->checklists->where('is_checked', true)->count(),
-            'evidence_count'     => $task->evidences->count(),
-            'is_cancelled'       => $task->status === TaskStatus::DIBATALKAN,
-            'sla_minutes'        => $task->sla_minutes,
-            'is_over_sla'        => $task->isOverSla(),
-        ];
-    }
 
     private function initials(string $name): string
     {
