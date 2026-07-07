@@ -10,6 +10,7 @@
 | [flowchart.md](flowchart.md) | Alur create/edit POP (cegah circular parent), alur generate registration number, alur generate CID |
 | [user-flow.md](user-flow.md) | Langkah Owner/Admin kelola POP |
 | [database-schema.md](database-schema.md) | Tabel `pops`, `pop_sequences` |
+| [bug.md](bug.md) | ✅ Fixed: gap Mini POP gak pernah terhubung ke pelanggan — sekarang ada `customers.mini_pop_id` + modal assignment |
 | [archive/](archive/) | Spesifikasi awal (`spesifikasi-pop-distribusi-cid.md`) + analisa historis + dokumen lama yang field-nya gak sesuai kode aktual |
 
 ## Konsep Inti

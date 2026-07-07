@@ -146,8 +146,7 @@ class CustomerController extends Controller
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
         $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
-        $distributions = \App\Models\Distribution::with('pop')->orderBy('name')->get();
-        return view('customers.create', compact('districts', 'packages', 'cities', 'pops', 'distributions'));
+        return view('customers.create', compact('districts', 'packages', 'cities', 'pops'));
     }
 
     /**
@@ -351,8 +350,7 @@ class CustomerController extends Controller
         $packages = \App\Models\InternetPackage::orderBy('name')->get();
         $cities = \App\Models\City::orderBy('name')->get();
         $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
-        $distributions = \App\Models\Distribution::with('pop')->orderBy('name')->get();
-        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops', 'distributions'));
+        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops'));
     }
 
     /**
@@ -374,7 +372,6 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
             'pop_id' => 'required|exists:pops,id',
-            'distribution_id' => 'nullable|exists:distributions,id',
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -642,9 +639,22 @@ class CustomerController extends Controller
         // - REQ ID murni (RQ######): pending, survey, pemasangan, installed, terminated
         // - CID lengkap (D2X6CRQ######_DESA_NAMA): aktif + punya distribusi
         // - Format default (C00RQ######): aktif tanpa distribusi
-        $customer->load(['pop', 'distribution']); // pastikan relasi dimuat untuk accessor
+        $customer->load(['pop', 'distribution', 'miniPop']); // pastikan relasi dimuat untuk accessor
         $displayId = $customer->display_id;
         $displayIdLabel = $customer->display_id_label;
+
+        // Mini POP (OLT) di bawah Cabang POP customer ini — buat modal assignment
+        // Mini POP + Distribusi pasca pemasangan/aktivasi (lihat CustomerNetworkAssignmentController).
+        $availableMiniPops = $customer->pop_id
+            ? \App\Models\Pop::where('parent_id', $customer->pop_id)
+                ->where('type', 'mini_pop')
+                ->orderBy('name')
+                ->get(['id', 'name', 'pop_code'])
+            : collect();
+
+        $availableDistributions = \App\Models\Distribution::whereIn('pop_id', $availableMiniPops->pluck('id'))
+            ->orderBy('code')
+            ->get(['id', 'pop_id', 'code', 'name']);
 
         // Keep backward compat for views that still reference $isCustomer / $isActive
         $isActive = in_array($status, ['active', 'suspended']);
@@ -768,7 +778,9 @@ class CustomerController extends Controller
             'auditLogs',
             'statusLogs',
             'customerTasks',
-            'customerFopTasks'
+            'customerFopTasks',
+            'availableMiniPops',
+            'availableDistributions'
         ));
     }
 

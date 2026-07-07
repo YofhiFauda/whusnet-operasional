@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_status',
     'pop_id',
     'distribution_id',
+    'mini_pop_id',
     'status',
     'address',
     'latitude',
@@ -136,6 +137,18 @@ class Customer extends Model
     public function distribution(): BelongsTo
     {
         return $this->belongsTo(Distribution::class);
+    }
+
+    /**
+     * Mini POP (OLT) spesifik customer ini — di-assign pasca pemasangan/aktivasi,
+     * gak diisi saat registrasi (registrasi cuma pilih Cabang POP via pop_id).
+     * Dipakai buat resolve segmen Mini POP di CID (lihat Pop::resolveMiniPopSegment()).
+     *
+     * @return BelongsTo<Pop, $this>
+     */
+    public function miniPop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'mini_pop_id');
     }
 
     /**

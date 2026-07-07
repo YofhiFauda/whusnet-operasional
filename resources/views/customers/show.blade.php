@@ -283,12 +283,28 @@
                     <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                         <div>
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">Nomer CID</span>
-                            <span class="font-mono font-medium text-slate-800 data-text">{{ $customer->cid ?? 'Belum dialokasikan' }}</span>
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase">Nomer CID / REQ ID</span>
+                            @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
+                            <button type="button" x-data @click="$dispatch('open-modal', 'network-assignment')"
+                                    class="font-mono font-medium text-primary hover:underline data-text cursor-pointer text-left"
+                                    title="Klik untuk atur Mini POP & Distribusi">
+                                {{ $displayId ?? $customer->cid ?? 'Belum dialokasikan' }}
+                            </button>
+                            @else
+                            <span class="font-mono font-medium text-slate-800 data-text">{{ $displayId ?? $customer->cid ?? 'Belum dialokasikan' }}</span>
+                            @endif
                         </div>
                         <div>
                             <span class="block text-[9px] font-bold text-slate-400 uppercase">POP Cabang</span>
                             <span class="font-medium text-slate-800">{{ $customer->pop->name ?? '-' }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase">Mini POP (OLT)</span>
+                            <span class="font-medium text-slate-800">{{ $customer->miniPop->name ?? 'Belum di-assign' }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[9px] font-bold text-slate-400 uppercase">Distribusi</span>
+                            <span class="font-medium text-slate-800">{{ $customer->distribution->code ?? 'Belum di-assign' }}</span>
                         </div>
                         <div>
                             <span class="block text-[9px] font-bold text-slate-400 uppercase">IP Address</span>
@@ -1381,5 +1397,83 @@
         }
     }
 </script>
+
+@if(auth()->user()->hasPermission('customers.detail.installation.validate'))
+<x-ui.modal name="network-assignment" title="Atur Mini POP & Distribusi" maxWidth="sm">
+    <div x-data="{ miniPopId: '{{ old('mini_pop_id', $customer->mini_pop_id) }}' }">
+        {{-- Header Info Pelanggan (Naked/Borderless Style) --}}
+        <div class="pb-3 mb-4 border-b border-border space-y-1">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Pelanggan</span>
+                    <span class="text-sm font-bold text-text-main">{{ $customer->full_name }}</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">ID Jaringan</span>
+                    <span class="font-mono text-xs text-text-main bg-surface-muted px-1.5 py-0.5 rounded border border-border">{{ $customer->cid ?? 'DRAFT' }}</span>
+                </div>
+            </div>
+            <div class="text-xs text-text-muted pt-1 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span>Cabang: <strong class="text-text-secondary font-semibold">{{ $customer->pop->name ?? '-' }} ({{ $customer->pop->pop_code ?? '' }})</strong></span>
+            </div>
+        </div>
+
+        {{-- Info Alert Banner --}}
+        <div class="flex gap-2 text-xs text-text-muted leading-relaxed bg-primary-soft/30 p-2.5 rounded-md border border-primary-border/40 mb-4">
+            <svg class="w-4 h-4 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Mini POP (OLT) & Distribusi dapat diatur setelah pemasangan dimulai, dan disesuaikan dengan konfigurasi MikroTik aktual.</span>
+        </div>
+
+        <form action="{{ route('customers.network-assignment.update', $customer) }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+
+            <div class="space-y-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Mini POP (OLT)</label>
+                <select name="mini_pop_id" x-model="miniPopId" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
+                    <option value="">— Belum di-assign —</option>
+                    @foreach($availableMiniPops as $miniPop)
+                        <option value="{{ $miniPop->id }}">[{{ $miniPop->pop_code }}] {{ $miniPop->name }}</option>
+                    @endforeach
+                </select>
+                @if($availableMiniPops->isEmpty())
+                    <div class="flex gap-1.5 items-start mt-1 text-[11px] text-warning">
+                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>Belum ada Mini POP terdaftar di bawah Cabang POP pelanggan ini — tambahkan dulu lewat Master POP.</span>
+                    </div>
+                @endif
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Distribusi</label>
+                <select name="distribution_id" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
+                    <option value="">— Belum di-assign —</option>
+                    @foreach($availableDistributions as $dist)
+                        <option value="{{ $dist->id }}"
+                                x-show="miniPopId == {{ $dist->pop_id }}"
+                                {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>
+                            [{{ $dist->code }}] {{ $dist->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-[11px] text-text-muted">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-border mt-4">
+                <button type="button" @click="$dispatch('close-modal', 'network-assignment')"
+                        class="text-sm font-semibold px-4 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-text-secondary transition-colors duration-200 cursor-pointer">Batal</button>
+                <button type="submit" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
+            </div>
+        </form>
+    </div>
+</x-ui.modal>
+@endif
 @endsection
 

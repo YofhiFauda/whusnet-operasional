@@ -108,7 +108,7 @@ class InvoiceController extends Controller
     /**
      * Display a single invoice detail.
      */
-    public function show(Invoice $invoice): View
+    public function show(Invoice $invoice): View|\Illuminate\Http\JsonResponse
     {
         abort_unless(
             Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
@@ -118,6 +118,10 @@ class InvoiceController extends Controller
 
         $invoice->load([
             'customer.pop',
+            'customer.customerAddress',
+            'customer.village',
+            'customer.district',
+            'customer.city',
             'pop',
             'customerService',
             'internetPackage',
@@ -126,6 +130,13 @@ class InvoiceController extends Controller
                 $query->with('receiver')->latest('payment_date')->latest('id');
             },
         ]);
+
+        if (request()->wantsJson() || request()->expectsJson()) {
+            if ($invoice->customer) {
+                $invoice->customer->append('clean_address');
+            }
+            return response()->json($invoice);
+        }
 
         return view('invoices.show', compact('invoice'));
     }

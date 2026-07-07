@@ -177,7 +177,14 @@
                     </td>
                     <!-- ID (CID / REQ) -->
                     <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
+                        @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
+                        <button type="button" onclick="openNetworkAssignmentModal({{ $customer->id }})"
+                                class="text-primary hover:underline cursor-pointer" title="Atur Mini POP & Distribusi">
+                            {{ $displayId }}
+                        </button>
+                        @else
                         {{ $displayId }}
+                        @endif
                     </td>
                     <!-- Nama -->
                     <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
@@ -698,5 +705,152 @@
             modal.classList.add('hidden');
         }, 150);
     }
+
+    // ══ Modal Atur Mini POP & Distribusi (dipakai bareng semua row) ══════
+    function openNetworkAssignmentModal(customerId) {
+        const form = document.getElementById('network-assignment-form');
+        const miniPopSelect = document.getElementById('na-mini-pop-select');
+        const distSelect = document.getElementById('na-distribution-select');
+        const warning = document.getElementById('na-blocked-warning');
+        const submitBtn = document.getElementById('na-submit-btn');
+
+        const custNameEl = document.getElementById('na-customer-name');
+        const custCidEl = document.getElementById('na-customer-cid');
+        const popNameEl = document.getElementById('na-pop-name');
+
+        form.action = `/customers/${customerId}/network-assignment`;
+        miniPopSelect.innerHTML = '<option value="">Memuat...</option>';
+        distSelect.innerHTML = '<option value="">—</option>';
+        custNameEl.textContent = 'Memuat...';
+        custCidEl.textContent = '—';
+        popNameEl.textContent = '—';
+        warning.classList.add('hidden');
+        submitBtn.disabled = true;
+
+        fetch(`/customers/${customerId}/network-assignment`, { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
+            .then(data => {
+                custNameEl.textContent = data.customer_name;
+                custCidEl.textContent = data.customer_cid || 'DRAFT';
+                popNameEl.textContent = `${data.pop_name} (${data.pop_code})`;
+
+                miniPopSelect.innerHTML = '<option value="">— Belum di-assign —</option>';
+                data.mini_pops.forEach(mp => {
+                    const opt = document.createElement('option');
+                    opt.value = mp.id;
+                    opt.textContent = `[${mp.pop_code}] ${mp.name}`;
+                    if (data.current.mini_pop_id === mp.id) opt.selected = true;
+                    miniPopSelect.appendChild(opt);
+                });
+
+                distSelect.dataset.allOptions = JSON.stringify(data.distributions);
+                distSelect.dataset.currentDistributionId = data.current.distribution_id ?? '';
+                renderDistributionOptions();
+
+                if (!data.editable) {
+                    warning.classList.remove('hidden');
+                    submitBtn.disabled = true;
+                } else {
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(() => {
+                custNameEl.textContent = 'Gagal memuat data. Coba lagi.';
+            });
+
+        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'network-assignment-list' }));
+    }
+
+    function renderDistributionOptions() {
+        const miniPopSelect = document.getElementById('na-mini-pop-select');
+        const distSelect = document.getElementById('na-distribution-select');
+        const selectedMiniPopId = miniPopSelect.value;
+        const currentDistributionId = distSelect.dataset.currentDistributionId || '';
+        const allDistributions = JSON.parse(distSelect.dataset.allOptions || '[]');
+
+        distSelect.innerHTML = '<option value="">— Belum di-assign —</option>';
+        allDistributions
+            .filter(d => String(d.pop_id) === String(selectedMiniPopId))
+            .forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.name ? `[${d.code}] ${d.name}` : d.code;
+                if (String(currentDistributionId) === String(d.id)) opt.selected = true;
+                distSelect.appendChild(opt);
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const miniPopSelect = document.getElementById('na-mini-pop-select');
+        if (miniPopSelect) {
+            miniPopSelect.addEventListener('change', renderDistributionOptions);
+        }
+    });
 </script>
+
+@if(auth()->user()->hasPermission('customers.detail.installation.validate'))
+<x-ui.modal name="network-assignment-list" title="Atur Mini POP & Distribusi" maxWidth="sm">
+    {{-- Header Info Pelanggan (Naked/Borderless Style) --}}
+    <div class="pb-3 mb-4 border-b border-border space-y-1">
+        <div class="flex justify-between items-start">
+            <div>
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Pelanggan</span>
+                <span id="na-customer-name" class="text-sm font-bold text-text-main">Memuat...</span>
+            </div>
+            <div class="text-right">
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">ID Jaringan</span>
+                <span id="na-customer-cid" class="font-mono text-xs text-text-main bg-surface-muted px-1.5 py-0.5 rounded border border-border">—</span>
+            </div>
+        </div>
+        <div class="text-xs text-text-muted pt-1 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span>Cabang: <strong id="na-pop-name" class="text-text-secondary font-semibold">—</strong></span>
+        </div>
+    </div>
+
+    {{-- Info Alert Banner --}}
+    <div class="flex gap-2 text-xs text-text-muted leading-relaxed bg-primary-soft/30 p-2.5 rounded-md border border-primary-border/40 mb-4">
+        <svg class="w-4 h-4 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Mini POP (OLT) & Distribusi dapat diatur setelah pemasangan dimulai, dan disesuaikan dengan konfigurasi MikroTik aktual.</span>
+    </div>
+
+    {{-- Blocked Warning Banner --}}
+    <div id="na-blocked-warning" class="hidden flex gap-2 text-xs text-error leading-relaxed bg-error-bg/30 p-2.5 rounded-md border border-error-border/40 mb-4">
+        <svg class="w-4 h-4 text-error shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span>Mini POP & Distribusi cuma bisa diatur setelah proses pemasangan dimulai.</span>
+    </div>
+
+    <form id="network-assignment-form" method="POST" class="space-y-4">
+        @csrf
+        @method('PUT')
+
+        <div class="space-y-1.5">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Mini POP (OLT)</label>
+            <select id="na-mini-pop-select" name="mini_pop_id" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white font-ui focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
+                <option value="">Memuat...</option>
+            </select>
+        </div>
+
+        <div class="space-y-1.5">
+            <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Distribusi</label>
+            <select id="na-distribution-select" name="distribution_id" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white font-ui focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
+                <option value="">—</option>
+            </select>
+            <p class="text-[11px] text-text-muted">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-border mt-4">
+            <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'network-assignment-list' }))"
+                    class="text-sm font-semibold px-4 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-text-secondary transition-colors duration-200 cursor-pointer">Batal</button>
+            <button type="submit" id="na-submit-btn" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
+        </div>
+    </form>
+</x-ui.modal>
+@endif
 @endsection

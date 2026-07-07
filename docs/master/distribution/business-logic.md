@@ -13,9 +13,11 @@
 
 **Implikasi:** 2 POP beda gak bisa punya Distribusi dengan kode yang sama persis, walau secara fisik itu perangkat yang beda-beda di lokasi beda. Kode harus didesain global-aware sejak awal (e.g. sisipkan kode POP di kode Distribusi, seperti contoh `X4A` di spesifikasi awal — bukan aturan sistem, cuma konvensi penamaan yang disarankan).
 
-## 3. Relasi ke POP — Wajib, Many-to-One
+## 3. Relasi ke POP — Wajib, Many-to-One (Sebenarnya ke Mini POP)
 
-Setiap Distribusi **wajib** terhubung ke 1 POP (`pop_id` NOT NULL, cascade delete — hapus POP ikut hapus semua Distribusi di bawahnya). Form create/edit selalu minta pilih POP dari dropdown (`Pop::where('status','active')`).
+Setiap Distribusi **wajib** terhubung ke 1 POP (`pop_id` NOT NULL, cascade delete — hapus POP ikut hapus semua Distribusi di bawahnya). Model & form gak enforce `type` tertentu di `pop_id`, tapi **struktur data yang benar** (sesuai `MasterPopSeeder`) adalah Distribusi terhubung ke **Mini POP** (`type=mini_pop`), bukan Cabang langsung — hierarki penuhnya `Cabang → Mini POP → Distribusi`.
+
+Form create/edit Master Distribusi (`Pop::where('status','active')`) nawarin **semua level POP** tanpa filter type — jadi admin bisa aja gak sengaja assign Distribusi ke row Cabang langsung (melanggar konvensi hierarki, walau gak ditolak sistem). Disiplin operasional: selalu pilih Mini POP, bukan Cabang.
 
 ## 4. Peran dalam Pembentukan CID
 
@@ -27,9 +29,11 @@ CID = {cid_prefix POP} + {segmen Mini POP} + {Distribution.code} + {REQ ID}
 
 Lihat [docs/master/pop/business-logic.md §4](../pop/business-logic.md#4-generate-cid-popgeneratecomplexcid) untuk detail lengkap kalkulasi CID. Kalau pelanggan belum di-assign Distribusi (`customer.distribution_id` kosong), sistem pakai placeholder `'XX'` di posisi ini — bukan error, cuma bagian dari format default (`C00RQ######`, lihat [docs/master/pop/business-logic.md §5](../pop/business-logic.md#5-resolve-display-id-per-status-popresolvedisplayid)).
 
-## 5. Kapan Distribusi Di-assign ke Pelanggan
+## 5. Kapan Distribusi Di-assign ke Pelanggan (✅ Fixed 2026-07-07)
 
-Pemilihan `distribution_id` terjadi di form laporan pemasangan (`CustomerInstallationController::store()`, field teknis ODP/OLT) — teknisi pilih Distribusi yang relevan berdasar lokasi fisik pemasangan. Ini disimpan sebelum Verifikasi Admin approve aktivasi, jadi CID yang di-generate saat `finalVerify()` udah bisa langsung pakai kode Distribusi yang benar.
+**Bukan** di form laporan pemasangan — `CustomerInstallationController::store()` gak pernah menyentuh `distribution_id` (cuma isi `CustomerTechnicalDetail`/`CustomerDevice`). Distribusi (bareng Mini POP) di-assign lewat modal **"Atur Mini POP & Distribusi"** yang muncul saat klik CID/REQ ID di halaman detail pelanggan (`CustomerNetworkAssignmentController@update`) — **pasca pemasangan**, kapan pun sebelum atau sesudah aktivasi, dan bisa diganti-ganti belakangan (nyusul konfigurasi Mikrotik manual). Dropdown Distribusi di modal ini otomatis ke-filter ikut Mini POP yang dipilih (`Distribution.pop_id = mini_pop.id`).
+
+Sebelum di-assign, sistem pakai placeholder `'XX'` (§4). Kalau Distribusi diganti setelah pelanggan `active`/`suspended`, CID di-regenerate otomatis. Riwayat gap sebelum fix ini: [../pop/bug.md](../pop/bug.md).
 
 ## 6. Tidak Ada Guard Penghapusan
 

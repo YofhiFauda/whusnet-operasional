@@ -32,7 +32,9 @@ Migrasi awal: `2026_06_09_035326_create`. Banyak kolom ditambah belakangan lewat
 | `status` | string(50), default `registered` | State machine — lihat `App\Enums\WorkflowTransition` |
 | `customer_status` | string | Label operasional Bahasa Indonesia (mapping terpisah dari `status`, e.g. `waiting_survey`→`survey`) |
 | `data_completeness_status` | string | e.g. `siap_billing` — dipakai guard di beberapa alur (invoice manual) |
-| `pop_id`, `distribution_id` | FK | Wilayah operasional & CID |
+| `pop_id` | FK → `pops.id` (WAJIB row `type=cabang`) | Diisi saat registrasi, gak pernah berubah level |
+| `distribution_id` | FK → `distributions.id`, nullable | Di-assign pasca pemasangan lewat modal, lihat [docs/master/pop/bug.md](../master/pop/bug.md) |
+| `mini_pop_id` | FK → `pops.id` (row `type=mini_pop`), nullable | Migrasi `2026_07_07_154528_add_mini_pop_id`. Di-assign bareng `distribution_id` lewat modal yang sama, dipakai resolve segmen Mini POP di CID |
 | `city_id`, `district_id`, `village_id` | FK, nullOnDelete | Region |
 | `address`, `latitude`, `longitude` | text/decimal | Alamat ringkas (duplikat sebagian dengan `customer_addresses`) |
 | `internet_package_id` | FK | Paket dipilih saat registrasi |
@@ -157,6 +159,9 @@ Migrasi: `2026_06_27_104414_create`.
 
 ```php
 // Customer
+pop(): BelongsTo(Pop::class)                    // selalu row Cabang
+miniPop(): BelongsTo(Pop::class, 'mini_pop_id')  // row Mini POP, assignment pasca pemasangan
+distribution(): BelongsTo(Distribution::class)
 customerAddress(): HasOne(CustomerAddress::class)
 customerService(): HasOne(CustomerService::class)
 surveys(): HasMany(CustomerSurvey::class)

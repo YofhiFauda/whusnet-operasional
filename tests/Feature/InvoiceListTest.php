@@ -63,6 +63,17 @@ class InvoiceListTest extends TestCase
         $popB = $this->createPop('POP-B', 'PONB', 'POP B');
         $adminCabang->pops()->attach($popA->id);
 
+        $userScope = \App\Models\UserRoleScope::create([
+            'user_id' => $adminCabang->id,
+            'role_id' => $role->id,
+            'scope_type' => 'selected_pop',
+        ]);
+        
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $userScope->id,
+            'pop_id' => $popA->id,
+        ]);
+
         $invoiceA = $this->createInvoice($popA, 'Customer Cabang Sendiri', 'INV-202606-9101', '2026-06', 'belum_dibayar');
         $invoiceB = $this->createInvoice($popB, 'Customer Cabang Lain', 'INV-202606-9102', '2026-06', 'belum_dibayar');
 
@@ -183,6 +194,7 @@ class InvoiceListTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

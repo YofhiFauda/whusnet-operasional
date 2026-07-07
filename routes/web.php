@@ -220,6 +220,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/verifications/{customer}/final', [CustomerVerificationController::class, 'finalVerify'])->name('customers.verification.final');
         Route::post('/verifications/{customer}/revisi', [CustomerVerificationController::class, 'revisi'])->name('customers.verification.revisi');
         Route::post('/verifications/{customer}/reject', [CustomerVerificationController::class, 'reject'])->name('customers.verification.reject');
+        Route::get('/customers/{customer}/network-assignment', [\App\Http\Controllers\CustomerNetworkAssignmentController::class, 'data'])->name('customers.network-assignment.data');
+        Route::put('/customers/{customer}/network-assignment', [\App\Http\Controllers\CustomerNetworkAssignmentController::class, 'update'])->name('customers.network-assignment.update');
     });
 
     Route::middleware('permission:customers.detail.devices.create|customers.detail.devices.update')->group(function () {

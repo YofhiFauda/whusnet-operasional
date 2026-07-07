@@ -297,6 +297,25 @@ class Pop extends Model
 
     private function resolveMiniPopSegment(Customer $customer, ?string $fallback = null): string
     {
+        // 1. Prioritas utama: Mini POP yang di-assign eksplisit ke customer
+        // (lewat modal assignment pasca pemasangan/aktivasi). Ini satu-satunya
+        // sumber yang bisa beda per-customer walau mereka 1 Cabang POP yang sama.
+        $miniPop = $customer->miniPop;
+        if ($miniPop) {
+            $miniPopCode = trim((string) $miniPop->pop_code);
+            $miniCidPrefix = trim((string) ($miniPop->cid_prefix ?? $this->cid_prefix ?? ''));
+
+            if ($miniPopCode !== '' && $miniCidPrefix !== '' && str_starts_with($miniPopCode, $miniCidPrefix)) {
+                $segment = preg_replace('/[^A-Z0-9]/i', '', substr($miniPopCode, strlen($miniCidPrefix))) ?: '';
+                if ($segment !== '') {
+                    return $segment;
+                }
+            }
+        }
+
+        // 2. Legacy fallback: pop_code milik Cabang POP customer sendiri. Catatan:
+        // ini NILAINYA SAMA untuk semua customer di Cabang yang sama (bukan per-OLT),
+        // dipertahankan cuma buat customer lama yang belum di-assign mini_pop_id.
         $popCode = trim((string) ($customer->pop?->pop_code ?? ''));
         $cidPrefix = trim((string) ($customer->pop?->cid_prefix ?? $this->cid_prefix ?? ''));
 
@@ -309,6 +328,7 @@ class Pop extends Model
             }
         }
 
+        // 3. Fallback terakhir: olt_number free-text dari laporan teknis instalasi.
         if (!empty($fallback)) {
             $fallback = preg_replace('/[^A-Z0-9]/i', '', (string) $fallback) ?: '';
             if ($fallback !== '') {

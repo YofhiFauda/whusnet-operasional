@@ -37,12 +37,11 @@ Dipanggil **cuma** di `CustomerVerificationController::finalVerify()` — satu-s
 
 Format: `{cid_prefix}{segmen_mini_pop}{kode_distribusi}{req_id}` — e.g. `D2X6CRQ000021` (sebelum suffix `_DESA_NAMA` yang ditambah terpisah di `generatePppoeUsername()`).
 
-**Resolusi segmen Mini POP** (`resolveMiniPopSegment()`) — urutan prioritas:
-1. Kalau `customer.pop.pop_code` diawali `cid_prefix` POP itu → ambil sisa string setelah prefix (dibersihkan non-alphanumeric).
-2. Kalau gagal, fallback ke `customerTechnicalDetail.olt_number` (dibersihkan sama).
-3. Kalau masih gagal, default `'1'`.
-
-⚠️ **`customer.pop` di sini SELALU row type `cabang`** (lihat §8) — bukan row Mini POP. Jadi segmen ini diambil dari `pop_code` milik **Cabang POP pelanggan sendiri**, bukan dari Mini POP yang di-pilih terpisah. Kalau admin isi `pop_code` Cabang dengan pola `{cid_prefix}{angka}` (e.g. cid_prefix=`D`, pop_code=`D1`), angka `1` itu yang muncul jadi segmen — bukan hasil relasi ke row Mini POP manapun.
+**Resolusi segmen Mini POP** (`resolveMiniPopSegment()`) — urutan prioritas (✅ fixed 2026-07-07, lihat [bug.md](bug.md)):
+1. **`customer.miniPop`** (`customers.mini_pop_id`, di-assign eksplisit lewat modal pasca pemasangan) → segmen dari `pop_code` Mini POP itu sendiri.
+2. Fallback legacy: `customer.pop.pop_code` (Cabang POP pelanggan) — dipertahankan buat pelanggan lama yang belum di-assign `mini_pop_id`. **Nilai ini konstan per-Cabang**, gak bisa beda per pelanggan.
+3. Fallback terakhir: `customerTechnicalDetail.olt_number` (free-text teknisi).
+4. Kalau semua gagal, default `'1'`.
 
 **Kode Distribusi** — dari `Distribution.code` yang di-assign ke pelanggan; kalau belum ada distribusi, pakai placeholder `'XX'`.
 
@@ -63,19 +62,18 @@ Aturan tampilan ID pelanggan berbeda tergantung status — ini **bukan** kolom t
 
 `Pop.parent_id` juga jadi basis `EffectiveAccessService::resolvePopTree()` — user dengan scope `selected_pop` yang di-assign ke 1 Cabang otomatis dapat akses ke **semua Mini POP di bawahnya** (BFS turun lewat `parent_id`). Lihat [docs/rbac/business-logic.md §6](../../rbac/business-logic.md#6-scope-pop--3-tipe).
 
-## 7. Mini POP Gak Pernah Dipilih User — Cuma Node Hierarki
+## 7. Mini POP — Assignment ke Pelanggan (✅ Fixed 2026-07-07)
 
-**Row `type=mini_pop` tidak pernah di-assign langsung ke pelanggan/task/invoice manapun.** Dicek di seluruh controller — cuma **1 tempat** yang benar-benar exclude/filter berdasar `type`:
+**Registrasi & Edit Pelanggan (form utama) cuma pilih Cabang POP** (`Pop::where('type','cabang')`) — Mini POP sengaja **gak** ditawarkan di sini, biar REQ ID/CID gak berantakan sebelum pemasangan kelar (keputusan produk, bukan keterbatasan teknis).
 
-| Halaman | Query POP | Level yang tampil |
-|---------|-----------|---------------------|
-| Master POP (`/master/pop`) | Semua | Pusat/Cabang/Mini POP — buat kelola struktur (`parent_id`) |
-| **Registrasi & Edit Pelanggan** | `Pop::where('type','cabang')` | **Cuma Cabang.** Mini POP gak pernah muncul di dropdown ini |
-| Filter tabel (index Pelanggan/Task/FOP Dashboard/FOP Tasks) | Semua (gak difilter type) | Semua level muncul, tapi cuma buat filter tampilan, bukan assignment |
+Mini POP + Distribusi baru di-assign **pasca pemasangan/aktivasi**, lewat modal "Atur Mini POP & Distribusi" (klik CID/REQ ID di halaman detail pelanggan → `CustomerNetworkAssignmentController@update`, route `PUT /customers/{customer}/network-assignment`):
 
-`customers.pop_id` **selalu** menunjuk row Cabang. Konsekuensi: segmen "Mini POP" di CID (§4) bukan hasil relasi ke row Mini POP manapun — itu string yang di-derive dari `pop_code` milik Cabang itu sendiri, fallback ke `olt_number` yang teknisi isi manual di form pemasangan.
+- Dropdown Mini POP di-scope ke anak (`parent_id`) Cabang POP pelanggan.
+- Dropdown Distribusi di-scope ke anak Mini POP yang dipilih (`Distribution.pop_id = mini_pop.id`, sesuai struktur data seeder — lihat [docs/master/distribution/business-logic.md](../distribution/business-logic.md)).
+- Guard status: ditolak kalau pelanggan masih pra-pemasangan (`registered`…`waiting_installation`) atau `rejected`.
+- Bisa diganti-ganti berkali-kali pasca aktivasi (nyusul konfigurasi Mikrotik manual, belum ada integrasi hardware) — tiap ganti, kalau pelanggan udah `active`/`suspended`, CID **di-regenerate otomatis**.
 
-**Row Mini POP di tabel `pops` cuma berguna untuk 1 hal:** node RBAC scope tree (§6) — assign user ke scope Cabang otomatis mencakup semua Mini POP anaknya. Kalau tim operasional berekspektasi Mini POP = representasi 1 OLT fisik yang dipilih eksplisit per pelanggan, itu **belum ada** di kode — sekadar konvensi penamaan `pop_code`, bukan relasi data yang di-enforce sistem.
+Riwayat gap sebelum fix ini (Mini POP gak pernah nyambung ke pelanggan sama sekali): [bug.md](bug.md).
 
 ## 8. Hal yang Belum/Sengaja Tidak Divalidasi
 

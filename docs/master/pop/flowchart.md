@@ -65,7 +65,8 @@ reqId = extractBareRegistrationId(customer.customer_code)  — strip prefix lama
         ▼
 oltNumber = resolveMiniPopSegment(customer, technicalDetail?.olt_number)
         │
-        ├─ customer.pop.pop_code diawali cid_prefix POP? ──ya──▶ ambil sisa string, bersihkan non-alnum
+        ├─ customer.miniPop ADA? ──ya──▶ ambil pop_code Mini POP itu, strip cid_prefix
+        ├─ tidak → customer.pop.pop_code (Cabang) diawali cid_prefix? ──ya──▶ ambil sisa string (legacy, konstan per-Cabang)
         ├─ tidak → pakai fallback olt_number (dibersihkan sama)
         └─ tidak ada juga → default '1'
         │
@@ -79,7 +80,36 @@ CID = "{cid_prefix}{oltNumber}{distCode}{reqId}"
 (dipakai lagi oleh) generatePppoeUsername() → CID + "_{DESA}_{NAMA}"
 ```
 
-## 4. Resolve Display ID (dipanggil kapan pun UI perlu tampilkan identitas pelanggan)
+## 4. Assign/Ganti Mini POP & Distribusi (✅ Fixed 2026-07-07, lihat [bug.md](bug.md))
+
+```
+Admin klik CID/REQ ID di halaman detail pelanggan → modal terbuka
+        │
+        ▼
+status pelanggan ∈ {registered..waiting_installation, rejected}? ──ya──▶ TOLAK
+        │ tidak (udah mulai pemasangan atau lebih lanjut)
+        ▼
+Pilih Mini POP (dropdown: anak Cabang POP pelanggan)
+Pilih Distribusi (dropdown ke-filter otomatis: anak Mini POP terpilih)
+        │
+        ▼
+Submit PUT /customers/{customer}/network-assignment
+        │
+        ▼
+Validasi silang: Mini POP.parent_id == customer.pop_id?
+                 Distribusi.pop_id == mini_pop_id terpilih?
+        │
+        ▼ (lolos)
+customer.mini_pop_id = ..., customer.distribution_id = ...
+        │
+        ▼
+status ∈ {active, suspended}? ──ya──▶ regenerate CID (Pop::generateComplexCid, pakai Mini POP/Distribusi baru)
+        │
+        ▼
+Save + AuditLog('update_network_assignment')
+```
+
+## 5. Resolve Display ID (dipanggil kapan pun UI perlu tampilkan identitas pelanggan)
 
 ```
 Pop::resolveDisplayId(customer)
@@ -94,7 +124,7 @@ customer.distribution_id ADA dan customer.cid ADA? ──ya──▶ return CID 
 return default "{cid_prefix}00{reqId}"
 ```
 
-## 5. Toggle Status POP
+## 6. Toggle Status POP
 
 ```
 Admin klik toggle status (POST /master/pop/{pop}/toggle)

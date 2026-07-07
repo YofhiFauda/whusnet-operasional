@@ -177,29 +177,13 @@
 
                         <div>
                             <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP CABANG <span class="text-red-500">*</span></label>
-                            <select name="pop_id" id="pop_id" onchange="filterDistributionsByPop(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="pop_id" id="pop_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
                                 <option value="" disabled selected>Pilih POP Cabang</option>
                                 @foreach($pops as $pop)
                                     <option value="{{ $pop->id }}" {{ old('pop_id', $customer->pop_id) == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
                                 @endforeach
                             </select>
-                        </div>
-
-                        <div>
-                            <label for="distribution_id" class="block mb-2 uppercase tracking-wide">KODE DISTRIBUSI
-                                <span class="text-slate-400 font-normal normal-case text-[10px] ml-1">(bagian dari CID pelanggan)</span>
-                            </label>
-                            <select name="distribution_id" id="distribution_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
-                                <option value="">— Pilih Distribusi (Opsional, Pilih POP Dulu) —</option>
-                                @foreach($distributions as $dist)
-                                    <option value="{{ $dist->id }}"
-                                        data-pop-id="{{ $dist->pop?->parent_id ?? $dist->pop_id }}"
-                                        {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>
-                                        {{ $dist->code }} — {{ $dist->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-[10px] text-slate-400 mt-1 font-mono">Kode distribusi digunakan untuk membentuk CID: <span class="text-sky-600">{POP}{OLT}<strong>{Distribusi}</strong>{RQ}_{Desa}_{Nama}</span></p>
+                            <p class="text-[10px] text-slate-400 mt-1">Mini POP & Distribusi diatur terpisah lewat modal "Atur Mini POP & Distribusi" di halaman detail pelanggan (pasca pemasangan).</p>
                         </div>
 
                         <div class="md:col-span-2">
@@ -565,7 +549,7 @@
     const formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
-            optional: ['email', 'alternative_phone', 'latitude', 'longitude', 'distribution_id']
+            optional: ['email', 'alternative_phone', 'latitude', 'longitude']
         },
         'dokumen': {
             required: [],
@@ -614,28 +598,6 @@
     
     if (activeCityId) {
         loadDistricts(activeCityId, activeDistrictId, activeVillageId);
-    }
-
-    // Filter distribusi berdasarkan POP yang dipilih
-    function filterDistributionsByPop(popId) {
-        const distSelect = document.getElementById('distribution_id');
-        if (!distSelect) return;
-        const options = distSelect.querySelectorAll('option[data-pop-id]');
-        options.forEach(opt => {
-            if (!popId || opt.dataset.popId === popId) {
-                opt.style.display = '';
-            } else {
-                opt.style.display = 'none';
-                // Deselect hidden options
-                if (opt.selected) opt.selected = false;
-            }
-        });
-    }
-
-    // Run on page load if POP already selected (e.g. after validation failure or initial load)
-    const oldPopId = "{{ old('pop_id', $customer->pop_id) }}";
-    if (oldPopId) {
-        filterDistributionsByPop(oldPopId);
     }
 
     // Dynamic dropdown for Districts

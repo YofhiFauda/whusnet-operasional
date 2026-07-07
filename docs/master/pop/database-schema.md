@@ -6,7 +6,9 @@
 pops ──self-ref (parent_id)──▶ pops (pusat → cabang → mini_pop)
 pops ──hasMany──▶ pop_sequences (registration & cid counter, per-POP)
 pops ──hasMany──▶ distributions (lihat docs/master/distribution)
-pops ──hasMany──▶ customers, payments, invoices, tasks, fop_tasks (banyak modul FK ke pop_id)
+pops ──hasMany──▶ customers (via pop_id, WAJIB row type=cabang)
+pops ──hasMany──▶ customers (via mini_pop_id, opsional, row type=mini_pop — assignment pasca pemasangan, lihat bug.md)
+pops ──hasMany──▶ payments, invoices, tasks, fop_tasks (banyak modul FK ke pop_id)
 pops ──belongsToMany──▶ users (via user_pops, legacy — RBAC modern pakai user_role_scope_targets)
 ```
 
