@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen alur/rencana historis — sebagian sudah diimplementasi, sebagian berbeda dari kode aktual. Lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini.
+
 # 🔄 Ringkasan Alur Status & Action (Dinamis pada List Antrean)
 Tombol ACTION pada Kolom List Antrean Proses akan berubah secara dinamis mengikuti STATUS pelanggan:
 

@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # Perubahan: Simplifikasi Modul Task & FOP
 
 Ringkasan seluruh perubahan dalam satu sesi kerja — dari RBAC Edit Tipe Task sampai penghapusan fitur yang udah gak relevan (List Task, Kalender, Form Penjadwalan, Kanban, Checklist).

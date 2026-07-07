@@ -18,10 +18,9 @@ class CustomerInstallationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Illuminate\Support\Facades\Cache::flush();
 
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(\Database\Seeders\DatabaseSeeder::class);
     }
 
     public function test_technician_can_fill_installation(): void
@@ -159,6 +158,12 @@ class CustomerInstallationTest extends TestCase
         $role = Role::where('name', $roleName)->firstOrFail();
         $user->role_id = $role->id;
         $user->save();
+        $user->load('role');
+
+        $user->roleScopes()->create([
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::ALL_POP,
+        ]);
 
         return $user;
     }

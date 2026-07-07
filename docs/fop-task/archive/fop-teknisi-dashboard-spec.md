@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # FOP & Teknisi Dashboard — Spesifikasi Desain
 
 **Sistem:** WHUSNET Admin Payment  

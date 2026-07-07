@@ -36,8 +36,16 @@ class CustomerSurveyController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
 
+        if ($customer->status === 'registered') {
+            try {
+                $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_SURVEY, 'Otomatis transisi ke waiting_survey saat mulai survey');
+            } catch (\Exception $e) {
+                return redirect()->back()->with('error', 'Gagal memproses transisi status: ' . $e->getMessage());
+            }
+        }
+
         if ($customer->status !== 'waiting_survey') {
-            return redirect()->back()->with('error', 'Status pelanggan tidak valid untuk memulai survey.');
+            return redirect()->back()->with('error', 'Status pelanggan tidak valid untuk memulai survey. Status saat ini: ' . $customer->status);
         }
 
         $task = \App\Models\Task::where('customer_id', $customer->id)

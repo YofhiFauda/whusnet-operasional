@@ -12,10 +12,12 @@ Untuk mempelajari setiap modul master, silakan buka sub-folder masing-masing yan
 | **Status Pelanggan** | [`docs/master/status-pelanggan/`](status-pelanggan/README.md) | Urutan workflow pelanggan (state machine). |
 | **Wilayah** | [`docs/master/wilayah/`](wilayah/README.md) | Hierarki Kota, Kecamatan, Kelurahan. |
 | **POP (Cabang)** | [`docs/master/pop/`](pop/README.md) | Titik Point of Presence untuk RBAC dan prefix id pelanggan. |
-| **Distribusi** | [`docs/master/distribution/`](distribution/README.md) | Perangkat infrastruktur jaringan (OLT, ODP, Router). |
+| **Distribusi** | [`docs/master/distribution/`](distribution/README.md) | Kode titik distribusi jaringan — segmen ke-3 di CID pelanggan. |
 
 Setiap folder di atas minimal memiliki 4 file standar:
 1. `README.md` - Penjelasan umum fitur.
 2. `database-schema.md` - Diagram Entity Relationship (ERD) dan field.
 3. `flowchart.md` - Alur sistem (system flow) di belakang layar.
 4. `user-flow.md` - Langkah demi langkah skenario pengguna dalam aplikasi.
+
+`pop/` dan `distribution/` juga punya `business-logic.md` (aturan hierarki POP, generate REQ ID/CID, keunikan kode) — keduanya saling terkait erat, lihat [docs/master/pop/README.md](pop/README.md).

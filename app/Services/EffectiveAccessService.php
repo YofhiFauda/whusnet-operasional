@@ -88,6 +88,21 @@ class EffectiveAccessService
     }
 
     /**
+     * Apakah user punya akses ke SEMUA POP (bukan sekadar allowedPopIds kosong).
+     * Beda dari "empty(getAllowedPopIds())" — itu ambigu antara ALL_POP asli
+     * vs user yang scope-nya belum di-setup sama sekali (harus di-treat sebagai
+     * deny-by-default, bukan dikasih akses penuh).
+     */
+    public function hasAllPopAccess(User $user): bool
+    {
+        if ($user->hasRole('owner', 'atasan')) {
+            return true;
+        }
+
+        return $this->getScopeType($user) === ScopeType::ALL_POP;
+    }
+
+    /**
      * Get the scope type for the user.
      */
     public function getScopeType(User $user): ?ScopeType

@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PonorogoRegionSeeder::class);
         $this->call(MadiunRegionSeeder::class);
-        // $this->call(JetisPopSeeder::class);
+        // $this->call(MasterPopSeeder::class);
         $this->call(SubscriptionStatusSeeder::class);
         $this->call(InternetPackageSeeder::class);
         $this->call(FeatureSeeder::class);

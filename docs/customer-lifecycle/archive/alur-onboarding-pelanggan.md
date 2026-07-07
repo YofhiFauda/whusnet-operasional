@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen alur/rencana historis — sebagian sudah diimplementasi, sebagian berbeda dari kode aktual. Lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini.
+
 # Alur Onboarding Pelanggan Baru (End-to-End)
 
 Dokumen ini menjelaskan alur kerja (*workflow*) lengkap operasional mulai dari pendaftaran pelanggan baru hingga menjadi pelanggan aktif dan masuk siklus penagihan billing.

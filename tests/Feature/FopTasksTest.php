@@ -188,7 +188,7 @@ class FopTasksTest extends TestCase
         ]);
 
         $task->refresh();
-        $this->assertEquals('Cancel', $task->status);
+        $this->assertEquals('Cancel', $task->status->value);
         $this->assertNotNull($task->cancelled_at);
     }
 
@@ -228,11 +228,11 @@ class FopTasksTest extends TestCase
         $todayTask->refresh();
 
         // Yesterday's cancelled task must be reset to Proses
-        $this->assertEquals('Proses', $yesterdayTask->status);
+        $this->assertEquals('Proses', $yesterdayTask->status->value);
         $this->assertNull($yesterdayTask->cancelled_at);
 
         // Today's cancelled task must remain Cancel
-        $this->assertEquals('Cancel', $todayTask->status);
+        $this->assertEquals('Cancel', $todayTask->status->value);
         $this->assertNotNull($todayTask->cancelled_at);
     }
 
@@ -253,5 +253,82 @@ class FopTasksTest extends TestCase
         $response = $this->actingAs($this->fopUser)->delete(route('fop-tasks.destroy', $task->id));
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseMissing('fop_tasks', ['id' => $task->id]);
+    }
+
+    public function test_guests_cannot_access_fop_tasks_history(): void
+    {
+        $response = $this->get(route('fop-tasks.history'));
+        $response->assertRedirect('/login');
+    }
+
+    public function test_unauthorized_users_cannot_access_fop_tasks_history(): void
+    {
+        $response = $this->actingAs($this->unauthorizedUser)->get(route('fop-tasks.history'));
+        $response->assertStatus(403);
+    }
+
+    public function test_authorized_users_can_view_fop_tasks_history(): void
+    {
+        $task = FopTask::create([
+            'task_number' => 'TFOP-2026-9999',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan FO Selesai',
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'issue' => 'Selesai',
+            'status' => 'Selesai',
+            'priority' => 'High'
+        ]);
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.history'));
+        $response->assertStatus(200);
+        $response->assertSee('TFOP-2026-9999');
+        $response->assertSee('Perbaikan FO Selesai');
+    }
+
+    public function test_fop_tasks_index_does_not_show_completed_or_cancelled_tasks(): void
+    {
+        $completedTask = FopTask::create([
+            'task_number' => 'TFOP-2026-1000',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Sudah Selesai',
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'issue' => 'Selesai',
+            'status' => 'Selesai',
+            'priority' => 'High'
+        ]);
+
+        $cancelledTask = FopTask::create([
+            'task_number' => 'TFOP-2026-2000',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Sudah Cancel',
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'issue' => 'Cancelled',
+            'status' => 'Cancel',
+            'priority' => 'High'
+        ]);
+
+        $activeTask = FopTask::create([
+            'task_number' => 'TFOP-2026-3000',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Masih Proses',
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'issue' => 'Proses',
+            'status' => 'Proses',
+            'priority' => 'High'
+        ]);
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $response->assertStatus(200);
+        $response->assertDontSee('TFOP-2026-1000');
+        $response->assertDontSee('TFOP-2026-2000');
+        $response->assertSee('TFOP-2026-3000');
     }
 }

@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Analisis Sistem Pembayaran & Billing ISP Lanjutan (Advanced Billing & Payment System)
 
 Dokumen ini menyajikan analisis mendalam dan rancangan solusi teknis untuk mengakomodasi seluruh kebutuhan operasional kasir/admin keuangan pada Website Billing ISP, khususnya untuk penanganan pembayaran awal/registrasi, bulanan rutin, reaktivasi, cicilan (prorate), piutang, tabungan kembalian (deposit), pembayaran instan (Quick Pay), setoran kolektor (pembayaran masal), serta rekapitulasi harian dan bulanan.

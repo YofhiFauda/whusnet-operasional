@@ -232,12 +232,7 @@
                     <div class="text-text-secondary leading-relaxed flex-1">
                         <div>
                             @if($task->customer)
-                                {{ implode(', ', array_filter([
-                                    $task->customer->address,
-                                    $task->customer->village?->name,
-                                    $task->customer->district?->name,
-                                    $task->customer->city?->name,
-                                ])) ?: '—' }}
+                                {{ $task->customer->clean_address }}
                             @else
                                 {{ $task->pop?->address ?? '—' }} ({{ $task->pop?->name }})
                             @endif
@@ -865,7 +860,7 @@
         @if($task->status->value === 'terjadwal')
             @if($task->scheduled_at && !$task->scheduled_at->startOfDay()->isFuture())
             @if($task->task_type->value === \App\Enums\TaskType::SURVEY->value)
-                @if(auth()->user()->hasPermission('customers.detail.survey.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
+                @if($task->customer_id && auth()->user()->hasPermission('customers.detail.survey.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                 <form action="{{ route('customers.survey.start', $task->customer_id) }}" method="POST">
                     @csrf
                     <button type="submit"
@@ -879,7 +874,7 @@
                 </form>
                 @endif
             @elseif($task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value)
-                @if(auth()->user()->hasPermission('customers.detail.installation.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
+                @if($task->customer_id && auth()->user()->hasPermission('customers.detail.installation.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                 <form action="{{ route('customers.installation.start', $task->customer_id) }}" method="POST">
                     @csrf
                     <button type="submit"
@@ -995,6 +990,21 @@
     {{-- ══ Action Buttons (FOP Review) ════════════════════════════════ --}}
     @if($task->status->value === 'selesai' && $task->fop_review_status === 'pending')
     @can('review', $task)
+    @if($task->task_type->value === 'PSB')
+    <div class="bg-surface border border-border rounded-lg p-5 mt-4 flex items-center justify-between shadow-sm">
+        <div>
+            <h4 class="text-sm font-semibold text-text-main mb-1">Approve Pemasangan Lewat Verifikasi Admin</h4>
+            <p class="text-xs text-text-secondary">Aktivasi pelanggan (CID + tagihan awal) hanya bisa diproses di halaman Verifikasi Admin, bukan dari sini.</p>
+        </div>
+        @if($task->customer_id)
+        <a href="{{ route('customers.verification.admin', $task->customer_id) }}"
+           class="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-md text-white transition-colors"
+           style="background:var(--color-primary)">
+            Buka Verifikasi Admin
+        </a>
+        @endif
+    </div>
+    @else
     <div class="bg-surface border border-border rounded-lg p-5 mt-4 flex items-center justify-between shadow-sm">
         <div>
             <h4 class="text-sm font-semibold text-text-main mb-1">Review Hasil & Tandai Selesai (Khusus FOP)</h4>
@@ -1017,6 +1027,7 @@
             </form>
         </div>
     </div>
+    @endif
     @endcan
     @endif
 </div>
@@ -1221,7 +1232,8 @@ function evidenceSection(taskId, initialCanComplete, initialCount) {
         },
     };
 }
-
+</script>
 @endpush
 @endsection
+
 

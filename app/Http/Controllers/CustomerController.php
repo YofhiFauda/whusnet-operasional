@@ -740,7 +740,6 @@ class CustomerController extends Controller
         $customerTasks = $customer->tasks()
             ->with([
                 'teamMembers.user', 
-                'checklists', 
                 'evidences', 
                 'creator', 
                 'fop', 

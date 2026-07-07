@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen desain/rencana historis RBAC — sebagian besar sudah diimplementasi (lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini).
+
 ﻿# Sprint 11 — Advanced Hierarchical RBAC Planning & Documentation
 
 ## Tujuan Sprint 11

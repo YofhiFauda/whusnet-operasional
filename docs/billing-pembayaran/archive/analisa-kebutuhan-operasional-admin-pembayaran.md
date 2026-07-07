@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Analisa Kebutuhan Operasional Admin Pembayaran
 
 Dokumen ini analisa kebutuhan admin sehari-hari dalam mengurus pembayaran (registrasi/awal, bulanan, reaktivasi, piutang, cicilan, kolektor, rekap harian/bulanan) — dicek langsung terhadap kode yang ada sekarang, bukan asumsi. Belum ada kode yang ditulis; ini murni analisa & rencana desain.

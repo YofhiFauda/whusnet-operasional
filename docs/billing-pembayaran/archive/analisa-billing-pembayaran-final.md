@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Analisa Final: Sistem Pembayaran & Billing (Gabungan, Terverifikasi Kode)
 
 Dokumen ini menggabungkan `analisis_billing_pembayaran_advanced.md` (desain skema/UX) dan `ANALISA_KEBUTUHAN_OPERASIONAL_ADMIN_PEMBAYARAN.md` (audit status kode), dikoreksi ulang lewat pengecekan langsung ke kode per 2026-07-04. Basis kerangka pakai dokumen kedua karena tiap klaimnya dicek file:line — dokumen pertama menulis solusi seolah dari nol padahal sebagian sudah jalan.

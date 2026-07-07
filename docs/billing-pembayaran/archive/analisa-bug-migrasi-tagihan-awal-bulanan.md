@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Analisa Bug Migrasi: Pembayaran Awal vs Bulanan
 
 Dokumen ini merangkum investigasi dan perbaikan pada `app/Console/Commands/MigrateLegacyDataCommand.php` terkait pemisahan invoice **AWAL** (registrasi/PSB) vs **BULANAN** (recurring), berdasarkan cross-check langsung ke dump SQL legacy (`jetis_db_aplikasi_jetis.sql`, `sand_db_sandya.sql`).

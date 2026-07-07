@@ -187,8 +187,11 @@
                         </a>
 
                         @if(auth()->user()->hasPermission('fop_tasks.view'))
-                        <a href="{{ route('fop-tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                        <a href="{{ route('fop-tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                             Task FOP
+                        </a>
+                        <a href="{{ route('fop-tasks.history') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.history') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            Riwayat Task FOP
                         </a>
                         @endif
 

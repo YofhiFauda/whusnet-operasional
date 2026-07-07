@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Rencana Pencegahan & UX Tagihan/Pembayaran
 
 Dokumen ini analisa lanjutan dari `ANALISA_BUG_MIGRASI_TAGIHAN_AWAL_BULANAN.md` — fokus ke **sistem baru** (bukan lagi data legacy): bagaimana mencegah kasus serupa terulang, bagaimana admin bisa membedakan tagihan AWAL vs BULANAN serta status bayar tanpa buka detail, dan bagaimana admin input pembayaran secara instan. Berdasarkan investigasi langsung ke kode saat ini (bukan rencana di ruang kosong).

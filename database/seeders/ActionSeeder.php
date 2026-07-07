@@ -101,7 +101,7 @@ class ActionSeeder extends Seeder
             ],
             [
                 'code' => ActionCode::UPDATE_SENSITIVE,
-                'name' => 'Update Sensitive',
+                'name' => 'Update Timer SLA',
                 'description' => 'Mengubah data sensitif',
             ],
         ];

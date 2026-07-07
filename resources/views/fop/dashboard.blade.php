@@ -56,6 +56,199 @@
         </div>
     </div>
 
+    {{-- ══ Team FOP Aktif ══════════════════════════════════════════ --}}
+    <div>
+        <div class="flex items-center justify-between mb-3">
+            <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Team FOP Aktif</p>
+            <a href="{{ route('fop-tasks.index') }}" class="text-xs text-primary hover:text-primary-hover transition-colors">Kelola Team →</a>
+        </div>
+        @if($activeFopTeams->count() > 0)
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            @foreach($activeFopTeams as $team)
+            <button type="button" @click="openTeamDetail({{ $team['id'] }})"
+                    class="text-left flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden hover:shadow-md hover:border-primary/40 transition-all cursor-pointer">
+                {{-- Header: nama team + tanggal --}}
+                <div class="px-4 py-2.5 border-b border-border bg-surface-muted flex items-center justify-between shrink-0">
+                    <span class="text-xs font-semibold text-text-main">{{ $team['name'] }}</span>
+                    <span class="text-[10px] text-text-muted">{{ $team['work_date'] }}</span>
+                </div>
+
+                {{-- Body: list task --}}
+                <div class="p-3 flex-1 space-y-1.5 max-h-44 overflow-y-auto">
+                    @forelse($team['tasks'] as $t)
+                    <div class="flex items-center justify-between text-[11px] bg-surface-muted rounded px-2 py-1.5">
+                        <span class="text-text-main truncate">{{ $t['tugas'] }}</span>
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ml-2
+                            {{ match($t['status']) {
+                                'Proses' => 'bg-blue-50 text-blue-700',
+                                'Pending' => 'bg-amber-50 text-amber-700',
+                                'Selesai' => 'bg-green-50 text-green-700',
+                                'Cancel' => 'bg-red-50 text-red-700',
+                                default => 'bg-slate-100 text-slate-600',
+                            } }}">
+                            {{ $t['status'] }}
+                        </span>
+                    </div>
+                    @empty
+                    <p class="text-[11px] text-text-muted italic py-2 text-center">Belum ada task</p>
+                    @endforelse
+                </div>
+
+                {{-- Footer: avatar teknisi + total --}}
+                <div class="px-3 py-2.5 border-t border-border bg-white flex items-center justify-between shrink-0">
+                    <div class="flex items-center -space-x-1.5">
+                        @foreach($team['members']->take(4) as $member)
+                        <span class="h-6 w-6 rounded-full bg-primary border-2 border-white flex items-center justify-center text-[9px] font-bold text-white" title="{{ $member['name'] }}">
+                            {{ $member['initials'] }}
+                        </span>
+                        @endforeach
+                        @if($team['members']->count() > 4)
+                        <span class="h-6 w-6 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[9px] font-bold text-slate-700">
+                            +{{ $team['members']->count() - 4 }}
+                        </span>
+                        @endif
+                    </div>
+                    <span class="text-[10px] text-text-muted">{{ $team['members']->count() }} teknisi · {{ $team['total_tasks'] }} task</span>
+                </div>
+            </button>
+            @endforeach
+        </div>
+        @else
+        <div class="bg-white border border-slate-200 rounded shadow-sm flex items-center justify-center py-8 text-text-muted">
+            <p class="text-sm">Belum ada team aktif hari ini.</p>
+        </div>
+        @endif
+    </div>
+
+    {{-- ══ TEAM DETAIL MODAL ══ --}}
+    <div x-show="teamDetail.open"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="teamDetail.open = false"></div>
+
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white border border-slate-200 w-full max-w-lg rounded shadow-xl relative z-10"
+                 x-show="teamDetail.open"
+                 @click.away="teamDetail.open = false"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+
+                <template x-if="teamDetail.data">
+                    <div>
+                        <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-800" x-text="teamDetail.data.name"></h3>
+                                <p class="text-[11px] text-slate-500" x-text="teamDetail.data.work_date"></p>
+                            </div>
+                            <button type="button" @click="teamDetail.open = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="p-5 max-h-[70vh] overflow-y-auto space-y-4">
+                            {{-- Progress ringkasan --}}
+                            <div class="bg-slate-50 border border-slate-200 rounded p-3">
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-xs font-semibold text-slate-700">Progress Team</span>
+                                    <span class="text-xs font-semibold text-slate-700" x-text="teamDetail.data.completed_tasks + '/' + teamDetail.data.total_tasks + ' selesai'"></span>
+                                </div>
+                                <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all"
+                                         :style="`width: ${teamDetail.data.progress_percent}%; background: ${teamDetail.data.progress_percent === 100 ? '#16a34a' : '#2563eb'}`">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Anggota (avatar row) --}}
+                            {{-- <div class="flex items-center gap-2 flex-wrap">
+                                <template x-for="member in teamDetail.data.members" :key="member.name">
+                                    <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full pl-1 pr-2.5 py-1">
+                                        <span class="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center text-[9px] font-bold text-white" x-text="member.initials"></span>
+                                        <span class="text-[11px] font-medium text-slate-700" x-text="member.name"></span>
+                                    </div>
+                                </template>
+                            </div> --}}
+
+                            {{-- List Task: tugas, siapa ngerjain, progress/status --}}
+                            <div>
+                                <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Task dalam Team</h4>
+                                <ul class="space-y-3">
+                                    <template x-for="t in teamDetail.data.tasks" :key="t.task_number">
+                                        <li>
+                                            <a :href="t.task_id ? `{{ url('/tasks') }}/${t.task_id}` : '#'"
+                                               class="block bg-white border border-slate-200 rounded-lg p-4 hover:border-sky-500 transition-colors shadow-sm cursor-pointer"
+                                               :class="!t.task_id ? 'pointer-events-none opacity-60' : ''">
+                                                
+                                                <!-- Top Row -->
+                                                <div class="flex items-start justify-between gap-2 mb-3">
+                                                    <!-- Top Left: Badge Kategori -->
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border font-ui"
+                                                          :class="t.badge_classes"
+                                                          x-text="t.category_label">
+                                                    </span>
+                                                    <!-- Top Right: Task ID & Status -->
+                                                    <div class="flex items-center gap-1.5 shrink-0">
+                                                        <span class="text-[10px] font-mono text-slate-500 font-medium" x-text="t.task_number"></span>
+                                                        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border font-ui"
+                                                              :style="t.status_style"
+                                                              x-text="t.status">
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Body: Customer Name -->
+                                                <div class="mb-1">
+                                                    <h5 class="text-sm font-semibold text-slate-900 font-ui" x-text="t.customer_name"></h5>
+                                                </div>
+
+                                                <!-- Body: Customer Address -->
+                                                <div class="mb-3">
+                                                    <p class="text-xs text-slate-500 font-ui leading-relaxed" x-text="t.customer_address"></p>
+                                                </div>
+
+                                                <!-- Footer: Technicians / PIC -->
+                                                <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                                                    <div class="flex items-center gap-1.5 text-[10px] text-slate-500 font-ui">
+                                                        <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                        </svg>
+                                                        <span class="font-medium" x-text="t.technicians.join(', ') || 'Belum ada PIC'"></span>
+                                                    </div>
+                                                    <span class="text-[10px] font-semibold text-sky-600 font-ui inline-flex items-center gap-0.5">
+                                                        Detail Task
+                                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                                        </svg>
+                                                    </span>
+                                                </div>
+
+                                            </a>
+                                        </li>
+                                    </template>
+                                    <li x-show="teamDetail.data.tasks.length === 0" class="text-[11px] text-slate-400 italic text-center py-3">Belum ada task</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex justify-end rounded-b">
+                            <a href="{{ route('fop-tasks.index') }}" class="text-xs font-medium text-primary hover:text-primary-hover transition-colors">Kelola di Task FOP →</a>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
     {{-- ══ Antrean Survey ═══════════════════════════════════════════ --}}
     <div>
         <div class="flex items-center justify-between mb-3">
@@ -106,62 +299,6 @@
             @else
             <div class="flex items-center justify-center py-10 text-text-muted">
                 <p class="text-sm">Tidak ada pelanggan dalam antrean survey.</p>
-            </div>
-            @endif
-        </div>
-    </div>
-
-    {{-- ══ Daftar Tim Gabungan / Otomatis ════════════════════════════ --}}
-    <div>
-        <div class="flex items-center justify-between mb-3">
-            <p class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Daftar Tim Gabungan (Hari Ini)</p>
-            <span class="text-xs text-text-muted">Menampilkan task aktif dengan >1 teknisi</span>
-        </div>
-        <div id="tim-gabungan-container" class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden mb-6">
-            @if(isset($activeTeams) && $activeTeams->count() > 0)
-            <table class="w-full text-[11px]">
-                <thead class="bg-surface-muted">
-                    <tr>
-                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Nama Tim</th>
-                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Anggota Tim</th>
-                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tugas (Task)</th>
-                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Alamat Penugasan</th>
-                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-text-muted">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    @foreach($activeTeams as $team)
-                    <tr class="hover:bg-surface-muted transition-colors">
-                        <td class="px-3 py-2">
-                            <span class="font-bold text-primary bg-primary-soft px-2 py-1 rounded-md">{{ $team['team_name'] }}</span>
-                        </td>
-                        <td class="px-3 py-2">
-                            <ul class="list-disc list-inside text-text-main">
-                                @foreach($team['members'] as $member)
-                                    <li>{{ $member }}</li>
-                                @endforeach
-                            </ul>
-                        </td>
-                        <td class="px-3 py-2">
-                            <p class="font-medium text-text-main">{{ $team['task_title'] }}</p>
-                            <span class="text-[10px] uppercase font-bold text-text-muted">{{ $team['task_type'] }}</span>
-                        </td>
-                        <td class="px-3 py-2 text-text-secondary truncate max-w-[200px]" title="{{ $team['address'] }}">
-                            {{ Str::limit($team['address'], 40) }}
-                        </td>
-                        <td class="px-3 py-2">
-                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
-                                  style="background:var(--color-{{ $team['status_color'] }}-bg); color:var(--color-{{ $team['status_color'] }}); border:1px solid var(--color-{{ $team['status_color'] }}-border)">
-                                {{ $team['status'] }}
-                            </span>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-            @else
-            <div class="flex items-center justify-center py-6 text-text-muted">
-                <p class="text-sm">Tidak ada Tim Gabungan yang aktif/terjadwal hari ini.</p>
             </div>
             @endif
         </div>
@@ -245,6 +382,14 @@
 <script>
 function fopDashboardHandler() {
     return {
+        teamsData: @json($activeFopTeams),
+        teamDetail: { open: false, data: null },
+
+        openTeamDetail(id) {
+            this.teamDetail.data = this.teamsData.find(t => t.id === id) || null;
+            this.teamDetail.open = true;
+        },
+
         init() {
             this.initEchoListeners();
         },
@@ -298,7 +443,7 @@ function fopDashboardHandler() {
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
-                ['stat-cards-container', 'antrian-survey-container', 'tim-gabungan-container', 'status-teknisi-container'].forEach(id => {
+                ['stat-cards-container', 'antrian-survey-container', 'status-teknisi-container'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
                     if (el && newEl) el.innerHTML = newEl.innerHTML;

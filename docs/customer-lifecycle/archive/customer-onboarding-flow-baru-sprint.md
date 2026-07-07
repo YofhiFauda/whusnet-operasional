@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen alur/rencana historis — sebagian sudah diimplementasi, sebagian berbeda dari kode aktual. Lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini.
+
 # Customer Onboarding — Flow Baru: Sprint Planning
 
 > **Dokumen ini** menjabarkan implementasi flow baru onboarding pelanggan ISP (Registrasi → Survey → Verifikasi → Pemasangan → Aktif) dengan sistem penjadwalan FOP, task teknisi, dan SLA real-time.

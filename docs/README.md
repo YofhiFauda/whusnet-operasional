@@ -12,6 +12,11 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | `docs/master/` | Dokumentasi master wilayah, paket layanan, dan status langganan. |
 | `docs/dashboard/` | Dokumentasi dashboard operasional. |
 | `docs/penunjang/` | Dokumentasi API dependent dropdown dan import pelanggan. |
+| `docs/fop-task/` | Dokumentasi modul FOP Task (tiket kerja lapangan, team harian, dashboard FOP). |
+| `docs/billing-pembayaran/` | Dokumentasi modul tagihan (Invoice) dan pembayaran (Payment). |
+| `docs/rbac/` | Dokumentasi RBAC (Role, Permission, Feature/Action, Scope POP). |
+| `docs/customer-lifecycle/` | Dokumentasi Customer Verifikasi & Onboarding Lifecycle (registrasi→survey→pemasangan→aktivasi). |
+| `docs/task-teknisi/` | Dokumentasi Task Teknisi (eksekusi lapangan: checklist, evidence, review FOP). |
 
 ## Fitur Utama
 
@@ -42,20 +47,15 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | Master Status | `app/Http/Controllers/Master/SubscriptionStatusController.php`, `app/Models/SubscriptionStatus.php` |
 | Master Wilayah | `app/Http/Controllers/Master/RegionController.php`, `app/Models/City.php`, `app/Models/District.php`, `app/Models/Village.php` |
 
-## Sprint 8 — FOP Task Management & Design System
+## FOP Task & Billing — Dokumentasi Modul
 
-Sprint 8 menambahkan modul task scheduling dan management untuk FOP dengan real-time updates dan design system konsistensi:
-
-| Sprint | Fitur | Dokumentasi |
-|--------|-------|------------|
-| S8.1 | FOP Dashboard Overview | [FOP Dashboard](sprint-8/fop-dashboard.md) |
-| S8.2-S8.3 | Kanban Task Scheduler | [Kanban](sprint-8/kanban-task-scheduler.md) |
-| S8.5 | Design System UI | [Design System](sprint-8/design-system-ui.md) |
-| S8.6 | Overdue Indicator | [Overdue](sprint-8/overdue-indicator.md) |
-| S8.7 | Calendar Scheduler | [Calendar](sprint-8/calendar-scheduler.md) |
-| S8.9 | Task Workflow & Approvals | [Workflow](sprint-8/task-workflow.md) |
-
-**Overview lengkap:** [Sprint 8 README](sprint-8/README.md)
+| Modul | Dokumentasi |
+|-------|-------------|
+| FOP Task (tiket kerja, team harian, dashboard) | [docs/fop-task/README.md](fop-task/README.md) |
+| Billing & Pembayaran (invoice, payment) | [docs/billing-pembayaran/README.md](billing-pembayaran/README.md) |
+| RBAC (role, permission, scope POP) | [docs/rbac/README.md](rbac/README.md) |
+| Customer Verifikasi & Onboarding Lifecycle | [docs/customer-lifecycle/README.md](customer-lifecycle/README.md) |
+| Task Teknisi (eksekusi lapangan) | [docs/task-teknisi/README.md](task-teknisi/README.md) |
 
 ---
 

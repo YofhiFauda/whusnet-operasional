@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen desain/rencana historis RBAC — sebagian besar sudah diimplementasi (lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini).
+
 ﻿# Analisa: RBAC Dinamis (Feature–Action–Scope) untuk WHUSNET Admin Payment
 
 **Project:** WHUSNET Admin Payment

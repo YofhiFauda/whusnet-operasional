@@ -35,7 +35,12 @@ class TaskController extends Controller
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where(function ($q) use ($today) {
                 $q->whereDate('scheduled_at', $today)
-                  ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value]);
+                  ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                  // Overdue: terjadwal tapi scheduled_at udah lewat hari ini — jangan sampe ilang dari list
+                  ->orWhere(function ($q2) use ($today) {
+                      $q2->where('status', TaskStatus::TERJADWAL->value)
+                         ->whereDate('scheduled_at', '<', $today);
+                  });
             })
             ->orderBy('scheduled_at')
             ->get();
@@ -346,6 +351,14 @@ class TaskController extends Controller
         $msg = '';
 
         if ($action === 'approve') {
+            // Approve Pemasangan wajib lewat Verifikasi Admin (finalVerify) — jalur itu
+            // yang generate CID & Invoice AWAL. Approve dari sini dulu langsung
+            // men-transisi customer ke ACTIVE tanpa CID/Invoice, bikin pelanggan
+            // "aktif" tapi gak pernah ditagih dan gak punya CID.
+            if ($task->task_type === TaskType::PEMASANGAN) {
+                return back()->with('error', 'Approve pemasangan wajib dilakukan lewat halaman Verifikasi Admin (generate CID & tagihan awal).');
+            }
+
             $task->update(['fop_review_status' => 'approved']);
             \App\Models\AuditLog::log($task, 'approved', $oldValues, $task->toArray());
 
@@ -353,8 +366,6 @@ class TaskController extends Controller
             if ($task->customer) {
                 if ($task->task_type === TaskType::SURVEY) {
                     $workflowService->transition($task->customer, \App\Enums\WorkflowTransition::WAITING_INSTALLATION, 'Survey Approved by FOP');
-                } elseif ($task->task_type === TaskType::PEMASANGAN) {
-                    $workflowService->transition($task->customer, \App\Enums\WorkflowTransition::ACTIVE, 'Installation Approved by FOP');
                 }
             }
             $this->notifyTeamMembers(

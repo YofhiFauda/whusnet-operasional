@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # Overdue Indicator (S8.6-T003)
 
 Display jumlah overdue tasks di FOP Dashboard stat cards untuk priority management.

@@ -166,8 +166,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:pops.create|pops.update')->group(function () {
         Route::get('/master/distribusi/create', [DistributionController::class, 'create'])->name('master.distribusi.create');
         Route::post('/master/distribusi', [DistributionController::class, 'store'])->name('master.distribusi.store');
-        Route::get('/master/distribusi/{distribution}/edit', [DistributionController::class, 'edit'])->name('master.distribusi.edit');
-        Route::put('/master/distribusi/{distribution}', [DistributionController::class, 'update'])->name('master.distribusi.update');
+        Route::get('/master/distribusi/{distribusi}/edit', [DistributionController::class, 'edit'])->name('master.distribusi.edit');
+        Route::put('/master/distribusi/{distribusi}', [DistributionController::class, 'update'])->name('master.distribusi.update');
     });
 
     Route::middleware('permission:pops.delete')->group(function () {
@@ -320,15 +320,19 @@ Route::middleware('auth')->group(function () {
     // FOP: Task FOP (Custom)
     Route::middleware('permission:fop_tasks.view')->group(function () {
         Route::get('/fop-tasks', [FopTaskController::class, 'index'])->name('fop-tasks.index');
+        Route::get('/fop-tasks/history', [FopTaskController::class, 'history'])->name('fop-tasks.history');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
         Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');
+        Route::post('/fop-tasks/teams', [FopTaskController::class, 'teamStore'])->name('fop-tasks.teams.store');
     });
     Route::middleware('permission:fop_tasks.update')->group(function () {
         Route::put('/fop-tasks/{fop_task}', [FopTaskController::class, 'update'])->name('fop-tasks.update');
+        Route::put('/fop-tasks/teams/{team}', [FopTaskController::class, 'teamUpdate'])->name('fop-tasks.teams.update');
     });
     Route::middleware('permission:fop_tasks.delete')->group(function () {
         Route::delete('/fop-tasks/{fop_task}', [FopTaskController::class, 'destroy'])->name('fop-tasks.destroy');
+        Route::delete('/fop-tasks/teams/{team}', [FopTaskController::class, 'teamDestroy'])->name('fop-tasks.teams.destroy');
     });
 
     // Location APIs (used in forms)

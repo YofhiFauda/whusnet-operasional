@@ -31,3 +31,17 @@ window.Echo = new Echo({
     },
     withCredentials: true,
 });
+
+// Handle modern browser Back-Forward Cache (bfcache) to prevent websocket errors and keep connection alive
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted && window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+        window.Echo.connector.pusher.connect();
+    }
+});
+
+window.addEventListener('pagehide', () => {
+    if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+        window.Echo.connector.pusher.disconnect();
+    }
+});
+

@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen lama/spesifikasi awal — sebagian tidak sesuai skema kode aktual (field fabrikasi seperti `capacity`/`used_ports`/`is_active` gak pernah ada). Lihat `../README.md`, `../business-logic.md`, `../database-schema.md` untuk kondisi kode terkini.
+
 # Flowchart: Master Distribusi
 
 Alur di bawah menjelaskan pengelolaan titik distribusi dan kaitannya dengan proses teknis pemasangan.

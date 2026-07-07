@@ -352,6 +352,44 @@ class Customer extends Model
         return 'ID';
     }
 
+    /**
+     * Get a clean formatted address without duplicated parts.
+     * Removes duplicate segments like village/district if they are already in the string.
+     */
+    public function getCleanAddressAttribute(): string
+    {
+        $address = $this->address ?? '';
+        
+        $village = $this->village?->name;
+        $district = $this->district?->name;
+        $city = $this->city?->name;
+
+        $parts = array_map('trim', explode(',', $address));
+        
+        $removables = array_filter([
+            strtolower($village ?? ''),
+            strtolower($district ?? ''),
+            strtolower($city ?? '')
+        ]);
+        
+        while (!empty($parts)) {
+            $lastPart = strtolower(end($parts));
+            $cleanLastPart = trim(str_replace(['desa ', 'kec. ', 'kecamatan ', 'kab. ', 'kabupaten ', 'kota ', 'kelurahan '], '', $lastPart));
+            
+            if (in_array($cleanLastPart, $removables, true) || in_array($lastPart, $removables, true)) {
+                array_pop($parts);
+            } else {
+                break;
+            }
+        }
+        
+        if ($village) $parts[] = $village;
+        if ($district) $parts[] = $district;
+        if ($city) $parts[] = $city;
+        
+        return empty($parts) ? '—' : implode(', ', array_filter($parts));
+    }
+
 
 
     /**

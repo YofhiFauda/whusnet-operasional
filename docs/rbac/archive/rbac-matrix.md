@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen desain/rencana historis RBAC — sebagian besar sudah diimplementasi (lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini).
+
 # RBAC_MATRIX.md - Advanced Hierarchical RBAC Design
 
 # Website Billing ISP Berbasis Master Data Pelanggan

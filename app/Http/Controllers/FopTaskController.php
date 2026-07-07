@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FopTask;
+use App\Models\FopTaskTeam;
 use App\Models\Village;
 use App\Models\User;
 use App\Models\Pop;
@@ -29,8 +30,18 @@ class FopTaskController extends Controller
         
         $this->autoSyncAndCalculatePriority();
 
-        $query = FopTask::with(['village', 'technicians'])
-            ->orderByRaw("CASE WHEN status IN ('Proses', 'Pending') THEN 1 ELSE 2 END")
+        $query = FopTask::with([
+            'village',
+            'technicians',
+            'task:id,scheduled_at',
+            'customer:id,created_at,updated_at',
+            'customer.tasks' => function ($q) {
+                $q->where('task_type', TaskType::SURVEY->value)
+                  ->where('status', 'selesai')
+                  ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
+            },
+        ])
+            ->whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
             ->orderByRaw("CASE priority 
                 WHEN 'Urgent' THEN 1 
                 WHEN 'High' THEN 2 
@@ -56,7 +67,12 @@ class FopTaskController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $statusVal = $request->input('status');
+            if (in_array($statusVal, ['Proses', 'Pending'])) {
+                $query->where('status', $statusVal);
+            } else {
+                $query->whereRaw('1=0');
+            }
         }
 
         if ($request->filled('priority')) {
@@ -67,7 +83,11 @@ class FopTaskController extends Controller
             $query->where('village_id', $request->input('village_id'));
         }
 
-        $fopTasks = $query->paginate(20)->withQueryString();
+        if ($request->filled('team_id')) {
+            $query->where('team_id', $request->input('team_id'));
+        }
+
+        $fopTasks = $query->with('team:id,name')->paginate(20)->withQueryString();
 
         // Get villages for area selector
         $villages = Village::orderBy('name', 'asc')->get();
@@ -93,7 +113,35 @@ class FopTaskController extends Controller
 
         $canEditFopTaskType = auth()->user()->hasPermission('fop_tasks.update_sensitive');
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType'));
+        // Daftar Team (dipakai dropdown filter, dropdown di modal create/edit, dan panel Kelola Team)
+        $teams = FopTaskTeam::with(['members:id,name', 'fopTasks:id,team_id,status', 'fopTasks.technicians:id,name'])
+            ->orderByDesc('work_date')
+            ->limit(50)
+            ->get()
+            ->map(function (FopTaskTeam $team) {
+                $activeCount = $team->fopTasks->filter(
+                    fn ($t) => !in_array($t->status->value, ['Selesai', 'Cancel'])
+                )->count();
+
+                $workload = $team->fopTasks
+                    ->flatMap(fn ($t) => $t->technicians)
+                    ->countBy('id');
+
+                return [
+                    'id'         => $team->id,
+                    'name'       => $team->name,
+                    'work_date'  => $team->work_date->format('Y-m-d'),
+                    'members'    => $team->members->map(fn ($m) => [
+                        'id'    => $m->id,
+                        'name'  => $m->name,
+                        'count' => $workload->get($m->id, 0),
+                    ])->values(),
+                    'task_count' => $team->fopTasks->count(),
+                    'is_active'  => $activeCount > 0,
+                ];
+            });
+
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams'));
     }
 
     /**
@@ -110,6 +158,7 @@ class FopTaskController extends Controller
             'village_id' => ['required', 'exists:villages,id'],
             'pop_id' => ['required', 'exists:pops,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
+            'team_id' => ['nullable', 'exists:fop_task_teams,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'string', Rule::enum(FopTaskStatus::class)],
@@ -136,6 +185,7 @@ class FopTaskController extends Controller
             $fopTask->village_id = $validated['village_id'];
             $fopTask->pop_id = $validated['pop_id'];
             $fopTask->customer_id = $validated['customer_id'] ?? null;
+            $fopTask->team_id = $validated['team_id'] ?? null;
             $fopTask->issue = $validated['issue'] ?? null;
             $fopTask->notes = $validated['notes'] ?? null;
             $fopTask->status = $validated['status'];
@@ -200,6 +250,7 @@ class FopTaskController extends Controller
             'village_id' => ['sometimes', 'required', 'exists:villages,id'],
             'pop_id' => ['sometimes', 'required', 'exists:pops,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
+            'team_id' => ['sometimes', 'nullable', 'exists:fop_task_teams,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'required', 'string', Rule::enum(FopTaskStatus::class)],
@@ -213,9 +264,10 @@ class FopTaskController extends Controller
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
         ]);
 
-        // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task.
+        // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task & Prioritas.
         if (!auth()->user()->hasPermission('fop_tasks.update_sensitive')) {
             unset($validated['category']);
+            unset($validated['priority']);
         }
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
@@ -227,6 +279,7 @@ class FopTaskController extends Controller
             if (array_key_exists('village_id', $validated)) $fopTask->village_id = $validated['village_id'];
             if (array_key_exists('pop_id', $validated)) $fopTask->pop_id = $validated['pop_id'];
             if (array_key_exists('customer_id', $validated)) $fopTask->customer_id = $validated['customer_id'];
+            if (array_key_exists('team_id', $validated)) $fopTask->team_id = $validated['team_id'];
             if (array_key_exists('issue', $validated)) $fopTask->issue = $validated['issue'];
             if (array_key_exists('notes', $validated)) $fopTask->notes = $validated['notes'];
             if (isset($validated['priority'])) $fopTask->priority = $validated['priority'];
@@ -330,6 +383,101 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Bikin Team harian baru (roster teknisi berlaku 1 hari, bisa lanjut kalau ada task Pending).
+     */
+    public function teamStore(Request $request)
+    {
+        $this->authorizeAccess();
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:100'],
+            'work_date' => ['required', 'date'],
+            'member_ids' => ['required', 'array', 'min:1'],
+            'member_ids.*' => ['exists:users,id'],
+        ]);
+
+        $conflicts = FopTaskTeam::findMemberConflicts($validated['member_ids'], $validated['work_date']);
+        if (!empty($conflicts)) {
+            return back()->withInput()->withErrors([
+                'member_ids' => $this->formatConflictMessage($conflicts),
+            ]);
+        }
+
+        $team = FopTaskTeam::create([
+            'name' => $validated['name'] ?: 'Tim ' . Carbon::parse($validated['work_date'])->format('d/m'),
+            'work_date' => $validated['work_date'],
+            'created_by' => auth()->id(),
+        ]);
+
+        $team->members()->sync($validated['member_ids']);
+
+        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$team->name}\" berhasil dibuat.");
+    }
+
+    /**
+     * Update nama/roster Team. Perubahan roster gak ngerubah task yang udah ke-assign sebelumnya.
+     */
+    public function teamUpdate(Request $request, FopTaskTeam $team)
+    {
+        $this->authorizeAccess();
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:100'],
+            'member_ids' => ['sometimes', 'required', 'array', 'min:1'],
+            'member_ids.*' => ['exists:users,id'],
+        ]);
+
+        if (isset($validated['member_ids'])) {
+            $conflicts = FopTaskTeam::findMemberConflicts(
+                $validated['member_ids'],
+                $team->work_date->toDateString(),
+                $team->id
+            );
+            if (!empty($conflicts)) {
+                return back()->withInput()->withErrors([
+                    'member_ids' => $this->formatConflictMessage($conflicts),
+                ]);
+            }
+        }
+
+        if (isset($validated['name'])) $team->name = $validated['name'];
+        $team->save();
+
+        if (isset($validated['member_ids'])) {
+            $team->members()->sync($validated['member_ids']);
+        }
+
+        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$team->name}\" berhasil diperbarui.");
+    }
+
+    /**
+     * Format pesan error konflik keanggotaan team jadi 1 kalimat.
+     */
+    private function formatConflictMessage(array $conflicts): string
+    {
+        $lines = array_map(
+            fn ($c) => "{$c['user_name']} udah di Team \"{$c['team_name']}\"",
+            $conflicts
+        );
+
+        return 'Gagal: ' . implode(', ', $lines) . ' — 1 teknisi gak boleh di 2 team aktif di tanggal yang sama.';
+    }
+
+    /**
+     * Hapus Team. Task yang masih nempel gak ikut kehapus — team_id otomatis null (FK set null).
+     */
+    public function teamDestroy(FopTaskTeam $team)
+    {
+        $this->authorizeAccess();
+
+        $teamName = $team->name;
+        $team->members()->detach();
+        $team->delete();
+
+        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$teamName}\" berhasil dihapus.");
+    }
+
+    /**
      * Authorize access to FOP task resource.
      */
     protected function authorizeAccess()
@@ -350,6 +498,109 @@ class FopTaskController extends Controller
         }
 
         abort(403, 'Anda tidak memiliki hak akses ke modul ini.');
+    }
+
+    /**
+     * Display a listing of completed and cancelled FOP tasks.
+     */
+    public function history(Request $request)
+    {
+        $this->authorizeAccess();
+
+        $query = FopTask::with(['village', 'technicians'])
+            ->whereIn('status', [FopTaskStatus::SELESAI, FopTaskStatus::CANCEL])
+            ->orderBy('updated_at', 'desc');
+
+        // Search filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('task_number', 'like', "%{$search}%")
+                  ->orWhere('tugas', 'like', "%{$search}%")
+                  ->orWhere('issue', 'like', "%{$search}%");
+            });
+        }
+
+        // Dropdown filters
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        if ($request->filled('status')) {
+            $statusVal = $request->input('status');
+            if (in_array($statusVal, ['Selesai', 'Cancel'])) {
+                $query->where('status', $statusVal);
+            } else {
+                $query->whereRaw('1=0');
+            }
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->input('priority'));
+        }
+
+        if ($request->filled('village_id')) {
+            $query->where('village_id', $request->input('village_id'));
+        }
+
+        if ($request->filled('team_id')) {
+            $query->where('team_id', $request->input('team_id'));
+        }
+
+        $fopTasks = $query->with('team:id,name')->paginate(20)->withQueryString();
+
+        // Get villages for area selector
+        $villages = Village::orderBy('name', 'asc')->get();
+
+        // Get POPs for cabang selector
+        $pops = Pop::orderBy('name', 'asc')->get();
+
+        // Get technicians for assignee selector
+        $technicians = User::whereHas('role', function($q) {
+            $q->where('code', 'teknisi');
+        })->where('status', 'active')->orderBy('name', 'asc')->get();
+
+        // Categories mapping using Enum
+        $categories = collect(TaskType::cases())->mapWithKeys(function ($category) {
+            return [$category->value => $category->label()];
+        })->toArray();
+
+        // Tipe task yang boleh dipakai
+        $manualCategories = collect($categories)
+            ->except(TaskType::autoOnlyValues())
+            ->toArray();
+
+        $canEditFopTaskType = auth()->user()->hasPermission('fop_tasks.update_sensitive');
+
+        // Daftar Team
+        $teams = FopTaskTeam::with(['members:id,name', 'fopTasks:id,team_id,status', 'fopTasks.technicians:id,name'])
+            ->orderByDesc('work_date')
+            ->limit(50)
+            ->get()
+            ->map(function (FopTaskTeam $team) {
+                $activeCount = $team->fopTasks->filter(
+                    fn ($t) => !in_array($t->status->value, ['Selesai', 'Cancel'])
+                )->count();
+
+                $workload = $team->fopTasks
+                    ->flatMap(fn ($t) => $t->technicians)
+                    ->countBy('id');
+
+                return [
+                    'id'         => $team->id,
+                    'name'       => $team->name,
+                    'work_date'  => $team->work_date->format('Y-m-d'),
+                    'members'    => $team->members->map(fn ($m) => [
+                        'id'    => $m->id,
+                        'name'  => $m->name,
+                        'count' => $workload->get($m->id, 0),
+                    ])->values(),
+                    'task_count' => $team->fopTasks->count(),
+                    'is_active'  => $activeCount > 0,
+                ];
+            });
+
+        return view('fop_tasks.history', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams'));
     }
 
     /**

@@ -17,15 +17,16 @@
     <div class="flex gap-2">
         @can('customers.detail.installation.activate')
             @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active')
-                <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengaktifkan layanan untuk pelanggan ini?', this);">
+                <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Pelanggan ini belum aktif lewat proses verifikasi normal. Aktifkan manual sekarang? CID akan dibuat dan tagihan pertama akan diterbitkan.', this);">
                     @csrf
-                    <button type="submit" 
+                    <button type="submit"
                             class="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none cursor-pointer"
+                            title="Khusus pelanggan yang belum otomatis aktif dari alur verifikasi (mis. data migrasi lama). Untuk pelanggan baru, aktivasi sudah otomatis saat verifikasi admin selesai."
                             @if(!$completeness['is_ready_billing']) disabled title="Data profil belum lengkap untuk diaktifkan" @endif>
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Aktivasi Layanan
+                        Aktivasi Manual
                     </button>
                 </form>
             @endif

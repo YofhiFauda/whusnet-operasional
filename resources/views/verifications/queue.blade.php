@@ -186,10 +186,12 @@
                                     Revisi
                                 </a>
                             @elseif($customer->status === 'installed' || $customer->status === 'verification_admin')
+                                @can('customers.detail.installation.validate')
                                 <a href="{{ route('customers.verification.admin', $customer) }}" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
                                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Verifikasi
                                 </a>
+                                @endcan
                             @endif
                         </div>
                     </td>

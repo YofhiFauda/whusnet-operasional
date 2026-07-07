@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # Calendar Scheduler (S8.7)
 
 Weekly calendar grid view untuk FOP task scheduling dan team management.

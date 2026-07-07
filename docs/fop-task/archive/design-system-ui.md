@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # Design System UI Konsistensi (S8.5)
 
 Migrasi dari hardcoded Tailwind colors ke design system CSS variables untuk konsistensi visual dan maintainability.

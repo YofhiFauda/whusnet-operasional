@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen lama/spesifikasi awal — sebagian tidak sesuai skema kode aktual (field fabrikasi seperti `capacity`/`used_ports`/`is_active` gak pernah ada). Lihat `../README.md`, `../business-logic.md`, `../database-schema.md` untuk kondisi kode terkini.
+
 # Master Distribusi
 
 Master Distribusi mengelola data jaringan titik distribusi seperti ODC (Optical Distribution Cabinet) atau ODP (Optical Distribution Point) hingga OLT (Optical Line Terminal). Data ini sangat penting bagi tim teknisi saat proses Instalasi & Pemasangan FOP untuk mencatat port mana yang digunakan pelanggan.

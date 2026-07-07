@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+
 # Kanban Task Scheduler (S8.2-S8.3)
 
 Pipeline task 5-kolom dengan real-time updates untuk FOP task management.

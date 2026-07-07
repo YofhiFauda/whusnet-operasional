@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen lama/spesifikasi awal — sebagian tidak sesuai skema kode aktual (field fabrikasi seperti `capacity`/`used_ports`/`is_active` gak pernah ada). Lihat `../README.md`, `../business-logic.md`, `../database-schema.md` untuk kondisi kode terkini.
+
 # Analisa: Manajemen POP, Mini-POP, Distribusi & Sistem ID Pelanggan
 
 > Dokumen ini menganalisa kondisi saat ini vs kebutuhan bisnis nyata untuk sistem manajemen jaringan hierarki dan pembentukan ID pelanggan (Request ID → CID → Terminated).

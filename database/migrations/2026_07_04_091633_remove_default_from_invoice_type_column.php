@@ -16,7 +16,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL");
+        }
     }
 
     /**
@@ -24,6 +26,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL DEFAULT 'bulanan'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL DEFAULT 'bulanan'");
+        }
     }
 };

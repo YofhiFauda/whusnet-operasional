@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen analisa/rencana historis — sebagian rekomendasi sudah diimplementasi, sebagian belum. Lihat [../README.md](../README.md) untuk dokumentasi kondisi kode terkini.
+
 # Analisa UI/UX: Memaksimalkan Admin Menganalisa & Melakukan Pembayaran
 
 Lanjutan dari `ANALISA_BILLING_PEMBAYARAN_FINAL.md` — fokus ke desain antarmuka per layar supaya admin bisa menganalisa kondisi tagihan/saldo pelanggan dan memproses pembayaran secepat mungkin, berdasarkan studi kasus yang sama (awal/bulanan/reaktivasi, piutang, kembalian ditabung, cicilan, bayar instan, bayar massal per kolektor, rekap harian/bulanan).

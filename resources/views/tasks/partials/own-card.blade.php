@@ -99,7 +99,7 @@
 
             @if($task->status->value === 'terjadwal')
                 @if($task->task_type->value === 'survey')
-                    @if(auth()->user()->hasPermission('customers.detail.survey.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
+                    @if($task->customer_id && auth()->user()->hasPermission('customers.detail.survey.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                     <form action="{{ route('customers.survey.start', $task->customer_id) }}" method="POST" class="flex-1">
                         @csrf
                         <button type="submit"
@@ -110,7 +110,7 @@
                     </form>
                     @endif
                 @elseif($task->task_type->value === 'pemasangan')
-                    @if(auth()->user()->hasPermission('customers.detail.installation.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
+                    @if($task->customer_id && auth()->user()->hasPermission('customers.detail.installation.update') && $task->teamMembers->pluck('user_id')->contains(auth()->id()))
                     <form action="{{ route('customers.installation.start', $task->customer_id) }}" method="POST" class="flex-1">
                         @csrf
                         <button type="submit"

@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen lama/spesifikasi awal — sebagian tidak sesuai skema kode aktual (field fabrikasi seperti `capacity`/`used_ports`/`is_active` gak pernah ada). Lihat `../README.md`, `../business-logic.md`, `../database-schema.md` untuk kondisi kode terkini.
+
 # Master POP (Point of Presence)
 
 Master POP / Cabang menyimpan data lokasi stasiun pemancar atau cabang operasional ISP. POP adalah komponen vital karena beroperasi sebagai referensi area layanan dan berperan aktif dalam mekanisme RBAC (Role-Based Access Control) di mana admin/staf cabang hanya boleh melihat data dari POP mereka sendiri.

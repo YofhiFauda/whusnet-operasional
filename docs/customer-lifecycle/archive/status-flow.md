@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen alur/rencana historis — sebagian sudah diimplementasi, sebagian berbeda dari kode aktual. Lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini.
+
 # STATUS_FLOW.md
 
 # Website Billing ISP Berbasis Master Data Pelanggan

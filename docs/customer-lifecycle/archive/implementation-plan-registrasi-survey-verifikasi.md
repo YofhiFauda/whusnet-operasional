@@ -1,3 +1,5 @@
+> **Arsip.** Dokumen alur/rencana historis — sebagian sudah diimplementasi, sebagian berbeda dari kode aktual. Lihat [../README.md](../README.md), [../business-logic.md](../business-logic.md) untuk kondisi kode terkini.
+
 # Implementation Plan: Alur Registrasi → Survey → Verifikasi Admin → Pemasangan → Aktivasi
 
 **Project:** WHUSNET Admin Payment

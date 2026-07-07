@@ -75,7 +75,6 @@ class TaskFeatureSeeder extends Seeder
             ['code' => 'task.conflict.override', 'name' => 'Override Konflik'],
             ['code' => 'task.reject',            'name' => 'Tolak Task'],
             ['code' => 'task.approve',           'name' => 'Setujui Task'],
-            ['code' => 'task.status.pending',    'name' => 'Pending Task (FOP)'],
         ];
 
         $fopPermIds = [];
