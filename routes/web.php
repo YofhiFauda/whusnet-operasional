@@ -11,6 +11,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
+use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\CustomerReportController;
@@ -195,11 +196,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/paket/{paket}/toggle', [InternetPackageController::class, 'toggleStatus'])->name('master.paket.toggle');
     });
 
+    Route::middleware('permission:sla_timeline.view')->group(function () {
+        Route::get('/master/sla-timeline', [SlaTimelineController::class, 'index'])->name('master.sla-timeline.index');
+    });
+
+    Route::middleware('permission:sla_timeline.update')->group(function () {
+        Route::put('/master/sla-timeline/{paket}', [SlaTimelineController::class, 'update'])->name('master.sla-timeline.update');
+    });
+
     Route::middleware('permission:customers.detail.survey.view|customers.detail.survey.update')->group(function () {
         Route::get('/surveys/queue', [CustomerSurveyController::class, 'index'])->name('surveys.queue');
         Route::get('/customers/{customer}/survey/report', [CustomerSurveyController::class, 'report'])->name('customers.survey.report');
         Route::post('/customers/{customer}/survey/start', [CustomerSurveyController::class, 'start'])->name('customers.survey.start');
         Route::post('/customers/{customer}/survey', [CustomerSurveyController::class, 'store'])->name('customers.survey.store');
+    });
+
+    Route::middleware('permission:customers.detail.survey.reject')->group(function () {
+        Route::post('/customers/{customer}/survey/cancel', [CustomerSurveyController::class, 'cancel'])->name('customers.survey.cancel');
     });
 
     Route::middleware('permission:customers.update')->group(function () {

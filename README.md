@@ -38,6 +38,7 @@ Aplikasi ini dibuat sebagai fondasi sistem operasional ISP dengan modul utama:
 | Master Wilayah | `/master/wilayah` | Referensi kota, kecamatan, desa, dan pencarian wilayah. | [Master Wilayah](docs/master/wilayah.md) |
 | Master Internet Package | `/master/paket` | Daftar paket internet aktif yang dikelompokkan berdasarkan kategori. | [Master Internet Package](docs/master/internet-package.md) |
 | Master Status Langganan | `/master/status-langganan` | Daftar status workflow pelanggan beserta jumlah pelanggan per status. | [Master Status Langganan](docs/master/status-langganan.md) |
+| Master Timeline SLA | `/master/sla-timeline` | Matrix batas waktu wajib mulai ditangani per jenis tiket, beda-beda per paket internet. | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
 | API Kecamatan | `/api/cities/{city}/districts` | Mengambil daftar kecamatan berdasarkan kota. | [API Wilayah](docs/penunjang/api-wilayah.md) |
 | API Desa | `/api/districts/{district}/villages` | Mengambil daftar desa berdasarkan kecamatan. | [API Wilayah](docs/penunjang/api-wilayah.md) |
 
@@ -232,6 +233,7 @@ Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu se
 | Melihat master status pelanggan | [Master Status Pelanggan](docs/master/status-pelanggan/README.md) |
 | Melihat master POP (Cabang) | [Master POP](docs/master/pop/README.md) |
 | Melihat master Distribusi jaringan | [Master Distribusi](docs/master/distribution/README.md) |
+| Melihat Master Timeline SLA (batas waktu tiket per paket) | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
 
 ### Penunjang
 

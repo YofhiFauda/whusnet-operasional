@@ -17,11 +17,20 @@ class RoleManagementService
      */
     public function syncPermissions(Role $role, array $permissions): void
     {
-        DB::transaction(function () use ($role, $permissions) {
+        // Sanitize to unique integers to avoid duplicate inserts and exceptions
+        $sanitizedPermissions = array_values(array_unique(array_map('intval', $permissions)));
+
+        DB::transaction(function () use ($role, $sanitizedPermissions, $permissions) {
+            // Lock row Role — cegah race condition kalau ada 2 request PUT matrix
+            // nyaris bersamaan (mis. double-klik submit) yang bisa bikin sync()
+            // di kedua request sama-sama baca state lama lalu tabrakan insert
+            // pivot yang sama (unique constraint role_permissions).
+            $role = Role::where('id', $role->id)->lockForUpdate()->firstOrFail();
+
             $oldPermissions = $role->permissions()->pluck('permissions.id')->toArray();
-            
+
             // 1. Eksekusi Relasi Utama
-            $role->permissions()->sync($permissions);
+            $role->permissions()->sync($sanitizedPermissions);
 
             // Clear cache for all users with this role
             $users = $role->users()->get();

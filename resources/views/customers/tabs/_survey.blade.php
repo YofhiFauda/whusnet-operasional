@@ -3,19 +3,52 @@
         <h3 class="text-sm font-bold text-text-main uppercase tracking-wider">Data Survey Teknis Pelanggan</h3>
         <p class="text-xs text-text-muted mt-0.5">Informasi hasil survey lapangan untuk persiapan instalasi.</p>
     </div>
-    @can('customers.detail.survey.update')
-        @if($customer->status === 'survey_in_progress')
-            <a href="{{ route('customers.survey.report', $customer) }}" class="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold shadow-sm">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Lapor Hasil Survey
-            </a>
-        @elseif($customer->status === 'waiting_survey')
-            <span class="text-[10px] italic px-2 py-1 rounded border" style="background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)">Mulai survey dari menu Antrean Survey terlebih dahulu.</span>
-        @endif
-    @endcan
+    <div class="flex items-center gap-2">
+        @can('customers.detail.survey.update')
+            @if($customer->status === 'survey_in_progress')
+                <a href="{{ route('customers.survey.report', $customer) }}" class="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold shadow-sm">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Lapor Hasil Survey
+                </a>
+            @elseif($customer->status === 'waiting_survey')
+                <span class="text-[10px] italic px-2 py-1 rounded border" style="background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)">Mulai survey dari menu Antrean Survey terlebih dahulu.</span>
+            @endif
+        @endcan
+
+        @can('customers.detail.survey.reject')
+            @if(in_array($customer->status, ['waiting_survey', 'survey_in_progress']))
+                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border" style="color:var(--color-error); border-color:var(--color-error-border); background:var(--color-error-bg);">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Batalkan Survey
+                </button>
+            @endif
+        @endcan
+    </div>
 </div>
+
+@can('customers.detail.survey.reject')
+@if(in_array($customer->status, ['waiting_survey', 'survey_in_progress']))
+<div id="cancel-survey-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-surface border border-border rounded-lg shadow-lg w-full max-w-md p-5">
+        <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Survey — Tidak Layak Pasang</h4>
+        <p class="text-xs text-text-muted mb-4">Pelanggan akan diubah statusnya menjadi <strong>ditolak</strong> dan tidak bisa lanjut ke tahap pemasangan. Tindakan ini tidak bisa dibatalkan.</p>
+        <form action="{{ route('customers.survey.cancel', $customer) }}" method="POST">
+            @csrf
+            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan <span class="text-error">*</span></label>
+            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Alamat tidak ditemukan, lokasi di luar jangkauan ODP, pelanggan menolak, dll."></textarea>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.add('hidden')" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
+                <button type="submit" class="text-xs px-3 py-1.5 rounded-md font-semibold text-white" style="background:var(--color-error);">Ya, Batalkan Survey</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
+@endcan
 
 @if($customer->surveys->count() > 0)
     <div class="space-y-6">

@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\TaskType;
 use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'package_code',
@@ -70,6 +72,29 @@ class InternetPackage extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function slaSettings(): HasMany
+    {
+        return $this->hasMany(PackageSlaSetting::class);
+    }
+
+    /**
+     * Batas waktu wajib mulai ditangani (Master Timeline), dalam jam, untuk
+     * jenis tiket tertentu. Fallback ke TaskType::defaultHandlingSlaHours()
+     * kalau paket ini belum diatur admin di Master Timeline SLA.
+     */
+    public function getHandlingSla(TaskType $type): int
+    {
+        $setting = $this->relationLoaded('slaSettings')
+            ? $this->slaSettings->firstWhere('task_type', $type)
+            : $this->slaSettings()->where('task_type', $type->value)->first();
+
+        if ($setting && $setting->is_active) {
+            return $setting->sla_hours;
+        }
+
+        return $type->defaultHandlingSlaHours();
     }
 
     public function calculateTotalPrice(): float

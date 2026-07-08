@@ -109,9 +109,10 @@ return [
         ],
         
         'customers.detail.survey' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::VALIDATE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
+            ActionCode::VALIDATE->value,
+            ActionCode::REJECT->value
         ],
         
         'customers.detail.installation' => [
@@ -170,6 +171,11 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
             ActionCode::UPDATE_SENSITIVE->value
+        ],
+
+        'sla_timeline' => [
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
         ],
     ],
 ];

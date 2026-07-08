@@ -51,9 +51,11 @@
 ### Lapor Survey (`store()`)
 
 - Guard status: cuma bisa submit kalau status masih `survey_in_progress`.
-- Validasi: `survey_status` (`pending`/`completed`/`failed`), `cable_estimation_meter`, `nearest_odp`, `survey_photo`+`house_photo` **wajib**, `difficulty_level` (`MUDAH`/`SEDANG`/`SULIT`) digabung jadi teks di `survey_note`.
+- Validasi: `survey_status` (`pending`/`completed`/`failed`). `cable_estimation_meter`, `nearest_odp`, `survey_photo`+`house_photo`, `difficulty_level` (`MUDAH`/`SEDANG`/`SULIT`) **wajib hanya kalau `survey_status=completed`** (`required_if`) — kalau `failed`, field teknis ini opsional karena situs mungkin memang tidak bisa disurvei penuh. `difficulty_level` (kalau ada) digabung jadi teks di `survey_note`.
 - **Multi-surveyor:** kalau Task punya >1 anggota tim, sistem catat siapa "Petugas Survey 1/2/3" berdasar urutan anggota — `surveyor_2_id`/`surveyor_3_id` diisi otomatis dari anggota lain (maks 3 surveyor tercatat by design kolom).
-- Kalau `survey_status = completed` **dan** status customer masih `survey_in_progress` → complete Task Survey, transition ke `waiting_acc`, broadcast `SurveyCompleted`, kirim notifikasi Telegram. Kalau `survey_status` bukan `completed` → data tersimpan tapi status customer/task **tidak berubah** (laporan partial/gagal, technician bisa submit ulang).
+- Kalau `survey_status = completed` **dan** status customer masih `survey_in_progress` → complete Task Survey, transition ke `waiting_acc`, broadcast `SurveyCompleted`, kirim notifikasi Telegram.
+- **Kalau `survey_status = failed` (✅ ditambahkan 2026-07-08 — sebelumnya gap, lihat [bug.md](bug.md)):** `survey_note` jadi **wajib** (alasan tidak layak pasang, ditombolkan lewat tombol "Tidak Layak Pasang" terpisah di UI — bukan dropdown, biar teknisi gak salah pencet). Task Survey terkait di-**cancel** (`TaskService::cancel()`, status `DIBATALKAN` + `cancel_reason`), customer di-**transition ke `rejected`** (state final, sama mekanisme dengan reject di tahap verifikasi — lihat §7). Tiket Pemasangan otomatis **tidak akan pernah terbentuk** karena workflow tidak pernah sampai `waiting_acc`.
+- Kalau `survey_status = pending` (laporan draf/belum final) → data tersimpan, status customer/task tidak berubah, technician bisa submit ulang nanti.
 
 ## 5. Tahap 3 — Verifikasi Survey → Proses ke Tim (`CustomerVerificationController::processToTeam`)
 

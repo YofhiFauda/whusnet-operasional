@@ -10,6 +10,7 @@ Siklus hidup pelanggan dari registrasi sampai aktif/berhenti: **Registrasi → S
 | [flowchart.md](flowchart.md) | Alur registrasi→survey→verifikasi→pemasangan→aktivasi, alur reject/revisi/terminasi |
 | [user-flow.md](user-flow.md) | Langkah Sales/FOP/Teknisi/Admin di tiap tahap |
 | [database-schema.md](database-schema.md) | Tabel `customers`, `customer_surveys`, `customer_installations`, `customer_services`, dll |
+| [bug.md](bug.md) | Gap survey "tidak layak pasang" yang gak pernah ditangani — fixed 2026-07-08 |
 | [archive/](archive/) | Dokumen alur/rencana historis (sebagian sudah diimplementasi, sebagian berbeda dari kode aktual) |
 
 ## Konsep Inti

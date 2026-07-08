@@ -23,7 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
     'pending_reason',
     'client_request_date',
     'cancelled_at',
-    'team_id'
+    'team_id',
+    'handling_sla_hours',
 ])]
 class FopTask extends Model
 {
@@ -37,6 +38,21 @@ class FopTask extends Model
             'priority' => \App\Enums\FopTaskPriority::class,
             'category' => \App\Enums\TaskType::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $fopTask) {
+            if ($fopTask->handling_sla_hours !== null) {
+                return;
+            }
+
+            $package = $fopTask->customer?->internetPackage;
+
+            $fopTask->handling_sla_hours = $package
+                ? $package->getHandlingSla($fopTask->category)
+                : $fopTask->category->defaultHandlingSlaHours();
+        });
     }
 
     /**
@@ -89,14 +105,27 @@ class FopTask extends Model
     }
 
     /**
+     * Batas waktu wajib mulai ditangani (Master Timeline SLA) dalam jam.
+     * Pakai snapshot handling_sla_hours (di-freeze saat tiket dibuat, resolve
+     * dari paket internet customer saat itu). Fallback ke default global
+     * kalau snapshot belum ada (data lama sebelum kolom ini ditambahkan).
+     */
+    protected function handlingSlaHours(): int
+    {
+        return $this->handling_sla_hours ?? $this->category->defaultHandlingSlaHours();
+    }
+
+    /**
      * Deadline SLA — single source of truth, sinkron sama aturan yang dipakai
      * di halaman Antrean Survey (1x24 jam sejak registrasi) & Verif Pemasangan
-     * (3x24 jam sejak survey selesai) di FopDashboardController.
+     * (3x24 jam sejak survey selesai) di FopDashboardController. Durasinya
+     * (1x24, 3x24, dst) sekarang bervariasi per paket internet customer —
+     * lihat Master Timeline SLA (docs/master/sla-timeline).
      *
-     * - Udah ditugaskan (ada Task asli) → task_date-nya (scheduled_at) + SLA per tipe.
-     * - Survey belum ditugaskan → customer.created_at + 1 hari.
-     * - Pemasangan belum ditugaskan → completed_at survey terakhir (fallback customer.updated_at) + 3 hari.
-     * - Tipe lain belum ditugaskan → task_date (create/auto-sync) + SLA per tipe.
+     * - Udah ditugaskan (ada Task asli) → task_date-nya (scheduled_at) + SLA pengerjaan per tipe (di luar scope Master Timeline).
+     * - Survey belum ditugaskan → customer.created_at + Master Timeline (jam).
+     * - Pemasangan belum ditugaskan → completed_at survey terakhir (fallback customer.updated_at) + Master Timeline (jam).
+     * - Tipe lain belum ditugaskan → task_date (create/auto-sync) + Master Timeline (jam).
      */
     public function slaDeadline(): \Illuminate\Support\Carbon
     {
@@ -106,7 +135,7 @@ class FopTask extends Model
         }
 
         if ($this->category === \App\Enums\TaskType::SURVEY && $this->customer) {
-            return \Illuminate\Support\Carbon::parse($this->customer->created_at)->addDay();
+            return \Illuminate\Support\Carbon::parse($this->customer->created_at)->addHours($this->handlingSlaHours());
         }
 
         if ($this->category === \App\Enums\TaskType::PEMASANGAN && $this->customer) {
@@ -118,10 +147,10 @@ class FopTask extends Model
 
             $ref = $surveyTask?->completed_at ?? $this->customer->updated_at;
 
-            return \Illuminate\Support\Carbon::parse($ref)->addDays(3);
+            return \Illuminate\Support\Carbon::parse($ref)->addHours($this->handlingSlaHours());
         }
 
-        return \Illuminate\Support\Carbon::parse($this->task_date)->addMinutes($this->category->slaMinutes());
+        return \Illuminate\Support\Carbon::parse($this->task_date)->addHours($this->handlingSlaHours());
     }
 
     /**
@@ -130,12 +159,7 @@ class FopTask extends Model
     public function slaTotalSeconds(): int
     {
         if (!$this->task?->scheduled_at) {
-            if ($this->category === \App\Enums\TaskType::SURVEY) {
-                return 86400;
-            }
-            if ($this->category === \App\Enums\TaskType::PEMASANGAN) {
-                return 259200;
-            }
+            return $this->handlingSlaHours() * 3600;
         }
 
         return $this->category->slaMinutes() * 60;

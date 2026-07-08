@@ -103,6 +103,47 @@ class CustomerSurveyController extends Controller
         return redirect()->back()->with('success', 'Waktu survey telah dimulai.');
     }
 
+    /**
+     * Batalkan survey pelanggan langsung dari status (tanpa lewat form Lapor Survey
+     * lengkap) — dipakai FOP/NOC/Admin buat nandain pelanggan tidak layak pasang
+     * lebih cepat. Alasan wajib diisi. Reuse logic yang sama persis dengan cabang
+     * `survey_status=failed` di store(): task survey di-cancel, customer di-reject.
+     */
+    public function cancel(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.survey.reject'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['waiting_survey', 'survey_in_progress']),
+            422,
+            'Survey pelanggan ini tidak bisa dibatalkan dari status saat ini: ' . $customer->status
+        );
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $validated, $workflowService) {
+            $task = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+                ->whereNotIn('status', [\App\Enums\TaskStatus::SELESAI->value, \App\Enums\TaskStatus::DIBATALKAN->value])
+                ->first();
+
+            if ($task) {
+                app(\App\Services\TaskService::class)->cancel($task, auth()->user(), $validated['reason']);
+            }
+
+            $survey = $customer->latestSurvey()->first() ?? new CustomerSurvey(['customer_id' => $customer->id]);
+            $survey->survey_status = 'failed';
+            $survey->survey_note = $validated['reason'];
+            $survey->save();
+
+            $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, $validated['reason']);
+        });
+
+        return redirect()->back()->with('success', 'Survey pelanggan berhasil dibatalkan: tidak layak pasang.');
+    }
+
     public function report(Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
@@ -136,18 +177,20 @@ class CustomerSurveyController extends Controller
         $validated = $request->validate([
             'survey_status'           => 'required|string|in:pending,completed,failed',
             'required_tools'          => 'nullable|string',
-            'cable_estimation_meter'  => 'required|integer|min:0',
-            'nearest_odp'             => 'required|string',
-            'survey_photo'            => 'required|image|max:2048',
-            'house_photo'             => 'required|image|max:2048',
-            'survey_note'             => 'nullable|string',
-            'difficulty_level'        => 'required|in:MUDAH,SEDANG,SULIT',
+            'cable_estimation_meter'  => 'required_if:survey_status,completed|nullable|integer|min:0',
+            'nearest_odp'             => 'required_if:survey_status,completed|nullable|string',
+            'survey_photo'            => 'required_if:survey_status,completed|nullable|image|max:2048',
+            'house_photo'             => 'required_if:survey_status,completed|nullable|image|max:2048',
+            'survey_note'             => 'required_if:survey_status,failed|nullable|string',
+            'difficulty_level'        => 'required_if:survey_status,completed|nullable|in:MUDAH,SEDANG,SULIT',
+        ], [
+            'survey_note.required_if' => 'Alasan tidak layak pasang wajib diisi.',
         ]);
 
-        $difficulty = $validated['difficulty_level'];
-        $note = "Tingkat Kesulitan: " . $difficulty;
+        $difficulty = $validated['difficulty_level'] ?? null;
+        $note = $difficulty ? ("Tingkat Kesulitan: " . $difficulty) : '';
         if (!empty($validated['survey_note'])) {
-            $note .= "\nCatatan: " . $validated['survey_note'];
+            $note .= ($note ? "\n" : '') . "Catatan: " . $validated['survey_note'];
         }
         $validated['survey_note'] = $note;
         unset($validated['difficulty_level']);
@@ -234,7 +277,7 @@ class CustomerSurveyController extends Controller
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error('Gagal broadcast SurveyCompleted: ' . $e->getMessage());
                 }
-                
+
                 try {
                     $telegram = app(\App\Services\TelegramBotService::class);
                     $message = "✅ <b>Survey Selesai</b>\n";
@@ -247,7 +290,20 @@ class CustomerSurveyController extends Controller
                     \Illuminate\Support\Facades\Log::error('Gagal mengirim notifikasi Telegram: ' . $e->getMessage());
                 }
             }
+
+            if ($validated['survey_status'] === 'failed' && $customer->status === 'survey_in_progress') {
+                // Tutup task survey sebagai dibatalkan — pelanggan tidak layak pasang
+                if ($task) {
+                    app(\App\Services\TaskService::class)->cancel($task, auth()->user(), $survey->survey_note);
+                }
+
+                $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, $survey->survey_note);
+            }
         });
+
+        if ($validated['survey_status'] === 'failed') {
+            return redirect()->route('surveys.queue')->with('success', 'Survey selesai dilaporkan: pelanggan tidak layak pasang.');
+        }
 
         return redirect()->route('verifications.queue')->with('success', 'Data survey berhasil disimpan.');
     }

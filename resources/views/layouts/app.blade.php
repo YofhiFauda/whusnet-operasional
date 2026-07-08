@@ -321,6 +321,11 @@
                                 Master Status Pelanggan
                             </a>
                         @endif
+                        @if(auth()->user()->hasPermission('sla_timeline.view'))
+                            <a href="/master/sla-timeline" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/sla-timeline*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                Master Timeline SLA
+                            </a>
+                        @endif
                     </div>
                 </div>
                 @endif

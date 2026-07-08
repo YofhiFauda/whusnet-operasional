@@ -45,6 +45,26 @@ enum TaskType: string
     }
 
     /**
+     * Default batas waktu wajib mulai ditangani (Master Timeline SLA), dalam
+     * jam. Dipakai sbg fallback kalau paket internet belum diatur admin di
+     * halaman Master Timeline SLA. Beda konsep dari slaMinutes() di atas
+     * (itu durasi pengerjaan, ini batas mulai ditangani).
+     */
+    public function defaultHandlingSlaHours(): int
+    {
+        return match ($this) {
+            self::SURVEY      => 24,   // 1x24 jam
+            self::PEMASANGAN  => 72,   // 3x24 jam
+            self::MAINTENANCE => 24,
+            self::AMBIL_MODEM => 24,
+            self::RELOKASI    => 48,
+            self::CREQ        => 24,
+            self::OREQ        => 48,
+            self::INFR        => 72,
+        };
+    }
+
+    /**
      * Warna badge/card untuk kalender UI.
      */
     public function color(): string
