@@ -144,6 +144,7 @@
             box.classList.remove('scale-95', 'opacity-0');
             
             this.isOpen = true;
+            document.body.classList.add('overflow-hidden');
         },
         
         close() {
@@ -153,6 +154,7 @@
             
             container.classList.add('opacity-0');
             box.classList.add('scale-95', 'opacity-0');
+            document.body.classList.remove('overflow-hidden');
             
             setTimeout(() => {
                 container.classList.add('hidden');

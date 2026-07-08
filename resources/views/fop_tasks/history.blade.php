@@ -226,6 +226,7 @@
 
     {{-- ══ EDIT TASK MODAL ══ --}}
     <div x-show="modal.open" 
+         x-effect="document.body.classList.toggle('overflow-hidden', modal.open)"
          class="fixed inset-0 z-50 overflow-y-auto" 
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="opacity-0" 
@@ -237,8 +238,8 @@
         
         <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="modal.open = false"></div>
 
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white border border-slate-200 w-full max-w-2xl rounded shadow-xl relative z-10" 
+        <div class="flex items-center justify-center min-h-screen p-0 sm:p-4">
+            <div class="bg-white border-y sm:border border-slate-200 w-full sm:max-w-2xl rounded-none sm:rounded shadow-xl relative z-10 flex flex-col sm:block max-h-screen sm:max-h-none" 
                  x-show="modal.open"
                  @click.away="modal.open = false"
                  x-transition:enter="transition ease-out duration-200"
@@ -258,7 +259,7 @@
                 </div>
 
                 <form :action="'{{ url('/fop-tasks') }}/' + modal.data.id" method="POST" @submit="isSubmitting = true">
-                    <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                    <div class="p-5 flex-1 max-h-[calc(100vh-120px)] sm:max-h-[75vh] overflow-y-auto space-y-4">
                         @csrf
                         <input type="hidden" name="_method" value="PUT">
 

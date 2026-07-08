@@ -21,6 +21,7 @@
     x-on:open-modal.window="$event.detail == name ? show = true : null"
     x-on:close-modal.window="$event.detail == name ? show = false : null"
     x-on:keydown.escape.window="show = false"
+    x-effect="document.body.classList.toggle('overflow-hidden', show)"
     style="display: none;"
     class="fixed inset-0 z-modal overflow-y-auto"
     aria-labelledby="modal-title" role="dialog" aria-modal="true"

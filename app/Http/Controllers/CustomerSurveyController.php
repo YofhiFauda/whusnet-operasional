@@ -123,6 +123,16 @@ class CustomerSurveyController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
 
+        // Data survey hanya boleh diubah selama tahap survey lapangan berjalan.
+        // Setelah lewat tahap ini (masuk antrean verifikasi/pemasangan/aktif dst),
+        // perubahan hanya diizinkan untuk role dengan permission validate (Admin/Verifikator).
+        abort_unless(
+            $customer->status === 'survey_in_progress'
+                || auth()->user()->hasPermission('customers.detail.survey.validate'),
+            403,
+            'Data survey pelanggan ini sudah melewati tahap survey dan tidak dapat diubah oleh role Anda.'
+        );
+
         $validated = $request->validate([
             'survey_status'           => 'required|string|in:pending,completed,failed',
             'required_tools'          => 'nullable|string',

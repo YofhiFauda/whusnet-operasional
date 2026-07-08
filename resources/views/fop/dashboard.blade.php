@@ -122,6 +122,7 @@
 
     {{-- ══ TEAM DETAIL MODAL ══ --}}
     <div x-show="teamDetail.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', teamDetail.open)"
          class="fixed inset-0 z-50 overflow-y-auto"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"

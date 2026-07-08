@@ -262,6 +262,7 @@
 
     {{-- ══ CREATE/EDIT TASK MODAL ══ --}}
     <div x-show="modal.open" 
+         x-effect="document.body.classList.toggle('overflow-hidden', modal.open)"
          class="fixed inset-0 z-50 overflow-y-auto" 
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="opacity-0" 
@@ -467,6 +468,7 @@
 
     {{-- ══ KELOLA TEAM MODAL ══ --}}
     <div x-show="teamModal.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', teamModal.open)"
          class="fixed inset-0 z-50 overflow-y-auto"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"

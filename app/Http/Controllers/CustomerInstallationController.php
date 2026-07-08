@@ -104,6 +104,16 @@ class CustomerInstallationController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
 
+        // Data pemasangan hanya boleh diubah selama tahap pemasangan berjalan atau
+        // sedang direvisi. Setelah lewat tahap ini (terverifikasi/aktif dst),
+        // perubahan hanya diizinkan untuk role dengan permission validate (Admin/Verifikator).
+        abort_unless(
+            in_array($customer->status, ['installation_in_progress', 'revision_installation'], true)
+                || auth()->user()->hasPermission('customers.detail.installation.validate'),
+            403,
+            'Data pemasangan pelanggan ini sudah melewati tahap pemasangan dan tidak dapat diubah oleh role Anda.'
+        );
+
         $validated = $request->validate([
             // Device info
             'device_type'          => 'required|string|in:modem,ont,onu,router,other',

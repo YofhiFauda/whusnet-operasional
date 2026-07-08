@@ -10,6 +10,7 @@ Sistem akses 3 dimensi: **Role** (siapa Anda), **Permission** (`{feature}.{actio
 | [flowchart.md](flowchart.md) | Alur cek permission, generate permission, resolve scope POP, sync role-permission |
 | [user-flow.md](user-flow.md) | Langkah Owner/Admin kelola role, permission matrix, assign scope user |
 | [database-schema.md](database-schema.md) | Tabel `roles`, `permissions`, `features`, `actions`, `user_role_scopes`, dll |
+| [field-lock-verifikasi.md](field-lock-verifikasi.md) | Analisa RBAC Registrasi/Survey/Pemasangan/Verifikasi Admin + field-lock pasca-verifikasi |
 | [archive/](archive/) | Dokumen desain & rencana historis (RBAC_MATRIX awal, analisa dinamis, rancangan per-fitur) |
 
 ## Konsep Inti

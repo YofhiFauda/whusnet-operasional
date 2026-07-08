@@ -19,6 +19,7 @@
     x-on:open-drawer.window="$event.detail == name ? show = true : null"
     x-on:close-drawer.window="$event.detail == name ? show = false : null"
     x-on:keydown.escape.window="show = false"
+    x-effect="document.body.classList.toggle('overflow-hidden', show)"
     style="display: none;"
     class="relative z-drawer"
     aria-labelledby="slide-over-title" role="dialog" aria-modal="true"
