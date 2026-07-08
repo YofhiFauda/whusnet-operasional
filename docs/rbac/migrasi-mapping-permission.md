@@ -47,7 +47,7 @@ Untuk **Tagihan** (Lunas/Belum Lunas/Semua) dan **Laporan** (Pelanggan/Tagihan/P
 | S1 | Rename label Action per-konteks fitur (fix "Update Timer SLA" dsb) | Update kolom `name`/tambah `display_name` — **tanpa ubah `code`** | Sangat rendah | 1 (segera) |
 | S2 | Alias label matrix = nama menu sidebar | Update kolom `name` di `Feature`/`Permission` | Sangat rendah | 1 (segera) |
 | S3 | Registrasi feature untuk Wilayah/Distribusi/Status Pelanggan | Tambah entry baru di `config/rbac.php` + generate permission baru | Rendah (additive) | 2 |
-| S4 | Pisahkan visual grup matrix: "Task FOP (Tiket)" vs "Task Checklist (Teknisi, legacy)" jadi 2 root feature beda, bukan 1 pohon "Task Management" | Reorganisasi `Feature` tree (`parent_id`, grouping), tanpa ubah `code` permission | Rendah-menengah | 2 |
+| S4 | Perjelas label 2 grup matrix jadi eksplisit pipeline: **"Tiket FOP — Perencanaan & Kategori"** (`fop_tasks.*`) dan **"Eksekusi Task — Penjadwalan, Checklist & Quality Gate"** (`task.*`), + tambah 1 baris keterangan di matrix "Layer 2 otomatis muncul setelah tiket di-assign teknisi". **Jangan digabung/dihapus** — keduanya perlu ada, cuma perlu keterangan hubungan | Update label `Feature`/grouping + copy keterangan, tanpa ubah `code` permission | Rendah | 2 |
 | S5 | Gabung permission mikro Task Teknisi jadi 1 permission bisnis ("Menjalankan & Melaporkan Tugas Lapangan") | Merge beberapa `code` lama → 1 `code` baru | **Menengah** (breaking, perlu remap pivot) | 3 |
 | S6 | Dependency chaining (parent-child) di `RoleManagementService` + UI checkbox | Tambah validasi baru, tidak ubah data permission | Rendah-menengah (logic baru) | 3 |
 | S7 | Role template preset (Owner/Teknisi/Finance shortcut) | Fitur baru murni | Rendah | 4 |
