@@ -9,10 +9,10 @@ flowchart TD
     B -->|Import batch| D[Import Pelanggan]
 
     C --> C1[Pilih kota]
-    C1 --> C2[GET /api/cities/{city}/districts]
+    C1 --> C2["GET /api/cities/{city}/districts"]
     C2 --> C3[Return JSON kecamatan]
     C3 --> C4[Pilih kecamatan]
-    C4 --> C5[GET /api/districts/{district}/villages]
+    C4 --> C5["GET /api/districts/{district}/villages"]
     C5 --> C6[Return JSON desa]
 
     D --> D1[Input data batch]

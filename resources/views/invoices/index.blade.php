@@ -288,5 +288,5 @@
     @endpush
 @endcan
 
-@include('partials.quick-payment-modal')
+@include('payments.partials.quick-payment-modal')
 @endsection

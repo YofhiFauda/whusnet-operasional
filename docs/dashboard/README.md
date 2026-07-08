@@ -27,7 +27,7 @@ Dashboard adalah halaman awal aplikasi dan menampilkan ringkasan kondisi operasi
 
 ```mermaid
 flowchart TD
-    A[GET /] --> B[DashboardController@index]
+    A[GET /] --> B["DashboardController@index"]
     B --> C[Hitung statistik pelanggan]
     B --> D[Hitung total paket dan kecamatan]
     B --> E[Group status pelanggan]

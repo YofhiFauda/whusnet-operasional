@@ -15,7 +15,7 @@ flowchart TD
     PaginateData --> RenderView[Render View master.wilayah.index]
 
     %% Flow API Dropdown
-    AksesAPI([Request AJAX /api/cities/{id}/districts]) --> ControllerAPI[Route Closure / Controller]
+    AksesAPI(["Request AJAX /api/cities/{id}/districts"]) --> ControllerAPI[Route Closure / Controller]
     ControllerAPI --> FetchAPI[Tarik districts WHERE city_id = id]
     FetchAPI --> JSONReturn[Return Response JSON]
 ```

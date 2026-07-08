@@ -1008,7 +1008,7 @@
                 @endif
             @endcan
 
-            @include('partials.quick-payment-modal')
+            @include('payments.partials.quick-payment-modal')
 
             <!-- Tab 8: Pembayaran -->
             <div id="tab-content-pembayaran" class="tab-content hidden space-y-6">

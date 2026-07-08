@@ -1,4 +1,6 @@
 > **Arsip.** Dokumen historis, sebagian sudah tidak sesuai kode aktif (lihat [../README.md](../README.md) untuk dokumentasi terkini).
+**DIBUAT KETIKA INVENTORY SUDAH JADI**
+
 
 # Spesifikasi UI/UX: Widget Tambahan Dashboard FOP
 ## WHUSNET Admin Payment · Modern & Comfortable UI

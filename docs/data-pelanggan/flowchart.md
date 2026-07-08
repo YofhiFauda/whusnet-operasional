@@ -6,7 +6,7 @@
 flowchart TD
     A[Mulai] --> B{Tambah atau Edit?}
     B -->|Tambah| C[GET /customers/create]
-    B -->|Edit| D[GET /customers/{customer}/edit]
+    B -->|Edit| D["GET /customers/{customer}/edit"]
     C --> E[Ambil master kota, kecamatan, paket]
     D --> E
     E --> F[User isi form]
@@ -31,7 +31,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[GET /customers/{customer}] --> B[Load customer dan relasi]
+    A["GET /customers/{customer}"] --> B[Load customer dan relasi]
     B --> C[Ambil status pelanggan]
     C --> D[Hitung status rank]
     D --> E[Susun timeline]

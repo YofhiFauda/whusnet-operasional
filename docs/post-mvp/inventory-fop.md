@@ -1,6 +1,8 @@
 # Analisa: Tracking Material/Alat & Biaya per Task FOP
 
 Status: Post-MVP (belum diimplementasi)
+**DIBUAT KETIKA INVENTORY SUDAH JADI**
+
 
 ## Latar Belakang
 

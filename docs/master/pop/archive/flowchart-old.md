@@ -6,7 +6,7 @@ Berikut adalah alur bagaimana Master POP digunakan di backend untuk memberikan `
 
 ```mermaid
 flowchart TD
-    Start([Simpan Customer Baru]) --> AssignPOP[Pelanggan di-assign ke POP ID: 1 (MLG)]
+    Start([Simpan Customer Baru]) --> AssignPOP["Pelanggan di-assign ke POP ID: 1 (MLG)"]
     AssignPOP --> LockSequence[DB Transaction: Lock row pop_sequences untuk MLG bulan ini]
     LockSequence --> CekSeq{Ada Record Sequence?}
     

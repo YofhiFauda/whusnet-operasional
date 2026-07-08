@@ -3,7 +3,7 @@
 ```mermaid
 flowchart TD
     A[User membuka dashboard] --> B[GET /]
-    B --> C[DashboardController@index]
+    B --> C["DashboardController@index"]
     C --> D[Hitung customer stats]
     C --> E[Hitung package dan district stats]
     C --> F[Group customers by status]

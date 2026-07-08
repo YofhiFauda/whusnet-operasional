@@ -5,7 +5,7 @@ Diagram di bawah ini menggambarkan alur akses dan penampilan data pada halaman M
 ```mermaid
 flowchart TD
     Start([User Akses Menu Master Paket]) --> Request[GET /master/paket]
-    Request --> Controller[InternetPackageController@index]
+    Request --> Controller["InternetPackageController@index"]
     Controller --> DBQuery[Query tabel internet_packages]
     
     DBQuery --> FilterCheck{Ada Filter?}
