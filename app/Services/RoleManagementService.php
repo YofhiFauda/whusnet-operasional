@@ -25,6 +25,7 @@ class RoleManagementService
             // nyaris bersamaan (mis. double-klik submit) yang bisa bikin sync()
             // di kedua request sama-sama baca state lama lalu tabrakan insert
             // pivot yang sama (unique constraint role_permissions).
+
             $role = Role::where('id', $role->id)->lockForUpdate()->firstOrFail();
 
             $oldPermissions = $role->permissions()->pluck('permissions.id')->toArray();
