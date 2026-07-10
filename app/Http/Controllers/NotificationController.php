@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+
+class NotificationController extends Controller
+{
+    /**
+     * Display a listing of notifications with dynamic filters and POP scope filtering.
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        $allowedPopIds = app(\App\Services\EffectiveAccessService::class)->getAllowedPopIds($user);
+        $scopeType = app(\App\Services\EffectiveAccessService::class)->getScopeType($user);
+
+        $query = \Illuminate\Notifications\DatabaseNotification::query();
+
+        // POP Scope Enforcement
+        if ($scopeType !== \App\Enums\ScopeType::ALL_POP) {
+            // Users with task.view.all permission (e.g. FOP, NOC, CS, Admin) can see all notifications in their POP scope
+            if ($user->hasPermission('task.view.all')) {
+                $query->whereHasMorph('notifiable', [\App\Models\User::class], function ($q) use ($allowedPopIds) {
+                    $q->where(function ($sub) use ($allowedPopIds) {
+                        $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
+                            ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
+                                ->whereHas('targets', fn ($t) => $t->whereIn('pop_id', $allowedPopIds))
+                            );
+                    });
+                });
+            } else {
+                // Otherwise, normal users (e.g. Technician) only see their own notifications
+                $query->where('notifiable_type', \App\Models\User::class)
+                    ->where('notifiable_id', $user->id);
+            }
+        } else {
+            // For Owner/Admin Pusat (all_pop):
+            // If they don't have task.view.all, restrict to their own
+            if (!$user->hasPermission('task.view.all')) {
+                $query->where('notifiable_type', \App\Models\User::class)
+                    ->where('notifiable_id', $user->id);
+            }
+        }
+
+        // Apply Filters
+        if ($request->filled('date')) {
+            $query->whereDate('created_at', $request->date);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('data->type', $request->type);
+        }
+
+        if ($request->filled('user_id')) {
+            $query->where('notifiable_id', $request->user_id);
+        }
+
+        $notifications = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
+
+        // Fetch users for dropdown filtering (scoped by POP)
+        $usersQuery = \App\Models\User::query();
+        if ($scopeType !== \App\Enums\ScopeType::ALL_POP) {
+            $usersQuery->where(function ($sub) use ($allowedPopIds) {
+                $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
+                        ->whereHas('targets', fn ($t) => $t->whereIn('pop_id', $allowedPopIds))
+                    );
+            });
+        }
+        $filterUsers = $usersQuery->orderBy('name')->get();
+
+        return view('notifications.index', compact('notifications', 'filterUsers'));
+    }
+
+    /**
+     * Mark a specific notification as read.
+     */
+    public function markAsRead(Request $request, string $id): JsonResponse
+    {
+        $notification = $request->user()->notifications()->where('id', $id)->first();
+        if ($notification) {
+            $notification->markAsRead();
+        }
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark a specific notification as unread.
+     */
+    public function markAsUnread(Request $request, string $id): JsonResponse
+    {
+        $notification = $request->user()->notifications()->where('id', $id)->first();
+        if ($notification) {
+            $notification->update(['read_at' => null]);
+        }
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark all notifications as read.
+     */
+    public function markAllAsRead(Request $request): JsonResponse
+    {
+        $request->user()->unreadNotifications->markAsRead();
+        return response()->json(['success' => true]);
+    }
+}
