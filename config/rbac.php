@@ -49,6 +49,27 @@ return [
     'allowed_actions' => [
         'dashboard' => [ActionCode::VIEW->value],
         
+        'master_wilayah' => [
+            ActionCode::VIEW->value, 
+            ActionCode::CREATE->value, 
+            ActionCode::UPDATE->value, 
+            ActionCode::DELETE->value
+        ],
+
+        'master_distribusi' => [
+            ActionCode::VIEW->value, 
+            ActionCode::CREATE->value, 
+            ActionCode::UPDATE->value, 
+            ActionCode::DELETE->value
+        ],
+
+        'master_status_pelanggan' => [
+            ActionCode::VIEW->value, 
+            ActionCode::CREATE->value, 
+            ActionCode::UPDATE->value, 
+            ActionCode::DELETE->value
+        ],
+
         'pops' => [
             ActionCode::VIEW->value, 
             ActionCode::CREATE->value, 
@@ -177,5 +198,50 @@ return [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | View Permission Overrides (Dependency Chaining)
+    |--------------------------------------------------------------------------
+    |
+    | RoleManagementService::syncPermissions() dependency chaining (S6) butuh
+    | tahu kode permission "view" milik tiap Feature buat auto-grant induk
+    | saat anak dicentang. Default konvensinya "{feature_code}.view".
+    |
+    | Sebagian Feature (mis. tasks.fop / tasks.teknisi dari TaskFeatureSeeder)
+    | gak ikut konvensi ini karena kode permission view-nya beda nama
+    | (task.view.all / task.view.own). Daftarkan pengecualiannya di sini
+    | biar RoleManagementService gak perlu hardcode per-fitur di kode PHP.
+    |
+    | Format: 'feature_code' => 'kode_permission_view'
+    |
+    */
+    'view_permission_overrides' => [
+        'tasks.fop' => 'task.view.all',
+        'tasks.teknisi' => 'task.view.own',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Name Overrides (Label Kontekstual)
+    |--------------------------------------------------------------------------
+    |
+    | Sebagian permission yang digenerate PermissionGeneratorService dari
+    | allowed_actions di atas butuh label tampilan yang beda dari nama Action
+    | generik (mis. Action `update_sensitive` namanya "Update Timer SLA" —
+    | itu gak relevan buat fitur di luar SLA timeline). Daftarkan override
+    | label per kode permission di sini; PermissionGeneratorService bakal
+    | pasang label ini setiap kali permission itu dibuat ATAU ditemukan masih
+    | null — jadi gak bergantung ke migration one-off yang timingnya gak
+    | reliable (lihat docs/post-mvp/rbac/migrasi-mapping-permission.md bagian 9).
+    |
+    | Format: 'kode_permission' => 'Label tampilan'
+    |
+    */
+    'permission_name_overrides' => [
+        'fop_tasks.update_sensitive' => 'Ubah Kategori & Prioritas Tiket',
+        'customers.detail.devices.update_sensitive' => 'Ubah Data Sensitif Perangkat',
+        'customers.detail.devices.view_sensitive' => 'Lihat Data Sensitif Perangkat',
     ],
 ];

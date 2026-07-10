@@ -286,7 +286,7 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view'))
+                @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view'))
                 <!-- Master Data Dropdown -->
                 <div>
                     <button onclick="toggleSubmenu('submenu-master', 'chevron-master')" title="Master Data" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
@@ -302,13 +302,17 @@
                     </button>
                     <!-- Submenu -->
                     <div id="submenu-master" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('master*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('pops.view'))
+                        @if(auth()->user()->hasPermission('master_wilayah.view'))
                             <a href="/master/wilayah" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/wilayah') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Data Wilayah
                             </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('pops.view'))
                             <a href="/master/pop" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/pop*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master POP/Cabang
                             </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('master_distribusi.view'))
                             <a href="/master/distribusi" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/distribusi*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Distribusi
                             </a>
@@ -317,6 +321,8 @@
                             <a href="/master/paket" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/paket*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Paket Internet
                             </a>
+                        @endif
+                        @if(auth()->user()->hasPermission('master_status_pelanggan.view'))
                             <a href="/master/status-langganan" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/status-langganan') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
                                 Master Status Pelanggan
                             </a>

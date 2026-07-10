@@ -32,7 +32,7 @@ class UserManagementTest extends TestCase
 
         $role = Role::firstOrFail();
         $user = User::factory()->create([
-            'name' => 'User Operasional',
+            'name' => 'A User Operasional',
             'email' => 'user.operasional@example.com',
             'status' => 'active',
             'role_id' => $role->id,
@@ -53,7 +53,7 @@ class UserManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Manajemen User & POP');
-        $response->assertSee('User Operasional', false);
+        $response->assertSee('A User Operasional', false);
         $response->assertSee('Atur Cabang', false);
         $response->assertSee($pop->name, false);
     }

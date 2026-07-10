@@ -22,14 +22,16 @@ class SlaTimelineFeatureSeeder extends Seeder
 {
     public function run(): void
     {
-        $sortOrder = (int) (Feature::whereNull('parent_id')->max('sort_order') ?? 0) + 1;
-
+        // sort_order fixed = 7, biar nyambung sama blok Master Data lain
+        // (Wilayah=2, POP/Cabang=3, Distribusi=4, Paket Internet=5, Status
+        // Pelanggan=6) yang diatur di FeatureSeeder.php — jangan pakai
+        // max()+1 lagi, itu bikin fitur ini selalu jatuh di paling bawah.
         Feature::updateOrCreate(
             ['code' => 'sla_timeline'],
             [
                 'name'       => 'Master Timeline SLA',
                 'type'       => FeatureType::ROOT,
-                'sort_order' => $sortOrder,
+                'sort_order' => 7,
                 'is_active'  => true,
                 'parent_id'  => null,
             ]

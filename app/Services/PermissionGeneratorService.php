@@ -27,6 +27,8 @@ class PermissionGeneratorService
             'errors' => []
         ];
 
+        $nameOverrides = Config::get('rbac.permission_name_overrides', []);
+
         DB::beginTransaction();
 
         try {
@@ -66,7 +68,8 @@ class PermissionGeneratorService
                             'action_id' => $action->id,
                             'code' => $permissionCode,
                             // To maintain backward compatibility, name and module can be null
-                            'name' => null,
+                            // kecuali kode ini terdaftar di rbac.permission_name_overrides
+                            'name' => $nameOverrides[$permissionCode] ?? null,
                             'module' => null,
                         ]);
                         $summary['permissions_created']++;
@@ -74,6 +77,12 @@ class PermissionGeneratorService
                         // If it exists but code is different (unlikely), update it
                         if ($existing->code !== $permissionCode) {
                             $existing->update(['code' => $permissionCode]);
+                        }
+                        // Backfill label kontekstual kalau permission udah ada tapi
+                        // name-nya masih null/belum sesuai override — jaga-jaga kalau
+                        // baris ini kebuat sebelum override didaftarkan di config.
+                        if (isset($nameOverrides[$permissionCode]) && $existing->name !== $nameOverrides[$permissionCode]) {
+                            $existing->update(['name' => $nameOverrides[$permissionCode]]);
                         }
                         $summary['permissions_skipped']++;
                     }

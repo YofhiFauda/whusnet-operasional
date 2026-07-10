@@ -134,7 +134,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Master Data
-    Route::middleware('permission:pops.view')->group(function () {
+    Route::middleware('permission:master_wilayah.view')->group(function () {
         Route::get('/master/wilayah', [RegionController::class, 'index'])->name('master.wilayah.index');
     });
 
@@ -160,22 +160,22 @@ Route::middleware('auth')->group(function () {
     });
 
     // Distribusi
-    Route::middleware('permission:pops.view')->group(function () {
+    Route::middleware('permission:master_distribusi.view')->group(function () {
         Route::get('/master/distribusi', [DistributionController::class, 'index'])->name('master.distribusi.index');
     });
 
-    Route::middleware('permission:pops.create|pops.update')->group(function () {
+    Route::middleware('permission:master_distribusi.create|master_distribusi.update')->group(function () {
         Route::get('/master/distribusi/create', [DistributionController::class, 'create'])->name('master.distribusi.create');
         Route::post('/master/distribusi', [DistributionController::class, 'store'])->name('master.distribusi.store');
         Route::get('/master/distribusi/{distribusi}/edit', [DistributionController::class, 'edit'])->name('master.distribusi.edit');
         Route::put('/master/distribusi/{distribusi}', [DistributionController::class, 'update'])->name('master.distribusi.update');
     });
 
-    Route::middleware('permission:pops.delete')->group(function () {
+    Route::middleware('permission:master_distribusi.delete')->group(function () {
         Route::delete('/master/distribusi/{distribusi}', [DistributionController::class, 'destroy'])->name('master.distribusi.destroy');
     });
 
-    Route::middleware('permission:packages.view')->group(function () {
+    Route::middleware('permission:master_status_pelanggan.view')->group(function () {
         Route::get('/master/status-langganan', [SubscriptionStatusController::class, 'index'])->name('master.status-langganan.index');
     });
 
@@ -278,12 +278,12 @@ Route::middleware('auth')->group(function () {
     });
 
     // FOP: Edit, cancel task
-    Route::middleware('permission:task.edit')->group(function () {
+    Route::middleware('permission:task.manage')->group(function () {
         Route::get('/tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
         Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     });
 
-    Route::middleware('permission:task.schedule|task.assign.team|task.edit')->group(function () {
+    Route::middleware('permission:task.manage|task.assign.team')->group(function () {
         Route::patch('/tasks/{task}/team', [\App\Http\Controllers\TaskTeamController::class, 'update'])->name('tasks.team.update');
     });
 
@@ -319,16 +319,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
     Route::post('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
 
-    Route::middleware('permission:task.status.pending')->group(function () {
+    Route::middleware('permission:task.execute')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
     });
 
     // Teknisi: Upload bukti
-    Route::middleware('permission:task.evidence.upload')->group(function () {
+    Route::middleware('permission:task.execute')->group(function () {
         Route::post('/tasks/{task}/evidences', [TaskEvidenceController::class, 'store'])->name('tasks.evidences.store');
     });
 
-    Route::middleware('permission:task.edit')->group(function () {
+    Route::middleware('permission:task.manage')->group(function () {
         Route::delete('/tasks/{task}/evidences/{evidence}', [TaskEvidenceController::class, 'destroy'])->name('tasks.evidences.destroy');
     });
 

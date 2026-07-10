@@ -129,3 +129,145 @@ Karena migrasi cuma additive (langkah 2-3) sebelum cleanup (langkah 6), rollback
 - [ ] Label `fop_tasks.update_sensitive` & `customers.detail.devices.*_sensitive` tampil benar (bukan lagi "Update Timer SLA") di halaman matrix
 - [ ] Role tanpa permission induk (`customers.view`) tidak bisa lagi centang permission anak setelah S6 (dependency chaining) diimplementasi
 - [ ] Setelah cleanup (langkah 6), tidak ada 403 baru yang muncul untuk role manapun di seluruh modul Task
+
+---
+
+## 7. Temuan Verifikasi Pasca-Implementasi (2026-07-09) — Screenshot `halaman-matrix-rbac.png`
+
+Setelah S1-S6 selesai dikerjakan, dicek ulang pakai screenshot nyata halaman matrix (role Admin) dibanding sidebar. Ketemu 3 gap yang belum masuk cakupan S1-S7 sebelumnya. Detail akar masalah & kronologi ada di [analisa-tampilan-rbac.md bagian 5](analisa-tampilan-rbac.md#5-verifikasi-pasca-implementasi-2026-07-09--temuan-sisa-dari-screenshot-matrix-terbaru). Bagian ini fokus ke rencana perbaikannya.
+
+### S8 — Alias label "Manajemen User & POP"
+
+Temuan 1.A asli (`pops`/`users` dipecah 2 modul padahal sidebar gabung 1 menu) kelewat, gak pernah masuk S1-S7. Ini **bukan permission baru, bukan merge** — cuma soal presentasi:
+
+- **Opsi A (minim effort):** tambah 1 baris keterangan di header matrix, mirip pola S4 — modul "POP/Cabang" & "User Management" dikasih catatan kecil "Keduanya mengontrol menu gabungan 'Manajemen User & POP' di sidebar." Gak ubah struktur data.
+- **Opsi B (lebih rapi tapi effort lebih):** render 2 modul itu sebagai 1 grup visual (union), tapi tetep 2 set checkbox terpisah di baliknya (POP tetap `pops.*`, User tetap `users.*` — jangan digabung jadi 1 permission, karena secara bisnis emang beda scope akses).
+
+Rekomendasi: **Opsi A** dulu — resiko sangat rendah, konsisten sama pendekatan S4 yang udah dipakai buat kasus Tiket FOP/Eksekusi Task.
+
+**Jenis perubahan:** update `Feature.name`/tambah copy keterangan di `matrix.blade.php`. Tidak butuh migrasi data.
+
+### S9 — Reorder grouping Master Data biar nyambung visual sama sidebar
+
+`pops` (sort_order lama, dekat urutan atas) dan `packages` juga secara konsep bagian dari "Master Data" tapi posisinya jauh dari `master_wilayah`/`master_distribusi`/`master_status_pelanggan`/`sla_timeline` (sort_order 12-14, ditambah belakangan pas S3).
+
+**Perbaikan:** samakan `sort_order` semua Feature yang masuk grup Master Data (`pops`, `packages`, `master_wilayah`, `master_distribusi`, `master_status_pelanggan`, `sla_timeline`) jadi satu blok angka berurutan di `FeatureSeeder.php`, sesuai urutan tampil di sidebar (`sidebar2.png`): Wilayah → POP/Cabang → Distribusi → Paket Internet → Status Pelanggan → Timeline SLA.
+
+**Jenis perubahan:** update kolom `sort_order` doang (angka), lewat seeder `updateOrCreate` — idempotent, tidak menyentuh `code`/pivot `role_permissions`. Resiko sangat rendah.
+
+### S10 — Fix styling "⚠ sensitif" hilang di permission level root
+
+`matrix.blade.php` cuma taro `$isSensitive = str_contains($perm->code, 'sensitive')` di loop level grandchild (nested di bawah Detail Pelanggan). Permission sensitif yang nempel langsung di Feature `ROOT` (contoh: `fop_tasks.update_sensitive`) gak lewat loop itu, jadi render polos tanpa warning merah/⚠ — padahal ini salah satu permission paling beresiko (siapa boleh ubah kategori & prioritas tiket FOP).
+
+**Perbaikan:** pindahkan logic `$isSensitive` (deteksi `str_contains($perm->code, 'sensitive')` + class merah + ikon ⚠) jadi dipakai di **ketiga level loop** (root, child, grandchild) di `matrix.blade.php`, bukan cuma grandchild.
+
+**Jenis perubahan:** murni template Blade, tidak menyentuh data/permission. Resiko sangat rendah, langsung kerjain.
+
+### Catatan operasional — ✅ Selesai (Poin D)
+
+Label `fop_tasks.update_sensitive` di screenshot masih nampilin nama lama "Update Timer SLA" karena migrasi `2026_07_09_000000_migrate_rbac_permissions.php` (step 3, rename) belum ke-apply ke database yang dipakai ambil screenshot.
+
+**Investigasi:** `php artisan migrate:status` nunjukin migrasi ini udah tercatat **"Ran"** (batch 1, pas database di-fresh). Tapi dicek isi datanya — kolom `name` buat `fop_tasks.update_sensitive`, `customers.detail.devices.update_sensitive`, `customers.detail.devices.view_sensitive` tetap `null`, dan `updated_at` sama persis `created_at` di **seluruh tabel `permissions`** (0 baris pernah ke-`update()`). Artinya step 3 gak pernah benar-benar nge-apply pas run yang tercatat itu — walau kode step 3-nya sendiri udah benar. Karena migrasi yang udah tercatat "Ran" gak akan Laravel jalankan ulang (walau isi file diedit belakangan), gak bisa langsung `php artisan migrate` lagi buat re-trigger.
+
+**Fix:** jalankan langsung logic rename-nya (persis sama step 3) lewat `php artisan tinker`:
+```php
+$renames = [
+    'fop_tasks.update_sensitive' => 'Ubah Kategori & Prioritas Tiket',
+    'customers.detail.devices.update_sensitive' => 'Ubah Data Sensitif Perangkat',
+    'customers.detail.devices.view_sensitive' => 'Lihat Data Sensitif Perangkat',
+];
+foreach ($renames as $code => $name) {
+    Permission::where('code', $code)->update(['name' => $name]);
+}
+```
+Dikonfirmasi ketiga baris sekarang punya `name` yang benar.
+
+**Root cause exact kenapa step 3 gak nge-apply pas migrasi jalan otomatis belum ketemu** (kemungkinan versi file yang benar-benar tereksekusi beda dari versi final di working tree sekarang). **Catatan buat rollout ke staging/prod nanti:** jangan cuma percaya `migrate:status` bilang "Ran" — verifikasi juga isi datanya (`SELECT name FROM permissions WHERE code IN (...)`) setelah migrasi jalan, biar ketauan kalau ada step yang diam-diam gak nge-apply kayak kejadian ini.
+
+| # | Solusi | Jenis perubahan | Resiko | Prioritas | Status |
+|---|---|---|---|---|---|
+| S8 | Alias label "Manajemen User & POP" (catatan keterangan, bukan merge) | Update `name`/copy di view | Sangat rendah | 2 | ✅ Selesai |
+| S9 | Reorder `sort_order` grup Master Data biar nyambung sidebar | Update kolom `sort_order` via seeder | Sangat rendah | 2 | ✅ Selesai |
+| S10 | Perbaiki styling sensitif hilang di level root/child | Template Blade doang | Sangat rendah | 1 (bug visual, segera) | ✅ Selesai |
+| Poin D | Rename label belum ke-apply di data real | Manual `Permission::update()` via tinker | Sangat rendah | 1 (data fix, segera) | ✅ Selesai |
+| S11 | Perbaiki 3 deskripsi fitur yang salah/kebalik + 1 minor | Update copy di array `$descriptions`, `matrix.blade.php` | Sangat rendah | 1 (info menyesatkan operator) | ✅ Selesai |
+
+### S11 — Fix deskripsi fitur yang salah di array `$descriptions`
+
+Array `$descriptions` (satu baris keterangan per fitur di header matrix) ditambah belakangan di `matrix.blade.php`, di luar cakupan S1-S10. Dicek satu-satu ke kode/dokumentasi terkait:
+
+| Kode | Sebelum (salah) | Sesudah (fix) | Bukti |
+|---|---|---|---|
+| `dashboard` | "...dan grafik billing." | "...termasuk ringkasan status billing pelanggan." | `DashboardController.php`/`dashboard.blade.php` gak ada chart/canvas — cuma stat card angka |
+| `sla_timeline` | "...untuk **penyelesaian** tiket gangguan/pemasangan." | "...batas waktu **wajib mulai ditangani**... bukan durasi pengerjaan teknisi di lapangan." | `docs/master/sla-timeline/README.md`: *"Bukan durasi pengerjaan teknisi di lapangan"* — deskripsi lama kebalik |
+| `customers.detail.packages` | "...dan **status aktivasi layanan**." | "...Status aktivasi layanan diatur lewat 'Pemasangan Pelanggan', bukan di sini." | `config/rbac.php`: action `ACTIVATE` cuma ada di `customers.detail.installation`, bukan `.packages` (yang cuma VIEW/UPDATE) |
+| `invoices` | "...penerbitan, **pembatalan**, pencetakan..." | "...penerbitan, penyesuaian nominal, **penghapusan**, dan pencetakan..." | `config/rbac.php`: `invoices` gak ada action `CANCEL`, cuma VIEW/CREATE/UPDATE/DELETE/PRINT |
+
+Semua perubahan cuma teks copy di `matrix.blade.php` — gak nyentuh data/permission, resiko nol.
+
+---
+
+## 8. Bug Ditemukan Saat Verifikasi Runtime (2026-07-09) — S6 Sibling-View Gap
+
+Diverifikasi langsung lewat HTTP request beneran (login session, submit form matrix, cek `role_permissions` di DB) — bukan cuma baca kode. Ketemu bug fungsional nyata di dependency chaining (S6) yang gak kelihatan dari code review.
+
+### Bug: dependency chaining cuma jalan buat ancestor, gak buat sibling-dalam-fitur-yang-sama
+
+**Repro:** submit matrix cuma centang `task.manage` (id 3) doang buat role baru → `role_permissions` hasilnya cuma `["task.manage"]`. Harusnya `task.view.all` ikut ke-grant otomatis (S6), tapi enggak.
+
+**Root cause:** `RoleManagementService::syncPermissions()` versi lama cuma jalanin loop mulai dari **PARENT** feature milik permission yang dicentang — gak pernah cek feature MILIK PERMISSION ITU SENDIRI. Ini kebetulan gak masalah buat kasus `customers.detail.survey.view` (MINI_FEATURE bertingkat, ancestor-chain `customers.detail` → `customers` jalan normal). Tapi buat `task.manage` — feature-nya `tasks.fop` (flat, gak ada nesting), dan `task.view.all` itu **sibling** (bukan ancestor) di feature yang sama. Loop versi lama jalan dari parent `tasks.fop` yaitu `tasks` (root, gak override, gak ada permission `tasks.view`) — jadi gak pernah nyentuh `tasks.fop` itu sendiri. Config `view_permission_overrides` (S6 awal) sebenarnya sia-sia buat 2 entry `tasks.fop`/`tasks.teknisi`-nya — gak pernah ke-match, karena dicek sebagai kode PARENT, padahal 'tasks.fop'/'tasks.teknisi' gak pernah jadi parent siapapun di tree ini.
+
+**Dampak lebih luas dari yang keliatan:** gap yang sama juga kena kasus `customers.detail.survey.update` dicentang tanpa `.view` — sibling `.view` di feature yang sama (`customers.detail.survey`) juga gak ke-grant otomatis (walau ancestor `customers.detail`/`customers` tetap ke-grant benar). Ini persis komplain awal di `analisa-tampilan-rbac.md` poin 3.C (403 tanpa alasan kalau cuma centang level bawah) — S6 versi awal cuma nutup separuh kasusnya.
+
+**Fix:** `RoleManagementService::syncPermissions()` — loop sekarang mulai dari feature MILIK PERMISSION itu sendiri (cek sibling-view dulu), baru lanjut ke ancestor. Satu logic yang sama nutup kedua kasus (sibling-dalam-fitur-flat & ancestor-chain-nested).
+
+**Verifikasi ulang pasca-fix** (HTTP request beneran, bukan cuma baca kode):
+| Skenario | Submit | Hasil `role_permissions` |
+|---|---|---|
+| Sibling-view (flat feature) | `task.manage` doang | `task.view.all`, `task.manage` ✅ |
+| Ancestor-chain (nested) | `customers.detail.survey.view` doang | `customers.view`, `customers.detail.view`, `customers.detail.survey.view` ✅ |
+| Sibling + ancestor sekaligus | `customers.detail.survey.update` doang | `customers.view`, `customers.detail.view`, `customers.detail.survey.view`, `customers.detail.survey.update` ✅ |
+| Sanity (fitur flat tanpa hierarki) | `dashboard.view` doang | `dashboard.view` doang (gak ada over-grant) ✅ |
+| Permission id gak valid | `permissions[]=999999` | Ditolak, state role gak berubah ✅ |
+
+**Jenis perubahan:** logic PHP di `RoleManagementService.php` doang, gak ubah skema/data. Resiko rendah, langsung berlaku begitu deploy (gak butuh migrasi).
+
+---
+
+## 9. Anomali Rename Label Balik Null — Root Cause Ketemu & Fix Permanen (2026-07-09)
+
+Poin D (bagian 7) sempat dianggap selesai lewat fix manual `tinker`, tapi user konfirmasi setelah refresh database (`migrate:fresh --seed`), label balik jadi `null` lagi. Ditelusuri ulang dan root cause-nya ketemu — bukan soal kode step 3 salah, tapi soal **urutan eksekusi migration vs seeder**.
+
+### Root cause
+
+Migrasi `2026_07_09_000000_migrate_rbac_permissions.php` step 1 manggil `PermissionGeneratorService::generate()`, yang butuh tabel `actions` udah keisi (dari `ActionSeeder`). Tapi `ActionSeeder` itu bagian dari `DatabaseSeeder` (fase `--seed`), yang jalan **SETELAH** semua migration selesai — bukan sebelum. Jadi saat step 1 migrasi kita jalan (masih fase migrations), `Action::all()` masih kosong → `generate()` skip semua kombinasi feature+action (gak ada yang match) → permission `fop_tasks.update_sensitive` dkk **belum ada** di titik itu. Step 3 (rename) yang jalan setelahnya di migration yang sama nyari `Permission::where('code', ...)` yang belum ada → `update()` kena 0 baris, gak error, gak ketauan.
+
+Permission-nya baru bener-bener ke-create belakangan, lewat `SlaTimelineFeatureSeeder` (dipanggil di `DatabaseSeeder`, fase `--seed`, saat itu `Action` udah ada) — tapi dibuat dengan `name = null` (default `PermissionGeneratorService`), dan gak ada proses lain sesudahnya yang rename ulang.
+
+Fix manual saya sebelumnya (lewat `tinker`) "berhasil" cuma karena saat itu dijalankan permission-nya **udah ada** (dari seed sebelumnya) — beda kondisi dari saat migration asli jalan di database kosong.
+
+### Fix permanen
+
+Rename dipindah dari migration one-off ke tempat yang PASTI jalan tiap kali permission itu dibuat/ditemukan:
+
+1. **`config/rbac.php`** — tambah `permission_name_overrides`, map kode permission → label kontekstual (3 entry yang sama: `fop_tasks.update_sensitive`, `customers.detail.devices.update_sensitive`, `customers.detail.devices.view_sensitive`).
+2. **`PermissionGeneratorService::generate()`** — dua titik:
+   - Saat **create** baris baru: `'name' => $nameOverrides[$permissionCode] ?? null` (langsung benar sejak lahir, gak nunggu proses lain).
+   - Saat permission **sudah ada** tapi `name`-nya belum sesuai override: backfill (`$existing->update(['name' => ...])`) — jaga-jaga kalau ada yang sempat ke-generate sebelum override didaftarkan, atau kena reset kayak kejadian ini.
+
+Karena `PermissionGeneratorService::generate()` dipanggil berkali-kali di banyak seeder (`SlaTimelineFeatureSeeder` 2x, dll), fix ini otomatis "self-healing" — gak peduli urutan/timing migration vs seeder, tiap kali `generate()` jalan dan permission itu ketemu, label-nya dipastikan benar.
+
+Migration `2026_07_09_000000...php` step 3 **dibiarkan ada** sebagai fallback tambahan (gak salah, cuma gak reliable sendirian) — dikasih komentar penjelasan biar gak dikira satu-satunya tempat fix ini diterapkan.
+
+**Verifikasi:** dijalankan ulang `app(PermissionGeneratorService::class)->generate()` langsung (mensimulasikan efek dari seeder manapun yang manggil dia) — hasil: `permissions_created: 0`, `permissions_skipped: 82`, dan ketiga label sekarang benar (`Ubah Kategori & Prioritas Tiket`, `Ubah Data Sensitif Perangkat`, `Lihat Data Sensitif Perangkat`).
+
+**Jenis perubahan:** `config/rbac.php` (data konfigurasi) + `PermissionGeneratorService.php` (logic). Idempotent, aman dijalankan berkali-kali, gak butuh migrasi data tambahan — otomatis kepasang tiap kali seeder yang manggil `generate()` jalan (termasuk `migrate:fresh --seed` berikutnya).
+
+### Implementasi S8-S10 (2026-07-09)
+
+- **S8**: `matrix.blade.php` — tambah catatan `@if($feature->code === 'pops' || $feature->code === 'users')` di header root feature, pola sama seperti S4 (fop_tasks/tasks).
+- **S9**: `sort_order` blok Master Data dirapikan jadi kontigu di `FeatureSeeder.php`: `master_wilayah`=2, `pops`=3, `master_distribusi`=4, `packages`=5, `master_status_pelanggan`=6. `sla_timeline` (`SlaTimelineFeatureSeeder.php`) diubah dari **dinamis** (`max(sort_order)+1` — akar masalah kenapa dia selalu jatuh paling bawah) jadi **fixed = 7**, biar Timeline SLA nutup blok Master Data persis di posisi terakhir sesuai urutan sidebar. Fitur lain di-geser: `users`=8, `roles`=9, `customers`=10, `invoices`=11, `payments`=12, `reports`=13, `audit_logs`=14, `fop_tasks`=15, `tasks` (`TaskFeatureSeeder.php`, root "Eksekusi Task")=16.
+  - **Wajib**: jalankan `php artisan db:seed --class=FeatureSeeder`, `--class=SlaTimelineFeatureSeeder`, `--class=TaskFeatureSeeder` ulang (atau lewat migrasi `2026_07_09_000000_migrate_rbac_permissions.php` yang udah manggil ketiganya) supaya `sort_order` di DB ke-update — `updateOrCreate` di seeder ini idempotent, aman dijalankan ulang kapan saja, gak nyentuh `role_permissions`.
+- **S10**: `$isSensitive` (deteksi `str_contains($perm->code, 'sensitive')` + styling merah + ikon ⚠) sekarang dipasang di ketiga level loop (root, child, grandchild) di `matrix.blade.php`, bukan cuma grandchild. `fop_tasks.update_sensitive` sekarang ikut kehighlight merah+⚠ seperti permission sensitif lainnya.
+
+Ketiganya murni perubahan seeder/view (`updateOrCreate` idempotent + template Blade) — tidak menyentuh pivot `role_permissions`, aman dijalankan kapan saja tanpa prosedur migrasi bertahap seperti S5.

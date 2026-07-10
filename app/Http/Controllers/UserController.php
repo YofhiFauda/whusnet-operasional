@@ -336,7 +336,7 @@ class UserController extends Controller
 
         foreach ($role->permissions as $permission) {
             $featureName = $permission->feature->name ?? 'Global';
-            $actionName = $permission->action->name ?? '';
+            $actionName = $permission->name ?? $permission->action->name ?? '';
             $actionCode = $permission->action->code ?? '';
 
             if (!isset($featuresSummary[$featureName])) {

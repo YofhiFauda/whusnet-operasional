@@ -19,6 +19,11 @@ class PermissionGeneratorServiceTest extends TestCase
     {
         parent::setUp();
         
+        // Clear tables to isolate the test from migrations seeding
+        Permission::query()->delete();
+        Feature::query()->delete();
+        Action::query()->delete();
+        
         // Seed features and actions manually for test
         $feature = Feature::create([
             'code' => 'test_feature',

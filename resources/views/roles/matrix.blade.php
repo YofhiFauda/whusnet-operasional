@@ -5,6 +5,41 @@
 
 @section('content')
 
+@php
+$descriptions = [
+    // Root features
+    'dashboard' => 'Halaman utama pemantauan indikator operasional, termasuk ringkasan status billing pelanggan.',
+    'master_wilayah' => 'Mengelola data administratif wilayah (Provinsi, Kabupaten, Kecamatan, Desa/Kelurahan).',
+    'pops' => 'Mengelola data Point of Presence (POP) / Kantor Cabang operasional. Bagian dari menu gabungan <span class="font-medium text-text-secondary">"Manajemen User & POP"</span> di sidebar — centang di sini (POP/Cabang) sesuai akses yang mau diberikan.',
+    'master_distribusi' => 'Mengelola data infrastruktur/jaringan distribusi kabel di lapangan.',
+    'packages' => 'Mengelola master produk layanan internet dan harga berlangganan bulanan.',
+    'master_status_pelanggan' => 'Mengelola status siklus hidup pelanggan (Draft, Perlu Dilengkapi, Lengkap, Siap Billing).',
+    'sla_timeline' => 'Mengatur batas waktu wajib mulai ditangani (SLA) per Paket Internet untuk tiap jenis tiket (Survey, Pemasangan, MTN, dll) — bukan durasi pengerjaan teknisi di lapangan.',
+    'users' => 'Mengelola akun pengguna sistem, penugasan role, dan cakupan wilayah kerja (User Scope). Bagian dari menu gabungan <span class="font-medium text-text-secondary">"Manajemen User & POP"</span> di sidebar — centang di sini (User Management) sesuai akses yang mau diberikan.',
+    'roles' => 'Mengelola grup peran jabatan (Role) dan matriks izin hak akses (Permission Matrix).',
+    'customers' => 'Pusat master data pelanggan, mencakup penambahan manual, pencarian, dan pengelolaan status.',
+    'invoices' => 'Mengelola penerbitan, penyesuaian nominal, penghapusan, dan pencetakan tagihan bulanan pelanggan.',
+    'payments' => 'Mengelola pencatatan pembayaran tagihan, verifikasi bukti transfer, approval, atau penolakan.',
+    'reports' => 'Menyusun laporan operasional pelanggan, riwayat tagihan, mutasi pembayaran, serta opsi ekspor file.',
+    'audit_logs' => 'Catatan kronologis aktivitas krusial yang dilakukan staf di sistem untuk audit keamanan.',
+    'fop_tasks' => 'Layer 1 (Tiket FOP) — Pembuatan tiket awal, penentuan tipe pekerjaan (SURVEY/PSB/MTN), prioritas, dan tim pelaksana. Begitu teknisi di-assign, tiket auto-lanjut ke <span class="font-medium text-text-secondary">"Eksekusi Task"</span> di bawah.',
+    'tasks' => 'Layer 2 (Eksekusi Task) — Kelanjutan otomatis dari Tiket FOP setelah teknisi di-assign untuk pengerjaan & pelaporan checklist lapangan. Bukan modul terpisah — jangan samakan dengan hak akses Tiket FOP.',
+
+    // Sub features
+    'customers.import' => 'Modul import massal data pelanggan lama via file Excel / CSV.',
+    'customers.detail' => 'Informasi detail pelanggan secara spesifik (identitas, alamat, billing, progress lapangan).',
+
+    // Mini features (grandchildren)
+    'customers.detail.identity' => 'Data personal pelanggan, kontak, NIK, dan berkas identitas.',
+    'customers.detail.address' => 'Data koordinat GPS, alamat, kelurahan, kecamatan, dan kota/kabupaten.',
+    'customers.detail.packages' => 'Paket layanan internet terhubung dan harga custom pelanggan. Status aktivasi layanan diatur lewat "Pemasangan Pelanggan", bukan di sini.',
+    'customers.detail.survey' => 'Hasil survey kelayakan, foto lokasi, status kelayakan, dan catatan surveyor.',
+    'customers.detail.installation' => 'Instalasi perangkat di rumah pelanggan, status pengerjaan, dan validasi aktivasi.',
+    'customers.detail.devices' => 'Data teknis modem, SN perangkat, port OLT, password PPPoE, dan nama/password WiFi.',
+    'customers.detail.documents' => 'Dokumen pendukung seperti KTP, foto rumah, form registrasi fisik, dsb.',
+];
+@endphp
+
 {{-- Breadcrumb & Info header --}}
 <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div class="flex items-center gap-2">
@@ -98,6 +133,11 @@
                         </svg>
                         <div class="min-w-0">
                             <span class="text-sm font-semibold text-text-main">{{ $feature->name }}</span>
+                            @if(isset($descriptions[$feature->code]))
+                                <p class="text-xs text-text-muted mt-0.5">
+                                    {!! $descriptions[$feature->code] !!}
+                                </p>
+                            @endif
                         </div>
                     </div>
 
@@ -122,15 +162,29 @@
                     <div class="px-6 py-3 flex flex-wrap gap-x-6 gap-y-3 border-b border-border/50"
                          data-feature-id="{{ $feature->id }}">
                         @foreach($permissions[$feature->id] as $perm)
+                        @php $isSensitive = str_contains($perm->code, 'sensitive'); @endphp
                         <label class="inline-flex items-center gap-2 cursor-pointer group">
                             <input type="checkbox"
                                    name="permissions[]"
                                    value="{{ $perm->id }}"
                                    @checked(in_array($perm->id, $rolePermissions))
-                                   onchange="updatePermCount()"
-                                   class="perm-checkbox rounded border-border text-primary focus:ring-2 focus:ring-primary-border group-hover:border-primary transition-colors">
-                            <span class="text-sm text-text-secondary group-hover:text-text-main transition-colors">
-                                {{ $perm->action->name ?? $perm->name ?? $perm->code }}
+                                   data-feature-id="{{ $feature->id }}"
+                                   data-parent-feature-id="{{ $feature->parent_id ?? '' }}"
+                                   data-permission-code="{{ $perm->code }}"
+                                   data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
+                                   onchange="handleCheckboxChange(this)"
+                                   class="perm-checkbox rounded border-border focus:ring-2 transition-colors
+                                          {{ $isSensitive
+                                              ? 'text-error border-error-border focus:ring-error-border'
+                                              : 'text-primary focus:ring-primary-border group-hover:border-primary' }}">
+                            <span class="text-sm transition-colors
+                                         {{ $isSensitive
+                                             ? 'text-error font-medium group-hover:opacity-80'
+                                             : 'text-text-secondary group-hover:text-text-main' }}">
+                                {{ $perm->name ?? $perm->action->name ?? $perm->code }}
+                                @if($isSensitive)
+                                    <span class="ml-0.5 text-error" title="Aksi sensitif — berikan hati-hati" aria-hidden="true">⚠</span>
+                                @endif
                             </span>
                         </label>
                         @endforeach
@@ -157,7 +211,14 @@
                                          fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>
-                                    <span class="text-sm font-medium text-text-secondary">{{ $child->name }}</span>
+                                    <div class="min-w-0">
+                                        <span class="text-sm font-medium text-text-secondary">{{ $child->name }}</span>
+                                        @if(isset($descriptions[$child->code]))
+                                            <p class="text-xs text-text-muted/80 mt-0.5">
+                                                {!! $descriptions[$child->code] !!}
+                                            </p>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
 
@@ -168,15 +229,29 @@
                                 <div class="px-5 py-2 flex flex-wrap gap-x-6 gap-y-2.5"
                                      data-feature-id="{{ $child->id }}">
                                     @foreach($permissions[$child->id] as $perm)
+                                    @php $isSensitive = str_contains($perm->code, 'sensitive'); @endphp
                                     <label class="inline-flex items-center gap-2 cursor-pointer group">
                                         <input type="checkbox"
                                                name="permissions[]"
                                                value="{{ $perm->id }}"
                                                @checked(in_array($perm->id, $rolePermissions))
-                                               onchange="updatePermCount()"
-                                               class="perm-checkbox rounded border-border text-primary focus:ring-2 focus:ring-primary-border group-hover:border-primary transition-colors">
-                                        <span class="text-sm text-text-secondary group-hover:text-text-main transition-colors">
-                                            {{ $perm->action->name ?? $perm->name ?? $perm->code }}
+                                               data-feature-id="{{ $child->id }}"
+                                               data-parent-feature-id="{{ $child->parent_id ?? '' }}"
+                                               data-permission-code="{{ $perm->code }}"
+                                               data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
+                                               onchange="handleCheckboxChange(this)"
+                                               class="perm-checkbox rounded border-border focus:ring-2 transition-colors
+                                                      {{ $isSensitive
+                                                          ? 'text-error border-error-border focus:ring-error-border'
+                                                          : 'text-primary focus:ring-primary-border group-hover:border-primary' }}">
+                                        <span class="text-sm transition-colors
+                                                     {{ $isSensitive
+                                                         ? 'text-error font-medium group-hover:opacity-80'
+                                                         : 'text-text-secondary group-hover:text-text-main' }}">
+                                            {{ $perm->name ?? $perm->action->name ?? $perm->code }}
+                                            @if($isSensitive)
+                                                <span class="ml-0.5 text-error" title="Aksi sensitif — berikan hati-hati" aria-hidden="true">⚠</span>
+                                            @endif
                                         </span>
                                     </label>
                                     @endforeach
@@ -195,11 +270,18 @@
                                     @foreach($child->children as $grandchild)
                                     <div class="py-2.5">
                                         {{-- Mini feature label --}}
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-primary/50 flex-shrink-0"></span>
-                                            <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                                                {{ $grandchild->name }}
-                                            </span>
+                                        <div class="flex flex-col gap-0.5 mb-2">
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-primary/50 flex-shrink-0"></span>
+                                                <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                                                    {{ $grandchild->name }}
+                                                </span>
+                                            </div>
+                                            @if(isset($descriptions[$grandchild->code]))
+                                                <p class="text-[11px] text-text-muted/70 pl-3.5">
+                                                    {!! $descriptions[$grandchild->code] !!}
+                                                </p>
+                                            @endif
                                         </div>
 
                                         @if(isset($permissions[$grandchild->id]) && $permissions[$grandchild->id]->count())
@@ -212,7 +294,11 @@
                                                        name="permissions[]"
                                                        value="{{ $perm->id }}"
                                                        @checked(in_array($perm->id, $rolePermissions))
-                                                       onchange="updatePermCount()"
+                                                       data-feature-id="{{ $grandchild->id }}"
+                                                       data-parent-feature-id="{{ $grandchild->parent_id ?? '' }}"
+                                                       data-permission-code="{{ $perm->code }}"
+                                                       data-is-view="{{ str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false' }}"
+                                                       onchange="handleCheckboxChange(this)"
                                                        class="perm-checkbox rounded border-border focus:ring-2 transition-colors
                                                               {{ $isSensitive
                                                                   ? 'text-error border-error-border focus:ring-error-border'
@@ -221,7 +307,7 @@
                                                              {{ $isSensitive
                                                                  ? 'text-error font-medium group-hover:opacity-80'
                                                                  : 'text-text-secondary group-hover:text-text-main' }}">
-                                                    {{ $perm->action->name ?? $perm->name ?? $perm->code }}
+                                                    {{ $perm->name ?? $perm->action->name ?? $perm->code }}
                                                     @if($isSensitive)
                                                         <span class="ml-0.5 text-error" title="Aksi sensitif — berikan hati-hati" aria-hidden="true">⚠</span>
                                                     @endif
@@ -325,15 +411,87 @@
         updateFeatureToggles();
     }
 
+    // Dependency chaining (parent-child) resolution
+    function resolvePermissionDependencies() {
+        const checkboxes = Array.from(document.querySelectorAll('.perm-checkbox'));
+        
+        // Helper to recursively check if a parent feature's view permission is checked
+        function isFeatureViewChecked(featureId) {
+            if (!featureId) return true;
+            
+            const viewCheckbox = checkboxes.find(cb => 
+                cb.dataset.featureId === featureId.toString() && 
+                cb.dataset.isView === 'true'
+            );
+            
+            if (!viewCheckbox) return true;
+            
+            if (!viewCheckbox.checked || viewCheckbox.disabled) {
+                return false;
+            }
+            
+            const parentId = viewCheckbox.dataset.parentFeatureId;
+            return isFeatureViewChecked(parentId);
+        }
+        
+        // Apply top-down disabling for children if parent view is unchecked
+        checkboxes.forEach(cb => {
+            const parentId = cb.dataset.parentFeatureId;
+            
+            if (parentId) {
+                const parentViewActive = isFeatureViewChecked(parentId);
+                if (!parentViewActive) {
+                    cb.checked = false;
+                    cb.disabled = true;
+                    cb.classList.add('opacity-50');
+                } else {
+                    cb.disabled = false;
+                    cb.classList.remove('opacity-50');
+                }
+            }
+        });
+    }
+
+    // Handle check state change with dependency checks
+    function handleCheckboxChange(changedCb) {
+        if (changedCb.checked) {
+            // Bottom-up auto-checking: checking a child automatically checks its parent feature's view permission
+            let parentId = changedCb.dataset.parentFeatureId;
+            const checkboxes = Array.from(document.querySelectorAll('.perm-checkbox'));
+            
+            while (parentId) {
+                const parentViewCb = checkboxes.find(cb => 
+                    cb.dataset.featureId === parentId.toString() && 
+                    cb.dataset.isView === 'true'
+                );
+                if (parentViewCb && !parentViewCb.checked) {
+                    parentViewCb.checked = true;
+                    parentId = parentViewCb.dataset.parentFeatureId;
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        resolvePermissionDependencies();
+        updatePermCount();
+    }
+
     // Pilih semua checkbox
     function selectAll() {
-        document.querySelectorAll('.perm-checkbox').forEach(cb => { cb.checked = true; });
+        document.querySelectorAll('.perm-checkbox').forEach(cb => { 
+            cb.checked = true; 
+            cb.disabled = false;
+            cb.classList.remove('opacity-50');
+        });
+        resolvePermissionDependencies();
         updatePermCount();
     }
 
     // Hapus semua checkbox
     function deselectAll() {
         document.querySelectorAll('.perm-checkbox').forEach(cb => { cb.checked = false; });
+        resolvePermissionDependencies();
         updatePermCount();
     }
 
@@ -343,9 +501,12 @@
         const featureGroup = document.querySelector(`[data-feature-id="${featureId}"]`);
         if (featureGroup) {
             featureGroup.querySelectorAll('.perm-checkbox').forEach(cb => {
-                cb.checked = toggleCb.checked;
+                if (!cb.disabled) {
+                    cb.checked = toggleCb.checked;
+                }
             });
         }
+        resolvePermissionDependencies();
         updatePermCount();
     }
 
@@ -366,9 +527,13 @@
 
     // Inisialisasi saat halaman dimuat
     document.addEventListener('DOMContentLoaded', () => {
+        resolvePermissionDependencies();
         updatePermCount();
         document.querySelectorAll('.perm-checkbox').forEach(cb => {
-            cb.addEventListener('change', updateFeatureToggles);
+            cb.addEventListener('change', () => {
+                resolvePermissionDependencies();
+                updateFeatureToggles();
+            });
         });
         updateFeatureToggles();
     });

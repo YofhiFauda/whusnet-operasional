@@ -28,9 +28,9 @@ class TaskFeatureSeeder extends Seeder
         $root = Feature::updateOrCreate(
             ['code' => 'tasks'],
             [
-                'name'       => 'Task Management',
+                'name'       => 'Eksekusi Task — Penjadwalan, Checklist & Quality Gate',
                 'type'       => FeatureType::ROOT,
-                'sort_order' => 11,
+                'sort_order' => 16, // setelah fop_tasks (15) — lihat FeatureSeeder.php buat urutan blok Master Data
                 'is_active'  => true,
                 'parent_id'  => null,
             ]
@@ -66,11 +66,10 @@ class TaskFeatureSeeder extends Seeder
 
         $fopPermDefs = [
             ['code' => 'task.view.all',          'name' => 'Lihat Semua Task'],
-            ['code' => 'task.lookup',            'name' => 'Pencarian Pelanggan & Cek Konflik (Utility API)'],
-            ['code' => 'task.edit',              'name' => 'Edit Task'],
-            ['code' => 'task.edit.type',         'name' => 'Ubah Tipe Task'],
+            ['code' => 'task.lookup',            'name' => 'Pencarian Pelanggan & Cek Konflik'],
+            ['code' => 'task.manage',            'name' => 'Mengubah Detail & Jadwal Tugas'],
+            ['code' => 'task.edit.type',         'name' => 'Ubah Kategori Task'],
             ['code' => 'task.cancel',            'name' => 'Batalkan Task'],
-            ['code' => 'task.schedule',          'name' => 'Ubah Jadwal Task (via Edit)'],
             ['code' => 'task.assign.team',       'name' => 'Assign Tim'],
             ['code' => 'task.conflict.override', 'name' => 'Override Konflik'],
             ['code' => 'task.reject',            'name' => 'Tolak Task'],
@@ -97,10 +96,7 @@ class TaskFeatureSeeder extends Seeder
 
         $teknisiPermDefs = [
             ['code' => 'task.view.own',          'name' => 'Lihat Task Sendiri'],
-            ['code' => 'task.status.start',      'name' => 'Mulai Task'],
-            ['code' => 'task.status.complete',   'name' => 'Selesaikan Task'],
-            ['code' => 'task.evidence.upload',   'name' => 'Upload Bukti Foto'],
-            ['code' => 'task.status.pending',    'name' => 'Laporan Nanti'],
+            ['code' => 'task.execute',           'name' => 'Menjalankan & Melaporkan Tugas Lapangan (Teknisi)'],
         ];
 
         $teknisiPermIds = [];
@@ -141,8 +137,8 @@ class TaskFeatureSeeder extends Seeder
 
         // ─── 8. Laporan ──────────────────────────────────────────────
 
-        $this->command->info('TaskFeatureSeeder: sub-feature FOP & Teknisi created/updated.');
-        $this->command->info('TaskFeatureSeeder: ' . count($fopPermDefs) . ' FOP permissions seeded.');
-        $this->command->info('TaskFeatureSeeder: ' . count($teknisiPermDefs) . ' Teknisi permissions seeded.');
+        $this->command?->info('TaskFeatureSeeder: sub-feature FOP & Teknisi created/updated.');
+        $this->command?->info('TaskFeatureSeeder: ' . count($fopPermDefs) . ' FOP permissions seeded.');
+        $this->command?->info('TaskFeatureSeeder: ' . count($teknisiPermDefs) . ' Teknisi permissions seeded.');
     }
 }

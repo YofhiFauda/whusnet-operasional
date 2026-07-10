@@ -72,7 +72,7 @@ class TaskPolicy
      */
     public function edit(User $user, Task $task): bool
     {
-        if (!$user->hasPermission('task.edit')) {
+        if (!$user->hasPermission('task.manage')) {
             return false;
         }
 
@@ -93,7 +93,7 @@ class TaskPolicy
      */
     public function schedule(User $user, Task $task): bool
     {
-        if ($user->hasPermission('task.schedule') || $user->hasPermission('task.assign.team') || $user->hasPermission('task.edit')) {
+        if ($user->hasPermission('task.manage') || $user->hasPermission('task.assign.team')) {
             return $task->status->isEditable();
         }
         return $this->canTransitionTo($user, $task, 'terjadwal') && $task->status->isEditable();
@@ -136,7 +136,7 @@ class TaskPolicy
      */
     public function fopPending(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.status.pending') && in_array($task->status->value, ['terjadwal', 'in_progress']);
+        return $user->hasPermission('task.manage') && in_array($task->status->value, ['terjadwal', 'in_progress']);
     }
 
     /**
@@ -158,7 +158,7 @@ class TaskPolicy
         
         $statusValue = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
 
-        if (!$canTransition && ($user->hasPermission('task.status.start') || $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value)) {
+        if (!$canTransition && ($user->hasPermission('task.execute') || $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value)) {
             $canTransition = in_array($statusValue, ['terjadwal', 'pending']);
         }
 
@@ -182,7 +182,7 @@ class TaskPolicy
      */
     public function statusPending(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.status.pending') && $task->isMember($user->id);
+        return $user->hasPermission('task.execute') && $task->isMember($user->id);
     }
 
     /**
@@ -190,7 +190,7 @@ class TaskPolicy
      */
     public function uploadEvidence(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.evidence.upload') && $task->isMember($user->id);
+        return $user->hasPermission('task.execute') && $task->isMember($user->id);
     }
 
     // ─── Dynamic Workflow Transitions Helper ──────────────────────────

@@ -20,6 +20,50 @@ class RoleManagementService
         // Sanitize to unique integers to avoid duplicate inserts and exceptions
         $sanitizedPermissions = array_values(array_unique(array_map('intval', $permissions)));
 
+        // S6: Auto-grant parent view permissions bottom-up for any checked child permission
+        if (!empty($sanitizedPermissions)) {
+            $allPermissions = \App\Models\Permission::with('feature')->get();
+            $permissionsMap = $allPermissions->keyBy('id');
+            $allFeatures = \App\Models\Feature::all()->keyBy('id');
+            $viewOverrides = config('rbac.view_permission_overrides', []);
+
+            $addedIds = [];
+            foreach ($sanitizedPermissions as $permId) {
+                $perm = $permissionsMap->get($permId);
+                if (!$perm || !$perm->feature) {
+                    continue;
+                }
+
+                // Cek fitur MILIK PERMISSION ITU SENDIRI dulu (sibling-view),
+                // baru jalan ke induknya (ancestor-view). Contoh sibling-view:
+                // task.manage & task.view.all sama-sama nempel di feature
+                // 'tasks.fop' (flat, gak ada nesting) — cek versi lama cuma
+                // jalanin loop mulai dari PARENT, jadi gak pernah nyentuh
+                // 'tasks.fop' punya sendiri kalau permission yg dicentang
+                // emang langsung anggota 'tasks.fop'.
+                $currentFeature = $perm->feature;
+                while ($currentFeature !== null) {
+                    // Kode permission "view" ikut konvensi "{feature_code}.view",
+                    // kecuali fitur yang didaftarkan di config/rbac.php > view_permission_overrides.
+                    $viewCode = $viewOverrides[$currentFeature->code] ?? "{$currentFeature->code}.view";
+
+                    if ($viewCode !== $perm->code) {
+                        $viewPerm = $allPermissions->first(fn($p) => $p->code === $viewCode);
+                        if ($viewPerm) {
+                            $addedIds[] = $viewPerm->id;
+                        }
+                    }
+
+                    $currentFeature = $currentFeature->parent_id !== null
+                        ? $allFeatures->get($currentFeature->parent_id)
+                        : null;
+                }
+            }
+            if (!empty($addedIds)) {
+                $sanitizedPermissions = array_values(array_unique(array_merge($sanitizedPermissions, $addedIds)));
+            }
+        }
+
         DB::transaction(function () use ($role, $sanitizedPermissions, $permissions) {
             // Lock row Role — cegah race condition kalau ada 2 request PUT matrix
             // nyaris bersamaan (mis. double-klik submit) yang bisa bikin sync()

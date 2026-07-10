@@ -24,7 +24,7 @@ class WorkflowTransitionPermissionSeeder extends Seeder
             [
                 'from_status' => 'pending',
                 'to_status' => 'terjadwal',
-                'permission_name' => 'task.schedule',
+                'permission_name' => 'task.manage',
                 'roles' => ['owner', 'admin', 'helpdesk', 'fop']
             ],
             [
@@ -42,19 +42,19 @@ class WorkflowTransitionPermissionSeeder extends Seeder
             [
                 'from_status' => 'pending',
                 'to_status' => 'pending',
-                'permission_name' => 'task.status.pending',
+                'permission_name' => 'task.execute',
                 'roles' => ['owner', 'admin', 'teknisi']
             ],
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'in_progress',
-                'permission_name' => 'task.status.start',
+                'permission_name' => 'task.execute',
                 'roles' => ['owner', 'admin', 'teknisi']
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'selesai',
-                'permission_name' => 'task.status.complete',
+                'permission_name' => 'task.execute',
                 'roles' => ['owner', 'admin', 'teknisi']
             ],
             [
@@ -72,13 +72,13 @@ class WorkflowTransitionPermissionSeeder extends Seeder
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'pending',
-                'permission_name' => 'task.status.pending',
+                'permission_name' => 'task.execute',
                 'roles' => ['owner', 'admin', 'teknisi']
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'pending',
-                'permission_name' => 'task.status.pending',
+                'permission_name' => 'task.execute',
                 'roles' => ['owner', 'admin', 'teknisi']
             ],
             [

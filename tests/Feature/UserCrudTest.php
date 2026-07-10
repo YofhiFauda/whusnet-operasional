@@ -35,7 +35,7 @@ class UserCrudTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Tambah User');
-        $response->assertSee('Simpan User', false);
+        $response->assertSee('Konfirmasi & Simpan', false);
     }
 
     public function test_admin_can_create_basic_user(): void
@@ -60,6 +60,7 @@ class UserCrudTest extends TestCase
             'phone' => '081234567890',
             'status' => 'active',
             'role_id' => $role->id,
+            'scope_type' => 'selected_pop',
             'pop_ids' => [$pop->id],
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -122,6 +123,7 @@ class UserCrudTest extends TestCase
             'phone' => '081111111111',
             'status' => 'active',
             'role_id' => $adminRole->id,
+            'scope_type' => 'selected_pop',
             'pop_ids' => [$popB->id],
             'password' => 'new-password123',
             'password_confirmation' => 'new-password123',

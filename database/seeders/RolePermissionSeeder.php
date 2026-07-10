@@ -37,8 +37,11 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.view',
                 'audit_logs.export', // assuming audit_logs has export
                 'fop_tasks.view',
+                'master_wilayah.view',
+                'master_distribusi.view',
+                'master_status_pelanggan.view',
             ],
-
+ 
             'admin' => [
                 'dashboard.view',
                 'pops.*',
@@ -59,8 +62,12 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.export',
                 'fop_tasks.*',
                 'task.lookup', // dipakai modal /fop-tasks (autocomplete pelanggan + cek konflik)
+                'master_wilayah.*',
+                'master_distribusi.*',
+                'master_status_pelanggan.*',
+                'task.manage',
             ],
-
+ 
             'noc' => [
                 'dashboard.view',
                 'pops.view',
@@ -87,8 +94,11 @@ class RolePermissionSeeder extends Seeder
                 'invoices.view',
                 'invoices.print',
                 'payments.print', // Based on matrix
+                'master_wilayah.view',
+                'master_distribusi.view',
+                'master_status_pelanggan.view',
             ],
-
+ 
             'helpdesk' => [
                 'dashboard.view',
                 'pops.view',
@@ -117,8 +127,11 @@ class RolePermissionSeeder extends Seeder
                 'payments.print',
                 'reports.view',
                 'reports.export',
+                'master_wilayah.view',
+                'master_distribusi.view',
+                'master_status_pelanggan.view',
             ],
-
+ 
             'fop' => [
                 'dashboard.view',
                 'customers.view',
@@ -138,6 +151,9 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
                 'fop_tasks.*',
+                'master_wilayah.view',
+                'master_distribusi.view',
+                'master_status_pelanggan.view',
             ],
 
             'teknisi' => [
@@ -196,6 +212,9 @@ class RolePermissionSeeder extends Seeder
                 'payments.print',
                 'reports.view',
                 'reports.export',
+                'master_wilayah.view',
+                'master_distribusi.view',
+                'master_status_pelanggan.view',
             ],
         ];
 
