@@ -27,23 +27,23 @@ return new class extends Migration
             (new TaskFeatureSeeder())->run();
 
             // 2. Fetch the newly created permissions
-            $taskExecute = Permission::where('code', 'task.execute')->first();
-            $taskManage = Permission::where('code', 'task.manage')->first();
+            $taskExecute = Permission::query()->where('code', 'task.execute')->first();
+            $taskManage = Permission::query()->where('code', 'task.manage')->first();
 
-            $masterWilayahView = Permission::where('code', 'master_wilayah.view')->first();
-            $masterWilayahCreate = Permission::where('code', 'master_wilayah.create')->first();
-            $masterWilayahUpdate = Permission::where('code', 'master_wilayah.update')->first();
-            $masterWilayahDelete = Permission::where('code', 'master_wilayah.delete')->first();
+            $masterWilayahView = Permission::query()->where('code', 'master_wilayah.view')->first();
+            $masterWilayahCreate = Permission::query()->where('code', 'master_wilayah.create')->first();
+            $masterWilayahUpdate = Permission::query()->where('code', 'master_wilayah.update')->first();
+            $masterWilayahDelete = Permission::query()->where('code', 'master_wilayah.delete')->first();
 
-            $masterDistribusiView = Permission::where('code', 'master_distribusi.view')->first();
-            $masterDistribusiCreate = Permission::where('code', 'master_distribusi.create')->first();
-            $masterDistribusiUpdate = Permission::where('code', 'master_distribusi.update')->first();
-            $masterDistribusiDelete = Permission::where('code', 'master_distribusi.delete')->first();
+            $masterDistribusiView = Permission::query()->where('code', 'master_distribusi.view')->first();
+            $masterDistribusiCreate = Permission::query()->where('code', 'master_distribusi.create')->first();
+            $masterDistribusiUpdate = Permission::query()->where('code', 'master_distribusi.update')->first();
+            $masterDistribusiDelete = Permission::query()->where('code', 'master_distribusi.delete')->first();
 
-            $masterStatusPelangganView = Permission::where('code', 'master_status_pelanggan.view')->first();
-            $masterStatusPelangganCreate = Permission::where('code', 'master_status_pelanggan.create')->first();
-            $masterStatusPelangganUpdate = Permission::where('code', 'master_status_pelanggan.update')->first();
-            $masterStatusPelangganDelete = Permission::where('code', 'master_status_pelanggan.delete')->first();
+            $masterStatusPelangganView = Permission::query()->where('code', 'master_status_pelanggan.view')->first();
+            $masterStatusPelangganCreate = Permission::query()->where('code', 'master_status_pelanggan.create')->first();
+            $masterStatusPelangganUpdate = Permission::query()->where('code', 'master_status_pelanggan.update')->first();
+            $masterStatusPelangganDelete = Permission::query()->where('code', 'master_status_pelanggan.delete')->first();
 
             // Old permissions we want to map from
             $oldExecCodes = ['task.status.start', 'task.status.complete', 'task.evidence.upload', 'task.status.pending'];
@@ -58,7 +58,7 @@ return new class extends Migration
                     ->pluck('permission_id')
                     ->toArray();
 
-                $permissionCodes = Permission::whereIn('id', $rolePermissionIds)->pluck('code')->toArray();
+                $permissionCodes = Permission::query()->whereIn('id', $rolePermissionIds, 'and', false)->pluck('code')->toArray();
 
                 // Migrate technician execute permissions
                 if ($taskExecute && array_intersect($oldExecCodes, $permissionCodes)) {
@@ -189,7 +189,7 @@ return new class extends Migration
                 'customers.detail.devices.view_sensitive' => 'Lihat Data Sensitif Perangkat',
             ];
             foreach ($renames as $code => $name) {
-                Permission::where('code', $code)->update(['name' => $name]);
+                Permission::query()->where('code', $code)->update(['name' => $name]);
             }
 
             // 4. Kode permission lama (task.edit, task.schedule, task.status.*, task.evidence.upload)

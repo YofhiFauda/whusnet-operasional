@@ -32,7 +32,7 @@ return new class extends Migration
             'task.schedule',
         ];
 
-        Permission::whereIn('code', $obsoleteCodes)->delete();
+        Permission::query()->whereIn('code', $obsoleteCodes, 'and', false)->delete();
     }
 
     /**
