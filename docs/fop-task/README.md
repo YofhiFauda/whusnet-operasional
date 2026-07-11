@@ -13,19 +13,21 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 | `FopTask` | Tiket kerja FOP — 1 row = 1 pekerjaan yang perlu diselesaikan (nomor `TFOP-2026-0001`) | "Survey Pelanggan: Budi", "Perbaikan ODP LOS Desa X" |
 | `Task` | Task eksekusi teknisi (jadwal, checklist, laporan, evidence foto) | Task yang dikerjakan teknisi di lapangan |
 
-`FopTask` auto-generate `Task` begitu ada teknisi di-assign (lewat `TaskService::create()`), disimpan di `fop_tasks.task_id`. FOP kerja di level `FopTask` (bikin/atur tiket + team); teknisi kerja di level `Task` (checklist, submit laporan) — lihat [task-workflow (archive)](archive/task-workflow.md) utk detail approval flow Task, itu masih berlaku.
+`FopTask` auto-generate `Task` begitu ada teknisi di-assign (lewat `TaskService::create()`), disimpan di `fop_tasks.task_id`. FOP kerja di level `FopTask` (bikin/atur tiket); teknisi kerja di level `Task` (checklist, submit laporan) — lihat [task-workflow (archive)](archive/task-workflow.md) utk detail approval flow Task, itu masih berlaku.
 
-**Team** (`FopTaskTeam`) = roster teknisi yang berlaku 1 hari (bisa nyambung ke hari berikutnya kalau ada tiket Pending). 1 Team bisa pegang banyak `FopTask` sekaligus; assignment teknisi ke tiket tetap manual per-tiket (bukan auto-split).
+**Team** (`FopTaskTeam`) = roster teknisi yang berlaku 1 hari (bisa nyambung ke hari berikutnya kalau ada tiket Pending). **Sejak Task 1 (Auto-Team Formation), Team gak lagi dibuat manual** — kebentuk/berubah sendiri lewat `FopTaskTeamService::rebuildTeamsForDate()` berdasar graf overlap teknisi per tiket (siapa kerja bareng siapa hari itu). FOP cuma perlu drop-in manual (`assign-to-team`) buat kasus solo/konflik, atau pakai **Switch Teknisi** (Task 2) buat mindahin teknisi antar Team dalam 1 submit atomic. Detail algoritma & rasional di [analisa-auto-team.md](analisa-auto-team.md) dan [analisa-sync-execution-task.md](analisa-sync-execution-task.md).
 
 ## Dokumen
 
 | Dokumen | Isi |
 |---------|-----|
-| [flowchart.md](flowchart.md) | Alur status tiket, auto-sync, prioritas SLA, lifecycle Team |
+| [flowchart.md](flowchart.md) | Alur status tiket, auto-sync, prioritas SLA, auto-team formation (Task 1), switch teknisi (Task 2) |
 | [user-flow.md](user-flow.md) | Langkah FOP di `/fop`, `/fop-tasks`, `/fop-tasks/history` |
 | [database-schema.md](database-schema.md) | Tabel, kolom, relasi, migrasi |
 | [fop-dashboard.md](fop-dashboard.md) | Detail dashboard `/fop` (stat card, Team FOP Aktif, antrean survey) |
-| [archive/](archive/) | Dokumen sprint lama (Kanban, Calendar, desain awal Team, dll) — historis |
+| [analisa-auto-team.md](analisa-auto-team.md) | Analisa kebutuhan & Sprint Backlog Task 1 (Auto-Team) & Task 2 (Switch Teknisi) |
+| [analisa-sync-execution-task.md](analisa-sync-execution-task.md) | Bugfix Task 1/2 + sync `FopTaskTeam` ↔ execution `Task` |
+| [archive/](archive/) | Dokumen sprint lama (Kanban, Calendar, desain awal Team manual, dll) — historis, arsitektur udah diganti |
 
 ## Routes & Permission
 
@@ -38,16 +40,17 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 | `/fop-tasks` | POST | `fop_tasks.create` | `FopTaskController@store` |
 | `/fop-tasks/{fop_task}` | PUT | `fop_tasks.update` | `FopTaskController@update` |
 | `/fop-tasks/{fop_task}` | DELETE | `fop_tasks.delete` | `FopTaskController@destroy` |
-| `/fop-tasks/teams` | POST | `fop_tasks.create` | `FopTaskController@teamStore` |
-| `/fop-tasks/teams/{team}` | PUT | `fop_tasks.update` | `FopTaskController@teamUpdate` |
-| `/fop-tasks/teams/{team}` | DELETE | `fop_tasks.delete` | `FopTaskController@teamDestroy` |
+| `/fop-tasks/{fop_task}/assign-to-team` | POST | `fop_tasks.update` | `FopTaskController@assignToTeam` — drop-in manual Team (solo/konflik) |
+| `/fop-tasks/switch-technician` | POST | `fop_tasks.update` | `FopTaskController@switchTechnician` — **Task 2**, switch teknisi antar Team 1x-submit |
+
+> Route CRUD Team manual (`fop-tasks.teams.store/update/destroy`) **udah dihapus total sejak Task 1** — 404 kalau diakses. Team gak lagi punya endpoint mutasi sendiri, semuanya derived dari assignment teknisi.
 
 **RBAC catatan khusus:** ubah `category` (tipe tiket) & `priority` cuma boleh user dengan permission `fop_tasks.update_sensitive` (lihat `FopTaskController::update()`). Tipe `Survey` & `PSB` (Pemasangan) gak bisa dipilih manual — cuma via auto-sync dari Registrasi Pelanggan (`TaskType::autoOnlyValues()`).
 
 ## Views
 
 - `resources/views/fop/dashboard.blade.php` — dashboard utama
-- `resources/views/fop_tasks/index.blade.php` — daftar tiket aktif (Proses/Pending) + modal create/edit + panel Kelola Team
+- `resources/views/fop_tasks/index.blade.php` — daftar tiket aktif (Proses/Pending) + modal create/edit + modal drop-in Team + modal konflik Team (C3) + modal Switch Teknisi. **Panel "Kelola Team" manual udah dihapus.**
 - `resources/views/fop_tasks/history.blade.php` — riwayat tiket Selesai/Cancel
 
 ## Teknologi
@@ -60,4 +63,4 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 
 ---
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-11 (Task 1 Auto-Team Formation & Task 2 Switch Teknisi — routes, views, konsep Team diupdate)

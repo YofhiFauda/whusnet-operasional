@@ -25,43 +25,52 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 
 1. Klik "Tambah Task" → modal muncul.
 2. Pilih kategori (Survey & PSB **gak muncul** di dropdown — itu auto-sync only).
-3. Isi tanggal, tugas, desa, POP, pelanggan (opsional), team (opsional), issue, catatan.
+3. Isi tanggal, tugas, desa, POP, pelanggan (opsional), issue, catatan. **Gak ada lagi field pilih Team** — dropdown `team_id` manual udah dihapus dari modal (lihat bagian 3, Team sekarang otomatis).
 4. Pilih status: Proses (default) atau Pending (wajib isi alasan + tanggal request client).
 5. Pilih prioritas — **cuma muncul kalau user punya `fop_tasks.update_sensitive`**, selain itu default Low/otomatis.
 6. Pilih 1+ teknisi (wajib) → submit.
-7. Sistem: simpan `FopTask`, `technicians()->sync()`, auto-buat `Task` eksekusi teknisi, link ke `fop_task.task_id`.
+7. Sistem: simpan `FopTask`, `technicians()->sync()`, auto-buat `Task` eksekusi teknisi (title polos dulu), link ke `fop_task.task_id`, lalu **auto-rebuild Team** untuk tanggal tiket itu (lihat bagian 3) — title Task eksekusi ke-update lagi begitu Team-nya kebentuk.
 
 ### Edit tiket
 
 1. Klik tiket di tabel → modal edit terisi data existing.
-2. User biasa cuma bisa ubah: tanggal, tugas, desa/POP/pelanggan/team, issue/catatan, status, teknisi.
+2. User biasa cuma bisa ubah: tanggal, tugas, desa/POP/pelanggan, issue/catatan, status, teknisi.
 3. User dengan `fop_tasks.update_sensitive` bisa juga ubah kategori & prioritas.
 4. Ganti status ke Pending → wajib isi alasan; ke Selesai/Proses → field pending auto-clear.
-5. Submit → update `FopTask`, sync teknisi, update/buat `Task` terkait, catat `AuditLog`.
+5. Submit → update `FopTask`, sync teknisi, update/buat `Task` terkait, catat `AuditLog`, **auto-rebuild Team** untuk tanggal tiket (dan tanggal lama juga kalau tanggalnya diubah).
 
 ### Hapus tiket
 
 1. Klik hapus (icon/tombol) → konfirmasi browser.
 2. Sistem detach teknisi, hapus `FopTask`, catat `AuditLog`.
 
-## 3. FOP kelola Team harian
+## 3. Team Harian — Otomatis (Task 1), Bukan Bikin Manual Lagi
 
-### Bikin Team baru
+**Berubah total.** Panel "Kelola Team" (bikin/edit/hapus Team manual) **sudah dihapus** dari `/fop-tasks`. FOP gak perlu (dan gak bisa lagi) bikin Team sebelum assign tiket — Team kebentuk sendiri berdasar siapa kerja bareng siapa hari itu.
 
-1. Buka panel "Kelola Team" di `/fop-tasks`.
-2. Isi nama (opsional, default "Tim dd/mm"), tanggal kerja, pilih anggota teknisi.
-3. Submit → sistem cek konflik: kalau ada teknisi yang udah masuk team aktif lain di tanggal sama → **ditolak**, muncul pesan konflik per nama.
-4. Kalau lolos → Team dibuat, siap dipakai buat assign tiket.
+### Aturan otomatis (ringkas — detail algoritma di [flowchart.md](flowchart.md#5-auto-team-formation-connected-components))
 
-### Assign tiket ke anggota Team
+- Tiket dengan **>1 teknisi** → otomatis jadi/gabung ke 1 Team (nama auto `"Team {n}"`).
+- Teknisi yang overlap ke beberapa tiket hari itu → tiket-tiketnya ke-gabung ke Team yang sama (dia jadi "jembatan").
+- Tiket **solo (1 teknisi)**: kalau teknisinya udah ada di Team lain hari itu → otomatis ikut Team itu. Kalau belum pernah punya Team sama sekali → tetap `team_id = null`, muncul tombol kecil **"+ Masukkan ke Team..."** di kolom Team buat drop-in manual.
+- Tiket yang narik 2 teknisi dari **2 Team beda** sekaligus → sistem GAK auto-gabung, muncul **modal "Konflik Team Terdeteksi"** minta FOP pilih: masuk Team A, Team B, atau bikin Team baru gabungan. Modal ini bisa dibuka ulang kapan aja lewat tombol "Konflik Team (n)" di header selama konfliknya belum diputuskan (gak ilang walau ke-close atau halaman di-refresh).
 
-- Waktu create/edit tiket, pilih `team_id` dari dropdown (opsional) — lalu tetap pilih teknisi manual per tiket (sistem gak auto-bagi rata).
-- Dashboard `/fop` nampilin ringkasan beban kerja per anggota (jumlah tiket).
+### Drop-in manual / resolve konflik
 
-### Edit / Hapus Team
+1. Klik "+ Masukkan ke Team..." (tiket solo) atau pilih Team dari modal konflik.
+2. Sistem assign `team_id`, kunci pilihan itu (`manual_override_at`) supaya gak ke-timpa rebuild otomatis berikutnya — sampai teknisi tiket itu diganti lagi lewat edit biasa.
+3. Kalau drop-in ini bikin teknisi keluar dari Team lamanya (dia masih nempel di tiket lain, Team beda, tanggal sama) → sistem otomatis cabut dia dari tiket lama itu, roster Team lama ke-refresh, title Task eksekusi tiket lama ikut ke-update.
 
-1. Edit: ubah nama dan/atau roster anggota — cek konflik ulang kalau roster diubah. Tiket yang udah ke-assign ke anggota lama **gak berubah** PIC-nya.
-2. Hapus: detach semua anggota, hapus Team — tiket yang masih nempel `team_id`-nya jadi `null` (FK `set null`), gak ikut kehapus.
+### Switch Teknisi antar Team (Task 2) — cara cepat pindahin teknisi
+
+1. Klik chip nama teknisi di kolom Teknisi (tabel `/fop-tasks`).
+2. Modal muncul: pilih **Task Tujuan** (tiket lain di tanggal yang sama) + **Pengganti** di Task asal (boleh teknisi baru, boleh yang udah ada di Task asal).
+3. Submit sekali → dalam 1 transaksi: teknisi pindah ke Task tujuan, pengganti masuk gantiin dia di Task asal, kedua Team ke-rebuild, notifikasi terkirim ke 2 teknisi, audit log tercatat.
+4. Kalau pengganti gak dipilih/invalid, atau lagi `in_progress` di tiket lain, atau Task tujuan beda hari → ditolak, **gak ada perubahan sama sekali** (Task asal gak pernah kosong teknisi).
+
+### Beban kerja per anggota
+
+Dashboard `/fop` nampilin ringkasan beban kerja per anggota Team (jumlah tiket) — sama seperti sebelumnya, cuma sumber data Team-nya sekarang auto, bukan manual.
 
 ## 4. FOP lihat riwayat (`/fop-tasks/history`)
 
@@ -75,9 +84,9 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 |------|------------------------|
 | Lihat dashboard `/fop` | Policy `viewAll` di `Task` |
 | Lihat `/fop-tasks`, `/fop-tasks/history` | `fop_tasks.view` |
-| Tambah tiket/Team | `fop_tasks.create` |
-| Edit tiket/Team | `fop_tasks.update` |
+| Tambah tiket | `fop_tasks.create` |
+| Edit tiket, drop-in Team manual (`assign-to-team`), Switch Teknisi (`switch-technician`) | `fop_tasks.update` |
 | Edit kategori & prioritas tiket | `fop_tasks.update_sensitive` |
-| Hapus tiket/Team | `fop_tasks.delete` |
+| Hapus tiket | `fop_tasks.delete` |
 
-Owner / user `hasFullAccess()` selalu lolos guard tanpa cek permission granular (lihat `FopTaskController::authorizeAccess()`).
+Owner / user `hasFullAccess()` selalu lolos guard tanpa cek permission granular (lihat `FopTaskController::authorizeAccess()`). Team gak lagi punya permission/endpoint CRUD sendiri (`fop-tasks.teams.*` udah dihapus) — semua Team dikelola implisit lewat permission tiket di atas.

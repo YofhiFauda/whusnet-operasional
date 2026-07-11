@@ -67,7 +67,9 @@ SLA per kategori:
 
 Method sumber: `FopTask::slaDeadline()`, `FopTask::slaTotalSeconds()`.
 
-## 4. Assignment Teknisi → Auto-buat `Task` Eksekusi
+## 4. Assignment Teknisi → Auto-buat `Task` Eksekusi + Auto-Team Rebuild
+
+**Berubah total sejak Task 1/2** — dulu FOP pilih `team_id` manual di form; sekarang Team-nya kebentuk sendiri.
 
 ```
 FOP assign teknisi ke FopTask (store/update)
@@ -76,55 +78,139 @@ FOP assign teknisi ke FopTask (store/update)
   technicians()->sync($ids)   [pivot fop_task_user]
         │
         ▼
-  fop_task.task_id kosong? ──── ya ──▶ TaskService::create() → Task baru
+  fop_task.task_id kosong? ──── ya ──▶ TaskService::create() → Task baru (title polos "FOP: <tugas>")
         │ tidak                              │
         ▼                                    ▼
-  TaskService::update($task, ...)     fop_task.task_id = task.id
+  TaskService::update($task, title polos)   fop_task.task_id = task.id
+        │
+        ▼
+  FopTaskTeamService::rebuildTeamsForDate(task_date)   ◀── lihat bagian 5
+        │
+        ▼
+  team_id ke-assign otomatis (atau null kalau solo/konflik)
+        │
+        ▼
+  syncExecutionTaskTitle(): Task.title di-update jadi
+  "[Team {n}] FOP: <tugas>" (atau polos kalau team_id null)
 ```
 
-- Judul Task auto-prefix `[Tim <nama>]` kalau lebih dari 1 teknisi.
+- **Title Task eksekusi gak lagi ditebak dari nama teknisi pertama** (`'Tim ' . strtok(...)`, cara lama) — dibuat polos dulu pas `store()`/`update()`, lalu di-isi ulang otomatis sama `rebuildTeamsForDate()` begitu Team-nya kebentuk/berubah, pakai nama Team yang SEBENARNYA. Jadi title selalu sinkron sama Team terkini, gak pernah basi walau Team-nya di-merge/rename belakangan.
 - `conflict_override: true` — assignment FOP task gak dicek bentrok jadwal kayak Task manual biasa.
+- Kalau technicians array literally berubah dan task sebelumnya punya `manual_override_at` — kolom itu di-null-in juga (lepas pin manual lama, biar rebuild bebas nentuin ulang).
 
-## 5. Lifecycle `FopTaskTeam` (Team Harian)
+## 5. Auto-Team Formation (Connected Components)
 
-```
-FOP bikin Team (nama opsional, work_date, member_ids)
-        │
-        ▼
-  cek konflik: teknisi udah di team aktif lain
-  di tanggal sama? ──── ya ──▶ tolak (422, pesan konflik)
-        │ tidak
-        ▼
-  Team dibuat, roster tersimpan (fop_task_team_user)
-        │
-        ▼
-  FOP assign FopTask satu-satu ke anggota Team (manual, bukan auto-split)
-        │
-        ▼
-  Team dianggap AKTIF selama ada FopTask dgn team_id ini
-  yang status BUKAN Selesai/Cancel (termasuk Pending)
-        │
-        ▼
-  semua FopTask di Team itu Selesai/Cancel → Team jadi RIWAYAT (derived, gak ada kolom fisik)
-```
-
-Catatan: kalau FopTask berstatus Pending nyambung ke hari berikutnya, Team lama tetap aktif meski `work_date` udah lewat — jalan paralel sama Team baru hari itu, sampai tiket pending-nya ditutup.
-
-## 6. Overview Halaman
+**Baru — Task 1.** Ganti total lifecycle manual Team lama (bikin Team dulu → baru assign tiket). Sekarang: FOP langsung assign teknisi ke tiket, Team-nya kebentuk/berubah sendiri lewat `FopTaskTeamService::rebuildTeamsForDate($task_date)`, dipanggil abis TIAP perubahan assignment teknisi (create/update/assign-to-team/switch-technician).
 
 ```
-/fop  (Dashboard)                     /fop-tasks (Kelola Tiket + Team)
+rebuildTeamsForDate($date)
+        │
+        ▼
+  Ambil semua FopTask aktif (Proses/Pending) di $date, load technicians
+        │
+        ▼
+  Pisah: locked (manual_override_at terisi) vs open
+        │
+        ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │ Untuk tiap task MULTI-teknisi (open):                    │
+  │  • teknisinya udah ada di >=2 Team existing BEDA?        │
+  │      YA  → Skenario C3: JANGAN auto-union,               │
+  │            catat sbg conflict (task_id + 2 kandidat Team)│
+  │            team_id di-null-in, nunggu FOP putusin manual │
+  │      TIDAK → union teknisi jadi 1 komponen graf          │
+  │              (Skenario A: baru, atau B: nyambung ke      │
+  │              Team existing lewat 1 teknisi jembatan)     │
+  └─────────────────────────────────────────────────────────┘
+        │
+        ▼
+  Untuk tiap task SOLO (1 teknisi):
+   • teknisinya udah py Team (dari task ini sendiri
+     ATAU dari task lain, snapshot SEBELUM rebuild)?
+       YA → ikut Team itu (Skenario C1, termasuk kasus
+            task multi-teknisi yang nyusut jadi solo —
+            teknisi yg tersisa TETAP di Team lamanya)
+       TIDAK → team_id = null (Skenario C2, nunggu FOP
+               drop-in manual lewat "+ Masukkan ke Team...")
+        │
+        ▼
+  Bikin/update FopTaskTeam per komponen graf (nama auto
+  "Team {n}", roster di-sync), assign team_id ke semua
+  task dalam komponen itu
+        │
+        ▼
+  Hapus FopTaskTeam yang gak py task aktif lagi (cleanup)
+        │
+        ▼
+  Sync Task.title (execution layer) ke nama Team final
+        │
+        ▼
+  return ['conflicts' => [...]]  → FE nampilin modal
+  konflik kalau ada isinya
+```
+
+**Drop-in manual** (Skenario C2/C3): endpoint `POST /fop-tasks/{task}/assign-to-team` — FOP pilih Team tujuan (atau minta Team baru) buat task solo tanpa Team, atau buat nyelesein conflict C3. Task yang di-drop-in dapet `manual_override_at = now()` — pin ini bikin `rebuildTeamsForDate()` gak nimpa `team_id`-nya lagi sampai teknisinya diganti lewat assignment biasa. Kalau drop-in ini bikin teknisi keluar dari Team lamanya (task lain di tanggal sama, Team beda), teknisi itu otomatis dicabut dari task lama tsb + roster Team lama ke-refresh.
+
+**Konflik yang ke-close/hilang:** `FopTaskController::index()` hitung ulang conflict LANGSUNG dari state DB tiap kali halaman diakses (`currentTeamConflicts()`) — bukan cuma dari session flash sekali-pakai — jadi modal konflik bisa dibuka ulang kapan aja lewat tombol "Konflik Team (n)" di header, walau sempet ke-close atau halaman di-refresh.
+
+## 6. Switch Teknisi antar Team (Task 2)
+
+**Baru.** Endpoint atomic `POST /fop-tasks/switch-technician` — pindahin 1 teknisi dari Task asal ke Task tujuan (Team beda) DALAM 1 SUBMIT, wajib isi pengganti di Task asal supaya Task asal gak pernah kosong teknisi.
+
+```
+FOP klik chip nama teknisi di tabel /fop-tasks
+        │
+        ▼
+  Modal: pilih Task Tujuan (task lain, tanggal sama)
+         + pilih Pengganti (teknisi manapun, termasuk yang
+           udah ada di Task asal — gak wajib org baru)
+        │
+        ▼
+  Validasi (SEBELUM transaksi, gagal = gak ada perubahan sama sekali):
+   • teknisi beneran anggota Task asal?
+   • pengganti != teknisi yang dipindah?
+   • Task asal & Task tujuan tanggal SAMA? (intra-hari only,
+     beda hari ditolak — arahkan ke jalur Pending/reschedule)
+   • pengganti lagi in_progress di task lain? (reuse query
+     yang sama dgn TaskService::start(), bukan bikin baru)
+        │ lolos semua
+        ▼
+  DB::transaction():
+   • sync pivot fop_task_user Task asal (teknisi keluar,
+     pengganti masuk) & Task tujuan (teknisi masuk)
+     — manual_override_at dilepas di kedua task
+     — team_id SENGAJA GAK di-null-in (beda dari update()
+       biasa) biar rebuild masih bisa pakai team_id lama
+       sbg anchor kalau salah satu task nyusut jadi solo
+   • sync ke Task eksekusi (TaskService::update, 2x)
+   • AuditLog 2 entry (switch_technician_out / _in)
+   • notifikasi in-app ke 2 teknisi (keluar & masuk)
+        │
+        ▼
+  rebuildTeamsForDate() untuk tanggal asal & tujuan
+  (sama tanggal karena intra-hari only)
+```
+
+## 7. Overview Halaman
+
+```
+/fop  (Dashboard)                     /fop-tasks (Kelola Tiket)
 ┌─────────────────────────┐           ┌─────────────────────────────┐
 │ Stat cards (antrean,     │           │ Filter (search/kategori/     │
 │ perlu aksi, overdue)     │           │ status/prioritas/desa/team)  │
 │                          │──────────▶│                              │
-│ Team FOP Aktif (card)    │  "Kelola  │ Tabel tiket aktif            │
-│  → klik buka detail team │   Team →" │ Modal create/edit tiket      │
-│                          │           │ Panel Kelola Team             │
-│ Antrean survey, teknisi  │           │  (create/edit/delete roster) │
-└─────────────────────────┘           └──────────────┬───────────────┘
+│ Team FOP Aktif (card,    │           │ Tabel tiket aktif             │
+│  auto-generated)         │           │  → klik chip teknisi = Switch│
+│  → klik buka detail team │           │  → "+ Masukkan ke Team..."   │
+│                          │           │    (task solo tanpa team)    │
+│ Antrean survey, teknisi  │           │ Modal create/edit tiket       │
+└─────────────────────────┘           │ Modal konflik Team (C3)       │
+                                       │ Tombol "Konflik Team (n)"     │
+                                       └──────────────┬───────────────┘
                                                        │
                                                        ▼
                                         /fop-tasks/history
                                         (tiket Selesai/Cancel, filter sama)
 ```
+
+Panel "Kelola Team" manual **sudah dihapus** — Team gak lagi dibuat/di-edit/dihapus lewat UI terpisah, sepenuhnya derived dari assignment teknisi (lihat bagian 5).

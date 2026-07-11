@@ -7,10 +7,13 @@ use App\Models\FopTaskTeam;
 use App\Models\Village;
 use App\Models\User;
 use App\Models\Pop;
+use App\Models\Task;
 use App\Enums\FopTaskPriority;
 use App\Enums\FopTaskStatus;
+use App\Enums\TaskStatus;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Notifications\AppNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -144,7 +147,16 @@ class FopTaskController extends Controller
 
         $teamConflicts = $this->currentTeamConflicts();
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts'));
+        // Daftar task ringkas (halaman berjalan) buat dropdown "Task Tujuan" di modal Switch Teknisi.
+        $switchTargetTasks = $fopTasks->getCollection()->map(fn (FopTask $t) => [
+            'id' => $t->id,
+            'task_number' => $t->task_number,
+            'tugas' => $t->tugas,
+            'task_date' => $t->task_date?->toDateString(),
+            'technician_ids' => $t->technicians->pluck('id')->all(),
+        ])->values();
+
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks'));
     }
 
     /**
@@ -504,6 +516,163 @@ class FopTaskController extends Controller
             return redirect()->route('fop-tasks.index')
                 ->with('success', "Task berhasil dimasukkan ke Team \"{$team->name}\".");
         });
+    }
+
+    /**
+     * Switch Teknisi antar Team (1 payload sekali submit, atomic) — sesuai kebutuhan poin 2.
+     * Mindahin `technician_id` dari Task asal ke Task tujuan, DAN wajib isi `replacement_technician_id`
+     * buat gantiin dia di Task asal — supaya Task asal gak pernah kosong teknisi. Cuma boleh
+     * intra-hari (task_date sama). Reuse conflict-check "in_progress" yang sama dengan
+     * TaskService::start() — bukan bikin conflict-check baru.
+     */
+    public function switchTechnician(Request $request)
+    {
+        $this->authorizeAccess();
+
+        $validated = $request->validate([
+            'technician_id' => ['required', 'integer', 'exists:users,id'],
+            'from_task_id' => ['required', 'integer', 'exists:fop_tasks,id'],
+            'to_task_id' => ['required', 'integer', 'different:from_task_id', 'exists:fop_tasks,id'],
+            'replacement_technician_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $fromTask = FopTask::with('technicians')->findOrFail($validated['from_task_id']);
+        $toTask = FopTask::with('technicians')->findOrFail($validated['to_task_id']);
+
+        if (!$fromTask->technicians->contains('id', $validated['technician_id'])) {
+            return $this->switchTechnicianError($request, 'technician_id', 'Teknisi yang dipilih bukan anggota Task asal.');
+        }
+
+        if ($toTask->technicians->contains('id', $validated['technician_id'])) {
+            return $this->switchTechnicianError($request, 'technician_id', 'Teknisi tersebut sudah ada di Task tujuan.');
+        }
+
+        if ((int) $validated['replacement_technician_id'] === (int) $validated['technician_id']) {
+            return $this->switchTechnicianError($request, 'replacement_technician_id', 'Pengganti tidak boleh teknisi yang sama dengan yang dipindah.');
+        }
+
+        if (!$fromTask->task_date || !$toTask->task_date || !$fromTask->task_date->isSameDay($toTask->task_date)) {
+            return $this->switchTechnicianError($request, 'to_task_id', 'Switch teknisi cuma boleh intra-hari (tanggal Task asal & tujuan harus sama). Task beda hari, pakai jalur Pending/reschedule.');
+        }
+
+        // Reuse conflict-check "in_progress" yang sama dengan TaskService::start() —
+        // pengganti gak boleh ditarik kalau lagi in_progress di task lain.
+        $replacementBusyOn = Task::where('status', TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $validated['replacement_technician_id']))
+            ->first();
+
+        if ($replacementBusyOn) {
+            return $this->switchTechnicianError(
+                $request,
+                'replacement_technician_id',
+                "Pengganti sedang mengerjakan task lain yang in_progress [{$replacementBusyOn->task_number}]. Selesaikan/pending-kan dulu sebelum jadi pengganti."
+            );
+        }
+
+        return DB::transaction(function () use ($validated, $fromTask, $toTask, $request) {
+            $oldFromValues = $fromTask->toArray();
+            $oldToValues = $toTask->toArray();
+
+            $newFromTechs = $fromTask->technicians->pluck('id')
+                ->reject(fn ($id) => (int) $id === (int) $validated['technician_id'])
+                ->push((int) $validated['replacement_technician_id'])
+                ->unique()
+                ->values()
+                ->all();
+
+            $newToTechs = $toTask->technicians->pluck('id')
+                ->push((int) $validated['technician_id'])
+                ->unique()
+                ->values()
+                ->all();
+
+            // Sengaja gak nge-null-in team_id di sini (beda dari update() biasa) — biar
+            // FopTaskTeamService::rebuildTeamsForDate() masih bisa pakai team_id lama sebagai
+            // anchor via $existingTeamOf kalau salah satu task nyusut jadi solo (lihat
+            // analisa-sync-execution-task.md bagian 1). manual_override_at tetap dilepas
+            // karena assignment manual lama udah gak relevan setelah teknisinya diganti.
+            foreach ([$fromTask, $toTask] as $task) {
+                $task->manual_override_at = null;
+                $task->save();
+            }
+
+            $fromTask->technicians()->sync($newFromTechs);
+            $toTask->technicians()->sync($newToTechs);
+
+            $this->syncSwitchedExecutionTask($fromTask, $newFromTechs);
+            $this->syncSwitchedExecutionTask($toTask, $newToTechs);
+
+            if (class_exists(AuditLog::class)) {
+                AuditLog::log($fromTask, 'switch_technician_out', $oldFromValues, $fromTask->fresh('technicians')->toArray());
+                AuditLog::log($toTask, 'switch_technician_in', $oldToValues, $toTask->fresh('technicians')->toArray());
+            }
+
+            $this->notifySwitchedTechnician(
+                (int) $validated['technician_id'],
+                "Anda dipindahkan dari task \"{$fromTask->tugas}\" ke task \"{$toTask->tugas}\".",
+            );
+            $this->notifySwitchedTechnician(
+                (int) $validated['replacement_technician_id'],
+                "Anda ditugaskan sebagai pengganti pada task \"{$fromTask->tugas}\".",
+            );
+
+            app(FopTaskTeamService::class)->rebuildTeamsForDate($fromTask->task_date->copy());
+            app(FopTaskTeamService::class)->rebuildTeamsForDate($toTask->task_date->copy());
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Switch teknisi berhasil.',
+                ]);
+            }
+
+            return redirect()->route('fop-tasks.index')->with('success', 'Switch teknisi berhasil.');
+        });
+    }
+
+    /**
+     * Sync roster teknisi Task eksekusi (`tasks`/`task_team`) setelah switch — pola sama
+     * dengan cross-task sync di `assignToTeam()`.
+     */
+    private function syncSwitchedExecutionTask(FopTask $fopTask, array $technicianIds): void
+    {
+        if (!$fopTask->task_id || !$fopTask->task) {
+            return;
+        }
+
+        app(TaskService::class)->update($fopTask->task, [
+            'team_member_ids' => $technicianIds,
+        ], auth()->user());
+    }
+
+    /**
+     * Notifikasi in-app buat teknisi yang kena switch (keluar atau masuk).
+     */
+    private function notifySwitchedTechnician(int $userId, string $message): void
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return;
+        }
+
+        $user->notify(new AppNotification(
+            title: 'Switch Teknisi',
+            message: $message,
+            actionUrl: route('fop-tasks.index'),
+            type: 'info'
+        ));
+    }
+
+    /**
+     * Response error konsisten (JSON atau redirect+errors) buat validasi switchTechnician().
+     */
+    private function switchTechnicianError(Request $request, string $field, string $message)
+    {
+        if ($request->wantsJson()) {
+            return response()->json(['success' => false, 'message' => $message], 422);
+        }
+
+        return back()->withErrors([$field => $message]);
     }
 
     /**

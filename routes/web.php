@@ -343,6 +343,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:fop_tasks.update')->group(function () {
         Route::put('/fop-tasks/{fop_task}', [FopTaskController::class, 'update'])->name('fop-tasks.update');
         Route::post('/fop-tasks/{fop_task}/assign-to-team', [FopTaskController::class, 'assignToTeam'])->name('fop-tasks.assign-to-team');
+        Route::post('/fop-tasks/switch-technician', [FopTaskController::class, 'switchTechnician'])->name('fop-tasks.switch-technician');
     });
     Route::middleware('permission:fop_tasks.delete')->group(function () {
         Route::delete('/fop-tasks/{fop_task}', [FopTaskController::class, 'destroy'])->name('fop-tasks.destroy');

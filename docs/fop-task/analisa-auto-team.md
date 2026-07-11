@@ -645,7 +645,7 @@ terdapat pada file docs\fop-task\analisa-sync-execution-task.md
 
 ### Task 2 — Switch Teknisi antar Team (Atomic Endpoint)
 
-**Status:** `To Do` (depends on Task 1)
+**Status:** `Done`
 
 **Tujuan:** Endpoint 1x-submit buat mindahin teknisi dari Task A (Team 1) ke Task B (Team 2) sekaligus wajib isi pengganti di Task A — sesuai kebutuhan poin 2.
 
@@ -662,20 +662,24 @@ terdapat pada file docs\fop-task\analisa-sync-execution-task.md
 | `tests/Feature/FopTaskSwitchTechnicianTest.php` | **Baru** — test transaksi sukses & rollback. |
 
 **Checklist:**
-- [ ] Payload terima: `technician_id`, `from_task_id`, `to_task_id`, `replacement_technician_id`.
-- [ ] Wajib `DB::transaction()` — kalau pengganti invalid (reuse cek `in_progress` dari `TaskService.php:135-146`), rollback total.
-- [ ] Sync pivot `fop_task_user` di 2 task (asal & tujuan) dalam 1 transaksi, lalu sync ke `Task` eksekusi lewat `TaskService::update()` sama seperti `update()` existing lakukan.
-- [ ] Panggil `FopTaskTeamService::rebuildTeamsForDate()` untuk tanggal asal & tujuan setelah commit.
-- [ ] Notifikasi ke 2 teknisi (yang keluar & masuk).
-- [ ] Audit log pakai trait `RecordsAuditLogs` (sudah dipakai di `Task`/`Customer`) — catat before/after assignment.
-- [ ] Validasi: switch cuma boleh intra-hari (`from_task.task_date == to_task.task_date`), tolak kalau beda hari (arahkan ke jalur `Pending`/reschedule, lihat Task 7).
+- [x] Payload terima: `technician_id`, `from_task_id`, `to_task_id`, `replacement_technician_id`.
+- [x] Wajib `DB::transaction()` — kalau pengganti invalid (reuse cek `in_progress` dari `TaskService.php` — logic sama, cek `Task::where('status', 'in_progress')->whereHas('teamMembers', ...)`), rollback total.
+- [x] Sync pivot `fop_task_user` di 2 task (asal & tujuan) dalam 1 transaksi, lalu sync ke `Task` eksekusi lewat `TaskService::update()` sama seperti `update()` existing lakukan.
+- [x] Panggil `FopTaskTeamService::rebuildTeamsForDate()` untuk tanggal asal & tujuan setelah commit.
+- [x] Notifikasi ke 2 teknisi (yang keluar & masuk).
+- [x] Audit log — **deviasi dari checklist asli**: bukan pakai trait `RecordsAuditLogs` (itu butuh nambah trait ke `FopTask` model, di luar scope file Task 2 ini), tapi reuse pola `AuditLog::log()` manual yang UDAH dipakai di controller yang sama (`store()`/`update()`/`assignToTeam()`) — hasil akhirnya sama (before/after + siapa + kapan tercatat), cuma beda mekanisme pemicu.
+- [x] Validasi: switch cuma boleh intra-hari (`from_task.task_date == to_task.task_date`), tolak kalau beda hari.
+
+**Catatan implementasi penting (bug yang KETEMU & langsung difix pas development):** draf awal method ini niru pola `update()` yang nge-null-in `team_id` SEBELUM manggil `rebuildTeamsForDate()`. Ternyata itu balik ngerusak fix Task 1 (`analisa-sync-execution-task.md` bagian 1) — kalau salah satu Task nyusut jadi solo abis di-switch, anchor `$existingTeamOf` di service jadi gak kebaca (soalnya team_id-nya udah keburu di-null-in duluan sama controller), jadi teamnya malah ilang lagi. Fix: `switchTechnician()` SENGAJA gak nge-null-in `team_id` sebelum rebuild — cuma `manual_override_at` yang dilepas. Dikonfirmasi lewat test `test_switch_triggers_rebuild_and_updates_team_rosters`.
 
 **Acceptance Criteria:**
-1. Switch teknisi lintas team berhasil dalam 1 submit, tanpa FOP edit 2 form terpisah.
-2. Kalau pengganti di Task asal tidak dipilih/invalid, seluruh perubahan rollback (Task A tidak pernah kosong teknisi).
-3. Rebuild Team ke-trigger otomatis di kedua tanggal terdampak.
-4. Switch lintas hari ditolak dengan pesan jelas.
-5. Audit log tercatat lengkap (teknisi lama, teknisi baru, waktu, siapa eksekusi).
+1. [x] Switch teknisi lintas team berhasil dalam 1 submit, tanpa FOP edit 2 form terpisah. (`test_switch_technician_succeeds_in_one_submit`)
+2. [x] Kalau pengganti di Task asal tidak dipilih/invalid, seluruh perubahan rollback (Task A tidak pernah kosong teknisi). (`test_switch_rejects_when_replacement_missing_from_request`, `test_switch_rejects_when_replacement_is_same_as_departing_technician`, `test_switch_rejects_when_replacement_is_in_progress_elsewhere`)
+3. [x] Rebuild Team ke-trigger otomatis di kedua tanggal terdampak. (`test_switch_triggers_rebuild_and_updates_team_rosters`)
+4. [x] Switch lintas hari ditolak dengan pesan jelas. (`test_switch_rejects_across_different_days`)
+5. [x] Audit log tercatat lengkap (teknisi lama, teknisi baru, waktu, siapa eksekusi). (`test_switch_records_audit_log_entries`)
+
+Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan seluruh test FOP (`FopTasksTest` + `FopTaskTeamServiceTest` + `FopTaskSwitchTechnicianTest`) 38/38 hijau, gak ada regresi.
 
 ---
 

@@ -36,7 +36,8 @@ Tiket kerja FOP. Sumber migrasi: `2026_06_30_000001`, `_153441_add_fields`, `202
 | `village_id` | FK → `villages.id` | ✔ | Area desa (`restrict` on delete) |
 | `pop_id` | FK → `pops.id` | ✔ | POP/Cabang (`restrict` on delete) |
 | `customer_id` | FK → `customers.id` | ✔ | Pelanggan terkait, kalau ada (`null on delete`) |
-| `team_id` | FK → `fop_task_teams.id` | ✔ | Team harian penanggung jawab (`set null` on delete) |
+| `team_id` | FK → `fop_task_teams.id` | ✔ | Team harian penanggung jawab — sekarang **auto-assigned** oleh `FopTaskTeamService::rebuildTeamsForDate()` (lihat [flowchart.md](flowchart.md#5-auto-team-formation-connected-components)), bukan dipilih manual lagi (`set null` on delete) |
+| `manual_override_at` | timestamp | ✔ | **Baru** (Task 1, migrasi `2026_07_10_000001`). Kalau terisi, `team_id` task ini adalah hasil drop-in manual FOP (Skenario C2/C3) atau hasil `switch-technician` (Task 2) — `rebuildTeamsForDate()` gak akan nimpa `team_id` task ini sampai teknisinya diganti lagi lewat assignment biasa (`store`/`update`), yang otomatis nge-null-in kolom ini balik |
 | `issue` | string | ✔ | Jenis gangguan/keperluan, e.g. "FO CUT", "ODP LOS" |
 | `notes` | text | ✔ | Catatan bebas |
 | `status` | string(20), default `Proses` | | Enum `App\Enums\FopTaskStatus`: Proses, Pending, Selesai, Cancel |
@@ -46,21 +47,23 @@ Tiket kerja FOP. Sumber migrasi: `2026_06_30_000001`, `_153441_add_fields`, `202
 | `cancelled_at` | timestamp | ✔ | Waktu pembatalan, di-set kalau `status = Cancel` |
 | `created_at` / `updated_at` | timestamp | | |
 
-Index: `status`, `priority`, `category`, `work_date` (di tabel Team).
+Index: `status`, `priority`, `category`, `task_date` (**baru**, migrasi `2026_07_10_000002` — dipakai query graf overlap teknisi per hari di `rebuildTeamsForDate()`), `team_id` (implisit dari FK constraint), `work_date` (di tabel Team). Pivot `fop_task_user.user_id` juga diindex (migrasi sama) buat query "teknisi ini lagi kerja di task apa aja hari ini".
 
 ## Tabel `fop_task_teams`
 
 Team harian (roster teknisi berlaku 1 hari). Sumber migrasi: `2026_07_06_082619_create`, `2026_07_06_110154_drop_pop_id` (kolom `pop_id` sempat ada, sudah dihapus — Team gak lagi discope per-POP).
 
+**Sejak Task 1, tabel ini gak lagi dikelola manual oleh FOP** — dibuat/di-update/dihapus sepenuhnya oleh `FopTaskTeamService::rebuildTeamsForDate()` (Connected Components algorithm berdasar overlap teknisi per `task_date`). Endpoint manual CRUD (`teamStore`/`teamUpdate`/`teamDestroy` + route `fop-tasks.teams.*`) sudah **dihapus total**.
+
 | Kolom | Tipe | Nullable | Keterangan |
 |-------|------|----------|------------|
 | `id` | bigint PK | | |
-| `name` | string | | Nama Team, e.g. "Tim 1" atau auto "Tim {nama lead}" |
+| `name` | string | | **Auto-generated**: `"Team {n}"`, `n` = nomor terkecil yang belum kepakai di tanggal (`work_date`) yang sama (`FopTaskTeamService::nextTeamName()`) — dulu formatnya `"Tim {nama lead}"`/manual, sekarang selalu format ini, gak pernah di-rename manual |
 | `work_date` | date | | Tanggal berlaku Team (indexed) |
-| `created_by` | FK → `users.id` | ✔ | `set null` on delete |
+| `created_by` | FK → `users.id` | ✔ | `set null` on delete — untuk team hasil rebuild otomatis, ini `auth()->id()` FOP yang men-trigger rebuild (lewat create/edit tiket) |
 | `created_at` / `updated_at` | timestamp | | |
 
-`isActive()` (derived, bukan kolom): true kalau ada `fop_tasks` dengan `team_id` ini yang status BUKAN Selesai/Cancel.
+`isActive()` (derived, bukan kolom): true kalau ada `fop_tasks` dengan `team_id` ini yang status BUKAN Selesai/Cancel. Team yang gak lagi aktif (semua task-nya lepas/selesai/cancel) otomatis **dihapus** oleh `rebuildTeamsForDate()` di step cleanup, bukan cuma dibiarkan jadi "riwayat".
 
 ## Tabel pivot `fop_task_user`
 
@@ -121,3 +124,12 @@ creator(): BelongsTo(User::class, 'created_by')
 members(): BelongsToMany(User::class, 'fop_task_team_user', 'fop_task_team_id', 'user_id')
 fopTasks(): HasMany(FopTask::class, 'team_id')
 ```
+
+## Service: `FopTaskTeamService` (Task 1 & 2)
+
+**File:** `app/Services/FopTaskTeamService.php` — satu-satunya tempat yang boleh nulis `fop_task_teams` (create/update/delete) dan `fop_tasks.team_id`.
+
+- `rebuildTeamsForDate(Carbon $date): array{conflicts: array}` — hitung ulang seluruh struktur Team di 1 tanggal dari graf overlap teknisi (union-find), dipanggil abis tiap perubahan assignment teknisi (`store`/`update`/`assignToTeam`/`switchTechnician`). Juga sinkronin `Task.title` (execution layer) ke nama Team asli via `syncExecutionTaskTitle()` privat.
+- `nextTeamName(Carbon $date): string` — generator nama `"Team {n}"` (public, dipakai controller juga buat bikin Team baru manual lewat drop-in).
+
+Lihat [analisa-auto-team.md](analisa-auto-team.md) (algoritma Skenario A/B/C1/C2/C3) dan [analisa-sync-execution-task.md](analisa-sync-execution-task.md) (bugfix + sync ke execution Task) buat detail lengkap.

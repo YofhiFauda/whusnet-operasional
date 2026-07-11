@@ -3,7 +3,7 @@
 @section('title', 'Task FOP')
 
 @section('content')
-<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
+<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
 
 
 
@@ -141,13 +141,16 @@
                                         $hiddenTechsCount = $task->technicians->count() - 2; 
                                     @endphp
                                     @forelse($visibleTechs as $tech)
-                                        @php 
+                                        @php
                                             // Ambil nama depan saja untuk menghemat ruang
-                                            $firstName = explode(' ', trim($tech->name))[0]; 
+                                            $firstName = explode(' ', trim($tech->name))[0];
                                         @endphp
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 cursor-help" title="{{ $tech->name }}">
+                                        <button type="button"
+                                            @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name))"
+                                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                                            title="{{ $tech->name }} — klik buat Switch Teknisi">
                                             {{ \Illuminate\Support\Str::limit($firstName, 12) }}
-                                        </span>
+                                        </button>
                                     @empty
                                         <span class="text-slate-400 text-[10px] italic">Unassigned</span>
                                     @endforelse
@@ -607,6 +610,75 @@
             </div>
         </div>
     </div>
+
+    {{-- ══ SWITCH TEKNISI MODAL (Task 2: switch teknisi antar team, 1 payload atomic) ══ --}}
+    <div x-show="switchTechModal.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', switchTechModal.open || modal.open || teamConflictModal.open || teamSelectionModal.open)"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="switchTechModal.open = false"></div>
+
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-surface border border-border w-full max-w-md rounded-md shadow-lg relative z-10"
+                 x-show="switchTechModal.open"
+                 @click.away="switchTechModal.open = false">
+
+                <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-md">
+                    <h3 class="text-sm font-semibold text-text-main">Switch Teknisi antar Team</h3>
+                    <button type="button" @click="switchTechModal.open = false" class="text-text-muted hover:text-text-main transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-5 space-y-4">
+                    <p class="text-xs text-text-secondary">
+                        Pindahkan <span class="font-semibold text-text-main" x-text="switchTechModal.technicianName"></span>
+                        dari task <span class="font-semibold text-text-main" x-text="switchTechModal.fromTaskNumber"></span>
+                        (<span x-text="switchTechModal.fromTaskTugas"></span>) ke task lain — wajib pilih pengganti supaya task asal gak kosong teknisi.
+                    </p>
+
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Task Tujuan <span class="text-error">*</span></label>
+                        <select x-model="switchTechModal.toTaskId" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                            <option value="">— Pilih Task Tujuan —</option>
+                            <template x-for="t in switchTargetTasks" :key="t.id">
+                                <option :value="t.id" x-text="t.task_number + ' — ' + t.tugas"></option>
+                            </template>
+                        </select>
+                        <p class="mt-1 text-[10px] text-text-muted" x-show="switchTargetTasks.length === 0">Gak ada task lain di tanggal yang sama (<span x-text="switchTechModal.fromTaskDate"></span>) buat dijadikan tujuan.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Pengganti di Task Asal <span class="text-error">*</span></label>
+                        <select x-model="switchTechModal.replacementId" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+                            <option value="">— Pilih Pengganti —</option>
+                            <template x-for="t in switchReplacementCandidates" :key="t.id">
+                                <option :value="t.id" x-text="t.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="px-5 py-3.5 border-t border-border bg-surface-muted flex items-center justify-end gap-3 rounded-b-md">
+                    <button type="button" @click="switchTechModal.open = false" class="btn-secondary text-xs">Batal</button>
+                    <button type="button" :disabled="switchTechModal.isSubmitting || !switchTechModal.toTaskId || !switchTechModal.replacementId"
+                            @click="submitSwitchTechnician()" class="btn-primary text-xs disabled:opacity-50">
+                        <span x-show="!switchTechModal.isSubmitting">Switch Sekarang</span>
+                        <span x-show="switchTechModal.isSubmitting">Memproses...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -628,8 +700,14 @@
             },
             teamConflictModal: { open: false, conflicts: @json($teamConflicts ?? []) },
             teamSelectionModal: { open: false, taskId: null, taskNumber: '', taskTugas: '', taskDate: '', teams: [] },
+            switchTechModal: {
+                open: false, technicianId: null, technicianName: '',
+                fromTaskId: null, fromTaskNumber: '', fromTaskTugas: '', fromTaskDate: '',
+                toTaskId: '', replacementId: '', isSubmitting: false,
+            },
             techniciansData: {!! json_encode($technicians->map(fn($t) => ['id' => $t->id, 'name' => $t->name])->toArray()) !!},
             teamsData: @json($teams),
+            allTasksData: @json($switchTargetTasks ?? []),
 
             openTeamSelectionModal(taskId, taskNumber, taskTugas, taskDate) {
                 this.teamSelectionModal.taskId = taskId;
@@ -638,6 +716,67 @@
                 this.teamSelectionModal.taskDate = taskDate;
                 this.teamSelectionModal.teams = this.teamsData.filter(t => t.work_date === taskDate);
                 this.teamSelectionModal.open = true;
+            },
+
+            openSwitchModal(taskId, taskNumber, taskTugas, taskDate, techId, techName) {
+                this.switchTechModal = {
+                    open: true,
+                    technicianId: techId,
+                    technicianName: techName,
+                    fromTaskId: taskId,
+                    fromTaskNumber: taskNumber,
+                    fromTaskTugas: taskTugas,
+                    fromTaskDate: taskDate,
+                    toTaskId: '',
+                    replacementId: '',
+                    isSubmitting: false,
+                };
+            },
+
+            get switchTargetTasks() {
+                return this.allTasksData.filter(t =>
+                    t.task_date === this.switchTechModal.fromTaskDate &&
+                    t.id !== this.switchTechModal.fromTaskId
+                );
+            },
+
+            get switchReplacementCandidates() {
+                return this.techniciansData.filter(t => t.id !== this.switchTechModal.technicianId);
+            },
+
+            submitSwitchTechnician() {
+                if (!this.switchTechModal.toTaskId || !this.switchTechModal.replacementId) return;
+                this.switchTechModal.isSubmitting = true;
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                fetch('{{ route('fop-tasks.switch-technician') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: JSON.stringify({
+                        technician_id: this.switchTechModal.technicianId,
+                        from_task_id: this.switchTechModal.fromTaskId,
+                        to_task_id: this.switchTechModal.toTaskId,
+                        replacement_technician_id: this.switchTechModal.replacementId,
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    this.switchTechModal.isSubmitting = false;
+                    if (data.success) {
+                        this.showToast('success', data.message);
+                        this.switchTechModal.open = false;
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        this.showToast('error', data.message || 'Gagal switch teknisi.');
+                    }
+                })
+                .catch(() => {
+                    this.switchTechModal.isSubmitting = false;
+                    this.showToast('error', 'Terjadi kesalahan jaringan.');
+                });
             },
 
             allCategoriesData: @json($categories),

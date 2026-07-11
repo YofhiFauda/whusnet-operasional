@@ -28,11 +28,11 @@ class TechnicianSeeder extends Seeder
         $faker = Faker::create('id_ID');
         $pops = Pop::all();
 
-        for ($i = 1; $i <= 10; $i++) {
+        for ($i = 1; $i <= 15; $i++) {
             $user = User::updateOrCreate(
                 ['email' => "teknisi{$i}@whusnet.com"],
                 [
-                    'name' => 'Teknisi ' . $faker->firstName,
+                    'name' => $faker->firstName,
                     'phone' => '08' . $faker->randomNumber(8, true),
                     'password' => Hash::make('password'),
                     'status' => 'active',
