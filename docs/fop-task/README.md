@@ -27,6 +27,7 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 | [fop-dashboard.md](fop-dashboard.md) | Detail dashboard `/fop` (stat card, Team FOP Aktif, antrean survey) |
 | [analisa-auto-team.md](analisa-auto-team.md) | Analisa kebutuhan & Sprint Backlog Task 1 (Auto-Team) & Task 2 (Switch Teknisi) |
 | [analisa-sync-execution-task.md](analisa-sync-execution-task.md) | Bugfix Task 1/2 + sync `FopTaskTeam` ↔ execution `Task` |
+| [perbandingan-assign-to-team-vs-switch-technician.md](perbandingan-assign-to-team-vs-switch-technician.md) | `assignToTeam()` (Task 1) vs `switchTechnician()` (Task 2) — beda implementasi, cara nguji, kapan pakai yang mana |
 | [archive/](archive/) | Dokumen sprint lama (Kanban, Calendar, desain awal Team manual, dll) — historis, arsitektur udah diganti |
 
 ## Routes & Permission
