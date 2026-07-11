@@ -1,6 +1,6 @@
 # ⚠️ ANALISA: Bug "Team Jadi Kosong" saat Task Di-shrink jadi Solo (+ Desync Execution Task)
 
-**Status:** ✅ **SEMUA gap di dokumen ini sudah di-FIX**, termasuk bagian 1-4 (bug team kosong) dan bagian 6 (desync ke execution `Task`/`TaskTeam`). Detail implementasi bagian 6 ada di bagian 6.6 di bawah. Test akhir: `FopTaskTeamServiceTest` 13/13 hijau, gabungan `FopTasksTest` + `FopTaskTeamServiceTest` 26/26 hijau — gak ada regresi.
+**Status:** ✅ **SEMUA gap di dokumen ini sudah di-FIX**, termasuk bagian 1-4 (bug team kosong), bagian 6 (desync ke execution `Task`/`TaskTeam`), bagian 7 (modal konflik C3 gak muncul — ternyata false alarm, backend selalu benar), bagian 8 (switch-teknisi otomatis pas resolve konflik), dan bagian 9 (modal konflik ke-close gak sengaja / ilang pas refresh). Test akhir: `FopTaskTeamServiceTest` 17/17 hijau, `FopTasksTest` 14/14 hijau, gabungan 31/31 — gak ada regresi. Bagian 10 catat 1 bug lain yang KETEMU gak sengaja pas investigasi, TERPISAH dari topik dokumen ini, BELUM difix.
 
 ---
 
@@ -239,3 +239,58 @@ Roster `TaskTeam` SENGAJA gak ikut di-resync di titik ini, karena analisa kode n
 - `test_execution_task_title_syncs_after_manual_assign_to_team` — simulasi `assignToTeam()` (drop-in manual), title ke-update ke nama team tujuan.
 
 **Hasil:** `FopTaskTeamServiceTest` 13/13 hijau, gabungan sama `FopTasksTest` 26/26 hijau. Gak ada perubahan skema/tabel baru — cuma nyambungin data yang udah ada.
+
+---
+
+## 7. Laporan "Modal Konflik Gak Muncul" — Diinvestigasi, Ternyata False Alarm
+
+**Laporan:** skenario Task A (Joko+Cagak, Cagak cuma 1 task di Tim 1), Task B (Suci+Tri, Suci cuma 1 task di Tim 2), Task C (Cagak+Suci) — seharusnya trigger modal konflik C3, tapi katanya gak muncul.
+
+**Investigasi dilakukan di 3 layer, semua ngonfirmasi backend BENAR:**
+1. **Service langsung** (`rebuildTeamsForDate()` dipanggil manual, simulasi per-request kayak UI asli) — konflik KEDETEKSI dengan benar, `result['conflicts']` isi task C + 2 kandidat team.
+2. **HTTP end-to-end** (`POST /fop-tasks` 3x buat Task A/B/C via `store()`) — response redirect 302, session `fop_team_conflicts` keisi bener.
+3. **Rendered HTML+JS** — di-extract dari response beneran, `node --check` gak ada syntax error, `teamConflictModal: { open: false, conflicts: [...] }` ke-render lengkap dengan data konflik yang bener, `x-init="initTeamConflicts()"` ada di root element.
+
+**Kesimpulan:** gak ketemu bug kode. Kemungkinan waktu itu browser masih pegang versi cache lama (halaman ini emang lagi sering berubah — teamSelectionModal, teamConflictModal, fix naming, dll nyusul satu-persatu). 3 test regresi udah ditambahkan buat ngonci perilaku ini di `FopTaskTeamServiceTest.php`:
+- `test_conflict_detection_for_user_scenario` — persis skenario Joko/Cagak/Tri/Suci di atas.
+- `test_conflict_detection_when_editing_task_with_existing_team_id` — konflik muncul walau Task C-nya hasil EDIT (bukan create baru).
+- `test_conflict_detection_when_task_under_review_has_lower_id_than_conflict_source` — mastiin urutan ID task gak ngaruh ke deteksi konflik.
+
+---
+
+## 8. Fitur Baru: Switch Teknisi Otomatis Pas Resolve Konflik C3
+
+**Requirement user:** kalau Task C (Cagak+Suci) di-resolve ke Tim 2, Cagak (yang tadinya di Task A/Tim 1) harus otomatis kecabut dari Task A — biar gak nyangkut di 2 tempat. Suci gak perlu dicabut dari Task B karena Task B & Task C sama-sama di Tim 2.
+
+**Implementasi** di `FopTaskController::assignToTeam()`: setelah `$fopTask->team_id` di-set ke team tujuan, sistem loop tiap teknisi di task yang lagi diresolve, cari task LAIN di tanggal sama yang masih nempel ke teknisi itu tapi `team_id`-nya BEDA dari team tujuan — teknisi itu di-detach dari task lama itu, dan kalau task lama itu punya execution `Task` terkait, `TaskService::update()` dipanggil buat refresh roster `TaskTeam`-nya juga.
+
+**Test:** `test_resolving_conflict_removes_technician_from_other_team_tasks` — assert Task C masuk Tim 2, Cagak kecabut dari Task A (Task A sisa Joko doang), Suci TETAP di Task B, roster Tim 1 jadi `[Joko]`, roster Tim 2 jadi `[Cagak, Suci, Tri]`.
+
+---
+
+## 9. Fix: Modal Konflik Ke-close Gak Sengaja / Ilang Pas Refresh
+
+**Masalah:** modal konflik cuma muncul dari session flash (`session('fop_team_conflicts')`) yang sifatnya sekali-pakai — begitu ke-close atau halaman di-refresh sesudah flash ke-baca, datanya ilang, padahal konfliknya di DB masih belum ke-resolve.
+
+**Fix** — `FopTaskController::index()` sekarang punya `currentTeamConflicts()`: query LANGSUNG ke DB nyari task aktif dengan `team_id = null` TAPI teknisi >= 2 (kondisi ini gak mungkin kejadian kecuali lagi nunggu resolve C3 — beda dari solo/C2 yang emang `team_id` null tapi cuma 1 teknisi). Buat tiap tanggal yang ketemu, `rebuildTeamsForDate()` dipanggil ulang (idempoten) buat regenerate daftar konfliknya, di-merge sama session flash (dedupe by `task_id`). Hasilnya dikirim ke view sebagai `$teamConflicts`, GAK gantung ke session lagi.
+
+**UI:** ditambah tombol "Konflik Team (n)" di header halaman, muncul kapan aja selama masih ada konflik pending — klik buat buka ulang modalnya, gak peduli udah di-close atau halaman baru di-refresh.
+
+**Test:** `test_team_conflict_still_shows_after_modal_closed_and_page_reloaded` (`FopTasksTest.php`) — create Task A/B/C, GET index() 2x berturut-turut, assert modal konflik & task_number Task C tetap muncul di kedua response (bukan cuma yang pertama).
+
+---
+
+## 10. Isu Lain yang Ketemu (TERPISAH, BELUM Difix)
+
+Pas verifikasi sync Task FOP / Dashboard FOP / Detail Task, sempet coba jalanin `FopDashboardController::index()` lewat test — dapet error 500:
+
+```
+SQLSTATE[HY000]: General error: 1 near "1": syntax error
+SQL: ... where "status" in (...) and DATE_ADD(created_at, INTERVAL 1 DAY) < NOW()
+```
+
+**Penyebab:** `$overdueSurvey`/`$overdueInstallation` di `FopDashboardController` pakai raw SQL `DATE_ADD(...)`/`NOW()` — sintaks MySQL doang, gak valid di SQLite. Kalau production emang jalan di MySQL, ini gak masalah (gak nyentuh user). Tapi kalau butuh dashboard ini bisa dites/di-jalanin di atas SQLite (misal buat test suite), perlu diganti ke query yang portable (`Carbon::now()->subDay()` dibandingin di PHP, atau `whereRaw` yang driver-agnostic).
+
+**Status:** cuma dicatat, BELUM difix — di luar topik dokumen ini (gak berhubungan sama auto-team/sync), FOP dashboard di production (asumsi MySQL) gak kepengaruh.
+
+**Verifikasi terpisah (gak lewat dashboard controller penuh, langsung query team-card-nya doang):** dikonfirmasi Team 1 = `[Joko]`, Team 2 = `[Cagak, Suci, Tri]`, per-task technician list bener semua — bagian "Team FOP Aktif" di dashboard (yang emang relevan buat sync teknisi) udah kebukti sinkron, terlepas dari bug 500 di widget survey yang gak berhubungan itu.
