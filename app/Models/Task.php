@@ -31,6 +31,7 @@ class Task extends Model
         'cancelled_at',
         'cancel_reason',
         'pending_reason',
+        'report_deferred',
         'reject_reason',
         'fop_review_status',
         'fop_id',
@@ -48,6 +49,7 @@ class Task extends Model
         'completed_at'     => 'datetime',
         'cancelled_at'     => 'datetime',
         'conflict_override' => 'boolean',
+        'report_deferred'  => 'boolean',
     ];
 
     // ─── Relasi ─────────────────────────────────────────────────

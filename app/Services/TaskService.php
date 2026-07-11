@@ -214,7 +214,7 @@ class TaskService
     /**
      * Teknisi set task ke Pending (butuh reschedule).
      */
-    public function setPending(Task $task, User $actor, string $reason): Task
+    public function setPending(Task $task, User $actor, string $reason, bool $reportDeferred = false): Task
     {
         abort_unless(
             $task->status === TaskStatus::IN_PROGRESS,
@@ -222,11 +222,12 @@ class TaskService
             'Task hanya bisa di-pending dari status In Progress.'
         );
 
-        DB::transaction(function () use ($task, $reason, $actor) {
+        DB::transaction(function () use ($task, $reason, $actor, $reportDeferred) {
             $task->update([
-                'status'         => TaskStatus::PENDING->value,
-                'pending_reason' => $reason,
-                'updated_by'     => $actor->id,
+                'status'          => TaskStatus::PENDING->value,
+                'pending_reason'  => $reason,
+                'report_deferred' => $reportDeferred,
+                'updated_by'      => $actor->id,
             ]);
 
             // Stop the timer on CustomerSurvey or CustomerInstallation if task type is survey or pemasangan

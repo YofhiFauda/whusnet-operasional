@@ -241,25 +241,24 @@
 
                     @can('statusComplete', $task)
                     @if(in_array($task->status->value, ['in_progress', 'pending']))
-                    @if($task->task_type->value === 'SURVEY')
-                    <a href="{{ route('customers.survey.report', $task->customer_id) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @elseif($task->task_type->value === 'PSB')
-                    <a href="{{ route('customers.installation.report', $task->customer_id) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @else
-                    <a href="{{ route('tasks.maintenance.report', $task) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @endif
+                        @php
+                            $reportUrl = match(true) {
+                                $task->task_type->value === 'SURVEY' => route('customers.survey.report', $task->customer_id),
+                                $task->task_type->value === 'PSB' => route('customers.installation.report', $task->customer_id),
+                                default => route('tasks.maintenance.report', $task),
+                            };
+                        @endphp
+                        @if($task->status->value === 'in_progress')
+                            <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl" class="flex-1 justify-center">
+                                Isi Laporan
+                            </x-task.report-choice-dialog>
+                        @else
+                            <a href="{{ $reportUrl }}"
+                               class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                               style="background:var(--color-success)">
+                                Lanjutkan Laporan
+                            </a>
+                        @endif
                     @endif
                     @endcan
                 </div>

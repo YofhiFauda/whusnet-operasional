@@ -61,10 +61,16 @@ class TaskStatusController extends Controller
         $this->authorize('statusPending', $task);
 
         $validated = $request->validate([
-            'pending_reason' => 'required|string|max:500',
+            'pending_reason'  => 'required|string|max:500',
+            'report_deferred' => 'sometimes|boolean',
         ]);
 
-        $this->taskService->setPending($task, auth()->user(), $validated['pending_reason']);
+        $this->taskService->setPending(
+            $task,
+            auth()->user(),
+            $validated['pending_reason'],
+            (bool) ($validated['report_deferred'] ?? false)
+        );
 
         return back()->with('success', "Task [{$task->task_number}] dipending.");
     }

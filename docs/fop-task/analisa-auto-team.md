@@ -702,11 +702,11 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 | `tests/Feature/FopTaskSwitchTeamTest.php` | **Baru** — test drag-drop constraint (task `in_progress`/`Selesai`/`Cancel` gak bisa di-drag). |
 
 **Checklist:**
-- [ ] Guard: task `in_progress`, `Selesai`, `Cancel` tidak bisa di-drag (disabled di UI + validasi backend).
-- [ ] Saat drop: modal minta pilih teknisi dari roster Team tujuan sebelum commit.
-- [ ] Keputusan eksplisit diterapkan: teknisi lama di task dilepas otomatis (default), teknisi baru ditambahkan — bukan numpuk tanpa sengaja.
-- [ ] Trigger `rebuildTeamsForDate()` setelah commit.
-- [ ] Audit log: task pindah dari Team mana ke Team mana, kapan, siapa yang eksekusi.
+- [x] Guard: task `in_progress`, `Selesai`, `Cancel` tidak bisa di-drag (disabled di UI + validasi backend).
+- [x] Saat drop: modal minta pilih teknisi dari roster Team tujuan sebelum commit.
+- [x] Keputusan eksplisit diterapkan: teknisi lama di task dilepas otomatis (default), teknisi baru ditambahkan — bukan numpuk tanpa sengaja.
+- [x] Trigger `rebuildTeamsForDate()` setelah commit.
+- [x] Audit log: task pindah dari Team mana ke Team mana, kapan, siapa yang eksekusi.
 
 **Acceptance Criteria:**
 1. Drag task dari Team card A ke Team card B memicu modal validasi (bukan langsung pindah tanpa konfirmasi).
@@ -716,9 +716,10 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 ---
 
-### Task 4 — Penanggung Jawab per Team (PIC)
-
-**Status:** `To Do` (depends on Task 1)
+**** 
+### Task 4 — Penanggung Jawab per Team (PIC) 'Pending = karena masih perlu diskusi'
+ 
+**Status:** `To Do` (depends on Task 1) 
 
 **Tujuan:** Pindahkan PIC dari level Task (rencana lama, sudah dikoreksi) ke level Team — FOP menunjuk 1 anggota roster jadi PIC — sesuai kebutuhan poin 4 & SOLUSI poin 4.
 
@@ -749,7 +750,7 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 ---
 
-### Task 5 — Tampilan Excel-Like (Inline Assignment)
+### Task 5 — Tampilan Excel-Like (Inline Assignment) 'Pending = karena masih perlu diskusi'
 
 **Status:** `To Do` (depends on Task 1)
 
@@ -783,33 +784,42 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 ### Task 6 — Dialog Laporan: `Lapor Sekarang` / `Lapor Nanti` (extend mekanisme existing)
 
-**Status:** `To Do`
+**Status:** `Done`
+
+**⚠️ Gap sementara (disengaja, nunggu Task 7):** eksekusi Task 6 MENGHAPUS tombol `Pending` berdiri sendiri milik teknisi (toggle lama baris 752-758, satu-satunya jalan teknisi set task ke Pending di luar konteks laporan). Setelah Task 6, teknisi **HANYA** bisa masuk status Pending lewat dialog Laporan → pilih `Lapor Nanti` (`report_deferred=true`). Tidak ada lagi tombol Pending generik buat alasan non-laporan (mis. darurat, kendala alat, dll) sampai Task 7 (tombol `Pending` top-level, reschedule) selesai dikerjakan. Ini konsisten sama desain final poin 8 (Pending = Task 7, Lapor Nanti = Task 6), tapi berarti ada window waktu di mana teknisi kehilangan opsi Pending generik. Diputuskan untuk dibiarkan (bukan bug) — prioritaskan Task 7 berikutnya.
 
 **Tujuan:** Setelah tombol Laporan Survey/Pemasangan/Maintenance/dll ditekan, tampilkan Dialog Alert 2 pilihan (`Lapor Sekarang`/`Lapor Nanti`) — sesuai kebutuhan poin 6.
 
-**Kondisi kode saat ini (koreksi dari draft awal):** `resources/views/tasks/show.blade.php` baris 750-758 punya tombol tunggal berlabel kondisional — **"Laporan Nanti"** (untuk `SURVEY`/`PEMASANGAN`/`MAINTENANCE`) atau **"Pending"** (tipe lain) — yang buka 1 modal (`pending-task`, baris 975-1002). Modal itu submit ke `route('tasks.pending')` → `TaskController::pending()` (baris 314-335): set `Task.status = TaskStatus::PENDING` + `pending_reason`, **TIDAK melepas assignment teknisi, TIDAK reschedule**. Belum ada tombol "Lapor Sekarang" ataupun dialog 2-pilihan sama sekali — perilaku existing ini justru sudah cocok jadi basis buat `Lapor Nanti` kita, bukan buat `Pending` (Task 7).
+**Kondisi kode saat ini (koreksi dari draft awal, dan koreksi kedua dari eksekusi Task 6):** `resources/views/tasks/show.blade.php` baris 752-756 (bukan 750-758) punya tombol tunggal berlabel kondisional — **"Laporan Nanti"** (untuk `SURVEY`/`PEMASANGAN`/`MAINTENANCE`) atau **"Pending"** (tipe lain) — yang buka 1 modal (`pending-task`, baris 976-1004). Modal itu submit ke `route('tasks.pending')`. **Koreksi penting:** route ini di-handle oleh **`TaskStatusController::pending()`** (baris 59-70, `authorize('statusPending', ...)`, panggil `TaskService::setPending()`) — **BUKAN** `TaskController::pending()` seperti tertulis semula. `TaskController::pending()` (baris 327-348) itu handler route **`tasks.fop-pending`** yang berbeda (`authorize('fopPending', ...)`, dipakai modal `fop-pending-task` FOP-side). Dua route/controller/modal ini mirip nama tapi beda tujuan — jangan tertukar. `TaskStatusController::pending()` + `TaskService::setPending()` sudah berperilaku benar: set `Task.status = TaskStatus::PENDING` + `pending_reason`, **TIDAK melepas assignment teknisi, TIDAK reschedule** — ini yang dipakai jadi basis `Lapor Nanti`.
 
-**File yang dibuat/dirubah:**
+Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang langsung ke form (statusComplete block, baris 760-791 lama) adalah tombol **terpisah** dari toggle Pending/Laporan Nanti di atas — bukan tombol yang sama seperti tersirat di draft awal. Implementasi final menggabungkan kedua tombol ini jadi satu entry point (gated `statusComplete`, tampil saat status `in_progress`) yang membuka dialog 2 pilihan; toggle lama (752-756) dan modal lama (976-1004) dihapus karena fungsinya dipindah ke komponen shared `<x-task.report-choice-dialog>`.
+
+**File yang dibuat/dirubah (realisasi):**
 | File | Aksi |
 |---|---|
-| `resources/views/tasks/show.blade.php` | **Rubah** — baris 750-758: tombol laporan (Survey/Pemasangan/Maintenance/dll) begitu ditekan munculkan Dialog Alert 2 pilihan baru (`Lapor Sekarang`/`Lapor Nanti`) alih-alih langsung ke form atau langsung ke modal `pending-task` existing. |
-| `resources/views/tasks/show.blade.php` | **Rubah** — modal `pending-task` (baris 975-1002) tetap dipakai buat pilihan `Lapor Nanti`, teksnya dirapikan konsisten "Lapor Nanti" (bukan campuran "Laporan Nanti"/"Pending"). |
-| `app/Http/Controllers/TaskController.php` | **Rubah (minor)** — `pending()` (baris 314-335) dipakai ulang apa adanya buat aksi `Lapor Nanti` (perilaku sudah benar: status berubah, assignment tidak lepas). Tambah kolom pembeda `report_deferred` (boolean) di `tasks` biar query/Riwayat bisa bedakan dari `Pending` FOP-side/Task 7 tanpa bikin enum baru yang tabrakan makna dengan `fopPending`. |
-| `database/migrations/2026_07_xx_add_report_deferred_to_tasks_table.php` | **Baru** — kolom `report_deferred` (boolean, default false) di `tasks`. |
-| `tests/Feature/TaskReportDialogTest.php` | **Baru** — test dialog 2 pilihan + reuse `pending()` untuk `Lapor Nanti`. |
+| `resources/views/components/task/report-choice-dialog.blade.php` | **Baru** — komponen shared: tombol trigger + modal Dialog Alert 2 pilihan (`Lapor Sekarang` → link form laporan; `Lapor Nanti` → modal alasan → submit `route('tasks.pending', $task)` dengan `report_deferred=1`). Dipakai di `tasks/show.blade.php` dan `tasks/own.blade.php` (bukan implementasi terpisah). |
+| `resources/views/tasks/show.blade.php` | **Rubah** — toggle button lama (752-758) dan modal `pending-task` lama (976-1004) dihapus; blok statusComplete (760-791 lama) diganti pemanggilan `<x-task.report-choice-dialog>` saat status `in_progress`, atau link langsung "Lanjutkan Laporan" saat status `pending` (laporan ditunda, tidak perlu dialog lagi). |
+| `resources/views/tasks/own.blade.php` | **Rubah** — "Isi Laporan" (242-264 lama) diganti sama seperti di atas: `<x-task.report-choice-dialog>` saat `in_progress`, link "Lanjutkan Laporan" saat `pending`. |
+| `app/Http/Controllers/TaskStatusController.php` | **Rubah (minor)** — `pending()` (baris 59-70) terima input `report_deferred` (boolean, opsional) dan teruskan ke `TaskService::setPending()`. |
+| `app/Services/TaskService.php` | **Rubah (minor)** — `setPending()` terima parameter `bool $reportDeferred = false`, simpan ke kolom `report_deferred`. |
+| `app/Models/Task.php` | **Rubah** — tambah `report_deferred` ke `$fillable` dan `$casts` (boolean). |
+| `database/migrations/2026_07_11_000001_add_report_deferred_to_tasks_table.php` | **Baru** — kolom `report_deferred` (boolean, default false) di `tasks`. |
+| `tests/Feature/TaskReportDialogTest.php` | **Baru** — test reuse `TaskStatusController::pending()`/`TaskService::setPending()` untuk `Lapor Nanti` + rendering dialog di `tasks/show.blade.php` dan `tasks/own.blade.php`. |
+
+**Catatan blocker untuk Task 9:** sinkronisasi `FopTask.status = lapor_nanti` (checklist poin ke-4 Task 6 di bawah) BELUM dikerjakan — itu scope Task 9 (Observer belum ada). Kolom `report_deferred` di `tasks` sudah tersedia dan terisi benar sebagai prasyarat Task 9.
 
 **Checklist:**
-- [ ] Dialog Alert muncul begitu tombol Laporan (Survey/Pemasangan/Maintenance/dll) ditekan — BUKAN langsung ke modal `pending-task` seperti sekarang.
-- [ ] `Lapor Sekarang` → lanjut ke form laporan (`surveys/report.blade.php`, `installations/report.blade.php`, `tasks/maintenance-report.blade.php`) langsung.
-- [ ] `Lapor Nanti` → reuse `TaskController::pending()` existing (status `TaskStatus::PENDING`, assignment tetap), set `report_deferred = true` biar beda query dari `Pending` reschedule (Task 7) yang statusnya sama-sama bisa disebut "pending" tapi behavior beda.
-- [ ] Sinkron ke `FopTask` (lihat Task 9): status FopTask jadi `lapor_nanti` (bukan `pending`) kalau `report_deferred = true`.
-- [ ] Badge/warna beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard.
-- [ ] Rapikan label tombol existing yang sekarang inconsistent ("Laporan Nanti" vs "Pending" di baris 755) jadi konsisten "Lapor Nanti" di semua tempat.
+- [x] Dialog Alert muncul begitu tombol Laporan (Survey/Pemasangan/Maintenance/dll) ditekan — BUKAN langsung ke modal `pending-task` seperti sekarang. (di `show.blade.php` dan `own.blade.php`)
+- [x] `Lapor Sekarang` → lanjut ke form laporan (`customers.survey.report`, `customers.installation.report`, `tasks.maintenance.report`) langsung.
+- [x] `Lapor Nanti` → reuse `TaskStatusController::pending()` + `TaskService::setPending()` existing (status `TaskStatus::PENDING`, assignment tetap), set `report_deferred = true` biar beda query dari `Pending` reschedule (Task 7) yang statusnya sama-sama bisa disebut "pending" tapi behavior beda.
+- [ ] Sinkron ke `FopTask` (lihat Task 9): status FopTask jadi `lapor_nanti` (bukan `pending`) kalau `report_deferred = true`. **BLOCKED — depends on Task 9 (Observer belum ada), tidak dikerjakan di Task 6.**
+- [ ] Badge/warna beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard. **BLOCKED — depends on Task 7 (tombol `Pending` top-level belum ada), tidak dikerjakan di Task 6.**
+- [x] Rapikan label tombol existing yang sekarang inconsistent ("Laporan Nanti" vs "Pending") jadi konsisten "Lapor Nanti" di semua tempat — toggle lama dihapus, diganti dialog seragam untuk semua task_type.
 
 **Acceptance Criteria:**
-1. Klik tombol Laporan apa pun → selalu muncul dialog 2 pilihan, tidak langsung ke form maupun langsung ke modal pending lama.
-2. Pilih `Lapor Nanti` → task tetap terdaftar ke teknisi yang sama (perilaku `pending()` existing tidak berubah), `report_deferred = true`, laporan bisa dilanjut kapan saja.
-3. FopTask yang terkait tampil status `lapor_nanti` (bukan `pending` generik) di dashboard/riwayat — beda dari hasil Task 7.
+1. ✅ Klik tombol Laporan apa pun → selalu muncul dialog 2 pilihan, tidak langsung ke form maupun langsung ke modal pending lama.
+2. ✅ Pilih `Lapor Nanti` → task tetap terdaftar ke teknisi yang sama (perilaku `pending()` existing tidak berubah), `report_deferred = true`, laporan bisa dilanjut kapan saja.
+3. ⏳ FopTask yang terkait tampil status `lapor_nanti` — depends on Task 9, belum bisa diverifikasi di Task 6.
 
 ---
 
@@ -819,7 +829,9 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 **Tujuan:** Tombol `Pending` di top-level Detail Task (teknisi-triggered) yang melepas assignment & reschedule task ke hari lain, balik ke antrian Task FOP — sesuai kebutuhan poin 7.
 
-**Kondisi kode saat ini (koreksi dari draft awal):** Ini **BUKAN sekadar rename tombol lama** — mekanisme reschedule-penuh-lepas-assignment belum ada sama sekali di kode. Yang mirip cuma "Set Pending" (baris 815-819, `resources/views/tasks/show.blade.php`) tapi itu **FOP-triggered** (`$this->authorize('fopPending', $task)`) dan modalnya (baris 897-916) eksplisit bilang: *"Tim teknisi yang sudah di-assign **tidak akan terhapus**"* — berlawanan arah dari yang kita mau. Task 7 harus bikin jalur **teknisi-triggered** yang baru, terpisah dari `fopPending`.
+**Kondisi kode saat ini (koreksi dari draft awal, line number di-refresh pasca eksekusi Task 6):** Ini **BUKAN sekadar rename tombol lama** — mekanisme reschedule-penuh-lepas-assignment belum ada sama sekali di kode. Yang mirip cuma "Set Pending" (baris 807, `resources/views/tasks/show.blade.php`) tapi itu **FOP-triggered** (`$this->authorize('fopPending', $task)`) dan modalnya (baris 890-902) eksplisit bilang: *"Tim teknisi yang sudah di-assign **tidak akan terhapus**"* — berlawanan arah dari yang kita mau. Task 7 harus bikin jalur **teknisi-triggered** yang baru, terpisah dari `fopPending`.
+
+**Prioritas naik:** Task 6 (sudah `Done`) menghapus satu-satunya tombol Pending generik milik teknisi (lihat catatan gap di Task 6). Sampai Task 7 ini selesai, teknisi tidak punya cara set task ke Pending di luar konteks laporan (Lapor Nanti). Kerjakan Task 7 lebih dulu dari task-task lain yang tidak dependent.
 
 **File yang dibuat/dirubah:**
 | File | Aksi |
@@ -952,14 +964,14 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 - Tombol kedua **"Isi Laporan" sudah ada** (baris 242-264), muncul begitu status `in_progress`/`pending` — link langsung ke `customers.survey.report`/`customers.installation.report`/`tasks.maintenance.report` tergantung tipe.
 - `started_at` **sudah** di-set pas teknisi klik Mulai (`TaskService.php`, method start via `TaskStatusController::start()` baris 18-20) — timer SLA sudah akurat sejak mulai kerja, bukan sejak buka Detail. Ini bagian yang SUDAH benar.
 - **Gap sebenarnya:** info pelanggan (nama, alamat, POP — baris 128-135) dan link **"Buka Detail"** (baris 200-203) **tampil UNCONDITIONAL**, tidak digate status `terjadwal` vs `in_progress` sama sekali — teknisi bisa langsung klik "Buka Detail" (yang berisi koordinat/Maps di `tasks/show.blade.php`) SEBELUM klik Mulai. Ini yang melanggar kebutuhan poin 11 ("info sensitif baru muncul setelah mulai"), bukan tombol Mulai-nya (itu udah benar).
-- **Cross-reference penting ke Task 6:** "Isi Laporan" di card ini (baris 248/254/260) link **LANGSUNG** ke halaman laporan, TIDAK lewat dialog `Lapor Sekarang`/`Lapor Nanti` yang dibangun Task 6 (yang ada di `tasks/show.blade.php`, bukan di sini). Task 6 harus intercept entry point INI JUGA, bukan cuma tombol di halaman Detail — kalau tidak, teknisi bisa bypass dialog lewat card `/tasks-saya` langsung.
+- **Cross-reference ke Task 6 (SUDAH DIKERJAKAN saat eksekusi Task 6):** "Isi Laporan" di `own.blade.php` (baris 242-264 lama) sudah diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (`<x-task.report-choice-dialog>`, shared dengan `show.blade.php`) — bukan lagi link langsung. **Sisa gap:** `resources/views/tasks/partials/own-card.blade.php` (baris 80-95) — partial AJAX-refresh dari `own.blade.php` — MASIH pakai link langsung ke form laporan, BELUM diarahkan ke dialog yang sama. Ini di luar scope Task 6 (Task 6 hanya menyebut `own.blade.php`, bukan partial-nya) — jadi teknisi masih bisa bypass dialog lewat versi partial/AJAX-refresh dari `/tasks-saya`. Task 11 (atau siapa pun yang menuntaskan partial ini) harus terapkan `<x-task.report-choice-dialog>` yang sama di sini juga.
 
 **File yang dibuat/dirubah:**
 | File | Aksi |
 |---|---|
 | `resources/views/tasks/own.blade.php` | **Rubah** — gate info pelanggan (baris 128-135) dan link "Buka Detail" (200-203): sembunyikan/disable selama `status === 'terjadwal'` (belum mulai), tampilkan penuh begitu `status != 'terjadwal'`. |
-| `resources/views/tasks/own.blade.php` | **Rubah** — "Isi Laporan" (242-264): ganti dari link langsung ke laporan jadi trigger dialog `Lapor Sekarang`/`Lapor Nanti` (shared component dengan Task 6, bukan implementasi terpisah). |
-| `resources/views/tasks/partials/own-card.blade.php` | **Cek konsistensi** — partial ini kemungkinan versi AJAX-refresh dari `own.blade.php`, pastikan perubahan gating & dialog diterapkan di kedua tempat, jangan cuma satu. |
+| `resources/views/tasks/own.blade.php` | ~~**Rubah**~~ — **SUDAH DIKERJAKAN di Task 6**: "Isi Laporan" (242-264 lama) sudah trigger dialog `<x-task.report-choice-dialog>`. |
+| `resources/views/tasks/partials/own-card.blade.php` | **Rubah** — MASIH belum konsisten, partial AJAX-refresh dari `own.blade.php` ini belum diterapkan dialog yang sama (baris 80-95 masih link langsung). |
 | `tests/Feature/TaskOwnCardStageTest.php` | **Baru** — fokus ke gating info sensitif (gap real), bukan ke tombol Mulai/Isi Laporan yang sudah benar. |
 
 **Checklist:**
@@ -967,8 +979,8 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 - [x] ~~Timer/SLA (`started_at`) mulai persis saat tombol "Mulai X" diklik~~ — **SUDAH ADA** (`TaskStatusController::start()`), tinggal regression test.
 - [ ] Gate info pelanggan (nama/alamat/POP, baris 128-135) — sembunyikan sebelum status berubah dari `terjadwal`.
 - [ ] Gate link "Buka Detail" (200-203) — disable/sembunyikan sebelum mulai, karena itu jalan pintas ke koordinat/Maps di halaman Detail.
-- [ ] "Isi Laporan" (242-264) diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (Task 6), bukan link langsung ke form laporan seperti sekarang.
-- [ ] Sinkron perubahan ke `own-card.blade.php` (partial AJAX), jangan cuma `own.blade.php`.
+- [x] "Isi Laporan" (`own.blade.php`) diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (Task 6) — **SUDAH** (dikerjakan saat eksekusi Task 6).
+- [ ] Sinkron perubahan ke `own-card.blade.php` (partial AJAX), jangan cuma `own.blade.php` — **BELUM**, sisa gap.
 
 **Acceptance Criteria:**
 1. Teknisi buka `/tasks-saya` sebelum klik Mulai — nama pelanggan/alamat/POP dan link "Buka Detail" tidak tampil (cuma jenis task, jadwal, tombol Mulai sesuai jenis).

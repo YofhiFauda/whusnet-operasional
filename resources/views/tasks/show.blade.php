@@ -747,44 +747,35 @@
             @endif
         @endif
 
-        @can('statusPending', $task)
-        @if($task->status->value === 'in_progress')
-        <button type="button" x-data @click="$dispatch('open-modal', 'pending-task')"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded border transition-colors bg-surface cursor-pointer"
-                style="border-color:var(--color-warning-border); color:var(--color-warning)">
-            {{ in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value, \App\Enums\TaskType::MAINTENANCE->value]) ? 'Laporan Nanti' : 'Pending' }}
-        </button>
-        @endif
-        @endcan
-
         @can('statusComplete', $task)
         @if(in_array($task->status->value, ['in_progress', 'pending']))
-            @if($task->task_type->value === \App\Enums\TaskType::SURVEY->value)
-                <a href="{{ route('customers.survey.report', $task->customer_id) }}"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer"
-                        style="background:var(--color-success)">
+            @php
+                $reportUrl = match(true) {
+                    $task->task_type->value === \App\Enums\TaskType::SURVEY->value => route('customers.survey.report', $task->customer_id),
+                    $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => route('customers.installation.report', $task->customer_id),
+                    default => route('tasks.maintenance.report', $task),
+                };
+                $reportLabel = match(true) {
+                    $task->task_type->value === \App\Enums\TaskType::SURVEY->value => 'Laporan Survey',
+                    $task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value => 'Laporan Pemasangan',
+                    default => 'Isi Laporan',
+                };
+            @endphp
+            @if($task->status->value === 'in_progress')
+                <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Laporan Survey
-                </a>
-            @elseif($task->task_type->value === \App\Enums\TaskType::PEMASANGAN->value)
-                <a href="{{ route('customers.installation.report', $task->customer_id) }}"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer"
-                        style="background:var(--color-success)">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Laporan Pemasangan
-                </a>
+                    {{ $reportLabel }}
+                </x-task.report-choice-dialog>
             @else
-                <a href="{{ route('tasks.maintenance.report', $task) }}"
+                <a href="{{ $reportUrl }}"
                         class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer"
                         style="background:var(--color-success)">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Isi Laporan
+                    Lanjutkan Laporan
                 </a>
             @endif
         @endif
@@ -972,36 +963,6 @@
 </x-ui.modal>
 @endcan
 
-{{-- ══ Pending Modal ("Laporan Nanti") ══════════════════════════════ --}}
-@can('statusPending', $task)
-<x-ui.modal name="pending-task" title="{{ in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value, \App\Enums\TaskType::MAINTENANCE->value]) ? 'Laporan Nanti' : 'Set Pending' }}" maxWidth="sm">
-    <p class="text-xs text-text-secondary mb-3 leading-relaxed font-ui">
-        @if(in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value, \App\Enums\TaskType::MAINTENANCE->value]))
-            Task akan disimpan sementara dengan status <span class="font-semibold text-text-main">Pending</span>. Anda dapat melanjutkan pengisian laporan hasil survei/pemasangan/maintenance sewaktu-waktu.
-        @else
-            Task ini akan diubah statusnya menjadi <span class="font-semibold text-text-main">Pending</span> dan menunggu penanganan atau penjadwalan ulang dari FOP.
-        @endif
-    </p>
-    <form id="form-pending-task" action="{{ route('tasks.pending', $task) }}" method="POST">
-        @csrf
-        <div class="space-y-1.5 font-ui">
-            <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                {{ in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value]) ? 'Alasan Menunda Laporan' : 'Alasan Pending' }} <span class="text-error">*</span>
-            </label>
-            <x-ui.textarea name="pending_reason" rows="3" placeholder="{{ in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value]) ? 'Contoh: Kendala sinyal di lokasi...' : 'Alasan task di-pending...' }}" required />
-        </div>
-    </form>
-    <x-slot name="footer">
-        <x-ui.button type="button" variant="secondary"
-                     x-on:click="$dispatch('close-modal', 'pending-task')">
-            Batal
-        </x-ui.button>
-        <x-ui.button type="submit" form="form-pending-task" variant="warning">
-            {{ in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value]) ? 'Konfirmasi Laporan Nanti' : 'Konfirmasi Pending' }}
-        </x-ui.button>
-    </x-slot>
-</x-ui.modal>
-@endcan
 
 {{-- ══ Task Data untuk Alpine.js ═════════════════════════════════════ --}}
 @php
