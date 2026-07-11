@@ -27,23 +27,32 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 1. Klik "Tambah Task" → modal muncul.
 2. Pilih kategori (Survey & PSB **gak muncul** di dropdown — itu auto-sync only).
 3. Isi tanggal, tugas, desa, POP, pelanggan (opsional), issue, catatan. **Gak ada lagi field pilih Team** — dropdown `team_id` manual udah dihapus dari modal (lihat bagian 3, Team sekarang otomatis).
-4. Pilih status: Proses (default) atau Pending (wajib isi alasan + tanggal request client).
+4. Pilih status: **Proses** (default) atau **Pending** (wajib isi alasan + tanggal request client) — cuma 2 opsi ini, buat klasifikasi awal tiket BARU (belum ada `Task` eksekusi buat di-derive statusnya). Opsi ini **cuma muncul di modal Tambah**, bukan modal Edit (lihat "Status Realtime" di bawah — sejak Task 9, status tiket existing gak bisa diubah manual lagi lewat modal).
 5. Pilih prioritas — **cuma muncul kalau user punya `fop_tasks.update_sensitive`**, selain itu default Low/otomatis.
 6. Pilih 1+ teknisi (wajib) → submit.
-7. Sistem: simpan `FopTask`, `technicians()->sync()`, auto-buat `Task` eksekusi teknisi (title polos dulu), link ke `fop_task.task_id`, lalu **auto-rebuild Team** untuk tanggal tiket itu (lihat bagian 3) — title Task eksekusi ke-update lagi begitu Team-nya kebentuk.
+7. Sistem: simpan `FopTask`, `technicians()->sync()`, auto-buat `Task` eksekusi teknisi (title polos dulu), link ke `fop_task.task_id`, lalu **auto-rebuild Team** untuk tanggal tiket itu (lihat bagian 3) — title Task eksekusi ke-update lagi begitu Team-nya kebentuk. Begitu `Task` eksekusi ada, statusnya langsung ikut aturan "Status Realtime" (lihat di bawah).
 
 ### Edit tiket
 
 1. Klik tiket di tabel → modal edit terisi data existing.
-2. User biasa cuma bisa ubah: tanggal, tugas, desa/POP/pelanggan, issue/catatan, status, teknisi.
+2. User biasa cuma bisa ubah: tanggal, tugas, desa/POP/pelanggan, issue/catatan, teknisi.
 3. User dengan `fop_tasks.update_sensitive` bisa juga ubah kategori & prioritas.
-4. Ganti status ke Pending → wajib isi alasan; ke Selesai/Proses → field pending auto-clear.
-5. Submit → update `FopTask`, sync teknisi, update/buat `Task` terkait, catat `AuditLog`, **auto-rebuild Team** untuk tanggal tiket (dan tanggal lama juga kalau tanggalnya diubah).
+4. **Status TIDAK bisa diubah dari modal ini lagi (sejak Task 9)** — field Status di modal edit sekarang cuma badge read-only (ngikutin status realtime tiket), bukan dropdown. Perubahan status cuma bisa lewat: (a) status teknisi berubah di lapangan (auto-derive, lihat "Status Realtime" di bawah), atau (b) tombol **Cancel** eksplisit di tabel (lihat di bawah).
+5. Submit → update `FopTask` (field non-status), sync teknisi, update/buat `Task` terkait, catat `AuditLog`, **auto-rebuild Team** untuk tanggal tiket (dan tanggal lama juga kalau tanggalnya diubah).
 
 ### Hapus tiket
 
 1. Klik hapus (icon/tombol) → konfirmasi browser.
 2. Sistem detach teknisi, hapus `FopTask`, catat `AuditLog`.
+
+### Status Realtime & Riwayat Transisi (Task 9)
+
+**Status tiket gak lagi FOP yang kontrol manual** (kecuali Cancel) — dia ngikutin status `Task` eksekusi teknisi terkait secara otomatis, lewat `TaskObserver`. Detail algoritma & tabel mapping lengkap di [flowchart.md § 9](flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9).
+
+1. Kolom Status di tabel `/fop-tasks` sekarang badge read-only (bukan dropdown), teksnya granular sesuai kondisi riil teknisi di lapangan — contoh: **"Sedang Dikerjakan"** (teknisi lagi in-progress), **"Perlu Review"** (laporan masuk, nunggu FOP approve/reject), **"Lapor Nanti"** (kerja selesai, laporan ditunda — Task 6), **"Pending"** (reschedule dari teknisi — Task 7, atau di-pending manual FOP lewat `fopPending`).
+2. Kalau tiket lagi **"Perlu Review"** → muncul link kecil **"Review Laporan →"** di bawah badge, ngarahin FOP ke halaman Detail Task (`tasks.show`) tempat tombol Approve/Reject laporan yang sebenarnya berada (gak duplikasi di sini).
+3. FOP tetap bisa **Cancel** tiket kapan aja (selama belum `Selesai`/`Cancel`) lewat tombol kecil **"Cancel"** di bawah badge status — satu-satunya override manual yang masih ada. Begitu di-Cancel, sync otomatis dari `Task` eksekusi berhenti buat tiket itu (gak ke-overwrite lagi walau `Task` terkait berubah status belakangan).
+4. Tiap transisi status (baik yang derived otomatis maupun Cancel manual) tercatat di tabel `fop_task_status_history` — belum ada UI buat nampilin tabel histori ini secara langsung di `/fop-tasks` (itu scope Task 10, Riwayat Lengkap), tapi datanya udah kesimpan lengkap dari sekarang.
 
 ## 3. Team Harian — Otomatis (Task 1), Bukan Bikin Manual Lagi
 

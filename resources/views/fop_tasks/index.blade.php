@@ -222,28 +222,45 @@
                                 @endif
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
-                                <div class="flex flex-col gap-1">
-                                    <select @change="updateStatus({{ $task->id }}, $event.target.value)"
-                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24"
-                                            :class="{
-                                                'border-blue-200 text-blue-700 bg-blue-50': '{{ $task->status->value }}' === 'Proses',
-                                                'border-amber-200 text-amber-700 bg-amber-50': '{{ $task->status->value }}' === 'Pending',
-                                                'border-green-200 text-green-700 bg-green-50': '{{ $task->status->value }}' === 'Selesai',
-                                                'border-red-200 text-red-700 bg-red-50': '{{ $task->status->value }}' === 'Cancel'
-                                            }">
-                                        <option value="Proses" {{ $task->status->value === 'Proses' ? 'selected' : '' }}>Proses</option>
-                                        <option value="Pending" {{ $task->status->value === 'Pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="Selesai" {{ $task->status->value === 'Selesai' ? 'selected' : '' }}>Selesai</option>
-                                        <option value="Cancel" {{ $task->status->value === 'Cancel' ? 'selected' : '' }}>Cancel</option>
-                                    </select>
-                                    @if($task->status->value === 'Pending')
+                                @php
+                                    $statusValue = $task->status->value;
+                                    $latestHistory = $task->statusHistories->first();
+                                    $statusLabel = $latestHistory?->label() ?? $statusValue;
+                                    $needsReview = $task->task && $task->task->status->value === 'selesai' && $task->task->fop_review_status === 'pending';
+                                @endphp
+                                <div class="flex flex-col gap-1 items-start">
+                                    <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit"
+                                          @class([
+                                              'border-blue-200 text-blue-700 bg-blue-50' => $statusValue === 'Proses',
+                                              'border-amber-200 text-amber-700 bg-amber-50' => $statusValue === 'Pending',
+                                              'border-green-200 text-green-700 bg-green-50' => $statusValue === 'Selesai',
+                                              'border-red-200 text-red-700 bg-red-50' => $statusValue === 'Cancel',
+                                          ])
+                                          title="Status realtime — derived otomatis dari status Task teknisi, gak bisa diedit manual">
+                                        {{ $statusLabel }}
+                                    </span>
+                                    {{-- @if($statusValue === 'Pending')
                                         <div class="text-[10px] text-amber-600 mt-1 leading-tight whitespace-normal min-w-[120px]">
                                             @if($task->client_request_date)
                                                 <span class="font-semibold">Req: {{ $task->client_request_date->format('d/m/y') }}</span><br>
                                             @endif
                                             <span>{{ $task->pending_reason }}</span>
                                         </div>
-                                    @endif
+                                    @endif --}}
+                                    <div class="flex flex-col gap-0.5 mt-0.5">
+                                        @if($needsReview)
+                                            <a href="{{ route('tasks.show', $task->task_id) }}" class="text-[10px] text-primary underline decoration-dotted">
+                                                Review Laporan →
+                                            </a>
+                                        @endif
+                                        @if(!in_array($statusValue, ['Selesai', 'Cancel']))
+                                            <button type="button" x-data
+                                                    @click="if (confirm('Cancel Task FOP [{{ $task->task_number }}]?')) cancelFopTask({{ $task->id }})"
+                                                    class="text-[10px] text-red-600 underline decoration-dotted text-left cursor-pointer">
+                                                Cancel
+                                            </button>
+                                        @endif
+                                    </div>
                                 </div>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
@@ -456,13 +473,27 @@
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-medium text-text-secondary mb-1">Status <span class="text-error">*</span></label>
-                                <select name="status" x-model="modal.data.status" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-                                    <option value="Proses">Proses</option>
-                                    <option value="Pending">Pending</option>
-                                    <option value="Selesai">Selesai</option>
-                                    <option value="Cancel">Cancel</option>
-                                </select>
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Status <span x-show="!modal.isEdit" class="text-error">*</span></label>
+                                <template x-if="!modal.isEdit">
+                                    <select name="status" x-model="modal.data.status" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                        <option value="Proses">Proses</option>
+                                        <option value="Pending">Pending</option>
+                                    </select>
+                                </template>
+                                <template x-if="modal.isEdit">
+                                    <div>
+                                        <span class="inline-flex items-center px-2.5 py-1.5 rounded text-xs font-medium border w-fit"
+                                              :class="{
+                                                  'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'Proses',
+                                                  'border-amber-200 text-amber-700 bg-amber-50': modal.data.status === 'Pending',
+                                                  'border-green-200 text-green-700 bg-green-50': modal.data.status === 'Selesai',
+                                                  'border-red-200 text-red-700 bg-red-50': modal.data.status === 'Cancel',
+                                              }"
+                                              x-text="modal.data.status"></span>
+                                        <p class="text-[10px] text-text-muted mt-1">Status realtime — otomatis mengikuti status Task teknisi, gak bisa diedit manual di sini. Pakai tombol "Cancel" di tabel buat cancel tiket.</p>
+                                        <input type="hidden" name="status" :value="modal.data.status">
+                                    </div>
+                                </template>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Prioritas <span class="text-error">*</span></label>
@@ -969,13 +1000,8 @@
                 }
             },
 
-            updateStatus(taskId, status) {
-                if (status === 'Pending') {
-                    alert("Untuk status Pending, silakan isi tanggal request client dan alasan pending melalui tombol edit detail task.");
-                    window.location.reload();
-                    return;
-                }
-                this.sendUpdateRequest(taskId, { status });
+            cancelFopTask(taskId) {
+                this.sendUpdateRequest(taskId, { status: 'Cancel' });
             },
 
             updatePriority(taskId, priority) {

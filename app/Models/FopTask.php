@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'task_number',
@@ -102,6 +103,17 @@ class FopTask extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(FopTaskTeam::class, 'team_id');
+    }
+
+    /**
+     * Riwayat transisi status realtime (Task 9) — ditulis oleh `TaskObserver`
+     * tiap kali `Task` eksekusi terkait berubah status. Dipakai buat badge
+     * status granular (mis. "Lapor Nanti" vs "Pending (Reschedule)") yang
+     * gak bisa dibedain dari kolom `fop_tasks.status` mentah (cuma 4 nilai).
+     */
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(FopTaskStatusHistory::class)->orderByDesc('changed_at');
     }
 
     /**

@@ -37,7 +37,8 @@ class FopTaskController extends Controller
         $query = FopTask::with([
             'village',
             'technicians',
-            'task:id,scheduled_at',
+            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'statusHistories',
             'customer:id,created_at,updated_at',
             'customer.tasks' => function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)

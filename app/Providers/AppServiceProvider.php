@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Task;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
+use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -39,6 +40,9 @@ class AppServiceProvider extends ServiceProvider
         // (controllers, artisan commands, future API), not just one controller.
         Invoice::observe(InvoiceObserver::class);
         Payment::observe(PaymentObserver::class);
+
+        // Task 9 — sync status Task eksekusi teknisi ke FopTask (status realtime).
+        Task::observe(TaskObserver::class);
 
         // Register Blade Directives for formatting
         \Illuminate\Support\Facades\Blade::directive('rupiah', function ($expression) {

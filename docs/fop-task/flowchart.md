@@ -2,14 +2,16 @@
 
 ## 1. Status Tiket `FopTask`
 
+**⚠️ Sejak Task 9, diagram di bawah ini cuma menggambarkan NILAI status yang mungkin — bukan lagi cara transisinya.** Sebelum Task 9, FOP ubah status ini manual lewat dropdown (`Proses`/`Pending`/`Selesai`/`Cancel` bebas dipilih). **Sekarang cuma `Cancel` yang masih manual** (tombol eksplisit) — `Proses`/`Pending`/`Selesai` full **derived otomatis** dari status `Task` eksekusi teknisi lewat `TaskObserver`. Detail lengkap mapping & trigger di [§ 9. Status Realtime](#9-status-realtime--sync-task-eksekusi--foptask-task-9) di bawah.
+
 ```
                  ┌──────────┐
    create ──────▶│  Proses  │◀────────────┐
                  └────┬─────┘              │
-                      │                    │ set status=Proses
-       set status=Pending                  │ (clear pending_reason,
-       (wajib isi pending_reason           │  client_request_date,
-        + client_request_date)             │  cancelled_at)
+                      │                    │ Task eksekusi balik ke terjadwal/
+        Task eksekusi jadi                 │ in_progress (derived, TaskObserver)
+        pending/reschedule                 │
+        (derived, TaskObserver)            │
                       ▼                    │
                  ┌──────────┐              │
                  │ Pending  │──────────────┘
@@ -20,12 +22,14 @@
    ┌──────────┐               ┌──────────┐
    │ Selesai  │               │  Cancel  │
    └──────────┘               └──────────┘
-   (cancelled_at=null)        (cancelled_at=now())
+   (derived — FOP approve      (MANUAL — tombol Cancel
+    laporan Task eksekusi)      eksplisit FOP, satu-satunya
+                                 transisi yang masih manual)
 ```
 
-- `Proses` → `Cancel` juga valid (tiket dibatalkan tanpa lewat Pending).
-- `Cancel` → `Selesai` valid (reopen/koreksi) — `cancelled_at` di-null-kan lagi.
-- Status hidup di enum `App\Enums\FopTaskStatus`.
+- `Proses` → `Cancel` juga valid (tiket dibatalkan tanpa lewat Pending) — manual, kapan aja selagi belum `Selesai`/`Cancel`.
+- **Perubahan perilaku sejak Task 9:** dulu FOP bisa reopen `Cancel` → `Selesai` (atau status lain) lewat dropdown edit bebas. Modal edit sekarang **read-only** buat status tiket existing (cuma badge, gak ada dropdown — lihat § 9), jadi reopen manual dari `Cancel` **gak ada jalur UI lagi**. Ditambah `TaskObserver` SENGAJA skip sync begitu `FopTask.status = Cancel` (proteksi override, lihat § 9) — jadi kalaupun `Task` eksekusi terkait berubah status lagi, `FopTask` tetap nyangkut di `Cancel` sampai ada perubahan manual langsung ke DB. Edge case ini dicatat, bukan dikerjain ulang di Task 9 (di luar scope).
+- Status hidup di enum `App\Enums\FopTaskStatus` (tetap 4 nilai — lihat § 9 kenapa gak nambah `lapor_nanti` sebagai nilai enum baru).
 
 ## 2. Auto-Sync Customer → FopTask (jalan tiap `GET /fop-tasks`)
 
@@ -235,3 +239,61 @@ ORDER BY
 - Badge visual di kolom "Tanggal" (`fop_tasks/index.blade.php`): **"JADWAL HARI INI"** (merah) kalau `client_request_date <= hari ini`, **"Terjadwal — {tanggal}"** (abu-abu) kalau di masa depan.
 - **Kenapa `>= besok`, bukan `> hari ini`:** ditemukan lewat test bahwa kolom `client_request_date` tersimpan dengan suffix waktu (`'... 00:00:00'`) di DB — perbandingan string `> 'YYYY-MM-DD'` (tanpa waktu) SELALU true karena string yang lebih panjang (ada suffix) dianggap "lebih besar" dari prefix-nya. Threshold `>= tanggal besok` menghindari ini sekaligus tetap portable ke MySQL & SQLite (gak pakai `CURDATE()` yang MySQL-only — dipakai binding parameter PHP `now()->addDay()->toDateString()` sebagai gantinya).
 - Detail implementasi & test: [analisa-auto-team.md § Task 8](analisa-auto-team.md).
+
+## 9. Status Realtime — Sync `Task` Eksekusi → `FopTask` (Task 9)
+
+**Baru.** Status `FopTask` gak lagi diubah manual FOP lewat dropdown (kecuali `Cancel`) — full **derived otomatis** dari perubahan status `Task` eksekusi teknisi terkait, lewat `App\Observers\TaskObserver` (hook `updated()`, di-register di `AppServiceProvider::boot()`).
+
+```
+Task (eksekusi) berubah status/report_deferred/fop_review_status
+        │  (lewat TaskController::reschedule() [Task 7], TaskStatusController::pending()
+        │   [Task 6 Lapor Nanti / existing fopPending], TaskService::start/complete(),
+        │   TaskController::review()/cancel(), dst — SEMUA jalur yg nge-save Task)
+        ▼
+  TaskObserver::updated($task)
+        │
+        ▼
+  Field yg relevan (status/report_deferred/fop_review_status) beneran berubah?
+        │ tidak ──▶ no-op (skip, gak nulis history)
+        │ ya
+        ▼
+  Cari FopTask::where('task_id', $task->id) — gak ketemu? ──▶ no-op (Task bukan hasil FOP-flow)
+        │ ketemu
+        ▼
+  FopTask.status udah Cancel? ──▶ YA: skip total (proteksi override manual FOP, lihat Task 12)
+        │ tidak
+        ▼
+  Resolve target [FopTaskStatus, label histori granular] dari kombinasi
+  Task.status + report_deferred + fop_review_status (tabel lengkap di
+  database-schema.md § Observer: TaskObserver)
+        │
+        ▼
+  FopTask.status di-update (idempotent — cuma nulis kalau beda)
+        │
+        ▼
+  Tulis 1 baris baru ke fop_task_status_history
+  (from_status, to_status granular, changed_by, changed_at)
+```
+
+**Mapping ringkas** (detail penuh + tabel di [database-schema.md](database-schema.md)):
+
+| Aksi teknisi/FOP | `Task.status` | `FopTask.status` | Label histori (`to_status`) |
+|---|---|---|---|
+| Task di-assign, belum mulai | `terjadwal` | `Proses` | `proses` |
+| Teknisi klik "Mulai" | `in_progress` | `Proses` | `proses_dikerjakan` (badge "Sedang Dikerjakan") |
+| Teknisi klik `Pending` top-level (Task 7, reschedule) | `reschedule` | `Pending` | `pending_reschedule` |
+| Teknisi pilih `Lapor Nanti` di dialog laporan (Task 6) | `pending` (+`report_deferred=true`) | `Pending` | `lapor_nanti` (badge "Lapor Nanti") |
+| FOP "Set Pending" existing (`fopPending`) | `pending` (+`report_deferred=false`) | `Pending` | `pending_fop` |
+| Teknisi submit laporan | `selesai` (+`fop_review_status=pending`) | `Proses` | `proses_review` (badge "Perlu Review") |
+| FOP approve laporan | `selesai` (+`fop_review_status=approved`) | `Selesai` | `selesai` |
+| FOP reject laporan | `in_progress` (+`fop_review_status=rejected`) | `Proses` | `proses_dikerjakan` |
+| Task eksekusi dibatalkan | `dibatalkan` | `Cancel` | `cancel` |
+
+**Poin penting:**
+- `fop_tasks.status` (kolom, enum `FopTaskStatus`) TETAP 4 nilai — `Proses`/`Pending`/`Selesai`/`Cancel`. Granularitas ekstra (bedain `lapor_nanti` vs `pending_reschedule` vs `pending_fop`, walau sama-sama `Pending`) cuma ada di `fop_task_status_history.to_status` (kolom string bebas) + badge UI, BUKAN nilai enum baru. Keputusan ini disengaja — nambah case baru di enum bakal mecahin banyak `whereIn('status', ['Proses', 'Pending'])` yang tersebar (`rebuildTeamsForDate()`, `index()`, dst).
+- **`Cancel` tetap satu-satunya transisi manual FOP** — tombol eksplisit baru di `fop_tasks/index.blade.php` (reuse endpoint `update()` existing, payload `{status: 'Cancel'}`). `TaskObserver` skip sync begitu `FopTask.status` udah `Cancel`, biar gak ke-overwrite diam-diam.
+- **Approve/reject laporan gak dapet endpoint baru di `FopTaskController`** — `fop_review_status` itu kolom di `tasks` (bukan `fop_tasks`), dan `TaskController::review()` udah punya business logic lengkap (transisi customer workflow, guard CID/Invoice PSB, notifikasi). Badge di `fop_tasks/index.blade.php` nampilin link **"Review Laporan →"** ke `route('tasks.show', $task->task_id)` kalau lagi nunggu review — FOP diarahkan ke tombol Approve/Reject yang udah ada di halaman Task, bukan duplikasi logic.
+- **UI:** kolom Status di `fop_tasks/index.blade.php` sekarang badge read-only (bukan `<select>`) yang nampilin label granular dari `statusHistories()->first()->label()` (fallback ke `status->value` mentah kalau belum ada histori). Modal edit tiket EXISTING juga jadi read-only (badge + hidden input), cuma modal CREATE tiket BARU yang masih punya `<select>` (2 opsi: `Proses`/`Pending`) — itu klasifikasi awal tiket baru, bukan "ubah status existing" yang dihapus.
+- **Riwayat status realtime Task 6/7 tertutup penuh oleh Task 9:** gap "sinkron FopTask" (Task 6 checklist) dan "riwayat histori reschedule" (Task 7 checklist) yang tadinya di-BLOCKED nunggu Task 9, sekarang otomatis kepenuhi — `TaskObserver` jalan generik buat SEMUA jalur transisi `Task`, termasuk yang dari `TaskController::reschedule()` (Task 7) dan `TaskStatusController::pending()` (Task 6), tanpa perlu kode tambahan di controller masing-masing.
+
+Detail implementasi, deviasi desain, & test: [analisa-auto-team.md § Task 9](analisa-auto-team.md).

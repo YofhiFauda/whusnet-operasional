@@ -6,6 +6,7 @@ use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
+use App\Models\FopTaskStatusHistory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -162,5 +163,42 @@ class TaskRescheduleTest extends TestCase
             ]);
 
         $response->assertForbidden();
+    }
+
+    /**
+     * Nutup gap Task 7 checklist poin ke-5 ("Riwayat catat histori reschedule
+     * lengkap di tabel dedicated") yang tadinya BLOCKED — tabel
+     * `fop_task_status_history` belum ada waktu Task 7 dikerjakan. Task 9
+     * (TaskObserver) sekarang nulis baris histori otomatis tiap kali
+     * `Task.status` berubah, termasuk `RESCHEDULE`. Verifikasi entry-nya
+     * `pending_reschedule` — beda dari `lapor_nanti` (Task 6) & `pending_fop`
+     * (fopPending existing), walau `fop_tasks.status` sama-sama `Pending`.
+     */
+    public function test_reschedule_writes_dedicated_status_history_row(): void
+    {
+        $task = $this->makeTask('TASK-2026-9106');
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-2026-9106',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan FO Cut',
+            'issue' => 'FO CUT di tiang 5',
+            'status' => 'Proses',
+            'priority' => 'High',
+            'task_id' => $task->id,
+        ]);
+
+        $this->actingAs($this->techUser)
+            ->post(route('tasks.reschedule', $task), [
+                'pending_reason' => 'Infra belum siap',
+            ])
+            ->assertRedirect(route('tasks.own'));
+
+        $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
+        $this->assertNotNull($history);
+        $this->assertEquals('pending_reschedule', $history->to_status);
+        $this->assertEquals('Pending', $history->label());
+        $this->assertNotEquals('lapor_nanti', $history->to_status);
+        $this->assertNotEquals('pending_fop', $history->to_status);
     }
 }

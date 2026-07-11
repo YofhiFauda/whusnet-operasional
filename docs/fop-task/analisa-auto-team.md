@@ -786,7 +786,7 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 **Status:** `Done `
 
-**⚠️ Gap sementara (disengaja, nunggu Task 7):** eksekusi Task 6 MENGHAPUS tombol `Pending` berdiri sendiri milik teknisi (toggle lama baris 752-758, satu-satunya jalan teknisi set task ke Pending di luar konteks laporan). Setelah Task 6, teknisi **HANYA** bisa masuk status Pending lewat dialog Laporan → pilih `Lapor Nanti` (`report_deferred=true`). Tidak ada lagi tombol Pending generik buat alasan non-laporan (mis. darurat, kendala alat, dll) sampai Task 7 (tombol `Pending` top-level, reschedule) selesai dikerjakan. Ini konsisten sama desain final poin 8 (Pending = Task 7, Lapor Nanti = Task 6), tapi berarti ada window waktu di mana teknisi kehilangan opsi Pending generik. Diputuskan untuk dibiarkan (bukan bug) — prioritaskan Task 7 berikutnya.
+**✅ Gap sementara DITUTUP (sebelumnya nunggu Task 7, sekarang Task 7 & 9 udah `Done`):** eksekusi Task 6 sempat MENGHAPUS tombol `Pending` berdiri sendiri milik teknisi (toggle lama baris 752-758, satu-satunya jalan teknisi set task ke Pending di luar konteks laporan) — window waktu di mana teknisi kehilangan opsi Pending generik sampai Task 7 (tombol `Pending` top-level, reschedule) selesai. Task 7 udah nutup gap ini (tombol `Pending` top-level terpisah, lihat bagian Task 7), dan Task 9 nutup sisi sinkronisasi/histori-nya. Sesuai desain final poin 8: `Pending` (top-level, reschedule) = Task 7, `Lapor Nanti` (dalam dialog laporan) = Task 6 — dua mekanisme berbeda, sekarang lengkap keduanya.
 
 **Tujuan:** Setelah tombol Laporan Survey/Pemasangan/Maintenance/dll ditekan, tampilkan Dialog Alert 2 pilihan (`Lapor Sekarang`/`Lapor Nanti`) — sesuai kebutuhan poin 6.
 
@@ -806,20 +806,23 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 | `database/migrations/2026_07_11_000001_add_report_deferred_to_tasks_table.php` | **Baru** — kolom `report_deferred` (boolean, default false) di `tasks`. |
 | `tests/Feature/TaskReportDialogTest.php` | **Baru** — test reuse `TaskStatusController::pending()`/`TaskService::setPending()` untuk `Lapor Nanti` + rendering dialog di `tasks/show.blade.php` dan `tasks/own.blade.php`. |
 
-**Catatan blocker untuk Task 9:** sinkronisasi `FopTask.status = lapor_nanti` (checklist poin ke-4 Task 6 di bawah) BELUM dikerjakan — itu scope Task 9 (Observer belum ada). Kolom `report_deferred` di `tasks` sudah tersedia dan terisi benar sebagai prasyarat Task 9.
+**Gap ke-4 & ke-5 DITUTUP (2026-07-11, pasca Task 9 `Done`):** sinkronisasi `FopTask` dan badge pembeda sekarang jalan otomatis lewat `TaskObserver` (Task 9) — gak ada kode tambahan yang perlu ditulis di Task 6 sendiri, cuma perlu test integrasi buat verifikasi end-to-end lewat jalur HTTP asli Task 6. Detail:
+- `FopTask.status` (kolom `FopTaskStatus` enum) tetap `Pending` (bukan case baru `lapor_nanti` — lihat keputusan desain di Task 9), TAPI `fop_task_status_history.to_status` nyimpen `'lapor_nanti'` granular, beda dari `pending_reschedule` (Task 7) & `pending_fop` (existing `fopPending`).
+- Badge status realtime di `fop_tasks/index.blade.php` (Task 9) nampilin label dari histori terbaru — jadi tiket yang lagi `Lapor Nanti` kelihatan teksnya "Lapor Nanti", bukan cuma "Pending" generik.
+- Diverifikasi test baru `test_lapor_nanti_syncs_fop_task_status_and_writes_dedicated_history_row` & `test_lapor_nanti_shows_distinct_badge_label_on_fop_tasks_dashboard` di `tests/Feature/TaskReportDialogTest.php`.
 
 **Checklist:**
 - [x] Dialog Alert muncul begitu tombol Laporan (Survey/Pemasangan/Maintenance/dll) ditekan — BUKAN langsung ke modal `pending-task` seperti sekarang. (di `show.blade.php` dan `own.blade.php`)
 - [x] `Lapor Sekarang` → lanjut ke form laporan (`customers.survey.report`, `customers.installation.report`, `tasks.maintenance.report`) langsung.
 - [x] `Lapor Nanti` → reuse `TaskStatusController::pending()` + `TaskService::setPending()` existing (status `TaskStatus::PENDING`, assignment tetap), set `report_deferred = true` biar beda query dari `Pending` reschedule (Task 7) yang statusnya sama-sama bisa disebut "pending" tapi behavior beda.
-- [ ] Sinkron ke `FopTask` (lihat Task 9): status FopTask jadi `lapor_nanti` (bukan `pending`) kalau `report_deferred = true`. **BLOCKED — depends on Task 9 (Observer belum ada), tidak dikerjakan di Task 6.**
-- [ ] Badge/warna beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard. **BLOCKED — Task 7 udah `Done` (tombol `Pending` top-level warna amber sudah ada di Detail Task), tapi badge/widget status pembeda di dashboard FOP (`/fop`, `/fop-tasks`) belum ada. Itu scope Task 9 (status realtime), belum dikerjakan di Task 6 maupun Task 7.**
+- [x] Sinkron ke `FopTask` (Task 9): histori transisi jadi `lapor_nanti` (granular di `fop_task_status_history.to_status`) kalau `report_deferred = true` — otomatis lewat `TaskObserver`, gak butuh kode tambahan di Task 6. **DITUTUP pasca Task 9.**
+- [x] Badge/label beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard — badge status realtime (Task 9) di `fop_tasks/index.blade.php` nampilin teks "Lapor Nanti" granular, beda dari "Pending (Reschedule)"/"Pending". **DITUTUP pasca Task 9.**
 - [x] Rapikan label tombol existing yang sekarang inconsistent ("Laporan Nanti" vs "Pending") jadi konsisten "Lapor Nanti" di semua tempat — toggle lama dihapus, diganti dialog seragam untuk semua task_type.
 
 **Acceptance Criteria:**
 1. ✅ Klik tombol Laporan apa pun → selalu muncul dialog 2 pilihan, tidak langsung ke form maupun langsung ke modal pending lama.
 2. ✅ Pilih `Lapor Nanti` → task tetap terdaftar ke teknisi yang sama (perilaku `pending()` existing tidak berubah), `report_deferred = true`, laporan bisa dilanjut kapan saja.
-3. ⏳ FopTask yang terkait tampil status `lapor_nanti` — depends on Task 9, belum bisa diverifikasi di Task 6.
+3. ✅ FopTask yang terkait tercatat histori `lapor_nanti` (granular) dan badge dashboard FOP nampilin label "Lapor Nanti" — diverifikasi via `TaskReportDialogTest` pasca Task 9.
 
 ---
 
@@ -845,26 +848,27 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 
 **Deviasi dari rencana awal (disengaja, dicatat biar gak dianggap bug):**
 - **Gak ada kolom `reschedule_reason` baru** — reuse kolom `pending_reason` yang udah ada di `tasks` (dipakai bareng sama `fopPending` dan Task 6 `Lapor Nanti`). Ini cuma reuse kolom teks alasan, BUKAN reuse makna status — `TaskStatus::RESCHEDULE` tetap nilai enum sendiri, terpisah total dari `TaskStatus::PENDING`.
-- **Riwayat/status history (checklist poin ke-5) BELUM dikerjakan di sini** — audit trail cuma lewat `AuditLog::log()` generik (pola yang sama dipakai `FopTaskController`), bukan tabel `fop_task_status_history` dedicated. Tabel itu scope Task 9/10, belum ada di codebase saat Task 7 dikerjakan. **Catatan blocker untuk Task 9/10:** perlu pastikan `fop_task_status_history` nanti bisa baca histori dari `AuditLog` action `'reschedule'` (baik di model `Task` maupun `FopTask`), atau di-refactor supaya `reschedule()` juga nulis ke tabel histori baru itu langsung.
+- **Riwayat/status history (checklist poin ke-5) tadinya BELUM dikerjakan di sini** — audit trail dulu cuma lewat `AuditLog::log()` generik (pola yang sama dipakai `FopTaskController`), bukan tabel `fop_task_status_history` dedicated (tabel itu belum ada di codebase saat Task 7 dikerjakan). **DITUTUP (2026-07-11) pasca Task 9 `Done`:** `TaskObserver` (Task 9) otomatis nulis baris `fop_task_status_history` tiap kali `Task.status` berubah, TERMASUK `RESCHEDULE` — gak butuh kode tambahan di `reschedule()` sendiri (Observer hook di level model `Task`, jalan buat SEMUA jalur transisi termasuk yang udah ada). `AuditLog::log()` yang lama tetap ada juga (2 mekanisme audit trail komplementer, bukan saling gantiin) — histori transisi granular (buat Riwayat FOP, Task 10) baca dari `fop_task_status_history`, sedangkan `AuditLog` tetap buat audit umum siapa-ubah-apa.
 
 **Checklist:**
 - [x] Tombol `Pending` (reschedule) HANYA di top-level Detail Task, benar-benar terpisah dari tombol "Laporan" (Task 6) dan dari tombol "Set Pending" FOP-side existing — 3 tombol beda, gak campur baur.
 - [x] Modal wajib isi alasan sebelum submit (`required` di textarea + validasi backend `required|string|max:500`).
 - [x] Task lepas dari teknisi (pivot `task_teams` dihapus via `teamMembers()->delete()`, plus `fop_task_user` di-detach), `team_id` FopTask di-reset — trigger `rebuildTeamsForDate()` karena roster berubah.
 - [x] Task balik muncul di halaman `/fop-tasks` untuk dijadwalkan ulang ke teknisi lain/hari lain (FopTask status `Pending`, `team_id = null`, technicians kosong).
-- [ ] Riwayat catat histori reschedule lengkap di tabel dedicated (lihat Task 10) — **BLOCKED, cuma `AuditLog::log()` generik dulu, tabel `fop_task_status_history` belum ada.**
+- [x] Riwayat catat histori reschedule lengkap di tabel dedicated (`fop_task_status_history`, entry `to_status = 'pending_reschedule'`) — **DITUTUP pasca Task 9**, otomatis lewat `TaskObserver`, diverifikasi test baru `test_reschedule_writes_dedicated_status_history_row` di `tests/Feature/TaskRescheduleTest.php`.
 
 **Acceptance Criteria:**
 1. [x] Klik tombol `Pending` (reschedule) di Detail Task selalu minta alasan dulu sebelum submit. (`test_reschedule_requires_reason`)
 2. [x] Task yang di-reschedule hilang dari `/tasks-saya` teknisi tsb (pivot lepas), muncul lagi di `/fop-tasks` untuk dijadwal ulang. (`test_reschedule_sets_status_and_releases_technician_assignment`, `test_reschedule_syncs_related_fop_task_and_resets_team`)
 3. [x] Rebuild Team ke-trigger karena roster tanggal itu berubah (task lepas dari teknisi). (dicek lewat assertion `team_id` null + `technicians` kosong pasca rebuild di `test_reschedule_syncs_related_fop_task_and_resets_team`)
-4. [x] 3 mekanisme beda — `Lapor Nanti` (Task 6, assignment tetap), `Pending` reschedule (Task 7, assignment lepas), `fopPending`/"Set Pending" existing (FOP-side, assignment tetap) — masing-masing punya test terpisah dan tidak saling menimpa status/behavior satu sama lain. (`TaskRescheduleTest` vs `TaskReportDialogTest` vs `TaskFopActionsTest`, ketiganya jalan bareng tanpa regresi — 69/69 test gabungan `--filter=Task` hijau)
+4. [x] 3 mekanisme beda — `Lapor Nanti` (Task 6, assignment tetap), `Pending` reschedule (Task 7, assignment lepas), `fopPending`/"Set Pending" existing (FOP-side, assignment tetap) — masing-masing punya test terpisah dan tidak saling menimpa status/behavior satu sama lain, TERMASUK di level histori granular (`lapor_nanti`/`pending_reschedule`/`pending_fop` beda entry walau `fop_tasks.status` sama-sama `Pending`). (`TaskRescheduleTest` vs `TaskReportDialogTest` vs `TaskFopActionsTest`, jalan bareng tanpa regresi — 88/88 gabungan `--filter=Task` hijau)
 
-Test suite: `tests/Feature/TaskRescheduleTest.php` 5/5 hijau. Regression check gabungan (`TaskReportDialogTest`, `FopTasksTest`, `FopTaskTeamServiceTest`, `FopTaskSwitchTechnicianTest`, `FopTaskSwitchTeamTest`, `TaskFopActionsTest`, `TaskBroadcastingTest`) 69/69 hijau, gak ada regresi.
+Test suite: `tests/Feature/TaskRescheduleTest.php` 6/6 hijau (5 asli + 1 baru nutup gap histori). Regression check gabungan (`TaskReportDialogTest`, `FopTasksTest`, `FopTaskTeamServiceTest`, `FopTaskSwitchTechnicianTest`, `FopTaskSwitchTeamTest`, `TaskFopActionsTest`, `TaskBroadcastingTest`, `FopTaskStatusSyncTest`) `--filter=Task` 88/88 hijau, `--filter=FopTask` 65/65 hijau, gak ada regresi.
 
-**Catatan blocker untuk Task lain:**
-- Task 6 checklist poin "Badge/warna beda dari tombol `Pending` (Task 7) di UI" masih **belum dikerjakan** — Task 7 udah kasih tombol `Pending` warna amber sendiri, tapi belum ada widget/badge status di dashboard FOP (`/fop`, `/fop-tasks`) yang bedain visual `pending` (reschedule) vs `lapor_nanti` vs `fopPending`. Itu scope Task 9 (status realtime + badge di FOP-side), bukan dikerjakan di sini.
-- Task 9 sekarang punya prasyarat lengkap dari Task 6 (`report_deferred`) dan Task 7 (`TaskStatus::RESCHEDULE`) buat mapping status FopTask otomatis.
+**Status blocker (semua DITUTUP pasca Task 9, 2026-07-11):**
+- ~~Task 6 checklist poin "Badge/warna beda dari tombol `Pending` (Task 7) di UI"~~ — **DITUTUP**, badge status realtime Task 9 nampilin label granular per transisi.
+- ~~Task 7 checklist poin "Riwayat catat histori reschedule lengkap"~~ — **DITUTUP**, `TaskObserver` (Task 9) nulis histori otomatis.
+- Task 9 sekarang selesai dipakein prasyarat dari Task 6 (`report_deferred`) dan Task 7 (`TaskStatus::RESCHEDULE`) buat mapping status FopTask otomatis — lingkaran Task 6/7/9 sekarang tertutup penuh, gak ada gap tersisa di antara ketiganya.
 
 ---
 
@@ -905,32 +909,44 @@ Test suite: `tests/Feature/FopTaskSortingTest.php` 6/6 hijau. Regression check g
 
 ### Task 9 — Status Realtime (Hapus Dropdown Manual)
 
-**Status:** `To Do` (depends on Task 6, Task 7)
+**Status:** `Done`
 
 **Tujuan:** Status `FopTask` full derive dari status `Task` eksekusi (sync 2 arah), dropdown status manual dihapus — sesuai kebutuhan poin 9.
 
-**Kondisi kode nyata:** `resources/views/fop_tasks/index.blade.php` baris 172 sudah punya dropdown status manual inline (`<select @change="updateStatus({{ $task->id }}, $event.target.value)">`), plus modal create/edit juga punya `<select name="status" x-model="modal.data.status">` di baris 417 — DUA tempat status bisa diubah manual bebas. Keduanya perlu dihapus/diganti jadi badge read-only.
+**Kondisi kode nyata (konfirmasi, line number geser dikit pasca Task 8):** `resources/views/fop_tasks/index.blade.php` punya dropdown status manual inline (`<select @change="updateStatus(...)">`, sekarang di baris ~226) dan modal create/edit punya `<select name="status" x-model="modal.data.status">` (sekarang di baris ~477) — DUA tempat status bisa diubah manual bebas. **Koreksi:** `updateStatus()` BUKAN method PHP terpisah di `FopTaskController` — itu cuma fungsi Alpine.js yang manggil endpoint generik `PUT /fop-tasks/{id}` (method `update()` yang sudah ada, sama kayak `updatePriority()`), jadi gak ada "handler updateStatus()" PHP yang perlu dihapus — cuma pemicu JS/UI-nya yang dicabut.
 
-**File yang dibuat/dirubah:**
+**File yang dibuat/dirubah (realisasi):**
 | File | Aksi |
 |---|---|
-| `app/Observers/TaskObserver.php` (atau event listener existing) | **Baru/Rubah** — sync ke `FopTask.status` berdasar kombinasi `Task.status` + `report_deferred`: `RESCHEDULE` (Task 7) → `FopTask.status = pending`; `PENDING` + `report_deferred = true` (Task 6) → `FopTask.status = lapor_nanti`; `PENDING` + `report_deferred = false` (existing `fopPending`) → tetap `FopTask.status = pending` juga, tapi flag beda di histori biar gak ketuker asalnya dari FOP bukan teknisi. |
-| `database/migrations/2026_07_xx_create_fop_task_status_history_table.php` | **Baru** — tabel log `fop_task_status_history` (`fop_task_id`, `from_status`, `to_status`, `changed_by`, `changed_at`). |
-| `app/Models/FopTaskStatusHistory.php` | **Baru** |
-| `resources/views/fop_tasks/index.blade.php` | **Hapus** dropdown status inline baris 172 (`updateStatus()`) dan dropdown status di modal baris 417 — ganti keduanya jadi badge read-only + tombol aksi eksplisit (approve/reject/cancel laporan). |
-| `app/Http/Controllers/FopTaskController.php` | **Rubah** — hapus handler `updateStatus()` (dipanggil dari baris 172), ganti endpoint approve/reject/cancel spesifik. |
-| `tests/Feature/FopTaskStatusSyncTest.php` | **Baru** |
+| `app/Observers/TaskObserver.php` | **Baru** — hook `updated(Task $task)`: cari `FopTask` terkait (`task_id`), skip kalau `FopTask.status` udah `Cancel` (proteksi override manual FOP, lihat Task 12), resolve target `FopTaskStatus` + label histori granular dari kombinasi `Task.status`/`report_deferred`/`fop_review_status`, update `FopTask.status` (idempotent) + tulis 1 baris `fop_task_status_history`. |
+| `database/migrations/2026_07_17_000001_create_fop_task_status_history_table.php` | **Baru** — tabel `fop_task_status_history` (`fop_task_id`, `from_status`, `to_status`, `changed_by`, `changed_at`). |
+| `app/Models/FopTaskStatusHistory.php` | **Baru** — tambah method `label()`: map `to_status` (string granular) ke label human-readable. |
+| `resources/views/fop_tasks/index.blade.php` | **Hapus** dropdown status inline di tabel dan dropdown status di modal edit — ganti jadi badge read-only (pakai label granular dari histori terbaru) + tombol "Cancel" eksplisit + link "Review Laporan →" kalau laporan lagi nunggu approve. Modal CREATE (bukan edit) tetap punya `<select>` tapi cuma 2 opsi (`Proses`/`Pending`) — ini klasifikasi awal tiket BARU (belum ada status buat di-derive), bukan "ubah status tiket existing" yang dilarang. |
+| `tests/Feature/FopTaskStatusSyncTest.php` | **Baru** — 10 test: semua mapping status + skip saat `FopTask` udah manual Cancel + no-op kalau field gak berubah + no-op kalau `Task` gak punya `FopTask` terkait. |
+
+**Deviasi dari rencana awal (disengaja, dicatat biar gak dianggap bug/scope-creep):**
+- **`fop_tasks.status` (kolom, `FopTaskStatus` enum) TETAP 4 nilai** (`Proses`/`Pending`/`Selesai`/`Cancel`) — **TIDAK** ditambah case `lapor_nanti` seperti tersirat di deskripsi file-list draft awal ("FopTask.status = lapor_nanti"). Nambah case baru di enum itu bakal mecahin banyak `whereIn('status', ['Proses', 'Pending'])` yang tersebar di codebase (`FopTaskTeamService::rebuildTeamsForDate()`, `FopTaskController::index()`, `switchTargetTasks`, `conflictDates`, `autoSyncAndCalculatePriority`, dst) — semua file itu TIDAK ada di file-list Task 9, jadi nambah case baru berarti keluar scope + resiko regresi luas. Sebagai gantinya: `fop_tasks.status` tetap `Pending` buat KETIGA kasus (`pending_reschedule`/`lapor_nanti`/`pending_fop`), bedanya cuma di kolom granular `fop_task_status_history.to_status` (string bebas, bukan enum) + label di UI. Ini tetap penuhin maksud Kebutuhan poin 9 (FOP bisa bedain "task ini nunggu dijadwal ulang" vs "task ini tinggal nunggu laporan") — cuma bedanya di level tampilan/histori, bukan di level skema `fop_tasks.status`.
+- **`app/Models/FopTask.php` disentuh** (di luar file-list literal) — nambah relasi `statusHistories(): HasMany` (perlu didefinisikan biar bisa di-eager-load `with('statusHistories')` dari `index()`). Ini plumbing minimal yang gak terhindarkan, sama kelasnya dengan companion-file lain di bawah.
+- **`app/Providers/AppServiceProvider.php` disentuh** (di luar file-list literal) — 2 baris `Task::observe(TaskObserver::class)`, ngikutin pola registrasi Observer existing (`Invoice::observe`, `Payment::observe`) yang udah ada di file yang sama. Tanpa ini Observer gak pernah ke-trigger sama sekali — bukan penambahan fitur, murni wiring wajib.
+- **Endpoint approve/reject laporan TIDAK dibikin baru di `FopTaskController`** — `fop_review_status` itu kolom di tabel `tasks` (execution), bukan `fop_tasks`, dan `TaskController::review()` udah punya business logic approve/reject LENGKAP (transisi customer workflow, guard CID/Invoice buat PSB, notifikasi) yang bakal keduplikasi kalau dibikin ulang versi FopTask-nya — resiko divergensi 2 sumber logic yang sama. Solusi: badge di `fop_tasks/index.blade.php` nampilin link **"Review Laporan →"** ke `route('tasks.show', $task->task_id)` kalau `Task.status=selesai` dan `fop_review_status=pending` — FOP diarahkan ke tombol Approve/Reject eksplisit yang udah ada di halaman itu (bukan dropdown, satu kali klik). Ini "jalur eksplisit" yang dimaksud AC3, cuma lokasinya di halaman Task, bukan halaman FopTask. **Cancel** tetap dapet tombol baru langsung di `fop_tasks/index.blade.php` (reuse endpoint `update()` existing, payload `{status: 'Cancel'}`) karena itu murni operasi level `fop_tasks`.
+- **`FopTaskController.php` gak ada method PHP yang dihapus** (gak ada `updateStatus()` PHP method dari awal, cuma dugaan draft). Perubahan riilnya cuma eager-load: `index()` nambah kolom `task.status/report_deferred/fop_review_status` + relasi `statusHistories` biar badge & link "Review Laporan" gak N+1.
 
 **Checklist:**
-- [ ] Setiap transisi status `Task` → `FopTask` tercatat di `fop_task_status_history` (bukan cuma overwrite kolom `status`).
-- [ ] Dropdown status manual dihapus dari UI.
-- [ ] Jalur eksplisit tetap ada: approve laporan, reject laporan, cancel (dengan `cancel_reason`, lihat Task 12) — supaya FOP tidak buntu.
-- [ ] Task `pending` (Task 7) dan `lapor_nanti` (Task 6) masing-masing punya baris histori jelas.
+- [x] Setiap transisi status `Task` → `FopTask` tercatat di `fop_task_status_history` (bukan cuma overwrite kolom `status`).
+- [x] Dropdown status manual dihapus dari UI (tabel & modal edit) — modal create sengaja disisakan 2-opsi buat klasifikasi tiket baru, lihat deviasi.
+- [x] Jalur eksplisit tetap ada: Cancel (tombol baru, reuse `update()`), approve/reject laporan (link ke tombol existing di `tasks/show.blade.php`, lihat deviasi) — supaya FOP tidak buntu.
+- [x] Task `pending_reschedule` (Task 7) dan `lapor_nanti` (Task 6) masing-masing punya baris histori jelas dengan `to_status` beda, walau `fop_tasks.status` sama-sama `Pending`.
 
 **Acceptance Criteria:**
-1. Tidak ada lagi dropdown bebas ubah status FopTask di UI.
-2. Tiap transisi status (proses→pending, proses→lapor_nanti, proses→selesai, dll) tercatat di `fop_task_status_history` dengan waktu & aktor.
-3. FOP tetap bisa approve/reject/cancel lewat tombol eksplisit, bukan dropdown generik.
+1. [x] Tidak ada lagi dropdown bebas ubah status FopTask **existing** di UI — badge read-only + tombol aksi eksplisit. (Verifikasi manual: `grep updateStatus(\|name="status" x-model` cuma nyisa 1 hit, itu select 2-opsi khusus create-mode.)
+2. [x] Tiap transisi status tercatat di `fop_task_status_history` dengan waktu (`changed_at`) & aktor (`changed_by`). (`FopTaskStatusSyncTest`, 8 skenario mapping.)
+3. [x] FOP tetap bisa approve/reject (link eksplisit ke Task review) /cancel (tombol eksplisit baru) — bukan dropdown generik.
+
+Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression check gabungan `--filter=FopTask` 65/65 hijau, `--filter=Task` 85/85 hijau. Full suite (`php artisan test`) ada 59 test gagal pre-existing (modul billing/invoice/payment/customer/RBAC — `RolePermissionMatrixTest`, `UserAuditHardeningTest`, `PaymentInputTest`, dst) yang **udah gagal sebelum Task 9 disentuh** (dikonfirmasi lewat `git stash` + re-run) — sama sekali gak nyentuh domain FOP Task/Task, di luar scope buat difix di sini.
+
+**Catatan blocker untuk Task lain:**
+- Task 12 (Cancel dengan `cancel_reason` wajib) belum dikerjakan — tombol "Cancel" baru di Task 9 masih pakai jalur `update()` existing yang BELUM wajibkan alasan (kolom `cancel_reason` di `fop_tasks` belum ada). Begitu Task 12 jalan, tombol Cancel ini perlu diarahkan ke modal alasan, bukan langsung submit.
+- Task 10 (Riwayat Lengkap) sekarang punya sumber data solid dari `fop_task_status_history` (baru ada di Task 9) buat nampilin histori transisi lengkap per tiket — belum ada UI buat nampilin tabel ini di halaman `/fop-tasks/history`, itu scope Task 10.
 
 ---
 

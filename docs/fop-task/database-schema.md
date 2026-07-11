@@ -20,6 +20,7 @@ customers ─┼──▶ fop_tasks ◀──── fop_task_teams ◀───�
 - `fop_tasks.task_id` → `tasks.id` (nullable, `null on delete`) — Task eksekusi teknisi yang di-generate otomatis
 - `fop_task_user` — pivot teknisi PIC per tiket (many-to-many `fop_tasks` ↔ `users`)
 - `fop_task_team_user` — pivot roster anggota Team (many-to-many `fop_task_teams` ↔ `users`)
+- `fop_task_status_history.fop_task_id` → `fop_tasks.id` (cascade delete) — **baru, Task 9**: log transisi status realtime, ditulis otomatis oleh `TaskObserver` tiap kali `Task` eksekusi (`fop_tasks.task_id`) berubah status. Bukan bagian ERD di atas (1 tabel log terpisah, hasMany dari `fop_tasks`), lihat detail di bawah.
 
 ## Tabel `fop_tasks`
 
@@ -40,7 +41,7 @@ Tiket kerja FOP. Sumber migrasi: `2026_06_30_000001`, `_153441_add_fields`, `202
 | `manual_override_at` | timestamp | ✔ | **Baru** (Task 1, migrasi `2026_07_10_000001`). Kalau terisi, `team_id` task ini adalah hasil drop-in manual FOP (Skenario C2/C3) atau hasil `switch-technician` (Task 2) — `rebuildTeamsForDate()` gak akan nimpa `team_id` task ini sampai teknisinya diganti lagi lewat assignment biasa (`store`/`update`), yang otomatis nge-null-in kolom ini balik |
 | `issue` | string | ✔ | Jenis gangguan/keperluan, e.g. "FO CUT", "ODP LOS" |
 | `notes` | text | ✔ | Catatan bebas |
-| `status` | string(20), default `Proses` | | Enum `App\Enums\FopTaskStatus`: Proses, Pending, Selesai, Cancel |
+| `status` | string(20), default `Proses` | | Enum `App\Enums\FopTaskStatus`: Proses, Pending, Selesai, Cancel. **Sejak Task 9**, nilai kolom ini full **derived otomatis** dari status `Task` eksekusi terkait lewat `TaskObserver` (lihat bagian [Observer: `TaskObserver`](#observer-taskobserver-task-9) di bawah) — FOP **gak bisa lagi** ubah manual lewat dropdown. Satu-satunya pengecualian: **`Cancel` tetap manual** (tombol eksplisit di `fop_tasks/index.blade.php`, reuse endpoint `update()`), dan `TaskObserver` sengaja skip sync kalau `status` udah `Cancel` (biar gak ke-overwrite diam-diam sama perubahan `Task` belakangan). |
 | `priority` | string(20), default `low` | | Enum `App\Enums\FopTaskPriority`: low, Medium, High, Urgent — dihitung dinamis dari SLA (lihat [flowchart.md](flowchart.md#3-kalkulasi-prioritas-dinamis-sla-based)) |
 | `pending_reason` | string | ✔ | Wajib diisi kalau `status = Pending` |
 | `client_request_date` | date | ✔ | Wajib diisi kalau `status = Pending`. **Sejak Task 8**, juga dipakai buat sorting antrian di `index()` (lihat [flowchart.md](flowchart.md#8-antrian-sorting-berdasarkan-client_request_date-task-8)) dan badge "JADWAL HARI INI"/"Terjadwal — {tanggal}" di `fop_tasks/index.blade.php`. **Catatan teknis:** meski kolomnya `date`, nilai yang tersimpan (di kedua driver MySQL & SQLite) punya suffix waktu (`'2026-07-11 00:00:00'`), bukan `'2026-07-11'` murni — perbandingan raw SQL harus pakai `>=` terhadap tanggal besok, BUKAN `>` terhadap tanggal hari ini (`>` selalu true gara-gara suffix waktu itu). |
@@ -91,6 +92,26 @@ Roster anggota Team (`FopTaskTeam::members()`).
 
 Unique: (`fop_task_team_id`, `user_id`).
 
+## Tabel `fop_task_status_history` (Task 9)
+
+**Baru.** Log tiap transisi status realtime `FopTask` yang di-derive dari `Task` eksekusi — ditulis otomatis oleh `TaskObserver`, gak pernah ditulis manual dari controller. Sumber migrasi: `2026_07_17_000001_create_fop_task_status_history_table`.
+
+| Kolom | Tipe | Nullable | Keterangan |
+|-------|------|----------|------------|
+| `id` | bigint PK | | |
+| `fop_task_id` | FK → `fop_tasks.id`, cascade delete | | Tiket FOP yang statusnya berubah |
+| `from_status` | string(30) | ✔ | Nilai `FopTaskStatus` SEBELUM transisi (mis. `Proses`) |
+| `to_status` | string(30) | | **Label granular**, BUKAN nilai `FopTaskStatus` mentah — kolom bebas (bukan enum-cast) yang bisa lebih detail dari 4 nilai `fop_tasks.status`. Nilai yang dipakai `TaskObserver`: `proses`, `proses_dikerjakan`, `proses_review`, `pending_reschedule`, `lapor_nanti`, `pending_fop`, `selesai`, `cancel`. Lihat mapping lengkap di [flowchart.md § Status Realtime](flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9). |
+| `changed_by` | FK → `users.id`, `null on delete` | ✔ | `auth()->id()` pas transisi terjadi (bisa null kalau dipicu proses tanpa auth context, mis. artisan command) |
+| `changed_at` | timestamp | | Waktu transisi (diisi `now()` oleh Observer, bukan `created_at` biar konsisten walau ada delay processing) |
+| `created_at` / `updated_at` | timestamp | | |
+
+Index: `fop_task_id`.
+
+**Kenapa `to_status` bukan enum `FopTaskStatus`:** `fop_tasks.status` SENGAJA tetap 4 nilai (lihat catatan di kolom `status` tabel `fop_tasks` di atas) supaya gak mecahin `whereIn('status', ['Proses', 'Pending'])` yang tersebar di banyak tempat (`FopTaskTeamService::rebuildTeamsForDate()`, `FopTaskController::index()`, dll). Granularitas ekstra (bedain `lapor_nanti` vs `pending_reschedule` vs `pending_fop`, walau semua `fop_tasks.status = Pending`) disimpan di `to_status` sini aja. `FopTaskStatusHistory::label()` nge-map nilai granular ini ke teks human-readable buat badge UI.
+
+Model: `app/Models/FopTaskStatusHistory.php` — relasi `fopTask(): BelongsTo(FopTask::class)`, `changedByUser(): BelongsTo(User::class, 'changed_by')`, method `label(): string`.
+
 ## SLA per `TaskType` (dipakai kalkulasi prioritas & deadline)
 
 Sumber: `App\Enums\TaskType::slaMinutes()`.
@@ -118,12 +139,40 @@ customer(): BelongsTo(Customer::class)
 technicians(): BelongsToMany(User::class, 'fop_task_user', 'fop_task_id', 'user_id')
 task(): BelongsTo(Task::class)
 team(): BelongsTo(FopTaskTeam::class, 'team_id')
+statusHistories(): HasMany(FopTaskStatusHistory::class)   // Task 9, orderByDesc('changed_at')
 
 // FopTaskTeam
 creator(): BelongsTo(User::class, 'created_by')
 members(): BelongsToMany(User::class, 'fop_task_team_user', 'fop_task_team_id', 'user_id')
 fopTasks(): HasMany(FopTask::class, 'team_id')
+
+// FopTaskStatusHistory (Task 9)
+fopTask(): BelongsTo(FopTask::class)
+changedByUser(): BelongsTo(User::class, 'changed_by')
 ```
+
+## Observer: `TaskObserver` (Task 9)
+
+**File:** `app/Observers/TaskObserver.php`, registered via `Task::observe(TaskObserver::class)` di `AppServiceProvider::boot()`.
+
+Hook `updated(Task $task)` — fire tiap kali model `Task` (eksekusi teknisi) di-save dengan perubahan di kolom `status`, `report_deferred`, atau `fop_review_status`. Cari `FopTask` terkait (`FopTask::where('task_id', $task->id)`), skip total kalau gak ketemu (Task yang bukan hasil FOP-flow, mis. task manual admin, gak kena efek apa-apa) ATAU kalau `FopTask.status` udah `Cancel` (proteksi override manual FOP, lihat Task 12).
+
+Mapping (`resolveTarget()`), sesuai tabel "status teknisi → status FopTask" di `docs/fop-task/analisa-auto-team.md § 10`:
+
+| `Task.status` | Kondisi tambahan | `FopTaskStatus` target | `to_status` (histori) |
+|---|---|---|---|
+| `terjadwal` | | `Proses` | `proses` |
+| `in_progress` | | `Proses` | `proses_dikerjakan` |
+| `reschedule` (Task 7) | | `Pending` | `pending_reschedule` |
+| `pending` | `report_deferred = true` (Task 6, Lapor Nanti) | `Pending` | `lapor_nanti` |
+| `pending` | `report_deferred = false` (`fopPending` existing) | `Pending` | `pending_fop` |
+| `selesai` | `fop_review_status = approved` | `Selesai` | `selesai` |
+| `selesai` | `fop_review_status = pending` (nunggu FOP review) | `Proses` | `proses_review` |
+| `dibatalkan` | | `Cancel` | `cancel` |
+
+Efek: `FopTask.status` di-update (idempotent, cuma nulis kalau nilainya beda) + 1 baris baru selalu ditulis ke `fop_task_status_history` (`from_status`/`to_status`/`changed_by`/`changed_at`) tiap ada transisi yang match tabel di atas. Kombinasi status yang gak match (mis. Task lain yang gak relevan) di-skip diam-diam (`[null, null]`).
+
+**Bukan bagian dari Observer:** `team_id`, pivot teknisi, dan trigger `rebuildTeamsForDate()` — itu tetap tanggung jawab controller yang mengubah `Task` (`TaskController::reschedule()` buat Task 7, dst), Observer murni sinkron kolom `status` + tulis histori.
 
 ## Service: `FopTaskTeamService` (Task 1 & 2)
 

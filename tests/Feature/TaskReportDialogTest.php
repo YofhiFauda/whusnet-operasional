@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Models\FopTask;
+use App\Models\FopTaskStatusHistory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -133,6 +136,87 @@ class TaskReportDialogTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Lapor Sekarang');
+        $response->assertSee('Lapor Nanti');
+    }
+
+    /**
+     * Nutup gap Task 6 checklist poin ke-4 ("Sinkron ke FopTask: status jadi
+     * lapor_nanti") yang tadinya BLOCKED nunggu Task 9 (TaskObserver + tabel
+     * fop_task_status_history). Sekarang Task 9 udah `Done` — verifikasi end-to-end
+     * lewat jalur HTTP asli Task 6 (`tasks.pending` + `report_deferred=1`), bukan
+     * cuma lewat model langsung kayak `FopTaskStatusSyncTest`.
+     */
+    public function test_lapor_nanti_syncs_fop_task_status_and_writes_dedicated_history_row(): void
+    {
+        $task = $this->makeInProgressTask('TASK-2026-9005');
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-2026-9005',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan',
+            'issue' => 'FO CUT',
+            'status' => 'Proses',
+            'priority' => 'High',
+            'task_id' => $task->id,
+        ]);
+
+        $this->actingAs($this->techUser)
+            ->post(route('tasks.pending', $task->id), [
+                'pending_reason' => 'Kendala sinyal di lokasi',
+                'report_deferred' => '1',
+            ])
+            ->assertRedirect();
+
+        $fopTask->refresh();
+        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
+
+        $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
+        $this->assertNotNull($history);
+        $this->assertEquals('lapor_nanti', $history->to_status);
+        $this->assertEquals('Lapor Nanti', $history->label());
+
+        // Beda entry dari FOP-side "Set Pending" (pending_fop) & dari reschedule
+        // Task 7 (pending_reschedule) — walau fop_tasks.status sama-sama Pending.
+        $this->assertNotEquals('pending_fop', $history->to_status);
+        $this->assertNotEquals('pending_reschedule', $history->to_status);
+    }
+
+    /**
+     * Nutup gap Task 6 checklist poin ke-5 ("Badge/warna beda dari tombol Pending
+     * Task 7 di dashboard FOP") — badge status realtime Task 9 di
+     * `fop_tasks/index.blade.php` sekarang nampilin label granular per transisi,
+     * jadi "Lapor Nanti" gak ketuker sama "Pending (Reschedule)"/"Pending" biasa.
+     */
+    public function test_lapor_nanti_shows_distinct_badge_label_on_fop_tasks_dashboard(): void
+    {
+        $task = $this->makeInProgressTask('TASK-2026-9006');
+        FopTask::create([
+            'task_number' => 'TFOP-2026-9006',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan',
+            'issue' => 'FO CUT',
+            'status' => 'Proses',
+            'priority' => 'High',
+            'task_id' => $task->id,
+        ]);
+
+        $this->actingAs($this->techUser)
+            ->post(route('tasks.pending', $task->id), [
+                'pending_reason' => 'Kendala sinyal di lokasi',
+                'report_deferred' => '1',
+            ]);
+
+        $fopRole = Role::where('code', 'fop')->first();
+        $fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $fopUser->roleScopes()->create([
+            'role_id' => $fopRole->id,
+            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+        ]);
+
+        $response = $this->actingAs($fopUser)->get(route('fop-tasks.index'));
+
+        $response->assertOk();
         $response->assertSee('Lapor Nanti');
     }
 }
