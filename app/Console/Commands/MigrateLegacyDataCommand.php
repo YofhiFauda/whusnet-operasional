@@ -37,7 +37,7 @@ protected $signature = 'app:import-legacy-sql
 
         if (!file_exists($sqlPath)) {
             $this->error("File {$fileName} does not exist in root directory.");
-            return Command::FAILURE;
+            return \Symfony\Component\Console\Command\Command::FAILURE;
         }
 
         $this->info("Starting migration from {$fileName}");
@@ -177,7 +177,7 @@ protected $signature = 'app:import-legacy-sql
 
         if (empty($paketRows) && empty($penggunaRows)) {
             $this->error("No data parsed. Make sure the SQL format matches.");
-            return Command::FAILURE;
+            return \Symfony\Component\Console\Command\Command::FAILURE;
         }
 
 
@@ -460,7 +460,7 @@ protected $signature = 'app:import-legacy-sql
 
             $candidateCode = $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '';
             if ($candidateCode !== '') {
-                if (isset($usedCustomerCodes[$candidateCode]) || \App\Models\Customer::where('customer_code', $candidateCode)->exists()) {
+                if (isset($usedCustomerCodes[$candidateCode]) || \App\Models\Customer::query()->where('customer_code', $candidateCode)->exists()) {
                     $candidateCode = ''; // Duplicate found, clear it so it gets auto-generated later
                 } else {
                     $usedCustomerCodes[$candidateCode] = true;
@@ -1029,7 +1029,7 @@ protected $signature = 'app:import-legacy-sql
         $validateData = json_decode($validateResponse->getContent(), true);
         if (!$validateData['success']) {
             $this->error("Validation failed. " . json_encode($validateData['errors'] ?? []));
-            return Command::FAILURE;
+            return \Symfony\Component\Console\Command\Command::FAILURE;
         }
 
         $this->info("Validation successful. Confirming import...");
@@ -1051,10 +1051,10 @@ protected $signature = 'app:import-legacy-sql
             }
 
             $this->info("Data migration execution completed.");
-            return Command::SUCCESS;
+            return \Symfony\Component\Console\Command\Command::SUCCESS;
         } catch (\Exception $e) {
             $this->error("Migration failed with exception: " . $e->getMessage());
-            return Command::FAILURE;
+            return \Symfony\Component\Console\Command\Command::FAILURE;
         }
     }
 

@@ -13,6 +13,8 @@ use App\Models\TaskTeam;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Models\FopTask;
+use App\Services\FopTaskTeamService;
 
 class TaskService
 {
@@ -103,6 +105,8 @@ class TaskService
 
             \App\Models\AuditLog::log($task, 'updated', $oldValues, $task->toArray());
 
+            $this->syncToFopTask($task);
+
             return $task->refresh();
         });
     }
@@ -131,7 +135,7 @@ class TaskService
             $memberIds[] = $actor->id;
         }
 
-        $activeTask = Task::where('id', '!=', $task->id)
+        $activeTask = Task::where('id', '!=', $task->id, 'and')
             ->where('status', TaskStatus::IN_PROGRESS->value)
             ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
             ->first();
@@ -183,7 +187,7 @@ class TaskService
         broadcast(new TaskCompleted($task));
 
         // Notify FOP users in the same POP
-        $fopUsers = \App\Models\User::whereHas('role', fn ($q) => $q->where('code', 'fop'))
+        $fopUsers = User::whereHas('role', fn ($q) => $q->where('code', 'fop'))
             ->where(function ($query) use ($task) {
                 $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
                     ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
@@ -227,8 +231,8 @@ class TaskService
 
             // Stop the timer on CustomerSurvey or CustomerInstallation if task type is survey or pemasangan
             if ($task->customer_id) {
-                if ($task->task_type === \App\Enums\TaskType::SURVEY) {
-                    $survey = \App\Models\CustomerSurvey::where('customer_id', $task->customer_id)
+                if ($task->task_type === TaskType::SURVEY) {
+                    $survey = \App\Models\CustomerSurvey::where('customer_id', '=', $task->customer_id, 'and')
                         ->latest()
                         ->first();
                     if ($survey && $survey->started_at && !$survey->completed_at) {
@@ -239,8 +243,8 @@ class TaskService
                         $survey->end_time = $completedAt->toTimeString();
                         $survey->save();
                     }
-                } elseif ($task->task_type === \App\Enums\TaskType::PEMASANGAN) {
-                    $installation = \App\Models\CustomerInstallation::where('customer_id', $task->customer_id)
+                } elseif ($task->task_type === TaskType::PEMASANGAN) {
+                    $installation = \App\Models\CustomerInstallation::where('customer_id', '=', $task->customer_id, 'and')
                         ->latest()
                         ->first();
                     if ($installation && $installation->started_at && !$installation->completed_at) {
@@ -342,7 +346,7 @@ class TaskService
 
         // Log the change — batch-load all relevant users to avoid N+1
         $allUserIds = array_unique(array_filter(array_merge([$reassignerId, $oldUserId, $newUserId], $otherUserIds)));
-        $usersById = \App\Models\User::whereIn('id', $allUserIds)->get()->keyBy('id');
+        $usersById = User::whereIn('id', $allUserIds)->get()->keyBy('id');
         $reassigner = $usersById->get($reassignerId);
         $oldUser = $usersById->get($oldUserId);
         $newUser = $usersById->get($newUserId);
@@ -406,7 +410,9 @@ class TaskService
         }
 
         // Broadcast Event to notify techs/frontend about schedule/team change
-        broadcast(new \App\Events\TaskScheduled($task, $scheduleChanged ? 'rescheduled' : 'created'));
+        broadcast(new TaskScheduled($task, $scheduleChanged ? 'rescheduled' : 'created'));
+
+        $this->syncToFopTask($task);
     }
 
     /**
@@ -433,7 +439,7 @@ class TaskService
                 $q->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
                   ->where('scheduled_at', '<', $end->toDateTimeString());
 
-                if (\Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite') {
+                if (DB::connection()->getDriverName() === 'sqlite') {
                     $q->whereRaw("datetime(scheduled_at, '+' || sla_minutes || ' minutes') > ?", [$start->toDateTimeString()]);
                 } else {
                     $q->whereRaw("DATE_ADD(scheduled_at, INTERVAL sla_minutes MINUTE) > ?", [$start->toDateTimeString()]);
@@ -464,7 +470,7 @@ class TaskService
         $count = Task::whereBetween('created_at', [
             Carbon::createFromDate($year)->startOfYear(),
             Carbon::createFromDate($year)->endOfYear(),
-        ])->count() + 1;
+        ], 'and', false)->count() + 1;
         return sprintf('TASK-%s-%04d', $year, $count);
     }
 
@@ -484,10 +490,43 @@ class TaskService
                 ));
 
                 // Optional: keep Telegram if already setup
-                \App\Jobs\SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+                SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
             }
         }
 
-        broadcast(new \App\Events\TaskScheduled($task, $eventType));
+        broadcast(new TaskScheduled($task, $eventType));
+    }
+
+    /**
+     * Synchronize Task changes (technicians and schedule) to corresponding FopTask.
+     */
+    private function syncToFopTask(Task $task): void
+    {
+        $fopTask = FopTask::where('task_id', '=', $task->id, 'and')->first();
+        if (!$fopTask) {
+            return;
+        }
+
+        $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
+        $newTaskDate = $task->scheduled_at;
+
+        // Sync technicians
+        $technicianIds = $task->teamMembers()->pluck('user_id')->toArray();
+        $fopTask->technicians()->sync($technicianIds);
+
+        // Sync task_date
+        if ($newTaskDate) {
+            $fopTask->task_date = $newTaskDate;
+        }
+        $fopTask->save();
+
+        // Rebuild teams for old and new dates if scheduled date changed
+        $fopTeamService = app(FopTaskTeamService::class);
+        if ($oldTaskDate && $newTaskDate && !$oldTaskDate->isSameDay($newTaskDate)) {
+            $fopTeamService->rebuildTeamsForDate($oldTaskDate);
+        }
+        if ($fopTask->task_date) {
+            $fopTeamService->rebuildTeamsForDate($fopTask->task_date);
+        }
     }
 }

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use App\Enums\TaskType;
 use App\Services\TaskService;
+use App\Services\FopTaskTeamService;
 
 class FopTaskController extends Controller
 {
@@ -113,7 +114,7 @@ class FopTaskController extends Controller
 
         $canEditFopTaskType = auth()->user()->hasPermission('fop_tasks.update_sensitive');
 
-        // Daftar Team (dipakai dropdown filter, dropdown di modal create/edit, dan panel Kelola Team)
+        // Daftar Team (dipakai dropdown filter & dropdown "+ Masukkan ke Team..." di kolom Team)
         $teams = FopTaskTeam::with(['members:id,name', 'fopTasks:id,team_id,status', 'fopTasks.technicians:id,name'])
             ->orderByDesc('work_date')
             ->limit(50)
@@ -141,7 +142,9 @@ class FopTaskController extends Controller
                 ];
             });
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams'));
+        $teamConflicts = $this->currentTeamConflicts();
+
+        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts'));
     }
 
     /**
@@ -158,7 +161,6 @@ class FopTaskController extends Controller
             'village_id' => ['required', 'exists:villages,id'],
             'pop_id' => ['required', 'exists:pops,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
-            'team_id' => ['nullable', 'exists:fop_task_teams,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'string', Rule::enum(FopTaskStatus::class)],
@@ -185,7 +187,6 @@ class FopTaskController extends Controller
             $fopTask->village_id = $validated['village_id'];
             $fopTask->pop_id = $validated['pop_id'];
             $fopTask->customer_id = $validated['customer_id'] ?? null;
-            $fopTask->team_id = $validated['team_id'] ?? null;
             $fopTask->issue = $validated['issue'] ?? null;
             $fopTask->notes = $validated['notes'] ?? null;
             $fopTask->status = $validated['status'];
@@ -204,18 +205,14 @@ class FopTaskController extends Controller
                 $technicians = $validated['technicians'];
                 $fopTask->technicians()->sync($technicians);
 
-                $taskTitle = 'FOP: ' . $fopTask->tugas;
-                if (count($technicians) > 1) {
-                    $leadUser = \App\Models\User::find($technicians[0]);
-                    $teamName = $leadUser ? 'Tim ' . strtok($leadUser->name, ' ') : 'Tim Gabungan';
-                    $taskTitle = '[' . $teamName . '] ' . $taskTitle;
-                }
-
+                // Title dibuat polos dulu — prefix "[Nama Team]" diisi oleh
+                // FopTaskTeamService::rebuildTeamsForDate() begitu team-nya kebentuk
+                // (dipanggil beberapa baris di bawah), bukan ditebak di sini.
                 $taskData = [
                     'customer_id' => $fopTask->customer_id,
                     'pop_id' => $fopTask->pop_id,
                     'task_type' => $fopTask->category->value,
-                    'title' => $taskTitle,
+                    'title' => 'FOP: ' . $fopTask->tugas,
                     'description' => trim($fopTask->issue . "\n" . $fopTask->notes),
                     'team_member_ids' => $technicians,
                     'scheduled_at' => $fopTask->task_date,
@@ -232,7 +229,16 @@ class FopTaskController extends Controller
                 AuditLog::log($fopTask, 'create', null, $fopTask->load('technicians')->toArray());
             }
 
-            return redirect()->route('fop-tasks.index')->with('success', "Task FOP {$taskNumber} berhasil dibuat.");
+            $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+
+            $redirect = redirect()->route('fop-tasks.index')
+                ->with('success', "Task FOP {$taskNumber} berhasil dibuat.");
+
+            if (count($technicians) > 1) {
+                $redirect = $redirect->with('fop_team_conflicts', $teamResult['conflicts']);
+            }
+
+            return $redirect;
         });
     }
 
@@ -250,7 +256,6 @@ class FopTaskController extends Controller
             'village_id' => ['sometimes', 'required', 'exists:villages,id'],
             'pop_id' => ['sometimes', 'required', 'exists:pops,id'],
             'customer_id' => ['nullable', 'exists:customers,id'],
-            'team_id' => ['sometimes', 'nullable', 'exists:fop_task_teams,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'required', 'string', Rule::enum(FopTaskStatus::class)],
@@ -272,6 +277,8 @@ class FopTaskController extends Controller
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
             $oldValues = $fopTask->load('technicians')->toArray();
+            $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
+            $oldTechnicianIds = collect($oldValues['technicians'] ?? [])->pluck('id')->sort()->values()->all();
 
             if (isset($validated['category'])) $fopTask->category = $validated['category'];
             if (isset($validated['task_date'])) $fopTask->task_date = $validated['task_date'];
@@ -279,7 +286,6 @@ class FopTaskController extends Controller
             if (array_key_exists('village_id', $validated)) $fopTask->village_id = $validated['village_id'];
             if (array_key_exists('pop_id', $validated)) $fopTask->pop_id = $validated['pop_id'];
             if (array_key_exists('customer_id', $validated)) $fopTask->customer_id = $validated['customer_id'];
-            if (array_key_exists('team_id', $validated)) $fopTask->team_id = $validated['team_id'];
             if (array_key_exists('issue', $validated)) $fopTask->issue = $validated['issue'];
             if (array_key_exists('notes', $validated)) $fopTask->notes = $validated['notes'];
             if (isset($validated['priority'])) $fopTask->priority = $validated['priority'];
@@ -312,21 +318,26 @@ class FopTaskController extends Controller
 
             if ($request->has('technicians')) {
                 $technicians = $validated['technicians'] ?? [];
+                $newTechnicianIds = collect($technicians)->sort()->values()->all();
+
+                if ($newTechnicianIds !== $oldTechnicianIds) {
+                    $fopTask->team_id = null;
+                    if ($fopTask->manual_override_at !== null) {
+                        $fopTask->manual_override_at = null;
+                    }
+                    $fopTask->save();
+                }
+
                 $fopTask->technicians()->sync($technicians);
 
                 if (!empty($technicians) || $fopTask->task_id) {
-                    $taskTitle = 'FOP: ' . $fopTask->tugas;
-                    if (count($technicians) > 1) {
-                        $leadUser = \App\Models\User::find($technicians[0]);
-                        $teamName = $leadUser ? 'Tim ' . strtok($leadUser->name, ' ') : 'Tim Gabungan';
-                        $taskTitle = '[' . $teamName . '] ' . $taskTitle;
-                    }
-
+                    // Title dibuat polos — prefix "[Nama Team]" diisi oleh
+                    // FopTaskTeamService::rebuildTeamsForDate() setelah ini (bukan ditebak di sini).
                     $taskData = [
                         'customer_id' => $fopTask->customer_id,
                         'pop_id' => $fopTask->pop_id,
                         'task_type' => $fopTask->category->value,
-                        'title' => $taskTitle,
+                        'title' => 'FOP: ' . $fopTask->tugas,
                         'description' => trim($fopTask->issue . "\n" . $fopTask->notes),
                         'team_member_ids' => $technicians,
                         'scheduled_at' => $fopTask->task_date,
@@ -349,15 +360,39 @@ class FopTaskController extends Controller
                 AuditLog::log($fopTask, 'update', $oldValues, $newValues);
             }
 
+            $conflicts = [];
+            if ($fopTask->task_date) {
+                if ($oldTaskDate && !$oldTaskDate->isSameDay($fopTask->task_date)) {
+                    app(FopTaskTeamService::class)->rebuildTeamsForDate($oldTaskDate);
+                }
+
+                $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+                $technicianCount = $request->has('technicians') ? count($validated['technicians'] ?? []) : $fopTask->technicians()->count();
+                if ($technicianCount > 1) {
+                    $conflicts = $teamResult['conflicts'];
+                }
+            }
+
             if ($request->wantsJson()) {
+                if (!empty($conflicts)) {
+                    session()->flash('fop_team_conflicts', $conflicts);
+                }
                 return response()->json([
                     'success' => true,
                     'message' => "Task FOP {$fopTask->task_number} berhasil diperbarui.",
-                    'task' => $fopTask
+                    'task' => $fopTask,
+                    'team_conflicts' => $conflicts,
                 ]);
             }
 
-            return redirect()->route('fop-tasks.index')->with('success', "Task FOP {$fopTask->task_number} berhasil diperbarui.");
+            $redirect = redirect()->route('fop-tasks.index')
+                ->with('success', "Task FOP {$fopTask->task_number} berhasil diperbarui.");
+
+            if (!empty($conflicts)) {
+                $redirect = $redirect->with('fop_team_conflicts', $conflicts);
+            }
+
+            return $redirect;
         });
     }
 
@@ -383,98 +418,117 @@ class FopTaskController extends Controller
     }
 
     /**
-     * Bikin Team harian baru (roster teknisi berlaku 1 hari, bisa lanjut kalau ada task Pending).
+     * Drop-in manual task ke Team (Skenario C2: solo task tanpa overlap; Skenario C3:
+     * task yang narik teknisi dari >=2 team berbeda). FOP pilih team tujuan lewat
+     * dropdown "+ Masukkan ke Team..." (team_id terisi), atau minta dibikinkan Team
+     * baru dari roster task ini sendiri (team_id kosong).
+     * Assignment ini di-pin lewat manual_override_at supaya gak ketimpa rebuild
+     * otomatis berikutnya, sampai teknisi task ini diganti lagi lewat assignment biasa.
      */
-    public function teamStore(Request $request)
+    public function assignToTeam(Request $request, FopTask $fopTask)
     {
         $this->authorizeAccess();
 
         $validated = $request->validate([
-            'name' => ['nullable', 'string', 'max:100'],
-            'work_date' => ['required', 'date'],
-            'member_ids' => ['required', 'array', 'min:1'],
-            'member_ids.*' => ['exists:users,id'],
+            'team_id' => ['nullable', 'integer', 'exists:fop_task_teams,id'],
         ]);
 
-        $conflicts = FopTaskTeam::findMemberConflicts($validated['member_ids'], $validated['work_date']);
-        if (!empty($conflicts)) {
-            return back()->withInput()->withErrors([
-                'member_ids' => $this->formatConflictMessage($conflicts),
-            ]);
+        if (!$fopTask->task_date) {
+            return back()->withErrors(['team_id' => 'Task ini belum punya tanggal jadwal.']);
         }
 
-        $team = FopTaskTeam::create([
-            'name' => $validated['name'] ?: 'Tim ' . Carbon::parse($validated['work_date'])->format('d/m'),
-            'work_date' => $validated['work_date'],
-            'created_by' => auth()->id(),
-        ]);
+        return DB::transaction(function () use ($validated, $fopTask, $request) {
+            $workDate = $fopTask->task_date->toDateString();
 
-        $team->members()->sync($validated['member_ids']);
+            if (!empty($validated['team_id'])) {
+                $team = FopTaskTeam::findOrFail($validated['team_id']);
 
-        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$team->name}\" berhasil dibuat.");
-    }
+                if ($team->work_date->toDateString() !== $workDate) {
+                    return back()->withErrors([
+                        'team_id' => "Team \"{$team->name}\" bukan untuk tanggal {$workDate}, gak bisa dipakai buat task ini.",
+                    ]);
+                }
+            } else {
+                $team = FopTaskTeam::create([
+                    'name' => app(FopTaskTeamService::class)->nextTeamName($fopTask->task_date->copy()),
+                    'work_date' => $workDate,
+                    'created_by' => auth()->id(),
+                ]);
+                $team->members()->sync($fopTask->technicians->pluck('id'));
+            }
 
-    /**
-     * Update nama/roster Team. Perubahan roster gak ngerubah task yang udah ke-assign sebelumnya.
-     */
-    public function teamUpdate(Request $request, FopTaskTeam $team)
-    {
-        $this->authorizeAccess();
+            $oldValues = $fopTask->toArray();
+            $fopTask->team_id = $team->id;
+            $fopTask->manual_override_at = now();
+            $fopTask->save();
 
-        $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:100'],
-            'member_ids' => ['sometimes', 'required', 'array', 'min:1'],
-            'member_ids.*' => ['exists:users,id'],
-        ]);
+            // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda
+            foreach ($fopTask->technicians as $tech) {
+                $otherTasks = FopTask::where('id', '!=', $fopTask->id)
+                    ->whereDate('task_date', $workDate)
+                    ->whereHas('technicians', fn ($q) => $q->where('users.id', $tech->id))
+                    ->whereNotNull('team_id')
+                    ->where('team_id', '!=', $team->id)
+                    ->get();
 
-        if (isset($validated['member_ids'])) {
-            $conflicts = FopTaskTeam::findMemberConflicts(
-                $validated['member_ids'],
-                $team->work_date->toDateString(),
-                $team->id
-            );
-            if (!empty($conflicts)) {
-                return back()->withInput()->withErrors([
-                    'member_ids' => $this->formatConflictMessage($conflicts),
+                foreach ($otherTasks as $otherTask) {
+                    $otherTask->technicians()->detach($tech->id);
+
+                    // Update execution task (tabel tasks) jika ada
+                    if ($otherTask->task_id && $otherTask->task) {
+                        $remainingTechs = $otherTask->technicians()->pluck('users.id')->all();
+                        app(TaskService::class)->update($otherTask->task, [
+                            'team_member_ids' => $remainingTechs,
+                        ], auth()->user());
+                    }
+                }
+            }
+
+            if (class_exists(AuditLog::class)) {
+                AuditLog::log($fopTask, 'assign_to_team', $oldValues, $fopTask->toArray());
+            }
+
+            $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
+            $team->refresh();
+
+            $conflicts = [];
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Task berhasil dimasukkan ke Team \"{$team->name}\".",
+                    'team_conflicts' => $conflicts,
                 ]);
             }
-        }
 
-        if (isset($validated['name'])) $team->name = $validated['name'];
-        $team->save();
-
-        if (isset($validated['member_ids'])) {
-            $team->members()->sync($validated['member_ids']);
-        }
-
-        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$team->name}\" berhasil diperbarui.");
+            return redirect()->route('fop-tasks.index')
+                ->with('success', "Task berhasil dimasukkan ke Team \"{$team->name}\".");
+        });
     }
 
     /**
-     * Format pesan error konflik keanggotaan team jadi 1 kalimat.
+     * Konflik team (Skenario C3) yang lagi nunggu keputusan FOP — dihitung LANGSUNG dari
+     * state DB (task multi-teknisi tapi `team_id` null), bukan cuma dari session flash.
+     * Jadi kalau modal konfliknya gak sengaja ke-close atau halaman di-refresh, konfliknya
+     * tetap kebaca lagi begitu index() dipanggil ulang — gak ilang/hangus kayak flash.
      */
-    private function formatConflictMessage(array $conflicts): string
+    private function currentTeamConflicts(): array
     {
-        $lines = array_map(
-            fn ($c) => "{$c['user_name']} udah di Team \"{$c['team_name']}\"",
-            $conflicts
-        );
+        $conflictDates = FopTask::whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
+            ->whereNull('team_id')
+            ->has('technicians', '>=', 2)
+            ->get(['task_date'])
+            ->map(fn (FopTask $t) => $t->task_date->toDateString())
+            ->unique();
 
-        return 'Gagal: ' . implode(', ', $lines) . ' — 1 teknisi gak boleh di 2 team aktif di tanggal yang sama.';
-    }
+        $conflicts = collect(session('fop_team_conflicts', []));
 
-    /**
-     * Hapus Team. Task yang masih nempel gak ikut kehapus — team_id otomatis null (FK set null).
-     */
-    public function teamDestroy(FopTaskTeam $team)
-    {
-        $this->authorizeAccess();
+        foreach ($conflictDates as $date) {
+            $result = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($date));
+            $conflicts = $conflicts->merge($result['conflicts']);
+        }
 
-        $teamName = $team->name;
-        $team->members()->detach();
-        $team->delete();
-
-        return redirect()->route('fop-tasks.index')->with('success', "Team \"{$teamName}\" berhasil dihapus.");
+        return $conflicts->unique('task_id')->values()->all();
     }
 
     /**

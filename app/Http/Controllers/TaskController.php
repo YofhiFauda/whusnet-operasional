@@ -145,7 +145,7 @@ class TaskController extends Controller
             'description'       => 'nullable|string|max:2000',
             'task_type'         => 'sometimes|required|in:' . implode(',', TaskType::manualValues()),
             'scheduled_at'      => 'sometimes|required|date',
-            'team_member_ids'   => 'sometimes|array|min:1|max:3',
+            'team_member_ids'   => 'sometimes|array|min:1',
             'team_member_ids.*' => 'exists:users,id',
             'conflict_override' => 'nullable|boolean',
         ]);
@@ -224,20 +224,33 @@ class TaskController extends Controller
         $q    = $request->query('q', '');
         $user = auth()->user();
 
-        $customers = Customer::with('village')->applyUserScope($user)
+        $customers = Customer::with(['village', 'pop'])->applyUserScope($user)
             ->where(function ($query) use ($q) {
                 $query->where('full_name', 'like', "%{$q}%")
                       ->orWhere('cid', 'like', "%{$q}%")
                       ->orWhere('customer_code', 'like', "%{$q}%");
             })
-            ->whereIn('status', ['active', 'siap_billing'])
-            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id', 'village_id')
+            ->whereIn('status', [
+                'active',
+                'siap_billing',
+                'registered',
+                'waiting_survey',
+                'survey_in_progress',
+                'surveyed',
+                'waiting_acc',
+                'waiting_installation',
+                'installation_in_progress',
+                'installed',
+                'verification_admin',
+                'revision_installation'
+            ])
+            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id', 'village_id', 'distribution_id', 'status')
             ->limit(10)
             ->get();
 
         return response()->json($customers->map(function ($c) {
             $desa = $c->village ? strtoupper($c->village->name) : 'NODESA';
-            $cid = $c->cid ?: $c->customer_code;
+            $cid = $c->display_id ?: ($c->cid ?: $c->customer_code);
             $nama = strtoupper($c->full_name);
             
             return [

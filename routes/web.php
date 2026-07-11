@@ -339,15 +339,13 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
         Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');
-        Route::post('/fop-tasks/teams', [FopTaskController::class, 'teamStore'])->name('fop-tasks.teams.store');
     });
     Route::middleware('permission:fop_tasks.update')->group(function () {
         Route::put('/fop-tasks/{fop_task}', [FopTaskController::class, 'update'])->name('fop-tasks.update');
-        Route::put('/fop-tasks/teams/{team}', [FopTaskController::class, 'teamUpdate'])->name('fop-tasks.teams.update');
+        Route::post('/fop-tasks/{fop_task}/assign-to-team', [FopTaskController::class, 'assignToTeam'])->name('fop-tasks.assign-to-team');
     });
     Route::middleware('permission:fop_tasks.delete')->group(function () {
         Route::delete('/fop-tasks/{fop_task}', [FopTaskController::class, 'destroy'])->name('fop-tasks.destroy');
-        Route::delete('/fop-tasks/teams/{team}', [FopTaskController::class, 'teamDestroy'])->name('fop-tasks.teams.destroy');
     });
 
     // Location APIs (used in forms)

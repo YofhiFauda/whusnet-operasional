@@ -581,7 +581,13 @@ Task dengan `client_request_date` di masa depan diselipkan ke bawah (section "Up
 
 ### Task 1 — Auto-Team Formation Engine (Connected Components + Solo Drop-in)
 
-**Status:** `To Do`
+**Status:** `Done`
+
+**Post-completion bugfix (SUDAH DI-FIX SEMUA):** detail lengkap di `docs/fop-task/analisa-sync-execution-task.md`.
+1. **Bug team kosong:** task multi-teknisi yang di-shrink jadi solo (1 teknisi dicabut) salah nge-nullify `team_id` sisa teknisinya dan bikin team-nya ikut kehapus (dianggap kosong), padahal teknisi itu masih aktif kerja di task tersebut. Fix di `FopTaskTeamService::rebuildTeamsForDate()` (blok solo-task handling, cek anchor `$existingTeamOf` sebelum nullify).
+2. **Desync ke execution Task:** nama team di `Task.title` (dipakai halaman teknisi `/tasks-saya` & detail task) dulu di-bake ad-hoc pas create/edit dan gak pernah ke-refresh pas auto-team rebuild ganti roster/nama team. Fix: `rebuildTeamsForDate()` sekarang sinkronin `Task.title` ke nama `FopTaskTeam` asli tiap kali jalan (method privat `syncExecutionTaskTitle()`); `FopTaskController::store()`/`update()` disederhanakan (gak nebak nama team lagi, biar rebuild yang isi).
+
+Regression test: `test_shrinking_multi_technician_task_to_solo_keeps_its_team_alive` + 4 test sync title (`test_execution_task_title_*`) di `tests/Feature/Services/FopTaskTeamServiceTest.php`. Hasil akhir: 13/13 test service hijau, 26/26 gabungan sama `FopTasksTest`, gak ada regresi.
 
 **Tujuan:** Ganti mekanisme pembuatan Team FOP dari manual (FOP bikin team dulu baru assign task) jadi otomatis — Team terbentuk/berubah sendiri berdasar graf overlap teknisi per `work_date`, sesuai kebutuhan poin 1. Ini fondasi buat Task 2-4 berikutnya (switch teknisi/task, PIC per team), jadi dikerjakan duluan.
 
@@ -609,28 +615,28 @@ Task dengan `client_request_date` di masa depan diselipkan ke bawah (section "Up
 | `database/migrations/xxxx_add_index_to_fop_tasks_task_date.php` | **Baru** (kalau index belum ada) — index komposit `(task_date, ...)` di kolom relevan pivot teknisi biar query graf gak lambat. |
 
 **Checklist:**
-- [ ] Buat `FopTaskTeamService::rebuildTeamsForDate($date)` dengan algoritma connected components di atas relasi teknisi-task per `task_date`.
-- [ ] Implementasi Skenario A: task dengan >1 teknisi otomatis jadi dasar team baru.
-- [ ] Implementasi Skenario B: overlap teknisi lintas task (jembatan) otomatis union jadi 1 team, nama team ter-update dinamis.
-- [ ] Implementasi Skenario C1: solo task otomatis merge ke team existing kalau teknisinya sudah jadi anggota team lain di tanggal sama.
-- [ ] Implementasi Skenario C2: solo task tanpa overlap sama sekali tetap `team_id = null`, sediakan endpoint + UI drop-in manual dengan validasi.
-- [ ] Implementasi Skenario C3: solo/multi-task yang narik teknisi dari 2 team berbeda sekaligus → jangan auto-union, munculkan validasi FOP pilih Team 1/Team 2/Team baru.
-- [ ] Kolom `manual_override_at` dipakai supaya hasil drop-in manual (C2/C3) gak ketimpa rebuild otomatis berikutnya, sampai teknisi task tersebut diganti lagi lewat assignment biasa.
-- [ ] Hapus `teamStore()`/`teamUpdate()`/`teamDestroy()` + 3 route terkait + panel "Kelola Team Harian" + dropdown `team_id` manual di modal task — bukan cuma disembunyikan, benar-benar dicabut dari controller & routes.
-- [ ] Migrasi data existing: task/team yang `team_id`-nya udah keburu dibuat manual sebelum fitur ini aktif — jalankan `rebuildTeamsForDate()` sekali secara retroaktif per `task_date` yang punya task aktif, biar konsisten sama roster hasil algoritma (bukan dibiarkan nyangkut di struktur lama).
-- [ ] Index database di kolom yang dipakai query graf (`task_date` + pivot teknisi) supaya rebuild gak berat.
-- [ ] Audit log: catat tiap kali rebuild membentuk/membubarkan/mengubah roster team (siapa trigger, task apa, hasil sebelum-sesudah).
-- [ ] Test coverage untuk seluruh skenario A/B/C1/C2/C3 termasuk kasus edge (task cancel jadi satu-satunya jembatan → team pecah, lihat SOLUSI poin 12).
+- [x] Buat `FopTaskTeamService::rebuildTeamsForDate($date)` dengan algoritma connected components di atas relasi teknisi-task per `task_date`.
+- [x] Implementasi Skenario A: task dengan >1 teknisi otomatis jadi dasar team baru.
+- [x] Implementasi Skenario B: overlap teknisi lintas task (jembatan) otomatis union jadi 1 team, nama team ter-update dinamis.
+- [x] Implementasi Skenario C1: solo task otomatis merge ke team existing kalau teknisinya sudah jadi anggota team lain di tanggal sama.
+- [x] Implementasi Skenario C2: solo task tanpa overlap sama sekali tetap `team_id = null`, sediakan endpoint + UI drop-in manual dengan validasi.
+- [x] Implementasi Skenario C3: solo/multi-task yang narik teknisi dari 2 team berbeda sekaligus → jangan auto-union, munculkan validasi FOP pilih Team 1/Team 2/Team baru.
+- [x] Kolom `manual_override_at` dipakai supaya hasil drop-in manual (C2/C3) gak ketimpa rebuild otomatis berikutnya, sampai teknisi task tersebut diganti lagi lewat assignment biasa.
+- [x] Hapus `teamStore()`/`teamUpdate()`/`teamDestroy()` + 3 route terkait + panel "Kelola Team Harian" + dropdown `team_id` manual di modal task — bukan cuma disembunyikan, benar-benar dicabut dari controller & routes.
+- [x] Migrasi data existing: task/team yang `team_id`-nya udah keburu dibuat manual sebelum fitur ini aktif — jalankan `rebuildTeamsForDate()` sekali secara retroaktif per `task_date` yang punya task aktif, biar konsisten sama roster hasil algoritma (bukan dibiarkan nyangkut di struktur lama).
+- [x] Index database di kolom yang dipakai query graf (`task_date` + pivot teknisi) supaya rebuild gak berat.
+- [x] Audit log: catat tiap kali rebuild membentuk/membubarkan/mengubah roster team (siapa trigger, task apa, hasil sebelum-sesudah).
+- [x] Test coverage untuk seluruh skenario A/B/C1/C2/C3 termasuk kasus edge (task cancel jadi satu-satunya jembatan → team pecah, lihat SOLUSI poin 12).
 
 **Acceptance Criteria:**
-1. FOP bikin task baru dengan >1 teknisi → Team baru otomatis terbentuk tanpa FOP buka panel "Kelola Team Harian" sama sekali (panel itu sendiri sudah tidak ada lagi di UI).
-2. FOP tambah task baru dengan 1 teknisi yang sudah ada di Team X pada tanggal sama → task tersebut otomatis masuk Team X, tanpa aksi tambahan dari FOP.
-3. FOP tambah task baru dengan 1 teknisi yang belum overlap ke task manapun hari itu → task berdiri solo (`team_id = null`), dan FOP bisa assign manual ke Team yang ada lewat UI drop-in dengan validasi (gak bisa asal pilih tanpa konfirmasi).
-4. FOP assign 1 task ke 2 teknisi yang masing-masing sudah di Team berbeda → sistem tidak diam-diam menggabungkan 2 team, melainkan menampilkan pilihan eksplisit ke FOP.
-5. Route `fop-tasks.teams.store/update/destroy` sudah tidak ada lagi (404 kalau diakses), dropdown `team_id` manual sudah hilang dari modal create/edit task.
-6. Setiap perubahan assignment teknisi (tambah/switch task) memicu rebuild otomatis dan hasilnya konsisten (tidak ada task nyangkut di team yang salah, tidak ada team kosong tersisa di database).
-7. Semua transisi rebuild tercatat di audit log (siapa, kapan, task apa, roster sebelum/sesudah).
-8. Test suite `FopTaskTeamServiceTest` hijau untuk seluruh skenario A/B/C1/C2/C3.
+1. [x] FOP bikin task baru dengan >1 teknisi → Team baru otomatis terbentuk tanpa FOP buka panel "Kelola Team Harian" sama sekali (panel itu sendiri sudah tidak ada lagi di UI).
+2. [x] FOP tambah task baru dengan 1 teknisi yang sudah ada di Team X pada tanggal sama → task tersebut otomatis masuk Team X, tanpa aksi tambahan dari FOP.
+3. [x] FOP tambah task baru dengan 1 teknisi yang belum overlap ke task manapun hari itu → task berdiri solo (`team_id = null`), dan FOP bisa assign manual ke Team yang ada lewat UI drop-in dengan validasi (gak bisa asal pilih tanpa konfirmasi).
+4. [x] FOP assign 1 task ke 2 teknisi yang masing-masing sudah di Team berbeda → sistem tidak diam-diam menggabungkan 2 team, melainkan menampilkan pilihan eksplisit ke FOP.
+5. [x] Route `fop-tasks.teams.store/update/destroy` sudah tidak ada lagi (404 kalau diakses), dropdown `team_id` manual sudah hilang dari modal create/edit task.
+6. [x] Setiap perubahan assignment teknisi (tambah/switch task) memicu rebuild otomatis dan hasilnya konsisten (tidak ada task nyangkut di team yang salah, tidak ada team kosong tersisa di database).
+7. [x] Semua transisi rebuild tercatat di audit log (siapa, kapan, task apa, roster sebelum/sesudah).
+8. [x] Test suite `FopTaskTeamServiceTest` hijau untuk seluruh skenario A/B/C1/C2/C3 (7/7 pass).
 
 ---
 

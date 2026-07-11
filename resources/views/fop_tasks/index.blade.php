@@ -3,7 +3,7 @@
 @section('title', 'Task FOP')
 
 @section('content')
-<div x-data="fopTaskPageHandler()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
+<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
 
 
 
@@ -14,12 +14,13 @@
             <p class="text-sm text-slate-500 mt-1 font-ui">Kelola penugasan, status, dan prioritas task FOP yang sedang berjalan.</p>
         </div>
         <div class="flex items-center gap-2">
-            <button @click="teamModal.open = true"
-                    class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui">
-                <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            <button x-show="teamConflictModal.conflicts.length > 0" @click="teamConflictModal.open = true"
+                    class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui"
+                    style="display: none;">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                 </svg>
-                Kelola Team
+                <span>Konflik Team (<span x-text="teamConflictModal.conflicts.length"></span>)</span>
             </button>
             <button @click="openCreateModal()"
                     class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui">
@@ -163,8 +164,32 @@
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                                         {{ $task->team->name }}
                                     </span>
+                                @elseif($task->technicians->count() === 1)
+                                    <button type="button" 
+                                            @click="openTeamSelectionModal({{ $task->id }}, '{{ $task->task_number }}', '{{ addslashes($task->tugas) }}', '{{ $task->task_date?->format('Y-m-d') }}')" 
+                                            class="text-[10px] text-blue-600 hover:text-blue-800 font-medium underline decoration-dotted">
+                                        + Masukkan ke Team...
+                                    </button>
                                 @else
-                                    <span class="text-slate-300 text-[10px]">—</span>
+                                    @php
+                                        $taskDate = $task->task_date?->toDateString();
+                                        $techIds = $task->technicians->pluck('id')->all();
+                                        $candidates = \App\Models\FopTaskTeam::whereDate('work_date', $taskDate)
+                                            ->whereHas('members', fn($q) => $q->whereIn('users.id', $techIds))
+                                            ->get()
+                                            ->map(fn($t) => ['team_id' => $t->id, 'team_name' => $t->name])
+                                            ->all();
+                                    @endphp
+                                    @if(count($candidates) >= 2)
+                                        <button type="button"
+                                                @click="triggerConflictModal({{ $task->id }}, '{{ $task->task_number }}', {{ json_encode($candidates) }})"
+                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 hover:bg-red-100 transition-colors"
+                                                title="Klik untuk memilih team">
+                                            ⚠️ Konflik Roster
+                                        </button>
+                                    @else
+                                        <span class="text-slate-300 text-[10px]">—</span>
+                                    @endif
                                 @endif
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
@@ -346,17 +371,6 @@
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-medium text-text-secondary mb-1">Team (opsional)</label>
-                            <select name="team_id" x-model="modal.data.team_id" @change="onTeamChange()" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-                                <option value="">— Tanpa Team —</option>
-                                <template x-for="t in teamsData" :key="t.id">
-                                    <option :value="t.id" x-text="t.name + ' (' + t.work_date + ')'"></option>
-                                </template>
-                            </select>
-                            <p class="mt-1 text-[10px] text-text-muted">Pilih Team buat filter daftar teknisi di bawah. Task tetap manual dipilih ke 1 anggota.</p>
-                        </div>
-
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="relative" @click.away="customerSearchResults = []">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Penugasan / Pelanggan <span class="text-error">*</span></label>
@@ -399,7 +413,7 @@
                             <div x-show="openTechDropdown" class="absolute z-50 w-full bg-surface border border-border rounded shadow-lg mt-1 max-h-48 overflow-y-auto" style="display: none;">
                                 @foreach($technicians as $tech)
                                     <label class="flex items-center gap-2 px-3 py-2 bg-surface hover:bg-surface-muted cursor-pointer border-b border-border last:border-0"
-                                           x-show="(searchTech === '' || '{{ strtolower($tech->name) }}'.includes(searchTech.toLowerCase())) && (teamMemberIds.length === 0 || teamMemberIds.includes({{ $tech->id }}))">
+                                           x-show="searchTech === '' || '{{ strtolower($tech->name) }}'.includes(searchTech.toLowerCase())">
                                         <input type="checkbox" name="technicians[]" value="{{ $tech->id }}"
                                                :checked="modal.techs.includes({{ $tech->id }})"
                                                @change="toggleTech({{ $tech->id }})"
@@ -466,9 +480,9 @@
         </div>
     </div>
 
-    {{-- ══ KELOLA TEAM MODAL ══ --}}
-    <div x-show="teamModal.open"
-         x-effect="document.body.classList.toggle('overflow-hidden', teamModal.open)"
+    {{-- ══ KONFLIK TEAM MODAL (Skenario C3: task narik teknisi dari >=2 team beda) ══ --}}
+    <div x-show="teamConflictModal.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', teamConflictModal.open)"
          class="fixed inset-0 z-50 overflow-y-auto"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
@@ -478,125 +492,119 @@
          x-transition:leave-end="opacity-0"
          style="display: none;">
 
-        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="teamModal.open = false"></div>
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="teamConflictModal.open = false"></div>
 
         <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-surface border border-border w-full max-w-2xl rounded-md shadow-lg relative z-10"
-                 x-show="teamModal.open"
-                 @click.away="teamModal.open = false">
+            <div class="bg-surface border border-border w-full max-w-lg rounded-md shadow-lg relative z-10"
+                 x-show="teamConflictModal.open"
+                 @click.away="teamConflictModal.open = false">
 
-                 <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-md">
-                     <h3 class="text-sm font-semibold text-text-main">Kelola Team Harian</h3>
-                     <button type="button" @click="teamModal.open = false" class="text-text-muted hover:text-text-main transition-colors">
-                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                         </svg>
-                     </button>
-                 </div>
+                <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-md">
+                    <h3 class="text-sm font-semibold text-text-main">Konflik Team Terdeteksi</h3>
+                    <button type="button" @click="teamConflictModal.open = false" class="text-text-muted hover:text-text-main transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
 
-                 <div class="p-5 max-h-[75vh] overflow-y-auto space-y-5">
+                <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                    <template x-for="c in teamConflictModal.conflicts" :key="c.task_id">
+                        <div class="border border-border rounded-md p-3">
+                            <p class="text-xs text-text-secondary mb-2">
+                                Task <span class="font-semibold" x-text="c.task_number"></span> menugaskan teknisi yang masing-masing sudah ada di team berbeda. Taruh di team mana?
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="cand in c.candidates" :key="cand.team_id">
+                                    <button type="button" @click="resolveTeamConflict(c.task_id, cand.team_id)" class="btn-secondary text-xs" x-text="cand.team_name"></button>
+                                </template>
+                                <button type="button" @click="resolveTeamConflict(c.task_id, null)" class="btn-secondary text-xs">Buat Team Baru</button>
+                            </div>
+                        </div>
+                    </template>
+                    <p x-show="teamConflictModal.conflicts.length === 0" class="text-xs text-text-muted text-center py-3">Tidak ada konflik.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                     {{-- List Team --}}
-                     <div>
-                         <h4 class="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2 font-sans">Team Berjalan</h4>
-                         <div class="space-y-2">
-                             <template x-for="t in teamsData" :key="t.id">
-                                 <div class="border border-border bg-surface rounded-md p-3">
-                                     <div class="flex items-center justify-between">
-                                         <div class="flex items-center gap-2">
-                                             <span class="text-sm font-semibold text-text-main" x-text="t.name"></span>
-                                             <span class="text-[10px] font-medium"
-                                                   :class="t.is_active ? 'badge badge-success text-[10px] py-0.5 px-1.5 min-h-[18px]' : 'badge badge-neutral text-[10px] py-0.5 px-1.5 min-h-[18px]'"
-                                                   x-text="t.is_active ? 'Aktif' : 'Riwayat'"></span>
-                                             <span class="text-[10px] text-text-muted font-mono" x-text="t.work_date"></span>
-                                         </div>
-                                         <div class="flex items-center gap-2">
-                                             <button type="button" @click="startEditTeam(t)" class="text-text-muted hover:text-primary transition-colors" title="Edit Team">
-                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                 </svg>
-                                             </button>
-                                             <button type="button" @click="deleteTeam(t.id, t.name)" class="text-text-muted hover:text-error transition-colors" title="Hapus Team">
-                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                     </svg>
-                                             </button>
-                                         </div>
-                                     </div>
-                                     <div class="mt-2 flex flex-wrap gap-1.5">
-                                         <template x-for="m in t.members" :key="m.id">
-                                             <span class="badge badge-info text-[10px] py-0.5 px-1.5 min-h-[18px]">
-                                                 <span x-text="m.name"></span>
-                                                 <span class="font-mono text-text-muted" x-text="'· ' + m.count + ' task'"></span>
-                                             </span>
-                                         </template>
-                                     </div>
-                                     <p class="mt-1.5 text-[10px] text-text-muted" x-text="t.task_count + ' task total'"></p>
-                                 </div>
-                             </template>
-                             <p x-show="teamsData.length === 0" class="text-xs text-text-muted text-center py-3">Belum ada team dibuat.</p>
-                         </div>
-                     </div>
+    {{-- ══ PEMILIHAN TEAM MODAL (Skenario C2: masukkan teknisi solo/baru ke team) ══ --}}
+    <div x-show="teamSelectionModal.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', teamSelectionModal.open || modal.open || teamConflictModal.open)"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
 
-                     {{-- Form Bikin/Edit Team --}}
-                     <div class="border-t border-border pt-4">
-                         <div class="flex items-center justify-between mb-2">
-                             <h4 class="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2 font-sans" x-text="teamForm.editingId ? 'Edit Team' : 'Bikin Team Baru'"></h4>
-                             <button type="button" x-show="teamForm.editingId" @click="cancelEditTeam()" class="text-[11px] font-medium text-text-muted hover:text-text-main transition-colors">Batal Edit</button>
-                         </div>
-                         <form :action="teamForm.editingId ? '{{ url('/fop-tasks/teams') }}/' + teamForm.editingId : '{{ route('fop-tasks.teams.store') }}'" method="POST" class="space-y-3">
-                             @csrf
-                             <template x-if="teamForm.editingId">
-                                 <input type="hidden" name="_method" value="PUT">
-                             </template>
-                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                 <div>
-                                     <label class="block text-xs font-medium text-text-secondary mb-1">Nama Team (opsional)</label>
-                                     <input type="text" name="name" x-model="teamForm.name" placeholder="Tim 1" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-                                 </div>
-                                 <div>
-                                     <label class="block text-xs font-medium text-text-secondary mb-1">
-                                         Tanggal Berlaku <span class="text-error" x-show="!teamForm.editingId">*</span>
-                                     </label>
-                                     <input type="date" name="work_date" x-model="teamForm.work_date" :required="!teamForm.editingId" :disabled="!!teamForm.editingId" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
-                                     <p class="mt-1 text-[10px] text-text-muted" x-show="teamForm.editingId">Tanggal berlaku gak bisa diubah, cuma nama/POP/anggota.</p>
-                                 </div>
-                             </div>
-                             <div class="relative" x-data="{ openMemberDropdown: false }">
-                                 <label class="block text-xs font-medium text-text-secondary mb-1">Anggota Team <span class="text-error">*</span></label>
-                                 <div @click="openMemberDropdown = true" @click.away="openMemberDropdown = false" class="min-h-[38px] w-full border border-border rounded bg-surface px-2 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary cursor-text flex items-center gap-2 flex-wrap">
-                                     <template x-for="techId in teamForm.member_ids" :key="techId">
-                                         <span class="inline-flex items-center gap-1 bg-surface-muted border border-border text-text-secondary text-xs font-medium px-2 py-0.5 rounded">
-                                             <span x-text="getTechName(techId)"></span>
-                                             <button type="button" @click.stop="toggleTeamMember(techId)" class="hover:text-error transition-colors">
-                                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                             </button>
-                                         </span>
-                                     </template>
-                                     <input type="text" x-model="searchTeamMember" @focus="openMemberDropdown = true" placeholder="Cari..." class="flex-1 min-w-[100px] outline-none text-sm text-text-main bg-transparent border-none p-0 focus:ring-0">
-                                 </div>
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="teamSelectionModal.open = false"></div>
 
-                                 <div x-show="openMemberDropdown" class="absolute bottom-full mb-1 z-50 w-full bg-surface border border-border rounded shadow-lg max-h-48 overflow-y-auto" style="display: none;">
-                                     @foreach($technicians as $tech)
-                                         <label class="flex items-center gap-2 px-3 py-2 bg-surface hover:bg-surface-muted cursor-pointer border-b border-border last:border-0"
-                                                x-show="searchTeamMember === '' || '{{ strtolower($tech->name) }}'.includes(searchTeamMember.toLowerCase())">
-                                             <input type="checkbox" name="member_ids[]" value="{{ $tech->id }}"
-                                                    :checked="teamForm.member_ids.includes('{{ $tech->id }}')"
-                                                    @change="toggleTeamMember('{{ $tech->id }}')"
-                                                    class="w-4 h-4 rounded border-border bg-surface text-primary focus:ring-primary">
-                                             <span class="text-sm text-text-secondary">{{ $tech->name }}</span>
-                                         </label>
-                                     @endforeach
-                                 </div>
-                                 <input type="hidden" :required="teamForm.member_ids.length === 0" class="absolute w-0 h-0 opacity-0" name="member_ids_required">
-                             </div>
-                             <div class="flex justify-end">
-                                 <button type="submit" class="btn-primary" x-text="teamForm.editingId ? 'Update Team' : 'Simpan Team'"></button>
-                             </div>
-                         </form>
-                     </div>
-                 </div>
-             </div>
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-surface border border-border w-full max-w-lg rounded-md shadow-lg relative z-10"
+                 x-show="teamSelectionModal.open"
+                 @click.away="teamSelectionModal.open = false"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 scale-95 translate-y-4">
+
+                <div class="px-5 py-3.5 border-b border-border flex items-center justify-between bg-surface-muted rounded-t-md">
+                    <h3 class="text-sm font-semibold text-text-main">Pilih Team untuk Task</h3>
+                    <button type="button" @click="teamSelectionModal.open = false" class="text-text-muted hover:text-text-main transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                    <div class="border border-border rounded-md p-3 bg-surface-muted/50">
+                        <p class="text-xs text-text-secondary leading-relaxed">
+                            Pilih tim kerja pada tanggal <span class="font-semibold text-text-main" x-text="teamSelectionModal.taskDate"></span> untuk memasukkan task <span class="font-semibold text-text-main" x-text="teamSelectionModal.taskNumber"></span> (<span x-text="teamSelectionModal.taskTugas"></span>):
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Tim Tersedia</label>
+                        <div class="flex flex-col gap-2">
+                            <template x-for="t in teamSelectionModal.teams" :key="t.id">
+                                <button type="button" 
+                                        @click="assignToTeam(teamSelectionModal.taskId, t.id); teamSelectionModal.open = false" 
+                                        class="w-full text-left px-4 py-3 border border-border rounded-md hover:bg-surface-muted hover:border-primary/50 transition-colors flex items-center justify-between group">
+                                    <div>
+                                        <span class="text-xs font-semibold text-text-main group-hover:text-primary transition-colors" x-text="t.name"></span>
+                                        <div class="flex items-center gap-1.5 mt-1">
+                                            <template x-for="m in t.members" :key="m.id">
+                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100" x-text="m.name"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <svg class="w-4 h-4 text-text-muted group-hover:text-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </template>
+                            <p x-show="teamSelectionModal.teams.length === 0" class="text-xs text-text-muted text-center py-4 bg-surface-muted/30 border border-dashed border-border rounded-md">
+                                Tidak ada tim kerja pada tanggal ini.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-border flex items-center justify-between gap-3">
+                        <button type="button" @click="assignToTeam(teamSelectionModal.taskId, null); teamSelectionModal.open = false" class="btn-primary text-xs w-full py-2.5 flex justify-center items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Buat Team Baru
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -606,7 +614,6 @@
         return {
             isSubmitting: false,
             searchTech: '',
-            searchTeamMember: '',
             customerSearchResults: [],
             isSearchingCustomer: false,
             modal: {
@@ -614,19 +621,24 @@
                 isEdit: false,
                 data: {
                     id: '', task_number: '', task_date: '', category: '', tugas: '',
-                    customer_id: '', village_id: '', pop_id: '', team_id: '', issue: '', notes: '',
+                    customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
                     status: 'Proses', priority: 'low', pending_reason: '', client_request_date: ''
                 },
                 techs: []
             },
-            teamModal: { open: false },
-            teamForm: {
-                editingId: null, name: '',
-                work_date: new Date().toISOString().slice(0, 10),
-                member_ids: []
-            },
+            teamConflictModal: { open: false, conflicts: @json($teamConflicts ?? []) },
+            teamSelectionModal: { open: false, taskId: null, taskNumber: '', taskTugas: '', taskDate: '', teams: [] },
             techniciansData: {!! json_encode($technicians->map(fn($t) => ['id' => $t->id, 'name' => $t->name])->toArray()) !!},
             teamsData: @json($teams),
+
+            openTeamSelectionModal(taskId, taskNumber, taskTugas, taskDate) {
+                this.teamSelectionModal.taskId = taskId;
+                this.teamSelectionModal.taskNumber = taskNumber;
+                this.teamSelectionModal.taskTugas = taskTugas;
+                this.teamSelectionModal.taskDate = taskDate;
+                this.teamSelectionModal.teams = this.teamsData.filter(t => t.work_date === taskDate);
+                this.teamSelectionModal.open = true;
+            },
 
             allCategoriesData: @json($categories),
             manualCategoriesData: @json($manualCategories),
@@ -636,42 +648,70 @@
                 return this.modal.isEdit ? this.allCategoriesData : this.manualCategoriesData;
             },
 
-            get teamMemberIds() {
-                if (!this.modal.data.team_id) return [];
-                const team = this.teamsData.find(t => t.id == this.modal.data.team_id);
-                return team ? team.members.map(m => m.id) : [];
+            triggerConflictModal(taskId, taskNumber, candidates) {
+                this.teamConflictModal.conflicts = [{
+                    task_id: taskId,
+                    task_number: taskNumber,
+                    candidates: candidates
+                }];
+                this.teamConflictModal.open = true;
             },
 
-            onTeamChange() {
-                // Buang teknisi yang udah dipilih tapi bukan anggota team yang baru dipilih
-                if (this.teamMemberIds.length === 0) return;
-                this.modal.techs = this.modal.techs.filter(id => this.teamMemberIds.includes(id));
+            initTeamConflicts() {
+                if (this.teamConflictModal.conflicts.length > 0) {
+                    this.teamConflictModal.open = true;
+                }
             },
 
-            startEditTeam(team) {
-                this.teamForm = {
-                    editingId: team.id,
-                    name: team.name,
-                    work_date: team.work_date,
-                    member_ids: team.members.map(m => String(m.id)),
-                };
-            },
-
-            cancelEditTeam() {
-                this.teamForm = {
-                    editingId: null, name: '',
-                    work_date: new Date().toISOString().slice(0, 10),
-                    member_ids: []
-                };
-            },
-
-            deleteTeam(id, name) {
-                if (!confirm(`Hapus Team "${name}"? Task yang udah nempel gak ikut kehapus.`)) return;
+            resolveTeamConflict(taskId, teamId) {
                 const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                fetch(`{{ url('/fop-tasks/teams') }}/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
-                }).then(() => window.location.reload());
+                fetch(`{{ url('/fop-tasks') }}/${taskId}/assign-to-team`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: JSON.stringify({ team_id: teamId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    this.teamConflictModal.conflicts = this.teamConflictModal.conflicts.filter(c => c.task_id !== taskId);
+                    if (this.teamConflictModal.conflicts.length === 0) this.teamConflictModal.open = false;
+                    this.showToast('success', data.message);
+                    setTimeout(() => window.location.reload(), 1000);
+                })
+                .catch(() => this.showToast('error', 'Terjadi kesalahan jaringan.'));
+            },
+
+            assignToTeam(taskId, teamId) {
+                if (teamId === undefined) return;
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                fetch(`{{ url('/fop-tasks') }}/${taskId}/assign-to-team`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: JSON.stringify({ team_id: teamId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        this.showToast('success', data.message);
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        if (data.team_conflicts && data.team_conflicts.length > 0) {
+                            this.teamConflictModal.conflicts = data.team_conflicts;
+                            this.teamConflictModal.open = true;
+                            this.showToast('warning', 'Konflik team terdeteksi.');
+                        } else {
+                            this.showToast('error', data.message || 'Gagal memasukkan ke Team.');
+                        }
+                    }
+                })
+                .catch(() => this.showToast('error', 'Terjadi kesalahan jaringan.'));
             },
 
             getTechName(id) {
@@ -712,7 +752,7 @@
 
                 this.modal.data = {
                     id: '', task_number: '', task_date: defaultDate, category: '', tugas: '',
-                    customer_id: '', village_id: '', pop_id: '', team_id: '', issue: '', notes: '',
+                    customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
                     status: 'Proses', priority: 'low', pending_reason: '', client_request_date: ''
                 };
                 this.modal.techs = [];
@@ -732,7 +772,6 @@
                     customer_id: task.customer_id || '',
                     village_id: task.village_id || '',
                     pop_id: task.pop_id || '',
-                    team_id: task.team_id || '',
                     issue: task.issue || '',
                     notes: task.notes || '',
                     status: task.status,
@@ -751,17 +790,6 @@
                 } else {
                     this.modal.techs.push(id);
                     this.searchTech = '';
-                }
-            },
-
-            toggleTeamMember(id) {
-                const idStr = String(id);
-                const index = this.teamForm.member_ids.indexOf(idStr);
-                if (index > -1) {
-                    this.teamForm.member_ids.splice(index, 1);
-                } else {
-                    this.teamForm.member_ids.push(idStr);
-                    this.searchTeamMember = '';
                 }
             },
 

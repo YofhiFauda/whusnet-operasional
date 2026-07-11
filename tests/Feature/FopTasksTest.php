@@ -331,4 +331,39 @@ class FopTasksTest extends TestCase
         $response->assertDontSee('TFOP-2026-2000');
         $response->assertSee('TFOP-2026-3000');
     }
+
+    public function test_team_conflict_still_shows_after_modal_closed_and_page_reloaded(): void
+    {
+        $joko = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Joko']);
+        $cagak = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Cagak']);
+        $tri = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Tri']);
+        $suci = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Suci']);
+
+        $date = now()->format('Y-m-d') . ' 08:00:00';
+
+        $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
+            'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
+            'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
+            'status' => 'Proses', 'priority' => 'Medium', 'technicians' => $techs,
+        ]);
+
+        $post([$joko->id, $cagak->id], 'A');
+        $post([$tri->id, $suci->id], 'B');
+        $post([$cagak->id, $suci->id], 'C');
+
+        // Request pertama: session flash masih ada, modal muncul.
+        $first = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $first->assertStatus(200);
+        $first->assertSee('Konflik Team');
+
+        // Simulasikan user nge-close modal lalu refresh halaman lagi — session flash
+        // dari request pertama udah abis dibaca, tapi konfliknya harus tetap kedeteksi
+        // ulang dari state DB (task_id null + >=2 teknisi), bukan cuma dari flash sekali pakai.
+        $second = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $second->assertStatus(200);
+        $second->assertSee('Konflik Team');
+
+        $taskC = FopTask::where('tugas', 'C')->firstOrFail();
+        $second->assertSee($taskC->task_number);
+    }
 }
