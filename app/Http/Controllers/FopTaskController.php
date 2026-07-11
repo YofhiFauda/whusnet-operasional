@@ -147,14 +147,21 @@ class FopTaskController extends Controller
 
         $teamConflicts = $this->currentTeamConflicts();
 
-        // Daftar task ringkas (halaman berjalan) buat dropdown "Task Tujuan" di modal Switch Teknisi.
-        $switchTargetTasks = $fopTasks->getCollection()->map(fn (FopTask $t) => [
-            'id' => $t->id,
-            'task_number' => $t->task_number,
-            'tugas' => $t->tugas,
-            'task_date' => $t->task_date?->toDateString(),
-            'technician_ids' => $t->technicians->pluck('id')->all(),
-        ])->values();
+        // Daftar task ringkas buat dropdown "Task Tujuan" di modal Switch Teknisi — query
+        // TERPISAH dari $fopTasks (yang kena filter/paginate dari request), soalnya "Task
+        // Tujuan" harus nampilin SEMUA task aktif (lintas team, lintas filter/halaman
+        // berapapun), bukan cuma yang lagi kebetulan tampil di tabel.
+        $switchTargetTasks = FopTask::whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
+            ->with('technicians:id,name')
+            ->get()
+            ->map(fn (FopTask $t) => [
+                'id' => $t->id,
+                'task_number' => $t->task_number,
+                'tugas' => $t->tugas,
+                'task_date' => $t->task_date?->toDateString(),
+                'technician_ids' => $t->technicians->pluck('id')->all(),
+            ])
+            ->values();
 
         return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks'));
     }
@@ -616,23 +623,40 @@ class FopTaskController extends Controller
                 "Anda ditugaskan sebagai pengganti pada task \"{$fromTask->tugas}\".",
             );
 
-            app(FopTaskTeamService::class)->rebuildTeamsForDate($fromTask->task_date->copy());
-            app(FopTaskTeamService::class)->rebuildTeamsForDate($toTask->task_date->copy());
+            // from/to task_date SELALU sama (udah divalidasi intra-hari di atas) — cukup
+            // rebuild SEKALI. Manggil rebuildTeamsForDate() 2x buat tanggal yang sama bikin
+            // pass ke-2 gak nemu lagi konflik/team yang udah kehapus sama cleanup di pass
+            // pertama (lihat analisa-sync-execution-task.md), teknisi jadi ke-merge salah.
+            $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fromTask->task_date->copy());
+            $conflicts = $teamResult['conflicts'];
 
             if ($request->wantsJson()) {
+                if (!empty($conflicts)) {
+                    session()->flash('fop_team_conflicts', $conflicts);
+                }
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Switch teknisi berhasil.',
+                    'team_conflicts' => $conflicts,
                 ]);
             }
 
-            return redirect()->route('fop-tasks.index')->with('success', 'Switch teknisi berhasil.');
+            return redirect()->route('fop-tasks.index')
+                ->with('success', 'Switch teknisi berhasil.')
+                ->with('fop_team_conflicts', $conflicts);
         });
     }
 
     /**
-     * Sync roster teknisi Task eksekusi (`tasks`/`task_team`) setelah switch — pola sama
-     * dengan cross-task sync di `assignToTeam()`.
+     * Sync roster teknisi Task eksekusi (`tasks`/`task_team`) setelah switch.
+     * SENGAJA gak lewat `TaskService::update()` (beda dari `assignToTeam()`) — method itu
+     * manggil `syncToFopTask()` di ujungnya yang UNCONDITIONAL manggil balik
+     * `rebuildTeamsForDate()`. Kalau dipanggil 2x (fromTask & toTask), itu jadi 2 rebuild
+     * pass TAMBAHAN yang gak diminta, masing-masing liat state transisi yang beda —
+     * rebuild pass yang nulify task konflik (C3) bisa ke-cleanup (team kandidat kehapus)
+     * SEBELUM pass berikutnya sempet baca datanya, hasilnya teknisi ke-merge ke team yang
+     * salah. Sync pivot `task_team` LANGSUNG di sini, roster doang, gak mancing rebuild lain.
      */
     private function syncSwitchedExecutionTask(FopTask $fopTask, array $technicianIds): void
     {
@@ -640,9 +664,14 @@ class FopTaskController extends Controller
             return;
         }
 
-        app(TaskService::class)->update($fopTask->task, [
-            'team_member_ids' => $technicianIds,
-        ], auth()->user());
+        $execTask = $fopTask->task;
+        $execTask->teamMembers()->delete();
+        foreach ($technicianIds as $index => $userId) {
+            $execTask->teamMembers()->create([
+                'user_id' => $userId,
+                'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
+            ]);
+        }
     }
 
     /**

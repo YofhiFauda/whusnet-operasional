@@ -366,4 +366,47 @@ class FopTasksTest extends TestCase
         $taskC = FopTask::where('tugas', 'C')->firstOrFail();
         $second->assertSee($taskC->task_number);
     }
+
+    public function test_switch_technician_target_dropdown_includes_tasks_across_teams_and_filters(): void
+    {
+        $teknisiRole = Role::where('code', 'teknisi')->first();
+        $wito = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Wito']);
+        $yanto = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Yanto']);
+        $joko = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Joko']);
+        $karim = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Karim']);
+        $abdul = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Abdul']);
+        $ajis = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Ajis']);
+
+        $date = now()->format('Y-m-d') . ' 08:00:00';
+
+        $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
+            'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
+            'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
+            'status' => 'Proses', 'priority' => 'Medium', 'technicians' => $techs,
+        ]);
+
+        // Task A & B => Tim 1 (Wito jembatan), Task C => Tim 2 — persis skenario yang dilaporkan.
+        $post([$wito->id, $yanto->id], 'Task A');
+        $post([$joko->id, $wito->id, $karim->id], 'Task B');
+        $post([$abdul->id, $ajis->id], 'Task C');
+
+        $taskA = FopTask::where('tugas', 'Task A')->firstOrFail();
+        $taskB = FopTask::where('tugas', 'Task B')->firstOrFail();
+        $taskC = FopTask::where('tugas', 'Task C')->firstOrFail();
+
+        $this->assertEquals($taskA->team_id, $taskB->team_id, 'Task A & B harus 1 tim (Wito jembatan).');
+        $this->assertNotEquals($taskA->team_id, $taskC->team_id, 'Task C harus tim beda.');
+
+        // FOP lagi buka halaman DENGAN FILTER team=Tim 1 aktif (cuma nampilin Task A & B di tabel) —
+        // dropdown "Task Tujuan" tetap harus nawarin Task C (tim lain), bukan cuma yang keliatan di tabel.
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index', ['team_id' => $taskA->team_id]));
+        $response->assertStatus(200);
+
+        // Task C sengaja gak match filter team_id ini, jadi gak nongol di baris TABEL —
+        // tapi tetap wajib ada di allTasksData (state Alpine) biar bisa dipilih di dropdown "Task Tujuan".
+        $content = $response->getContent();
+        $tableSection = substr($content, 0, strpos($content, 'allTasksData:'));
+        $this->assertStringNotContainsString($taskC->task_number, $tableSection, 'Task C seharusnya gak nongol di baris tabel karena kefilter team_id.');
+        $response->assertSee('"task_number":"' . $taskC->task_number . '"', false);
+    }
 }

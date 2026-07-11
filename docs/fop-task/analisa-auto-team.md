@@ -640,7 +640,9 @@ Regression test: `test_shrinking_multi_technician_task_to_solo_keeps_its_team_al
 
 
 **Terdapat Bug dan Perbaikan**
-terdapat pada file docs\fop-task\analisa-sync-execution-task.md
+terdapat pada file docs\fop-task\analisa-sync-execution-task.md.
+
+
 ---
 
 ### Task 2 — Switch Teknisi antar Team (Atomic Endpoint)

@@ -228,6 +228,51 @@ class FopTaskTeamServiceTest extends TestCase
         $this->assertCount(2, $result['conflicts'][0]['candidates']);
     }
 
+    public function test_c3_conflict_candidate_team_survives_even_when_its_only_task_is_the_one_conflicted(): void
+    {
+        // Beda dari test C3 di atas: di sini Team 2 CUMA punya 1 task (taskC), dan task
+        // itu SENDIRI yang jadi sumber konflik — begitu taskC di-null-in team_id-nya,
+        // Team 2 kelihatan "gak aktif lagi" di pass yang SAMA. Team 2 harus tetap idup
+        // (jadi kandidat conflict yang valid buat FOP pilih), bukan ke-cleanup diam-diam.
+        $wito = User::factory()->create(['name' => 'Wito']);
+        $joko = User::factory()->create(['name' => 'Joko']);
+        $abdul = User::factory()->create(['name' => 'Abdul']);
+        $ajis = User::factory()->create(['name' => 'Ajis']);
+
+        $taskB = $this->makeTask([$wito->id, $joko->id]); // Team 1
+        $this->service->rebuildTeamsForDate($this->date);
+
+        $taskC = $this->makeTask([$abdul->id, $ajis->id]); // Team 2 (satu-satunya task Team 2)
+        $this->service->rebuildTeamsForDate($this->date);
+
+        $taskB->refresh();
+        $taskC->refresh();
+        $team1Id = $taskB->team_id;
+        $team2Id = $taskC->team_id;
+        $this->assertNotNull($team1Id);
+        $this->assertNotNull($team2Id);
+        $this->assertNotEquals($team1Id, $team2Id);
+
+        // Wito (Team 1) ditambahin ke Task C juga — Task C sekarang narik dari 2 team beda.
+        $taskC->technicians()->sync([$wito->id, $abdul->id, $ajis->id]);
+        $result = $this->service->rebuildTeamsForDate($this->date);
+
+        $taskC->refresh();
+        $this->assertNull($taskC->team_id, 'Task C harus jadi conflict (C3), bukan auto-merge.');
+        $this->assertCount(1, $result['conflicts']);
+        $this->assertCount(2, $result['conflicts'][0]['candidates']);
+
+        // Team 1 & Team 2 DUA-DUANYA harus tetap ada — Team 2 gak boleh ke-cleanup
+        // cuma karena task tunggalnya (taskC) lagi nunggu keputusan FOP.
+        $this->assertNotNull(FopTaskTeam::find($team1Id), 'Team 1 gak boleh kehapus.');
+        $this->assertNotNull(FopTaskTeam::find($team2Id), 'Team 2 gak boleh kehapus walau task satu-satunya lagi konflik.');
+
+        $team1 = FopTaskTeam::find($team1Id);
+        $team2 = FopTaskTeam::find($team2Id);
+        $this->assertEqualsCanonicalizing([$wito->id, $joko->id], $team1->members->pluck('id')->all());
+        $this->assertEqualsCanonicalizing([$abdul->id, $ajis->id], $team2->members->pluck('id')->all());
+    }
+
     public function test_rebuild_deletes_empty_team_when_bridging_task_is_cancelled(): void
     {
         $andi = User::factory()->create(['name' => 'Andi']);

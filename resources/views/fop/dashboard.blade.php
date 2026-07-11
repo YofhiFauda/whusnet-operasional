@@ -65,18 +65,27 @@
         @if($activeFopTeams->count() > 0)
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             @foreach($activeFopTeams as $team)
-            <button type="button" @click="openTeamDetail({{ $team['id'] }})"
-                    class="text-left flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden hover:shadow-md hover:border-primary/40 transition-all cursor-pointer">
+            <div @dragover.prevent="onTeamDragOver({{ $team['id'] }})"
+                 @dragleave="onTeamDragLeave({{ $team['id'] }})"
+                 @drop.prevent="onTeamDrop({{ $team['id'] }})"
+                 :class="dragOverTeamId === {{ $team['id'] }} ? 'ring-2 ring-primary ring-offset-1' : ''"
+                 class="flex flex-col bg-white border border-slate-200 rounded shadow-sm overflow-hidden hover:shadow-md hover:border-primary/40 transition-all">
                 {{-- Header: nama team + tanggal --}}
-                <div class="px-4 py-2.5 border-b border-border bg-surface-muted flex items-center justify-between shrink-0">
+                <button type="button" @click="openTeamDetail({{ $team['id'] }})"
+                        class="text-left px-4 py-2.5 border-b border-border bg-surface-muted flex items-center justify-between shrink-0 cursor-pointer">
                     <span class="text-xs font-semibold text-text-main">{{ $team['name'] }}</span>
                     <span class="text-[10px] text-text-muted">{{ $team['work_date'] }}</span>
-                </div>
+                </button>
 
-                {{-- Body: list task --}}
+                {{-- Body: list task (draggable ke Team lain) --}}
                 <div class="p-3 flex-1 space-y-1.5 max-h-44 overflow-y-auto">
                     @forelse($team['tasks'] as $t)
-                    <div class="flex items-center justify-between text-[11px] bg-surface-muted rounded px-2 py-1.5">
+                    <div draggable="{{ $t['draggable'] ? 'true' : 'false' }}"
+                         @dragstart="{{ $t['draggable'] ? 'true' : 'false' }} ? startTaskDrag($event, {{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas'])) : $event.preventDefault()"
+                         @dragend="endTaskDrag()"
+                         @click="openTeamDetail({{ $team['id'] }})"
+                         class="flex items-center justify-between text-[11px] bg-surface-muted rounded px-2 py-1.5
+                            {{ $t['draggable'] ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-60' }}">
                         <span class="text-text-main truncate">{{ $t['tugas'] }}</span>
                         <span class="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ml-2
                             {{ match($t['status']) {
@@ -95,7 +104,8 @@
                 </div>
 
                 {{-- Footer: avatar teknisi + total --}}
-                <div class="px-3 py-2.5 border-t border-border bg-white flex items-center justify-between shrink-0">
+                <button type="button" @click="openTeamDetail({{ $team['id'] }})"
+                        class="text-left px-3 py-2.5 border-t border-border bg-white flex items-center justify-between shrink-0 cursor-pointer">
                     <div class="flex items-center -space-x-1.5">
                         @foreach($team['members']->take(4) as $member)
                         <span class="h-6 w-6 rounded-full bg-primary border-2 border-white flex items-center justify-center text-[9px] font-bold text-white" title="{{ $member['name'] }}">
@@ -109,8 +119,8 @@
                         @endif
                     </div>
                     <span class="text-[10px] text-text-muted">{{ $team['members']->count() }} teknisi · {{ $team['total_tasks'] }} task</span>
-                </div>
-            </button>
+                </button>
+            </div>
             @endforeach
         </div>
         @else
@@ -250,6 +260,91 @@
         </div>
     </div>
 
+    {{-- ══ SWITCH TEAM MODAL (drag-drop confirm) ══ --}}
+    <div x-show="switchTeamModal.open"
+         x-effect="document.body.classList.toggle('overflow-hidden', switchTeamModal.open)"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         style="display: none;">
+
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="switchTeamModal.open = false"></div>
+
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white border border-slate-200 w-full max-w-sm rounded shadow-xl relative z-10"
+                 @click.away="switchTeamModal.open = false">
+
+                <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t">
+                    <h3 class="text-sm font-semibold text-slate-800">Pindahkan Task ke Team Lain</h3>
+                    <button type="button" @click="switchTeamModal.open = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-5 space-y-4">
+                    <p class="text-xs text-slate-600">
+                        Task <span class="font-semibold" x-text="switchTeamModal.tugas"></span>
+                        dipindah dari <span class="font-semibold" x-text="switchTeamModal.fromTeamName"></span>
+                        ke <span class="font-semibold" x-text="switchTeamModal.toTeamName"></span>.
+                    </p>
+
+                    <div class="relative" x-data="{ openTechDropdown: false }">
+                        <label class="block text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
+                            Teknisi Pengerjaan di Team Tujuan
+                        </label>
+                        <div @click="openTechDropdown = true" @click.away="openTechDropdown = false"
+                             class="min-h-[38px] w-full border border-slate-300 rounded px-2 py-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/40 cursor-text flex items-center gap-1.5 flex-wrap">
+                            <template x-for="techId in switchTeamModal.technicianIds" :key="techId">
+                                <span class="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium px-2 py-0.5 rounded">
+                                    <span x-text="switchTeamModal.toTeamMembers.find(m => m.id === techId)?.name"></span>
+                                    <button type="button" @click.stop="toggleSwitchTeamTech(techId)" class="hover:text-error transition-colors">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </span>
+                            </template>
+                            <input type="text" x-model="switchTeamModal.searchTech" @focus="openTechDropdown = true"
+                                   placeholder="Cari teknisi..." class="flex-1 min-w-[80px] outline-none text-sm bg-transparent border-none p-0 focus:ring-0">
+                        </div>
+
+                        <div x-show="openTechDropdown" class="absolute z-50 w-full bg-white border border-slate-200 rounded shadow-lg mt-1 max-h-40 overflow-y-auto" style="display: none;">
+                            <template x-for="member in switchTeamModal.toTeamMembers" :key="member.id">
+                                <label class="flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                       x-show="switchTeamModal.searchTech === '' || member.name.toLowerCase().includes(switchTeamModal.searchTech.toLowerCase())">
+                                    <input type="checkbox"
+                                           :checked="switchTeamModal.technicianIds.includes(member.id)"
+                                           @change="toggleSwitchTeamTech(member.id)"
+                                           class="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary">
+                                    <span class="text-sm text-slate-700" x-text="member.name"></span>
+                                </label>
+                            </template>
+                            <p x-show="switchTeamModal.toTeamMembers.length === 0" class="px-3 py-2 text-xs text-slate-400 italic">Team tujuan belum punya anggota.</p>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">Hanya menampilkan anggota Team tujuan — hindari konflik teknisi dari team lain. Teknisi lama pada task ini otomatis dilepas, digantikan pilihan di atas.</p>
+                    </div>
+                </div>
+
+                <div class="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b">
+                    <button type="button" @click="switchTeamModal.open = false"
+                            class="text-xs font-medium px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button type="button" @click="submitSwitchTeam()"
+                            :disabled="switchTeamModal.technicianIds.length === 0 || switchTeamModal.isSubmitting"
+                            class="text-xs font-medium px-3 py-1.5 rounded bg-primary text-white hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!switchTeamModal.isSubmitting">Konfirmasi Pindah</span>
+                        <span x-show="switchTeamModal.isSubmitting">Memproses...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- ══ Antrean Survey ═══════════════════════════════════════════ --}}
     <div>
         <div class="flex items-center justify-between mb-3">
@@ -385,10 +480,130 @@ function fopDashboardHandler() {
     return {
         teamsData: @json($activeFopTeams),
         teamDetail: { open: false, data: null },
+        dragOverTeamId: null,
+        dragging: null,
+        switchTeamModal: {
+            open: false,
+            fopTaskId: null,
+            fromTeamId: null,
+            fromTeamName: '',
+            toTeamId: null,
+            toTeamName: '',
+            toTeamMembers: [],
+            tugas: '',
+            technicianIds: [],
+            searchTech: '',
+            isSubmitting: false,
+        },
 
         openTeamDetail(id) {
             this.teamDetail.data = this.teamsData.find(t => t.id === id) || null;
             this.teamDetail.open = true;
+        },
+
+        // ── Drag & Drop: Switch Task antar Team ─────────────────────
+        startTaskDrag(event, fopTaskId, fromTeamId, tugas) {
+            this.dragging = { fopTaskId, fromTeamId, tugas };
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(fopTaskId));
+        },
+
+        endTaskDrag() {
+            this.dragging = null;
+            this.dragOverTeamId = null;
+        },
+
+        onTeamDragOver(teamId) {
+            if (!this.dragging || this.dragging.fromTeamId === teamId) return;
+            this.dragOverTeamId = teamId;
+        },
+
+        onTeamDragLeave(teamId) {
+            if (this.dragOverTeamId === teamId) this.dragOverTeamId = null;
+        },
+
+        onTeamDrop(toTeamId) {
+            this.dragOverTeamId = null;
+            if (!this.dragging || this.dragging.fromTeamId === toTeamId) {
+                this.dragging = null;
+                return;
+            }
+
+            const fromTeam = this.teamsData.find(t => t.id === this.dragging.fromTeamId);
+            const toTeam = this.teamsData.find(t => t.id === toTeamId);
+            if (!toTeam) {
+                this.dragging = null;
+                return;
+            }
+
+            this.switchTeamModal = {
+                open: true,
+                fopTaskId: this.dragging.fopTaskId,
+                fromTeamId: this.dragging.fromTeamId,
+                fromTeamName: fromTeam ? fromTeam.name : '',
+                toTeamId: toTeam.id,
+                toTeamName: toTeam.name,
+                toTeamMembers: toTeam.members,
+                tugas: this.dragging.tugas,
+                technicianIds: [],
+                searchTech: '',
+                isSubmitting: false,
+            };
+            this.dragging = null;
+        },
+
+        toggleSwitchTeamTech(id) {
+            const index = this.switchTeamModal.technicianIds.indexOf(id);
+            if (index > -1) {
+                this.switchTeamModal.technicianIds.splice(index, 1);
+            } else {
+                this.switchTeamModal.technicianIds.push(id);
+                this.switchTeamModal.searchTech = '';
+            }
+        },
+
+        submitSwitchTeam() {
+            if (this.switchTeamModal.technicianIds.length === 0) return;
+            this.switchTeamModal.isSubmitting = true;
+            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch(`{{ url('/fop-tasks') }}/${this.switchTeamModal.fopTaskId}/switch-team`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
+                body: JSON.stringify({
+                    to_team_id: this.switchTeamModal.toTeamId,
+                    technician_ids: this.switchTeamModal.technicianIds,
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                this.switchTeamModal.isSubmitting = false;
+                if (data.success) {
+                    this.showToast('success', data.message);
+                    this.switchTeamModal.open = false;
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    this.showToast('error', data.message || 'Gagal memindahkan task.');
+                }
+            })
+            .catch(() => {
+                this.switchTeamModal.isSubmitting = false;
+                this.showToast('error', 'Terjadi kesalahan jaringan.');
+            });
+        },
+
+        showToast(type, message) {
+            if (window.Toast) {
+                if (type === 'success') window.Toast.success('Berhasil', message);
+                else if (type === 'error') window.Toast.error('Gagal', message);
+                else if (type === 'warning') window.Toast.warning('Peringatan', message);
+                else window.Toast.info('Informasi', message);
+            } else {
+                alert(message);
+            }
         },
 
         init() {

@@ -156,9 +156,23 @@
                                     @endforelse
                                     
                                     @if($hiddenTechsCount > 0)
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 cursor-help" title="{{ $task->technicians->skip(2)->pluck('name')->implode(', ') }}">
-                                            +{{ $hiddenTechsCount }}
-                                        </span>
+                                        <div class="relative" x-data="{ openHidden: false }">
+                                            <button type="button" @click="openHidden = !openHidden"
+                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors">
+                                                +{{ $hiddenTechsCount }}
+                                            </button>
+                                            <div x-show="openHidden" @click.away="openHidden = false"
+                                                class="absolute z-40 mt-1 min-w-[140px] bg-surface border border-border rounded shadow-lg py-1"
+                                                style="display: none;">
+                                                @foreach($task->technicians->skip(2) as $tech)
+                                                    <button type="button"
+                                                        @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name)); openHidden = false"
+                                                        class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors">
+                                                        {{ $tech->name }}
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endif
                                 </div>
                             </td>

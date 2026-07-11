@@ -1,6 +1,6 @@
 # ⚠️ ANALISA: Bug "Team Jadi Kosong" saat Task Di-shrink jadi Solo (+ Desync Execution Task)
 
-**Status:** ✅ **SEMUA gap di dokumen ini sudah di-FIX**, termasuk bagian 1-4 (bug team kosong), bagian 6 (desync ke execution `Task`/`TaskTeam`), bagian 7 (modal konflik C3 gak muncul — ternyata false alarm, backend selalu benar), bagian 8 (switch-teknisi otomatis pas resolve konflik), dan bagian 9 (modal konflik ke-close gak sengaja / ilang pas refresh). Test akhir: `FopTaskTeamServiceTest` 17/17 hijau, `FopTasksTest` 14/14 hijau, gabungan 31/31 — gak ada regresi. Bagian 10 catat 1 bug lain yang KETEMU gak sengaja pas investigasi, TERPISAH dari topik dokumen ini, BELUM difix.
+**Status:** ✅ **SEMUA gap di dokumen ini sudah di-FIX**, termasuk bagian 1-4 (bug team kosong), bagian 6 (desync ke execution `Task`/`TaskTeam`), bagian 7 (modal konflik C3 gak muncul — ternyata false alarm, backend selalu benar), bagian 8 (switch-teknisi otomatis pas resolve konflik), bagian 9 (modal konflik ke-close gak sengaja / ilang pas refresh), dan **bagian 11 (baru — bug "teknisi ke-merge/ketuker Team" pas pakai `switchTechnician()`, Task 2)**. Test akhir gabungan 49/49 hijau. Bagian 10 catat 1 bug lain yang KETEMU gak sengaja pas investigasi, TERPISAH dari topik dokumen ini, BELUM difix.
 
 ---
 
@@ -294,3 +294,50 @@ SQL: ... where "status" in (...) and DATE_ADD(created_at, INTERVAL 1 DAY) < NOW(
 **Status:** cuma dicatat, BELUM difix — di luar topik dokumen ini (gak berhubungan sama auto-team/sync), FOP dashboard di production (asumsi MySQL) gak kepengaruh.
 
 **Verifikasi terpisah (gak lewat dashboard controller penuh, langsung query team-card-nya doang):** dikonfirmasi Team 1 = `[Joko]`, Team 2 = `[Cagak, Suci, Tri]`, per-task technician list bener semua — bagian "Team FOP Aktif" di dashboard (yang emang relevan buat sync teknisi) udah kebukti sinkron, terlepas dari bug 500 di widget survey yang gak berhubungan itu.
+
+---
+
+## 11. Bug "Teknisi Ke-merge/Ketuker Team" via `switchTechnician()` (SUDAH DIFIX)
+
+**Laporan user:** habis pakai fitur Switch Teknisi (Task 2), teknisi yang seharusnya di Tim 1 malah kepindah/ketuker jadi Tim 2, dan sebaliknya.
+
+### 11.1 Reproduksi
+
+```
+Setup: Task A = Wito+Yanto (Tim 1), Task B = Joko+Wito+Karim (Tim 1, Wito jembatan), Task C = Abdul+Ajis (Tim 2).
+
+Aksi: switchTechnician() — pindah Wito dari Task A ke Task C, pengganti Yanto di Task A.
+
+Hasil SEBELUM fix:
+  Team 1: Yanto              (bener)
+  Team 2: KEHAPUS             ← Abdul & Ajis ilang teamnya!
+  Task C: technicians=[Wito,Abdul,Ajis], team_id=1   ← ke-merge paksa ke Team 1, padahal
+                                                          harusnya jadi conflict (Wito jembatan
+                                                          ke 2 team beda: Team1 via Task B,
+                                                          Team2 via Task C)
+```
+
+### 11.2 Root Cause #1 — `rebuildTeamsForDate()` Dipanggil Berlapis Tanpa Sadar
+
+`switchTechnician()` manggil `rebuildTeamsForDate()` 1x eksplisit di akhir. TAPI method privat `syncSwitchedExecutionTask()` (dipanggil 2x, buat `fromTask` & `toTask`) awalnya lewat `TaskService::update($execTask, ['team_member_ids' => ...], ...)` — dan `TaskService::update()` (baris 108) SELALU manggil `syncToFopTask()` di akhir, yang (baris 528-530) **UNCONDITIONAL manggil `rebuildTeamsForDate()` lagi**. Jadi total ada **3 rebuild pass** per 1 switch (2 tersembunyi + 1 eksplisit), bukan 1.
+
+Pass pertama BENER (Task C terdeteksi C3 conflict, `team_id` di-null-in). Tapi pass ke-2 (dari `syncSwitchedExecutionTask(toTask, ...)`) jalan SETELAH itu — snapshot `$existingTeamOf`-nya udah gak nemu bukti Team 2 lagi (karena Team 2 kadung kehapus di pass 1, lihat 11.3), jadi Wito+Abdul+Ajis dianggap AMAN di-union ke Team 1. Pass ke-3 cuma nguatin hasil yang udah salah itu.
+
+**Fix:** `syncSwitchedExecutionTask()` diganti — SENGAJA gak lewat `TaskService::update()` lagi, langsung manipulasi pivot `task_team` (hapus + insert ulang manual), biar gak mancing `syncToFopTask()` dan rebuild tersembunyi. `switchTechnician()` sekarang bener-bener cuma 1x manggil `rebuildTeamsForDate()`.
+
+### 11.3 Root Cause #2 — Team Kandidat Konflik Ke-cleanup di Pass yang Sama
+
+Walau root cause #1 udah difix, bug MASIH kejadian (cuma versinya beda: gak ke-merge, tapi Team 2 tetep kehapus). Sebabnya: Team 2 di skenario ini CUMA punya 1 task (Task C). Begitu Task C ke-deteksi C3 conflict dan `team_id`-nya di-null-in (dalem 1 pass rebuild yang sama), Team 2 langsung keliatan "gak py task aktif lagi" → step cleanup ("hapus team kosong") di ujung `rebuildTeamsForDate()` LANGSUNG ngehapus Team 2 — padahal FOP belum sempet mutusin konfliknya. Efeknya: rebuild berikutnya (misal cuma buka ulang `/fop-tasks`) udah gak nemu bukti Team 2 pernah ada, jadi Wito+Abdul+Ajis di-treat kayak gak py konflik sama sekali, di-union diam-diam ke Team 1.
+
+**Fix:** di `FopTaskTeamService::rebuildTeamsForDate()`, step cleanup sekarang skip team yang `id`-nya ada di daftar `candidates` dari `$conflicts` pass itu — team yang lagi jadi "opsi buat FOP pilih" gak boleh dihapus sampai konfliknya beneran diputusin (lewat `assignToTeam()`, yang baru manggil rebuild lagi setelah FOP milih).
+
+### 11.4 Fix Tambahan — Response `switchTechnician()` Sekarang Nyertain Conflict
+
+Sebelum fix, kalau switch bikin task LAIN (bukan yang lagi di-switch) jadi C3 conflict, `$conflicts` hasil `rebuildTeamsForDate()` dibuang begitu aja (gak dipakai). Sekarang di-flash ke session (`fop_team_conflicts`) & disertain di response JSON (`team_conflicts`), sama persis pola `store()`/`update()`/`assignToTeam()` — jadi modal konflik otomatis muncul abis switch kalau ternyata nyisain conflict yang perlu diputusin FOP.
+
+### 11.5 Test Regresi
+
+- `test_c3_conflict_candidate_team_survives_even_when_its_only_task_is_the_one_conflicted` (`FopTaskTeamServiceTest.php`) — replikasi persis skenario Wito/Team1/Team2: mastiin Team 2 TETAP ADA dan roster-nya utuh walau task satu-satunya lagi jadi conflict candidate.
+- Semua 7 test `FopTaskSwitchTechnicianTest.php` di-re-run, tetep hijau (gak ada regresi ke behavior switch yang udah bener sebelumnya).
+
+**Hasil akhir:** gabungan seluruh test FOP 49/49 hijau.

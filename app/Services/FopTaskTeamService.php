@@ -203,10 +203,25 @@ class FopTaskTeamService
                 }
             }
 
-            // Hapus team di tanggal ini yang udah gak punya task aktif sama sekali.
+            // Hapus team di tanggal ini yang udah gak punya task aktif sama sekali —
+            // KECUALI team yang lagi jadi kandidat conflict (Skenario C3) di pass ini.
+            // Kalau gak diproteksi, team yang task-nya cuma 1 dan task itu justru yang
+            // lagi konflik bakal ke-nullify duluan (gak aktif lagi) terus KEHAPUS di pass
+            // yang SAMA — padahal FOP belum sempet mutusin. Efeknya: rebuild berikutnya
+            // (misal cuma buka halaman /fop-tasks lagi) udah gak nemu bukti konfliknya,
+            // teknisi ke-merge diam-diam ke team yang salah (lihat perbandingan-assign-to-team-vs-switch-technician.md).
+            $protectedTeamIds = collect($conflicts)
+                ->flatMap(fn ($c) => collect($c['candidates'])->pluck('team_id'))
+                ->unique()
+                ->all();
+
             FopTaskTeam::whereDate('work_date', $date->toDateString())
                 ->get()
-                ->each(function (FopTaskTeam $team) {
+                ->each(function (FopTaskTeam $team) use ($protectedTeamIds) {
+                    if (in_array($team->id, $protectedTeamIds, true)) {
+                        return;
+                    }
+
                     if (!$team->isActive()) {
                         $oldValues = $team->load('members:id,name')->toArray();
                         $team->members()->detach();

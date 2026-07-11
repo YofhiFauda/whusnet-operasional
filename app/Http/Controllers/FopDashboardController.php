@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
@@ -10,8 +12,11 @@ use App\Models\Pop;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
+use App\Services\FopTaskTeamService;
+use App\Services\TaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class FopDashboardController extends Controller
@@ -180,11 +185,13 @@ class FopDashboardController extends Controller
                     }
 
                     return [
+                        'fop_task_id'  => $t->id,
                         'task_id'      => $t->task_id,
                         'task_number'  => $t->task_number,
                         'tugas'        => $t->tugas,
                         'status'       => $status,
                         'status_style' => $statusStyle,
+                        'draggable'    => !in_array($status, ['Selesai', 'Cancel', 'In Progress'], true),
                         'category_label' => $t->category->value,
                         'badge_classes'  => $t->category->badgeClasses(),
                         'customer_name' => $t->customer?->full_name ?? '—',
@@ -204,6 +211,7 @@ class FopDashboardController extends Controller
                     'completed_tasks'  => $completedTasks,
                     'progress_percent' => $totalTasks > 0 ? (int) round($completedTasks / $totalTasks * 100) : 0,
                     'members'          => $team->members->map(fn (User $m) => [
+                        'id'       => $m->id,
                         'name'     => $m->name,
                         'initials' => $this->initials($m->name),
                     ])->values(),
@@ -220,6 +228,115 @@ class FopDashboardController extends Controller
             'activeFopTeams',
             'pops',
         ));
+    }
+
+    /**
+     * Switch Task antar Team (drag & drop card di `/fop`) — sesuai kebutuhan
+     * poin 3 & SOLUSI poin 3 (docs/fop-task/analisa-auto-team.md, Sprint Backlog Task 3).
+     * Wajib pilih teknisi dari roster Team tujuan sebelum commit. Teknisi lama di
+     * task dilepas otomatis, teknisi terpilih (bisa >1, seperti multi-select di edit
+     * Task FOP) jadi assignee baru di Team tujuan. Pilihan teknisi dibatasi ke roster
+     * Team tujuan saja (bukan semua teknisi) — biar gak ada konflik teknisi lain tim.
+     */
+    public function switchTeam(Request $request, FopTask $fopTask)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(401);
+        }
+
+        if (!$user->hasRole('owner') && !$user->hasFullAccess() && !$user->hasPermission('fop_tasks.update')) {
+            abort(403, 'Anda tidak memiliki hak akses ke modul ini.');
+        }
+
+        $validated = $request->validate([
+            'to_team_id'         => ['required', 'integer', 'exists:fop_task_teams,id'],
+            'technician_ids'     => ['required', 'array', 'min:1'],
+            'technician_ids.*'   => ['integer', 'exists:users,id'],
+        ]);
+
+        $fopTask->load(['technicians', 'task', 'team']);
+        $toTeam = FopTaskTeam::with('members')->findOrFail($validated['to_team_id']);
+        $technicianIds = collect($validated['technician_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+
+        if (in_array($fopTask->status, [FopTaskStatus::SELESAI, FopTaskStatus::CANCEL], true)) {
+            return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus {$fopTask->status->value}, tidak bisa dipindah team.");
+        }
+
+        if ($fopTask->task && $fopTask->task->status->value === TaskStatus::IN_PROGRESS->value) {
+            return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} sedang in_progress, tidak bisa dipindah team.");
+        }
+
+        if ($fopTask->team_id === $toTeam->id) {
+            return $this->switchTeamError($request, 'to_team_id', 'Task sudah berada di Team tersebut.');
+        }
+
+        if (!$fopTask->task_date || $toTeam->work_date->toDateString() !== $fopTask->task_date->toDateString()) {
+            return $this->switchTeamError($request, 'to_team_id', "Team \"{$toTeam->name}\" bukan untuk tanggal task ini.");
+        }
+
+        $teamMemberIds = $toTeam->members->pluck('id');
+        $outsideRoster = $technicianIds->diff($teamMemberIds);
+        if ($outsideRoster->isNotEmpty()) {
+            return $this->switchTeamError($request, 'technician_ids', 'Teknisi yang dipilih harus anggota Team tujuan.');
+        }
+
+        $busyOn = Task::where('status', TaskStatus::IN_PROGRESS->value)
+            ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $technicianIds))
+            ->first();
+
+        if ($busyOn) {
+            return $this->switchTeamError(
+                $request,
+                'technician_ids',
+                "Salah satu teknisi terpilih sedang mengerjakan task lain yang in_progress [{$busyOn->task_number}]."
+            );
+        }
+
+        return DB::transaction(function () use ($fopTask, $toTeam, $technicianIds, $request) {
+            $oldValues = $fopTask->toArray();
+
+            $fopTask->team_id = $toTeam->id;
+            $fopTask->manual_override_at = now();
+            $fopTask->save();
+
+            $fopTask->technicians()->sync($technicianIds->all());
+
+            if ($fopTask->task_id && $fopTask->task) {
+                app(TaskService::class)->update($fopTask->task, [
+                    'team_member_ids' => $technicianIds->all(),
+                ], $request->user());
+            }
+
+            if (class_exists(AuditLog::class)) {
+                AuditLog::log($fopTask, 'switch_team', $oldValues, $fopTask->fresh(['technicians', 'team'])->toArray());
+            }
+
+            app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
+
+            $toTeam->refresh();
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Task {$fopTask->task_number} berhasil dipindah ke \"{$toTeam->name}\".",
+                ]);
+            }
+
+            return redirect()->route('fop.dashboard')->with('success', "Task berhasil dipindah ke \"{$toTeam->name}\".");
+        });
+    }
+
+    /**
+     * Response error konsisten (JSON atau redirect+errors) buat validasi switchTeam().
+     */
+    private function switchTeamError(Request $request, string $field, string $message)
+    {
+        if ($request->wantsJson()) {
+            return response()->json(['success' => false, 'message' => $message], 422);
+        }
+
+        return back()->withErrors([$field => $message]);
     }
 
     // ─── Private Helpers ─────────────────────────────────────────
