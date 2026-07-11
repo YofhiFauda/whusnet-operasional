@@ -18,8 +18,9 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 ### Lihat & filter tiket aktif
 
 1. Buka `/fop-tasks` → sistem auto-sync dulu (buat tiket Survey/PSB baru dari pelanggan yang belum ada tiketnya, recalculate prioritas semua tiket aktif).
-2. Tabel nampilin tiket status Proses/Pending, urut prioritas (Urgent→Low) lalu tanggal.
-3. Filter tersedia: search (nomor/tugas/issue), kategori, status, prioritas, desa, team.
+2. Tabel nampilin tiket status Proses/Pending, urut: **tiket dengan `client_request_date` di masa depan (besok+) selalu di bawah** (section "Upcoming", walau prioritasnya Urgent — lihat [flowchart.md § 8](flowchart.md#8-antrian-sorting-berdasarkan-client_request_date-task-8)), baru di antara sisanya urut prioritas (Urgent→Low) lalu tanggal. Begitu `client_request_date` udah sama dengan hari ini (gak perlu nunggu refresh manual/cron), tiketnya otomatis "naik" ikut sorting prioritas normal di request berikutnya.
+3. Kolom "Tanggal" nampilin badge kalau tiket punya `client_request_date`: **"JADWAL HARI INI"** (merah, kalau tanggalnya hari ini/udah lewat) atau **"Terjadwal — {tanggal}"** (abu-abu, kalau masih di masa depan).
+4. Filter tersedia: search (nomor/tugas/issue), kategori, status, prioritas, desa, team.
 
 ### Tambah tiket manual
 

@@ -43,7 +43,7 @@ Tiket kerja FOP. Sumber migrasi: `2026_06_30_000001`, `_153441_add_fields`, `202
 | `status` | string(20), default `Proses` | | Enum `App\Enums\FopTaskStatus`: Proses, Pending, Selesai, Cancel |
 | `priority` | string(20), default `low` | | Enum `App\Enums\FopTaskPriority`: low, Medium, High, Urgent — dihitung dinamis dari SLA (lihat [flowchart.md](flowchart.md#3-kalkulasi-prioritas-dinamis-sla-based)) |
 | `pending_reason` | string | ✔ | Wajib diisi kalau `status = Pending` |
-| `client_request_date` | date | ✔ | Wajib diisi kalau `status = Pending` |
+| `client_request_date` | date | ✔ | Wajib diisi kalau `status = Pending`. **Sejak Task 8**, juga dipakai buat sorting antrian di `index()` (lihat [flowchart.md](flowchart.md#8-antrian-sorting-berdasarkan-client_request_date-task-8)) dan badge "JADWAL HARI INI"/"Terjadwal — {tanggal}" di `fop_tasks/index.blade.php`. **Catatan teknis:** meski kolomnya `date`, nilai yang tersimpan (di kedua driver MySQL & SQLite) punya suffix waktu (`'2026-07-11 00:00:00'`), bukan `'2026-07-11'` murni — perbandingan raw SQL harus pakai `>=` terhadap tanggal besok, BUKAN `>` terhadap tanggal hari ini (`>` selalu true gara-gara suffix waktu itu). |
 | `cancelled_at` | timestamp | ✔ | Waktu pembatalan, di-set kalau `status = Cancel` |
 | `created_at` / `updated_at` | timestamp | | |
 

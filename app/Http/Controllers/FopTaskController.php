@@ -46,11 +46,12 @@ class FopTaskController extends Controller
             },
         ])
             ->whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
-            ->orderByRaw("CASE priority 
-                WHEN 'Urgent' THEN 1 
-                WHEN 'High' THEN 2 
-                WHEN 'Medium' THEN 3 
-                WHEN 'low' THEN 4 
+            ->orderByRaw("CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END", [now()->addDay()->toDateString()])
+            ->orderByRaw("CASE priority
+                WHEN 'Urgent' THEN 1
+                WHEN 'High' THEN 2
+                WHEN 'Medium' THEN 3
+                WHEN 'low' THEN 4
                 ELSE 5 END")
             ->orderByRaw("CASE WHEN category IN ('Survey', 'PSB') THEN created_at END ASC")
             ->orderByRaw("CASE WHEN category NOT IN ('Survey', 'PSB') THEN created_at END DESC");

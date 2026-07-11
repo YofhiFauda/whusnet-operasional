@@ -870,29 +870,36 @@ Test suite: `tests/Feature/TaskRescheduleTest.php` 5/5 hijau. Regression check g
 
 ### Task 8 — Antrian Sorting Berdasarkan `client_request_date`
 
-**Status:** `To Do`
+**Status:** `Done`
 
 **Tujuan:** Task dengan `client_request_date` di masa depan tampil di bawah (Upcoming), begitu jadwalnya tiba naik otomatis ke atas — sesuai kebutuhan poin 8 (dan poin 13, lihat catatan di Task 13).
 
-**Kondisi kode nyata:** `FopTaskController::index()` (baris 27) saat ini sudah punya `orderByRaw` di baris 45-52: CASE berdasar `priority` (Urgent→High→Medium→Low→else), lalu CASE `category IN ('Survey','PSB')` → `created_at ASC` else `created_at DESC`. **`client_request_date` sama sekali belum masuk sorting** — cuma dipakai di validasi/set saat `store()`/`update()` (baris 167/196, 259/293-306), belum pernah dibaca balik buat urutan tampilan.
+**Kondisi kode nyata:** `FopTaskController::index()` (baris 31, line number geser dikit dari draft) sudah punya `orderByRaw` di baris 49-56: CASE berdasar `priority` (Urgent→High→Medium→Low→else), lalu CASE `category IN ('Survey','PSB')` → `created_at ASC` else `created_at DESC`. **`client_request_date` sama sekali belum masuk sorting** — cuma dipakai di validasi/set saat `store()`/`update()`, belum pernah dibaca balik buat urutan tampilan. Konfirmasi ini masih akurat, cuma line number bergeser (drift wajar pasca Task 1-7).
 
-**File yang dibuat/dirubah:**
+**File yang dibuat/dirubah (realisasi):**
 | File | Aksi |
 |---|---|
-| `app/Http/Controllers/FopTaskController.php` | **Rubah** — `index()` baris 45-52: sisipkan 1 CASE tambahan berdasar `client_request_date` vs `CURDATE()` SEBELUM CASE priority yang sudah ada (atau kombinasikan sesuai prioritas bisnis: overdue/hari-ini tetap harus di atas Upcoming meski priority-nya rendah). |
-| `resources/views/fop_tasks/index.blade.php` | **Rubah** — section/badge visual "Terjadwal — {tanggal}" vs "Hari Ini"/"Overdue". |
-| `tests/Feature/FopTaskSortingTest.php` | **Baru** — termasuk regression test buat 2 CASE existing (priority + category Survey/PSB) yang jangan sampai rusak. |
+| `app/Http/Controllers/FopTaskController.php` | **Rubah** — `index()`: sisipkan 1 CASE tambahan SEBELUM CASE priority yang sudah ada, tanpa menghapus 2 CASE lama. |
+| `resources/views/fop_tasks/index.blade.php` | **Rubah** — kolom "Tanggal" ditambah badge "JADWAL HARI INI" (kalau `client_request_date <= hari ini`) atau "Terjadwal — {tanggal}" (kalau di masa depan), muncul di bawah `task_date` per baris. |
+| `tests/Feature/FopTaskSortingTest.php` | **Baru** — 6 test: sink-below untuk upcoming, normal-sort untuk hari-ini, regression priority, regression category Survey/PSB, 2 test badge. |
+
+**Deviasi dari rencana awal (disengaja, ketemu pas development, dicatat biar gak dianggap bug):**
+- **`CURDATE()` diganti jadi parameter binding tanggal** — rencana awal pakai `CURDATE()` (fungsi MySQL-only). Test suite proyek ini jalan di SQLite in-memory (`phpunit.xml`), dan SQLite gak punya `CURDATE()` — query langsung error `no such function: CURDATE` kalau dipertahankan. Diganti jadi `client_request_date >= ?` dengan binding `now()->addDay()->toDateString()` (portable, jalan di MySQL maupun SQLite).
+- **Threshold diubah dari `> CURDATE()` jadi `>= besok`** — ditemukan bug lewat test: kolom `client_request_date` (meski migrasinya `$table->date()`) ternyata disimpan dengan suffix waktu (`'2026-07-11 00:00:00'`, bukan `'2026-07-11'` murni) di kedua driver. Perbandingan string `'...00:00:00' > '2026-07-11'` SELALU true (string yang punya suffix dianggap "lebih besar" dari prefix-nya secara leksikografis) — akibatnya task dengan `client_request_date` HARI INI pun ikut ke-sink ke bucket "upcoming", padahal harusnya ikut sorting normal. Fix: bandingkan `>= tanggal besok` (bukan `> hari ini`) — hasil akhirnya identik secara semantik (upcoming = strictly setelah hari ini) tapi kebal dari isu suffix waktu di kedua driver. Ke-cover di test `test_task_with_today_client_request_date_follows_normal_priority_sort`.
+- **Test regression category pakai `category = 'PSB'`, bukan `'SURVEY'`** — ditemukan (bukan dikerjakan/difix, di luar scope Task 8) bug pre-existing: literal CASE existing `category IN ('Survey', 'PSB')` pakai title-case `'Survey'`, padahal backing value enum `TaskType::SURVEY` sekarang `'SURVEY'` (uppercase, hasil migrasi `2026_07_01_111156_update_task_type_values_to_uppercase`). String comparison case-sensitive di kedua driver bikin literal `'Survey'` itu **gak pernah match** kategori SURVEY asli — CASE ASC-by-created_at buat Survey secara diam-diam gak pernah kepakai, task SURVEY malah ikut jalur DESC (sama kayak kategori lain). `'PSB'` di literal itu masih exact-match sama `TaskType::PEMASANGAN`, jadi dipakai buat regression test yang akurat. **Catatan blocker (bukan dikerjakan di sini):** literal `'Survey'` di 2 CASE existing (baris category, gak disentuh Task 8) perlu diganti `'SURVEY'` di task terpisah kalau mau match asli sesuai intent aslinya — di luar scope "jangan hapus/ubah 2 CASE lama" punya Task 8, tapi worth di-flag buat siapa pun yang pegang controller ini berikutnya.
 
 **Checklist:**
-- [ ] Tambah CASE baru di `orderByRaw` existing (baris 45-52): `client_request_date IS NOT NULL AND client_request_date > CURDATE()` → taruh di bawah; digabung TANPA menghapus 2 CASE lama (priority, category Survey/PSB ASC/DESC).
-- [ ] Badge "JADWAL HARI INI" begitu `client_request_date <= CURDATE()`.
-- [ ] Section "Upcoming/Terjadwal" untuk task dengan tanggal request di masa depan.
-- [ ] Regression test: sorting existing (priority/created_at) tidak rusak.
+- [x] Tambah CASE baru di `orderByRaw` existing: `client_request_date IS NOT NULL AND client_request_date >= {besok}` → taruh di bucket "upcoming" (1) yang di-ranking di bawah (0); digabung TANPA menghapus 2 CASE lama (priority, category Survey/PSB ASC/DESC).
+- [x] Badge "JADWAL HARI INI" begitu `client_request_date <= hari ini`.
+- [x] Badge "Terjadwal — {tanggal}" untuk task dengan tanggal request di masa depan.
+- [x] Regression test: sorting existing (priority/created_at) tidak rusak.
 
 **Acceptance Criteria:**
-1. Task dengan `client_request_date` besok atau lebih tampil di section bawah "Upcoming".
-2. Begitu hari sistem sama dengan `client_request_date`, task otomatis pindah ke atas tanpa perlu cron/refresh manual (dihitung ulang tiap page load).
-3. Sorting lama (priority/overdue) tetap jalan untuk task tanpa `client_request_date`.
+1. [x] Task dengan `client_request_date` besok atau lebih tampil di bawah, walau priority-nya lebih tinggi dari task lain. (`test_task_with_future_client_request_date_sinks_below_others`)
+2. [x] Begitu hari sistem sama dengan `client_request_date`, task otomatis ikut sorting normal (priority) tanpa perlu cron/refresh manual (dihitung ulang tiap page load, bukan job terjadwal). (`test_task_with_today_client_request_date_follows_normal_priority_sort`)
+3. [x] Sorting lama (priority, category Survey/PSB ASC/DESC) tetap jalan untuk task tanpa `client_request_date`. (`test_priority_sorting_regression_unaffected`, `test_category_survey_psb_created_at_ascending_regression_unaffected`)
+
+Test suite: `tests/Feature/FopTaskSortingTest.php` 6/6 hijau. Regression check gabungan `--filter=FopTask` 55/55 hijau, `--filter=Task` 75/75 hijau, gak ada regresi.
 
 ---
 

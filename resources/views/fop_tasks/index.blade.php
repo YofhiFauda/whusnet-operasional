@@ -124,6 +124,18 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-slate-600">
                                 {{ $task->task_date ? $task->task_date->format('d/m/Y H:i') : '—' }}
+                                @if($task->client_request_date)
+                                    <br>
+                                    @if($task->client_request_date->lte(\Illuminate\Support\Carbon::today()))
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-50 text-red-700 border border-red-100 mt-0.5">
+                                            JADWAL HARI INI
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-600 border border-slate-200 mt-0.5">
+                                            Terjadwal — {{ $task->client_request_date->format('d/m/Y') }}
+                                        </span>
+                                    @endif
+                                @endif
                             </td>
                             <td class="px-3 py-2 min-w-[200px] whitespace-normal leading-tight">
                                 <span class="font-medium text-slate-800">{{ $task->tugas }}</span>

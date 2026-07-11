@@ -214,3 +214,24 @@ FOP klik chip nama teknisi di tabel /fop-tasks
 ```
 
 Panel "Kelola Team" manual **sudah dihapus** — Team gak lagi dibuat/di-edit/dihapus lewat UI terpisah, sepenuhnya derived dari assignment teknisi (lihat bagian 5).
+
+## 8. Antrian Sorting berdasarkan `client_request_date` (Task 8)
+
+**Baru.** `FopTaskController::index()` sekarang sort 4 CASE berurutan (bukan cuma 2 kayak sebelumnya) — CASE baru ditaruh PALING DEPAN, jadi presedensinya di atas priority/category:
+
+```
+ORDER BY
+  1. CASE: client_request_date terisi DAN >= besok?
+       YA  → bucket 1 (Upcoming, di-sink ke BAWAH daftar)
+       TIDAK (kosong, atau <= hari ini) → bucket 0 (ikut sorting normal)
+  2. CASE priority: Urgent(1) → High(2) → Medium(3) → low(4) → else(5)
+  3. CASE category IN (Survey, PSB) → created_at ASC   (yang lama duluan)
+  4. CASE category NOT IN (Survey, PSB) → created_at DESC  (yang baru duluan)
+```
+
+- Task dengan `client_request_date` di masa depan (besok atau lebih) **selalu** tampil di bawah tiket lain, walau priority-nya Urgent — bucket 1 kalah sama bucket 0 di ORDER BY pertama, gak peduli apa pun nilai CASE sesudahnya.
+- Task dengan `client_request_date` hari ini (atau udah lewat) masuk bucket 0 — ikut aturan sorting normal (priority dulu, baru category/created_at) berbarengan sama task yang gak punya `client_request_date` sama sekali.
+- **Gak ada cron.** Bucket dihitung ulang tiap kali `GET /fop-tasks` di-load — begitu tanggal sistem nyampe/lewat `client_request_date`, task otomatis "naik" ke sorting normal di request berikutnya, tanpa job terjadwal.
+- Badge visual di kolom "Tanggal" (`fop_tasks/index.blade.php`): **"JADWAL HARI INI"** (merah) kalau `client_request_date <= hari ini`, **"Terjadwal — {tanggal}"** (abu-abu) kalau di masa depan.
+- **Kenapa `>= besok`, bukan `> hari ini`:** ditemukan lewat test bahwa kolom `client_request_date` tersimpan dengan suffix waktu (`'... 00:00:00'`) di DB — perbandingan string `> 'YYYY-MM-DD'` (tanpa waktu) SELALU true karena string yang lebih panjang (ada suffix) dianggap "lebih besar" dari prefix-nya. Threshold `>= tanggal besok` menghindari ini sekaligus tetap portable ke MySQL & SQLite (gak pakai `CURDATE()` yang MySQL-only — dipakai binding parameter PHP `now()->addDay()->toDateString()` sebagai gantinya).
+- Detail implementasi & test: [analisa-auto-team.md § Task 8](analisa-auto-team.md).
