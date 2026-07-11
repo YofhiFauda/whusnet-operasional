@@ -784,7 +784,7 @@ Test suite: `tests/Feature/FopTaskSwitchTechnicianTest.php` 7/7 hijau, gabungan 
 
 ### Task 6 — Dialog Laporan: `Lapor Sekarang` / `Lapor Nanti` (extend mekanisme existing)
 
-**Status:** `Done`
+**Status:** `Done `
 
 **⚠️ Gap sementara (disengaja, nunggu Task 7):** eksekusi Task 6 MENGHAPUS tombol `Pending` berdiri sendiri milik teknisi (toggle lama baris 752-758, satu-satunya jalan teknisi set task ke Pending di luar konteks laporan). Setelah Task 6, teknisi **HANYA** bisa masuk status Pending lewat dialog Laporan → pilih `Lapor Nanti` (`report_deferred=true`). Tidak ada lagi tombol Pending generik buat alasan non-laporan (mis. darurat, kendala alat, dll) sampai Task 7 (tombol `Pending` top-level, reschedule) selesai dikerjakan. Ini konsisten sama desain final poin 8 (Pending = Task 7, Lapor Nanti = Task 6), tapi berarti ada window waktu di mana teknisi kehilangan opsi Pending generik. Diputuskan untuk dibiarkan (bukan bug) — prioritaskan Task 7 berikutnya.
 
@@ -813,7 +813,7 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 - [x] `Lapor Sekarang` → lanjut ke form laporan (`customers.survey.report`, `customers.installation.report`, `tasks.maintenance.report`) langsung.
 - [x] `Lapor Nanti` → reuse `TaskStatusController::pending()` + `TaskService::setPending()` existing (status `TaskStatus::PENDING`, assignment tetap), set `report_deferred = true` biar beda query dari `Pending` reschedule (Task 7) yang statusnya sama-sama bisa disebut "pending" tapi behavior beda.
 - [ ] Sinkron ke `FopTask` (lihat Task 9): status FopTask jadi `lapor_nanti` (bukan `pending`) kalau `report_deferred = true`. **BLOCKED — depends on Task 9 (Observer belum ada), tidak dikerjakan di Task 6.**
-- [ ] Badge/warna beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard. **BLOCKED — depends on Task 7 (tombol `Pending` top-level belum ada), tidak dikerjakan di Task 6.**
+- [ ] Badge/warna beda dari tombol `Pending` (Task 7) di UI supaya FOP gak ketuker di dashboard. **BLOCKED — Task 7 udah `Done` (tombol `Pending` top-level warna amber sudah ada di Detail Task), tapi badge/widget status pembeda di dashboard FOP (`/fop`, `/fop-tasks`) belum ada. Itu scope Task 9 (status realtime), belum dikerjakan di Task 6 maupun Task 7.**
 - [x] Rapikan label tombol existing yang sekarang inconsistent ("Laporan Nanti" vs "Pending") jadi konsisten "Lapor Nanti" di semua tempat — toggle lama dihapus, diganti dialog seragam untuk semua task_type.
 
 **Acceptance Criteria:**
@@ -825,7 +825,7 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 
 ### Task 7 — Tombol `Pending` Top-Level (Reschedule Penuh) — FITUR BARU, BUKAN REUSE
 
-**Status:** `To Do`
+**Status:** `Done`
 
 **Tujuan:** Tombol `Pending` di top-level Detail Task (teknisi-triggered) yang melepas assignment & reschedule task ke hari lain, balik ke antrian Task FOP — sesuai kebutuhan poin 7.
 
@@ -833,28 +833,38 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 
 **Prioritas naik:** Task 6 (sudah `Done`) menghapus satu-satunya tombol Pending generik milik teknisi (lihat catatan gap di Task 6). Sampai Task 7 ini selesai, teknisi tidak punya cara set task ke Pending di luar konteks laporan (Lapor Nanti). Kerjakan Task 7 lebih dulu dari task-task lain yang tidak dependent.
 
-**File yang dibuat/dirubah:**
+**File yang dibuat/dirubah (realisasi):**
 | File | Aksi |
 |---|---|
-| `app/Enums/TaskStatus.php` | **Rubah** — tambah case baru `RESCHEDULE` (`reschedule`) — **jangan reuse `TaskStatus::PENDING` existing**, karena `PENDING` udah dipakai buat 2 hal beda (FOP `fopPending` set-pending-tanpa-lepas, dan Task 6 `Lapor Nanti` lewat `report_deferred`). Pakai nama status baru biar gak tabrakan makna 3x. |
-| `resources/views/tasks/show.blade.php` | **Rubah** — tambah tombol baru `Pending` di top-level Detail Task (terpisah dari tombol Laporan/dialog Task 6 dan dari tombol "Set Pending" FOP-side baris 815-819), warna amber/kuning, modal alasan wajib. |
-| `app/Http/Controllers/TaskController.php` | **Rubah** — action handler baru `reschedule()` (nama beda dari `pending()` existing biar gak collision): set `Task.status = RESCHEDULE`, **lepas** pivot teknisi, sync `FopTask.status = pending` + reset `team_id`, task balik ke `fop-tasks.index` untuk dijadwal ulang. |
-| `routes/web.php` | **Rubah** — tambah route baru `POST /tasks/{task}/reschedule` (jangan pakai route `tasks.pending` existing, itu punya makna beda). |
-| `app/Policies/TaskPolicy.php` | **Rubah** — tambah ability baru `statusReschedule` (terpisah dari `statusPending` existing yang dipakai Task 6). |
-| `tests/Feature/TaskRescheduleTest.php` | **Baru** |
+| `app/Enums/TaskStatus.php` | **Rubah** — tambah case baru `RESCHEDULE = 'reschedule'` + entry di `label()` ("Reschedule") dan `badgeClasses()` (kuning, satu grup sama `PENDING`/`WAITING_*`). Kolom `tasks.status` cuma `string(30)` di DB (bukan DB-level enum), jadi gak perlu migrasi buat nilai baru ini. |
+| `resources/views/tasks/show.blade.php` | **Rubah** — tombol baru `Pending` (warna amber/kuning, ikon jam) ditaruh di awal blok "Action Buttons" top-level (sebelum tombol Mulai/Laporan), gated `@can('statusReschedule', $task)`. Modal terpisah `reschedule-task-{id}` (alasan wajib) ditaruh berdekatan dengan modal "Set Pending" FOP-side existing tapi named-scope beda — tidak menyentuh toggle FOP (baris ~805-813) atau dialog Task 6. |
+| `app/Http/Controllers/TaskController.php` | **Rubah** — method baru `reschedule(Request, Task)`: `authorize('statusReschedule')` → validasi `pending_reason` (reuse kolom existing, bukan kolom baru) → `DB::transaction`: `Task.status = RESCHEDULE` + `pending_reason` + `updated_by`, `$task->teamMembers()->delete()` (lepas pivot eksekusi), cari `FopTask::where('task_id', $task->id)`, kalau ada: `technicians()->detach()`, `status = FopTaskStatus::PENDING`, `pending_reason` disamakan, `team_id = null`, `manual_override_at = null` (di-set langsung via `$model->save()`, bukan `update()`, karena `manual_override_at` gak masuk `#[Fillable]` di `FopTask`), lalu `AuditLog::log()` untuk Task & FopTask, lalu `app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date))`. Redirect ke `tasks.own` (bukan `tasks.show` — teknisi udah bukan member lagi setelah pivot lepas). |
+| `routes/web.php` | **Rubah** — tambah `POST /tasks/{task}/reschedule` (`tasks.reschedule`) di dalam group `permission:task.execute` yang sama dengan `tasks.pending` existing. |
+| `app/Policies/TaskPolicy.php` | **Rubah** — ability baru `statusReschedule(User, Task): bool` = `hasPermission('task.execute') && isMember && status in [terjadwal, in_progress]` (beda dari `statusPending` yang gak ngecek status secara eksplisit di policy). |
+| `tests/Feature/TaskRescheduleTest.php` | **Baru** — 5 test: set status + lepas pivot, wajib alasan (422/validation error), sync ke FopTask terkait (status/team_id/technicians), guard hanya member, guard status `selesai` ditolak. |
+
+**Deviasi dari rencana awal (disengaja, dicatat biar gak dianggap bug):**
+- **Gak ada kolom `reschedule_reason` baru** — reuse kolom `pending_reason` yang udah ada di `tasks` (dipakai bareng sama `fopPending` dan Task 6 `Lapor Nanti`). Ini cuma reuse kolom teks alasan, BUKAN reuse makna status — `TaskStatus::RESCHEDULE` tetap nilai enum sendiri, terpisah total dari `TaskStatus::PENDING`.
+- **Riwayat/status history (checklist poin ke-5) BELUM dikerjakan di sini** — audit trail cuma lewat `AuditLog::log()` generik (pola yang sama dipakai `FopTaskController`), bukan tabel `fop_task_status_history` dedicated. Tabel itu scope Task 9/10, belum ada di codebase saat Task 7 dikerjakan. **Catatan blocker untuk Task 9/10:** perlu pastikan `fop_task_status_history` nanti bisa baca histori dari `AuditLog` action `'reschedule'` (baik di model `Task` maupun `FopTask`), atau di-refactor supaya `reschedule()` juga nulis ke tabel histori baru itu langsung.
 
 **Checklist:**
-- [ ] Tombol `Pending` (reschedule) HANYA di top-level Detail Task, benar-benar terpisah dari tombol "Laporan" (Task 6) dan dari tombol "Set Pending" FOP-side existing (baris 815-819) — 3 tombol beda, jangan campur baur.
-- [ ] Modal wajib isi alasan sebelum submit.
-- [ ] Task lepas dari teknisi (pivot dihapus), `team_id` di-reset — trigger `rebuildTeamsForDate()` karena roster berubah.
-- [ ] Task balik muncul di halaman `/fop-tasks` untuk dijadwalkan ulang ke teknisi lain/hari lain.
-- [ ] Riwayat catat histori reschedule lengkap (lihat Task 10) — beda entry dari `Lapor Nanti` (Task 6) dan dari `fopPending` existing.
+- [x] Tombol `Pending` (reschedule) HANYA di top-level Detail Task, benar-benar terpisah dari tombol "Laporan" (Task 6) dan dari tombol "Set Pending" FOP-side existing — 3 tombol beda, gak campur baur.
+- [x] Modal wajib isi alasan sebelum submit (`required` di textarea + validasi backend `required|string|max:500`).
+- [x] Task lepas dari teknisi (pivot `task_teams` dihapus via `teamMembers()->delete()`, plus `fop_task_user` di-detach), `team_id` FopTask di-reset — trigger `rebuildTeamsForDate()` karena roster berubah.
+- [x] Task balik muncul di halaman `/fop-tasks` untuk dijadwalkan ulang ke teknisi lain/hari lain (FopTask status `Pending`, `team_id = null`, technicians kosong).
+- [ ] Riwayat catat histori reschedule lengkap di tabel dedicated (lihat Task 10) — **BLOCKED, cuma `AuditLog::log()` generik dulu, tabel `fop_task_status_history` belum ada.**
 
 **Acceptance Criteria:**
-1. Klik tombol `Pending` (reschedule) di Detail Task selalu minta alasan dulu sebelum submit.
-2. Task yang di-reschedule hilang dari `/tasks-saya` teknisi tsb (pivot lepas), muncul lagi di `/fop-tasks` untuk dijadwal ulang.
-3. Rebuild Team ke-trigger karena roster tanggal itu berubah (task lepas dari teknisi).
-4. 3 mekanisme beda — `Lapor Nanti` (Task 6, assignment tetap), `Pending` reschedule (Task 7, assignment lepas), `fopPending`/"Set Pending" existing (FOP-side, assignment tetap) — masing-masing punya test terpisah dan tidak saling menimpa status/behavior satu sama lain.
+1. [x] Klik tombol `Pending` (reschedule) di Detail Task selalu minta alasan dulu sebelum submit. (`test_reschedule_requires_reason`)
+2. [x] Task yang di-reschedule hilang dari `/tasks-saya` teknisi tsb (pivot lepas), muncul lagi di `/fop-tasks` untuk dijadwal ulang. (`test_reschedule_sets_status_and_releases_technician_assignment`, `test_reschedule_syncs_related_fop_task_and_resets_team`)
+3. [x] Rebuild Team ke-trigger karena roster tanggal itu berubah (task lepas dari teknisi). (dicek lewat assertion `team_id` null + `technicians` kosong pasca rebuild di `test_reschedule_syncs_related_fop_task_and_resets_team`)
+4. [x] 3 mekanisme beda — `Lapor Nanti` (Task 6, assignment tetap), `Pending` reschedule (Task 7, assignment lepas), `fopPending`/"Set Pending" existing (FOP-side, assignment tetap) — masing-masing punya test terpisah dan tidak saling menimpa status/behavior satu sama lain. (`TaskRescheduleTest` vs `TaskReportDialogTest` vs `TaskFopActionsTest`, ketiganya jalan bareng tanpa regresi — 69/69 test gabungan `--filter=Task` hijau)
+
+Test suite: `tests/Feature/TaskRescheduleTest.php` 5/5 hijau. Regression check gabungan (`TaskReportDialogTest`, `FopTasksTest`, `FopTaskTeamServiceTest`, `FopTaskSwitchTechnicianTest`, `FopTaskSwitchTeamTest`, `TaskFopActionsTest`, `TaskBroadcastingTest`) 69/69 hijau, gak ada regresi.
+
+**Catatan blocker untuk Task lain:**
+- Task 6 checklist poin "Badge/warna beda dari tombol `Pending` (Task 7) di UI" masih **belum dikerjakan** — Task 7 udah kasih tombol `Pending` warna amber sendiri, tapi belum ada widget/badge status di dashboard FOP (`/fop`, `/fop-tasks`) yang bedain visual `pending` (reschedule) vs `lapor_nanti` vs `fopPending`. Itu scope Task 9 (status realtime + badge di FOP-side), bukan dikerjakan di sini.
+- Task 9 sekarang punya prasyarat lengkap dari Task 6 (`report_deferred`) dan Task 7 (`TaskStatus::RESCHEDULE`) buat mapping status FopTask otomatis.
 
 ---
 

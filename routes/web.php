@@ -321,6 +321,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.execute')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
+        // Pending top-level (reschedule penuh) — beda dari tasks.pending (Lapor Nanti) & tasks.fop-pending (FOP-side).
+        Route::post('/tasks/{task}/reschedule', [TaskController::class, 'reschedule'])->name('tasks.reschedule');
     });
 
     // Teknisi: Upload bukti

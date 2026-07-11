@@ -10,6 +10,7 @@ enum TaskStatus: string
     case SELESAI               = 'selesai';
     case DIBATALKAN            = 'dibatalkan';
     case PENDING               = 'pending';
+    case RESCHEDULE            = 'reschedule';
     case WAITING_SURVEY        = 'waiting_survey';
     case WAITING_INSTALLATION  = 'waiting_installation';
     case WAITING_INSTALLATIONS = 'waiting_installations';
@@ -23,6 +24,7 @@ enum TaskStatus: string
             self::SELESAI               => 'Selesai',
             self::DIBATALKAN            => 'Dibatalkan',
             self::PENDING               => 'Pending',
+            self::RESCHEDULE            => 'Reschedule',
             self::WAITING_SURVEY        => 'Waiting Survey',
             self::WAITING_INSTALLATION, 
             self::WAITING_INSTALLATIONS => 'Waiting Installation',
@@ -37,9 +39,10 @@ enum TaskStatus: string
             self::IN_PROGRESS           => 'bg-amber-100 text-amber-700',
             self::SELESAI               => 'bg-green-100 text-green-700',
             self::DIBATALKAN            => 'bg-red-100 text-red-700 line-through',
-            self::PENDING, 
-            self::WAITING_SURVEY, 
-            self::WAITING_INSTALLATION, 
+            self::PENDING,
+            self::RESCHEDULE,
+            self::WAITING_SURVEY,
+            self::WAITING_INSTALLATION,
             self::WAITING_INSTALLATIONS => 'bg-yellow-100 text-yellow-700',
         };
     }

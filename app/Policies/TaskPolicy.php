@@ -186,6 +186,18 @@ class TaskPolicy
     }
 
     /**
+     * Pending top-level (reschedule penuh) — beda dari statusPending (Lapor Nanti,
+     * assignment tetap) dan fopPending (FOP-side, assignment tetap). Ini lepas
+     * assignment & balik ke antrian FOP, cuma boleh sebelum task selesai.
+     */
+    public function statusReschedule(User $user, Task $task): bool
+    {
+        return $user->hasPermission('task.execute')
+            && $task->isMember($user->id)
+            && in_array($task->status->value, ['terjadwal', 'in_progress']);
+    }
+
+    /**
      * Upload foto bukti.
      */
     public function uploadEvidence(User $user, Task $task): bool

@@ -695,6 +695,16 @@
     {{-- ══ Action Buttons ════════════════════════════════════════════ --}}
     @if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending']))
     <div class="flex flex-wrap items-center justify-end gap-2.5 pt-1.5 font-ui">
+        @can('statusReschedule', $task)
+        <button type="button" x-data @click="$dispatch('open-modal', 'reschedule-task-{{ $task->id }}')"
+                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded border bg-white transition-colors hover:bg-warning/5 cursor-pointer"
+                style="border-color:var(--color-warning-border); color:var(--color-warning)">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Pending
+        </button>
+        @endcan
         @if($task->status->value === 'terjadwal')
             @if($task->scheduled_at && !$task->scheduled_at->startOfDay()->isFuture())
             @if($task->task_type->value === \App\Enums\TaskType::SURVEY->value)
@@ -909,6 +919,31 @@
 </x-ui.modal>
 @endcan
 
+
+{{-- ══ Pending Top-Level (Reschedule Penuh) Modal — beda dari Set Pending FOP-side & dialog Laporan ═══ --}}
+@can('statusReschedule', $task)
+<x-ui.modal name="reschedule-task-{{ $task->id }}" title="Pending Task (Reschedule)" maxWidth="sm">
+    <p class="text-xs text-text-secondary mb-3 font-ui">
+        Task ini akan dilepas dari Anda dan dikembalikan ke antrian Task FOP untuk dijadwalkan ulang ke teknisi/hari lain.
+        <span class="font-semibold text-text-main">Assignment Anda pada task ini akan dihapus.</span>
+    </p>
+    <form id="form-reschedule-{{ $task->id }}" action="{{ route('tasks.reschedule', $task) }}" method="POST">
+        @csrf
+        <div class="space-y-1.5 font-ui">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">Alasan Pending <span class="text-error">*</span></label>
+            <x-ui.textarea name="pending_reason" rows="3" placeholder="Alasan mengapa task ini di-pending/reschedule..." required />
+        </div>
+    </form>
+    <x-slot name="footer">
+        <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'reschedule-task-{{ $task->id }}')">
+            Batal
+        </x-ui.button>
+        <x-ui.button type="submit" form="form-reschedule-{{ $task->id }}" variant="warning">
+            Pending Task
+        </x-ui.button>
+    </x-slot>
+</x-ui.modal>
+@endcan
 
 {{-- ══ FOP Reject Modal ══════════════════════════════════════════════ --}}
 @can('review', $task)

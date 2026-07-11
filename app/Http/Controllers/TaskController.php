@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
+use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class TaskController extends Controller
@@ -209,6 +214,61 @@ class TaskController extends Controller
         return redirect()
             ->route('fop.dashboard')
             ->with('success', "Task [{$task->task_number}] berhasil dibatalkan.");
+    }
+
+    /**
+     * Teknisi: Pending top-level (reschedule penuh) — lepas assignment teknisi,
+     * balik task ke antrian Task FOP untuk dijadwalkan ulang. BEDA dari
+     * `TaskStatusController::pending()` (Lapor Nanti, assignment tetap) dan
+     * `pending()` di controller ini (FOP-side "Set Pending", assignment tetap).
+     * Guard: task.status.reschedule — hanya anggota tim, status terjadwal/in_progress.
+     */
+    public function reschedule(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('statusReschedule', $task);
+
+        $validated = $request->validate([
+            'pending_reason' => 'required|string|max:500',
+        ]);
+
+        DB::transaction(function () use ($task, $validated) {
+            $oldValues = $task->toArray();
+
+            $task->update([
+                'status'         => TaskStatus::RESCHEDULE,
+                'pending_reason' => $validated['pending_reason'],
+                'updated_by'     => auth()->id(),
+            ]);
+
+            $task->teamMembers()->delete();
+
+            AuditLog::log($task, 'reschedule', $oldValues, $task->fresh()->toArray());
+
+            $fopTask = FopTask::where('task_id', $task->id)->first();
+
+            if ($fopTask) {
+                $fopOldValues = $fopTask->toArray();
+
+                $fopTask->technicians()->detach();
+                $fopTask->update([
+                    'status'         => FopTaskStatus::PENDING,
+                    'pending_reason' => $validated['pending_reason'],
+                    'team_id'        => null,
+                ]);
+                $fopTask->manual_override_at = null;
+                $fopTask->save();
+
+                AuditLog::log($fopTask, 'reschedule', $fopOldValues, $fopTask->fresh()->toArray());
+
+                if ($fopTask->task_date) {
+                    app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+                }
+            }
+        });
+
+        return redirect()
+            ->route('tasks.own')
+            ->with('success', "Task [{$task->task_number}] di-reschedule, kembali ke antrian FOP.");
     }
 
     // ─── API Endpoints ───────────────────────────────────────────
