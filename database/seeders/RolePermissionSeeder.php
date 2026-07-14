@@ -285,5 +285,12 @@ class RolePermissionSeeder extends Seeder
             // Sync efficiently
             $role->permissions()->sync($permissionIds);
         }
+
+        // EffectiveAccessService cache permission per-user 1 jam (Cache::remember
+        // "user.{id}.permissions") — kalau gak di-flush di sini, hasil sync di atas
+        // gak kepakai sampai cache lama expire sendiri (bisa nunggu 1 jam), bikin
+        // developer bingung tiap abis reset/reseed DB (permission "keliatan" gak
+        // berubah padahal DB udah bener).
+        \Illuminate\Support\Facades\Cache::flush();
     }
 }

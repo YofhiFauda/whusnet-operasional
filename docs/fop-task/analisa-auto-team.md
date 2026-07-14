@@ -952,37 +952,51 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 
 ### Task 10 — Riwayat Lengkap + SLA Deadline (Dual-Cycle)
 
-**Status:** `To Do` (depends on Task 6, Task 7, Task 9)
+**Status:** `Done` (2026-07-13) — depends on Task 6, Task 7, Task 9 (semua sudah selesai)
 
 **Tujuan:** Halaman Riwayat gabung detail task + semua laporan + SLA total (wall-clock penuh, dipecah 2 siklus kalau pernah `Pending`) — sesuai kebutuhan poin 10.
 
+**KOREKSI ARAH (2026-07-13, klarifikasi user setelah miss komunikasi draft awal):** Tabel `history.blade.php` **tetap tabel** (tampilannya sudah sama persis dengan `/fop-tasks` index — itu sudah benar, TIDAK diganti card/kanban). Yang salah di draft awal: rencana nambah kolom SLA/tools_used langsung ke tabel existing. **Yang benar:** klik row di Riwayat → navigasi ke **halaman Detail terpisah** (`/fop-tasks/history/{id}`, pola sama dengan `/tasks/{id}`), isinya: detail task, laporan (survey/pemasangan/maintenance — alat yang dipakai, foto, dll), histori status lengkap dengan alasan (`pending_reason`/`cancel_reason`/`fop_review` per transisi dari `fop_task_status_history`), dan durasi/SLA per siklus. Tabel Riwayat sendiri cukup tambah 1 kolom aksi "Detail →", tidak perlu kolom SLA/alat dipepetkan ke tabel.
+
+**KOREKSI PRASYARAT (2026-07-13, cross-check ulang):** Klaim "bug filter `task_type` di `SlaTimelineController.php:37`" **TIDAK VALID** — dicek ulang, baris itu (method `update()`) sudah filter `internet_package_id` + `task_type` dengan benar. Lookup lain (`InternetPackage::getHandlingSla()`) juga sudah benar filter `task_type`. Gak ada bug di manapun. **Lebih penting:** `PackageSlaSetting` itu konsepnya **handling SLA** (batas waktu wajib mulai ditangani sejak tiket dibuat), BUKAN **SLA pengerjaan** (durasi teknisi kerja di lapangan — konsep yang dipakai Task 10 ini, dual-cycle `started_at`→`completed_at`). `docs/master/sla-timeline/business-logic.md:43` sudah eksplisit memutuskan SLA pengerjaan **tetap** pakai `Task::sla_minutes`/`TaskType::slaMinutes()` existing, **TIDAK** direfactor pakai `PackageSlaSetting`. Jadi: prasyarat "fix filter" **dihapus** (tidak applicable), dan sumber `sla_target_minutes` di `task_reports` **dibalik** — pakai `Task::sla_minutes` (snapshot dari `TaskType::slaMinutes()` saat task dibuat), bukan `PackageSlaSetting`.
+
+**KOREKSI TOOLS_USED (2026-07-13):** Laporan survey/pemasangan/maintenance **udah ada**, tapi tersebar di 3 tabel beda format, BUKAN seragam: `CustomerSurvey.required_tools` (Survey, string bebas), `TaskMaintenance.kabel/modem/patchcord/sleeve/lainnya` (Maintenance, kolom terpisah), `CustomerTechnicalDetail` (Pemasangan, device detail, gak ada field "alat kerja" eksplisit). Gak ada input seragam "alat dipakai" di form manapun. **Keputusan:** `task_reports` **TIDAK** punya kolom `tools_used` — table ini CUMA nyimpen cycle timestamp + durasi + SLA (data yang emang belum ada di manapun). Halaman Detail baca "Alat Dipakai" LANGSUNG dari tabel existing sesuai `task_type` (Survey→`CustomerSurvey.required_tools`, Maintenance→`TaskMaintenance` kolom alat, Pemasangan→`CustomerTechnicalDetail`) — gak duplikasi data, gak ubah form laporan existing (`CustomerSurveyController`/`CustomerInstallationController`/maintenance report, semuanya di luar scope Task 10).
+
 **Kondisi kode nyata:**
-- `Task::actualDurationMinutes()` dan `isOverSla()` (`Task.php:121-137`) **sudah ada tapi single-cycle murni**: `$this->started_at->diffInMinutes($this->completed_at)` — gak ada konsep multi-siklus sama sekali, jadi dual-cycle beneran kerjaan baru.
-- **Tidak ada** field `tools_used` di mana pun (`Task.php` fillable, atau tabel lain) — `task_reports` genuinely tabel baru, bukan extend existing.
-- `PackageSlaSetting::getSlaHoursAttribute()` (baris 43-46) cuma konversi `sla_duration`→jam. **Temuan penting:** query lookup existing di `app/Http/Controllers/Master/SlaTimelineController.php:37` cuma filter `internet_package_id`, **TIDAK filter `task_type`** — padahal kolom `task_type` ada di tabel `package_sla_settings`. Ini kemungkinan bug/gap existing yang perlu diperbaiki DULU sebelum Task 10 bisa reuse lookup ini dengan benar (kalau dibiarkan, target SLA yang keambil bisa salah tipe task).
+- `Task::actualDurationMinutes()` dan `isOverSla()` (`Task.php:123-143`) **sudah ada tapi single-cycle murni**: `$this->started_at->diffInMinutes($this->completed_at)` — gak ada konsep multi-siklus sama sekali, jadi dual-cycle beneran kerjaan baru.
+- `Task.sla_minutes` (kolom existing, diisi `TaskType::slaMinutes()` saat task dibuat — lihat `TaskService.php:51`) adalah sumber SLA pengerjaan yang benar, tinggal dibaca langsung dari `$task->sla_minutes`, bukan lookup baru ke `PackageSlaSetting`.
 - `resources/views/fop_tasks/history.blade.php` kolomnya sekarang cuma: Kategori, Tanggal, Tugas, Area, Issue, Teknisi, Team, Status, Prioritas, Aksi (baris 86-95) — **tidak ada kolom SLA/durasi/alat sama sekali**, jadi ini benar-benar nambah kolom baru, bukan modifikasi kecil.
 
 **File yang dibuat/dirubah:**
 | File | Aksi |
 |---|---|
-| `app/Http/Controllers/Master/SlaTimelineController.php` | **Rubah (prasyarat)** — baris 37: tambah filter `->where('task_type', $task->category->value)` ke query `PackageSlaSetting`, supaya lookup SLA target sesuai tipe task, bukan cuma paket internet. Kerjakan ini SEBELUM reuse di `TaskReport`. |
-| `database/migrations/2026_07_xx_create_task_reports_table.php` | **Baru** — `task_reports` (`task_id`, `tools_used` json, `started_at`, `pending_at`, `resumed_at`, `completed_at`, `total_duration_minutes`, `sla_target_minutes`, `sla_status`, `sla_overrun_minutes`, `package_sla_setting_id` FK nullable). |
+| `database/migrations/2026_07_18_000001_create_task_reports_table.php` | **Baru** — `task_reports` (`task_id`, `started_at`, `pending_at`, `resumed_at`, `completed_at`, `total_duration_minutes`, `sla_target_minutes`, `sla_status`, `sla_overrun_minutes`). Tanpa `tools_used`, tanpa FK `package_sla_setting_id` — `sla_target_minutes` diisi dari `Task::sla_minutes`. |
 | `app/Models/TaskReport.php` | **Baru** — accessor hitung total durasi dari akumulasi siklus (bukan selisih timestamp pertama-terakhir seperti `actualDurationMinutes()` existing). |
-| `resources/views/fop_tasks/history.blade.php` | **Rubah** — tambah kolom baru SLA Deadline + tools_used di tabel existing (baris 86-95), gabung tampilan laporan Survey/Pemasangan/Maintenance. |
-| `app/Http/Controllers/FopTaskController.php` | **Rubah** — method `history()` eager-load `TaskReport` + `FopTaskStatusHistory` (Task 9). |
-| `tests/Feature/TaskReportSlaCalculationTest.php` | **Baru** — test kasus dengan & tanpa siklus pending, plus regression test filter `task_type` di `SlaTimelineController`. |
+| `resources/views/fop_tasks/history.blade.php` | **Rubah (kecil)** — tabel tetap (kolom existing tidak berubah), tambah 1 kolom aksi "Detail →" per row link ke halaman detail baru. **TIDAK** nambah kolom SLA/tools_used ke tabel ini. |
+| `resources/views/fop_tasks/history_detail.blade.php` | **Baru** — halaman detail terpisah (pola sama `/tasks/{id}`): info task, laporan per tipe (baca langsung dari `CustomerSurvey`/`TaskMaintenance`/`CustomerTechnicalDetail` sesuai `task_type`, termasuk alat & foto), histori status+alasan (`fop_task_status_history`), durasi & SLA per siklus (dual-cycle kalau pernah Pending). |
+| `routes/web.php` | **Rubah** — tambah `Route::get('/fop-tasks/history/{fop_task}', [FopTaskController::class, 'showHistory'])->name('fop-tasks.history.show')` (nama param `fop_task` ngikutin konvensi route existing di controller yang sama, mis. `update()`/`assignToTeam()`). |
+| `app/Http/Controllers/FopTaskController.php` | **Rubah** — method `history()` cukup eager-load ringan buat tabel (tanpa `TaskReport` detail penuh); method baru `showHistory($fopTask)` eager-load penuh `TaskReport` + `FopTaskStatusHistory` (Task 9) khusus halaman detail. |
+| `tests/Feature/TaskReportSlaCalculationTest.php` | **Baru** — test kasus dengan & tanpa siklus pending; `sla_target_minutes` diverifikasi sama dengan `Task::sla_minutes`. |
+| `tests/Feature/FopTaskHistoryDetailPageTest.php` | **Baru** — test halaman detail menampilkan laporan, histori status+alasan, durasi/SLA dengan benar. |
+
+**Catatan companion-file (di luar tabel literal, plumbing minimal yang gak terhindarkan — sama kelasnya dengan precedent Task 9):**
+- `app/Models/Task.php` — tambah relasi `report(): HasOne` (ke `TaskReport`), dipakai `showHistory()` & blade detail. Tanpa ini `$task->report` gak bisa diakses.
+- `app/Observers/TaskObserver.php` — tambah method `syncTaskReport()` + `accumulateCycle()`, dipanggil di awal `updated()` (SEBELUM guard/early-return sync FopTask, supaya durasi tetap tercatat walau task gak/belum punya FopTask terhubung). Ini satu-satunya tempat siklus `task_reports` ditulis — checklist Task 10 sendiri sudah nyebut "via TaskObserver Task 9" tapi tabel file-list awal kelupaan mencantumkannya secara eksplisit.
 
 **Checklist:**
-- [ ] Fix lookup `PackageSlaSetting` di `SlaTimelineController.php:37` — tambah filter `task_type` (prasyarat, bukan opsional).
-- [ ] Kolom siklus (`started_at`, `pending_at`, `resumed_at`, `completed_at`) dicatat tiap kali status berubah (via `TaskObserver` Task 9).
-- [ ] `total_duration_minutes` dihitung dari akumulasi seluruh siklus (siklus 1 + siklus 2 dst.), bukan `completed_at - started_at` polos seperti `actualDurationMinutes()` existing.
-- [ ] `sla_target_minutes` diambil dari `PackageSlaSetting` (setelah fix filter `task_type` di atas) — bukan hardcode ulang, bukan juga cuma reuse `Task::sla_minutes` yang statis per tipe (`TaskType::slaMinutes()`) tanpa mempertimbangkan paket pelanggan.
-- [ ] Riwayat tampilkan histori laporan (alat, durasi, SLA) + histori status (`pending_reason`/`cancel_reason`) dalam 1 halaman — kolom baru di `history.blade.php` yang sekarang belum ada sama sekali.
+- [x] Kolom siklus (`started_at`, `pending_at`, `resumed_at`, `completed_at`) dicatat tiap kali status berubah (via `TaskObserver` Task 9). Diverifikasi `test_dual_cycle_accumulates_work_minutes_and_excludes_pending_gap` + `test_reschedule_pause_accumulates_same_as_pending`.
+- [x] `total_duration_minutes` dihitung dari akumulasi seluruh siklus (siklus 1 + siklus 2 dst.), bukan `completed_at - started_at` polos seperti `actualDurationMinutes()` existing. Jeda antar siklus (mis. 3 jam nunggu reschedule) terverifikasi TIDAK ikut terhitung.
+- [x] `sla_target_minutes` diambil dari `Task::sla_minutes` existing (snapshot `TaskType::slaMinutes()`) — bukan hardcode ulang, bukan lookup baru ke `PackageSlaSetting`. Diverifikasi `test_sla_target_minutes_matches_task_sla_minutes_not_package_sla_setting`.
+- [x] Row Riwayat (`history.blade.php`) tambah link "Detail →" ke halaman baru — tabel existing sendiri tidak dipepetkan kolom SLA/alat.
+- [x] Halaman Detail baru (`history_detail.blade.php`) tampilkan laporan (baca dari `CustomerSurvey`/`TaskMaintenance`/`CustomerTechnicalDetail` sesuai tipe, termasuk alat) + durasi/SLA (`TaskReport`) + histori status (`pending_reason`/`cancel_reason`) lengkap per transisi.
 
-**Acceptance Criteria:**
-1. Task yang selesai tanpa pernah Pending → SLA dihitung 1 siklus lurus dari `started_at` ke `completed_at`.
-2. Task yang pernah kena `Pending` lalu dijadwal ulang → SLA dihitung dari akumulasi 2 (atau lebih) siklus, bukan selisih timestamp pertama-terakhir yang bakal salah menghitung jeda reschedule sebagai waktu kerja.
-3. Halaman Riwayat menampilkan laporan Survey/Pemasangan/Maintenance + SLA achievement dalam 1 tampilan gabungan.
+**Acceptance Criteria (semua terverifikasi test, `43 passed` termasuk regresi Task 6/7/9):**
+1. [x] Task yang selesai tanpa pernah Pending → SLA dihitung 1 siklus lurus dari `started_at` ke `completed_at`. (`test_single_cycle_task_completed_without_ever_pending`)
+2. [x] Task yang pernah kena `Pending` lalu dijadwal ulang → SLA dihitung dari akumulasi 2 (atau lebih) siklus, bukan selisih timestamp pertama-terakhir yang bakal salah menghitung jeda reschedule sebagai waktu kerja. (`test_dual_cycle_accumulates_work_minutes_and_excludes_pending_gap`)
+3. [x] Klik "Detail →" di row Riwayat membuka halaman terpisah (`/fop-tasks/history/{id}`) yang menampilkan laporan Survey/Pemasangan/Maintenance + histori status+alasan + SLA achievement per siklus dalam 1 tampilan gabungan. (`FopTaskHistoryDetailPageTest`)
+
+**Deviasi/gap ditemukan di luar scope Task 10 (BUKAN dikerjakan, cuma dicatat sebagai blocker buat task lain):**
+- `TaskController::reschedule()` men-detach seluruh teknisi & set status `RESCHEDULE`, tapi `TaskService::update()` (dipanggil saat FOP nge-assign ulang teknisi lewat `FopTaskController::update()`) TIDAK PERNAH mengembalikan status ke `TERJADWAL` — cuma `TaskService::create()` yang set status itu. Task yang di-reschedule penuh kemungkinan STUCK di status `RESCHEDULE` selamanya walau udah di-assign ulang teknisi baru (teknisi gak akan bisa klik "Mulai" lagi karena `start()` mensyaratkan status `TERJADWAL`). Ini bug pre-existing, di luar scope Task 10 — task_reports sengaja gak "memperbaiki" ini, cuma nyatat cycle apa adanya sesuai state Task yang sebenarnya terjadi.
 
 ---
 

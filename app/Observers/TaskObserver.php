@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Models\FopTask;
 use App\Models\FopTaskStatusHistory;
 use App\Models\Task;
+use App\Models\TaskReport;
 
 class TaskObserver
 {
@@ -21,6 +22,8 @@ class TaskObserver
      */
     public function updated(Task $task): void
     {
+        $this->syncTaskReport($task);
+
         if (!$task->wasChanged(['status', 'report_deferred', 'fop_review_status'])) {
             return;
         }
@@ -58,6 +61,84 @@ class TaskObserver
             'changed_by'  => auth()->id(),
             'changed_at'  => now(),
         ]);
+    }
+
+    /**
+     * Catat siklus pengerjaan (Task 10, kebutuhan poin 10 — Riwayat + SLA
+     * dual-cycle) ke `task_reports`. Independen dari sync `FopTask` di atas
+     * (jalan duluan, gak nunggu/butuh `FopTask` terkait ada) — durasi kerja
+     * teknisi harus tetap tercatat walau task itu gak (lagi) punya FopTask
+     * terhubung. `total_duration_minutes` diakumulasi tiap siklus ditutup
+     * (masuk Pending/Reschedule/Selesai), bukan cuma selisih timestamp
+     * pertama-terakhir — supaya jeda reschedule/pending gak ikut kehitung
+     * sebagai waktu kerja.
+     */
+    private function syncTaskReport(Task $task): void
+    {
+        if (!$task->wasChanged('status')) {
+            return;
+        }
+
+        if ($task->status === TaskStatus::IN_PROGRESS) {
+            $report = TaskReport::firstOrNew(['task_id' => $task->id]);
+
+            if (!$report->exists) {
+                $report->started_at = $task->started_at ?? now();
+                $report->sla_target_minutes = $task->sla_minutes;
+            } else {
+                $report->resumed_at = now();
+            }
+
+            $report->save();
+
+            return;
+        }
+
+        if (in_array($task->status, [TaskStatus::PENDING, TaskStatus::RESCHEDULE], true)) {
+            $report = TaskReport::where('task_id', $task->id)->first();
+
+            if (!$report) {
+                return;
+            }
+
+            $this->accumulateCycle($report);
+            $report->pending_at = now();
+            $report->save();
+
+            return;
+        }
+
+        if ($task->status === TaskStatus::SELESAI) {
+            $report = TaskReport::where('task_id', $task->id)->first();
+
+            if (!$report) {
+                return;
+            }
+
+            $this->accumulateCycle($report);
+            $report->completed_at = now();
+
+            if ($report->sla_target_minutes !== null) {
+                $report->sla_status = $report->total_duration_minutes <= $report->sla_target_minutes ? 'on_time' : 'over';
+                $report->sla_overrun_minutes = max(0, $report->total_duration_minutes - $report->sla_target_minutes);
+            }
+
+            $report->save();
+        }
+    }
+
+    /**
+     * Tambahkan durasi siklus yang baru saja ditutup (dari `resumed_at` kalau
+     * ini siklus ke-2+, atau `started_at` kalau siklus pertama) ke akumulator
+     * `total_duration_minutes`.
+     */
+    private function accumulateCycle(TaskReport $report): void
+    {
+        $cycleStart = $report->resumed_at ?? $report->started_at;
+
+        if ($cycleStart) {
+            $report->total_duration_minutes += (int) $cycleStart->diffInMinutes(now());
+        }
     }
 
     /**

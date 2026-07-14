@@ -603,44 +603,6 @@
                                 <p class="text-xs font-semibold text-text-main truncate font-ui">{{ $member->user?->name ?? 'User dihapus' }}</p>
                                 <p class="text-[9px] text-text-muted capitalize font-ui">{{ $member->role_in_task }}</p>
                             </div>
-                            @can('task.assign.team')
-                                @if(in_array($task->status->value, ['terjadwal', 'in_progress']))
-                                    <button type="button" 
-                                        x-data="" 
-                                        x-on:click="$dispatch('open-modal', 'swap-technician-{{ $member->user_id }}')" 
-                                        class="text-xs text-primary hover:underline whitespace-nowrap cursor-pointer font-ui">
-                                        Ganti
-                                    </button>
-                                    
-                                    <x-ui.modal name="swap-technician-{{ $member->user_id }}" title="Ganti Teknisi" maxWidth="sm">
-                                        <form action="{{ route('tasks.team.update', $task) }}" method="POST">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="old_user_id" value="{{ $member->user_id }}">
-                                            <div class="mb-4">
-                                                <label class="block text-sm font-medium mb-1 font-ui">Pilih Teknisi Pengganti</label>
-                                                <select name="new_user_id" class="w-full rounded border-border text-sm focus:border-primary focus:ring-primary font-ui" required>
-                                                    <option value="">-- Pilih Teknisi --</option>
-                                                    @foreach(\App\Models\User::whereHas('role', fn($q) => $q->where('code', 'teknisi'))->where('id', '!=', $member->user_id)->orderBy('name')->get() as $tek)
-                                                        <option value="{{ $tek->id }}">{{ $tek->name }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                            <div class="mb-4">
-                                                <label class="block text-sm font-medium mb-1 font-ui font-ui">Jadwal Pelaksanaan (Opsional)</label>
-                                                <input type="datetime-local" name="scheduled_at" 
-                                                       value="{{ $task->scheduled_at ? $task->scheduled_at->format('Y-m-d\TH:i') : '' }}" 
-                                                       class="w-full border border-border rounded px-3 py-2 text-sm text-text-main bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition font-mono">
-                                                <p class="text-[11px] text-text-muted mt-1 font-ui font-ui">Biarkan default atau kosongkan jika tidak ingin mengubah jadwal.</p>
-                                            </div>
-                                            <div class="flex justify-end gap-2">
-                                                <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', 'swap-technician-{{ $member->user_id }}')">Batal</x-ui.button>
-                                                <x-ui.button type="submit" variant="primary">Simpan</x-ui.button>
-                                            </div>
-                                        </form>
-                                    </x-ui.modal>
-                                @endif
-                            @endcan
                         </div>
                         @endforeach
                     </div>

@@ -858,6 +858,46 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Halaman Detail Riwayat (Task 10) — detail task, laporan (baca langsung dari
+     * CustomerSurvey/TaskMaintenance/CustomerTechnicalDetail sesuai task_type,
+     * BUKAN duplikasi ke task_reports), histori status+alasan, durasi/SLA per
+     * siklus (dual-cycle).
+     */
+    public function showHistory(FopTask $fopTask)
+    {
+        $this->authorizeAccess();
+
+        $fopTask->load([
+            'village',
+            'pop',
+            'customer',
+            'technicians',
+            'team:id,name',
+            'statusHistories.changedByUser:id,name',
+            'task.report',
+            'task.teamMembers.user:id,name',
+            'task.maintenanceReport',
+        ]);
+
+        $survey = null;
+        $installation = null;
+        $technicalDetail = null;
+
+        if ($fopTask->customer) {
+            if ($fopTask->category === TaskType::SURVEY) {
+                $survey = $fopTask->customer->surveys()->latest()->first();
+            } elseif ($fopTask->category === TaskType::PEMASANGAN) {
+                $installation = $fopTask->customer->installations()->latest()->first();
+                $technicalDetail = $fopTask->customer->customerTechnicalDetail;
+            }
+        }
+
+        $maintenance = $fopTask->task?->maintenanceReport;
+
+        return view('fop_tasks.history_detail', compact('fopTask', 'survey', 'installation', 'technicalDetail', 'maintenance'));
+    }
+
+    /**
      * Auto-sync customers to FOP Task and calculate priority dynamically based on SLA.
      */
     private function autoSyncAndCalculatePriority()

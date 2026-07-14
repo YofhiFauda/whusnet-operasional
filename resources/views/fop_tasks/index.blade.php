@@ -248,11 +248,6 @@
                                         </div>
                                     @endif --}}
                                     <div class="flex flex-col gap-0.5 mt-0.5">
-                                        @if($needsReview)
-                                            <a href="{{ route('tasks.show', $task->task_id) }}" class="text-[10px] text-primary underline decoration-dotted">
-                                                Review Laporan →
-                                            </a>
-                                        @endif
                                         @if(!in_array($statusValue, ['Selesai', 'Cancel']))
                                             <button type="button" x-data
                                                     @click="if (confirm('Cancel Task FOP [{{ $task->task_number }}]?')) cancelFopTask({{ $task->id }})"

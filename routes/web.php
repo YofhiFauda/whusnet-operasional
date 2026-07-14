@@ -338,6 +338,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:fop_tasks.view')->group(function () {
         Route::get('/fop-tasks', [FopTaskController::class, 'index'])->name('fop-tasks.index');
         Route::get('/fop-tasks/history', [FopTaskController::class, 'history'])->name('fop-tasks.history');
+        Route::get('/fop-tasks/history/{fop_task}', [FopTaskController::class, 'showHistory'])->name('fop-tasks.history.show');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
         Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');

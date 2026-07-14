@@ -51,6 +51,7 @@ class CustomerSurveyController extends Controller
         $task = \App\Models\Task::where('customer_id', $customer->id)
             ->where('task_type', \App\Enums\TaskType::SURVEY->value)
             ->where('status', \App\Enums\TaskStatus::TERJADWAL->value)
+            ->latest('id')
             ->first();
 
         if ($task) {
@@ -127,6 +128,7 @@ class CustomerSurveyController extends Controller
             $task = \App\Models\Task::where('customer_id', $customer->id)
                 ->where('task_type', \App\Enums\TaskType::SURVEY->value)
                 ->whereNotIn('status', [\App\Enums\TaskStatus::SELESAI->value, \App\Enums\TaskStatus::DIBATALKAN->value])
+                ->latest('id')
                 ->first();
 
             if ($task) {
@@ -214,6 +216,8 @@ class CustomerSurveyController extends Controller
             
             $task = \App\Models\Task::where('customer_id', $customer->id)
                 ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+                ->whereIn('status', [\App\Enums\TaskStatus::IN_PROGRESS->value, \App\Enums\TaskStatus::PENDING->value])
+                ->latest('id')
                 ->first();
 
             if (!$survey->completed_at) {

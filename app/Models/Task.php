@@ -9,6 +9,7 @@ use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Task extends Model
 {
@@ -97,6 +98,11 @@ class Task extends Model
     public function maintenanceReport()
     {
         return $this->hasOne(TaskMaintenance::class);
+    }
+
+    public function report(): HasOne
+    {
+        return $this->hasOne(TaskReport::class);
     }
 
     // ─── Helper Methods ─────────────────────────────────────────
