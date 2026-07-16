@@ -54,13 +54,41 @@
             <span class="font-mono text-[11px] text-text-muted shrink-0">{{ $task->task_number }}</span>
         </div>
 
-        {{-- Nama pelanggan + alamat --}}
+        {{-- Nama pelanggan + alamat — selalu ditampilkan --}}
         <p class="font-semibold text-text-main">{{ $task->customer?->full_name ?? $task->title }}</p>
         @if($task->customer)
         <p class="text-xs text-text-muted mt-0.5">
-            {{ $task->customer->address ?? '' }}
+            {{ $task->customer->clean_address ?? '' }}
             @if($task->pop)&mdash; {{ $task->pop->name }}@endif
         </p>
+        @endif
+
+        {{-- Koordinat Lokasi + Maps — digate sampai task mulai dikerjakan (S8.4-T011) --}}
+        @if($task->status->value !== 'terjadwal')
+        @php
+            $lat = $task->customer?->customerAddress?->latitude ?? $task->pop?->latitude;
+            $lng = $task->customer?->customerAddress?->longitude ?? $task->pop?->longitude;
+        @endphp
+        @if($lat && $lng)
+        <div class="mt-2.5 p-2 bg-surface-muted border border-border rounded-md flex items-center justify-between gap-3" data-coordinate-card>
+            <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Koordinat Lokasi</span>
+                <span class="font-mono text-[10px] text-text-secondary truncate">
+                    {{ $lat }}, {{ $lng }}
+                </span>
+            </div>
+            <a href="https://www.google.com/maps/search/?api=1&query={{ $lat }},{{ $lng }}" 
+               target="_blank"
+               class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 border border-border rounded bg-surface hover:bg-surface-muted text-primary transition-colors cursor-pointer"
+               data-map-button>
+                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Maps
+            </a>
+        </div>
+        @endif
         @endif
 
         {{-- Jadwal --}}
@@ -74,30 +102,32 @@
 
         {{-- Tombol aksi --}}
         <div class="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+            {{-- "Buka Detail" digate sampai task mulai dikerjakan (S8.4-T011) --}}
+            @if($task->status->value !== 'terjadwal')
             <a href="{{ route('tasks.show', $task) }}"
                class="flex-1 text-center text-xs font-semibold py-2 px-3 border border-border rounded-md bg-background hover:bg-surface-muted text-text-secondary transition-colors">
                 Buka Detail
             </a>
+            @endif
 
             @if(in_array($task->status->value, ['in_progress', 'pending']))
-                @if($task->task_type->value === 'SURVEY' || strtolower($task->task_type->value) === 'survey')
-                <a href="{{ route('customers.survey.report', $task->customer_id) }}"
-                        class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                        style="background:var(--color-success)">
-                    Isi Laporan
-                </a>
-                @elseif($task->task_type->value === 'PSB' || strtolower($task->task_type->value) === 'pemasangan')
-                <a href="{{ route('customers.installation.report', $task->customer_id) }}"
-                        class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                        style="background:var(--color-success)">
-                    Isi Laporan
-                </a>
+                @php
+                    $reportUrl = match(true) {
+                        $task->task_type->value === 'SURVEY' => route('customers.survey.report', $task->customer_id),
+                        $task->task_type->value === 'PSB' => route('customers.installation.report', $task->customer_id),
+                        default => route('tasks.maintenance.report', $task),
+                    };
+                @endphp
+                @if($task->status->value === 'in_progress')
+                    <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl" class="flex-1 justify-center">
+                        Isi Laporan
+                    </x-task.report-choice-dialog>
                 @else
-                <a href="{{ route('tasks.maintenance.report', $task) }}"
-                        class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                        style="background:var(--color-success)">
-                    Isi Laporan
-                </a>
+                    <a href="{{ $reportUrl }}"
+                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                       style="background:var(--color-success)">
+                        Lanjutkan Laporan
+                    </a>
                 @endif
             @endif
 

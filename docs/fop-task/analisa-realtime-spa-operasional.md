@@ -1,71 +1,209 @@
 # Analisa Implementasi Real-Time (SPA-Like) pada Aplikasi Whusnet Operasional
 
-Dokumen ini mencatat analisis arsitektur, metode implementasi real-time tanpa reload/polling, serta daftar halaman-halaman operasional yang sangat krusial untuk ditingkatkan menjadi real-time dengan pengalaman pengguna mirip Single Page Application (SPA).
+Dokumen ini mencatat analisis arsitektur, perbandingan metode implementasi real-time tanpa reload/polling, serta detail panduan penerapan menggunakan pendekatan **Reactive State-Binding (Alpine.js State)** yang dipilih untuk halaman operasional Whusnet.
 
 ---
 
 ## 1. Fondasi Arsitektur Real-Time Existing
 Aplikasi saat ini telah dilengkapi dengan infrastruktur modern yang siap mendukung pembaruan data real-time:
-*   **Backend:** [Laravel Reverb](https://laravel.com/docs/11.x/reverb) (WebSocket Server bawaan Laravel) yang dikombinasikan dengan Broadcast Event Laravel (`ShouldBroadcast` / `ShouldBroadcastNow`).
-*   **Frontend:** [Laravel Echo](https://laravel.com/docs/11.x/broadcasting#receiving-broadcasts) terkonfigurasi secara dinamis di [echo.js](file:///d:/Whusnet/whusnet-operasional/resources/js/echo.js) dan diintegrasikan dengan state reactive [Alpine.js](https://alpinejs.dev/).
+*   **Backend:** [Laravel Reverb](file:///d:/Whusnet/whusnet-operasional/config/broadcasting.php) (WebSocket Server bawaan Laravel 11+) yang dikombinasikan dengan Broadcast Event Laravel (`ShouldBroadcast` / `ShouldBroadcastNow`).
+*   **Frontend:** [Laravel Echo](file:///d:/Whusnet/whusnet-operasional/resources/js/echo.js) terkonfigurasi secara dinamis di `echo.js` dan diintegrasikan dengan state reactive [Alpine.js](https://alpinejs.dev/).
 
 ---
 
-## 2. Realisasi Real-Time pada Halaman Task FOP
-Pada halaman [Task FOP](file:///d:/Whusnet/whusnet-operasional/resources/views/fop_tasks/index.blade.php), pembaruan data (ubah status, prioritas, switch teknisi, dll.) masih memicu `window.location.reload()`.
+## 2. Perbandingan Dua Metode Real-Time Frontend
 
-Untuk mengubah perilaku ini menjadi **SPA-Like**, diterapkan metode **Dynamic DOM Swapping (SPA-Lite)**:
+Untuk merancang UI yang reaktif tanpa refresh manual, auto refresh, atau polling, terdapat dua pilihan metode utama di sisi frontend:
 
-### A. Alur Event (Backend)
-1. Buat event penyiaran baru `FopTaskChanged` yang mengimplementasikan `ShouldBroadcastNow`.
-2. Siarkan perubahan ke Private Channel `fop.{pop_id}` agar mematuhi aturan pembatasan wilayah data (POP Scope) sesuai kebijakan RBAC proyek.
-3. Trigger event tersebut di [FopTaskController.php](file:///d:/Whusnet/whusnet-operasional/app/Http/Controllers/FopTaskController.php) pada akhir method `store()`, `update()`, `destroy()`, `assignToTeam()`, dan `switchTechnician()`.
+### Metode 1: Direct DOM Target (Manipulasi DOM Spesifik)
+Pendekatan ini menyisipkan ID unik di elemen HTML Blade, kemudian memanipulasi properti/teks dari elemen tersebut langsung menggunakan JavaScript Vanilla sewaktu event WebSocket diterima.
 
-### B. Alur Sinkronisasi (Frontend)
-1. Di sisi client, Alpine.js mendaftar listener ke Laravel Echo saat halaman di-load:
-   ```javascript
-   window.Echo.private(`fop.${popId}`).listen('FopTaskChanged', () => this.reloadTable());
-   ```
-2. Fungsi `reloadTable()` melakukan request `fetch(window.location.href)` secara asinkron (di belakang layar), lalu menukar elemen `<tbody>` tabel, paginasi, dan teks counter data tanpa perlu menyegarkan (refresh) halaman seutuhnya.
-3. Ganti panggilan `window.location.reload()` lokal pasca-aksi AJAX dengan pemanggilan langsung fungsi `this.reloadTable()` untuk pembaruan instan.
-
-*Keuntungan Utama:* Menjaga seluruh logic otentikasi Blade, parameter query URL (filter, pencarian), dan paginasi tetap aman diatur dari server tanpa merusak state Alpine.js di client.
+*   **Konsep:**
+    ```html
+    <!-- Blade template -->
+    <span id="task-status-{{ $task->id }}" class="badge">
+        {{ $task->status }}
+    </span>
+    ```
+    ```javascript
+    // Echo listener
+    window.Echo.private(`fop.${popId}`)
+        .listen('TaskUpdated', (e) => {
+            const badge = document.getElementById(`task-status-${e.task_id}`);
+            if (badge) {
+                badge.innerText = e.status;
+                badge.className = `badge ${e.badge_class}`;
+            }
+        });
+    ```
+*   **Pro:** Sangat mudah diterapkan pada halaman Laravel Blade tradisional tanpa mengubah loop data (`@foreach`).
+*   **Kontra:** Jika UI semakin kompleks (misalnya ada interaksi antar elemen, pergantian list, atau pengurutan ulang), manipulasi DOM manual akan menjadi sangat rumit, rawan error (*fragile*), dan kode menjadi tidak rapi (*spaghetti code*).
 
 ---
 
-## 3. Kandidat Halaman Lain yang Membutuhkan Real-Time (SPA-Like)
+### Metode 2: Reactive State-Binding (Alpine.js State) — *PILIHAN YANG DIGUNAKAN*
+Pendekatan ini menyimpan seluruh data data tabular atau list ke dalam variabel *state* (array JavaScript) di dalam Alpine.js (`x-data`). HTML di-render secara dinamis menggunakan directive `x-for`. Ketika event WebSocket diterima, kita hanya perlu memodifikasi data array di memory, dan Alpine.js secara otomatis melacak serta merender ulang bagian DOM yang berubah secara instan.
 
-Berikut adalah daftar halaman operasional selain Task FOP yang direkomendasikan untuk beralih ke arsitektur real-time tanpa polling:
+*   **Konsep:**
+    ```html
+    <!-- Alpine.js loop -->
+    <div x-data="{ 
+        tasks: @json($fopTasks->items()),
+        init() {
+            window.Echo.private(`fop.${popId}`)
+                .listen('TaskUpdated', (e) => {
+                    let task = this.tasks.find(t => t.id === e.task_id);
+                    if (task) {
+                        task.status = e.status;
+                        task.badge_class = e.badge_class;
+                    }
+                });
+        }
+    }">
+        <table>
+            <template x-for="task in tasks" :key="task.id">
+                <tr>
+                    <td x-text="task.tugas"></td>
+                    <td>
+                        <span :class="task.badge_class" x-text="task.status"></span>
+                    </td>
+                </tr>
+            </template>
+        </table>
+    </div>
+    ```
+*   **Pro:**
+    *   **SPA-Like sejati:** UI ter-update instan secara deklaratif dan responsif.
+    *   **Bebas Manipulasi DOM Manual:** Cukup kelola datanya, tampilan akan otomatis sinkron (*data-binding*).
+    *   **Clean Code:** Logika UI terpusat di satu handler JS/Alpine.js.
+*   **Kontra:** Membutuhkan perubahan struktur kode loop dari Blade `@foreach` menjadi Alpine `x-for`.
 
-### A. Notifikasi In-App & Lonceng Notifikasi
-*   **Target File:** [notification-dropdown.blade.php](file:///d:/Whusnet/whusnet-operasional/resources/views/components/notification-dropdown.blade.php)
-*   **Urgensi Real-Time:** Pengguna harus segera mengetahui kejadian penting (misal: pengaduan baru, tugas mendesak, atau konfirmasi keuangan) tanpa perlu me-refresh halaman web secara berkala.
-*   **Pengalaman SPA:** Angka badge notifikasi langsung bertambah secara instan (`+1`) dan memicu visual pop-up **Toast Notification** di sudut layar.
+---
 
-### B. Daftar Tugas Kerja Teknisi (Tasks Saya)
-*   **Target File:** [own.blade.php](file:///d:/Whusnet/whusnet-operasional/resources/views/tasks/own.blade.php) & [own-card.blade.php](file:///d:/Whusnet/whusnet-operasional/resources/views/tasks/partials/own-card.blade.php)
-*   **Urgensi Real-Time:** Teknisi di lapangan umumnya mengakses aplikasi melalui browser ponsel cerdas. Melakukan refresh manual pada perangkat seluler sangat menguras waktu dan kuota data.
-*   **Pengalaman SPA:** Begitu dispatcher/FOP memasukkan tugas baru ke team, tugas tersebut langsung muncul di layar daftar kerja teknisi secara instan. Sebaliknya, jika ada pembatalan tugas atau reschedule, tugas tersebut langsung menghilang dari daftar dengan transisi animasi halus.
+## 3. Langkah Implementasi dengan Pendekatan Alpine.js State
 
-### C. Dashboard Pemantauan SLA & Statistik Utama
-*   **Target File:** [dashboard.blade.php](file:///d:/Whusnet/whusnet-operasional/resources/views/dashboard.blade.php) (Utama) & [fop-dashboard.md](file:///d:/Whusnet/whusnet-operasional/docs/fop-task/fop-dashboard.md)
-*   **Urgensi Real-Time:** Dashboard pimpinan, manajemen, atau ruang kontrol NOC membutuhkan akurasi data detik demi detik untuk memantau beban kerja teknisi dan pencapaian SLA.
-*   **Pengalaman SPA:** Angka statistik "Sedang Berjalan", "Selesai Hari Ini", dan diagram progress langsung ter-update otomatis ketika status kerja di lapangan berubah.
+Untuk menerapkan **Alpine.js State** pada modul seperti **Task FOP**, ikuti spesifikasi berikut:
 
-### D. Konfirmasi Pembayaran Kasir & Status Tagihan
-*   **Target Folder:** [invoices](file:///d:/Whusnet/whusnet-operasional/resources/views/invoices) & [payments](file:///d:/Whusnet/whusnet-operasional/resources/views/payments)
-*   **Urgensi Real-Time:** Mencegah terjadinya pembagian tagihan ganda atau penagihan berulang oleh kasir pusat apabila pelanggan sudah melakukan pembayaran di mini POP/cabang pembantu.
-*   **Pengalaman SPA:** Ketika kasir cabang mencatat pembayaran, status tagihan (invoice) pelanggan bersangkutan di monitor kasir pusat langsung berubah dari **Unpaid (Merah)** menjadi **Paid (Hijau)** saat itu juga tanpa memuat ulang halaman.
+### Langkah A: Kirim Payload Lengkap dari Backend Event
+Event Laravel harus mengemas seluruh field yang diperlukan frontend untuk me-render UI secara mandiri.
+Contoh pada event `app/Events/TaskScheduled.php`:
 
-### E. Logs Audit & Log Aktivitas Sistem
-*   **Target Folder:** [audit-logs](file:///d:/Whusnet/whusnet-operasional/resources/views/audit-logs)
-*   **Urgensi Real-Time:** Berguna bagi admin keamanan dan owner untuk melacak alur mutasi data master secara aktual.
-*   **Pengalaman SPA:** Setiap ada perubahan data pelanggan, data audit log terbaru langsung meluncur ke tabel pemantauan seperti streaming log konsol.
+```php
+namespace App\Events;
 
-### F. Siklus Hidup Pelanggan & Kelengkapan Validasi Data
-*   **Target Folder:** [customers](file:///d:/Whusnet/whusnet-operasional/resources/views/customers)
-*   **Urgensi Real-Time:** Billing tidak boleh diaktifkan jika data pelanggan belum lengkap.
-*   **Pengalaman SPA:** Di layar Admin Aktivasi, data pelanggan yang awalnya berstatus `Draft` atau `Perlu Dilengkapi` akan langsung berubah status kelengkapannya menjadi `Lengkap (Siap Billing)` begitu teknisi menyelesaikan survei dan koordinat GPS tersinkron secara real-time dari lapangan.
+use App\Models\Task;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+
+class TaskScheduled implements ShouldBroadcast
+{
+    public Task $task;
+    public string $eventType;
+
+    public function __construct(Task $task, string $eventType = 'created')
+    {
+        $this->task = $task;
+        $this->eventType = $eventType;
+    }
+
+    public function broadcastOn(): array
+    {
+        // Distribusikan ke teknisi yang ditugaskan
+        return $this->task->teamMembers->map(fn ($member) => new PrivateChannel('teknisi.' . $member->user_id))->all();
+    }
+
+    public function broadcastWith(): array
+    {
+        // Custom payload lengkap untuk di-render client
+        return [
+            'id' => $this->task->id,
+            'task_number' => $this->task->task_number,
+            'title' => $this->task->title,
+            'description' => $this->task->description,
+            'status' => $this->task->status->value,
+            'badge_class' => $this->task->status->badgeClasses(),
+            'scheduled_at' => $this->task->scheduled_at?->toIso8601String(),
+            'customer' => [
+                'name' => $this->task->customer?->name,
+                'address' => $this->task->customer?->address,
+            ]
+        ];
+    }
+}
+```
+
+### Langkah B: Integrasikan State ke Handler Alpine.js
+Di file Handler JavaScript halaman, buat variabel penampung data (misalnya `tasks`) dan bind listener Laravel Echo untuk memperbarui state tersebut secara realtime.
+
+Contoh integrasi pada `fopTaskPageHandler()`:
+
+```javascript
+function fopTaskPageHandler() {
+    return {
+        // State awal diambil dari server-side render json
+        tasks: [], 
+        
+        init() {
+            // Load initial data
+            this.tasks = initialTasks;
+            
+            // Dengarkan perubahan realtime via Reverb
+            this.initEchoListeners();
+        },
+
+        initEchoListeners() {
+            if (typeof window.Echo === 'undefined') return;
+
+            window.Echo.private(`fop.${popId}`)
+                .listen('TaskScheduled', (e) => {
+                    if (e.event_type === 'created') {
+                        // Tambahkan item baru ke baris paling atas
+                        this.tasks.unshift(e);
+                    }
+                })
+                .listen('TaskUpdated', (e) => {
+                    // Cari item berdasarkan ID dan update statusnya saja
+                    let task = this.tasks.find(t => t.id === e.id);
+                    if (task) {
+                        task.status = e.status;
+                        task.badge_class = e.badge_class;
+                        task.technician_name = e.technician_name;
+                    }
+                })
+                .listen('TaskCancelled', (e) => {
+                    // Hapus task dari layar
+                    this.tasks = this.tasks.filter(t => t.id !== e.id);
+                });
+        }
+    }
+}
+```
+
+### Langkah C: Ganti Rendering Blade Looping dengan `x-for`
+Ubah looping tabel di template Blade agar sepenuhnya dibaca dari state Alpine.js:
+
+```html
+<tbody class="divide-y divide-slate-100">
+    <template x-for="task in tasks" :key="task.id">
+        <tr class="hover:bg-slate-50 transition-colors">
+            <!-- Kolom Judul Tugas -->
+            <td class="px-3 py-2 whitespace-nowrap">
+                <span class="font-medium text-slate-800" x-text="task.title"></span>
+            </td>
+            
+            <!-- Kolom Pelanggan -->
+            <td class="px-3 py-2">
+                <span x-text="task.customer?.name || '—'"></span>
+            </td>
+
+            <!-- Kolom Status Realtime -->
+            <td class="px-3 py-2">
+                <span :class="task.badge_class" class="px-2 py-1 rounded text-xs font-semibold" x-text="task.status"></span>
+            </td>
+        </tr>
+    </template>
+</tbody>
+```
 
 ---
 

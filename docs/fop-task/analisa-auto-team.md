@@ -1032,35 +1032,40 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 
 **Status:** `To Do`
 
-**Tujuan:** Default card di `/tasks-saya` cuma tombol `Mulai Survey`/`Mulai Pemasangan`/`Mulai Maintenance` sesuai tipe, detail+maps baru muncul setelah diklik — sesuai kebutuhan poin 11.
+**Tujuan:**
+- **Default Task (Sebelum Mulai)**: Menampilkan Kategori Task, Status Task, ID Task, Nama Pelanggan, Alamat Pelanggan, Waktu Penjadwalan, SLA, dan Button Mulai. (Koordinat lokasi, tombol Maps, dan tombol Buka Detail disembunyikan).
+- **Started Task (Setelah Mulai)**: Menampilkan Kategori Task, Status Task, ID Task, Nama Pelanggan, Alamat Pelanggan, Koordinat Lokasi + Button Maps, Waktu Penjadwalan, SLA, Buka Detail, dan tombol/action pengerjaan laporan (e.g. Isi Laporan).
 
 **Kondisi kode nyata — SEBAGIAN BESAR SUDAH ADA, scope jauh lebih kecil dari draft awal:**
 - Tombol per-jenis **sudah ada persis**: `own.blade.php` baris 205-239 — status `terjadwal` + tipe `SURVEY` → tombol "Mulai Survey" (213), tipe `PSB` → "Mulai Pemasangan" (224), tipe `MAINTENANCE` → "Mulai Maintenance" (235), tipe lain → "Mulai Task" generic (235, fallback).
 - Tombol kedua **"Isi Laporan" sudah ada** (baris 242-264), muncul begitu status `in_progress`/`pending` — link langsung ke `customers.survey.report`/`customers.installation.report`/`tasks.maintenance.report` tergantung tipe.
 - `started_at` **sudah** di-set pas teknisi klik Mulai (`TaskService.php`, method start via `TaskStatusController::start()` baris 18-20) — timer SLA sudah akurat sejak mulai kerja, bukan sejak buka Detail. Ini bagian yang SUDAH benar.
-- **Gap sebenarnya:** info pelanggan (nama, alamat, POP — baris 128-135) dan link **"Buka Detail"** (baris 200-203) **tampil UNCONDITIONAL**, tidak digate status `terjadwal` vs `in_progress` sama sekali — teknisi bisa langsung klik "Buka Detail" (yang berisi koordinat/Maps di `tasks/show.blade.php`) SEBELUM klik Mulai. Ini yang melanggar kebutuhan poin 11 ("info sensitif baru muncul setelah mulai"), bukan tombol Mulai-nya (itu udah benar).
+- **Gap sebenarnya:**
+  1. Link **"Buka Detail"** (baris 200-203) **tampil UNCONDITIONAL**, tidak digate status `terjadwal` vs `in_progress` sama sekali.
+  2. Belum ada tampilan **Koordinat Lokasi + Button Maps** pada card tugas `/tasks-saya` ketika task di-mulai (status bukan `terjadwal`).
 - **Cross-reference ke Task 6 (SUDAH DIKERJAKAN saat eksekusi Task 6):** "Isi Laporan" di `own.blade.php` (baris 242-264 lama) sudah diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (`<x-task.report-choice-dialog>`, shared dengan `show.blade.php`) — bukan lagi link langsung. **Sisa gap:** `resources/views/tasks/partials/own-card.blade.php` (baris 80-95) — partial AJAX-refresh dari `own.blade.php` — MASIH pakai link langsung ke form laporan, BELUM diarahkan ke dialog yang sama. Ini di luar scope Task 6 (Task 6 hanya menyebut `own.blade.php`, bukan partial-nya) — jadi teknisi masih bisa bypass dialog lewat versi partial/AJAX-refresh dari `/tasks-saya`. Task 11 (atau siapa pun yang menuntaskan partial ini) harus terapkan `<x-task.report-choice-dialog>` yang sama di sini juga.
 
 **File yang dibuat/dirubah:**
 | File | Aksi |
 |---|---|
-| `resources/views/tasks/own.blade.php` | **Rubah** — gate info pelanggan (baris 128-135) dan link "Buka Detail" (200-203): sembunyikan/disable selama `status === 'terjadwal'` (belum mulai), tampilkan penuh begitu `status != 'terjadwal'`. |
-| `resources/views/tasks/own.blade.php` | ~~**Rubah**~~ — **SUDAH DIKERJAKAN di Task 6**: "Isi Laporan" (242-264 lama) sudah trigger dialog `<x-task.report-choice-dialog>`. |
-| `resources/views/tasks/partials/own-card.blade.php` | **Rubah** — MASIH belum konsisten, partial AJAX-refresh dari `own.blade.php` ini belum diterapkan dialog yang sama (baris 80-95 masih link langsung). |
-| `tests/Feature/TaskOwnCardStageTest.php` | **Baru** — fokus ke gating info sensitif (gap real), bukan ke tombol Mulai/Isi Laporan yang sudah benar. |
+| `resources/views/tasks/own.blade.php` | **Rubah** — Pastikan nama & alamat pelanggan selalu tampil. Gaten link "Buka Detail", serta tambahkan sub-card koordinat (Latitude & Longitude) dan button Maps agar hanya tampil ketika `status != 'terjadwal'`. |
+| `resources/views/tasks/partials/own-card.blade.php` | **Rubah** — Pastikan nama & alamat pelanggan selalu tampil. Gaten link "Buka Detail", serta tambahkan sub-card koordinat (Latitude & Longitude) dan button Maps agar hanya tampil ketika `status != 'terjadwal'`. Sinkronkan dialog `<x-task.report-choice-dialog>` dari Task 6. |
+| `tests/Feature/TaskOwnCardStageTest.php` | **Rubah** — update assertions: ketika `terjadwal`, nama & alamat tampil tetapi detail/koordinat/Maps tersembunyi; ketika `in_progress`, koordinat & Maps + detail muncul. |
 
 **Checklist:**
 - [x] ~~Mapping `task_type` → label tombol (`Mulai Survey`/`Mulai Pemasangan`/`Mulai Maintenance`)~~ — **SUDAH ADA** (baris 205-239), tinggal regression test.
 - [x] ~~Timer/SLA (`started_at`) mulai persis saat tombol "Mulai X" diklik~~ — **SUDAH ADA** (`TaskStatusController::start()`), tinggal regression test.
-- [ ] Gate info pelanggan (nama/alamat/POP, baris 128-135) — sembunyikan sebelum status berubah dari `terjadwal`.
-- [ ] Gate link "Buka Detail" (200-203) — disable/sembunyikan sebelum mulai, karena itu jalan pintas ke koordinat/Maps di halaman Detail.
+- [x] Pastikan info pelanggan (nama/alamat/POP) selalu tampil baik sebelum/sesudah mulai.
+- [ ] Gate link "Buka Detail" — sembunyikan/disable sebelum mulai.
+- [ ] Tampilkan sub-card koordinat (Latitude & Longitude) dan button Maps di bawah alamat/POP ketika status bukan `terjadwal`.
 - [x] "Isi Laporan" (`own.blade.php`) diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (Task 6) — **SUDAH** (dikerjakan saat eksekusi Task 6).
-- [ ] Sinkron perubahan ke `own-card.blade.php` (partial AJAX), jangan cuma `own.blade.php` — **BELUM**, sisa gap.
+- [ ] Sinkron perubahan ke `own-card.blade.php` (partial AJAX) — selalu tampilkan info pelanggan, tambahkan sub-card koordinat + button Maps, dan sinkronkan dialog `Lapor Sekarang`/`Lapor Nanti`.
 
 **Acceptance Criteria:**
-1. Teknisi buka `/tasks-saya` sebelum klik Mulai — nama pelanggan/alamat/POP dan link "Buka Detail" tidak tampil (cuma jenis task, jadwal, tombol Mulai sesuai jenis).
-2. Setelah klik Mulai (mekanisme existing, tidak berubah), info pelanggan + "Buka Detail" muncul, `started_at` sudah tercatat (perilaku existing, regression-tested).
-3. Klik "Isi Laporan" dari card `/tasks-saya` memicu dialog `Lapor Sekarang`/`Lapor Nanti` yang sama dengan Task 6 — tidak langsung ke form laporan seperti perilaku existing sekarang.
+1. Sebelum klik Mulai (Default): Kategori, status, ID, nama pelanggan, alamat, jadwal, SLA, dan tombol Mulai tampil. Tombol Maps, koordinat lokasi, dan link "Buka Detail" tidak tampil.
+2. Setelah klik Mulai: Kategori, status, ID, nama pelanggan, alamat, jadwal, SLA, serta sub-card koordinat lokasi + tombol Maps, link "Buka Detail", dan tombol pengerjaan laporan tampil.
+3. Klik button Maps membuka Google Maps dengan koordinat (`https://www.google.com/maps/search/?api=1&query={lat},{lng}`) yang sesuai.
+4. Klik "Isi Laporan" dari card `/tasks-saya` memicu dialog `Lapor Sekarang`/`Lapor Nanti` yang sama dengan Task 6.
 
 ---
 
