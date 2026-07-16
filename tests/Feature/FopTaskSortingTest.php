@@ -185,4 +185,57 @@ class FopTaskSortingTest extends TestCase
         $response->assertSee('Terjadwal');
         $response->assertSee($futureDate->format('d/m/Y'));
     }
+
+    public function test_end_to_end_survey_request_date_sinks_then_rises_when_scheduled(): void
+    {
+        // Alur nyata: Survey selesai, FOP set Task jadi Pending sambil isi
+        // client_request_date lewat endpoint update() (bukan set atribut manual),
+        // sesuai Task 13 — pastikan cuma 1 sorting query (Task 8) yang jalan.
+        $surveyTask = $this->makeFopTask([
+            'category' => 'SURVEY',
+            'priority' => 'Urgent',
+        ]);
+        $otherTask = $this->makeFopTask([
+            'priority' => 'low',
+        ]);
+
+        $requestedInstallDate = Carbon::today()->addDays(4);
+
+        $updateResponse = $this->actingAs($this->fopUser)->put(route('fop-tasks.update', $surveyTask), [
+            'status' => 'pending',
+            'pending_reason' => 'Request tanggal pemasangan dari pelanggan saat survey',
+            'client_request_date' => $requestedInstallDate->toDateString(),
+        ]);
+        $updateResponse->assertRedirect();
+
+        $surveyTask->refresh();
+        $this->assertNotNull($surveyTask->client_request_date);
+        $this->assertTrue($surveyTask->client_request_date->isSameDay($requestedInstallDate));
+
+        // Belum jadwalnya: task hasil survey (walau Urgent) harus tenggelam
+        // di bawah task lain meski priority-nya kalah.
+        $sunkResponse = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $sunkResponse->assertOk();
+        $sunkContent = $sunkResponse->getContent();
+        $posOtherSunk = strpos($sunkContent, $otherTask->task_number);
+        $posSurveySunk = strpos($sunkContent, $surveyTask->task_number);
+        $this->assertNotFalse($posOtherSunk);
+        $this->assertNotFalse($posSurveySunk);
+        $this->assertLessThan($posSurveySunk, $posOtherSunk, 'Sebelum jadwalnya tiba, task hasil request survey harus di bawah.');
+
+        // Jadwalnya tiba: pura-pura hari ini sudah requestedInstallDate.
+        Carbon::setTestNow($requestedInstallDate->copy()->startOfDay());
+        try {
+            $risenResponse = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+            $risenResponse->assertOk();
+            $risenContent = $risenResponse->getContent();
+            $posOtherRisen = strpos($risenContent, $otherTask->task_number);
+            $posSurveyRisen = strpos($risenContent, $surveyTask->task_number);
+            $this->assertNotFalse($posOtherRisen);
+            $this->assertNotFalse($posSurveyRisen);
+            $this->assertLessThan($posOtherRisen, $posSurveyRisen, 'Begitu jadwalnya tiba, task naik ke atas ikut sorting normal (Urgent > low).');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
 }

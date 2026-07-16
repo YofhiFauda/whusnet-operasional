@@ -328,9 +328,10 @@ class TaskController extends Controller
             $nama = strtoupper($c->full_name);
             
             return [
-                'id'       => $c->id,
-                'label'    => "{$cid}_{$desa}_{$nama}",
-                'pop_id'   => $c->pop_id,
+                'id'         => $c->id,
+                'label'      => "{$cid}_{$desa}_{$nama}",
+                'pop_id'     => $c->pop_id,
+                'village_id' => $c->village_id,
             ];
         }));
     }

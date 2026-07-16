@@ -271,8 +271,18 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
 
+        // Task 14 — record existing Survey/Pemasangan cuma dibolehin submit balik
+        // category yang sama (hidden input di form tetap ngirim nilai existing biar
+        // field lain di form yang sama tetap bisa disave), TAPI gak boleh diubah jadi
+        // tipe lain sama sekali. Kunci customer_id/pop_id/village_id-nya sendiri
+        // dicek di bawah (setelah validasi), berbasis diff, bukan cuma presence.
+        $lockedExistingCategory = $fopTask->category?->value;
+        $categoryAllowedValues = in_array($lockedExistingCategory, TaskType::autoOnlyValues(), true)
+            ? array_unique(array_merge(TaskType::manualValues(), [$lockedExistingCategory]))
+            : TaskType::manualValues();
+
         $validated = $request->validate([
-            'category' => ['sometimes', 'required', 'string', Rule::enum(TaskType::class)],
+            'category' => ['sometimes', 'required', 'string', Rule::in($categoryAllowedValues)],
             'task_date' => ['sometimes', 'required', 'date'],
             'tugas' => ['sometimes', 'required', 'string', 'max:255'],
             'village_id' => ['sometimes', 'required', 'exists:villages,id'],
@@ -292,6 +302,22 @@ class FopTaskController extends Controller
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
             'cancel_reason.required_if' => 'Alasan pembatalan wajib diisi.',
         ]);
+
+        // Task 14 — record existing Survey/Pemasangan gak boleh diubah sama sekali di
+        // category/customer_id/pop_id/village_id, terlepas dari permission
+        // fop_tasks.update_sensitive (Kebutuhan poin 14 & 15). Dicek berbasis DIFF
+        // (bukan cuma presence) karena form tetap ngirim balik nilai existing lewat
+        // hidden input buat field lain yang gak dikunci tetap bisa disave.
+        if (in_array($lockedExistingCategory, TaskType::autoOnlyValues(), true)) {
+            $lockedFieldChanged = (array_key_exists('category', $validated) && $validated['category'] !== $lockedExistingCategory)
+                || (array_key_exists('customer_id', $validated) && (string) $validated['customer_id'] !== (string) $fopTask->customer_id)
+                || (array_key_exists('pop_id', $validated) && (string) $validated['pop_id'] !== (string) $fopTask->pop_id)
+                || (array_key_exists('village_id', $validated) && (string) $validated['village_id'] !== (string) $fopTask->village_id);
+
+            if ($lockedFieldChanged) {
+                abort(422, 'Task Survey/Pemasangan tidak bisa diedit dari sini — hanya bisa diubah lewat alur Registrasi Pelanggan.');
+            }
+        }
 
         // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task & Prioritas.
         if (!auth()->user()->hasPermission('fop_tasks.update_sensitive')) {

@@ -375,7 +375,7 @@
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tipe Task <span class="text-error">*</span></label>
                                 <select name="category" x-model="modal.data.category"
-                                        :disabled="modal.isEdit && !canEditCategory"
+                                        :disabled="isEditingLockedSurveyPsb || (modal.isEdit && !canEditCategory)"
                                         required
                                         class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Tipe</option>
@@ -383,10 +383,11 @@
                                         <option :value="key" x-text="key + ' - ' + val"></option>
                                     </template>
                                 </select>
-                                <template x-if="modal.isEdit && !canEditCategory">
+                                <template x-if="isEditingLockedSurveyPsb || (modal.isEdit && !canEditCategory)">
                                     <input type="hidden" name="category" :value="modal.data.category">
                                 </template>
-                                <p class="mt-1 text-[10px] text-text-muted" x-show="modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb">Task Survey/Pemasangan tidak bisa diedit dari sini — hanya lewat alur Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="!isEditingLockedSurveyPsb && modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
                             </div>
                             <div>
@@ -398,7 +399,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">POP / Cabang <span class="text-error">*</span></label>
-                                <select name="pop_id" x-model="modal.data.pop_id" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <select name="pop_id" x-model="modal.data.pop_id" :disabled="isEditingLockedSurveyPsb" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Cabang</option>
                                     @foreach($pops as $p)
                                         <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -407,7 +408,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Area (Desa) <span class="text-error">*</span></label>
-                                <select name="village_id" x-model="modal.data.village_id" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <select name="village_id" x-model="modal.data.village_id" :disabled="isEditingLockedSurveyPsb" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Desa</option>
                                     @foreach($villages as $v)
                                         <option value="{{ $v->id }}">{{ $v->name }}</option>
@@ -419,15 +420,16 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="relative" @click.away="customerSearchResults = []">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Penugasan / Pelanggan <span class="text-error">*</span></label>
-                                <input type="text" name="tugas" x-model="modal.data.tugas" 
+                                <input type="text" name="tugas" x-model="modal.data.tugas"
                                        @input.debounce.300ms="searchCustomer()"
                                        @keydown.escape="customerSearchResults = []"
                                        autocomplete="off"
+                                       :disabled="isEditingLockedSurveyPsb"
                                        placeholder="Ketik tugas / nama..." required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-                                
+
                                 <input type="hidden" name="customer_id" :value="modal.data.customer_id">
-                                
-                                <div x-show="customerSearchResults.length > 0" class="absolute z-50 w-full bg-surface border border-border rounded mt-1 max-h-48 overflow-y-auto shadow-lg" style="display: none;">
+
+                                <div x-show="!isEditingLockedSurveyPsb && customerSearchResults.length > 0" class="absolute z-50 w-full bg-surface border border-border rounded mt-1 max-h-48 overflow-y-auto shadow-lg" style="display: none;">
                                     <template x-for="c in customerSearchResults" :key="c.id">
                                         <button type="button" @click="selectCustomer(c)" class="w-full text-left px-3 py-2 text-sm bg-surface hover:bg-surface-muted text-text-main border-b border-border last:border-0 outline-none">
                                             <span class="font-medium text-text-secondary" x-text="c.label"></span>
@@ -861,7 +863,12 @@
 
             allCategoriesData: @json($categories),
             manualCategoriesData: @json($manualCategories),
+            autoOnlyCategoryValues: @json(\App\Enums\TaskType::autoOnlyValues()),
             canEditCategory: @json($canEditFopTaskType),
+
+            get isEditingLockedSurveyPsb() {
+                return this.modal.isEdit && this.autoOnlyCategoryValues.includes(this.modal.data.category);
+            },
 
             get availableCategories() {
                 return this.modal.isEdit ? this.allCategoriesData : this.manualCategoriesData;
@@ -957,6 +964,8 @@
             selectCustomer(c) {
                 this.modal.data.tugas = c.label;
                 this.modal.data.customer_id = c.id;
+                if (c.pop_id) { this.modal.data.pop_id = c.pop_id; }
+                if (c.village_id) { this.modal.data.village_id = c.village_id; }
                 this.customerSearchResults = [];
             },
 
