@@ -46,7 +46,7 @@ class FopTasksTest extends TestCase
         $this->ownerUser = User::factory()->create(['role_id' => $ownerRole->id]);
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
         $this->unauthorizedUser = User::factory()->create(['role_id' => $salesRole->id]);
-        
+
         $this->technician1 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
         $this->technician2 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
 
@@ -58,7 +58,7 @@ class FopTasksTest extends TestCase
             'name' => 'Polorejo',
             'postal_code' => '63491'
         ]);
-        
+
         $this->pop = Pop::create([
             'name' => 'POP Polorejo',
             'code' => 'POP-PLR',
@@ -91,7 +91,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'FO CUT di tiang 5',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'High'
         ]);
 
@@ -111,7 +111,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Request khusus',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
             'technicians' => [$this->technician1->id, $this->technician2->id]
         ]);
@@ -120,7 +120,7 @@ class FopTasksTest extends TestCase
         $this->assertDatabaseHas('fop_tasks', [
             'category' => 'C-REQ',
             'tugas' => 'Instalasi Jalur Baru Kantor',
-            'status' => 'Proses'
+            'status' => 'terjadwal'
         ]);
 
         $task = FopTask::where('tugas', 'Instalasi Jalur Baru Kantor')->first();
@@ -136,7 +136,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Backbone LOS',
-            'status' => 'Pending',
+            'status' => 'pending',
             'priority' => 'Urgent',
             'technicians' => [$this->technician1->id]
         ]);
@@ -154,7 +154,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Backbone LOS',
-            'status' => 'Pending',
+            'status' => 'pending',
             'priority' => 'Urgent',
             'pending_reason' => 'Menunggu perizinan warga',
             'client_request_date' => $reqDate,
@@ -163,7 +163,7 @@ class FopTasksTest extends TestCase
 
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseHas('fop_tasks', [
-            'status' => 'Pending',
+            'status' => 'pending',
             'pending_reason' => 'Menunggu perizinan warga',
             'client_request_date' => $reqDate . ' 00:00:00'
         ]);
@@ -179,16 +179,16 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'High'
         ]);
 
         $response = $this->actingAs($this->fopUser)->put(route('fop-tasks.update', $task->id), [
-            'status' => 'Cancel'
+            'status' => 'dibatalkan'
         ]);
 
         $task->refresh();
-        $this->assertEquals('Cancel', $task->status->value);
+        $this->assertEquals('dibatalkan', $task->status->value);
         $this->assertNotNull($task->cancelled_at);
     }
 
@@ -203,7 +203,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Cancel',
+            'status' => 'dibatalkan',
             'priority' => 'High',
             'cancelled_at' => Carbon::yesterday()
         ]);
@@ -217,7 +217,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Cancel',
+            'status' => 'dibatalkan',
             'priority' => 'High',
             'cancelled_at' => Carbon::now()
         ]);
@@ -227,12 +227,12 @@ class FopTasksTest extends TestCase
         $yesterdayTask->refresh();
         $todayTask->refresh();
 
-        // Yesterday's cancelled task must be reset to Proses
-        $this->assertEquals('Proses', $yesterdayTask->status->value);
+        // Yesterday's cancelled task must be reset to in_progress
+        $this->assertEquals('in_progress', $yesterdayTask->status->value);
         $this->assertNull($yesterdayTask->cancelled_at);
 
-        // Today's cancelled task must remain Cancel
-        $this->assertEquals('Cancel', $todayTask->status->value);
+        // Today's cancelled task must remain dibatalkan
+        $this->assertEquals('dibatalkan', $todayTask->status->value);
         $this->assertNotNull($todayTask->cancelled_at);
     }
 
@@ -246,7 +246,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'High'
         ]);
 
@@ -277,13 +277,15 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
-            'status' => 'Selesai',
+            'status' => 'selesai',
             'priority' => 'High'
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.history'));
         $response->assertStatus(200);
-        $response->assertSee('TFOP-2026-9999');
+        // task_number gak dirender sebagai teks di tabel Riwayat (cuma tugas/kategori/dst) —
+        // dulu kebetulan lolos gara-gara json_encode($task) di tombol Edit yang sekarang
+        // udah dihapus (Riwayat gak boleh ada aksi edit/delete lagi).
         $response->assertSee('Perbaikan FO Selesai');
     }
 
@@ -297,7 +299,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
-            'status' => 'Selesai',
+            'status' => 'selesai',
             'priority' => 'High'
         ]);
 
@@ -309,7 +311,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Cancelled',
-            'status' => 'Cancel',
+            'status' => 'dibatalkan',
             'priority' => 'High'
         ]);
 
@@ -321,7 +323,7 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Proses',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'High'
         ]);
 
@@ -344,7 +346,7 @@ class FopTasksTest extends TestCase
         $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
             'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
-            'status' => 'Proses', 'priority' => 'Medium', 'technicians' => $techs,
+            'status' => 'terjadwal', 'priority' => 'Medium', 'technicians' => $techs,
         ]);
 
         $post([$joko->id, $cagak->id], 'A');
@@ -382,7 +384,7 @@ class FopTasksTest extends TestCase
         $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
             'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
-            'status' => 'Proses', 'priority' => 'Medium', 'technicians' => $techs,
+            'status' => 'terjadwal', 'priority' => 'Medium', 'technicians' => $techs,
         ]);
 
         // Task A & B => Tim 1 (Wito jembatan), Task C => Tim 2 — persis skenario yang dilaporkan.

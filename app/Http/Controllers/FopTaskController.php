@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Enums\FopTaskPriority;
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Models\AuditLog;
 use App\Models\Customer;
@@ -46,7 +45,7 @@ class FopTaskController extends Controller
                   ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
             },
         ])
-            ->whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
+            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderByRaw("CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END", [now()->addDay()->toDateString()])
             ->orderByRaw("CASE priority
                 WHEN 'Urgent' THEN 1
@@ -74,7 +73,11 @@ class FopTaskController extends Controller
 
         if ($request->filled('status')) {
             $statusVal = $request->input('status');
-            if (in_array($statusVal, ['Proses', 'Pending'])) {
+            $activeStatuses = collect(TaskStatus::cases())
+                ->reject(fn (TaskStatus $s) => in_array($s, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true))
+                ->map(fn (TaskStatus $s) => $s->value)
+                ->all();
+            if (in_array($statusVal, $activeStatuses, true)) {
                 $query->where('status', $statusVal);
             } else {
                 $query->whereRaw('1=0');
@@ -126,7 +129,7 @@ class FopTaskController extends Controller
             ->get()
             ->map(function (FopTaskTeam $team) {
                 $activeCount = $team->fopTasks->filter(
-                    fn ($t) => !in_array($t->status->value, ['Selesai', 'Cancel'])
+                    fn ($t) => !in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 )->count();
 
                 $workload = $team->fopTasks
@@ -153,7 +156,7 @@ class FopTaskController extends Controller
         // TERPISAH dari $fopTasks (yang kena filter/paginate dari request), soalnya "Task
         // Tujuan" harus nampilin SEMUA task aktif (lintas team, lintas filter/halaman
         // berapapun), bukan cuma yang lagi kebetulan tampil di tabel.
-        $switchTargetTasks = FopTask::whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
+        $switchTargetTasks = FopTask::whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->with('technicians:id,name')
             ->get()
             ->map(fn (FopTask $t) => [
@@ -184,10 +187,10 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'status' => ['required', 'string', Rule::enum(FopTaskStatus::class)],
+            'status' => ['required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => ['nullable', 'required_if:status,Pending', 'string', 'max:255'],
-            'client_request_date' => ['nullable', 'required_if:status,Pending', 'date'],
+            'pending_reason' => ['nullable', 'required_if:status,pending', 'string', 'max:255'],
+            'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
             'technicians' => ['required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
         ], [
@@ -196,9 +199,7 @@ class FopTaskController extends Controller
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
-            $year  = date('Y');
-            $count = FopTask::whereYear('created_at', $year)->count() + 1;
-            $taskNumber = sprintf('TFOP-%s-%04d', $year, $count);
+            $taskNumber = $this->generateTaskNumber();
 
             $fopTask = new FopTask();
             $fopTask->task_number = $taskNumber;
@@ -213,10 +214,10 @@ class FopTaskController extends Controller
             $fopTask->status = $validated['status'];
             $fopTask->priority = $validated['priority'];
 
-            if ($validated['status'] === FopTaskStatus::PENDING->value) {
+            if ($validated['status'] === TaskStatus::PENDING->value) {
                 $fopTask->pending_reason = $validated['pending_reason'];
                 $fopTask->client_request_date = $validated['client_request_date'];
-            } elseif ($validated['status'] === FopTaskStatus::CANCEL->value) {
+            } elseif ($validated['status'] === TaskStatus::DIBATALKAN->value) {
                 $fopTask->cancelled_at = now();
             }
 
@@ -279,10 +280,10 @@ class FopTaskController extends Controller
             'customer_id' => ['nullable', 'exists:customers,id'],
             'issue' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'required', 'string', Rule::enum(FopTaskStatus::class)],
+            'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => ['nullable', 'required_if:status,Pending', 'string', 'max:255'],
-            'client_request_date' => ['nullable', 'required_if:status,Pending', 'date'],
+            'pending_reason' => ['nullable', 'required_if:status,pending', 'string', 'max:255'],
+            'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
             'technicians' => ['sometimes', 'required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
         ], [
@@ -294,6 +295,18 @@ class FopTaskController extends Controller
         if (!auth()->user()->hasPermission('fop_tasks.update_sensitive')) {
             unset($validated['category']);
             unset($validated['priority']);
+        }
+
+        // SRV/PSB terikat ke workflow Customer (List Pelanggan Gagal) — cancel
+        // buat 2 tipe ini WAJIB lewat halaman Customer (CustomerSurveyController/
+        // CustomerInstallationController::cancel()), BUKAN dari tiket FOP. Sama
+        // persis aturan yang dipasang di TaskPolicy::cancel() buat halaman Task.
+        $effectiveCategory = $validated['category'] ?? $fopTask->category?->value ?? $fopTask->category;
+        if (
+            ($validated['status'] ?? null) === TaskStatus::DIBATALKAN->value
+            && in_array($effectiveCategory, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value], true)
+        ) {
+            abort(422, 'Task SRV/PSB gak bisa dibatalkan dari sini — batalkan lewat halaman Pelanggan (tab Survey/Pemasangan).');
         }
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
@@ -315,20 +328,20 @@ class FopTaskController extends Controller
                 $oldStatus = $fopTask->status->value ?? $fopTask->status;
                 $fopTask->status = $validated['status'];
 
-                if ($validated['status'] === FopTaskStatus::PENDING->value) {
+                if ($validated['status'] === TaskStatus::PENDING->value) {
                     $fopTask->pending_reason = $validated['pending_reason'] ?? $fopTask->pending_reason;
                     $fopTask->client_request_date = $validated['client_request_date'] ?? $fopTask->client_request_date;
                     $fopTask->cancelled_at = null;
-                } elseif ($validated['status'] === FopTaskStatus::CANCEL->value || $validated['status'] === FopTaskStatus::SELESAI->value) {
-                    if ($oldStatus !== FopTaskStatus::CANCEL->value && $validated['status'] === FopTaskStatus::CANCEL->value) {
+                } elseif ($validated['status'] === TaskStatus::DIBATALKAN->value || $validated['status'] === TaskStatus::SELESAI->value) {
+                    if ($oldStatus !== TaskStatus::DIBATALKAN->value && $validated['status'] === TaskStatus::DIBATALKAN->value) {
                         $fopTask->cancelled_at = now();
                     }
-                    if ($validated['status'] === FopTaskStatus::SELESAI->value && $oldStatus === FopTaskStatus::CANCEL->value) {
+                    if ($validated['status'] === TaskStatus::SELESAI->value && $oldStatus === TaskStatus::DIBATALKAN->value) {
                         $fopTask->cancelled_at = null;
                     }
                     $fopTask->pending_reason = null;
                     $fopTask->client_request_date = null;
-                } else { // Proses
+                } else { // draft/terjadwal/in_progress
                     $fopTask->pending_reason = null;
                     $fopTask->client_request_date = null;
                     $fopTask->cancelled_at = null;
@@ -336,6 +349,20 @@ class FopTaskController extends Controller
             }
 
             $fopTask->save();
+
+            // Cancel dari sisi FOP harus nembus ke Task eksekusi teknisi juga —
+            // kalau enggak, Task tetap Terjadwal/Sedang Dikerjakan di Riwayat
+            // Task & /tasks-saya walau tiket FOP-nya udah Cancel.
+            if (isset($validated['status'])
+                && $validated['status'] === TaskStatus::DIBATALKAN->value
+                && $oldStatus !== TaskStatus::DIBATALKAN->value
+                && $fopTask->task_id
+            ) {
+                $linkedTask = $fopTask->task;
+                if ($linkedTask && !in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
+                    app(TaskService::class)->cancel($linkedTask, auth()->user(), "Dibatalkan dari Task FOP {$fopTask->task_number}.");
+                }
+            }
 
             if ($request->has('technicians')) {
                 $technicians = $validated['technicians'] ?? [];
@@ -426,6 +453,22 @@ class FopTaskController extends Controller
 
         return DB::transaction(function () use ($fopTask) {
             $oldValues = $fopTask->load('technicians')->toArray();
+
+            // Jika merupakan task auto-sync (Survey / PSB), ubah status customer menjadi REJECTED agar tidak terbuat lagi secara otomatis
+            if ($fopTask->customer_id && in_array($fopTask->category->value, \App\Enums\TaskType::autoOnlyValues(), true)) {
+                $customer = $fopTask->customer;
+                if ($customer && $customer->status !== 'rejected') {
+                    try {
+                        app(\App\Services\CustomerWorkflowService::class)->transition(
+                            $customer,
+                            \App\Enums\WorkflowTransition::REJECTED,
+                            'Tiket FOP dihapus oleh FOP.'
+                        );
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::warning("Could not transition customer to rejected during FopTask deletion: " . $e->getMessage());
+                    }
+                }
+            }
 
             $fopTask->technicians()->detach();
             $fopTask->delete();
@@ -714,7 +757,7 @@ class FopTaskController extends Controller
      */
     private function currentTeamConflicts(): array
     {
-        $conflictDates = FopTask::whereIn('status', [FopTaskStatus::PROSES, FopTaskStatus::PENDING])
+        $conflictDates = FopTask::whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->whereNull('team_id')
             ->has('technicians', '>=', 2)
             ->get(['task_date'])
@@ -761,8 +804,8 @@ class FopTaskController extends Controller
     {
         $this->authorizeAccess();
 
-        $query = FopTask::with(['village', 'technicians'])
-            ->whereIn('status', [FopTaskStatus::SELESAI, FopTaskStatus::CANCEL])
+        $query = FopTask::with(['village', 'technicians', 'task:id,status,report_deferred'])
+            ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderBy('updated_at', 'desc');
 
         // Search filter
@@ -782,12 +825,13 @@ class FopTaskController extends Controller
 
         if ($request->filled('status')) {
             $statusVal = $request->input('status');
-            if (in_array($statusVal, ['Selesai', 'Cancel'])) {
+            if (in_array($statusVal, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value], true)) {
                 $query->where('status', $statusVal);
             } else {
                 $query->whereRaw('1=0');
             }
         }
+
 
         if ($request->filled('priority')) {
             $query->where('priority', $request->input('priority'));
@@ -833,7 +877,7 @@ class FopTaskController extends Controller
             ->get()
             ->map(function (FopTaskTeam $team) {
                 $activeCount = $team->fopTasks->filter(
-                    fn ($t) => !in_array($t->status->value, ['Selesai', 'Cancel'])
+                    fn ($t) => !in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 )->count();
 
                 $workload = $team->fopTasks
@@ -905,14 +949,12 @@ class FopTaskController extends Controller
         // --- 1. Auto-Sync Survey ---
         $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
             ->whereDoesntHave('fopTasks', function ($q) {
-                $q->where('category', 'Survey')->whereIn('status', ['Proses', 'Pending']);
+                $q->where('category', 'Survey')->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
 
         foreach ($surveyCustomers as $c) {
-            $year = date('Y');
-            $count = FopTask::whereYear('created_at', $year)->count() + 1;
-            $taskNumber = sprintf('TFOP-%s-%04d', $year, $count);
-            
+            $taskNumber = $this->generateTaskNumber();
+
             FopTask::create([
                 'task_number' => $taskNumber,
                 'task_date' => now(),
@@ -922,7 +964,7 @@ class FopTaskController extends Controller
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,
                 'issue' => 'Auto-Sync dari antrean survey',
-                'status' => FopTaskStatus::PROSES,
+                'status' => TaskStatus::DRAFT,
                 'priority' => FopTaskPriority::MEDIUM, // will be recalculated below
             ]);
         }
@@ -930,13 +972,11 @@ class FopTaskController extends Controller
         // --- 2. Auto-Sync Installation ---
         $installCustomers = Customer::whereIn('status', ['waiting_installation', 'waiting_installations', 'surveyed'])
             ->whereDoesntHave('fopTasks', function ($q) {
-                $q->where('category', 'PSB')->whereIn('status', ['Proses', 'Pending']);
+                $q->where('category', 'PSB')->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
 
         foreach ($installCustomers as $c) {
-            $year = date('Y');
-            $count = FopTask::whereYear('created_at', $year)->count() + 1;
-            $taskNumber = sprintf('TFOP-%s-%04d', $year, $count);
+            $taskNumber = $this->generateTaskNumber();
 
             FopTask::create([
                 'task_number' => $taskNumber,
@@ -947,7 +987,7 @@ class FopTaskController extends Controller
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,
                 'issue' => 'Auto-Sync dari antrean pemasangan',
-                'status' => FopTaskStatus::PROSES,
+                'status' => TaskStatus::DRAFT,
                 'priority' => FopTaskPriority::MEDIUM, // will be recalculated below
             ]);
         }
@@ -959,7 +999,7 @@ class FopTaskController extends Controller
               ->where('status', 'selesai')
               ->orderByDesc('completed_at');
         }])
-            ->whereIn('status', ['Proses', 'Pending'])
+            ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
             ->whereIn('category', ['Survey', 'PSB'])
             ->whereNotNull('customer_id')
             ->get();
@@ -1004,5 +1044,23 @@ class FopTaskController extends Controller
                 }
             }
         }
+    }
+
+    /**
+     * Generate a unique sequential task number for the current year.
+     *
+     * Nomor urut dihitung di PHP (bukan `ORDER BY` SQL raw kayak
+     * `SUBSTRING_INDEX`) biar portable — jalan di MySQL (prod) maupun SQLite
+     * (test env), bukan cuma di salah satu driver.
+     */
+    private function generateTaskNumber()
+    {
+        $year = date('Y');
+        $lastNum = FopTask::where('task_number', 'like', "TFOP-{$year}-%")
+            ->pluck('task_number')
+            ->map(fn ($taskNumber) => (int) substr($taskNumber, strrpos($taskNumber, '-') + 1))
+            ->max() ?? 0;
+
+        return sprintf('TFOP-%s-%04d', $year, $lastNum + 1);
     }
 }

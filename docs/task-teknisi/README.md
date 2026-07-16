@@ -77,10 +77,10 @@ Task (1 pekerjaan lapangan)
 
 ## Terhubung dengan Modul Lain
 
-- [docs/fop-task](../fop-task/README.md) — `FopTaskController` auto-create `Task` saat teknisi di-assign ke tiket FOP.
-- [docs/customer-lifecycle](../customer-lifecycle/README.md) — `CustomerWorkflowService` auto-create `Task` (tipe Survey/Pemasangan) saat status Customer masuk `waiting_survey`/`waiting_installation`; `TaskController::review()` approve laporan Survey/Pemasangan ikut men-transisi status Customer.
+- [docs/fop-task](../fop-task/README.md) — `FopTaskController` auto-create `Task` saat teknisi di-assign ke tiket FOP. Sebaliknya, SETIAP perubahan `Task.status`/`report_deferred`/`fop_review_status` (lewat `start()`/`complete()`/`pending()`/`reschedule()`/`review()`/`cancel()` — semua jalur di modul ini) otomatis dipantau `App\Observers\TaskObserver` (registered di `AppServiceProvider`) buat sync status `FopTask` + tulis log `fop_task_status_history` + akumulasi durasi/SLA ke `task_reports` (Task 10, dual-cycle) — modul ini gak perlu manggil apa-apa secara eksplisit, semua kejadian otomatis lewat Observer hook.
+- [docs/customer-lifecycle](../customer-lifecycle/README.md) — `CustomerWorkflowService` auto-create `Task` (tipe Survey/Pemasangan) saat status Customer masuk `waiting_survey`/`waiting_installation`; `TaskController::review()` approve laporan Survey/Pemasangan ikut men-transisi status Customer. **Catatan penting:** ada 2 jalur "reject" yang beda efeknya — reject laporan di modul ini (`TaskController::review()`, kualitas laporan jelek → `Task.status` balik `in_progress`, teknisi redo) VS reject final customer di `CustomerVerificationController::reject()` (Customer module, gak eligible/belum bayar → `Task.status` TETAP `selesai`, cuma `fop_review_status=rejected`, terminal). Lihat `docs/project_verifikasi_reject_gap.md`.
 - [docs/rbac](../rbac/README.md) — sebagian transisi status Task (cancel, review, start dari kondisi non-standar) dikontrol dinamis lewat `WorkflowTransitionPermission`, bukan permission string statis biasa.
 
 ---
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-14 (cross-reference `TaskObserver`/Task 10 SLA dual-cycle + klarifikasi 2 jalur reject beda efek)

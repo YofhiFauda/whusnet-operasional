@@ -137,10 +137,11 @@ return [
         ],
         
         'customers.detail.installation' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::VALIDATE->value, 
-            ActionCode::ACTIVATE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
+            ActionCode::VALIDATE->value,
+            ActionCode::ACTIVATE->value,
+            ActionCode::REJECT->value
         ],
         
         'customers.detail.devices' => [

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
@@ -91,7 +90,9 @@ class TaskRescheduleTest extends TestCase
         $response->assertSessionHas('success');
 
         $task->refresh();
-        $this->assertEquals(TaskStatus::RESCHEDULE->value, $task->status->value);
+        // TaskStatus::RESCHEDULE dihapus (2026-07-15) — dileburin jadi `pending`
+        // biasa, perilaku lepas-tim TETAP sama. Lihat docs/project_status_label_unifikasi.md.
+        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
         $this->assertEquals('Pelanggan minta hari lain', $task->pending_reason);
         $this->assertFalse($task->teamMembers()->where('user_id', $this->techUser->id)->exists());
     }
@@ -120,7 +121,7 @@ class TaskRescheduleTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Perbaikan FO Cut',
             'issue' => 'FO CUT di tiang 5',
-            'status' => 'Proses',
+            'status' => 'in_progress',
             'priority' => 'High',
             'task_id' => $task->id,
         ]);
@@ -133,7 +134,7 @@ class TaskRescheduleTest extends TestCase
             ->assertRedirect(route('tasks.own'));
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
         $this->assertEquals('Infra belum siap', $fopTask->pending_reason);
         $this->assertNull($fopTask->team_id);
         $this->assertCount(0, $fopTask->technicians);
@@ -170,9 +171,13 @@ class TaskRescheduleTest extends TestCase
      * lengkap di tabel dedicated") yang tadinya BLOCKED — tabel
      * `fop_task_status_history` belum ada waktu Task 7 dikerjakan. Task 9
      * (TaskObserver) sekarang nulis baris histori otomatis tiap kali
-     * `Task.status` berubah, termasuk `RESCHEDULE`. Verifikasi entry-nya
-     * `pending_reschedule` — beda dari `lapor_nanti` (Task 6) & `pending_fop`
-     * (fopPending existing), walau `fop_tasks.status` sama-sama `Pending`.
+     * `Task.status` berubah.
+     *
+     * Sejak 2026-07-15 (docs/project_status_label_unifikasi.md), `RESCHEDULE`
+     * dileburin jadi `pending` biasa — entry histori-nya sekarang `pending_fop`
+     * (sama kayak FOP "Set Pending" manual), BUKAN `pending_reschedule` lagi.
+     * Beda dari `lapor_nanti` (Task 6, report_deferred=true) yang TETAP kondisi
+     * tersendiri.
      */
     public function test_reschedule_writes_dedicated_status_history_row(): void
     {
@@ -183,7 +188,7 @@ class TaskRescheduleTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Perbaikan FO Cut',
             'issue' => 'FO CUT di tiang 5',
-            'status' => 'Proses',
+            'status' => 'in_progress',
             'priority' => 'High',
             'task_id' => $task->id,
         ]);
@@ -196,9 +201,8 @@ class TaskRescheduleTest extends TestCase
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertNotNull($history);
-        $this->assertEquals('pending_reschedule', $history->to_status);
+        $this->assertEquals('pending_fop', $history->to_status);
         $this->assertEquals('Pending', $history->label());
         $this->assertNotEquals('lapor_nanti', $history->to_status);
-        $this->assertNotEquals('pending_fop', $history->to_status);
     }
 }

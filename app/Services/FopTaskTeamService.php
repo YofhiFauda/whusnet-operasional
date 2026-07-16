@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\TaskStatus;
 use App\Models\AuditLog;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
@@ -34,7 +35,7 @@ class FopTaskTeamService
 
             $tasks = FopTask::with('technicians:id,name')
                 ->whereBetween('task_date', [$start, $end])
-                ->whereIn('status', ['Proses', 'Pending'])
+                ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 ->orderBy('id')
                 ->get();
 

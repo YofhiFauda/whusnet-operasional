@@ -60,7 +60,7 @@ class FopTaskSwitchTechnicianTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'i',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
             'technicians' => $technicianIds,
         ]);

@@ -132,6 +132,15 @@
                                     Lapor Data
                                 </a>
                             @endif
+
+                            @can('customers.detail.survey.reject')
+                                <button type="button"
+                                        onclick="openCancelSurveyModal('{{ route('customers.survey.cancel', $customer) }}', '{{ addslashes($customer->full_name) }}')"
+                                        class="flex-1 sm:flex-none text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-white"
+                                        style="background:var(--color-error)">
+                                    Batalkan
+                                </button>
+                            @endcan
                         </div>
                     </td>
                 </tr>
@@ -155,4 +164,33 @@
         </div>
     @endif
 </div>
+
+@can('customers.detail.survey.reject')
+<div id="cancel-survey-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-surface border border-border rounded-lg shadow-lg w-full max-w-md p-5">
+        <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Survey — Tidak Layak Pasang</h4>
+        <p class="text-xs text-text-muted mb-4">
+            Survey <strong id="cancel-survey-modal-name"></strong> akan diubah statusnya menjadi <strong>ditolak</strong>
+            dan tidak bisa lanjut ke tahap pemasangan. Tindakan ini tidak bisa dibatalkan.
+        </p>
+        <form id="cancel-survey-modal-form" method="POST">
+            @csrf
+            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan <span class="text-error">*</span></label>
+            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Alamat tidak ditemukan, lokasi di luar jangkauan ODP, pelanggan menolak, dll."></textarea>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.add('hidden')" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
+                <button type="submit" class="text-xs px-3 py-1.5 rounded-md font-semibold text-white" style="background:var(--color-error);">Ya, Batalkan Survey</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openCancelSurveyModal(actionUrl, customerName) {
+        document.getElementById('cancel-survey-modal-form').setAttribute('action', actionUrl);
+        document.getElementById('cancel-survey-modal-name').textContent = customerName;
+        document.getElementById('cancel-survey-modal').classList.remove('hidden');
+    }
+</script>
+@endcan
 @endsection

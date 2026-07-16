@@ -3,8 +3,8 @@
         <h3 class="text-sm font-bold text-text-main uppercase tracking-wider">Data Pemasangan Pelanggan</h3>
         <p class="text-xs text-text-muted mt-0.5">Jadwal, teknisi, status, foto, dan catatan hasil pemasangan pelanggan.</p>
     </div>
-    @can('customers.detail.installation.update')
-        <div class="flex gap-2">
+    <div class="flex gap-2">
+        @can('customers.detail.installation.update')
             <button onclick="openTestReportModal()" class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold shadow-sm">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -17,9 +17,40 @@
                 </svg>
                 Isi Data Pemasangan
             </button>
-        </div>
-    @endcan
+        @endcan
+
+        @can('customers.detail.installation.reject')
+            @if(in_array($customer->status, ['waiting_installation', 'installation_in_progress', 'revision_installation']))
+                <button type="button" onclick="document.getElementById('cancel-installation-modal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border" style="color:var(--color-error); border-color:var(--color-error-border); background:var(--color-error-bg);">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Batalkan Pemasangan
+                </button>
+            @endif
+        @endcan
+    </div>
 </div>
+
+@can('customers.detail.installation.reject')
+@if(in_array($customer->status, ['waiting_installation', 'installation_in_progress', 'revision_installation']))
+<div id="cancel-installation-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-surface border border-border rounded-lg shadow-lg w-full max-w-md p-5">
+        <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Pemasangan — Tidak Layak Lanjut</h4>
+        <p class="text-xs text-text-muted mb-4">Pelanggan akan diubah statusnya menjadi <strong>ditolak</strong> dan tidak bisa lanjut ke tahap aktivasi. Tindakan ini tidak bisa dibatalkan.</p>
+        <form action="{{ route('customers.installation.cancel', $customer) }}" method="POST">
+            @csrf
+            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan <span class="text-error">*</span></label>
+            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Pelanggan menolak pemasangan, lokasi tidak sesuai, dll."></textarea>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="document.getElementById('cancel-installation-modal').classList.add('hidden')" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
+                <button type="submit" class="text-xs px-3 py-1.5 rounded-md font-semibold text-white" style="background:var(--color-error);">Ya, Batalkan Pemasangan</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
+@endcan
 
 @if($customer->installations->count() > 0)
     <div class="space-y-6">

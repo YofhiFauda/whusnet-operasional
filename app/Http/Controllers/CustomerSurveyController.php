@@ -92,7 +92,7 @@ class CustomerSurveyController extends Controller
             if ($task) {
                 $taskService->start($task, auth()->user());
             }
-        });
+        }, 3);
 
         // Trigger Event SurveyStarted
         try {

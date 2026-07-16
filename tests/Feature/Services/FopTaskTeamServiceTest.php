@@ -38,7 +38,7 @@ class FopTaskTeamServiceTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Task ' . self::$counter,
             'issue' => 'Issue',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
         ], $overrides));
 
@@ -288,9 +288,9 @@ class FopTaskTeamServiceTest extends TestCase
         $teamId = $task1->team_id;
         $this->assertNotNull($teamId);
 
-        $task1->status = 'Cancel';
+        $task1->status = 'dibatalkan';
         $task1->save();
-        $task2->status = 'Cancel';
+        $task2->status = 'dibatalkan';
         $task2->save();
 
         $this->service->rebuildTeamsForDate($this->date);

@@ -172,6 +172,13 @@ Kalau task_type SURVEY/PEMASANGAN & customer_id ada:
 FOP cancel (POST /tasks/{task}/cancel)
         │
         ▼
+Policy cancel: task_type in [SURVEY, PEMASANGAN]? ──ya──▶ TOLAK (2026-07-21)
+        │                                              — batalkan SRV/PSB WAJIB
+        │                                                lewat halaman Customer,
+        │                                                lihat docs/fop-task/
+        │                                                flowchart.md § 12
+        │ tidak
+        ▼
 Policy cancel: canTransitionTo(...,'dibatalkan') AND status not in [selesai,dibatalkan]
         │
         ▼

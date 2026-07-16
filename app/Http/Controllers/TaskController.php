@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\AuditLog;
@@ -38,6 +37,7 @@ class TaskController extends Controller
 
         $tasks = Task::with(['customer', 'pop', 'evidences', 'fop', 'teamMembers'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
+            ->where('status', '!=', TaskStatus::DIBATALKAN->value)
             ->where(function ($q) use ($today) {
                 $q->whereDate('scheduled_at', $today)
                   ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
@@ -217,10 +217,12 @@ class TaskController extends Controller
     }
 
     /**
-     * Teknisi: Pending top-level (reschedule penuh) — lepas assignment teknisi,
-     * balik task ke antrian Task FOP untuk dijadwalkan ulang. BEDA dari
-     * `TaskStatusController::pending()` (Lapor Nanti, assignment tetap) dan
-     * `pending()` di controller ini (FOP-side "Set Pending", assignment tetap).
+     * Teknisi: Pending top-level — lepas assignment teknisi, balik task ke
+     * antrian Task FOP untuk dijadwalkan ulang. BEDA dari
+     * `TaskStatusController::pending()` (Lapor Nanti, assignment tetap).
+     * SAMA PERSIS perilakunya dengan `pending()` FOP di bawah — "Pending"
+     * cuma 1 logic di sistem ini, siapapun yang trigger (lihat
+     * `releaseTeamAndSetPending()` dan docs/project_status_label_unifikasi.md).
      * Guard: task.status.reschedule — hanya anggota tim, status terjadwal/in_progress.
      */
     public function reschedule(Request $request, Task $task): RedirectResponse
@@ -231,18 +233,34 @@ class TaskController extends Controller
             'pending_reason' => 'required|string|max:500',
         ]);
 
-        DB::transaction(function () use ($task, $validated) {
+        $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'reschedule');
+
+        return redirect()
+            ->route('tasks.own')
+            ->with('success', "Task [{$task->task_number}] di-reschedule, kembali ke antrian FOP.");
+    }
+
+    /**
+     * Set Task ke `Pending` + lepas tim + rebuild jadwal — SATU-SATUNYA
+     * perilaku "pending" di sistem (2026-07-15). Dipanggil dari `reschedule()`
+     * (teknisi, top-level) dan `pending()` (FOP, manual) — beda cuma guard
+     * permission & pesan redirect, kelakuan intinya SAMA PERSIS. Lihat
+     * docs/project_status_label_unifikasi.md § DESAIN FINAL.
+     */
+    private function releaseTeamAndSetPending(Task $task, string $reason, string $auditAction): void
+    {
+        DB::transaction(function () use ($task, $reason, $auditAction) {
             $oldValues = $task->toArray();
 
             $task->update([
-                'status'         => TaskStatus::RESCHEDULE,
-                'pending_reason' => $validated['pending_reason'],
+                'status'         => TaskStatus::PENDING,
+                'pending_reason' => $reason,
                 'updated_by'     => auth()->id(),
             ]);
 
             $task->teamMembers()->delete();
 
-            AuditLog::log($task, 'reschedule', $oldValues, $task->fresh()->toArray());
+            AuditLog::log($task, $auditAction, $oldValues, $task->fresh()->toArray());
 
             $fopTask = FopTask::where('task_id', $task->id)->first();
 
@@ -251,24 +269,20 @@ class TaskController extends Controller
 
                 $fopTask->technicians()->detach();
                 $fopTask->update([
-                    'status'         => FopTaskStatus::PENDING,
-                    'pending_reason' => $validated['pending_reason'],
+                    'status'         => TaskStatus::PENDING,
+                    'pending_reason' => $reason,
                     'team_id'        => null,
                 ]);
                 $fopTask->manual_override_at = null;
                 $fopTask->save();
 
-                AuditLog::log($fopTask, 'reschedule', $fopOldValues, $fopTask->fresh()->toArray());
+                AuditLog::log($fopTask, $auditAction, $fopOldValues, $fopTask->fresh()->toArray());
 
                 if ($fopTask->task_date) {
                     app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
                 }
             }
         });
-
-        return redirect()
-            ->route('tasks.own')
-            ->with('success', "Task [{$task->task_number}] di-reschedule, kembali ke antrian FOP.");
     }
 
     // ─── API Endpoints ───────────────────────────────────────────
@@ -382,7 +396,11 @@ class TaskController extends Controller
     }
 
     /**
-     * FOP: Pending scheduled/in_progress task
+     * FOP: Pending scheduled/in_progress task — lepas tim + rebuild jadwal,
+     * perilaku SAMA PERSIS kayak `reschedule()` teknisi di atas (lihat
+     * `releaseTeamAndSetPending()`). Notifikasi ke tim dikirim SEBELUM tim
+     * dilepas (`releaseTeamAndSetPending` men-detach pivot-nya, jadi query tim
+     * sesudahnya bakal kosong).
      */
     public function pending(Request $request, Task $task): RedirectResponse
     {
@@ -392,17 +410,14 @@ class TaskController extends Controller
             'pending_reason' => 'required|string|max:1000',
         ]);
 
-        $task->update([
-            'status' => TaskStatus::PENDING,
-            'pending_reason' => $validated['pending_reason'],
-        ]);
-
         $this->notifyTeamMembers(
             $task,
             'Task Di-pending: ' . $task->task_number,
             'Task ditangguhkan oleh FOP: ' . $validated['pending_reason'],
             'warning'
         );
+
+        $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'pending');
 
         return back()->with('success', "Task [{$task->task_number}] di-pending.");
     }

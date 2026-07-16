@@ -130,7 +130,8 @@ class TaskReportSlaCalculationTest extends TestCase
         $task->update(['status' => TaskStatus::IN_PROGRESS->value, 'started_at' => now()]);
 
         Carbon::setTestNow(now()->addMinutes(30));
-        $task->update(['status' => TaskStatus::RESCHEDULE->value, 'pending_reason' => 'Pelanggan minta hari lain']);
+        // TaskStatus::RESCHEDULE dihapus (2026-07-15) — dileburin ke `pending` biasa.
+        $task->update(['status' => TaskStatus::PENDING->value, 'pending_reason' => 'Pelanggan minta hari lain']);
 
         $report = TaskReport::where('task_id', $task->id)->first();
 

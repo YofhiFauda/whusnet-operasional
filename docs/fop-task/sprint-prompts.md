@@ -120,6 +120,18 @@ laporan — itu juga harus lewat dialog ini (cross-reference Task 11).
 ---
 
 ### Task 7
+
+> **⚠️ SUPERSEDED 2026-07-15** — prompt di bawah ini historis (Task 7 udah `Done`
+> lama). Keputusan desain "tambah enum `RESCHEDULE` terpisah dari `PENDING`" yang
+> ditulis di prompt ini **UDAH DIBALIK**: `TaskStatus::RESCHEDULE` DIHAPUS TOTAL,
+> dileburin jadi `pending` biasa — perilaku lepas-tim/rebuild yang dulu eksklusif
+> punya `reschedule()` sekarang jadi SATU-SATUNYA perilaku "pending" di sistem
+> (termasuk FOP punya `fopPending()`, yang dulu SENGAJA tidak lepas assignment —
+> sekarang JUGA lepas assignment). Jangan pakai prompt ini sebagai referensi kalau
+> ngerjain ulang/nge-review Task 7 — baca `docs/project_status_label_unifikasi.md`
+> § DESAIN FINAL buat versi yang bener. Ini dibiarin apa adanya di bawah cuma
+> sebagai arsip historis kenapa desain awalnya begitu.
+
 ```
 Baca docs/fop-task/analisa-auto-team.md — Kebutuhan poin 7, SOLUSI poin 6&7 (bagian
 Task 7), Sprint Backlog Task 7 (Tombol Pending Top-Level / Reschedule Penuh).
@@ -158,6 +170,11 @@ Implementasikan Task 8: CASE tambahan client_request_date vs CURDATE(), badge
 ---
 
 ### Task 9
+
+> **Catatan (2026-07-15):** baris "butuh ... RESCHEDULE sudah ada" di bawah historis
+> — `RESCHEDULE` udah dihapus (lihat catatan Task 7 di atas). Gak ngubah apa-apa buat
+> Task 9 sendiri (udah `Done`), cuma biar gak salah kira `RESCHEDULE` masih ada pas baca ulang.
+
 ```
 Baca docs/fop-task/analisa-auto-team.md — Kebutuhan poin 9, SOLUSI poin 9,
 Sprint Backlog Task 9 (Status Realtime). Task 6 & Task 7 harus sudah selesai

@@ -81,6 +81,8 @@ FOP review (approve/reject/pending) via TaskController::review()
 
 **✅ Fixed (2026-07-07):** `TaskController::review()` approve untuk `task_type === PEMASANGAN` sekarang **ditolak** — satu-satunya jalur aktivasi resmi adalah `CustomerVerificationController::finalVerify()` (`/verifications/{customer}/admin`, lihat [docs/customer-lifecycle](../customer-lifecycle/README.md)), yang generate Invoice AWAL + CID sekaligus. Detail bug lama & perbaikannya ada di [bug.md](bug.md).
 
+**Klarifikasi (2026-07-14, fix reject-sync gap):** blok `reject:` di diagram atas ITU BUKAN jalur yang sama dengan `CustomerVerificationController::reject()` di Customer module. Diagram di atas = FOP nolak KUALITAS LAPORAN (foto kurang jelas dst) → `Task.status` balik `in_progress`, teknisi disuruh kerjain ulang, customer balik ke tahap in-progress, `FopTask` ikut mirror balik ke `in_progress` (unifikasi enum 2026-07-20 — dulu istilahnya `Proses`/"Perlu Review", enum `FopTaskStatus` itu sekarang udah dihapus). Reject di Customer module = admin nolak CUSTOMER-nya (gak eligible/belum bayar) → `Task.status` TETAP `selesai`, `fop_review_status=rejected`, terminal (`FopTask` TETAP `selesai` — kerjaan lapangan sukses, cuma dapet badge kedua "Verifikasi: Ditolak", gak ada jalur balik). Dua-duanya sama-sama nulis `fop_review_status=rejected` tapi efek ke `Task.status` & ke `FopTask` beda total — jangan disamain pas baca kode/log. Detail: `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
+
 ## 7. Maintenance Report — Jalur Khusus
 
 - Task tipe `MAINTENANCE` (dan tipe non-Survey/Pemasangan lain) pakai form laporan sendiri (`TaskMaintenanceController`), bukan form Survey/Instalasi.

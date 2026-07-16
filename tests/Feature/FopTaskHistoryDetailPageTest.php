@@ -84,7 +84,7 @@ class FopTaskHistoryDetailPageTest extends TestCase
             'pop_id' => $this->pop->id,
             'customer_id' => $customer->id,
             'issue' => 'Auto-Sync dari antrean survey',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
             'task_id' => $task->id,
         ]);
@@ -93,7 +93,7 @@ class FopTaskHistoryDetailPageTest extends TestCase
         // & TaskReport, keduanya butuh FopTask sudah terhubung sebelum status berubah).
         $task->update(['status' => TaskStatus::IN_PROGRESS->value, 'started_at' => now()]);
         $task->update(['status' => TaskStatus::SELESAI->value, 'completed_at' => now()]);
-        $fopTask->update(['status' => 'Selesai']);
+        $fopTask->update(['status' => 'selesai']);
 
         CustomerSurvey::create([
             'customer_id' => $customer->id,

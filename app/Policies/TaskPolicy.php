@@ -16,6 +16,13 @@ class TaskPolicy
      */
     public function before(User $user, string $ability): ?bool
     {
+        // 'cancel' sengaja DIKELUARIN dari bypass wildcard — SRV/PSB gak boleh
+        // dibatalkan dari Task sama sekali (harus lewat halaman Customer),
+        // aturan ini berlaku buat SEMUA role termasuk owner/admin.
+        if ($ability === 'cancel') {
+            return null;
+        }
+
         if ($user->hasPermission('*')) {
             return true;
         }
@@ -112,6 +119,13 @@ class TaskPolicy
      */
     public function cancel(User $user, Task $task): bool
     {
+        // SRV/PSB terikat ke workflow Customer (List Pelanggan Gagal) — cancel
+        // buat 2 tipe ini WAJIB lewat halaman Customer (CustomerSurveyController/
+        // CustomerInstallationController::cancel()), bukan tombol Task langsung.
+        if (in_array($task->task_type, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+            return false;
+        }
+
         return $this->canTransitionTo($user, $task, 'dibatalkan') && !in_array($task->status->value, ['selesai', 'dibatalkan']);
     }
 

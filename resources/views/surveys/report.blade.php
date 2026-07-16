@@ -394,10 +394,6 @@
                         Lanjut
                     </button>
 
-                    <button type="button" id="btn-failed" onclick="reportFailed()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
-                        Tidak Layak Pasang
-                    </button>
-
                     <button type="submit" id="btn-submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
                         Simpan Laporan Survey
                     </button>
@@ -637,25 +633,7 @@
         }
     }
 
-    // Tandai survey sebagai "tidak layak pasang" — beda dari laporan survey normal.
-    // Field teknis (ODP, estimasi kabel, foto, tingkat kesulitan) jadi opsional,
-    // tapi Catatan Teknis wajib diisi sebagai alasan tidak layak.
-    function reportFailed() {
-        const noteEl = document.getElementById('survey_note');
-        if (!noteEl.value.trim()) {
-            alert('Alasan tidak layak pasang wajib diisi di Catatan Teknis Survey.');
-            goToStep(4);
-            noteEl.focus();
-            return;
-        }
 
-        if (!confirm('Yakin pelanggan ini tidak layak pasang? Status pelanggan akan diubah menjadi ditolak dan tidak bisa lanjut ke pemasangan.')) {
-            return;
-        }
-
-        document.getElementById('survey_status_input').value = 'failed';
-        document.getElementById('wizard-form').submit();
-    }
 </script>
 @endsection
 

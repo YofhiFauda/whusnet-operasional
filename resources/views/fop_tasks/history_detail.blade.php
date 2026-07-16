@@ -24,12 +24,15 @@
                 @php
                     $statusBadge = match ($fopTask->status->value) {
                         'Selesai' => 'bg-green-50 text-green-700 border-green-200',
-                        'Cancel'  => 'bg-red-50 text-red-700 border-red-200',
-                        default   => 'bg-slate-50 text-slate-600 border-slate-200',
+                        'Cancel' => 'bg-red-50 text-red-700 border-red-200',
+                        default => 'bg-slate-50 text-slate-600 border-slate-200',
                     };
+                    $statusLabel = $fopTask->task
+                        ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
+                        : $fopTask->status->value;
                 @endphp
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui {{ $statusBadge }}">
-                    {{ $fopTask->status->value }}
+                    {{ $statusLabel }}
                 </span>
             </div>
             <h1 class="text-xl font-bold text-slate-900 tracking-tight font-ui">{{ $fopTask->tugas }}</h1>

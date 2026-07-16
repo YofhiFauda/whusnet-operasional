@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
@@ -155,7 +154,7 @@ class TaskReportDialogTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Perbaikan',
             'issue' => 'FO CUT',
-            'status' => 'Proses',
+            'status' => 'in_progress',
             'priority' => 'High',
             'task_id' => $task->id,
         ]);
@@ -168,7 +167,7 @@ class TaskReportDialogTest extends TestCase
             ->assertRedirect();
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertNotNull($history);
@@ -196,7 +195,7 @@ class TaskReportDialogTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Perbaikan',
             'issue' => 'FO CUT',
-            'status' => 'Proses',
+            'status' => 'in_progress',
             'priority' => 'High',
             'task_id' => $task->id,
         ]);

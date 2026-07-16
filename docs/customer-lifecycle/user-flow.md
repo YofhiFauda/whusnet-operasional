@@ -17,6 +17,16 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 5. Pilih status laporan: `completed` (survey selesai, lanjut ke antrean verifikasi) / `failed` / `pending` (belum kelar, submit ulang nanti).
 6. Submit → kalau `completed`, pelanggan otomatis pindah ke antrean Verifikasi FOP.
 
+### 2b. FOP/Admin — Batalkan Survey (baru 2026-07-21)
+
+Buat pelanggan yang **belum ditugaskan** (belum ada teknisi jalan) ATAU **udah ditugaskan tapi gak jadi/dibatalkan** (teknisi udah di-assign tapi belum/gak akan dikerjakan):
+
+1. Klik tombol **"Batalkan"** — tersedia di 2 tempat: tabel `/surveys/queue` (Antrean Survey Lapangan, kolom Action) DAN tab Survey halaman detail Customer.
+2. Isi alasan (wajib, mis. "Alamat tidak ditemukan", "Pelanggan menolak").
+3. Submit → Task Survey terkait dibatalkan, pelanggan pindah ke `rejected` (masuk List **Pelanggan Gagal**).
+4. Tombol ini muncul selama status masih `waiting_survey` atau `survey_in_progress` — begitu laporan udah disubmit (`completed`), pakai jalur reject di Verifikasi (§5), bukan cancel ini.
+5. **Cancel Task Survey langsung dari halaman Task/tabel FOP Task gak bisa lagi** — tombol Cancel disembunyikan buat kategori Survey, harus lewat sini biar status pelanggan konsisten ke-update.
+
 ## 3. FOP — Verifikasi Survey & Proses ke Tim Pemasangan
 
 1. Buka `/verifications/queue` — lihat pelanggan status `waiting_acc`/`surveyed`/dst, plus list teknisi yang lagi standby/aktif.
@@ -30,14 +40,24 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 4. Pilih status: `completed` (semua foto wajib lengkap, kalau kurang satu aja ditolak dengan pesan spesifik) / `failed` (butuh revisi, balik ke antrean) / progress (belum kelar).
 5. Submit `completed` → pelanggan otomatis masuk antrean Verifikasi Admin.
 
+### 4b. Admin/FOP — Batalkan Pemasangan (baru 2026-07-21)
+
+Setara Batalkan Survey (§2b), buat tahap Pemasangan:
+
+1. Buka tab Pemasangan halaman detail Customer → klik **"Batalkan Pemasangan"**.
+2. Isi alasan → submit. Muncul selama status `waiting_installation`, `installation_in_progress`, atau `revision_installation` (belum submit laporan `completed`).
+3. Task Pemasangan terkait dibatalkan, pelanggan pindah ke `rejected` (List Pelanggan Gagal).
+4. Permission baru: `customers.detail.installation.reject`. Sebelumnya **gak ada jalur ini sama sekali** — satu-satunya cara batalin Task Pemasangan yang lagi jalan cuma lewat tombol Cancel di halaman Task, yang gak nyentuh status pelanggan (gap, sekarang ditutup).
+
 ## 5. FOP/Admin — Verifikasi Admin (Aktivasi Final)
 
 1. Buka `/verifications/{customer}/admin` — review semua data: device, technical detail, hasil instalasi, paket, alamat.
 2. Pilih salah satu aksi:
    - **Approve/Aktivasi** — isi manual: periode billing, tanggal terbit/jatuh tempo, subtotal, discount, PPN, biaya prorate/kabel/tiang/instalasi tambahan → submit. Sistem generate Invoice AWAL, generate CID, aktivasi pelanggan+service.
-   - **Reject** — isi alasan → pelanggan final ditolak, gak bisa diproses lagi.
+   - **Tolak** *(tombol ini baru ditambahkan di halaman ini — fix reject-sync gap, 2026-07-14; sebelumnya cuma ada Approve/Revisi di sini, reject cuma bisa dari halaman queue tahap survey)* — isi alasan, modal kasih peringatan tegas **"final, gak bisa dibuka lagi, harus registrasi ulang dari awal"**. Pelanggan masuk list **Pelanggan Gagal**, Task Pemasangan terkait ke-mark `fop_review_status=rejected` (bukan Task Survey — target-nya sekarang sesuai tahap). Tiketnya sendiri tetap `Selesai` di Riwayat FOP (kerjaan lapangan teknisi bener, cuma keputusan bisnis customer-nya yang ditolak) — dapet badge KEDUA "Verifikasi: Ditolak" terpisah dari status utama.
    - **Revisi** — isi alasan → pelanggan balik ke antrean pemasangan teknisi buat perbaikan, laporan lama gak hilang (catatan revisi ditambahkan).
 3. Setelah aktivasi, pelanggan lanjut ke alur normal billing bulanan (lihat [docs/billing-pembayaran](../billing-pembayaran/README.md)).
+4. **Sebelum admin mutusin** (approve/tolak/revisi): tiket teknisi TETAP tampil `Selesai` di Riwayat FOP (bukan nangkring di antrian aktif, karena kerjaan lapangan emang udah kelar) — badge kedua "Verifikasi: Menunggu" nunjukin masih nunggu keputusan, dengan link balik ke halaman ini. Lihat `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
 
 ## 6. Admin — Terminasi Layanan
 
@@ -51,8 +71,10 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 | Registrasi pelanggan | `customers.create` |
 | Mulai/lapor Survey | `customers.detail.survey.update` |
 | Lihat antrean Survey | `customers.detail.survey.view` |
+| **Batalkan Survey** | `customers.detail.survey.reject` |
 | Proses ke Tim, Aktivasi, Reject, Revisi | `customers.detail.installation.validate` |
 | Mulai/lapor Pemasangan | `customers.detail.installation.update` |
+| **Batalkan Pemasangan** *(baru 2026-07-21)* | `customers.detail.installation.reject` |
 | Lihat antrean Verifikasi | `customers.detail.installation.view` |
 | Upload/lihat dokumen tambahan | `customers.detail.documents.upload` / `.view` |
 | Tambah/update device manual | `customers.detail.devices.create` / `.update` |
@@ -61,5 +83,6 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 
 - **Konflik jadwal teknisi** berlaku di 2 tahap (Survey & Pemasangan) — kalau teknisi lagi pegang Task `in_progress` lain, mulai kerjaan baru bakal ditolak. Solusi: selesaikan atau tandai Pending task yang lagi jalan dulu.
 - **Foto wajib saat pemasangan `completed`** — 4 foto (pemasangan, kontrak, TTD, speedtest) dicek satu-satu, submit gagal kalau ada yang belum diupload (baik baru maupun yang sudah tersimpan sebelumnya).
+- **Cancel Task Survey/Pemasangan cuma bisa dari halaman Customer (2026-07-21)** — tombol Cancel di halaman Task/tabel FOP Task disembunyikan/diblokir buat kategori Survey & PSB, biar `Customer.status` selalu konsisten ikut ke-update pas dibatalkan (masuk List Pelanggan Gagal). Task_type lain (MTN/DEAC/RELOKASI/dst) tetap bisa dibatalkan langsung dari Task seperti biasa.
 - **CID baru muncul saat Aktivasi** — sebelum status `active`, pelanggan belum punya CID sama sekali.
 - **Terminasi gak lewat state machine** — beda dari semua transisi lain, jadi gak masuk riwayat `customer_status_logs`, cuma di `AuditLog`.

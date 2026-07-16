@@ -284,20 +284,32 @@ class CustomerVerificationController extends Controller
             'reason' => 'required|string|max:255'
         ]);
 
+        // Tahap ditentukan dari status SEBELUM transition (transition di bawah
+        // mengubah customer->status jadi 'rejected', jadi harus direkam duluan).
+        $isInstallStage = in_array($customer->status, [
+            'installation_in_progress', 'revision_installation', 'installed', 'verification_admin',
+        ], true);
+
         try {
             DB::beginTransaction();
-            
+
             $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, 'Ditolak: ' . $request->reason);
 
-            // Otomatis tolak (reject) Task Survey yang terkait
-            $surveyTask = \App\Models\Task::where('customer_id', $customer->id)
-                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
+            // Otomatis tolak (reject) Task Survey atau Pemasangan yang terkait,
+            // tergantung tahap penolakan. Reject di tahap survey TIDAK boleh
+            // menyentuh Task Pemasangan (belum tentu ada), begitu juga sebaliknya.
+            $rejectedTaskType = $isInstallStage
+                ? \App\Enums\TaskType::PEMASANGAN
+                : \App\Enums\TaskType::SURVEY;
+
+            $rejectedTask = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', $rejectedTaskType->value)
                 ->where('status', \App\Enums\TaskStatus::SELESAI->value)
                 ->where('fop_review_status', 'pending')
                 ->latest()
                 ->first();
-            if ($surveyTask) {
-                $surveyTask->update([
+            if ($rejectedTask) {
+                $rejectedTask->update([
                     'fop_review_status' => 'rejected',
                     'reject_reason' => $request->reason,
                     'updated_by' => auth()->id(),

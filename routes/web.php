@@ -227,6 +227,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/customers/{customer}/test-report', [CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
     });
 
+    Route::middleware('permission:customers.detail.installation.reject')->group(function () {
+        Route::post('/customers/{customer}/installation/cancel', [CustomerInstallationController::class, 'cancel'])->name('customers.installation.cancel');
+    });
+
     Route::middleware('permission:customers.detail.installation.validate')->group(function () {
         Route::get('/verifications/{customer}/admin', [CustomerVerificationController::class, 'showAdmin'])->name('customers.verification.admin');
         Route::post('/verifications/{customer}/process-to-team', [CustomerVerificationController::class, 'processToTeam'])->name('customers.verification.process-to-team');

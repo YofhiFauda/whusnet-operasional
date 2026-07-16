@@ -46,41 +46,81 @@ class CustomerInstallationController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::transaction(function() use ($customer, $workflowService, $taskService, $task) {
+                $installation = $customer->installations()->latest()->first();
 
-            $installation = $customer->installations()->latest()->first();
+                $updateData = [
+                    'started_at' => now(),
+                    'start_time' => now()->toTimeString(),
+                    'installation_status' => 'in_progress',
+                ];
+                if ($task) {
+                    $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
+                }
 
-            $updateData = [
-                'started_at' => now(),
-                'start_time' => now()->toTimeString(),
-                'installation_status' => 'in_progress',
-            ];
-            if ($task) {
-                $updateData['fop_id'] = $task->fop_id ?? $task->created_by;
-            }
+                if ($installation) {
+                    $installation->update($updateData);
+                } else {
+                    $customer->installations()->create($updateData);
+                }
 
-            if ($installation) {
-                $installation->update($updateData);
-            } else {
-                $customer->installations()->create($updateData);
-            }
+                $workflowService->transition($customer, 'installation_in_progress', 'Mulai proses pemasangan lapangan');
 
-            $workflowService->transition($customer, 'installation_in_progress', 'Mulai proses pemasangan lapangan');
+                if ($task) {
+                    $taskService->start($task, auth()->user());
+                }
 
-            if ($task) {
-                $taskService->start($task, auth()->user());
-            }
-
-            // Broadcast Event
-            broadcast(new InstallationStarted($customer))->toOthers();
-
-            DB::commit();
+                // Broadcast Event
+                broadcast(new InstallationStarted($customer))->toOthers();
+            }, 3);
 
             return redirect()->back()->with('success', 'Waktu pemasangan berhasil dimulai.');
         } catch (\Exception $e) {
-            DB::rollBack();
             return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Batalkan pemasangan — satu-satunya jalur cancel Task PEMASANGAN
+     * (Task.cancel dikunci di TaskPolicy buat task_type ini, lihat
+     * TaskPolicy::cancel()). Pola sama persis CustomerSurveyController::cancel().
+     */
+    public function cancel(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.reject'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['waiting_installation', 'installation_in_progress', 'revision_installation']),
+            422,
+            'Pemasangan pelanggan ini tidak bisa dibatalkan dari status saat ini: ' . $customer->status
+        );
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+
+        DB::transaction(function () use ($customer, $validated, $workflowService) {
+            $task = \App\Models\Task::where('customer_id', $customer->id)
+                ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
+                ->whereNotIn('status', [\App\Enums\TaskStatus::SELESAI->value, \App\Enums\TaskStatus::DIBATALKAN->value])
+                ->latest('id')
+                ->first();
+
+            if ($task) {
+                app(\App\Services\TaskService::class)->cancel($task, auth()->user(), $validated['reason']);
+            }
+
+            $installation = $customer->installations()->latest()->first();
+            if ($installation) {
+                $installation->installation_status = 'failed';
+                $installation->notes = trim(($installation->notes ? $installation->notes . "\n" : '') . 'Dibatalkan: ' . $validated['reason']);
+                $installation->save();
+            }
+
+            $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, $validated['reason']);
+        });
+
+        return redirect()->back()->with('success', 'Pemasangan pelanggan berhasil dibatalkan: tidak layak lanjut.');
     }
 
     public function report(Customer $customer)

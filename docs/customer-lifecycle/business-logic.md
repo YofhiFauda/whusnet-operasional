@@ -57,6 +57,15 @@
 - **Kalau `survey_status = failed` (✅ ditambahkan 2026-07-08 — sebelumnya gap, lihat [bug.md](bug.md)):** `survey_note` jadi **wajib** (alasan tidak layak pasang, ditombolkan lewat tombol "Tidak Layak Pasang" terpisah di UI — bukan dropdown, biar teknisi gak salah pencet). Task Survey terkait di-**cancel** (`TaskService::cancel()`, status `DIBATALKAN` + `cancel_reason`), customer di-**transition ke `rejected`** (state final, sama mekanisme dengan reject di tahap verifikasi — lihat §7). Tiket Pemasangan otomatis **tidak akan pernah terbentuk** karena workflow tidak pernah sampai `waiting_acc`.
 - Kalau `survey_status = pending` (laporan draf/belum final) → data tersimpan, status customer/task tidak berubah, technician bisa submit ulang nanti.
 
+### Batalkan Survey — sebelum/selagi dikerjakan (`cancel()`)
+
+**Beda dari §"Lapor Survey" `survey_status=failed` di atas** — itu jalur "teknisi UDAH di lokasi, submit laporan gagal survey". Method `cancel()` ini buat kasus SEBELUM laporan ada sama sekali: **belum ditugaskan** (`waiting_survey`, belum ada teknisi/Task jalan) ATAU **udah ditugaskan tapi gak jadi/dibatalkan** (`waiting_survey` juga — status customer TETAP `waiting_survey` walau Task Survey-nya udah `terjadwal`/teknisi udah di-assign, sampai teknisi beneran pencet "Mulai Survey") ATAU **lagi dikerjakan tapi dibatalkan di tengah jalan** (`survey_in_progress`, belum submit laporan).
+
+- Guard: `customer->status` harus `waiting_survey` atau `survey_in_progress`, permission `customers.detail.survey.reject`.
+- 1 transaksi: cari Task Survey terkait yang belum `selesai`/`dibatalkan` → `TaskService::cancel()` (status `dibatalkan`, otomatis sync ke `FopTask` via `TaskObserver`) → `CustomerSurvey.survey_status = failed` (record survey terbaru, dibuat baru kalau belum ada) → `CustomerWorkflowService::transition(customer, REJECTED, $reason)`.
+- **Tombol ada di 2 tempat** (2026-07-21): tab Survey halaman Customer detail (`resources/views/customers/tabs/_survey.blade.php`, tombol "Batalkan Survey") DAN tabel Antrean Survey Lapangan (`/surveys/queue`, tombol "Batalkan" per baris — **baru ditambah**, sebelumnya cuma ada "Mulai Survey"/"Lapor Data", gak ada opsi batalkan sama sekali dari halaman ini).
+- **Ini SATU-SATUNYA jalur sah buat batalin Task Survey** — `TaskPolicy::cancel()` block cancel langsung dari halaman Task buat task_type SURVEY (berlaku semua role termasuk owner), dan `FopTaskController::update()` nolak (422) kalau coba cancel tiket FOP kategori Survey. Alasannya: cancel dari Task/FopTask doang gak nyentuh `Customer.status` — pelanggan bakal nyangkut permanen di status lama, gak pernah masuk List Pelanggan Gagal. Lihat `docs/fop-task/flowchart.md` § 12.
+
 ## 5. Tahap 3 — Verifikasi Survey → Proses ke Tim (`CustomerVerificationController::processToTeam`)
 
 - Guard status: cuma dari `waiting_acc` atau `surveyed`.
@@ -83,6 +92,15 @@
   - `failed` → transition balik ke `waiting_installation` ("Instalasi gagal/butuh revisi. Menunggu penjadwalan ulang").
   - lainnya (progress belum selesai) → data tersimpan, status customer/task tidak berubah.
 
+### Batalkan Pemasangan — sebelum/selagi dikerjakan (`cancel()`, **baru 2026-07-21**)
+
+Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan — sebelumnya **GAK ADA jalur ini sama sekali** buat PSB (gap: satu-satunya cara batalin Task Pemasangan yang lagi jalan ya lewat tombol Cancel langsung di halaman Task, yang BYPASS `Customer.status` sepenuhnya).
+
+- Guard: `customer->status` harus `waiting_installation`, `installation_in_progress`, atau `revision_installation`, permission **`customers.detail.installation.reject`** (baru ditambah ke `config/rbac.php` + role `noc`/`fop` di `RolePermissionSeeder`, sebelumnya cuma ada `.view/.update/.validate/.activate` — gak ada `.reject`).
+- 1 transaksi: cari Task Pemasangan terkait yang belum `selesai`/`dibatalkan` → `TaskService::cancel()` → `CustomerInstallation.installation_status = failed` (+ append alasan ke `notes`) → `CustomerWorkflowService::transition(customer, REJECTED, $reason)`.
+- Tombol "Batalkan Pemasangan" di tab Pemasangan halaman Customer detail (`resources/views/customers/tabs/_installation.blade.php`).
+- Sama kayak Survey: ini satu-satunya jalur sah, `TaskPolicy::cancel()` + `FopTaskController::update()` block cancel langsung buat task_type PEMASANGAN.
+
 ## 7. Tahap 5 — Verifikasi Admin & Aktivasi (`CustomerVerificationController`)
 
 ### Approve → Aktivasi (`finalVerify`)
@@ -96,8 +114,10 @@
 
 ### Reject (`reject`)
 
-- Transition ke `rejected` (final, gak bisa balik) — dipakai kalau pelanggan dibatalkan total di titik verifikasi manapun.
-- Auto-reject Task Survey terkait yang masih `fop_review_status=pending`.
+- Transition ke `rejected` (final, gak bisa balik) — dipakai kalau pelanggan dibatalkan total di titik verifikasi manapun. Pelanggan yang ditolak otomatis masuk list **Pelanggan Gagal** (`CustomerController` statusGroup `failed`, `whereIn('status', ['failed','rejected','gagal'])`) — no-op, gak ada kode tambahan buat ini.
+- **Stage-aware sejak fix reject-sync gap (2026-07-14):** tahap ditentukan dari `$customer->status` SEBELUM `transition()` dipanggil (transition-nya sendiri ngubah status jadi `rejected`, jadi harus direkam duluan) — `installation_in_progress|revision_installation|installed|verification_admin` = tahap install → target **Task Pemasangan**; selain itu (`waiting_acc|survey_in_progress|surveyed|waiting_installation`) = tahap survey → target **Task Survey** (behavior lama). SEBELUM fix ini, `reject()` SELALU nyentuh Task Survey — kalau ditolak di tahap install, Task Pemasangan gak pernah ke-update, nyangkut permanen di antrian FOP aktif. Detail: `docs/project_verifikasi_reject_gap.md`.
+- Auto-reject Task (Survey atau Pemasangan, sesuai tahap) yang masih `fop_review_status=pending` → `fop_review_status=rejected` + `reject_reason`. `Task.status` **TETAP `selesai`** (beda dari Revisi di bawah yang revert ke `in_progress`) — downstream `TaskObserver` TETAP sync `FopTask` ke `Selesai` (bukan `Cancel` — kerjaan lapangan teknisi sukses, yang ditolak keputusan bisnis customer-nya, 2 hal beda sengaja gak dicampur), cuma label histori granularnya jadi `selesai_ditolak_verifikasi`. Di Riwayat FOP, badge "Verifikasi: Ditolak" muncul sebagai kolom/badge KEDUA (overlay dari `FopTask::verificationStatus()`), terpisah dari badge status utama "Selesai" (lihat [docs/fop-task/flowchart.md § 9](../fop-task/flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9)).
+- UI: tombol "Tolak" tersedia di halaman queue (tahap survey, sudah lama ada) DAN di halaman Verif & Pemasangan `verifications/admin.blade.php` (tahap install, **baru ditambahkan** — sebelumnya cuma ada Approve/Revisi di situ). Modal Tolak eksplisit warning "final, gak bisa dibuka lagi, harus registrasi ulang dari awal".
 
 ### Revisi (`revisi`)
 
@@ -114,5 +134,7 @@
 ## 9. Kaitan dengan Modul Lain
 
 - **FOP Task** — `CustomerWorkflowService` auto-create `Task` (bukan `FopTask`) saat masuk `waiting_survey`/`waiting_installation`. `FopTaskController::autoSyncAndCalculatePriority()` yang kemudian sinkron `FopTask` dari status `Customer` (lihat [docs/fop-task/flowchart.md](../fop-task/flowchart.md)) — jadi ada **2 lapis auto-sync** yang jalan independen: satu bikin `Task` (level workflow), satu bikin `FopTask` (level tiket FOP).
+- **FOP Task — status Task selesai + nunggu keputusan**: begitu `Task.status=selesai` (tahap survey maupun install, nunggu aksi Approve/Revisi/Tolak di modul ini), `FopTask` terkait LANGSUNG `selesai` (unifikasi enum 2026-07-20 — `FopTask.status` sekarang mirror langsung `Task.status`, bukan mapping bucket `FopTaskStatus` yang udah dihapus) — otomatis udah gak nangkring di antrian FOP aktif (selesai emang gak pernah masuk antrian, gak butuh logic exclude khusus). Nasib keputusan (Menunggu/Diterima/Ditolak) tampil sebagai badge KEDUA di Riwayat FOP (`FopTask::verificationStatus()`), + link balik ke halaman verifikasi ini kalau masih Menunggu. Keputusan sebenarnya (Approve/Revisi/Tolak) TETAP di modul Customer ini, Riwayat FOP cuma informasional. Lihat `docs/fop-task/flowchart.md` § 11 & `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
+- **FOP Task — cancel SRV/PSB terkunci dari Task/FopTask (2026-07-21)**: `TaskPolicy::cancel()` + `FopTaskController::update()` block cancel/dibatalkan buat task_type SURVEY/PEMASANGAN, di SEMUA role. Satu-satunya jalur sah: `CustomerSurveyController::cancel()` (§4) / `CustomerInstallationController::cancel()` (§6) di modul ini — biar `Customer.status` konsisten ikut `rejected`. Lihat `docs/fop-task/flowchart.md` § 12.
 - **Billing** — `finalVerify()` satu-satunya titik yang bikin Invoice tipe `awal`. Invoice bulanan rutin (`billing:generate-monthly-invoices`) baru mulai jalan bulan **setelah** bulan aktivasi ini (guard anti-dobel-tagih, lihat [docs/billing-pembayaran/flowchart.md](../billing-pembayaran/flowchart.md)).
 - **RBAC** — semua guard di atas granular per sub-fitur (`customers.detail.survey.*`, `customers.detail.installation.*`) — role Teknisi biasanya cuma punya `.update` (submit laporan), role FOP/Admin punya `.validate` (approve/reject/revisi/aktivasi).

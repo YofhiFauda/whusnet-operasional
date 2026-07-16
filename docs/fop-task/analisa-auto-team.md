@@ -201,7 +201,7 @@ Detail Task
 | **Lapor Sekarang** | Dalam dialog laporan | lanjut ke form laporan | Teknisi isi laporan saat itu juga. |
 | **Lapor Nanti** | Dalam dialog laporan | `lapor_nanti` | Kerja lapangan sudah selesai, laporan ditunda — task tetap di teknisi yang sama, TIDAK balik ke antrian FOP. |
 
-**Detail tombol `Pending`:** warna amber/kuning (konsisten status `Pending` di seluruh sistem), wajib isi alasan di modal sebelum submit, sinkron ke FopTask maupun Task eksekusi teknisi.
+**Detail tombol `Pending`:** warna amber/kuning (konsisten status `Pending` di seluruh sistem), wajib isi alasan di modal sebelum submit, sinkron ke FopTask maupun Task eksekusi teknisi. Sejak 2026-07-15, ini BUKAN lagi enum terpisah (`RESCHEDULE`) — literal `TaskStatus::PENDING`, sama kayak tombol "Set Pending" FOP-side (lihat § Task 7).
 
 ---
 
@@ -231,14 +231,18 @@ Urgent/Overdue → Hari Ini → Upcoming
 |---|---|
 | Task di-assign tapi belum dimulai | `Proses` (jadwal aktif) |
 | Teknisi klik "Mulai" | `Proses` + indikator ⚡ Sedang Dikerjakan |
-| Teknisi klik "Pending" (top-level Detail Task) | `pending` — direschedule, balik ke antrian Task FOP |
-| Teknisi pilih "Lapor Nanti" (dalam dialog laporan) | `lapor_nanti` — kerja selesai, laporan gantung, task tetap di teknisi sama |
-| Teknisi submit laporan | `Proses` + badge "Perlu Review" |
-| FOP approve laporan | `Selesai` |
-| FOP reject laporan | `Proses` kembali |
-| FOP cancel (dengan `cancel_reason`) | `Cancel` |
+| Teknisi klik "Pending" (top-level Detail Task) ATAU FOP klik "Set Pending" manual | `Pending` — tim dilepas, balik ke antrian Task FOP nunggu di-assign ulang. **1 logic buat 2 trigger** (2026-07-15, `TaskStatus::RESCHEDULE` dihapus, lihat § Task 7 di atas & `docs/project_status_label_unifikasi.md`) |
+| Teknisi pilih "Lapor Nanti" (dalam dialog laporan) | `Pending` (data) tapi label beda: **Lapor Nanti** — kerja selesai, laporan gantung, tim TETAP nempel (satu-satunya sub-kondisi `Pending` yang gak lepas tim) |
+| Teknisi submit laporan — task_type **MTN/DEAC/RELOKASI/dst** (review kualitas laporan biasa) | `Proses` (bucket), label badge **"Perlu Review"** (masih ada, task_type ini beda dari Survey/PSB — lihat baris di bawah) |
+| Teknisi submit laporan — task_type **SURVEY/PEMASANGAN** (diputus lewat Customer module) | `Selesai` LANGSUNG, label badge **"Selesai"** — TIDAK ADA badge/teks verifikasi tambahan lagi (sempet ada "Verifikasi: Menunggu" di iterasi sebelumnya, UDAH DICABUT 2026-07-15 karena bikin ambigu — lihat `docs/project_status_label_unifikasi.md`) |
+| FOP approve laporan | `Selesai`, label "Selesai" |
+| FOP reject laporan (kualitas laporan jelek, teknisi disuruh redo — task_type MTN/dst) | `Proses` kembali, `Task.status` balik `in_progress` |
+| **Admin tolak final customer** (gak eligible/belum bayar) di Verif & Pemasangan ATAU Survey queue — task_type SURVEY/PEMASANGAN | TETAP `Selesai`, label badge TETAP **"Selesai"** polos (gak ada teks "Ditolak" di badge Task lagi) — `Task.status` di sini TETAP `selesai` (kerjaan lapangan teknisi bener, yang ditolak keputusan bisnis customer-nya), terminal di sisi Customer module (gak ada jalur reopen), tapi TIDAK bocor jadi variasi label status Task |
+| FOP cancel (dengan `cancel_reason`) | `Cancel`, label "Dibatalkan"/"Cancel" (tergantung sumbernya Task atau FopTask manual) |
 
-**Perubahan:** Status diupdate **otomatis** dari perubahan status `Task` eksekusi yang terkait — sinkronisasi dua arah antara `FopTask` dan `Task`. Status minimal 5 nilai: `proses`, `pending`, `lapor_nanti`, `selesai`, `cancel` — bukan cuma pending/selesai. Detail lihat SOLUSI poin 9.
+**Perubahan:** Status diupdate **otomatis** dari perubahan status `Task` eksekusi yang terkait — sinkronisasi dua arah antara `FopTask` dan `Task`. Status minimal 4 bucket: `proses`, `pending`, `selesai`, `cancel` — granularitas ekstra (Lapor Nanti, Perlu Review, dst) cuma di label, bukan bucket. Detail lihat SOLUSI poin 9.
+
+**Susulan (fix reject-sync gap, 2026-07-14, desain final):** Task (kerjaan lapangan) VS keputusan bisnis (customer diterima/ditolak) itu 2 hal beda, sengaja gak dicampur di 1 bucket status. Sebelumnya Task `selesai`+`fop_review_status=rejected` KESALAHAN ke-treat sama kayak `selesai`+`pending` (dua-duanya `Proses`) — task ditolak nyangkut permanen di antrian aktif. Iterasi PERTAMA nyoba fix ini pakai `Cancel`+exclusion query (udah di-scrap, keliru nyampur konsep Task vs keputusan bisnis). Iterasi KEDUA nambah badge overlay "Verifikasi: Menunggu/Ditolak" (juga udah dicabut, dianggap bikin ambigu). Desain FINAL (2026-07-15): `FopTask` SELALU `Selesai` begitu `Task.status=selesai` (buat task_type SURVEY/PEMASANGAN), dan LABEL yang ditampilin SELALU cuma "Selesai" polos — nasib customer (approved/pending/rejected) cuma kesimpen di `fop_review_status` + `fop_task_status_history` (audit trail), gak pernah nongol jadi variasi teks status Task. Detail lengkap: `docs/project_verifikasi_reject_gap.md` § DESAIN FINAL, `docs/project_status_label_unifikasi.md`.
 
 ---
 
@@ -828,7 +832,29 @@ Selain itu, tombol "Laporan Survey/Pemasangan/Maintenance/Isi Laporan" yang lang
 
 ### Task 7 — Tombol `Pending` Top-Level (Reschedule Penuh) — FITUR BARU, BUKAN REUSE
 
-**Status:** `Done`
+**Status:** `Done` — **desainnya kemudian DIREVISI 2026-07-15, lihat blok ⚠️ di bawah, sebelum baca narasi historis selanjutnya.**
+
+> **⚠️ SUPERSEDED 2026-07-15 (docs/project_status_label_unifikasi.md § DESAIN FINAL):**
+> Keputusan "`TaskStatus::RESCHEDULE` case terpisah dari `PENDING`, `fopPending` SENGAJA
+> gak lepas assignment" yang dirinci di seluruh section ini **UDAH DIBALIK TOTAL**:
+> - `TaskStatus::RESCHEDULE` **DIHAPUS** dari enum — dileburin jadi `pending` biasa.
+> - Perilaku "lepas tim + `rebuildTeamsForDate()` + audit log" yang dulu CUMA milik
+>   `reschedule()` sekarang jadi SATU-SATUNYA perilaku "pending" — `TaskController::pending()`
+>   (`fopPending`, dulu eksplisit TIDAK lepas assignment) SEKARANG JUGA lepas assignment.
+>   Logic-nya ditarik jadi 1 method bersama `TaskController::releaseTeamAndSetPending()`,
+>   dipanggil dari `reschedule()` DAN `pending()`.
+> - `fop_task_status_history.to_status = 'pending_reschedule'` gak ditulis lagi buat
+>   transisi baru (tetep ada di data historis lama) — transisi baru (baik dari teknisi
+>   maupun FOP) sama-sama nulis `pending_fop`.
+> - `TaskStatus::isEditable()` — `PENDING` DIKELUARIN dari daftar editable (task pending
+>   harus di-assign ulang dulu baru bisa diedit).
+> - Alasan: "2 kelakuan beda buat 1 nama status yang keliatan sama di layar" itu jebakan
+>   maintenance — siapa pun baca status "Pending" sekarang PASTI tau tim udah lepas,
+>   gak perlu buka kode buat nebak siapa yang trigger.
+>
+> Narasi di bawah ini (file-list, checklist, AC) dibiarin APA ADANYA sebagai arsip
+> historis desain ASLI Task 7 — udah gak match kode aktual, jangan dipakai referensi
+> implementasi baru.
 
 **Tujuan:** Tombol `Pending` di top-level Detail Task (teknisi-triggered) yang melepas assignment & reschedule task ke hari lain, balik ke antrian Task FOP — sesuai kebutuhan poin 7.
 
@@ -910,6 +936,8 @@ Test suite: `tests/Feature/FopTaskSortingTest.php` 6/6 hijau. Regression check g
 ### Task 9 — Status Realtime (Hapus Dropdown Manual)
 
 **Status:** `Done`
+
+> **⚠️ ADDENDUM 2026-07-20/21 (unifikasi enum + kunci cancel SRV/PSB):** narasi di bawah ini (mapping ke `FopTaskStatus` 4 bucket) ditulis waktu itu — SEKARANG SUDAH BERUBAH. `App\Enums\FopTaskStatus` **dihapus total**, `fop_tasks.status` share vocab persis `App\Enums\TaskStatus` (6 nilai, mirror langsung dari `Task.status`, gak ada mapping bucket). Cancel/Dibatalkan buat task_type SURVEY/PEMASANGAN juga dikunci dari sisi Task/FopTask (harus lewat halaman Customer). Detail akurat & terkini: `docs/fop-task/database-schema.md` § Observer: TaskObserver dan `docs/fop-task/flowchart.md` § 9 & § 12. Sisa isi section ini dipertahankan sebagai catatan historis keputusan sprint, JANGAN dipakai sebagai referensi state kode saat ini.
 
 **Tujuan:** Status `FopTask` full derive dari status `Task` eksekusi (sync 2 arah), dropdown status manual dihapus — sesuai kebutuhan poin 9.
 
@@ -996,7 +1024,7 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 3. [x] Klik "Detail →" di row Riwayat membuka halaman terpisah (`/fop-tasks/history/{id}`) yang menampilkan laporan Survey/Pemasangan/Maintenance + histori status+alasan + SLA achievement per siklus dalam 1 tampilan gabungan. (`FopTaskHistoryDetailPageTest`)
 
 **Deviasi/gap ditemukan di luar scope Task 10 (BUKAN dikerjakan, cuma dicatat sebagai blocker buat task lain):**
-- `TaskController::reschedule()` men-detach seluruh teknisi & set status `RESCHEDULE`, tapi `TaskService::update()` (dipanggil saat FOP nge-assign ulang teknisi lewat `FopTaskController::update()`) TIDAK PERNAH mengembalikan status ke `TERJADWAL` — cuma `TaskService::create()` yang set status itu. Task yang di-reschedule penuh kemungkinan STUCK di status `RESCHEDULE` selamanya walau udah di-assign ulang teknisi baru (teknisi gak akan bisa klik "Mulai" lagi karena `start()` mensyaratkan status `TERJADWAL`). Ini bug pre-existing, di luar scope Task 10 — task_reports sengaja gak "memperbaiki" ini, cuma nyatat cycle apa adanya sesuai state Task yang sebenarnya terjadi.
+- `TaskController::reschedule()`/`pending()` (lewat `releaseTeamAndSetPending()`, 2026-07-15) men-detach seluruh teknisi & set status `Pending`, tapi `TaskService::update()` (dipanggil saat FOP nge-assign ulang teknisi lewat `FopTaskController::update()`) TIDAK PERNAH mengembalikan status ke `TERJADWAL` — cuma `TaskService::create()` yang set status itu. Task yang di-pending-in kemungkinan STUCK di status `Pending` selamanya walau udah di-assign ulang teknisi baru (teknisi gak akan bisa klik "Mulai" lagi karena `start()` mensyaratkan status `TERJADWAL`, dan sekarang `Pending` juga gak `isEditable()` — makin gak ada jalur keluar manual). Ini bug pre-existing (dulu cuma nyangkut `RESCHEDULE`, sekarang blast radius-nya LEBIH LEBAR karena `fopPending` JUGA kena efek yang sama sejak disatuin) — **di luar scope perubahan status-label-unifikasi ini, TAPI layak diprioritaskan buat dicek/di-fix terpisah** karena sekarang mempengaruhi 2 jalur trigger, bukan cuma 1.
 
 ---
 
@@ -1036,36 +1064,42 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 
 ---
 
-### Task 12 — Cancel Survey/Pemasangan dengan Alasan
+### Task 12 — Cancel dengan Alasan
 
-**Status:** `To Do`
+**Status:** `PARTIAL` — bagian **SRV/PSB: `OBSOLETE`** (dikunci total, JANGAN dikerjakan seperti judul asli). Bagian **task_type LAIN (MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ): `To Do`**, masih relevan, belum dikerjakan.
 
-**Tujuan:** FOP/role berwenang bisa cancel Task dengan alasan wajib (data ganda, rumah direnovasi, salah input POP, dll) — sesuai kebutuhan poin 12.
+> **⚠️⚠️ OBSOLETE (2026-07-21) — premis Task 12 ini UDAH DIBALIK TOTAL, jangan dikerjakan.** Judul & isi section ini asumsinya "Cancel Survey/Pemasangan tetap boleh dari Task FOP, tinggal ditambahin alasan wajib". Keputusan final SEKARANG: **Cancel Task/FopTask kategori Survey & PSB DIKUNCI TOTAL**, gak boleh dari sisi Task/FopTask sama sekali (bukan cuma "kasih alasan wajib") — satu-satunya jalur sah buat batalin Survey/PSB adalah lewat halaman Customer (`CustomerSurveyController::cancel()` / `CustomerInstallationController::cancel()`, yang UDAH mewajibkan `reason` dari awal + sekalian nge-set `Customer.status=rejected`). `TaskPolicy::cancel()` block task_type SURVEY/PEMASANGAN buat SEMUA role (termasuk owner), `FopTaskController::update()` nolak (422) kalau target status `dibatalkan` + category SURVEY/PSB. Task_type LAIN (MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ) TETAP bisa di-cancel langsung dari Task/FopTask — kalau mau nambahin `cancel_reason` wajib buat kategori-kategori itu, itu scope yang masih relevan dari Task 12, tapi JANGAN buka lagi tombol Cancel buat Survey/PSB di `fop_tasks/index.blade.php`/`tasks/show.blade.php`. Detail lengkap: `docs/fop-task/flowchart.md` § 12, `docs/customer-lifecycle/business-logic.md` § 4/§ 6.
 
-**Kondisi kode saat ini:** status `Cancel` + `cancelled_at` sudah ada di `FopTaskController::store`/`update`. Belum ada kolom alasan dedicated.
+> ⚠️ **Line number di section ini udah DRIFT** (per 2026-07-15, akumulasi dari fix reject-sync-gap + status-label-unifikasi + Task 9/10 di sesi-sesi sebelumnya) — jangan percaya baris literal di bawah, cross-check dulu ke kode aktual sebelum eksekusi (sesuai "Aturan umum" di `sprint-prompts.md`: kalau beda, STOP & laporkan). Logic/konsep Task 12 sendiri TIDAK kena dampak substansi dari perubahan Reschedule→Pending — cuma nomor barisnya yang basi.
+
+**Tujuan (scope asli):** FOP/role berwenang bisa cancel Task dengan alasan wajib (data ganda, rumah direnovasi, salah input POP, dll) — sesuai kebutuhan poin 12. **Scope SEKARANG (2026-07-21):** cuma berlaku buat task_type MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ — SURVEY/PEMASANGAN **DIKECUALIKAN TOTAL**, cancel 2 kategori itu udah gak lewat jalur ini sama sekali (lihat addendum OBSOLETE di atas + `docs/fop-task/flowchart.md` § 12).
+
+**Kondisi kode saat ini:** status `dibatalkan` + `cancelled_at` sudah ada di `FopTaskController::store`/`update`. Belum ada kolom alasan dedicated. `TaskPolicy::cancel()` + `FopTaskController::update()` UDAH block cancel buat category SURVEY/PSB (2026-07-21) — guard ini di LUAR scope Task 12, dikerjain terpisah, jangan disentuh/dilonggarkan pas ngerjain sisa Task 12 di bawah.
 
 **File yang dibuat/dirubah:**
 | File | Aksi |
 |---|---|
 | `database/migrations/2026_07_xx_add_cancel_reason_to_fop_tasks_table.php` | **Baru** — kolom `cancel_reason` (text, nullable). |
-| `app/Http/Controllers/FopTaskController.php` | **Rubah** — validasi `required_if:status,Cancel` untuk `cancel_reason`; sync cancel ke `Task` eksekusi + notifikasi teknisi kalau task sedang `in_progress`. |
+| `app/Http/Controllers/FopTaskController.php` | **Rubah** — validasi `required_if:status,dibatalkan` untuk `cancel_reason` (cuma berlaku efektif buat category NON-SRV/PSB, yang SRV/PSB udah ke-block duluan sama guard existing); sync cancel ke `Task` eksekusi + notifikasi teknisi kalau task sedang `in_progress`. |
 | `config/rbac.php` | **Rubah** — tambah permission baru `fop_tasks.cancel` (ikuti konvensi underscore existing: `fop_tasks.view/create/update/delete/update_sensitive`, bukan `fop-task.cancel` hyphen). |
-| `resources/views/fop_tasks/index.blade.php` | **Rubah** — modal cancel dengan textarea alasan wajib. |
+| `resources/views/fop_tasks/index.blade.php` | **Rubah** — modal cancel dengan textarea alasan wajib (tombol ini SUDAH gak muncul buat category Survey/PSB sejak 2026-07-21, gak perlu disentuh ulang). |
 | `resources/views/fop_tasks/history.blade.php` | **Rubah** — tampilkan `cancel_reason` sejajar `pending_reason`. |
-| `tests/Feature/FopTaskCancelTest.php` | **Baru** |
+| `tests/Feature/FopTaskCancelTest.php` | **Baru** — cakupan MTN/DEAC/dst SAJA; test buat SRV/PSB udah ada di `tests/Feature/FopTaskStatusSyncTest.php`/`TaskPolicy` test terpisah (guard block, bukan alasan wajib). |
 
 **Checklist:**
-- [ ] `cancel_reason` wajib diisi sebelum submit cancel.
+- [ ] `cancel_reason` wajib diisi sebelum submit cancel — **berlaku task_type NON-SRV/PSB aja**.
 - [ ] Role yang boleh cancel di-gate lewat permission `fop_tasks.cancel` baru di `config/rbac.php`, bukan hardcode role FOP saja.
 - [ ] Cancel task yang `in_progress` ikut cancel/sync ke `Task` eksekusi + notif ke teknisi yang lagi jalan.
 - [ ] Cancel trigger `rebuildTeamsForDate()` — kalau task itu satu-satunya jembatan penghubung 2 teknisi, team pecah otomatis (lihat Task 1 checklist edge case).
 - [ ] Riwayat tampilkan `cancel_reason`.
+- [x] ~~Cancel Survey/Pemasangan (alasan wajib dari halaman Task)~~ — **OBSOLETE, jangan dikerjakan.** Diganti: cancel SRV/PSB dikunci total dari Task/FopTask, WAJIB lewat halaman Customer (`CustomerSurveyController::cancel()`/`CustomerInstallationController::cancel()`, alasan udah wajib dari situ). Selesai dikerjakan 2026-07-21.
 
 **Acceptance Criteria:**
-1. Cancel tanpa isi alasan ditolak (validasi 422).
-2. Role selain FOP yang diberi permission `fop_tasks.cancel` juga bisa cancel.
+1. Cancel tanpa isi alasan ditolak (validasi 422) — **task_type NON-SRV/PSB**.
+2. Role selain FOP yang diberi permission `fop_tasks.cancel` juga bisa cancel — **task_type NON-SRV/PSB**.
 3. Cancel task yang sedang dikerjakan teknisi memicu notifikasi ke teknisi tsb, task eksekusi ikut ke-cancel.
 4. Cancel yang memutus jembatan team memicu rebuild — team lama pecah jadi sesuai roster baru.
+5. ~~Cancel Survey/Pemasangan bisa diisi alasan dari Task~~ — **N/A, digantikan AC baru:** request cancel Survey/Pemasangan dari halaman Task/tabel FopTask (langsung ATAU via API, permission apapun termasuk owner) **selalu ditolak** — satu-satunya jalur sah tetap halaman Customer. **Status: DONE (2026-07-21).**
 
 ---
 
@@ -1097,6 +1131,8 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 ### Task 14 — Customer ID Wajib per Tipe Task + Lock Survey/Pemasangan + Auto-fill POP/Area
 
 **Status:** `To Do`
+
+> ⚠️ **Line number di section ini udah DRIFT CUKUP JAUH** (per 2026-07-15) — dicek langsung: `store()` Rule::in sekarang baris **179** (dulu ditulis 155), `update()` Rule::enum sekarang baris **272** (dulu 247), `canEditFopTaskType` sekarang baris **120** & **842** (dulu 114/573). Jangan pakai nomor baris di narasi/file-list di bawah sebagai acuan — cross-check ulang ke kode aktual dulu (sesuai "Aturan umum" di `sprint-prompts.md`). Logic/konsep Task 14 sendiri (lock Survey/Pemasangan di edit, auto-fill POP/Area) TIDAK kena dampak substansi dari perubahan Reschedule→Pending — cuma nomor barisnya yang basi, akumulasi dari beberapa sesi perubahan sebelumnya (fix reject-sync-gap, status-label-unifikasi, dst).
 
 **Tujuan:** Modal Tambah/Edit Task FOP: Survey & Pemasangan gak bisa ditambah/diedit manual (murni dari alur registrasi); Deac/Relokasi/C-REQ wajib `customer_id` dengan POP/Area auto-fill; O-REQ/INFR REQ boleh request POP/Area manual — sesuai kebutuhan poin 14 & 15 (konfirmasi).
 

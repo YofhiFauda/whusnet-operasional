@@ -18,7 +18,7 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 ### Lihat & filter tiket aktif
 
 1. Buka `/fop-tasks` → sistem auto-sync dulu (buat tiket Survey/PSB baru dari pelanggan yang belum ada tiketnya, recalculate prioritas semua tiket aktif).
-2. Tabel nampilin tiket status Proses/Pending, urut: **tiket dengan `client_request_date` di masa depan (besok+) selalu di bawah** (section "Upcoming", walau prioritasnya Urgent — lihat [flowchart.md § 8](flowchart.md#8-antrian-sorting-berdasarkan-client_request_date-task-8)), baru di antara sisanya urut prioritas (Urgent→Low) lalu tanggal. Begitu `client_request_date` udah sama dengan hari ini (gak perlu nunggu refresh manual/cron), tiketnya otomatis "naik" ikut sorting prioritas normal di request berikutnya.
+2. Tabel nampilin tiket status aktif (draft/terjadwal/in_progress/pending — bukan selesai/dibatalkan), urut: **tiket dengan `client_request_date` di masa depan (besok+) selalu di bawah** (section "Upcoming", walau prioritasnya Urgent — lihat [flowchart.md § 8](flowchart.md#8-antrian-sorting-berdasarkan-client_request_date-task-8)), baru di antara sisanya urut prioritas (Urgent→Low) lalu tanggal. Begitu `client_request_date` udah sama dengan hari ini (gak perlu nunggu refresh manual/cron), tiketnya otomatis "naik" ikut sorting prioritas normal di request berikutnya.
 3. Kolom "Tanggal" nampilin badge kalau tiket punya `client_request_date`: **"JADWAL HARI INI"** (merah, kalau tanggalnya hari ini/udah lewat) atau **"Terjadwal — {tanggal}"** (abu-abu, kalau masih di masa depan).
 4. Filter tersedia: search (nomor/tugas/issue), kategori, status, prioritas, desa, team.
 
@@ -27,7 +27,7 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 1. Klik "Tambah Task" → modal muncul.
 2. Pilih kategori (Survey & PSB **gak muncul** di dropdown — itu auto-sync only).
 3. Isi tanggal, tugas, desa, POP, pelanggan (opsional), issue, catatan. **Gak ada lagi field pilih Team** — dropdown `team_id` manual udah dihapus dari modal (lihat bagian 3, Team sekarang otomatis).
-4. Pilih status: **Proses** (default) atau **Pending** (wajib isi alasan + tanggal request client) — cuma 2 opsi ini, buat klasifikasi awal tiket BARU (belum ada `Task` eksekusi buat di-derive statusnya). Opsi ini **cuma muncul di modal Tambah**, bukan modal Edit (lihat "Status Realtime" di bawah — sejak Task 9, status tiket existing gak bisa diubah manual lagi lewat modal).
+4. Pilih status: **Terjadwal** (default) atau **Pending** (wajib isi alasan + tanggal request client) — cuma 2 opsi ini, buat klasifikasi awal tiket BARU (belum ada `Task` eksekusi buat di-derive statusnya). Opsi ini **cuma muncul di modal Tambah**, bukan modal Edit (lihat "Status Realtime" di bawah — sejak Task 9, status tiket existing gak bisa diubah manual lagi lewat modal).
 5. Pilih prioritas — **cuma muncul kalau user punya `fop_tasks.update_sensitive`**, selain itu default Low/otomatis.
 6. Pilih 1+ teknisi (wajib) → submit.
 7. Sistem: simpan `FopTask`, `technicians()->sync()`, auto-buat `Task` eksekusi teknisi (title polos dulu), link ke `fop_task.task_id`, lalu **auto-rebuild Team** untuk tanggal tiket itu (lihat bagian 3) — title Task eksekusi ke-update lagi begitu Team-nya kebentuk. Begitu `Task` eksekusi ada, statusnya langsung ikut aturan "Status Realtime" (lihat di bawah).
@@ -49,10 +49,11 @@ Aktor utama: **FOP** (koordinator lapangan, permission `fop_tasks.*`). Aktor sek
 
 **Status tiket gak lagi FOP yang kontrol manual** (kecuali Cancel) — dia ngikutin status `Task` eksekusi teknisi terkait secara otomatis, lewat `TaskObserver`. Detail algoritma & tabel mapping lengkap di [flowchart.md § 9](flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9).
 
-1. Kolom Status di tabel `/fop-tasks` sekarang badge read-only (bukan dropdown), teksnya granular sesuai kondisi riil teknisi di lapangan — contoh: **"Sedang Dikerjakan"** (teknisi lagi in-progress), **"Perlu Review"** (laporan masuk, nunggu FOP approve/reject), **"Lapor Nanti"** (kerja selesai, laporan ditunda — Task 6), **"Pending"** (reschedule dari teknisi — Task 7, atau di-pending manual FOP lewat `fopPending`).
-2. Kalau tiket lagi **"Perlu Review"** → muncul link kecil **"Review Laporan →"** di bawah badge, ngarahin FOP ke halaman Detail Task (`tasks.show`) tempat tombol Approve/Reject laporan yang sebenarnya berada (gak duplikasi di sini).
-3. FOP tetap bisa **Cancel** tiket kapan aja (selama belum `Selesai`/`Cancel`) lewat tombol kecil **"Cancel"** di bawah badge status — satu-satunya override manual yang masih ada. Begitu di-Cancel, sync otomatis dari `Task` eksekusi berhenti buat tiket itu (gak ke-overwrite lagi walau `Task` terkait berubah status belakangan).
-4. Tiap transisi status (baik yang derived otomatis maupun Cancel manual) tercatat di tabel `fop_task_status_history` — belum ada UI buat nampilin tabel histori ini secara langsung di `/fop-tasks` (itu scope Task 10, Riwayat Lengkap), tapi datanya udah kesimpan lengkap dari sekarang.
+1. Kolom Status di tabel `/fop-tasks` sekarang badge read-only (bukan dropdown), teksnya SERAGAM di semua halaman (`/fop-tasks`, `/fop-tasks/history`, `/tasks-saya` — 1 sumber `TaskStatus::displayLabel()`, lihat `docs/project_status_label_unifikasi.md`): **"Draft"**, **"Terjadwal"**, **"Sedang Dikerjakan"**, **"Pending"**, **"Lapor Nanti"**, **"Selesai"**, **"Dibatalkan"**. Tiket standalone (belum ada teknisi di-assign, `status=draft`) dikasih label khusus **"Belum Ditugaskan"** biar gak nyesatin. Laporan yang lagi nunggu FOP review TETAP tampil **"Selesai"** polos (unifikasi 2026-07-20 — gak ada lagi demosi/label beda buat kondisi ini, nuansa "masih ditinjau" cuma ada di histori granular `selesai_menunggu_verifikasi`, bukan badge utama).
+2. FOP tetap bisa **Cancel** tiket kapan aja (selama belum `Selesai`/`Dibatalkan`) lewat tombol kecil **"Cancel"** di bawah badge status — satu-satunya override manual yang masih ada. Begitu di-Cancel, sync otomatis dari `Task` eksekusi berhenti buat tiket itu (gak ke-overwrite lagi walau `Task` terkait berubah status belakangan). **Pengecualian (2026-07-21):** tombol ini TIDAK MUNCUL buat kategori **Survey** & **PSB** — batalin 2 kategori itu WAJIB lewat halaman Customer (tab Survey/Pemasangan, atau tombol "Batalkan" di `/surveys/queue`), biar `Customer.status` ikut ke-set `rejected` (masuk List Pelanggan Gagal). Lihat [flowchart.md § 12](flowchart.md#12-canceldibatalkan-srv--psb-terkunci-dari-taskfoptask-2026-07-21).
+4. **"Pending" sekarang SATU logic** (2026-07-15) — teknisi klik tombol Pending top-level ATAU FOP klik "Set Pending" manual, dua-duanya SAMA PERSIS: tim dilepas, jadwal di-rebuild, tiket balik ke antrian nunggu di-assign ulang. `TaskStatus::RESCHEDULE` (enum terpisah, dulu cuma dipakai jalur teknisi) UDAH DIHAPUS. Tiket berstatus Pending gak bisa diedit langsung — harus di-assign ulang teknisi dulu.
+5. Tiap transisi status (baik yang derived otomatis maupun Cancel manual) tercatat di tabel `fop_task_status_history` — ditampilin lengkap di halaman Detail Riwayat (Task 10, lihat bagian 4 di bawah).
+6. **Tiket Survey/Pemasangan yang teknisinya udah selesai kerja** (`Task.status=selesai`) **LANGSUNG jadi "Selesai" dan pindah ke Riwayat**, badge TETAP "Selesai" POLOS — gak peduli admin udah/belum putus keputusan customer-nya, dan GAK ADA badge/teks verifikasi tambahan di UI Task FOP (draft sebelumnya sempet nambah badge kedua "Verifikasi: Menunggu/Diterima/Ditolak" — UDAH DICABUT 2026-07-15, dianggap bikin ambigu). Nasib keputusan customer cuma bisa dilihat di halaman Verif & Pemasangan (Customer module), bukan di Task FOP. Lihat bagian 4.
 
 ## 3. Team Harian — Otomatis (Task 1), Bukan Bikin Manual Lagi
 
@@ -84,9 +85,12 @@ Dashboard `/fop` nampilin ringkasan beban kerja per anggota Team (jumlah tiket) 
 
 ## 4. FOP lihat riwayat (`/fop-tasks/history`)
 
-1. Buka `/fop-tasks/history` — tabel tiket status Selesai/Cancel, urut update terbaru.
-2. Filter sama kayak halaman aktif (search/kategori/status/prioritas/desa/team).
-3. Dipakai buat audit & laporan kinerja, bukan buat aksi lanjutan (read-only report).
+1. Buka `/fop-tasks/history` — tabel tiket urut update terbaru. Kolom **Status** nampilin label seragam (`TaskStatus::displayLabel()`, sama kayak `/fop-tasks` & `/tasks-saya`):
+   - **Selesai** (badge hijau) — kerjaan lapangan teknisi kelar (buat Survey/Pemasangan, ini muncul begitu teknisi submit laporan, GAK NUNGGU admin approve/reject — lihat prinsip di bagian 2 poin 6). Badge ini TETAP "Selesai" polos walau customer-nya belakangan ditolak admin — **gak ada badge/kolom Verifikasi terpisah lagi** (sempet ada di draft sebelumnya, DICABUT 2026-07-15 karena bikin ambigu).
+   - **Dibatalkan/Cancel** (badge merah) — dibatalkan (baik `Task.status=dibatalkan` maupun `FopTask` di-Cancel manual FOP).
+2. Filter sama kayak halaman aktif (search/kategori/prioritas/desa/team) + dropdown **Status** (Selesai/Cancel). Nasib keputusan customer (approved/pending/rejected) TETAP kesimpen (`fop_review_status`, `fop_task_status_history`) buat audit, tapi cek/putusinnya lewat halaman Verif & Pemasangan (Customer module) — bukan lewat filter di sini.
+3. Klik tiket manapun → buka **Detail Riwayat** (`/fop-tasks/history/{id}`, Task 10): Info Task, Durasi & SLA Pengerjaan (dual-cycle: mulai/pending/resume/selesai, status SLA on-time/over), Laporan (baca dari Survey/Instalasi/Maintenance sesuai kategori), dan **Histori Status** — log lengkap tiap perubahan status + siapa + kapan, audit trail utama.
+4. Dipakai buat audit & laporan kinerja, bukan buat aksi lanjutan (read-only report) — keputusan approve/reject/revisi tetap di halaman Verif & Pemasangan (Customer module), bukan di sini.
 
 ## Guard / Permission per Aksi
 

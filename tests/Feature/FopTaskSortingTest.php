@@ -64,7 +64,7 @@ class FopTaskSortingTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Issue ' . $seq,
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'low',
         ], $overrides));
     }

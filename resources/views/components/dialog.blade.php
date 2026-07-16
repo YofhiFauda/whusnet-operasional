@@ -116,7 +116,12 @@
                     }
                     
                     if (typeof btn.onClick === 'function') {
-                        btnEl.addEventListener('click', (e) => btn.onClick(e, this));
+                        btnEl.addEventListener('click', (e) => {
+                            if (btnEl.disabled) return;
+                            btnEl.disabled = true;
+                            btnEl.classList.add('opacity-50', 'cursor-not-allowed');
+                            btn.onClick(e, this);
+                        });
                     } else if (!btn.type || btn.type === 'secondary') {
                         // default close behavior for secondary if no onClick
                         btnEl.addEventListener('click', () => this.close());

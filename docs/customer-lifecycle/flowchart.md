@@ -74,6 +74,28 @@ transition → waiting_acc
 broadcast SurveyCompleted + notifikasi Telegram
 ```
 
+### 2b. Batalkan Survey — sebelum/selagi dikerjakan (baru 2026-07-21)
+
+```
+FOP/Admin klik "Batalkan" (tab Survey Customer, ATAU tombol baru di /surveys/queue)
+        │
+        ▼
+   status not in [waiting_survey, survey_in_progress]? ──ya──▶ TOLAK (422)
+        │ tidak
+        ▼
+Isi alasan (wajib) → POST /customers/{c}/survey/cancel
+        │
+        ▼
+Cari Task Survey terkait (belum selesai/dibatalkan)
+        │
+        ▼
+TaskService::cancel() → Task.status=dibatalkan (sync ke FopTask via TaskObserver)
+CustomerSurvey.survey_status = failed
+transition → rejected (masuk List Pelanggan Gagal)
+```
+
+**Catatan:** cancel dari halaman Task/tabel FopTask kategori Survey SENGAJA di-block (`TaskPolicy::cancel()` + `FopTaskController::update()` guard, lihat `docs/fop-task/flowchart.md` § 12) — jalur di atas SATU-SATUNYA cara sah batalin Survey, biar `Customer.status` konsisten ikut ke-update.
+
 ## 3. Alur Verifikasi Survey → Proses ke Tim Pemasangan
 
 ```
@@ -132,7 +154,32 @@ Teknisi isi & submit laporan (POST /customers/{c}/installation)
         └─ progress (belum completed/failed) → simpan data, status tetap
 ```
 
+### 4b. Batalkan Pemasangan — sebelum/selagi dikerjakan (baru 2026-07-21)
+
+```
+Admin/FOP klik "Batalkan Pemasangan" (tab Pemasangan Customer)
+        │
+        ▼
+   status not in [waiting_installation, installation_in_progress,
+                  revision_installation]? ──ya──▶ TOLAK (422)
+        │ tidak
+        ▼
+Isi alasan (wajib) → POST /customers/{c}/installation/cancel
+        │
+        ▼
+Cari Task Pemasangan terkait (belum selesai/dibatalkan)
+        │
+        ▼
+TaskService::cancel() → Task.status=dibatalkan (sync ke FopTask via TaskObserver)
+CustomerInstallation.installation_status = failed
+transition → rejected (masuk List Pelanggan Gagal)
+```
+
+Permission baru: `customers.detail.installation.reject`. Sama kayak Survey — cancel dari Task/FopTask kategori PSB di-block, jalur ini satu-satunya yang sah.
+
 ## 5. Alur Verifikasi Admin (Aktivasi / Reject / Revisi)
+
+**Update 2026-07-14 (fix reject-sync gap):** tombol **"Tolak"** sekarang ADA di halaman ini juga (`verifications/admin.blade.php`) — sebelumnya reject cuma bisa dipicu dari halaman queue tahap survey (`verifications/queue.blade.php`). `reject()` sekarang stage-aware: infer tahap dari `customer->status` SEBELUM transition, target Task yang bener (Survey atau Pemasangan). Detail: `docs/project_verifikasi_reject_gap.md`.
 
 ```
 FOP/Admin buka /verifications/{c}/admin (status: installed atau verification_admin)
@@ -140,18 +187,29 @@ FOP/Admin buka /verifications/{c}/admin (status: installed atau verification_adm
         ├──────────────┬──────────────────┬──────────────────┐
         ▼              ▼                  ▼                  ▼
    Approve         Reject             Revisi              (batal, tetap
-   (finalVerify)   (reject)           (revisi)             di halaman)
-        │              │                  │
-        ▼              ▼                  ▼
-  Buat Invoice AWAL   transition       CustomerInstallation
-  (input manual       → rejected      .status = in_progress
-   subtotal/fee)       (FINAL)        + prepend catatan revisi
-        │              │              transition → revision_installation
-        ▼              ▼                  │
-  Generate CID      auto-reject           ▼
-  (Pop::generate     Task Survey      auto-revert Task Pemasangan
-   ComplexCid)        pending          → in_progress, fop_review_status=rejected
-        │
+   (finalVerify)   (reject, BARU      (revisi)             di halaman)
+        │           di halaman ini)       │
+        ▼              │                  ▼
+  Buat Invoice AWAL     ▼              CustomerInstallation
+  (input manual     transition        .status = in_progress
+   subtotal/fee)     → rejected       + prepend catatan revisi
+        │            (FINAL, gak      transition → revision_installation
+        ▼             ada reopen)         │
+  Generate CID           │                ▼
+  (Pop::generate         ▼            auto-revert Task Pemasangan
+   ComplexCid)      auto-reject       → in_progress, fop_review_status=rejected
+        │           Task PEMASANGAN
+        │           (bukan Survey lagi —
+        │            stage-aware sejak fix)
+        │           fop_review_status=rejected,
+        │           Task.status TETAP selesai
+        │                │
+        │                ▼
+        │           masuk list Pelanggan Gagal
+        │           + FopTask TETAP → Selesai (kerjaan teknisi sukses,
+        │             independen dari keputusan bisnis) — badge KEDUA
+        │             "Verifikasi: Ditolak" di Riwayat FOP (overlay,
+        │             bukan ganti bucket status utama)
         ▼
   customer.status=active, customer_status=aktif,
   data_completeness_status=siap_billing
@@ -161,6 +219,8 @@ FOP/Admin buka /verifications/{c}/admin (status: installed atau verification_adm
   auto-approve Task Pemasangan pending
   notifikasi Telegram "Pelanggan Aktif"
 ```
+
+**Reject di tahap Survey** (dari `verifications/queue.blade.php`, tombol Batalkan/Gagal — behavior lama, gak berubah): sama persis alur di atas, tapi target Task **Survey** (bukan Pemasangan), karena `customer->status` masih `waiting_acc|survey_in_progress|surveyed|waiting_installation` pas reject dipanggil.
 
 ## 6. Auto-Sync Task Lintas Layer
 

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
@@ -19,6 +18,7 @@ class FopTaskStatusSyncTest extends TestCase
     use RefreshDatabase;
 
     protected User $techUser;
+    protected User $fopUser;
     protected Pop $pop;
 
     protected function setUp(): void
@@ -52,6 +52,9 @@ class FopTaskStatusSyncTest extends TestCase
             'role_id' => $techRole->id,
             'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
         ]);
+
+        $fopRole = Role::where('code', 'fop')->first();
+        $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
     }
 
     protected function makeLinkedTask(string $taskNumber, string $status = 'terjadwal'): array
@@ -74,7 +77,7 @@ class FopTaskStatusSyncTest extends TestCase
             'category' => 'MTN',
             'tugas' => 'Perbaikan',
             'issue' => 'FO CUT',
-            'status' => 'Proses',
+            'status' => $status,
             'priority' => 'High',
             'task_id' => $task->id,
         ]);
@@ -82,32 +85,19 @@ class FopTaskStatusSyncTest extends TestCase
         return [$task, $fopTask];
     }
 
-    public function test_task_in_progress_syncs_fop_task_to_proses_dikerjakan_label(): void
+    public function test_task_in_progress_syncs_fop_task_to_in_progress(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9201');
 
         $task->update(['status' => TaskStatus::IN_PROGRESS]);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PROSES->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::IN_PROGRESS->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertNotNull($history);
-        $this->assertEquals('proses_dikerjakan', $history->to_status);
+        $this->assertEquals('in_progress', $history->to_status);
         $this->assertEquals('Sedang Dikerjakan', $history->label());
-    }
-
-    public function test_task_reschedule_syncs_fop_task_to_pending_with_reschedule_label(): void
-    {
-        [$task, $fopTask] = $this->makeLinkedTask('TASK-9202', 'in_progress');
-
-        $task->update(['status' => TaskStatus::RESCHEDULE, 'pending_reason' => 'Infra belum siap']);
-
-        $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
-
-        $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
-        $this->assertEquals('pending_reschedule', $history->to_status);
     }
 
     public function test_task_pending_with_report_deferred_syncs_lapor_nanti_label(): void
@@ -121,7 +111,7 @@ class FopTaskStatusSyncTest extends TestCase
         ]);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertEquals('lapor_nanti', $history->to_status);
@@ -138,24 +128,27 @@ class FopTaskStatusSyncTest extends TestCase
         ]);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PENDING->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertEquals('pending_fop', $history->to_status);
     }
 
-    public function test_task_selesai_with_pending_review_syncs_proses_review_label(): void
+    public function test_task_selesai_with_pending_review_syncs_selesai_menunggu_verifikasi_label(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9205', 'in_progress');
 
         $task->update(['status' => TaskStatus::SELESAI, 'fop_review_status' => 'pending', 'completed_at' => now()]);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::PROSES->value, $fopTask->status->value);
+        // FopTask.status sekarang mirror Task.status apa adanya — laporan yang
+        // masih ditinjau TETAP status 'selesai' (bukan didemosikan balik ke
+        // in_progress), nuansa "perlu review" cuma di label histori/badge.
+        $this->assertEquals(TaskStatus::SELESAI->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
-        $this->assertEquals('proses_review', $history->to_status);
-        $this->assertEquals('Perlu Review', $history->label());
+        $this->assertEquals('selesai_menunggu_verifikasi', $history->to_status);
+        $this->assertEquals('Selesai — Menunggu Verifikasi', $history->label());
     }
 
     public function test_task_approved_syncs_fop_task_to_selesai(): void
@@ -167,20 +160,20 @@ class FopTaskStatusSyncTest extends TestCase
         $task->update(['fop_review_status' => 'approved']);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::SELESAI->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::SELESAI->value, $fopTask->status->value);
 
         $history = FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->latest('changed_at')->first();
         $this->assertEquals('selesai', $history->to_status);
     }
 
-    public function test_task_dibatalkan_syncs_fop_task_to_cancel(): void
+    public function test_task_dibatalkan_syncs_fop_task_to_dibatalkan(): void
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9207', 'terjadwal');
 
         $task->update(['status' => TaskStatus::DIBATALKAN, 'cancelled_at' => now(), 'cancel_reason' => 'Data ganda']);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::CANCEL->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::DIBATALKAN->value, $fopTask->status->value);
     }
 
     public function test_no_history_written_when_task_has_no_linked_fop_task(): void
@@ -205,13 +198,13 @@ class FopTaskStatusSyncTest extends TestCase
     {
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9209', 'in_progress');
 
-        $fopTask->update(['status' => FopTaskStatus::CANCEL]);
+        $fopTask->update(['status' => TaskStatus::DIBATALKAN]);
         FopTaskStatusHistory::query()->delete();
 
         $task->update(['status' => TaskStatus::SELESAI, 'fop_review_status' => 'pending', 'completed_at' => now()]);
 
         $fopTask->refresh();
-        $this->assertEquals(FopTaskStatus::CANCEL->value, $fopTask->status->value);
+        $this->assertEquals(TaskStatus::DIBATALKAN->value, $fopTask->status->value);
         $this->assertEquals(0, FopTaskStatusHistory::where('fop_task_id', $fopTask->id)->count());
     }
 
@@ -222,5 +215,36 @@ class FopTaskStatusSyncTest extends TestCase
         $task->update(['title' => 'Judul Baru Tanpa Ganti Status']);
 
         $this->assertEquals(0, FopTaskStatusHistory::count());
+    }
+
+    public function test_cancelling_fop_task_also_cancels_linked_task(): void
+    {
+        [$task, $fopTask] = $this->makeLinkedTask('TASK-9211', 'in_progress');
+
+        $this->actingAs($this->fopUser)
+            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan'])
+            ->assertOk();
+
+        $task->refresh();
+        $this->assertEquals(TaskStatus::DIBATALKAN->value, $task->status->value);
+    }
+
+    public function test_cancelling_fop_task_without_linked_task_does_not_error(): void
+    {
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-9212',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan',
+            'issue' => 'FO CUT',
+            'status' => 'draft',
+            'priority' => 'High',
+        ]);
+
+        $this->actingAs($this->fopUser)
+            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan'])
+            ->assertOk();
+
+        $this->assertEquals(TaskStatus::DIBATALKAN->value, $fopTask->fresh()->status->value);
     }
 }

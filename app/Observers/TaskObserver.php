@@ -2,8 +2,8 @@
 
 namespace App\Observers;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\FopTask;
 use App\Models\FopTaskStatusHistory;
 use App\Models\Task;
@@ -12,13 +12,15 @@ use App\Models\TaskReport;
 class TaskObserver
 {
     /**
-     * Sync status `Task` eksekusi teknisi ke `FopTask` (Task 9, kebutuhan poin 9).
-     * `fop_tasks.status` sengaja TETAP dalam 4 nilai enum existing (Proses/Pending/
-     * Selesai/Cancel) — bedanya "Pending (reschedule)" vs "Lapor Nanti" vs "Pending
-     * (FOP)" cuma granular di `fop_task_status_history.to_status` (kolom string
-     * bebas), BUKAN nilai baru di `FopTaskStatus` enum. Nambah case baru di enum itu
-     * akan mecahin banyak `whereIn('status', ['Proses', 'Pending'])` yang tersebar
-     * di codebase (rebuildTeamsForDate, index(), dst) — di luar scope Task 9.
+     * Sync status `Task` eksekusi teknisi ke `FopTask` (Task 9, direvisi
+     * 2026-07-20 unifikasi enum — `FopTaskStatus` dihapus, `fop_tasks.status`
+     * sekarang share vocab persis sama `TaskStatus`, jadi sync-nya CUMA copy
+     * langsung, gak ada mapping bucket lagi). Nuansa granular ("Pending
+     * (reschedule)" vs "Lapor Nanti" vs "Pending (FOP)", "Selesai" vs "Selesai
+     * (perlu review)") tetap disimpan di `fop_task_status_history.to_status`
+     * (kolom string bebas) sebagai label histori/badge overlay — BUKAN
+     * mengubah nilai `status` utama, biar dashboard 6-kolom (docs/
+     * project_status_label_unifikasi.md) tetap 1:1 sama lifecycle Task asli.
      */
     public function updated(Task $task): void
     {
@@ -37,17 +39,13 @@ class TaskObserver
         // FOP yang udah manual Cancel-kan tiket (Task 12, jalur eksplisit yang
         // sengaja tetap manual) gak boleh ke-overwrite diam-diam oleh sync
         // otomatis ini kalau Task eksekusinya belakangan berubah status lagi.
-        if ($fopTask->status === FopTaskStatus::CANCEL) {
+        if ($fopTask->status === TaskStatus::DIBATALKAN) {
             return;
         }
 
         [$targetStatus, $historyLabel] = $this->resolveTarget($task);
 
-        if ($targetStatus === null) {
-            return;
-        }
-
-        $fromStatus = $fopTask->status instanceof FopTaskStatus ? $fopTask->status->value : $fopTask->status;
+        $fromStatus = $fopTask->status instanceof TaskStatus ? $fopTask->status->value : $fopTask->status;
 
         if ($fopTask->status !== $targetStatus) {
             $fopTask->status = $targetStatus;
@@ -94,7 +92,7 @@ class TaskObserver
             return;
         }
 
-        if (in_array($task->status, [TaskStatus::PENDING, TaskStatus::RESCHEDULE], true)) {
+        if ($task->status === TaskStatus::PENDING) {
             $report = TaskReport::where('task_id', $task->id)->first();
 
             if (!$report) {
@@ -142,24 +140,33 @@ class TaskObserver
     }
 
     /**
-     * Mapping kondisi `Task` eksekusi → [`FopTaskStatus` target, label histori
-     * granular]. Sesuai tabel "Mapping status teknisi → status FopTask" di
-     * docs/fop-task/analisa-auto-team.md § 10.
+     * Mapping kondisi `Task` eksekusi → [`TaskStatus` target (dicopy apa
+     * adanya ke `FopTask.status`), label histori granular]. Sesuai tabel
+     * "Mapping status teknisi → status FopTask" di
+     * docs/fop-task/analisa-auto-team.md § 10 (direvisi 2026-07-20).
      *
-     * @return array{0: FopTaskStatus|null, 1: string|null}
+     * Status utama sekarang 1:1 sama lifecycle `Task` — nuansa "Selesai (perlu
+     * review)" vs "Selesai (approved)" vs "Selesai (ditolak verifikasi)" CUMA
+     * beda di label histori/badge overlay (`fop_task_status_history.to_status`
+     * + `FopTask::verificationStatus()`), BUKAN status yang beda — tiket yang
+     * laporannya masih ditinjau tetap tampil di kolom "Selesai" dashboard,
+     * dikasih badge "Perlu Review" di atasnya (view layer), bukan didemosikan
+     * balik ke kolom "Sedang Dikerjakan".
      */
     private function resolveTarget(Task $task): array
     {
-        return match (true) {
-            $task->status === TaskStatus::TERJADWAL => [FopTaskStatus::PROSES, 'proses'],
-            $task->status === TaskStatus::IN_PROGRESS => [FopTaskStatus::PROSES, 'proses_dikerjakan'],
-            $task->status === TaskStatus::RESCHEDULE => [FopTaskStatus::PENDING, 'pending_reschedule'],
-            $task->status === TaskStatus::PENDING && $task->report_deferred => [FopTaskStatus::PENDING, 'lapor_nanti'],
-            $task->status === TaskStatus::PENDING && !$task->report_deferred => [FopTaskStatus::PENDING, 'pending_fop'],
-            $task->status === TaskStatus::SELESAI && $task->fop_review_status === 'approved' => [FopTaskStatus::SELESAI, 'selesai'],
-            $task->status === TaskStatus::SELESAI => [FopTaskStatus::PROSES, 'proses_review'],
-            $task->status === TaskStatus::DIBATALKAN => [FopTaskStatus::CANCEL, 'cancel'],
-            default => [null, null],
+        $isCustomerDecisionTask = in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true);
+
+        $historyLabel = match (true) {
+            $task->status === TaskStatus::PENDING && $task->report_deferred => 'lapor_nanti',
+            $task->status === TaskStatus::PENDING && !$task->report_deferred => 'pending_fop',
+            $task->status === TaskStatus::SELESAI && $task->fop_review_status === 'approved' => 'selesai',
+            $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask && $task->fop_review_status === 'rejected' => 'selesai_ditolak_verifikasi',
+            $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask => 'selesai_menunggu_verifikasi',
+            $task->status === TaskStatus::SELESAI => 'selesai_menunggu_verifikasi',
+            default => $task->status->value,
         };
+
+        return [$task->status, $historyLabel];
     }
 }

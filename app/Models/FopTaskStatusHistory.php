@@ -42,14 +42,15 @@ class FopTaskStatusHistory extends Model
     public function label(): string
     {
         return match ($this->to_status) {
-            'proses' => 'Proses',
-            'proses_dikerjakan' => 'Sedang Dikerjakan',
-            'proses_review' => 'Perlu Review',
-            'pending_reschedule' => 'Pending',
+            'draft' => 'Draft',
+            'terjadwal' => 'Terjadwal',
+            'in_progress' => 'Sedang Dikerjakan',
             'lapor_nanti' => 'Lapor Nanti',
             'pending_fop' => 'Pending',
             'selesai' => 'Selesai',
-            'cancel' => 'Cancel',
+            'selesai_menunggu_verifikasi' => 'Selesai — Menunggu Verifikasi',
+            'selesai_ditolak_verifikasi' => 'Selesai — Ditolak Verifikasi',
+            'dibatalkan' => 'Dibatalkan',
             default => $this->to_status,
         };
     }

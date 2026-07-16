@@ -228,6 +228,56 @@ class TaskFopActionsTest extends TestCase
         $this->assertEquals('Menunggu data tambahan', $task->pending_reason);
     }
 
+    /**
+     * Sejak 2026-07-15 (docs/project_status_label_unifikasi.md), "Pending"
+     * cuma 1 logic di sistem — siapapun yang trigger (teknisi top-level ATAU
+     * FOP manual), tim HARUS dilepas + jadwal ke-rebuild. Sebelumnya
+     * `fopPending` cuma ganti status doang, tim tetap nempel — itu yang
+     * bikin "2 kelakuan beda buat 1 nama status" dan sekarang disatuin.
+     */
+    public function test_fop_pending_releases_team_and_rebuilds_schedule(): void
+    {
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0007',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance Rutin',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now()->addDay(),
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->techUser->id, 'role_in_task' => 'lead']);
+
+        $fopTask = \App\Models\FopTask::create([
+            'task_number' => 'TFOP-2026-0007',
+            'task_date' => $task->scheduled_at,
+            'category' => 'MTN',
+            'tugas' => 'Maintenance Rutin',
+            'issue' => 'Sinyal lemah',
+            'status' => 'terjadwal',
+            'priority' => 'Medium',
+            'task_id' => $task->id,
+        ]);
+        $fopTask->technicians()->attach($this->techUser->id);
+
+        $response = $this->actingAs($this->fopUser)
+            ->post(route('tasks.fop-pending', $task->id), [
+                'pending_reason' => 'Teknisi berhalangan',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $task->refresh();
+        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
+        $this->assertFalse($task->teamMembers()->where('user_id', $this->techUser->id)->exists());
+
+        $fopTask->refresh();
+        $this->assertNull($fopTask->team_id);
+        $this->assertCount(0, $fopTask->technicians);
+    }
+
     public function test_unauthorized_user_cannot_perform_fop_actions(): void
     {
         $task = Task::create([

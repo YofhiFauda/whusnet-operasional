@@ -60,7 +60,7 @@ class FopTaskSwitchTeamTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'i',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
             'technicians' => $technicianIds,
         ]);
@@ -135,7 +135,7 @@ class FopTaskSwitchTeamTest extends TestCase
         $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id]);
         $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id]);
 
-        $taskA->update(['status' => 'Selesai']);
+        $taskA->update(['status' => 'selesai']);
 
         $response = $this->actingAs($this->fopUser)->postJson("/fop-tasks/{$taskA->id}/switch-team", [
             'to_team_id' => $taskE->team_id,
@@ -151,7 +151,7 @@ class FopTaskSwitchTeamTest extends TestCase
         $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id]);
         $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id]);
 
-        $taskA->update(['status' => 'Cancel']);
+        $taskA->update(['status' => 'dibatalkan']);
 
         $response = $this->actingAs($this->fopUser)->postJson("/fop-tasks/{$taskA->id}/switch-team", [
             'to_team_id' => $taskE->team_id,

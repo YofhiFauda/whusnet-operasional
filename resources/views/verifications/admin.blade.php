@@ -778,6 +778,9 @@
                                 ← Kembali ke Antrean
                             </a>
                             <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                <button type="button" onclick="openRejectModal()" class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-red-700 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-all shadow-sm active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/30">
+                                    Tolak
+                                </button>
                                 <button type="button" onclick="openRevisiModal()" class="flex justify-center items-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-all shadow-sm active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500/30">
                                     Revisi Pemasangan
                                 </button>
@@ -831,6 +834,35 @@
     </div>
 </div>
 
+{{-- MODAL TOLAK (FINAL, TERMINAL — PELANGGAN HARUS DAFTAR ULANG) --}}
+<div id="rejectModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-slate-900/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-red-50">
+            <h3 class="text-lg font-bold text-red-800">Tolak Pelanggan</h3>
+            <button type="button" onclick="closeRejectModal()" class="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none rounded-md hover:bg-slate-100 p-1 cursor-pointer">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <form id="rejectForm" method="POST" action="{{ route('customers.verification.reject', $customer->id) }}">
+            @csrf
+            <div class="p-6">
+                <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                    Ini keputusan <span class="font-bold">final</span>. Pelanggan tidak bisa dibuka lagi — masuk daftar Pelanggan Gagal, dan kalau mau lanjut harus registrasi ulang dari awal.
+                </p>
+                <div class="mb-4">
+                    <label for="reject_reason" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Alasan Penolakan <span class="text-red-500">*</span></label>
+                    <textarea name="reason" id="reject_reason" rows="3" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20" required placeholder="Contoh: Pelanggan tidak memenuhi kriteria / belum melunasi pembayaran."></textarea>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                <button type="button" onclick="closeRejectModal()" class="px-5 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors cursor-pointer">Batal</button>
+                <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors shadow-sm cursor-pointer">Tolak Final</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -870,6 +902,7 @@
         if (e.key === 'Escape') {
             closePhotoLightbox();
             if (typeof closeRevisiModal === 'function') closeRevisiModal();
+            if (typeof closeRejectModal === 'function') closeRejectModal();
         }
     });
 
@@ -886,6 +919,25 @@
 
     function closeRevisiModal() {
         const modal = document.getElementById('revisiModal');
+        modal.classList.add('opacity-0');
+        modal.querySelector('div').classList.add('scale-95');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    // ── MODAL TOLAK ────────────────────────────────────────────────────
+    function openRejectModal() {
+        const modal = document.getElementById('rejectModal');
+        modal.classList.remove('hidden');
+        void modal.offsetWidth;
+        modal.classList.remove('opacity-0');
+        modal.querySelector('div').classList.remove('scale-95');
+        modal.querySelector('textarea').focus();
+    }
+
+    function closeRejectModal() {
+        const modal = document.getElementById('rejectModal');
         modal.classList.add('opacity-0');
         modal.querySelector('div').classList.add('scale-95');
         setTimeout(() => {

@@ -97,16 +97,18 @@
                         </span>
                         {{-- Status badge --}}
                         @php
-                            $statusStyle = match($task->status->value) {
-                                'terjadwal'  => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
-                                'in_progress'=> 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
-                                'selesai'    => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
-                                'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
-                                default      => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
+                            $statusStyle = match(true) {
+                                $task->status->value === 'terjadwal'   => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
+                                $task->status->value === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
+                                $task->status->value === 'selesai'     => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
+                                $task->status->value === 'dibatalkan'  => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
+                                $task->status->value === 'pending' && $task->report_deferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
+                                $task->status->value === 'pending'     => 'background:#fefce8; color:#a16207; border-color:#fde68a',
+                                default                                => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
                             };
                         @endphp
                         <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border" style="{{ $statusStyle }}">
-                            {{ $task->status->label() }}
+                            {{ $task->status->displayLabel($task->report_deferred) }}
                         </span>
                         @if($task->isOverSla())
                         <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border"

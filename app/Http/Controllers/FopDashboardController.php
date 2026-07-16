@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\FopTaskStatus;
 use App\Enums\TaskStatus;
 use App\Models\AuditLog;
 use App\Models\Customer;
@@ -153,36 +152,24 @@ class FopDashboardController extends Controller
             ))
             ->map(function (FopTaskTeam $team) {
                 $mappedTasks = $team->fopTasks->map(function (FopTask $t) {
-                    $status = $t->status->value;
-                    $statusStyle = 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)';
+                    // FopTask.status share vocab persis TaskStatus (unifikasi 2026-07-20)
+                    // — kalau ada Task eksekusi terhubung, pakai itu buat label/style
+                    // (bawa nuansa report_deferred "Lapor Nanti"); FopTask standalone
+                    // (task_id null, masih 'draft') pakai displayLabel() punya sendiri.
+                    $refStatus = $t->task?->status ?? $t->status;
+                    $reportDeferred = $t->task?->report_deferred ?? false;
+                    $statusValue = $refStatus->value;
+                    $status = $refStatus->displayLabel($reportDeferred);
 
-                    if ($t->task) {
-                        $taskStatus = $t->task->status->value;
-                        if ($taskStatus === 'selesai') {
-                            $status = 'Selesai';
-                            $statusStyle = 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)';
-                        } elseif ($taskStatus === 'pending') {
-                            $status = 'Pending';
-                            $statusStyle = 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)';
-                        } elseif ($taskStatus === 'dibatalkan') {
-                            $status = 'Cancel';
-                            $statusStyle = 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)';
-                        } elseif ($taskStatus === 'in_progress') {
-                            $status = 'In Progress';
-                            $statusStyle = 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)';
-                        } elseif ($taskStatus === 'terjadwal') {
-                            $status = 'Terjadwal';
-                            $statusStyle = 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)';
-                        }
-                    } else {
-                        if ($status === 'Selesai') {
-                            $statusStyle = 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)';
-                        } elseif ($status === 'Pending') {
-                            $statusStyle = 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)';
-                        } elseif ($status === 'Cancel') {
-                            $statusStyle = 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)';
-                        }
-                    }
+                    $statusStyle = match(true) {
+                        $statusValue === 'terjadwal'   => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
+                        $statusValue === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
+                        $statusValue === 'selesai'     => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
+                        $statusValue === 'dibatalkan'  => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
+                        $statusValue === 'pending' && $reportDeferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
+                        $statusValue === 'pending'     => 'background:#fefce8; color:#a16207; border-color:#fde68a',
+                        default => 'background:var(--color-surface-muted); color:var(--color-text-main); border-color:var(--color-border)',
+                    };
 
                     return [
                         'fop_task_id'  => $t->id,
@@ -190,8 +177,9 @@ class FopDashboardController extends Controller
                         'task_number'  => $t->task_number,
                         'tugas'        => $t->tugas,
                         'status'       => $status,
+                        'status_value' => $statusValue,
                         'status_style' => $statusStyle,
-                        'draggable'    => !in_array($status, ['Selesai', 'Cancel', 'In Progress'], true),
+                        'draggable'    => !in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress'], true),
                         'category_label' => $t->category->value,
                         'badge_classes'  => $t->category->badgeClasses(),
                         'customer_name' => $t->customer?->full_name ?? '—',
@@ -201,7 +189,7 @@ class FopDashboardController extends Controller
                 })->values();
 
                 $totalTasks     = $mappedTasks->count();
-                $completedTasks = $mappedTasks->filter(fn ($t) => $t['status'] === 'Selesai')->count();
+                $completedTasks = $mappedTasks->filter(fn ($t) => $t['status_value'] === 'selesai')->count();
 
                 return [
                     'id'               => $team->id,
@@ -259,7 +247,7 @@ class FopDashboardController extends Controller
         $toTeam = FopTaskTeam::with('members')->findOrFail($validated['to_team_id']);
         $technicianIds = collect($validated['technician_ids'])->map(fn ($id) => (int) $id)->unique()->values();
 
-        if (in_array($fopTask->status, [FopTaskStatus::SELESAI, FopTaskStatus::CANCEL], true)) {
+        if (in_array($fopTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true)) {
             return $this->switchTeamError($request, 'fop_task_id', "Task {$fopTask->task_number} berstatus {$fopTask->status->value}, tidak bisa dipindah team.");
         }
 

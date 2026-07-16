@@ -35,7 +35,7 @@ class FopTask extends Model
             'task_date' => 'datetime',
             'client_request_date' => 'date',
             'cancelled_at' => 'datetime',
-            'status' => \App\Enums\FopTaskStatus::class,
+            'status' => \App\Enums\TaskStatus::class,
             'priority' => \App\Enums\FopTaskPriority::class,
             'category' => \App\Enums\TaskType::class,
         ];
@@ -103,6 +103,25 @@ class FopTask extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(FopTaskTeam::class, 'team_id');
+    }
+
+    /**
+     * Nasib keputusan customer (approve/pending/reject) buat tiket kategori
+     * Survey/Pemasangan — murni overlay INFORMASIONAL, gak pernah dipakai buat
+     * nentuin bucket `status` utama (`FopTask.status` selalu `Selesai` begitu
+     * `Task.status=selesai`, independen dari ini — lihat `TaskObserver::resolveTarget()`).
+     * Keputusan sebenarnya tetap di halaman Verif & Pemasangan
+     * (`CustomerVerificationController`), bukan di modul FopTask ini.
+     *
+     * @return 'pending'|'approved'|'rejected'|null null kalau task_type bukan Survey/Pemasangan atau belum ada Task terkait
+     */
+    public function verificationStatus(): ?string
+    {
+        if (!in_array($this->category, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+            return null;
+        }
+
+        return $this->task?->fop_review_status;
     }
 
     /**

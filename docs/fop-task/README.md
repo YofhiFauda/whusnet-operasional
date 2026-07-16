@@ -15,6 +15,8 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 
 `FopTask` auto-generate `Task` begitu ada teknisi di-assign (lewat `TaskService::create()`), disimpan di `fop_tasks.task_id`. FOP kerja di level `FopTask` (bikin/atur tiket); teknisi kerja di level `Task` (checklist, submit laporan) — lihat [task-workflow (archive)](archive/task-workflow.md) utk detail approval flow Task, itu masih berlaku.
 
+Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObserver`, plus (Task 10) tiap Task selesai kerja dicatat durasi & SLA-nya di tabel `task_reports` (dual-cycle: akumulasi durasi kerja aktual, exclude jeda pending) — bisa dilihat lengkap di halaman Detail Riwayat. **Prinsip fix reject-sync gap (2026-07-14):** Task (kerjaan lapangan) VS keputusan bisnis (customer diterima/ditolak) itu 2 hal beda — begitu teknisi selesai kerja (tiket kategori Survey/Pemasangan), `FopTask` LANGSUNG `Selesai` (gak nangkring di antrian aktif), nasib customer (Menunggu/Diterima/Ditolak) tampil sebagai badge KEDUA di Riwayat, gak pernah ngubah status utama. Detail: `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
+
 **Team** (`FopTaskTeam`) = roster teknisi yang berlaku 1 hari (bisa nyambung ke hari berikutnya kalau ada tiket Pending). **Sejak Task 1 (Auto-Team Formation), Team gak lagi dibuat manual** — kebentuk/berubah sendiri lewat `FopTaskTeamService::rebuildTeamsForDate()` berdasar graf overlap teknisi per tiket (siapa kerja bareng siapa hari itu). FOP cuma perlu drop-in manual (`assign-to-team`) buat kasus solo/konflik, atau pakai **Switch Teknisi** (Task 2) buat mindahin teknisi antar Team dalam 1 submit atomic. Detail algoritma & rasional di [analisa-auto-team.md](analisa-auto-team.md) dan [analisa-sync-execution-task.md](analisa-sync-execution-task.md).
 
 ## Dokumen
@@ -28,6 +30,7 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 | [analisa-auto-team.md](analisa-auto-team.md) | Analisa kebutuhan & Sprint Backlog Task 1 (Auto-Team) & Task 2 (Switch Teknisi) |
 | [analisa-sync-execution-task.md](analisa-sync-execution-task.md) | Bugfix Task 1/2 + sync `FopTaskTeam` ↔ execution `Task` |
 | [perbandingan-assign-to-team-vs-switch-technician.md](perbandingan-assign-to-team-vs-switch-technician.md) | `assignToTeam()` (Task 1) vs `switchTechnician()` (Task 2) — beda implementasi, cara nguji, kapan pakai yang mana |
+| [../project_verifikasi_reject_gap.md](../project_verifikasi_reject_gap.md) | Fix: task ditolak verifikasi nyangkut di antrian aktif → desain final: Task selalu `Selesai`, keputusan customer jadi badge kedua overlay di Riwayat |
 | [archive/](archive/) | Dokumen sprint lama (Kanban, Calendar, desain awal Team manual, dll) — historis, arsitektur udah diganti |
 
 ## Routes & Permission
@@ -38,6 +41,7 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 | `/api/fop/pipeline` | GET | `task.view.all` | `FopDashboardController@pipeline` |
 | `/fop-tasks` | GET | `fop_tasks.view` | `FopTaskController@index` |
 | `/fop-tasks/history` | GET | `fop_tasks.view` | `FopTaskController@history` |
+| `/fop-tasks/history/{fop_task}` | GET | `fop_tasks.view` | `FopTaskController@showHistory` — **Task 10**, Detail Riwayat (Info Task, Durasi & SLA dual-cycle, Laporan, Histori Status) |
 | `/fop-tasks` | POST | `fop_tasks.create` | `FopTaskController@store` |
 | `/fop-tasks/{fop_task}` | PUT | `fop_tasks.update` | `FopTaskController@update` |
 | `/fop-tasks/{fop_task}` | DELETE | `fop_tasks.delete` | `FopTaskController@destroy` |
@@ -51,8 +55,9 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 ## Views
 
 - `resources/views/fop/dashboard.blade.php` — dashboard utama
-- `resources/views/fop_tasks/index.blade.php` — daftar tiket aktif (Proses/Pending) + modal create/edit + modal drop-in Team + modal konflik Team (C3) + modal Switch Teknisi. **Panel "Kelola Team" manual udah dihapus.**
-- `resources/views/fop_tasks/history.blade.php` — riwayat tiket Selesai/Cancel
+- `resources/views/fop_tasks/index.blade.php` — daftar tiket aktif (draft/terjadwal/in_progress/pending) + modal create/edit + modal drop-in Team + modal konflik Team (C3) + modal Switch Teknisi. **Panel "Kelola Team" manual udah dihapus.** Tombol Cancel disembunyikan buat kategori Survey/PSB (2026-07-21, lihat flowchart.md § 12).
+- `resources/views/fop_tasks/history.blade.php` — riwayat tiket: Selesai / Dibatalkan (kolom Status polos) + kolom kedua **Verifikasi** (Menunggu/Diterima/Ditolak, overlay khusus Survey/Pemasangan, fix reject-sync gap) — filter Status & Verifikasi independen
+- `resources/views/fop_tasks/history_detail.blade.php` — **Task 10**, detail 1 tiket (Info Task, Durasi & SLA Pengerjaan dual-cycle, Laporan, Histori Status)
 
 ## Teknologi
 
@@ -64,4 +69,4 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 
 ---
 
-**Last updated:** 2026-07-11 (Task 1 Auto-Team Formation & Task 2 Switch Teknisi — routes, views, konsep Team diupdate)
+**Last updated:** 2026-07-14 (Task 10 Riwayat Lengkap + SLA Dual-Cycle, dan fix reject-sync gap desain final — Task selalu `Selesai` buat Survey/Pemasangan, keputusan customer jadi badge overlay kedua, lihat `docs/project_verifikasi_reject_gap.md`)

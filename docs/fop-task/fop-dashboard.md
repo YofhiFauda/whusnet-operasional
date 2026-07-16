@@ -41,7 +41,7 @@ Return: `view('fop.dashboard', compact('surveyQueue','stats','teknisiList','acti
 2. **Stat cards** (grid 2/4 kolom) — Antrean Survey, Perlu Aksi FOP, Sedang Berjalan, Selesai Hari Ini. Badge merah "X Terlambat" muncul kalau `overdue_survey`/`overdue_installation` > 0.
 3. **Team FOP Aktif** — grid card per `FopTaskTeam` aktif:
    - Header: nama team + `work_date`
-   - Body: list tiket (`tugas` + badge status warna sesuai FopTaskStatus)
+   - Body: list tiket (`tugas` + badge status warna — sejak unifikasi 2026-07-20, `TaskStatus` kalau ada Task terhubung, atau `FopTask.status` sendiri kalau standalone/draft, lihat `database-schema.md`)
    - Footer: avatar inisial anggota (max 4 + counter) + total tiket
    - Klik card → `openTeamDetail(team.id)` (Alpine) buka detail panel
    - Link "Kelola Team →" ke `/fop-tasks`

@@ -87,14 +87,8 @@
                          class="flex items-center justify-between text-[11px] bg-surface-muted rounded px-2 py-1.5
                             {{ $t['draggable'] ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-60' }}">
                         <span class="text-text-main truncate">{{ $t['tugas'] }}</span>
-                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ml-2
-                            {{ match($t['status']) {
-                                'Proses' => 'bg-blue-50 text-blue-700',
-                                'Pending' => 'bg-amber-50 text-amber-700',
-                                'Selesai' => 'bg-green-50 text-green-700',
-                                'Cancel' => 'bg-red-50 text-red-700',
-                                default => 'bg-slate-100 text-slate-600',
-                            } }}">
+                        <span class="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ml-2"
+                            style="{{ $t['status_style'] }}">
                             {{ $t['status'] }}
                         </span>
                     </div>

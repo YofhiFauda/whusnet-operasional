@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Enums\TaskStatus;
 
 #[Fillable([
     'name',
@@ -43,7 +44,7 @@ class FopTaskTeam extends Model
      */
     public function isActive(): bool
     {
-        return $this->fopTasks()->whereNotIn('status', ['Selesai', 'Cancel'])->exists();
+        return $this->fopTasks()->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])->exists();
     }
 
     /**

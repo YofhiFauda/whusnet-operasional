@@ -104,6 +104,6 @@ class CustomerWorkflowService
             }
 
             return $saved;
-        });
+        }, 3);
     }
 }

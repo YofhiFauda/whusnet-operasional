@@ -51,9 +51,11 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Status</label>
                 <select name="status" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
-                    <option value="">Semua (Proses & Pending)</option>
-                    <option value="Proses" {{ request('status') === 'Proses' ? 'selected' : '' }}>Proses</option>
-                    <option value="Pending" {{ request('status') === 'Pending' ? 'selected' : '' }}>Pending</option>
+                    <option value="">Semua (Aktif)</option>
+                    <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
+                    <option value="terjadwal" {{ request('status') === 'terjadwal' ? 'selected' : '' }}>Terjadwal</option>
+                    <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>Sedang Dikerjakan</option>
+                    <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
                 </select>
             </div>
             <div>
@@ -223,34 +225,32 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 @php
+                                    // FopTask.status share vocab persis sama TaskStatus (unifikasi
+                                    // 2026-07-20) — kalau udah ada Task eksekusi terhubung, pakai label/
+                                    // badge dari situ (bawa nuansa report_deferred). Kalau belum (FopTask
+                                    // standalone, task_id null, masih 'draft' — belum ada teknisi
+                                    // di-assign), pakai punya FopTask sendiri, dikasih label khusus biar
+                                    // gak nyesatin ("draft" doang kurang jelas buat FOP).
                                     $statusValue = $task->status->value;
-                                    $latestHistory = $task->statusHistories->first();
-                                    $statusLabel = $latestHistory?->label() ?? $statusValue;
-                                    $needsReview = $task->task && $task->task->status->value === 'selesai' && $task->task->fop_review_status === 'pending';
+                                    $statusLabel = $task->task
+                                        ? $task->task->status->displayLabel($task->task->report_deferred)
+                                        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
+                                    $statusClasses = $task->task
+                                        ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
+                                        : ($statusValue === 'draft' ? 'border-slate-200 text-slate-600 bg-slate-50' : $task->status->displayBadgeClasses());
                                 @endphp
                                 <div class="flex flex-col gap-1 items-start">
-                                    <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit"
-                                          @class([
-                                              'border-blue-200 text-blue-700 bg-blue-50' => $statusValue === 'Proses',
-                                              'border-amber-200 text-amber-700 bg-amber-50' => $statusValue === 'Pending',
-                                              'border-green-200 text-green-700 bg-green-50' => $statusValue === 'Selesai',
-                                              'border-red-200 text-red-700 bg-red-50' => $statusValue === 'Cancel',
-                                          ])
+                                    <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit {{ $statusClasses }}"
                                           title="Status realtime — derived otomatis dari status Task teknisi, gak bisa diedit manual">
                                         {{ $statusLabel }}
                                     </span>
-                                    {{-- @if($statusValue === 'Pending')
-                                        <div class="text-[10px] text-amber-600 mt-1 leading-tight whitespace-normal min-w-[120px]">
-                                            @if($task->client_request_date)
-                                                <span class="font-semibold">Req: {{ $task->client_request_date->format('d/m/y') }}</span><br>
-                                            @endif
-                                            <span>{{ $task->pending_reason }}</span>
-                                        </div>
-                                    @endif --}}
                                     <div class="flex flex-col gap-0.5 mt-0.5">
-                                        @if(!in_array($statusValue, ['Selesai', 'Cancel']))
+                                        {{-- SRV/PSB gak boleh dibatalkan dari sini — harus lewat halaman
+                                             Customer (tab Survey/Pemasangan), biar masuk List Pelanggan
+                                             Gagal. Lihat TaskPolicy::cancel() & FopTaskController::update(). --}}
+                                        @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
                                             <button type="button" x-data
-                                                    @click="if (confirm('Cancel Task FOP [{{ $task->task_number }}]?')) cancelFopTask({{ $task->id }})"
+                                                    @click="window.Confirm('Konfirmasi Cancel', 'Apakah Anda yakin ingin membatalkan Task FOP [{{ $task->task_number }}]?', 'warning', () => cancelFopTask({{ $task->id }}))"
                                                     class="text-[10px] text-red-600 underline decoration-dotted text-left cursor-pointer">
                                                 Cancel
                                             </button>
@@ -261,17 +261,19 @@
                             <td class="px-3 py-2 whitespace-nowrap">
                                 @if($canEditFopTaskType)
                                     <select @change="updatePriority({{ $task->id }}, $event.target.value)" 
-                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24"
+                                            x-data="{ currentPriority: '{{ $task->priority->value }}' }"
+                                            x-model="currentPriority"
+                                            class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200"
                                             :class="{
-                                                'border-slate-200 text-slate-700 bg-slate-50': '{{ $task->priority->value }}' === 'low',
-                                                'border-yellow-300 text-yellow-800 bg-yellow-50': '{{ $task->priority->value }}' === 'Medium',
-                                                'border-orange-300 text-orange-800 bg-orange-50': '{{ $task->priority->value }}' === 'High',
-                                                'border-red-300 text-red-700 bg-red-50 font-bold': '{{ $task->priority->value }}' === 'Urgent'
+                                                'border-slate-200 text-slate-700 bg-slate-50': currentPriority === 'low',
+                                                'border-yellow-300 text-yellow-800 bg-yellow-50': currentPriority === 'Medium',
+                                                'border-orange-300 text-orange-800 bg-orange-50': currentPriority === 'High',
+                                                'border-red-300 text-red-700 bg-red-50 font-bold': currentPriority === 'Urgent'
                                             }">
-                                        <option value="low" {{ $task->priority->value === 'low' ? 'selected' : '' }}>Low</option>
-                                        <option value="Medium" {{ $task->priority->value === 'Medium' ? 'selected' : '' }}>Medium</option>
-                                        <option value="High" {{ $task->priority->value === 'High' ? 'selected' : '' }}>High</option>
-                                        <option value="Urgent" {{ $task->priority->value === 'Urgent' ? 'selected' : '' }}>Urgent</option>
+                                        <option value="low">Low</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High</option>
+                                        <option value="Urgent">Urgent</option>
                                     </select>
                                 @else
                                     <x-countdown-timer
@@ -291,7 +293,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </button>
-                                    <form action="{{ route('fop-tasks.destroy', $task->id) }}" method="POST" onsubmit="return confirm('Hapus Task FOP ini?')" class="inline-block">
+                                    <form action="{{ route('fop-tasks.destroy', $task->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus Task FOP ini?" class="inline-block">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-slate-400 hover:text-red-600 transition-colors bg-slate-100 hover:bg-red-50 p-1.5 rounded" title="Hapus">
@@ -471,18 +473,20 @@
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Status <span x-show="!modal.isEdit" class="text-error">*</span></label>
                                 <template x-if="!modal.isEdit">
                                     <select name="status" x-model="modal.data.status" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-                                        <option value="Proses">Proses</option>
-                                        <option value="Pending">Pending</option>
+                                        <option value="terjadwal">Terjadwal</option>
+                                        <option value="pending">Pending</option>
                                     </select>
                                 </template>
                                 <template x-if="modal.isEdit">
                                     <div>
                                         <span class="inline-flex items-center px-2.5 py-1.5 rounded text-xs font-medium border w-fit"
                                               :class="{
-                                                  'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'Proses',
-                                                  'border-amber-200 text-amber-700 bg-amber-50': modal.data.status === 'Pending',
-                                                  'border-green-200 text-green-700 bg-green-50': modal.data.status === 'Selesai',
-                                                  'border-red-200 text-red-700 bg-red-50': modal.data.status === 'Cancel',
+                                                  'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'terjadwal',
+                                                  'border-amber-200 text-amber-700 bg-amber-50': modal.data.status === 'in_progress',
+                                                  'border-yellow-200 text-yellow-700 bg-yellow-50': modal.data.status === 'pending',
+                                                  'border-green-200 text-green-700 bg-green-50': modal.data.status === 'selesai',
+                                                  'border-red-200 text-red-700 bg-red-50': modal.data.status === 'dibatalkan',
+                                                  'border-slate-200 text-slate-600 bg-slate-50': modal.data.status === 'draft',
                                               }"
                                               x-text="modal.data.status"></span>
                                         <p class="text-[10px] text-text-muted mt-1">Status realtime — otomatis mengikuti status Task teknisi, gak bisa diedit manual di sini. Pakai tombol "Cancel" di tabel buat cancel tiket.</p>
@@ -506,14 +510,14 @@
                             </div>
                         </div>
 
-                        <div x-show="modal.data.status === 'Pending'" class="space-y-3 bg-surface-muted border border-border rounded p-3" style="display: none;">
+                        <div x-show="modal.data.status === 'pending'" class="space-y-3 bg-surface-muted border border-border rounded p-3" style="display: none;">
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Alasan Pending <span class="text-error">*</span></label>
-                                <input type="text" name="pending_reason" x-model="modal.data.pending_reason" :required="modal.data.status === 'Pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <input type="text" name="pending_reason" x-model="modal.data.pending_reason" :required="modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tgl Request Client <span class="text-error">*</span></label>
-                                <input type="date" name="client_request_date" x-model="modal.data.client_request_date" :required="modal.data.status === 'Pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
+                                <input type="date" name="client_request_date" x-model="modal.data.client_request_date" :required="modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
                             </div>
                         </div>
 
@@ -746,7 +750,7 @@
                 data: {
                     id: '', task_number: '', task_date: '', category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
-                    status: 'Proses', priority: 'low', pending_reason: '', client_request_date: ''
+                    status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 },
                 techs: []
             },
@@ -944,7 +948,7 @@
                 this.modal.data = {
                     id: '', task_number: '', task_date: defaultDate, category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
-                    status: 'Proses', priority: 'low', pending_reason: '', client_request_date: ''
+                    status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 };
                 this.modal.techs = [];
                 this.modal.open = true;
@@ -996,7 +1000,7 @@
             },
 
             cancelFopTask(taskId) {
-                this.sendUpdateRequest(taskId, { status: 'Cancel' });
+                this.sendUpdateRequest(taskId, { status: 'dibatalkan' });
             },
 
             updatePriority(taskId, priority) {

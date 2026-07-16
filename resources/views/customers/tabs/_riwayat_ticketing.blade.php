@@ -251,12 +251,12 @@
             @foreach($customerFopTasks as $ftask)
                 @php
                     $uniqueId = 'foptask_' . $ftask->id;
-                    $statusStr = $ftask->status instanceof \App\Enums\FopTaskStatus ? $ftask->status->value : ($ftask->status ?? 'pending');
-                    
+                    $statusStr = $ftask->status instanceof \App\Enums\TaskStatus ? $ftask->status->value : ($ftask->status ?? 'draft');
+
                     $statusBadge = match($statusStr) {
                         'completed', 'selesai' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                        'in_progress', 'proses' => 'bg-amber-50 text-amber-700 border-amber-200',
-                        'cancelled', 'batal' => 'bg-rose-50 text-rose-700 border-rose-200',
+                        'in_progress', 'proses', 'terjadwal' => 'bg-amber-50 text-amber-700 border-amber-200',
+                        'cancelled', 'batal', 'dibatalkan' => 'bg-rose-50 text-rose-700 border-rose-200',
                         default => 'bg-slate-100 text-slate-700 border-slate-200'
                     };
 
