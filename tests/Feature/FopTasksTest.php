@@ -184,7 +184,8 @@ class FopTasksTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->fopUser)->put(route('fop-tasks.update', $task->id), [
-            'status' => 'dibatalkan'
+            'status' => 'dibatalkan',
+            'cancel_reason' => 'Test cancel',
         ]);
 
         $task->refresh();

@@ -273,6 +273,8 @@ class TaskService
             'Task yang sudah selesai atau dibatalkan tidak bisa dibatalkan lagi.'
         );
 
+        $wasInProgress = $task->status === TaskStatus::IN_PROGRESS;
+
         $task->update([
             'status'       => TaskStatus::DIBATALKAN->value,
             'cancelled_at' => now(),
@@ -281,6 +283,13 @@ class TaskService
         ]);
 
         \App\Models\AuditLog::log($task, 'cancelled', ['status' => $task->getOriginal('status')], ['status' => TaskStatus::DIBATALKAN->value, 'cancel_reason' => $reason]);
+
+        // Task 12 — teknisi yang lagi ngerjain (in_progress) harus tau begitu
+        // task-nya dibatalkan dari atas, gak cukup cuma keliatan diam-diam ilang
+        // dari /tasks-saya.
+        if ($wasInProgress) {
+            $this->notifyTeam($task, "Task dibatalkan: {$reason}", 'cancelled');
+        }
 
         return $task->refresh();
     }

@@ -1030,7 +1030,7 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 
 ### Task 11 — `/tasks-saya` Tombol Mulai per Jenis Task + Card Bertahap
 
-**Status:** `To Do`
+**Status:** `DONE`
 
 **Tujuan:**
 - **Default Task (Sebelum Mulai)**: Menampilkan Kategori Task, Status Task, ID Task, Nama Pelanggan, Alamat Pelanggan, Waktu Penjadwalan, SLA, dan Button Mulai. (Koordinat lokasi, tombol Maps, dan tombol Buka Detail disembunyikan).
@@ -1056,10 +1056,10 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 - [x] ~~Mapping `task_type` → label tombol (`Mulai Survey`/`Mulai Pemasangan`/`Mulai Maintenance`)~~ — **SUDAH ADA** (baris 205-239), tinggal regression test.
 - [x] ~~Timer/SLA (`started_at`) mulai persis saat tombol "Mulai X" diklik~~ — **SUDAH ADA** (`TaskStatusController::start()`), tinggal regression test.
 - [x] Pastikan info pelanggan (nama/alamat/POP) selalu tampil baik sebelum/sesudah mulai.
-- [ ] Gate link "Buka Detail" — sembunyikan/disable sebelum mulai.
-- [ ] Tampilkan sub-card koordinat (Latitude & Longitude) dan button Maps di bawah alamat/POP ketika status bukan `terjadwal`.
+- [x] Gate link "Buka Detail" — sembunyikan/disable sebelum mulai.
+- [x] Tampilkan sub-card koordinat (Latitude & Longitude) dan button Maps di bawah alamat/POP ketika status bukan `terjadwal`.
 - [x] "Isi Laporan" (`own.blade.php`) diarahkan ke dialog `Lapor Sekarang`/`Lapor Nanti` (Task 6) — **SUDAH** (dikerjakan saat eksekusi Task 6).
-- [ ] Sinkron perubahan ke `own-card.blade.php` (partial AJAX) — selalu tampilkan info pelanggan, tambahkan sub-card koordinat + button Maps, dan sinkronkan dialog `Lapor Sekarang`/`Lapor Nanti`.
+- [x] Sinkron perubahan ke `own-card.blade.php` (partial AJAX) — selalu tampilkan info pelanggan, tambahkan sub-card koordinat + button Maps, dan sinkronkan dialog `Lapor Sekarang`/`Lapor Nanti`.
 
 **Acceptance Criteria:**
 1. Sebelum klik Mulai (Default): Kategori, status, ID, nama pelanggan, alamat, jadwal, SLA, dan tombol Mulai tampil. Tombol Maps, koordinat lokasi, dan link "Buka Detail" tidak tampil.
@@ -1071,7 +1071,7 @@ Test suite: `tests/Feature/FopTaskStatusSyncTest.php` 10/10 hijau. Regression ch
 
 ### Task 12 — Cancel dengan Alasan
 
-**Status:** `PARTIAL` — bagian **SRV/PSB: `OBSOLETE`** (dikunci total, JANGAN dikerjakan seperti judul asli). Bagian **task_type LAIN (MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ): `To Do`**, masih relevan, belum dikerjakan.
+**Status:** `Done` (2026-07-22) — bagian **SRV/PSB: `OBSOLETE`** (dikunci total, JANGAN dikerjakan seperti judul asli). Bagian **task_type LAIN (MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ): `Done`**.
 
 > **⚠️⚠️ OBSOLETE (2026-07-21) — premis Task 12 ini UDAH DIBALIK TOTAL, jangan dikerjakan.** Judul & isi section ini asumsinya "Cancel Survey/Pemasangan tetap boleh dari Task FOP, tinggal ditambahin alasan wajib". Keputusan final SEKARANG: **Cancel Task/FopTask kategori Survey & PSB DIKUNCI TOTAL**, gak boleh dari sisi Task/FopTask sama sekali (bukan cuma "kasih alasan wajib") — satu-satunya jalur sah buat batalin Survey/PSB adalah lewat halaman Customer (`CustomerSurveyController::cancel()` / `CustomerInstallationController::cancel()`, yang UDAH mewajibkan `reason` dari awal + sekalian nge-set `Customer.status=rejected`). `TaskPolicy::cancel()` block task_type SURVEY/PEMASANGAN buat SEMUA role (termasuk owner), `FopTaskController::update()` nolak (422) kalau target status `dibatalkan` + category SURVEY/PSB. Task_type LAIN (MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ) TETAP bisa di-cancel langsung dari Task/FopTask — kalau mau nambahin `cancel_reason` wajib buat kategori-kategori itu, itu scope yang masih relevan dari Task 12, tapi JANGAN buka lagi tombol Cancel buat Survey/PSB di `fop_tasks/index.blade.php`/`tasks/show.blade.php`. Detail lengkap: `docs/fop-task/flowchart.md` § 12, `docs/customer-lifecycle/business-logic.md` § 4/§ 6.
 

@@ -43,14 +43,14 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 | `/fop-tasks/history` | GET | `fop_tasks.view` | `FopTaskController@history` |
 | `/fop-tasks/history/{fop_task}` | GET | `fop_tasks.view` | `FopTaskController@showHistory` — **Task 10**, Detail Riwayat (Info Task, Durasi & SLA dual-cycle, Laporan, Histori Status) |
 | `/fop-tasks` | POST | `fop_tasks.create` | `FopTaskController@store` |
-| `/fop-tasks/{fop_task}` | PUT | `fop_tasks.update` | `FopTaskController@update` |
+| `/fop-tasks/{fop_task}` | PUT | `fop_tasks.update` (+ `fop_tasks.cancel` kalau target `status=dibatalkan`, Task 12) | `FopTaskController@update` |
 | `/fop-tasks/{fop_task}` | DELETE | `fop_tasks.delete` | `FopTaskController@destroy` |
 | `/fop-tasks/{fop_task}/assign-to-team` | POST | `fop_tasks.update` | `FopTaskController@assignToTeam` — drop-in manual Team (solo/konflik) |
 | `/fop-tasks/switch-technician` | POST | `fop_tasks.update` | `FopTaskController@switchTechnician` — **Task 2**, switch teknisi antar Team 1x-submit |
 
 > Route CRUD Team manual (`fop-tasks.teams.store/update/destroy`) **udah dihapus total sejak Task 1** — 404 kalau diakses. Team gak lagi punya endpoint mutasi sendiri, semuanya derived dari assignment teknisi.
 
-**RBAC catatan khusus:** ubah `category` (tipe tiket) & `priority` cuma boleh user dengan permission `fop_tasks.update_sensitive` (lihat `FopTaskController::update()`). Tipe `Survey` & `PSB` (Pemasangan) gak bisa dipilih manual — cuma via auto-sync dari Registrasi Pelanggan (`TaskType::autoOnlyValues()`).
+**RBAC catatan khusus:** ubah `category` (tipe tiket) & `priority` cuma boleh user dengan permission `fop_tasks.update_sensitive` (lihat `FopTaskController::update()`). Tipe `Survey` & `PSB` (Pemasangan) gak bisa dipilih manual — cuma via auto-sync dari Registrasi Pelanggan (`TaskType::autoOnlyValues()`). Cancel (`status=dibatalkan`) butuh permission terpisah `fop_tasks.cancel` (**Task 12, 2026-07-22**) + `cancel_reason` wajib diisi — role `admin`/`fop` dapet otomatis lewat wildcard `fop_tasks.*`.
 
 ## Views
 

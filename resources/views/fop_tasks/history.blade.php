@@ -33,8 +33,8 @@
                 <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Status</label>
                 <select name="status" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
                     <option value="">Semua</option>
-                    <option value="Selesai" {{ request('status') === 'Selesai' ? 'selected' : '' }}>Selesai</option>
-                    <option value="Cancel" {{ request('status') === 'Cancel' ? 'selected' : '' }}>Cancel</option>
+                    <option value="selesai" {{ request('status') === 'selesai' ? 'selected' : '' }}>Selesai</option>
+                    <option value="dibatalkan" {{ request('status') === 'dibatalkan' ? 'selected' : '' }}>Dibatalkan</option>
                 </select>
             </div>
             <div>
@@ -152,20 +152,18 @@
                                 @php
                                     $statusLabel = $task->task
                                         ? $task->task->status->displayLabel($task->task->report_deferred)
-                                        : $task->status->value;
+                                        : $task->status->displayLabel();
                                     $statusClasses = $task->task
                                         ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
-                                        : match($task->status->value) {
-                                            'Selesai' => 'border-green-200 text-green-700 bg-green-50',
-                                            'Cancel'  => 'border-red-200 text-red-700 bg-red-50',
-                                            'Pending' => 'border-yellow-200 text-yellow-700 bg-yellow-50',
-                                            default   => 'border-slate-200 text-slate-600 bg-slate-50',
-                                        };
+                                        : $task->status->displayBadgeClasses();
                                 @endphp
                                 <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit {{ $statusClasses }}"
                                     title="Status Riwayat sudah final, tidak bisa diubah">
                                     {{ $statusLabel }}
                                 </span>
+                                @if($task->status->value === 'dibatalkan' && $task->cancel_reason)
+                                    <p class="text-[10px] text-slate-400 mt-0.5 max-w-[160px] truncate" title="{{ $task->cancel_reason }}">{{ $task->cancel_reason }}</p>
+                                @endif
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap font-ui">
                                 <span @class([

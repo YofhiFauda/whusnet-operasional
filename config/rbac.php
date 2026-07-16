@@ -192,7 +192,8 @@ return [
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
-            ActionCode::UPDATE_SENSITIVE->value
+            ActionCode::UPDATE_SENSITIVE->value,
+            ActionCode::CANCEL->value
         ],
 
         'sla_timeline' => [

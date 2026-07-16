@@ -407,3 +407,51 @@ Task.status=selesai + fop_review_status=pending (task_type SURVEY/PEMASANGAN)
 **Kenapa gak taruh keputusan approve/reject di modul FopTask/Riwayat:** Riwayat murni nampung ("task yang udah dikerjakan dengan berbagai status"), keputusan sebenarnya (approve/reject pelanggan) tetap di Customer module — prinsip yang sama kayak reject laporan biasa gak dobel-implement di FopTaskController (lihat § 9 poin "Approve/reject laporan gak dapet endpoint baru").
 
 Detail lengkap + test: `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL), `docs/project_status_label_unifikasi.md`, `tests/Feature/FopTaskVerificationOverlayTest.php`, `tests/Feature/CustomerVerificationRejectFopSyncTest.php`.
+
+## 13. Cancel dengan Alasan — task_type NON-SRV/PSB (Task 12, 2026-07-22)
+
+**Scope:** cuma MTN/DEAC/RELOKASI/C-REQ/O-REQ/INFR REQ — SURVEY/PEMASANGAN udah dikunci total di § 12 di atas, gak lewat jalur ini.
+
+```
+FOP klik "Cancel" di tabel /fop-tasks (kategori NON-SRV/PSB)
+        │
+        ▼
+  Modal muncul — textarea alasan wajib (Alpine cancelModal, ganti
+  window.Confirm polos yang lama)
+        │
+        ▼
+  Submit PUT /fop-tasks/{id} {status: 'dibatalkan', cancel_reason: '...'}
+        │
+        ▼
+  FopTaskController::update()
+        │
+        ├─ cancel_reason kosong? ──▶ 422 "Alasan pembatalan wajib diisi."
+        │
+        ├─ user gak punya permission fop_tasks.cancel? ──▶ 403
+        │   (gate BARU, terpisah dari fop_tasks.update biasa)
+        │
+        ▼
+  FopTask.status=dibatalkan, cancelled_at=now(), cancel_reason=alasan
+        │
+        ▼
+  Task eksekusi terkait ikut dibatalkan — TaskService::cancel($task, $actor, $reason)
+  (alasan yang SAMA diteruskan, bukan pesan generik lagi)
+        │
+        ├─ Task.status sebelumnya == in_progress?
+        │        │
+        │        ├─ YA ──▶ notifyTeam() ke semua anggota tim — AppNotification
+        │        │          type=error, "Task dibatalkan: {alasan}"
+        │        │
+        │        └─ TIDAK (terjadwal/draft) ──▶ gak ada notifikasi
+        │
+        ▼
+  rebuildTeamsForDate() jalan otomatis (kode existing, gak ada logic baru) —
+  task yang dibatalkan otomatis ke-exclude dari query aktif, team yang cuma
+  ditempatin task ini ikut kehapus di step cleanup
+```
+
+**Permission `fop_tasks.cancel`** (baru di `config/rbac.php`, `ActionCode::CANCEL`) — role `admin`/`fop` otomatis dapet lewat wildcard `fop_tasks.*` existing (gak perlu ubah `RolePermissionSeeder`, cuma `fop_tasks.update_sensitive` yang di-exclude eksplisit dari wildcard `fop` role).
+
+**Notifikasi cancel ini SATU jalur buat SEMUA pemicu cancel** — logic-nya ditaruh di `TaskService::cancel()` sendiri (bukan di controller), jadi otomatis berlaku juga buat cancel SRV/PSB dari halaman Customer (§ 12) kalau task-nya kebetulan lagi `in_progress` pas dibatalin.
+
+Test: `tests/Feature/FopTaskCancelTest.php` (7 test). Detail realisasi & file list lengkap: `docs/fop-task/analisa-auto-team.md` § Task 12.

@@ -284,11 +284,13 @@ class FopTaskController extends Controller
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ['nullable', 'required_if:status,pending', 'string', 'max:255'],
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
+            'cancel_reason' => ['nullable', 'required_if:status,dibatalkan', 'string', 'max:500'],
             'technicians' => ['sometimes', 'required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
         ], [
             'pending_reason.required_if' => 'Alasan pending wajib diisi jika status Pending.',
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
+            'cancel_reason.required_if' => 'Alasan pembatalan wajib diisi.',
         ]);
 
         // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task & Prioritas.
@@ -307,6 +309,15 @@ class FopTaskController extends Controller
             && in_array($effectiveCategory, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value], true)
         ) {
             abort(422, 'Task SRV/PSB gak bisa dibatalkan dari sini — batalkan lewat halaman Pelanggan (tab Survey/Pemasangan).');
+        }
+
+        // Task 12 — cancel (task_type NON-SRV/PSB, yang di atas udah diblok) butuh
+        // permission eksplisit `fop_tasks.cancel`, bukan cuma `fop_tasks.update` biasa.
+        if (
+            ($validated['status'] ?? null) === TaskStatus::DIBATALKAN->value
+            && !auth()->user()->hasPermission('fop_tasks.cancel')
+        ) {
+            abort(403, 'Anda tidak memiliki hak akses untuk membatalkan Task FOP.');
         }
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
@@ -335,9 +346,11 @@ class FopTaskController extends Controller
                 } elseif ($validated['status'] === TaskStatus::DIBATALKAN->value || $validated['status'] === TaskStatus::SELESAI->value) {
                     if ($oldStatus !== TaskStatus::DIBATALKAN->value && $validated['status'] === TaskStatus::DIBATALKAN->value) {
                         $fopTask->cancelled_at = now();
+                        $fopTask->cancel_reason = $validated['cancel_reason'] ?? null;
                     }
                     if ($validated['status'] === TaskStatus::SELESAI->value && $oldStatus === TaskStatus::DIBATALKAN->value) {
                         $fopTask->cancelled_at = null;
+                        $fopTask->cancel_reason = null;
                     }
                     $fopTask->pending_reason = null;
                     $fopTask->client_request_date = null;
@@ -360,7 +373,7 @@ class FopTaskController extends Controller
             ) {
                 $linkedTask = $fopTask->task;
                 if ($linkedTask && !in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
-                    app(TaskService::class)->cancel($linkedTask, auth()->user(), "Dibatalkan dari Task FOP {$fopTask->task_number}.");
+                    app(TaskService::class)->cancel($linkedTask, auth()->user(), $validated['cancel_reason'] ?? "Dibatalkan dari Task FOP {$fopTask->task_number}.");
                 }
             }
 

@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'pending_reason',
     'client_request_date',
     'cancelled_at',
+    'cancel_reason',
     'team_id',
     'handling_sla_hours',
 ])]

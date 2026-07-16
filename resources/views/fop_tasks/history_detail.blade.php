@@ -23,13 +23,13 @@
                 </span>
                 @php
                     $statusBadge = match ($fopTask->status->value) {
-                        'Selesai' => 'bg-green-50 text-green-700 border-green-200',
-                        'Cancel' => 'bg-red-50 text-red-700 border-red-200',
+                        'selesai' => 'bg-green-50 text-green-700 border-green-200',
+                        'dibatalkan' => 'bg-red-50 text-red-700 border-red-200',
                         default => 'bg-slate-50 text-slate-600 border-slate-200',
                     };
                     $statusLabel = $fopTask->task
                         ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
-                        : $fopTask->status->value;
+                        : $fopTask->status->displayLabel();
                 @endphp
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui {{ $statusBadge }}">
                     {{ $statusLabel }}
@@ -74,10 +74,10 @@
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Issue</p>
                 <p class="font-medium text-red-600">{{ $fopTask->issue ?? '—' }}</p>
             </div>
-            @if($fopTask->status->value === 'Cancel')
+            @if($fopTask->status->value === 'dibatalkan')
             <div class="col-span-2">
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alasan Cancel</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->pending_reason ?? '—' }}</p>
+                <p class="font-medium text-slate-800">{{ $fopTask->cancel_reason ?? '—' }}</p>
             </div>
             @endif
             @if($fopTask->notes)

@@ -3,7 +3,7 @@
 @section('title', 'Task FOP')
 
 @section('content')
-<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
+<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open || cancelModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
 
 
 
@@ -248,13 +248,15 @@
                                         {{-- SRV/PSB gak boleh dibatalkan dari sini — harus lewat halaman
                                              Customer (tab Survey/Pemasangan), biar masuk List Pelanggan
                                              Gagal. Lihat TaskPolicy::cancel() & FopTaskController::update(). --}}
-                                        @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
-                                            <button type="button" x-data
-                                                    @click="window.Confirm('Konfirmasi Cancel', 'Apakah Anda yakin ingin membatalkan Task FOP [{{ $task->task_number }}]?', 'warning', () => cancelFopTask({{ $task->id }}))"
-                                                    class="text-[10px] text-red-600 underline decoration-dotted text-left cursor-pointer">
-                                                Cancel
-                                            </button>
-                                        @endif
+                                        @can('fop_tasks.cancel')
+                                            @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
+                                                <button type="button"
+                                                        @click="openCancelModal({{ $task->id }}, '{{ $task->task_number }}')"
+                                                        class="text-[10px] text-red-600 underline decoration-dotted text-left cursor-pointer">
+                                                    Cancel
+                                                </button>
+                                            @endif
+                                        @endcan
                                     </div>
                                 </div>
                             </td>
@@ -539,6 +541,27 @@
         </div>
     </div>
 
+    {{-- ══ CANCEL TASK MODAL (Task 12 — alasan wajib, task_type NON-SRV/PSB) ══ --}}
+    <div x-show="cancelModal.open"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+         style="display: none;">
+        <div class="bg-surface border border-border rounded-lg shadow-lg w-full max-w-md p-5" @click.away="cancelModal.open = false">
+            <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Task <span class="font-mono" x-text="cancelModal.taskNumber"></span></h4>
+            <p class="text-xs text-text-muted mb-4">Task akan dibatalkan. Tindakan ini tidak dapat dibatalkan.</p>
+            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan Pembatalan <span class="text-error">*</span></label>
+            <textarea x-model="cancelModal.reason" rows="3" class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Data ganda, pelanggan batal, salah input POP, dll."></textarea>
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="cancelModal.open = false" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
+                <button type="button" :disabled="cancelModal.isSubmitting || !cancelModal.reason.trim()"
+                        @click="submitCancelModal()"
+                        class="text-xs px-3 py-1.5 rounded-md font-semibold text-white disabled:opacity-50" style="background:var(--color-error);">
+                    <span x-show="!cancelModal.isSubmitting">Ya, Batalkan Task</span>
+                    <span x-show="cancelModal.isSubmitting">Membatalkan...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- ══ KONFLIK TEAM MODAL (Skenario C3: task narik teknisi dari >=2 team beda) ══ --}}
     <div x-show="teamConflictModal.open"
          x-effect="document.body.classList.toggle('overflow-hidden', teamConflictModal.open)"
@@ -754,6 +777,7 @@
                 },
                 techs: []
             },
+            cancelModal: { open: false, taskId: null, taskNumber: '', reason: '', isSubmitting: false },
             teamConflictModal: { open: false, conflicts: @json($teamConflicts ?? []) },
             teamSelectionModal: { open: false, taskId: null, taskNumber: '', taskTugas: '', taskDate: '', teams: [] },
             switchTechModal: {
@@ -999,8 +1023,19 @@
                 }
             },
 
-            cancelFopTask(taskId) {
-                this.sendUpdateRequest(taskId, { status: 'dibatalkan' });
+            openCancelModal(taskId, taskNumber) {
+                this.cancelModal.taskId = taskId;
+                this.cancelModal.taskNumber = taskNumber;
+                this.cancelModal.reason = '';
+                this.cancelModal.isSubmitting = false;
+                this.cancelModal.open = true;
+            },
+
+            submitCancelModal() {
+                if (!this.cancelModal.reason.trim()) return;
+                this.cancelModal.isSubmitting = true;
+                this.sendUpdateRequest(this.cancelModal.taskId, { status: 'dibatalkan', cancel_reason: this.cancelModal.reason.trim() })
+                    .finally(() => { this.cancelModal.isSubmitting = false; });
             },
 
             updatePriority(taskId, priority) {
@@ -1009,7 +1044,7 @@
 
             sendUpdateRequest(taskId, data) {
                 const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                fetch(`{{ url('/fop-tasks') }}/${taskId}`, {
+                return fetch(`{{ url('/fop-tasks') }}/${taskId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1018,13 +1053,14 @@
                     },
                     body: JSON.stringify(data)
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        this.showToast('success', data.message);
+                .then(res => res.json().then(body => ({ ok: res.ok, body })))
+                .then(({ ok, body }) => {
+                    if (ok && body.success) {
+                        this.cancelModal.open = false;
+                        this.showToast('success', body.message);
                         setTimeout(() => window.location.reload(), 1000);
                     } else {
-                        this.showToast('error', 'Gagal memperbarui data.');
+                        this.showToast('error', body.message || 'Gagal memperbarui data.');
                     }
                 })
                 .catch(err => {

@@ -43,6 +43,8 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 
 **Fallback tambahan** di `statusStart`/`statusComplete`: kalau `canTransitionTo()` gagal, masih ada jalur alternatif — misal task tipe `MAINTENANCE` atau task tipe Survey/Pemasangan yang lagi `pending` tetap bisa distart/dicomplete asal user permission generik (`task.status.start`) dan `isMember()` true. Jadi **jangan asumsikan satu jalur guard tunggal** — cek kedua kondisi kalau debug masalah akses.
 
+**Cancel punya jalur guard KE-3 yang beda lagi (Task 12, 2026-07-22):** di atas cuma buat cancel dari halaman Task (`TaskPolicy::cancel()`, mekanisme B). Cancel dari tabel FOP Task (`FopTaskController::update()`, task_type NON-SRV/PSB) pakai permission STATIS terpisah `fop_tasks.cancel` (`config/rbac.php`, bukan `WorkflowTransitionPermission`) — 2 sistem permission BEDA buat aksi cancel yang secara efek sama-sama manggil `TaskService::cancel()`, tergantung dari halaman mana usernya masuk. Jangan kaget kalau user bisa cancel dari satu halaman tapi ditolak di halaman lain — itu 2 gate independen, cek keduanya kalau debug.
+
 ## 4. Batasan Tim (1–3 Teknisi)
 
 - Validasi form edit: `team_member_ids` max 3 (`TaskController::update()`).

@@ -222,7 +222,7 @@ class FopTaskStatusSyncTest extends TestCase
         [$task, $fopTask] = $this->makeLinkedTask('TASK-9211', 'in_progress');
 
         $this->actingAs($this->fopUser)
-            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan'])
+            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan', 'cancel_reason' => 'Test cancel'])
             ->assertOk();
 
         $task->refresh();
@@ -242,7 +242,7 @@ class FopTaskStatusSyncTest extends TestCase
         ]);
 
         $this->actingAs($this->fopUser)
-            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan'])
+            ->putJson(route('fop-tasks.update', $fopTask), ['status' => 'dibatalkan', 'cancel_reason' => 'Test cancel'])
             ->assertOk();
 
         $this->assertEquals(TaskStatus::DIBATALKAN->value, $fopTask->fresh()->status->value);
