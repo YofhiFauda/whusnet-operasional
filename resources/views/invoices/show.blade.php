@@ -5,7 +5,7 @@
 
 @section('content')
 @php
-    $badgeClass = match($invoice->invoice_status) {
+    $badgeClass = match($invoice->invoice_status->value) {
         'lunas' => 'bg-green-50 text-green-700 border-green-100',
         'sebagian' => 'bg-amber-50 text-amber-700 border-amber-100',
         'batal' => 'bg-red-50 text-red-700 border-red-100',
@@ -23,7 +23,7 @@
         <h1 class="text-xl font-bold text-slate-800 tracking-tight">Detail Tagihan {{ $invoice->invoice_number }}</h1>
     </div>
     <div class="flex gap-2">
-        @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status, ['lunas', 'batal'], true))
+        @if(auth()->user()->hasPermission('create_payments') && !in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
             <a href="{{ route('invoices.payments.create', $invoice->id) }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
                 Input Pembayaran
             </a>
@@ -51,7 +51,7 @@
                 </span>
                 @endif
                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border {{ $badgeClass }}">
-                    {{ ucwords(str_replace('_', ' ', $invoice->invoice_status)) }}
+                    {{ $invoice->invoice_status->label() }}
                 </span>
             </div>
         </div>

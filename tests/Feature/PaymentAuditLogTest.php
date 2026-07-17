@@ -105,6 +105,11 @@ class PaymentAuditLogTest extends TestCase
             'role_id' => $adminPusatRole->id,
             'status' => 'active',
         ]);
+        \App\Models\UserRoleScope::create([
+            'user_id' => $adminPusat->id,
+            'role_id' => $adminPusatRole->id,
+            'scope_type' => \App\Enums\ScopeType::ALL_POP,
+        ]);
 
         $pop = $this->createPop('POP-PAY-AUDIT-VIEW', 'PPV', 'POP Payment Audit View');
         $invoice = $this->createInvoice($pop, 'Audit View Payment Customer', 'INV-202606-8802');
@@ -192,6 +197,7 @@ class PaymentAuditLogTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

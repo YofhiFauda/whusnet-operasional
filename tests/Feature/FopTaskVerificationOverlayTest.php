@@ -32,6 +32,8 @@ class FopTaskVerificationOverlayTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(\Database\Seeders\FeatureSeeder::class);
+        $this->seed(\Database\Seeders\ActionSeeder::class);
         $this->seed(\Database\Seeders\RoleSeeder::class);
         $this->seed(\Database\Seeders\PermissionSeeder::class);
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);

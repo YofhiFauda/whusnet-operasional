@@ -126,7 +126,7 @@
             <tbody class="divide-y divide-slate-100">
                 @forelse($invoices as $invoice)
                     @php
-                        $badgeClass = match($invoice->invoice_status) {
+                        $badgeClass = match($invoice->invoice_status->value) {
                             'lunas' => 'bg-green-50 text-green-700 border-green-100',
                             'sebagian' => 'bg-amber-50 text-amber-700 border-amber-100',
                             'batal' => 'bg-red-50 text-red-700 border-red-100',
@@ -136,7 +136,7 @@
                     <tr class="hover:bg-slate-50/45 transition-colors" id="invoice-row-{{ $invoice->id }}">
                         @can('payments.create')
                             <td class="px-4 py-3.5 text-center">
-                                @if(!in_array($invoice->invoice_status, ['lunas', 'batal']))
+                                @if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
                                     <input type="checkbox" class="bulk-pay-checkbox rounded border-slate-300 cursor-pointer" value="{{ $invoice->id }}" onclick="updateBulkPayBar()">
                                 @endif
                             </td>
@@ -168,13 +168,13 @@
                         <td class="px-6 py-3.5 text-right font-mono">Rp {{ number_format((float) $invoice->remaining_amount, 2, ',', '.') }}</td>
                         <td class="px-6 py-3.5 text-center whitespace-nowrap">
                             <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}" id="invoice-status-badge-{{ $invoice->id }}" data-badge-style="pill">
-                                {{ ucwords(str_replace('_', ' ', $invoice->invoice_status)) }}
+                                {{ $invoice->invoice_status->label() }}
                             </span>
                         </td>
                         <td class="px-6 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
                                 @can('payments.create')
-                                    @if(!in_array($invoice->invoice_status, ['lunas', 'batal']))
+                                    @if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
                                         <button type="button"
                                                 onclick="openQuickPaymentModal({{ $invoice->id }}, '{{ $invoice->invoice_number }}', {{ (float) $invoice->remaining_amount }})"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">

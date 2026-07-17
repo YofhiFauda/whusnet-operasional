@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class InvoiceController extends Controller
         $status = trim((string) $request->query('status', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
         $invoiceType = trim((string) $request->query('invoice_type', ''));
-        $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
+        $allowedStatuses = array_column(InvoiceStatus::cases(), 'value');
 
         $query = Invoice::query()
             ->applyUserScope()
@@ -54,9 +55,9 @@ class InvoiceController extends Controller
         }
 
         if ($statusGroup === 'lunas') {
-            $query->where('invoice_status', 'lunas');
+            $query->where('invoice_status', InvoiceStatus::LUNAS->value);
         } elseif ($statusGroup === 'belum_lunas') {
-            $query->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+            $query->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
         } elseif ($status !== '' && in_array($status, $allowedStatuses, true)) {
             $query->where('invoice_status', $status);
         }
@@ -68,7 +69,7 @@ class InvoiceController extends Controller
         // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.
         $unpaidBase = Invoice::query()
             ->applyUserScope()
-            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
 
         $unpaidAwalTotal = (clone $unpaidBase)
             ->whereIn('invoice_type', ['awal', 'reaktivasi'])

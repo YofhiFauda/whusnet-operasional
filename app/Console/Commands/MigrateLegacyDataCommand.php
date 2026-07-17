@@ -415,10 +415,10 @@ protected $signature = 'app:import-legacy-sql
             }
 
             // Standardize gender
-            $gender = 'Laki-laki';
+            $gender = \App\Enums\Gender::LAKI_LAKI->value;
             if (isset($row['JENISKELAMIN'])) {
                 if (strtoupper($row['JENISKELAMIN']) === 'P') {
-                    $gender = 'Perempuan';
+                    $gender = \App\Enums\Gender::PEREMPUAN->value;
                 }
             }
 
@@ -1000,12 +1000,15 @@ protected $signature = 'app:import-legacy-sql
 
         if (!$admin) {
             // Create a system user if none exists
+            $ownerRole = \App\Models\Role::where('code', 'owner')->first();
+
             $admin = User::create([
                 'name' => 'System Admin',
                 'username' => 'system',
                 'email' => 'system@whusnet.local',
                 'password' => bcrypt('password'),
                 'status' => 'active',
+                'role_id' => $ownerRole?->id,
             ]);
             $this->info("Created a fallback System Admin user.");
         }

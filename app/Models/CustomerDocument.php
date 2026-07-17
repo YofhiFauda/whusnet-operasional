@@ -14,13 +14,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CustomerDocument extends Model
 {
-    public const TYPES = [
-        'ktp' => 'Dokumen KTP',
-        'rumah' => 'Foto Rumah',
-        'kontrak' => 'Dokumen Kontrak',
-        'survey' => 'Foto Survey',
-        'pemasangan' => 'Foto Pemasangan',
-    ];
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'document_type' => \App\Enums\DocumentType::class,
+        ];
+    }
 
     /**
      * @return BelongsTo<Customer, $this>
@@ -40,7 +42,7 @@ class CustomerDocument extends Model
 
     public function typeLabel(): string
     {
-        return self::TYPES[$this->document_type] ?? ucwords(str_replace('_', ' ', $this->document_type));
+        return $this->document_type->label();
     }
 
     public function isImage(): bool

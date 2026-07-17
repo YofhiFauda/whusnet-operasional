@@ -545,7 +545,7 @@ class CustomerImportTest extends TestCase
 
         $this->assertSame('active', $customer->status);
         $this->assertSame('aktif', $customer->customer_status);
-        $this->assertSame('sebagian', $invoice->invoice_status);
+        $this->assertSame('sebagian', $invoice->invoice_status->value);
         $this->assertEquals(50000.00, (float) $invoice->paid_amount);
         $this->assertEquals(50000.00, (float) $invoice->remaining_amount);
 

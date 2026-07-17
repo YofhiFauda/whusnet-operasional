@@ -187,7 +187,7 @@ class CustomerVerificationController extends Controller
                 'total_amount' => $validated['total_amount'],
                 'remaining_amount' => $validated['total_amount'],
                 'paid_amount' => 0,
-                'invoice_status' => 'belum_dibayar',
+                'invoice_status' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
                 'created_by' => auth()->id(),
             ]);
 

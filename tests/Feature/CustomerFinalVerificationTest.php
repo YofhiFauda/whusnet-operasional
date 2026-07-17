@@ -13,6 +13,8 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
 use App\Models\Invoice;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -30,6 +32,8 @@ class CustomerFinalVerificationTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
@@ -178,6 +182,6 @@ class CustomerFinalVerificationTest extends TestCase
         $this->assertNotNull($invoice);
         $this->assertEquals('2026-06', $invoice->billing_period);
         $this->assertEquals(166500, $invoice->total_amount);
-        $this->assertEquals('belum_dibayar', $invoice->invoice_status);
+        $this->assertEquals('belum_dibayar', $invoice->invoice_status->value);
     }
 }

@@ -206,7 +206,8 @@ class TaskController extends Controller
         $this->authorize('cancel', $task);
 
         $validated = $request->validate([
-            'cancel_reason' => 'required|string|max:500',
+            // Task.cancel_reason varchar(255) — max harus samain kapasitas kolom.
+            'cancel_reason' => \App\Support\ReasonValidationRule::required(255),
         ]);
 
         $this->taskService->cancel($task, auth()->user(), $validated['cancel_reason']);
@@ -230,7 +231,8 @@ class TaskController extends Controller
         $this->authorize('statusReschedule', $task);
 
         $validated = $request->validate([
-            'pending_reason' => 'required|string|max:500',
+            // Task.pending_reason varchar(255) — max harus samain kapasitas kolom.
+            'pending_reason' => \App\Support\ReasonValidationRule::required(255),
         ]);
 
         $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'reschedule');
@@ -378,7 +380,8 @@ class TaskController extends Controller
         $this->authorize('fopReject', $task);
 
         $validated = $request->validate([
-            'reject_reason' => 'required|string|max:1000',
+            // Task.reject_reason varchar(1000).
+            'reject_reason' => \App\Support\ReasonValidationRule::required(1000),
         ]);
 
         $task->update([
@@ -390,7 +393,7 @@ class TaskController extends Controller
             $task,
             'Task Ditolak: ' . $task->task_number,
             'Task pending ditolak oleh FOP: ' . $validated['reject_reason'],
-            'error'
+            \App\Enums\NotificationType::ERROR
         );
 
         return back()->with('success', "Task [{$task->task_number}] ditolak (reject).");
@@ -408,14 +411,15 @@ class TaskController extends Controller
         $this->authorize('fopPending', $task);
 
         $validated = $request->validate([
-            'pending_reason' => 'required|string|max:1000',
+            // Task.pending_reason varchar(255) — max harus samain kapasitas kolom.
+            'pending_reason' => \App\Support\ReasonValidationRule::required(255),
         ]);
 
         $this->notifyTeamMembers(
             $task,
             'Task Di-pending: ' . $task->task_number,
             'Task ditangguhkan oleh FOP: ' . $validated['pending_reason'],
-            'warning'
+            \App\Enums\NotificationType::WARNING
         );
 
         $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'pending');
@@ -431,7 +435,10 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'action' => 'required|in:approve,reject,pending',
-            'reason' => 'required_if:action,reject,pending|nullable|string|max:1000',
+            // 'reason' ditulis ke reject_reason (varchar 1000) ATAU pending_reason
+            // (varchar 255) tergantung $action — dicap ke yg lebih kecil (255)
+            // biar gak pernah overflow kolom manapun tujuannya.
+            'reason' => 'required_if:action,reject,pending|nullable|string|max:255',
         ]);
 
         $action = $validated['action'];
@@ -461,7 +468,7 @@ class TaskController extends Controller
                 $task,
                 'Laporan Disetujui: ' . $task->task_number,
                 'Laporan task Anda telah disetujui oleh FOP.',
-                'success'
+                \App\Enums\NotificationType::SUCCESS
             );
             $msg = 'disetujui';
         } elseif ($action === 'reject') {
@@ -484,7 +491,7 @@ class TaskController extends Controller
                 $task,
                 'Laporan Ditolak: ' . $task->task_number,
                 'Laporan task Anda ditolak oleh FOP: ' . $reason,
-                'error'
+                \App\Enums\NotificationType::ERROR
             );
             $msg = 'ditolak dan dikembalikan ke In Progress';
         } elseif ($action === 'pending') {
@@ -497,7 +504,7 @@ class TaskController extends Controller
                 $task,
                 'Task Di-pending: ' . $task->task_number,
                 'Task Anda di-pending kembali oleh FOP: ' . $reason,
-                'warning'
+                \App\Enums\NotificationType::WARNING
             );
             $msg = 'di-pending';
         }
@@ -575,7 +582,7 @@ class TaskController extends Controller
         return array_values($teamsMap);
     }
 
-    private function notifyTeamMembers(Task $task, string $title, string $message, string $type = 'info'): void
+    private function notifyTeamMembers(Task $task, string $title, string $message, \App\Enums\NotificationType $type = \App\Enums\NotificationType::INFO): void
     {
         $task->loadMissing('teamMembers.user');
         $url = route('tasks.show', $task->id);

@@ -206,6 +206,12 @@ class CustomerValidationService
             return false;
         }
 
+        // Beberapa field (mis. gender) di-cast ke backed enum — unwrap ke
+        // ->value dulu sebelum (string) cast, enum gak punya __toString().
+        if ($value instanceof \BackedEnum) {
+            $value = $value->value;
+        }
+
         $stringValue = trim((string) $value);
         return $stringValue !== '' && $stringValue !== '0';
     }

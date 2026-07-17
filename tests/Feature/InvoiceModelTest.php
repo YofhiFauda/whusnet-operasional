@@ -112,6 +112,7 @@ class InvoiceModelTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-202606-0001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

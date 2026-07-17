@@ -212,8 +212,8 @@
                                 {{ $payment->receiver->name ?? '-' }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ $statusBadges[$payment->payment_status] ?? 'bg-slate-50 text-slate-600 border-slate-200' }}">
-                                    {{ $statusLabels[$payment->payment_status] ?? $payment->payment_status }}
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ $statusBadges[$payment->payment_status->value] ?? 'bg-slate-50 text-slate-600 border-slate-200' }}">
+                                    {{ $statusLabels[$payment->payment_status->value] ?? $payment->payment_status->label() }}
                                 </span>
                             </td>
                         </tr>

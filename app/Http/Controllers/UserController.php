@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\Pop;
@@ -106,7 +107,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'status' => ['required', Rule::in(['active', 'inactive'])],
+            'status' => ['required', Rule::enum(UserStatus::class)],
             'role_id' => ['required', 'exists:roles,id'],
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
@@ -118,7 +119,7 @@ class UserController extends Controller
             'email.email' => 'Format email user tidak valid.',
             'email.unique' => 'Email user sudah digunakan.',
             'status.required' => 'Status user wajib dipilih.',
-            'status.in' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
+            'status.enum' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
             'role_id.required' => 'Role user wajib dipilih.',
             'role_id.exists' => 'Role user yang dipilih tidak valid.',
             'scope_type.required' => 'Scope wilayah data wajib dipilih.',
@@ -193,7 +194,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
-            'status' => ['required', Rule::in(['active', 'inactive'])],
+            'status' => ['required', Rule::enum(UserStatus::class)],
             'role_id' => ['required', 'exists:roles,id'],
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
@@ -205,7 +206,7 @@ class UserController extends Controller
             'email.email' => 'Format email user tidak valid.',
             'email.unique' => 'Email user sudah digunakan.',
             'status.required' => 'Status user wajib dipilih.',
-            'status.in' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
+            'status.enum' => 'Status user tidak valid. Pilih aktif atau nonaktif.',
             'role_id.required' => 'Role user wajib dipilih.',
             'role_id.exists' => 'Role user yang dipilih tidak valid.',
             'scope_type.required' => 'Scope wilayah data wajib dipilih.',

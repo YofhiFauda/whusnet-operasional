@@ -149,7 +149,7 @@
 
                         <div>
                             <span class="block mb-1 uppercase tracking-wide text-[10px] text-slate-400">JENIS KELAMIN</span>
-                            <span class="block text-sm text-slate-800">{{ $customer->gender ?? '-' }}</span>
+                            <span class="block text-sm text-slate-800">{{ $customer->gender?->label() ?? '-' }}</span>
                         </div>
 
                         <div>

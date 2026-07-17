@@ -37,6 +37,15 @@ class PaymentInputTest extends TestCase
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-1', 'PAY1', 'POP Payment 1');
         $finance->pops()->attach($pop->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $finance->id,
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop->id,
+        ]);
         $invoice = $this->createInvoice($pop, 'INV-202606-8001');
 
         $response = $this->actingAs($finance)->post(route('invoices.payments.store', $invoice->id), [
@@ -76,6 +85,15 @@ class PaymentInputTest extends TestCase
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-2', 'PAY2', 'POP Payment 2');
         $finance->pops()->attach($pop->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $finance->id,
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop->id,
+        ]);
         $invoice = $this->createInvoice($pop, 'INV-202606-8002');
 
         $response = $this->actingAs($finance)->post(route('invoices.payments.store', $invoice->id), [
@@ -198,6 +216,7 @@ class PaymentInputTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

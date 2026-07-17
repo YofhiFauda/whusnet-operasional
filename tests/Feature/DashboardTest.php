@@ -368,6 +368,7 @@ class DashboardTest extends TestCase
         // Invoice month 1 (2026-05)
         \App\Models\Invoice::create([
             'invoice_number' => 'INV-0001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
@@ -387,6 +388,7 @@ class DashboardTest extends TestCase
         // Invoice month 2 (2026-06)
         \App\Models\Invoice::create([
             'invoice_number' => 'INV-0002',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

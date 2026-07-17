@@ -365,7 +365,7 @@
                         </div>
                         <div class="py-1.5 border-b border-slate-50 flex justify-between">
                             <span class="text-slate-400">Jenis Kelamin</span>
-                            <span class="font-semibold text-slate-800">{{ $customer->gender ?? 'Belum diisi' }}</span>
+                            <span class="font-semibold text-slate-800">{{ $customer->gender?->label() ?? 'Belum diisi' }}</span>
                         </div>
                         <div class="py-1.5 border-b border-slate-50 flex justify-between">
                             <span class="text-slate-400">Nomor HP Utama</span>
@@ -755,20 +755,14 @@
                                                     <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format($invoice->total_amount, 2, ',', '.') }}</td>
                                                     <td class="px-4 py-3 text-center">
                                                         @php
-                                                            $statusClass = match($invoice->invoice_status) {
+                                                            $statusClass = match($invoice->invoice_status->value) {
                                                                 'lunas' => 'bg-green-50 text-green-700 border-green-200',
                                                                 'sebagian' => 'bg-blue-50 text-blue-700 border-blue-200',
                                                                 'belum_dibayar' => 'bg-amber-50 text-amber-700 border-amber-200',
                                                                 'batal' => 'bg-red-50 text-red-700 border-red-200',
                                                                 default => 'bg-slate-50 text-slate-700 border-slate-200',
                                                             };
-                                                            $statusLabel = match($invoice->invoice_status) {
-                                                                'lunas' => 'Lunas',
-                                                                'sebagian' => 'Sebagian',
-                                                                'belum_dibayar' => 'Belum Dibayar',
-                                                                'batal' => 'Batal',
-                                                                default => ucwords(str_replace('_', ' ', $invoice->invoice_status)),
-                                                            };
+                                                            $statusLabel = $invoice->invoice_status->label();
                                                         @endphp
                                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusClass }}" id="invoice-status-badge-{{ $invoice->id }}" data-badge-style="tag">
                                                             {{ $statusLabel }}
@@ -777,7 +771,7 @@
                                                     <td class="px-4 py-3 text-slate-500">{{ $invoice->creator->name ?? 'System' }}</td>
                                                     @can('payments.create')
                                                         <td class="px-4 py-3 text-center">
-                                                            @if(!in_array($invoice->invoice_status, ['lunas', 'batal']))
+                                                            @if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true))
                                                                 <button type="button"
                                                                         onclick="openQuickPaymentModal({{ $invoice->id }}, '{{ $invoice->invoice_number }}', {{ (float) $invoice->remaining_amount }})"
                                                                         class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer">
@@ -1049,7 +1043,7 @@
                                         <td class="px-4 py-3 text-right font-mono font-semibold">Rp {{ number_format((float) $payment->amount, 2, ',', '.') }}</td>
                                         <td class="px-4 py-3">
                                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide bg-green-50 text-green-700 border-green-200">
-                                                {{ ucwords(str_replace('_', ' ', $payment->payment_status)) }}
+                                                {{ $payment->payment_status->label() }}
                                             </span>
                                         </td>
                                         <td class="px-4 py-3">
@@ -1084,7 +1078,7 @@
                     </div>
                 </div>
 
-                @if(auth()->user()->hasPermission('view_customer_documents'))
+                @if(auth()->user()->hasPermission('customers.detail.documents.view'))
                     @if(auth()->user()->hasPermission('upload_customer_documents'))
                         <form method="POST" action="{{ route('customers.documents.store', ['customer' => $customer->id]) }}" enctype="multipart/form-data" class="border border-slate-200 rounded-lg p-4 bg-slate-50">
                             @csrf
@@ -1092,8 +1086,8 @@
                                 <div>
                                     <label for="document_type" class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Jenis Dokumen</label>
                                     <select name="document_type" id="document_type" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" required>
-                                        @foreach(\App\Models\CustomerDocument::TYPES as $type => $label)
-                                            <option value="{{ $type }}">{{ $label }}</option>
+                                        @foreach(\App\Enums\DocumentType::cases() as $type)
+                                            <option value="{{ $type->value }}">{{ $type->label() }}</option>
                                         @endforeach
                                     </select>
                                 </div>

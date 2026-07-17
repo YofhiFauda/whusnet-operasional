@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
@@ -26,7 +28,7 @@ class PaymentController extends Controller
         $status = trim((string) $request->query('status', ''));
         $invoiceType = trim((string) $request->query('invoice_type', ''));
         $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
-        $allowedStatuses = ['pending', 'valid', 'ditolak'];
+        $allowedStatuses = array_column(PaymentStatus::cases(), 'value');
 
         $query = Payment::query()
             ->applyUserScope()
@@ -112,7 +114,7 @@ class PaymentController extends Controller
 
         $relations = ['invoice.customerService', 'invoice.internetPackage', 'customer', 'pop', 'receiver'];
 
-        if (auth()->user()->hasPermission('view_audit_logs')) {
+        if (auth()->user()->hasPermission('audit_logs.view')) {
             $relations[] = 'auditLogs.user';
         }
 
@@ -140,7 +142,7 @@ class PaymentController extends Controller
     {
         $this->authorizeInvoiceAccess($invoice);
 
-        if ($invoice->invoice_status === 'lunas') {
+        if ($invoice->invoice_status === InvoiceStatus::LUNAS) {
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'Tagihan ini sudah lunas.'], 422);
             }
@@ -150,7 +152,7 @@ class PaymentController extends Controller
                 ->withErrors(['amount' => 'Tagihan ini sudah lunas.']);
         }
 
-        if ($invoice->invoice_status === 'batal') {
+        if ($invoice->invoice_status === InvoiceStatus::BATAL) {
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'Tagihan yang batal tidak dapat menerima pembayaran.'], 422);
             }
@@ -195,7 +197,7 @@ class PaymentController extends Controller
 
             $paidAmount = round((float) $lockedInvoice->paid_amount + $amount, 2);
             $remainingAmount = max(0, round((float) $lockedInvoice->total_amount - $paidAmount, 2));
-            $invoiceStatus = $remainingAmount <= 0 ? 'lunas' : 'sebagian';
+            $invoiceStatus = $remainingAmount <= 0 ? InvoiceStatus::LUNAS->value : InvoiceStatus::SEBAGIAN->value;
 
             $payment = Payment::create([
                 'payment_number' => $this->generatePaymentNumber($validated['payment_date']),
@@ -207,7 +209,7 @@ class PaymentController extends Controller
                 'amount' => $amount,
                 'received_by' => auth()->id(),
                 'proof_file' => $proofPath,
-                'payment_status' => 'valid',
+                'payment_status' => PaymentStatus::VALID->value,
                 'note' => $validated['note'] ?? null,
             ]);
 
@@ -263,7 +265,7 @@ class PaymentController extends Controller
         $invoices = Invoice::query()
             ->applyUserScope()
             ->whereIn('id', $validated['invoice_ids'])
-            ->whereNotIn('invoice_status', ['lunas', 'batal'])
+            ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
             ->get();
 
         $paid = 0;
@@ -291,14 +293,14 @@ class PaymentController extends Controller
                         'payment_method' => $validated['payment_method'],
                         'amount' => $amount,
                         'received_by' => auth()->id(),
-                        'payment_status' => 'valid',
+                        'payment_status' => PaymentStatus::VALID->value,
                         'note' => $validated['note'] ?? 'Pembayaran massal',
                     ]);
 
                     $lockedInvoice->update([
                         'paid_amount' => $paidAmount,
                         'remaining_amount' => $remainingAmount,
-                        'invoice_status' => $remainingAmount <= 0 ? 'lunas' : 'sebagian',
+                        'invoice_status' => $remainingAmount <= 0 ? InvoiceStatus::LUNAS->value : InvoiceStatus::SEBAGIAN->value,
                     ]);
                 });
 

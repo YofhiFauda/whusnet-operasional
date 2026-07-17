@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -37,6 +38,7 @@ class Payment extends Model
         return [
             'payment_date' => 'date',
             'amount' => 'decimal:2',
+            'payment_status' => PaymentStatus::class,
         ];
     }
 
@@ -54,7 +56,7 @@ class Payment extends Model
                 return;
             }
 
-            $action = $payment->wasChanged('payment_status') && $payment->payment_status === 'ditolak'
+            $action = $payment->wasChanged('payment_status') && $payment->payment_status === PaymentStatus::DITOLAK
                 ? 'cancel'
                 : 'update';
 

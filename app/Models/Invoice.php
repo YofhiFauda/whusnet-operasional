@@ -50,6 +50,7 @@ class Invoice extends Model
     {
         return [
             'invoice_type' => \App\Enums\InvoiceType::class,
+            'invoice_status' => \App\Enums\InvoiceStatus::class,
             'issue_date' => 'date',
             'due_date' => 'date',
             'subtotal' => 'decimal:2',

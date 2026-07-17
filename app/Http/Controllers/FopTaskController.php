@@ -41,20 +41,18 @@ class FopTaskController extends Controller
             'customer:id,created_at,updated_at',
             'customer.tasks' => function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)
-                  ->where('status', 'selesai')
+                  ->where('status', TaskStatus::SELESAI->value)
                   ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
             },
         ])
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderByRaw("CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END", [now()->addDay()->toDateString()])
-            ->orderByRaw("CASE priority
-                WHEN 'Urgent' THEN 1
-                WHEN 'High' THEN 2
-                WHEN 'Medium' THEN 3
-                WHEN 'low' THEN 4
-                ELSE 5 END")
-            ->orderByRaw("CASE WHEN category IN ('Survey', 'PSB') THEN created_at END ASC")
-            ->orderByRaw("CASE WHEN category NOT IN ('Survey', 'PSB') THEN created_at END DESC");
+            ->orderByRaw(
+                'CASE priority ' . self::priorityOrderCaseSql() . ' ELSE 5 END',
+                self::priorityOrderBindings()
+            )
+            ->orderByRaw("CASE WHEN category IN (?, ?) THEN created_at END ASC", TaskType::autoOnlyValues())
+            ->orderByRaw("CASE WHEN category NOT IN (?, ?) THEN created_at END DESC", TaskType::autoOnlyValues());
 
         // Search filter
         if ($request->filled('search')) {
@@ -189,7 +187,7 @@ class FopTaskController extends Controller
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => ['nullable', 'required_if:status,pending', 'string', 'max:255'],
+            'pending_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
             'technicians' => ['required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
@@ -292,9 +290,9 @@ class FopTaskController extends Controller
             'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => ['nullable', 'required_if:status,pending', 'string', 'max:255'],
+            'pending_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
-            'cancel_reason' => ['nullable', 'required_if:status,dibatalkan', 'string', 'max:500'],
+            'cancel_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'dibatalkan', 500),
             'technicians' => ['sometimes', 'required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
         ], [
@@ -772,7 +770,7 @@ class FopTaskController extends Controller
             title: 'Switch Teknisi',
             message: $message,
             actionUrl: route('fop-tasks.index'),
-            type: 'info'
+            type: \App\Enums\NotificationType::INFO
         ));
     }
 
@@ -988,7 +986,7 @@ class FopTaskController extends Controller
         // --- 1. Auto-Sync Survey ---
         $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
             ->whereDoesntHave('fopTasks', function ($q) {
-                $q->where('category', 'Survey')->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
+                $q->where('category', TaskType::SURVEY->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
 
         foreach ($surveyCustomers as $c) {
@@ -1011,7 +1009,7 @@ class FopTaskController extends Controller
         // --- 2. Auto-Sync Installation ---
         $installCustomers = Customer::whereIn('status', ['waiting_installation', 'waiting_installations', 'surveyed'])
             ->whereDoesntHave('fopTasks', function ($q) {
-                $q->where('category', 'PSB')->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
+                $q->where('category', TaskType::PEMASANGAN->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
 
         foreach ($installCustomers as $c) {
@@ -1035,11 +1033,11 @@ class FopTaskController extends Controller
         // Menggunakan eager loading (N+1 safe) agar query tidak dilooping
         $activeTasks = FopTask::with(['customer.tasks' => function($q) {
             $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
-              ->where('status', 'selesai')
+              ->where('status', TaskStatus::SELESAI->value)
               ->orderByDesc('completed_at');
         }])
             ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
-            ->whereIn('category', ['Survey', 'PSB'])
+            ->whereIn('category', TaskType::autoOnlyValues())
             ->whereNotNull('customer_id')
             ->get();
             
@@ -1052,17 +1050,23 @@ class FopTaskController extends Controller
             $totalSeconds = 0;
             $remainSeconds = 0;
 
+            // SLA-window diambil dari TaskType::defaultHandlingSlaHours() (satu
+            // sumber kebenaran, sama yg dipakai FopTask.php) — bukan literal
+            // 86400/259200 hand-roll lagi, biar gak divergen kalau default
+            // SLA per-tipe diubah di masa depan.
             if ($task->category === TaskType::SURVEY) {
-                $deadline = Carbon::parse($customer->created_at)->addDay();
-                $totalSeconds = 86400; // 1x24 hours
+                $slaHours = $task->category->defaultHandlingSlaHours();
+                $deadline = Carbon::parse($customer->created_at)->addHours($slaHours);
+                $totalSeconds = $slaHours * 3600;
                 $remainSeconds = -$deadline->diffInSeconds($now, false);
             } elseif ($task->category === TaskType::PEMASANGAN) {
+                $slaHours = $task->category->defaultHandlingSlaHours();
                 // Ambil task survey dari relation yang sudah di-eager load (bukan query baru)
                 $surveyTask = $customer->tasks->first();
-                
+
                 $refDate = $surveyTask?->completed_at ? Carbon::parse($surveyTask->completed_at) : Carbon::parse($customer->updated_at);
-                $deadline = $refDate->addDays(3);
-                $totalSeconds = 259200; // 3x24 hours
+                $deadline = $refDate->addHours($slaHours);
+                $totalSeconds = $slaHours * 3600;
                 $remainSeconds = -$deadline->diffInSeconds($now, false);
             }
 
@@ -1083,6 +1087,31 @@ class FopTaskController extends Controller
                 }
             }
         }
+    }
+
+    /**
+     * Bagian "WHEN ? THEN n" dari CASE SQL sorting priority, digenerate dari
+     * FopTaskPriority::sortOrder() — bukan literal string per value lagi
+     * (lihat ANALISA_REDUNDANSI_LOGIC.md §5). Kalau enum direname/ditambah
+     * case baru, ini otomatis ikut, gak perlu sentuh raw SQL manual.
+     */
+    private static function priorityOrderCaseSql(): string
+    {
+        return collect(FopTaskPriority::cases())
+            ->sortBy(fn (FopTaskPriority $p) => $p->sortOrder())
+            ->map(fn (FopTaskPriority $p) => "WHEN ? THEN {$p->sortOrder()}")
+            ->implode(' ');
+    }
+
+    /**
+     * Binding value buat priorityOrderCaseSql(), urutannya harus sama persis.
+     */
+    private static function priorityOrderBindings(): array
+    {
+        return collect(FopTaskPriority::cases())
+            ->sortBy(fn (FopTaskPriority $p) => $p->sortOrder())
+            ->map(fn (FopTaskPriority $p) => $p->value)
+            ->all();
     }
 
     /**

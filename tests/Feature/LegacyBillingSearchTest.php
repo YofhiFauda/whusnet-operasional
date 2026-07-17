@@ -60,6 +60,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-2025-001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
@@ -125,6 +126,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-NEW-002',
+            'invoice_type' => 'bulanan',
             'old_invoice_id' => 'OLD-INV-777',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
@@ -191,6 +193,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-NEW-003',
+            'invoice_type' => 'bulanan',
             'old_invoice_id' => 'OLD-INV-666',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,

@@ -82,6 +82,15 @@ class ReportInvoiceTest extends TestCase
 
         // Assign popA only
         $user->pops()->attach($popA->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $adminCabangRole->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         $invoiceA = $this->createInvoice($popA, 'Pelanggan SDA', 'INV-SDA-001', '2026-06', 'belum_dibayar');
         $invoiceB = $this->createInvoice($popB, 'Pelanggan SBY', 'INV-SBY-001', '2026-06', 'belum_dibayar');
@@ -150,6 +159,15 @@ class ReportInvoiceTest extends TestCase
         $popA = $this->createPop('SDA', 'SDA', 'POP Sidoarjo');
         $popB = $this->createPop('SBY', 'SBY', 'POP Surabaya');
         $user->pops()->attach($popA->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $adminCabangRole->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         $this->createInvoice($popA, 'Export Pelanggan SDA', 'INV-SDA-991', '2026-06', 'belum_dibayar');
         $this->createInvoice($popB, 'Export Pelanggan SBY', 'INV-SBY-992', '2026-06', 'belum_dibayar');
@@ -235,6 +253,7 @@ class ReportInvoiceTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

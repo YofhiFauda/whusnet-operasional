@@ -75,7 +75,7 @@ class UserCrudTest extends TestCase
 
         $this->assertSame('User Baru', $user->name);
         $this->assertSame('081234567890', $user->phone);
-        $this->assertSame('active', $user->status);
+        $this->assertSame('active', $user->status->value);
         $this->assertSame($role->id, $user->role_id);
         $this->assertTrue($user->pops->contains($pop));
         $this->assertTrue(Hash::check('password123', $user->password));
@@ -137,7 +137,7 @@ class UserCrudTest extends TestCase
         $this->assertSame('User Baru Diedit', $user->name);
         $this->assertSame('user.baru.diedit@example.com', $user->email);
         $this->assertSame('081111111111', $user->phone);
-        $this->assertSame('active', $user->status);
+        $this->assertSame('active', $user->status->value);
         $this->assertSame($adminRole->id, $user->role_id);
         $this->assertTrue($user->pops->contains($popB));
         $this->assertFalse($user->pops->contains($popA));

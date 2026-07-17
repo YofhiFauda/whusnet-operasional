@@ -13,6 +13,8 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
 use App\Models\AuditLog;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -30,6 +32,8 @@ class CustomerActivationTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);

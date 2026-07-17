@@ -114,7 +114,7 @@ class GenerateMonthlyInvoicesCommand extends Command
                         'total_amount' => $totalAmount,
                         'paid_amount' => 0,
                         'remaining_amount' => $totalAmount,
-                        'invoice_status' => 'belum_dibayar',
+                        'invoice_status' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
                         'created_by' => null,
                     ]);
                 });

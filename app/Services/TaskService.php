@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Events\TaskCompleted;
@@ -202,7 +203,7 @@ class TaskService
                 title: 'Laporan Task Selesai: ' . $task->task_number,
                 message: "Teknisi {$actor->name} telah menyelesaikan task dan mengunggah laporan. Butuh review Anda.",
                 actionUrl: route('tasks.show', $task->id),
-                type: 'info'
+                type: NotificationType::INFO
             ));
         }
 
@@ -301,7 +302,7 @@ class TaskService
      */
     public function reassignTeam(Task $task, int $oldUserId, int $newUserId, int $reassignerId, ?string $newScheduledAt = null): void
     {
-        if (!in_array($task->status, ['terjadwal', 'in_progress'])) {
+        if (!in_array($task->status, [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS], true)) {
             throw new \Exception("Hanya task terjadwal atau in progress yang bisa di-reassign.");
         }
 
@@ -314,6 +315,13 @@ class TaskService
                 $scheduleChanged = true;
                 $targetScheduledAt = $parsedNewTime->toDateTimeString();
             }
+        }
+
+        // Check if old user is in the team — cek duluan sebelum conflict-detection
+        // biar gak buang query conflict kalau oldUserId emang bukan member.
+        $hasMember = $task->teamMembers()->where('user_id', $oldUserId)->exists();
+        if (!$hasMember) {
+            throw new \Exception("Teknisi lama tidak ditemukan dalam tim task ini.");
         }
 
         // Determine user IDs to check for conflicts
@@ -333,26 +341,22 @@ class TaskService
             throw new \Exception("Teknisi memiliki jadwal yang bentrok: {$taskNum} pada {$sched}.");
         }
 
-        // Check if old user is in the team
-        $hasMember = $task->teamMembers()->where('user_id', $oldUserId)->exists();
-        if (!$hasMember) {
-            throw new \Exception("Teknisi lama tidak ditemukan dalam tim task ini.");
-        }
+        // Update the team member ID + task, dibungkus transaction sendiri biar
+        // service ini self-contained gak gantung transaction dari caller.
+        DB::transaction(function () use ($task, $oldUserId, $newUserId, $reassignerId, $scheduleChanged, $targetScheduledAt) {
+            $task->teamMembers()->where('user_id', $oldUserId)->update(['user_id' => $newUserId]);
 
-        // Update the team member ID
-        $task->teamMembers()->where('user_id', $oldUserId)->update(['user_id' => $newUserId]);
-
-        // If schedule changed, update task's scheduled_at
-        if ($scheduleChanged) {
-            $task->update([
-                'scheduled_at' => $targetScheduledAt,
-                'updated_by'   => $reassignerId,
-            ]);
-        } else {
-            $task->update([
-                'updated_by'   => $reassignerId,
-            ]);
-        }
+            if ($scheduleChanged) {
+                $task->update([
+                    'scheduled_at' => $targetScheduledAt,
+                    'updated_by'   => $reassignerId,
+                ]);
+            } else {
+                $task->update([
+                    'updated_by'   => $reassignerId,
+                ]);
+            }
+        });
 
         // Log the change — batch-load all relevant users to avoid N+1
         $allUserIds = array_unique(array_filter(array_merge([$reassignerId, $oldUserId, $newUserId], $otherUserIds)));
@@ -387,7 +391,7 @@ class TaskService
                 title: 'Task Baru Di-assign: ' . $task->task_number,
                 message: $msg,
                 actionUrl: $url,
-                type: 'info'
+                type: NotificationType::INFO
             ));
         }
 
@@ -398,7 +402,7 @@ class TaskService
                 title: 'Task Di-unassign: ' . $task->task_number,
                 message: "Tugas ini telah dialihkan ke teknisi lain.",
                 actionUrl: $url,
-                type: 'error'
+                type: NotificationType::ERROR
             ));
         }
 
@@ -413,7 +417,7 @@ class TaskService
                         title: 'Jadwal Task Diperbarui: ' . $task->task_number,
                         message: "Jadwal task diubah ke {$formattedTime}.",
                         actionUrl: $url,
-                        type: 'info'
+                        type: NotificationType::INFO
                     ));
                 }
             }
@@ -496,7 +500,7 @@ class TaskService
                     title: 'Update Task: ' . $task->task_number,
                     message: $message,
                     actionUrl: $url,
-                    type: $eventType === 'cancelled' || $eventType === 'rejected' ? 'error' : 'info'
+                    type: $eventType === 'cancelled' || $eventType === 'rejected' ? NotificationType::ERROR : NotificationType::INFO
                 ));
 
                 // Optional: keep Telegram if already setup

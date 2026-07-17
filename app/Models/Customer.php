@@ -77,6 +77,7 @@ class Customer extends Model
     {
         return [
             'registration_date' => 'date',
+            'gender' => \App\Enums\Gender::class,
         ];
     }
 

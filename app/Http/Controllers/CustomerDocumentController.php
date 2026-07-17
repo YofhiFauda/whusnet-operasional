@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DocumentType;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerDocumentController extends Controller
@@ -17,7 +19,7 @@ class CustomerDocumentController extends Controller
         $this->authorizeCustomerAccess($customer);
 
         $validated = $request->validate([
-            'document_type' => 'required|string|in:ktp,rumah,kontrak,survey,pemasangan',
+            'document_type' => ['required', 'string', Rule::enum(DocumentType::class)],
             'document_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
         ]);
 

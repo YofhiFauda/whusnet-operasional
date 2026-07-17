@@ -25,6 +25,8 @@ class InvoiceCreateTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(\Database\Seeders\FeatureSeeder::class);
+        $this->seed(\Database\Seeders\ActionSeeder::class);
         $this->seed(\Database\Seeders\RoleSeeder::class);
         $this->seed(\Database\Seeders\PermissionSeeder::class);
         $this->seed(\Database\Seeders\RolePermissionSeeder::class);
@@ -111,6 +113,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -186,6 +189,7 @@ class InvoiceCreateTest extends TestCase
         // First invoice
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer1->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -193,6 +197,7 @@ class InvoiceCreateTest extends TestCase
         // Second invoice (same period, different customer)
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer2->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -229,6 +234,7 @@ class InvoiceCreateTest extends TestCase
         // First creation succeeds
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -236,6 +242,7 @@ class InvoiceCreateTest extends TestCase
         // Second creation fails
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -264,6 +271,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -292,6 +300,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -310,6 +319,15 @@ class InvoiceCreateTest extends TestCase
 
         // Assign user to pop1 only
         $user->pops()->attach($pop1->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop1->id,
+        ]);
 
         $package = InternetPackage::query()->firstOrFail();
         $customerInPop1 = $this->createTestCustomer($pop1, $package);
@@ -342,6 +360,7 @@ class InvoiceCreateTest extends TestCase
         // Creating invoice for POP1 succeeds
         $response1 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop1->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -351,6 +370,7 @@ class InvoiceCreateTest extends TestCase
         // Creating invoice for POP2 fails with 403
         $response2 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop2->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);

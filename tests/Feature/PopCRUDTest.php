@@ -6,6 +6,8 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Permission;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -21,6 +23,8 @@ class PopCRUDTest extends TestCase
         parent::setUp();
 
         // Seed roles and permissions
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);

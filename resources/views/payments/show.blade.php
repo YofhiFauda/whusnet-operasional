@@ -5,7 +5,7 @@
 
 @section('content')
 @php
-    $badgeClass = match($payment->payment_status) {
+    $badgeClass = match($payment->payment_status->value) {
         'valid' => 'bg-green-50 text-green-700 border-green-100',
         'ditolak' => 'bg-red-50 text-red-700 border-red-100',
         default => 'bg-amber-50 text-amber-700 border-amber-100',
@@ -41,7 +41,7 @@
                 <p class="text-xs text-slate-500 mt-1">Pembayaran ini tercatat pada invoice dan pelanggan berikut.</p>
             </div>
             <span class="px-2.5 py-1 text-xs font-bold rounded-full border {{ $badgeClass }}">
-                {{ ucwords(str_replace('_', ' ', $payment->payment_status)) }}
+                {{ $payment->payment_status->label() }}
             </span>
         </div>
 
@@ -118,7 +118,7 @@
             @endif
         </div>
 
-        @if(auth()->user()->hasPermission('view_audit_logs'))
+        @if(auth()->user()->hasPermission('audit_logs.view'))
             <div class="border-t border-slate-100 p-6">
                 <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Riwayat Audit Pembayaran</h3>
                 @if($payment->relationLoaded('auditLogs') && $payment->auditLogs->count() > 0)

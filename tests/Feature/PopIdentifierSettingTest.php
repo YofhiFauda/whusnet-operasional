@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Pop;
 use App\Models\PopSequence;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -18,6 +20,8 @@ class PopIdentifierSettingTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);

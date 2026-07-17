@@ -171,9 +171,15 @@ class FopTask extends Model
         }
 
         if ($this->category === \App\Enums\TaskType::PEMASANGAN && $this->customer) {
+            // NB: ini Collection::where (in-memory), bukan query builder — 'task_type'
+            // & 'status' attribute-nya di-cast ke enum (TaskType/TaskStatus), jadi
+            // bandingnya harus ke enum instance, BUKAN ->value string. Enum vs
+            // string loose-compare gak pernah match (sama kelas bug kayak §0) —
+            // sebelum fix ini, $surveyTask SELALU null (2 kondisi ini dulu gak
+            // pernah match sekaligus).
             $surveyTask = $this->customer->tasks
-                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
-                ->where('status', 'selesai')
+                ->where('task_type', \App\Enums\TaskType::SURVEY)
+                ->where('status', \App\Enums\TaskStatus::SELESAI)
                 ->sortByDesc('completed_at')
                 ->first();
 

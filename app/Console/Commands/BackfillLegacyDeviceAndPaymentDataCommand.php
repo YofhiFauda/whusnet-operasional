@@ -234,7 +234,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
                     'amount' => $installationFee,
                     'payment_date' => $payDate,
                     'payment_method' => 'cash',
-                    'payment_status' => 'valid',
+                    'payment_status' => \App\Enums\PaymentStatus::VALID->value,
                     'note' => 'Pembayaran biaya pasang (migrasi backfill)',
                 ]);
                 $installationInserted++;

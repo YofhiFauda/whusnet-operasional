@@ -796,13 +796,13 @@ class CustomerController extends Controller
 
         // Cari invoice terbaru yang belum lunas
         $latestInvoice = $customer->invoices()
-            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian'])
+            ->whereIn('invoice_status', [\App\Enums\InvoiceStatus::BELUM_DIBAYAR->value, \App\Enums\InvoiceStatus::SEBAGIAN->value])
             ->latest('issue_date')
             ->first();
 
         // Hitung total piutang (sum dari remaining_amount semua invoice yang belum lunas)
         $totalPiutang = $customer->invoices()
-            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian'])
+            ->whereIn('invoice_status', [\App\Enums\InvoiceStatus::BELUM_DIBAYAR->value, \App\Enums\InvoiceStatus::SEBAGIAN->value])
             ->sum('remaining_amount');
 
         return response()->json([
@@ -2066,9 +2066,11 @@ class CustomerController extends Controller
                     ]);
 
                     // Update invoice paid & remaining amounts
-                    $newPaidAmount = (float)$invoice->payments()->where('payment_status', 'valid')->sum('amount');
+                    $newPaidAmount = (float)$invoice->payments()->where('payment_status', \App\Enums\PaymentStatus::VALID->value)->sum('amount');
                     $newRemaining = max(0.00, (float)$invoice->total_amount - $newPaidAmount);
-                    $newStatus = $newPaidAmount <= 0 ? 'belum_dibayar' : ($newRemaining <= 0 ? 'lunas' : 'sebagian');
+                    $newStatus = $newPaidAmount <= 0
+                        ? \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value
+                        : ($newRemaining <= 0 ? \App\Enums\InvoiceStatus::LUNAS->value : \App\Enums\InvoiceStatus::SEBAGIAN->value);
 
                     $invoice->update([
                         'paid_amount' => $newPaidAmount,
@@ -2342,17 +2344,13 @@ class CustomerController extends Controller
     {
         $normalized = strtolower(str_replace([' ', '-'], '_', $this->cleanLegacyValue($status) ?? ''));
 
-        return [
-            'lunas' => 'lunas',
-            'paid' => 'lunas',
-            'sebagian' => 'sebagian',
-            'partial' => 'sebagian',
-            'batal' => 'batal',
-            'cancelled' => 'batal',
-            'belum_dibayar' => 'belum_dibayar',
-            'unpaid' => 'belum_dibayar',
-            '' => 'belum_dibayar',
-        ][$normalized] ?? 'belum_dibayar';
+        return match ($normalized) {
+            'lunas', 'paid' => \App\Enums\InvoiceStatus::LUNAS->value,
+            'sebagian', 'partial' => \App\Enums\InvoiceStatus::SEBAGIAN->value,
+            'batal', 'cancelled' => \App\Enums\InvoiceStatus::BATAL->value,
+            'belum_dibayar', 'unpaid', '' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
+            default => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
+        };
     }
 
     private function mapLegacyPaymentMethod(mixed $method): string
@@ -2372,16 +2370,12 @@ class CustomerController extends Controller
     {
         $normalized = strtolower(str_replace([' ', '-'], '_', $this->cleanLegacyValue($status) ?? 'valid'));
 
-        return [
-            'valid' => 'valid',
-            'diterima' => 'valid',
-            'lunas' => 'valid',
-            'pending' => 'pending',
-            'ditolak' => 'ditolak',
-            'rejected' => 'ditolak',
-            'batal' => 'ditolak',
-            '' => 'valid',
-        ][$normalized] ?? 'valid';
+        return match ($normalized) {
+            'valid', 'diterima', 'lunas', '' => \App\Enums\PaymentStatus::VALID->value,
+            'pending' => \App\Enums\PaymentStatus::PENDING->value,
+            'ditolak', 'rejected', 'batal' => \App\Enums\PaymentStatus::DITOLAK->value,
+            default => \App\Enums\PaymentStatus::VALID->value,
+        };
     }
 
     /**
@@ -2675,7 +2669,7 @@ class CustomerController extends Controller
                 'total_amount'            => $totalAmount,
                 'paid_amount'             => $paidAmount,
                 'remaining_amount'        => $remainingAmount,
-                'invoice_status'          => 'belum_dibayar',
+                'invoice_status'          => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
                 'created_by'              => auth()->id(),
             ]);
 

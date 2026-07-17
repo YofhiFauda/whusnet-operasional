@@ -554,20 +554,25 @@ Seluruh nilai di dokumen ini mengacu pada token dari Design System Enterprise Gr
 
 ### 2.1 Warna Utama (Quick Reference)
 
-| Token | Hex | Penggunaan di WHUSNET |
-|---|---:|---|
-| `--color-primary` | `#0284C7` | Tombol utama, active nav, link aksi |
-| `--color-primary-hover` | `#0369A1` | Hover state |
-| `--color-primary-soft` | `#E0F2FE` | Active sidebar item background |
-| `--color-background` | `#F8FAFC` | App background |
-| `--color-surface` | `#FFFFFF` | Card, tabel, modal |
-| `--color-border` | `#E2E8F0` | Garis pembatas halus |
-| `--color-text-main` | `#0F172A` | Teks utama |
-| `--color-text-muted` | `#64748B` | Label, helper, metadata |
-| `--color-success` | `#16A34A` | Aktif, Lunas, Online |
-| `--color-warning` | `#D97706` | Pending, Terlambat, Scheduled |
-| `--color-error` | `#DC2626` | Overdue, Kritis, Gagal |
-| `--color-purple` | `#7C3AED` | Isolir, Admin Suspend |
+| Token | Light Mode Hex | Dark Mode Hex | Penggunaan di WHUSNET |
+|---|---:|---:|---|
+| `--color-primary` | `#4F46E5` | `#4F46E5` | Tombol utama, active nav, link aksi (Cobalt/Indigo) |
+| `--color-primary-hover` | `#4338CA` | `#4338CA` | Hover state |
+| `--color-primary-soft` | `#F5F3FF` | `#1E1B4B` | Active sidebar item background |
+| `--color-primary-border`| `#C7D2FE` | `#312E81` | Accent border untuk active state / focus |
+| `--color-background` | `#F8FAFC` | `#090D16` | App background |
+| `--color-surface` | `#FFFFFF` | `#111827` | Card, tabel, modal |
+| `--color-surface-muted`| `#F1F5F9` | `#1F2937` | Sidebar, input background, hover card |
+| `--color-border` | `#E2E8F0` | `#1E293B` | Garis pembatas halus |
+| `--color-border-strong`| `#CBD5E1` | `#334155` | Garis pembatas tebal / focus border |
+| `--color-text-main` | `#0F172A` | `#F8FAFC` | Teks utama |
+| `--color-text-secondary`| `#334155` | `#CBD5E1` | Teks sekunder / body |
+| `--color-text-muted` | `#64748B` | `#94A3B8` | Label, helper, metadata |
+| `--color-text-disabled`| `#94A3B8` | `#475569` | Teks disabled / placeholder |
+| `--color-success` | `#10B981` | `#34D399` | Aktif, Lunas, Online, UP |
+| `--color-warning` | `#F59E0B` | `#FBBF24` | Pending, Terlambat, Scheduled |
+| `--color-error` | `#EF4444` | `#F87171` | Overdue, Kritis, Gagal, LOS |
+| `--color-purple` | `#7C3AED` | `#A78BFA` | Isolir, Admin Suspend |
 
 ### 2.2 Tipografi (Quick Reference)
 
@@ -582,14 +587,14 @@ Seluruh nilai di dokumen ini mengacu pada token dari Design System Enterprise Gr
 
 ### 2.3 Status Warna Operasional ISP
 
-| Status | Warna Teks | Background | Kapan digunakan |
-|---|---:|---:|---|
-| Aktif / Lunas / Online | `#16A34A` | `#F0FDF4` | Pelanggan aktif, tagihan terbayar, node UP |
-| Pre-aktif / Provisioning | `#0284C7` | `#E0F2FE` | Onboarding, konfigurasi berlangsung |
-| Pending / Terjadwal | `#D97706` | `#FFFBEB` | Menunggu instalasi, jatuh tempo segera |
-| Overdue / LOS | `#DC2626` | `#FEF2F2` | Tagihan telat, signal hilang, kritis |
-| Isolir / Suspend | `#7C3AED` | `#F5F3FF` | Diblokir billing atau admin |
-| Terminasi / Churn | `#475569` | `#F8FAFC` | Kontrak selesai, tidak aktif |
+| Status | Light Mode Teks | Light Mode BG | Dark Mode Teks | Dark Mode BG | Kapan digunakan |
+|---|---:|---:|---:|---:|---|
+| Aktif / Lunas / Online | `#10B981` | `#ECFDF5` | `#34D399` | `#064E3B` | Pelanggan aktif, tagihan terbayar, node UP |
+| Pre-aktif / Provisioning | `#2563EB` | `#EFF6FF` | `#60A5FA` | `#172554` | Onboarding, konfigurasi berlangsung |
+| Pending / Terjadwal | `#F59E0B` | `#FFFBEB` | `#FBBF24` | `#451A03` | Menunggu instalasi, jatuh tempo segera |
+| Overdue / LOS / Down | `#EF4444` | `#FEF2F2` | `#F87171` | `#450A0A` | Tagihan telat, signal hilang, kritis |
+| Isolir / Suspend | `#7C3AED` | `#F5F3FF` | `#A78BFA` | `#2E1065` | Diblokir billing atau admin |
+| Terminasi / Churn | `#64748B` | `#F8FAFC` | `#94A3B8` | `#0F172A` | Kontrak selesai, tidak aktif |
 
 ---
 

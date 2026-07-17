@@ -238,4 +238,84 @@ class FopTaskSortingTest extends TestCase
             Carbon::setTestNow();
         }
     }
+
+    /**
+     * Regresi ANALISA_REDUNDANSI_LOGIC.md §1: dedupe guard auto-sync survey
+     * (FopTaskController::autoSyncAndCalculatePriority(), sebelumnya
+     * `->where('category', 'Survey')`) sempat bandingin literal 'Survey' ke
+     * kolom category yg isinya 'SURVEY' (TaskType enum di-uppercase-in) — gak
+     * pernah match, jadi tiap kali index() diakses bikin FopTask survey
+     * DUPLIKAT terus buat customer yg sama. Test ini pastikan customer yg
+     * udah punya FopTask survey aktif gak didobel lagi walau index() diakses
+     * berkali-kali.
+     */
+    public function test_auto_sync_does_not_duplicate_existing_active_survey_task(): void
+    {
+        $customer = \App\Models\Customer::create([
+            'customer_code' => 'C00RQ000099',
+            'full_name' => 'Pelanggan Antri Survey',
+            'phone' => '081200000099',
+            'registration_date' => now(),
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'status' => 'waiting_survey',
+        ]);
+
+        $existingSurveyTask = $this->makeFopTask([
+            'category' => \App\Enums\TaskType::SURVEY->value,
+            'status' => \App\Enums\TaskStatus::DRAFT->value,
+            'customer_id' => $customer->id,
+        ]);
+
+        // Akses index() dua kali — ini yg trigger autoSyncAndCalculatePriority()
+        // tiap request. Sebelum fix, tiap panggilan nambah 1 FopTask duplikat.
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+
+        $surveyTaskCount = FopTask::where('customer_id', $customer->id)
+            ->where('category', \App\Enums\TaskType::SURVEY->value)
+            ->count();
+
+        $this->assertEquals(1, $surveyTaskCount, 'Auto-sync gak boleh bikin FopTask survey duplikat buat customer yg udah punya task aktif.');
+        $this->assertTrue(FopTask::where('id', $existingSurveyTask->id)->exists());
+    }
+
+    /**
+     * Regresi ANALISA_REDUNDANSI_LOGIC.md §2: SLA-window priority-recalc
+     * sebelumnya hand-roll literal `addDay()`/86400 detik, sekarang pakai
+     * `TaskType::defaultHandlingSlaHours()` (satu sumber kebenaran yg sama
+     * dipakai FopTask.php). Refactor murni angka (24 jam == addDay()), tapi
+     * belum ada test sama sekali buat logic priority-recalc ini sebelumnya —
+     * test ini nutup gap-nya: customer survey yg SLA-nya (24 jam) udah
+     * lewat harus otomatis naik jadi Urgent.
+     */
+    public function test_survey_task_priority_escalates_to_urgent_when_sla_overdue(): void
+    {
+        $customer = \App\Models\Customer::create([
+            'customer_code' => 'C00RQ000098',
+            'full_name' => 'Pelanggan SLA Lewat',
+            'phone' => '081200000098',
+            'registration_date' => now()->subDays(2),
+            'village_id' => $this->village->id,
+            'pop_id' => $this->pop->id,
+            'status' => 'waiting_survey',
+        ]);
+        // SLA survey defaultnya 24 jam (TaskType::SURVEY->defaultHandlingSlaHours()) —
+        // paksa created_at 2 hari lalu biar udah lewat deadline.
+        \Illuminate\Support\Facades\DB::table('customers')
+            ->where('id', $customer->id)
+            ->update(['created_at' => now()->subDays(2)]);
+
+        $surveyTask = $this->makeFopTask([
+            'category' => \App\Enums\TaskType::SURVEY->value,
+            'status' => \App\Enums\TaskStatus::DRAFT->value,
+            'priority' => 'low',
+            'customer_id' => $customer->id,
+        ]);
+
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+
+        $surveyTask->refresh();
+        $this->assertEquals(\App\Enums\FopTaskPriority::URGENT->value, $surveyTask->priority->value);
+    }
 }

@@ -137,8 +137,8 @@
                         @endif
                     </td>
                     <td class="px-6 py-4 text-center">
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $user->status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200' }}">
-                            {{ $user->status === 'active' ? 'Aktif' : 'Nonaktif' }}
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold {{ $user->status?->value === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200' }}">
+                            {{ $user->status?->label() ?? 'Nonaktif' }}
                         </span>
                     </td>
                     <td class="px-6 py-4 text-center">

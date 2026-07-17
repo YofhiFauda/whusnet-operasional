@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationType;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
@@ -15,7 +16,7 @@ class AppNotification extends Notification implements ShouldQueue
         public readonly string $title,
         public readonly string $message,
         public readonly ?string $actionUrl = null,
-        public readonly string $type = 'info'
+        public readonly NotificationType $type = NotificationType::INFO
     ) {}
 
     public function via(object $notifiable): array
@@ -29,7 +30,7 @@ class AppNotification extends Notification implements ShouldQueue
             'title' => $this->title,
             'message' => $this->message,
             'action_url' => $this->actionUrl,
-            'type' => $this->type,
+            'type' => $this->type->value,
         ];
     }
 
@@ -40,7 +41,7 @@ class AppNotification extends Notification implements ShouldQueue
             'title' => $this->title,
             'message' => $this->message,
             'action_url' => $this->actionUrl,
-            'type' => $this->type,
+            'type' => $this->type->value,
             'created_at' => now()->toIso8601String(),
             'read_at' => null,
         ]);

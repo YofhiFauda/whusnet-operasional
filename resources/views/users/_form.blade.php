@@ -31,8 +31,8 @@
         <label for="status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
         <select id="status" name="status"
                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
-            <option value="active"   @selected(old('status', $user->status ?? 'active') === 'active')>Aktif</option>
-            <option value="inactive" @selected(old('status', $user->status ?? 'active') === 'inactive')>Nonaktif</option>
+            <option value="active"   @selected(old('status', $user->status?->value ?? 'active') === 'active')>Aktif</option>
+            <option value="inactive" @selected(old('status', $user->status?->value ?? 'active') === 'inactive')>Nonaktif</option>
         </select>
         @error('status')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>

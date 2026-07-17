@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
 use Illuminate\Http\Request;
@@ -67,16 +68,16 @@ class InvoiceReportController extends Controller
 
         if ($showTunggakan) {
             $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', 'batal');
+                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
         }
 
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
         $summaryQuery = clone $query;
         $totalAmountSum = $summaryQuery->sum('total_amount');
         $totalPaidSum = $summaryQuery->sum('paid_amount');
-        
+
         // Sisa tunggakan dihitung dari invoice yang tidak batal
-        $totalTunggakanSum = $summaryQuery->where('invoice_status', '!=', 'batal')->sum('remaining_amount');
+        $totalTunggakanSum = $summaryQuery->where('invoice_status', '!=', InvoiceStatus::BATAL->value)->sum('remaining_amount');
 
         // Dapatkan data terpaginasi
         $invoices = $query->orderByDesc('issue_date')
@@ -84,7 +85,7 @@ class InvoiceReportController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
+        $allowedStatuses = array_column(InvoiceStatus::cases(), 'value');
 
         return view('reports.invoices.index', compact(
             'invoices',
@@ -154,7 +155,7 @@ class InvoiceReportController extends Controller
 
         if ($showTunggakan) {
             $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', 'batal');
+                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
         }
 
         $invoices = $query->orderByDesc('issue_date')
@@ -206,7 +207,7 @@ class InvoiceReportController extends Controller
                     (float) $invoice->total_amount,
                     (float) $invoice->paid_amount,
                     (float) $invoice->remaining_amount,
-                    ucfirst(str_replace('_', ' ', $invoice->invoice_status)),
+                    $invoice->invoice_status->label(),
                 ]);
             }
 

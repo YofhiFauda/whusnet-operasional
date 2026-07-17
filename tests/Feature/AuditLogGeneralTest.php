@@ -117,6 +117,7 @@ class AuditLogGeneralTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-202606-9901',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

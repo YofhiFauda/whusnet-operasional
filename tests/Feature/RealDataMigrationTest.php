@@ -209,9 +209,9 @@ class RealDataMigrationTest extends TestCase
                     $invoice = $dbPmt->invoice;
                     $this->assertNotNull($invoice);
                     if ($invoice->remaining_amount <= 0) {
-                        $this->assertEquals('lunas', $invoice->invoice_status);
+                        $this->assertEquals('lunas', $invoice->invoice_status->value);
                     } else {
-                        $this->assertEquals('sebagian', $invoice->invoice_status);
+                        $this->assertEquals('sebagian', $invoice->invoice_status->value);
                     }
                 }
             }

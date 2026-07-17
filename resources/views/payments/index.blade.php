@@ -102,7 +102,7 @@
             <tbody class="divide-y divide-slate-100">
                 @forelse($payments as $payment)
                     @php
-                        $badgeClass = match($payment->payment_status) {
+                        $badgeClass = match($payment->payment_status->value) {
                             'valid' => 'bg-green-50 text-green-700 border-green-100',
                             'ditolak' => 'bg-red-50 text-red-700 border-red-100',
                             default => 'bg-amber-50 text-amber-700 border-amber-100',
@@ -138,7 +138,7 @@
                         <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp {{ number_format((float) $payment->amount, 2, ',', '.') }}</td>
                         <td class="px-6 py-3.5 text-center whitespace-nowrap">
                             <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
-                                {{ ucwords(str_replace('_', ' ', $payment->payment_status)) }}
+                                {{ $payment->payment_status->label() }}
                             </span>
                         </td>
                         <td class="px-6 py-3.5 text-right">

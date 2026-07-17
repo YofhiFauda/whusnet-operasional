@@ -64,13 +64,13 @@ class DashboardController extends Controller
                 ->count(),
             'total_invoices_amount' => (float) (clone $periodInvoiceQuery)->sum('total_amount'),
             'total_payments_amount' => (float) (clone $periodPaymentQuery)
-                ->where('payment_status', 'valid')
+                ->where('payment_status', \App\Enums\PaymentStatus::VALID->value)
                 ->sum('amount'),
             'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
-                ->whereNotIn('invoice_status', ['lunas', 'batal'])
+                ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
                 ->sum('remaining_amount'),
             'due_invoices_count' => (clone $invoiceQuery)
-                ->whereNotIn('invoice_status', ['lunas', 'batal'])
+                ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
                 ->whereDate('due_date', '<=', now()->toDateString())
                 ->count(),
         ];
@@ -84,7 +84,7 @@ class DashboardController extends Controller
 
         $dueInvoices = (clone $invoiceQuery)
             ->with(['customer', 'pop'])
-            ->whereNotIn('invoice_status', ['lunas', 'batal'])
+            ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
             ->whereDate('due_date', '<=', now()->toDateString())
             ->orderBy('due_date')
             ->limit(10)

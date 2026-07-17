@@ -9,10 +9,10 @@
 
 :root {
   /* Colors */
-  --color-primary: #0284C7;
-  --color-primary-hover: #0369A1;
-  --color-primary-soft: #E0F2FE;
-  --color-primary-border: #BAE6FD;
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-primary-soft: #F5F3FF;
+  --color-primary-border: #C7D2FE;
 
   --color-background: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -27,23 +27,23 @@
   --color-text-disabled: #94A3B8;
   --color-white: #FFFFFF;
 
-  --color-success: #16A34A;
-  --color-success-bg: #F0FDF4;
-  --color-success-border: #BBF7D0;
+  --color-success: #10B981;
+  --color-success-bg: #ECFDF5;
+  --color-success-border: #A7F3D0;
 
-  --color-warning: #D97706;
+  --color-warning: #F59E0B;
   --color-warning-bg: #FFFBEB;
   --color-warning-border: #FDE68A;
 
-  --color-error: #DC2626;
+  --color-error: #EF4444;
   --color-error-bg: #FEF2F2;
-  --color-error-border: #FECACA;
+  --color-error-border: #FEE2E2;
 
-  --color-info: #0284C7;
+  --color-info: #2563EB;
   --color-info-bg: #EFF6FF;
-  --color-info-border: #BFDBFE;
+  --color-info-border: #DBEAFE;
 
-  --color-neutral: #475569;
+  --color-neutral: #64748B;
 
   /* Typography */
   --font-ui: 'Inter', sans-serif;
@@ -101,48 +101,48 @@
 /* Dark Mode Token System */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: #0F172A;
-    --color-surface: #1E293B;
-    --color-surface-muted: #334155;
-    --color-border: #334155;
-    --color-border-strong: #475569;
-    --color-text-main: #F1F5F9;
+    --color-background: #090D16;
+    --color-surface: #111827;
+    --color-surface-muted: #1F2937;
+    --color-border: #1E293B;
+    --color-border-strong: #334155;
+    --color-text-main: #F8FAFC;
     --color-text-secondary: #CBD5E1;
     --color-text-muted: #94A3B8;
     --color-text-disabled: #475569;
-    --color-primary-soft: #0C2A3D;
-    --color-primary-border: #164B6D;
-    --color-success-bg: #052E16;
-    --color-success-border: #14532D;
-    --color-warning-bg: #2D1B00;
-    --color-warning-border: #713F12;
-    --color-error-bg: #2D0A0A;
+    --color-primary-soft: #1E1B4B;
+    --color-primary-border: #312E81;
+    --color-success-bg: #064E3B;
+    --color-success-border: #065F46;
+    --color-warning-bg: #451A03;
+    --color-warning-border: #78350F;
+    --color-error-bg: #450A0A;
     --color-error-border: #7F1D1D;
-    --color-info-bg: #0A1929;
-    --color-info-border: #0C3054;
+    --color-info-bg: #172554;
+    --color-info-border: #1E3A8A;
   }
 }
 
 .dark {
-  --color-background: #0F172A;
-  --color-surface: #1E293B;
-  --color-surface-muted: #334155;
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-text-main: #F1F5F9;
+  --color-background: #090D16;
+  --color-surface: #111827;
+  --color-surface-muted: #1F2937;
+  --color-border: #1E293B;
+  --color-border-strong: #334155;
+  --color-text-main: #F8FAFC;
   --color-text-secondary: #CBD5E1;
   --color-text-muted: #94A3B8;
   --color-text-disabled: #475569;
-  --color-primary-soft: #0C2A3D;
-  --color-primary-border: #164B6D;
-  --color-success-bg: #052E16;
-  --color-success-border: #14532D;
-  --color-warning-bg: #2D1B00;
-  --color-warning-border: #713F12;
-  --color-error-bg: #2D0A0A;
+  --color-primary-soft: #1E1B4B;
+  --color-primary-border: #312E81;
+  --color-success-bg: #064E3B;
+  --color-success-border: #065F46;
+  --color-warning-bg: #451A03;
+  --color-warning-border: #78350F;
+  --color-error-bg: #450A0A;
   --color-error-border: #7F1D1D;
-  --color-info-bg: #0A1929;
-  --color-info-border: #0C3054;
+  --color-info-bg: #172554;
+  --color-info-border: #1E3A8A;
 }
 
 @theme {
@@ -730,5 +730,76 @@ html {
 .scrollbar-none {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* 5. Design System components from Design.md */
+.metric-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 110px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard), border-color var(--duration-normal) var(--ease-standard);
+}
+
+.metric-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Accent left border untuk operational status cards */
+.metric-card.status-error {
+  border-left: 4px solid var(--color-error);
+}
+.metric-card.status-warning {
+  border-left: 4px solid var(--color-warning);
+}
+.metric-card.status-success {
+  border-left: 4px solid var(--color-success);
+}
+.metric-card.status-info {
+  border-left: 4px solid var(--color-info);
+}
+
+.metric-card-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-card-value-container {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.metric-card-value {
+  font-family: var(--font-data);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-text-main);
+  line-height: 1;
+}
+
+.metric-card-footer {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 8px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 6px;
 }
 

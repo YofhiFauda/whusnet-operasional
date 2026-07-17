@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\Pop;
 use Illuminate\Http\Request;
@@ -73,8 +74,8 @@ class PaymentReportController extends Controller
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
         $summaryQuery = clone $query;
         $totalAmountSum = $summaryQuery->sum('amount');
-        $totalValidSum = (clone $summaryQuery)->where('payment_status', 'valid')->sum('amount');
-        $totalPendingSum = (clone $summaryQuery)->where('payment_status', 'pending')->sum('amount');
+        $totalValidSum = (clone $summaryQuery)->where('payment_status', PaymentStatus::VALID->value)->sum('amount');
+        $totalPendingSum = (clone $summaryQuery)->where('payment_status', PaymentStatus::PENDING->value)->sum('amount');
 
         // Dapatkan data terpaginasi
         $payments = $query->orderByDesc('payment_date')
@@ -83,7 +84,7 @@ class PaymentReportController extends Controller
             ->withQueryString();
 
         $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
-        $allowedStatuses = ['pending', 'valid', 'ditolak'];
+        $allowedStatuses = array_column(PaymentStatus::cases(), 'value');
 
         return view('reports.payments.index', compact(
             'payments',
@@ -200,7 +201,7 @@ class PaymentReportController extends Controller
                     strtoupper($payment->payment_method),
                     (float) $payment->amount,
                     $payment->receiver->name ?? '-',
-                    ucfirst($payment->payment_status),
+                    $payment->payment_status->label(),
                     $payment->note ?? '-',
                 ]);
             }

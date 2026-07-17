@@ -80,7 +80,7 @@ class FopDashboardController extends Controller
             ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
             ->whereHas('tasks', function ($q) {
                 $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
-                  ->where('status', 'selesai')
+                  ->where('status', TaskStatus::SELESAI->value)
                   ->whereRaw('DATE_ADD(completed_at, INTERVAL 3 DAY) < NOW()');
             })
             ->count();

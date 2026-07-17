@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Gender;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CustomerRegistrationRequest extends FormRequest
 {
@@ -22,7 +24,7 @@ class CustomerRegistrationRequest extends FormRequest
         return [
             'full_name' => 'required|string|max:150',
             'identity_number' => 'required|string|size:16|regex:/^[0-9]+$/',
-            'gender' => 'required|string|in:Laki-laki,Perempuan',
+            'gender' => ['required', 'string', Rule::enum(Gender::class)],
             'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
             'alternative_phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
             'email' => 'nullable|email|max:100',

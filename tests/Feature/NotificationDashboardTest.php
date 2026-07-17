@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\NotificationType;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -109,14 +110,14 @@ class NotificationDashboardTest extends TestCase
         $this->techUser->notify(new \App\Notifications\AppNotification(
             title: 'Notif POP 1',
             message: 'Ini Notif POP 1',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         // Notification 2: for FOP 2 in POP 2
         $this->fopUser2->notify(new \App\Notifications\AppNotification(
             title: 'Notif POP 2',
             message: 'Ini Notif POP 2',
-            type: 'error'
+            type: NotificationType::ERROR
         ));
 
         // FOP User (POP 1) should see Notif POP 1 but NOT Notif POP 2
@@ -136,14 +137,14 @@ class NotificationDashboardTest extends TestCase
         $this->fopUser->notify(new \App\Notifications\AppNotification(
             title: 'Info Alert',
             message: 'Message 1',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         // Create a success notification
         $this->fopUser->notify(new \App\Notifications\AppNotification(
             title: 'Success Alert',
             message: 'Message 2',
-            type: 'success'
+            type: NotificationType::SUCCESS
         ));
 
         // Test filter by type = info
@@ -162,7 +163,7 @@ class NotificationDashboardTest extends TestCase
         $this->fopUser->notify(new \App\Notifications\AppNotification(
             title: 'Unread Alert',
             message: 'Test Message',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         $notification = DatabaseNotification::first();

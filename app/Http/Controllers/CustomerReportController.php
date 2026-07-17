@@ -178,7 +178,7 @@ class CustomerReportController extends Controller
                     $customer->cid ?? '-',
                     $customer->full_name,
                     $customer->primary_phone ?? $customer->phone ?? '-',
-                    $customer->gender ?? '-',
+                    $customer->gender?->label() ?? '-',
                     $customer->email ?? '-',
                     $customer->pop->name ?? '-',
                     $customer->internetPackage->name ?? '-',

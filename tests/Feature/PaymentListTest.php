@@ -69,6 +69,15 @@ class PaymentListTest extends TestCase
         $popA = $this->createPop('POP-PAY-CABANG-A', 'PCA', 'POP Payment Cabang A');
         $popB = $this->createPop('POP-PAY-CABANG-B', 'PCB', 'POP Payment Cabang B');
         $adminCabang->pops()->attach($popA->id);
+        $scope = \App\Models\UserRoleScope::create([
+            'user_id' => $adminCabang->id,
+            'role_id' => $role->id,
+            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+        ]);
+        \App\Models\UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         $invoiceA = $this->createInvoice($popA, 'Customer Payment Cabang Sendiri', 'INV-202606-7101');
         $invoiceB = $this->createInvoice($popB, 'Customer Payment Cabang Lain', 'INV-202606-7102');
@@ -179,6 +188,7 @@ class PaymentListTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

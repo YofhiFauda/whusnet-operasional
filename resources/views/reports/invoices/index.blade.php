@@ -198,12 +198,12 @@
                             <td class="px-6 py-4 text-right font-medium text-green-600 whitespace-nowrap">
                                 Rp {{ number_format($invoice->paid_amount, 2, ',', '.') }}
                             </td>
-                            <td class="px-6 py-4 text-right font-bold {{ $invoice->remaining_amount > 0 && $invoice->invoice_status !== 'batal' ? 'text-rose-600' : 'text-slate-500' }} whitespace-nowrap">
+                            <td class="px-6 py-4 text-right font-bold {{ $invoice->remaining_amount > 0 && $invoice->invoice_status->value !== 'batal' ? 'text-rose-600' : 'text-slate-500' }} whitespace-nowrap">
                                 Rp {{ number_format($invoice->remaining_amount, 2, ',', '.') }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ $statusBadges[$invoice->invoice_status] ?? 'bg-slate-50 text-slate-600 border-slate-200' }}">
-                                    {{ $statusLabels[$invoice->invoice_status] ?? $invoice->invoice_status }}
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ $statusBadges[$invoice->invoice_status->value] ?? 'bg-slate-50 text-slate-600 border-slate-200' }}">
+                                    {{ $statusLabels[$invoice->invoice_status->value] ?? $invoice->invoice_status->label() }}
                                 </span>
                             </td>
                         </tr>
