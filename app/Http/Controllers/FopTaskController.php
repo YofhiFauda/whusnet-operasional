@@ -44,6 +44,14 @@ class FopTaskController extends Controller
                   ->where('status', TaskStatus::SELESAI->value)
                   ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
             },
+            // MTN/C-REQ yang asalnya dari Ticketing — dipakai modal Edit biar
+            // form-nya nampilin CID/data pelanggan yang sama kayak /tickets,
+            // bukan form generik. pop_id/status/distribution_id WAJIB ikut
+            // ke-select — dipakai Customer::getDisplayIdAttribute() (lihat
+            // catatan yang sama di TicketController::index()).
+            'ticket:id,ticket_number,fop_task_id,customer_id,detail_keluhan,catatan_teknis,customer_name,customer_address,customer_phone,customer_odp,customer_package,customer_device,customer_latitude,customer_longitude',
+            'ticket.customer:id,cid,customer_code,pop_id,status,distribution_id',
+            'ticket.customer.pop:id,name,cid_prefix',
         ])
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderByRaw("CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END", [now()->addDay()->toDateString()])
@@ -95,6 +103,12 @@ class FopTaskController extends Controller
         }
 
         $fopTasks = $query->with('team:id,name')->paginate(20)->withQueryString();
+
+        // display_id itu accessor (bukan kolom) — gak otomatis ikut kebawa pas
+        // di-json_encode() buat modal Edit, jadi WAJIB di-append manual per baris.
+        foreach ($fopTasks as $fopTask) {
+            $fopTask->ticket?->customer?->append('display_id');
+        }
 
         // Get villages for area selector
         $villages = Village::orderBy('name', 'asc')->get();
@@ -549,6 +563,24 @@ class FopTaskController extends Controller
     public function destroy(FopTask $fopTask)
     {
         $this->authorizeAccess();
+
+        // SRV/PSB gak boleh dihapus dari sini SAMA SEKALI — di bawah ini,
+        // destroy() beneran mentransisikan customer ke status 'rejected' (efek
+        // samping yang udah ada dari awal, bukan baru), jadi hapus tiket ini
+        // sengaja punya konsekuensi bisnis nyata di luar sekadar hapus baris —
+        // harus lewat halaman Pelanggan biar disengaja, bukan kesenggol gak sadar.
+        if (in_array($fopTask->category, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
+            abort(422, 'Task Survey/Pemasangan tidak bisa dihapus dari sini — bakal otomatis mengubah status pelanggan jadi Gagal. Kelola lewat halaman Pelanggan.');
+        }
+
+        // MTN/C-REQ yang asalnya dari Ticketing gak boleh dihapus — tiketnya
+        // ada catatan pengirim (ticket_histories) yang harus tetap ke-trace.
+        // Toleransi salah input tetap ada lewat Cancel (fop_tasks.cancel),
+        // BUKAN Hapus. MTN/C-REQ yang dibuat manual langsung di sini (gak
+        // punya $fopTask->ticket) tetap boleh dihapus seperti biasa.
+        if ($fopTask->ticket) {
+            abort(422, 'Task ini berasal dari Ticketing — gak bisa dihapus dari sini. Batalkan lewat tombol Cancel kalau salah input data.');
+        }
 
         return DB::transaction(function () use ($fopTask) {
             $oldValues = $fopTask->load('technicians')->toArray();
@@ -1052,7 +1084,10 @@ class FopTaskController extends Controller
     private function autoSyncAndCalculatePriority()
     {
         // --- 1. Auto-Sync Survey ---
+        // 'pop' WAJIB ikut eager-load — Customer::getDisplayIdAttribute() butuh
+        // relasi ini buat resolve CID (format tugas "{CID}_{Nama}" di bawah).
         $surveyCustomers = Customer::whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
+            ->with('pop')
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::SURVEY->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
@@ -1064,7 +1099,7 @@ class FopTaskController extends Controller
                 'task_number' => $taskNumber,
                 'task_date' => now(),
                 'category' => TaskType::SURVEY,
-                'tugas' => 'Survey Pelanggan: ' . $c->full_name,
+                'tugas' => $c->display_id . '_' . $c->full_name,
                 'village_id' => $c->village_id ?? 1,
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,
@@ -1076,6 +1111,7 @@ class FopTaskController extends Controller
 
         // --- 2. Auto-Sync Installation ---
         $installCustomers = Customer::whereIn('status', ['waiting_installation', 'waiting_installations', 'surveyed'])
+            ->with('pop')
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::PEMASANGAN->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
@@ -1087,7 +1123,7 @@ class FopTaskController extends Controller
                 'task_number' => $taskNumber,
                 'task_date' => now(),
                 'category' => TaskType::PEMASANGAN,
-                'tugas' => 'Pemasangan Baru: ' . $c->full_name,
+                'tugas' => $c->display_id . '_' . $c->full_name,
                 'village_id' => $c->village_id ?? 1,
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,

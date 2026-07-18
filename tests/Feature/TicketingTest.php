@@ -149,7 +149,15 @@ class TicketingTest extends TestCase
         $this->assertNull($fopTask->task_id);
     }
 
-    public function test_fop_task_notes_records_ticket_origin_and_technical_note(): void
+    /**
+     * fop_tasks.notes cuma nyimpen pointer pendek asal-usul (nomor ticket +
+     * pengirim) — SENGAJA gak nyalin ulang catatan_teknis ke sini. Catatan
+     * teknis punya rumah sendiri yang proper di ticket->catatan_teknis,
+     * ditampilkan utuh di Detail Task (section "Detail Ticket"). Nyalin ke
+     * notes bikin dua sumber kebenaran yang bisa menyimpang + notes jadi blob
+     * teks campur aduk, bukan catatan yang bersih.
+     */
+    public function test_fop_task_notes_records_only_ticket_origin_pointer(): void
     {
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.store'), $this->validPayload());
@@ -158,7 +166,23 @@ class TicketingTest extends TestCase
 
         $this->assertStringContainsString($ticket->ticket_number, $ticket->fopTask->notes);
         $this->assertStringContainsString($this->helpdeskUser->name, $ticket->fopTask->notes);
-        $this->assertStringContainsString('Redaman -28 dBm', $ticket->fopTask->notes);
+        $this->assertStringNotContainsString('Redaman -28 dBm', $ticket->fopTask->notes);
+    }
+
+    /**
+     * Point 1 sinkronisasi: tugas FopTask hasil auto-sync Ticketing harus
+     * "{CID}_{Nama}" — konsisten sama identitas pelanggan yang dipakai di
+     * seluruh sistem, bukan label tipe tiket generik.
+     */
+    public function test_fop_task_tugas_uses_cid_and_customer_name_format(): void
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload());
+
+        $ticket = Ticket::first();
+        $expectedCid = $this->customer->fresh()->display_id;
+
+        $this->assertSame("{$expectedCid}_{$this->customer->full_name}", $ticket->fopTask->tugas);
     }
 
     public function test_creq_ticket_is_accepted(): void

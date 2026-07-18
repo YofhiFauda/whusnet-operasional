@@ -13,6 +13,7 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | `docs/dashboard/` | Dokumentasi dashboard operasional. |
 | `docs/penunjang/` | Dokumentasi API dependent dropdown dan import pelanggan. |
 | `docs/fop-task/` | Dokumentasi modul FOP Task (tiket kerja lapangan, team harian, dashboard FOP). |
+| `docs/ticketing/` | Dokumentasi modul Ticketing (tiket internal perusahaan MTN/C-REQ, auto-sync ke FOP Task). |
 | `docs/billing-pembayaran/` | Dokumentasi modul tagihan (Invoice) dan pembayaran (Payment). |
 | `docs/rbac/` | Dokumentasi RBAC (Role, Permission, Feature/Action, Scope POP). |
 | `docs/customer-lifecycle/` | Dokumentasi Customer Verifikasi & Onboarding Lifecycle (registrasi→survey→pemasangan→aktivasi). |
@@ -53,6 +54,7 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | Modul | Dokumentasi |
 |-------|-------------|
 | FOP Task (tiket kerja, team harian, dashboard) | [docs/fop-task/README.md](fop-task/README.md) |
+| Ticketing (tiket internal perusahaan MTN/C-REQ, auto-sync ke FOP Task) | [docs/ticketing/README.md](ticketing/README.md) |
 | Billing & Pembayaran (invoice, payment) | [docs/billing-pembayaran/README.md](billing-pembayaran/README.md) |
 | RBAC (role, permission, scope POP) | [docs/rbac/README.md](rbac/README.md) |
 | Customer Verifikasi & Onboarding Lifecycle | [docs/customer-lifecycle/README.md](customer-lifecycle/README.md) |

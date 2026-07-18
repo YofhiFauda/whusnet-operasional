@@ -44,7 +44,10 @@ class TicketService
             /** @var Customer $customer */
             $customer = Customer::query()
                 ->applyUserScope($actor)
-                ->with(['internetPackage', 'customerDevice'])
+                // 'pop' WAJIB ikut — Customer::getDisplayIdAttribute() butuh
+                // relasi ini buat resolve CID (lihat syncToFopTask() & bug CID
+                // yang sama di docs/ticketing/business-logic.md §7).
+                ->with(['internetPackage', 'customerDevice', 'pop'])
                 ->whereKey($data['customer_id'])
                 ->firstOrFail();
 
@@ -190,7 +193,11 @@ class TicketService
         $fopTask->task_number = $this->generateFopTaskNumber();
         $fopTask->task_date = $taskDate ?? now();
         $fopTask->category = $ticket->type;
-        $fopTask->tugas = $ticket->type->label() . ': ' . $customer->full_name;
+        // Format "{CID}_{Nama}" (mis. "C1X4ARQ000631_Masudah Yuni Fitri") —
+        // konsisten sama identitas pelanggan yang dipakai di seluruh sistem
+        // (CID/REQ ID, lihat docs/master/pop/business-logic.md), bukan label
+        // tipe tiket generik kayak "Maintenance: ...".
+        $fopTask->tugas = $customer->display_id . '_' . $customer->full_name;
         $fopTask->village_id = $customer->village_id;
         $fopTask->pop_id = $customer->pop_id;
         $fopTask->customer_id = $customer->id;
@@ -210,20 +217,17 @@ class TicketService
     /**
      * Jejak asal-usul di FopTask — biar FOP yang cuma lihat /fop-tasks tetap
      * tahu tiket ini datang dari siapa tanpa harus buka modul Ticketing.
+     *
+     * SENGAJA cuma pointer pendek, BUKAN nyalin ulang catatan_teknis ke sini —
+     * catatan teknis udah punya rumah sendiri yang bersih di `ticket->catatan_teknis`
+     * (ditampilkan proper di halaman Detail Task, lihat history_detail.blade.php).
+     * Nyalin ke sini bikin dua sumber kebenaran yang gampang menyimpang begitu
+     * salah satunya diedit belakangan, dan bikin kolom `notes` jadi blob teks
+     * campur aduk (metadata + isi), bukan catatan yang proper.
      */
     private function composeFopNotes(Ticket $ticket, User $actor): string
     {
-        $lines = [
-            "[Ticket {$ticket->ticket_number} — dikirim oleh {$actor->name}]",
-        ];
-
-        if (filled($ticket->catatan_teknis)) {
-            $lines[] = '';
-            $lines[] = 'Catatan Teknis:';
-            $lines[] = $ticket->catatan_teknis;
-        }
-
-        return implode("\n", $lines);
+        return "Ticket {$ticket->ticket_number} — dikirim oleh {$actor->name}.";
     }
 
     private function storeAttachment(Ticket $ticket, UploadedFile $file, User $actor): void

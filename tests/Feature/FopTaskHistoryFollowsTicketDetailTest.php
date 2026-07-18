@@ -52,6 +52,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
         $this->pop = Pop::create([
             'name' => 'POP Polorejo',
             'code' => 'POP-PLR',
+            'cid_prefix' => 'C',
             'type' => 'branch',
             'address' => 'Polorejo',
             'status' => 'active',
@@ -231,5 +232,112 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
             ->assertOk()
             ->assertDontSee('Detail Ticket')
             ->assertDontSee('Riwayat Ticketing');
+    }
+
+    /**
+     * Point 3 dari kebutuhan sinkronisasi: Detail Task harus nampilin SEMUA
+     * elemen yang ada di Detail Ticketing — sebelumnya CID pelanggan dan
+     * siapa/kapan ticket dikirim ("Assigned by"/"Created") gak muncul sama
+     * sekali di halaman ini.
+     */
+    public function test_detail_task_shows_customer_cid_and_ticket_sender_info(): void
+    {
+        $this->customer->update([
+            'cid' => 'C1X4CRQ000007',
+            'distribution_id' => \App\Models\Distribution::create([
+                'pop_id' => $this->pop->id,
+                'code' => 'C',
+                'description' => 'Distribusi C',
+            ])->id,
+            'status' => 'active',
+        ]);
+
+        $ticket = $this->submitTicket();
+
+        $this->actingAs($this->fopUser)
+            ->get(route('fop-tasks.history.show', $ticket->fop_task_id))
+            ->assertOk()
+            ->assertSee('C1X4CRQ000007')
+            ->assertSee('Assigned by')
+            ->assertSee($this->helpdeskUser->name)
+            ->assertSee('Created');
+    }
+
+    /**
+     * Point 2 sinkronisasi: Issue/Gangguan & Catatan Teknis WAJIB kepisah
+     * jelas di Detail Task — masing-masing satu blok label sendiri, versi
+     * utuh (bukan $fopTask->issue yang kepotong 255 karakter), dan gak
+     * ditampilkan dobel (Info Task lama gak lagi nampilin baris Issue/Catatan
+     * generik buat tipe ticket-origin).
+     */
+    public function test_detail_task_separates_issue_and_catatan_teknis_clearly(): void
+    {
+        $longComplaint = str_repeat('Internet mati total, sudah dicoba restart modem berkali-kali. ', 5);
+        $ticket = $this->submitTicket([
+            'detail_keluhan' => $longComplaint,
+            'catatan_teknis' => 'Redaman -30 dBm, indikasi ODP kotor.',
+        ]);
+
+        $response = $this->actingAs($this->fopUser)
+            ->get(route('fop-tasks.history.show', $ticket->fop_task_id));
+
+        $response->assertOk();
+        $response->assertSee('Issue / Gangguan');
+        $response->assertSee('Catatan Teknis');
+
+        $html = $response->getContent();
+
+        // Isi keluhan lengkap harus utuh (>255 char), bukan kepotong.
+        $this->assertGreaterThan(255, strlen($longComplaint));
+        $this->assertStringContainsString(trim($longComplaint), $html);
+
+        // Catatan teknis muncul TEPAT SEKALI (gak dobel di dua tempat).
+        $this->assertSame(1, substr_count($html, 'Redaman -30 dBm, indikasi ODP kotor.'));
+
+        // Baris "Catatan" generik (dari fop_tasks.notes) SENGAJA disembunyikan
+        // buat tipe ticket-origin — "Assigned by" di section Detail Ticket
+        // udah nampilin info pengirim yang sama, jadi gak perlu dobel.
+        $this->assertStringNotContainsString('dikirim oleh', $html);
+    }
+
+    /**
+     * Regresi: FopTask non-ticket (SURVEY) tetap pakai Info Task biasa
+     * (Issue generik dari $fopTask->issue) — perubahan ini gak boleh
+     * ngilangin baris Issue buat tipe yang gak nyambung ke ticket.
+     */
+    public function test_non_ticket_task_still_shows_generic_issue_row(): void
+    {
+        $task = \App\Models\Task::create([
+            'task_number' => 'TASK-SRV-ISSUE-0001',
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::SURVEY->value,
+            'title' => 'Survey: ' . $this->customer->full_name,
+            'status' => 'terjadwal',
+            'scheduled_at' => now(),
+            'sla_minutes' => 120,
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-SRV-ISSUE-0001',
+            'task_date' => now(),
+            'category' => 'SURVEY',
+            'tugas' => 'Survey Pelanggan: ' . $this->customer->full_name,
+            'village_id' => $this->customer->village_id,
+            'pop_id' => $this->pop->id,
+            'customer_id' => $this->customer->id,
+            'issue' => 'Auto-Sync dari antrean survey',
+            'status' => 'terjadwal',
+            'priority' => 'Medium',
+            'task_id' => $task->id,
+        ]);
+
+        $this->actingAs($this->fopUser)
+            ->get(route('fop-tasks.history.show', $fopTask->id))
+            ->assertOk()
+            ->assertSee('Auto-Sync dari antrean survey')
+            ->assertDontSee('Issue / Gangguan');
     }
 }

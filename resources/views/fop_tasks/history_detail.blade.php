@@ -40,6 +40,17 @@
         </div>
     </div>
 
+    @php
+        // MTN & C-REQ yang asalnya dari Ticketing — Issue/Gangguan & Catatan
+        // Teknis buat tipe ini WAJIB dibaca dari $ticket (utuh, proper),
+        // bukan $fopTask->issue (kepotong 255 char) — dipindah ke atas Info
+        // Task biar baris Issue generik bisa disembunyikan buat tipe ini
+        // (dipindah/diganti versi robust di section "Detail Ticket" bawah).
+        $isTicketOriginType = in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ], true);
+        $ticket = $fopTask->ticket;
+        $showTicketDetail = $isTicketOriginType && $ticket && auth()->user()->hasPermission('tickets.view');
+    @endphp
+
     {{-- ══ Info Task ══ --}}
     <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
         <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
@@ -70,17 +81,24 @@
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Team</p>
                 <p class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</p>
             </div>
+            {{-- Issue generik ($fopTask->issue, kepotong 255 char) cuma relevan
+                 buat tipe NON-Ticketing. MTN/C-REQ dari Ticketing nampilin versi
+                 utuh & proper di section "Detail Ticket" di bawah — lihat situ,
+                 bukan di sini, biar gak ada 2 versi (satu kepotong, satu utuh)
+                 dari konten yang sama. --}}
+            @unless($showTicketDetail)
             <div class="col-span-2">
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Issue</p>
                 <p class="font-medium text-red-600">{{ $fopTask->issue ?? '—' }}</p>
             </div>
+            @endunless
             @if($fopTask->status->value === 'dibatalkan')
             <div class="col-span-2">
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alasan Cancel</p>
                 <p class="font-medium text-slate-800">{{ $fopTask->cancel_reason ?? '—' }}</p>
             </div>
             @endif
-            @if($fopTask->notes)
+            @if($fopTask->notes && !$showTicketDetail)
             <div class="col-span-2 sm:col-span-4">
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Catatan</p>
                 <p class="font-medium text-slate-800">{{ $fopTask->notes }}</p>
@@ -89,19 +107,7 @@
         </div>
     </div>
 
-    @php
-        // MTN & C-REQ yang asalnya dari Ticketing (submit di /tickets, auto-sync
-        // ke FopTask oleh TicketService::syncToFopTask()) — detail keluhan,
-        // catatan teknis, data pelanggan, lampiran di sini WAJIB sama persis
-        // dengan yang dilihat di /tickets/{ticket}, biar FOP gak perlu buka dua
-        // halaman buat baca laporan yang sama. FopTask MTN yang dibuat manual
-        // langsung dari /fop-tasks (bukan dari Ticketing) gak punya $fopTask->ticket,
-        // jadi section ini otomatis gak muncul buat mereka — cuma Info Task biasa.
-        $isTicketOriginType = in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ], true);
-        $ticket = $fopTask->ticket;
-    @endphp
-
-    @if($isTicketOriginType && $ticket && auth()->user()->hasPermission('tickets.view'))
+    @if($showTicketDetail)
     {{-- ══ Detail dari Ticketing (mengikuti /tickets/{ticket}) ══ --}}
     <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
         <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
@@ -111,11 +117,24 @@
             </a>
         </div>
 
+        {{-- Assign by & Created at — sebelumnya gak ada sama sekali di halaman
+             Detail Task, padahal ini yang pertama dilihat di /tickets/{ticket}. --}}
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 pt-3 text-[11px] font-ui">
+            <p><span class="text-slate-400">Assigned by:</span> <span class="font-medium text-slate-800">{{ $ticket->creator->name ?? '—' }}</span></p>
+            <p><span class="text-slate-400">Created:</span> <span class="font-medium text-slate-800 font-data">{{ \App\Support\IndonesianDate::dateTime($ticket->created_at) }}</span></p>
+        </div>
+
         {{-- Data Pelanggan — snapshot saat ticket dibuat, sama kayak panel di /tickets --}}
         <div class="px-4 pt-3">
             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-ui mb-2">Data Pelanggan (saat ticket dibuat)</p>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-4 pb-4 text-[11px] font-ui">
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
+                <p class="font-medium text-blue-700 font-data">
+                    {{ $ticket->customer?->display_id ?: ($ticket->customer?->cid ?: ($ticket->customer?->customer_code ?: '—')) }}
+                </p>
+            </div>
             <div>
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
                 <p class="font-medium text-slate-800">{{ $ticket->customer_name ?: '—' }}</p>
@@ -152,16 +171,24 @@
             </div>
         </div>
 
-        {{-- Detail Keluhan & Catatan Teknis — versi utuh, bukan $fopTask->issue
-             yang kepotong 255 karakter --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4 pb-4 text-[11px] font-ui border-t border-slate-100 pt-3">
-            <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1">Detail Keluhan</p>
-                <p class="font-medium text-slate-800 whitespace-pre-line">{{ $ticket->detail_keluhan }}</p>
+        {{-- Issue/Gangguan & Catatan Teknis — dipisah jadi 2 blok utuh sendiri
+             (bukan berbagi 1 baris grid), masing-masing sumbernya beda dan
+             gak boleh ketuker: Issue/Gangguan dari $ticket->detail_keluhan
+             (keluhan PELANGGAN, wajib diisi), Catatan Teknis dari
+             $ticket->catatan_teknis (asesmen TEKNIS awal NOC, opsional).
+             Versi utuh — BUKAN $fopTask->issue yang kepotong 255 karakter. --}}
+        <div class="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
+            <div class="border border-amber-200 bg-amber-50/60 rounded overflow-hidden">
+                <p class="px-3 py-1.5 text-[10px] font-semibold text-amber-700 uppercase tracking-wider font-ui border-b border-amber-200 bg-amber-50">
+                    Issue / Gangguan
+                </p>
+                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 whitespace-pre-line font-ui">{{ $ticket->detail_keluhan }}</p>
             </div>
-            <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1">Catatan Teknis</p>
-                <p class="font-medium text-slate-800 whitespace-pre-line">{{ $ticket->catatan_teknis ?: '—' }}</p>
+            <div class="border border-slate-200 bg-slate-50/60 rounded overflow-hidden">
+                <p class="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider font-ui border-b border-slate-200 bg-slate-100">
+                    Catatan Teknis
+                </p>
+                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 whitespace-pre-line font-ui">{{ $ticket->catatan_teknis ?: '— Belum ada catatan teknis.' }}</p>
             </div>
         </div>
 

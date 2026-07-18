@@ -229,4 +229,27 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
         $this->assertSame(0, Ticket::count());
         $this->assertSame(1, FopTask::where('category', 'O-REQ')->count());
     }
+
+    /**
+     * Point 1 dari kebutuhan sinkronisasi: modal "Tambah Task FOP" mode
+     * Ticketing (MTN/C-REQ) harus sama persis kapabilitasnya dengan /tickets/new
+     * — termasuk Lampiran, yang sebelumnya gak ada endpoint/field-nya di form ini.
+     */
+    public function test_fop_can_attach_evidence_when_creating_ticket_from_fop_tasks_page(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload([
+            'attachments' => [\Illuminate\Http\UploadedFile::fake()->image('bukti.jpg')],
+        ]));
+
+        $response->assertRedirect(route('fop-tasks.index'));
+
+        $ticket = Ticket::first();
+        $attachment = $ticket->attachments->first();
+
+        $this->assertNotNull($attachment);
+        $this->assertSame('bukti.jpg', $attachment->original_name);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($attachment->file_path);
+    }
 }

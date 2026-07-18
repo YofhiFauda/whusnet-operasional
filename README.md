@@ -208,6 +208,18 @@ Sprint 8 menambahkan modul task scheduling dan management untuk FOP:
 
 **Overview lengkap:** [Sprint 8 Documentation](docs/sprint-8/README.md)
 
+## Ticketing — Tiket Internal Perusahaan
+
+Modul Ticketing menangani tiket MTN (Maintenance) dan C-REQ (Customer Request) yang diajukan helpdesk/NOC/sales/admin, otomatis membuat Task FOP terkait:
+
+| Fitur | Route | Dokumentasi |
+|-------|-------|-------------|
+| Daftar Tiket (4 bucket) | `/tickets/{bucket}` | [README](docs/ticketing/README.md) |
+| Tiket Baru | `/tickets/new` | [User Flow](docs/ticketing/user-flow.md) |
+| Detail Tiket | `/tickets/{id}` | [Business Logic](docs/ticketing/business-logic.md) |
+
+**Overview lengkap:** [Ticketing Documentation](docs/ticketing/README.md)
+
 ---
 
 ## Catatan Implementasi
@@ -260,6 +272,16 @@ Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu se
 | Memahami aturan generate CID & REQ ID pelanggan | [Business Logic Master POP](docs/master/pop/business-logic.md) |
 | Melihat master Distribusi jaringan | [Master Distribusi](docs/master/distribution/README.md) |
 | Melihat Master Timeline SLA (batas waktu tiket per paket) | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
+
+### Ticketing
+
+| Kebutuhan | Dokumentasi |
+| --- | --- |
+| Memahami fitur Ticketing secara umum | [Overview Ticketing](docs/ticketing/README.md) |
+| Melihat alur submit/assign/cancel tiket | [User Flow Ticketing](docs/ticketing/user-flow.md) |
+| Melihat aturan bisnis (RBAC, snapshot, dual-history, bug fixes) | [Business Logic Ticketing](docs/ticketing/business-logic.md) |
+| Melihat flowchart auto-sync & pembatalan | [Flowchart Ticketing](docs/ticketing/flowchart.md) |
+| Melihat tabel dan kolom Ticketing | [Schema Ticketing](docs/ticketing/database-schema.md) |
 
 ### Penunjang
 

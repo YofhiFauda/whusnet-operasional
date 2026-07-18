@@ -238,6 +238,15 @@
                                     $statusClasses = $task->task
                                         ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
                                         : ($statusValue === 'draft' ? 'border-slate-200 text-slate-600 bg-slate-50' : $task->status->displayBadgeClasses());
+
+                                    // SRV/PSB gak boleh dihapus SAMA SEKALI (efek samping: customer
+                                    // otomatis jadi Gagal — kelola lewat halaman Pelanggan). MTN/C-REQ
+                                    // yang asalnya dari Ticketing juga gak boleh (riwayat pengirim harus
+                                    // ke-trace) — toleransi salah input tetap ada lewat Cancel. MTN/C-REQ
+                                    // yang dibuat manual langsung di /fop-tasks (gak punya ->ticket) tetap
+                                    // boleh dihapus seperti biasa. Dicek ulang di server
+                                    // (FopTaskController::destroy()) — ini cuma UI, bukan satu-satunya gerbang.
+                                    $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$task->ticket;
                                 @endphp
                                 <div class="flex flex-col gap-1 items-start">
                                     <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit {{ $statusClasses }}"
@@ -288,13 +297,22 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-right">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <button @click="openEditModal({{ json_encode($task) }}, {{ json_encode($task->technicians->pluck('id')) }})" 
+                                    <a href="{{ route('fop-tasks.history.show', $task->id) }}"
+                                       class="text-slate-400 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 p-1.5 rounded"
+                                       title="Detail Task">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </a>
+                                    <button @click="openEditModal({{ json_encode($task) }}, {{ json_encode($task->technicians->pluck('id')) }})"
                                             class="text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 p-1.5 rounded"
                                             title="Edit">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </button>
+                                    @if($canDeleteTask)
                                     <form action="{{ route('fop-tasks.destroy', $task->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus Task FOP ini?" class="inline-block">
                                         @csrf
                                         @method('DELETE')
@@ -304,6 +322,17 @@
                                             </svg>
                                         </button>
                                     </form>
+                                    @else
+                                    <button type="button" disabled
+                                            class="text-slate-300 bg-slate-50 p-1.5 rounded cursor-not-allowed"
+                                            title="{{ in_array($task->category->value, ['SURVEY', 'PSB'], true)
+                                                ? 'Task Survey/Pemasangan gak bisa dihapus — kelola lewat halaman Pelanggan.'
+                                                : 'Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.' }}">
+                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -364,7 +393,7 @@
                     </button>
                 </div>
 
-                <form :action="formAction" method="POST" @submit="isSubmitting = true">
+                <form :action="formAction" method="POST" enctype="multipart/form-data" @submit="isSubmitting = true">
                     <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
                         @csrf
                         <template x-if="modal.isEdit">
@@ -376,7 +405,7 @@
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tipe Task <span class="text-error">*</span></label>
                                 <select name="category" x-model="modal.data.category"
                                         @change="onCategoryChange()"
-                                        :disabled="isEditingLockedSurveyPsb || (modal.isEdit && !canEditCategory)"
+                                        :disabled="isEditingLockedSurveyPsb || isEditingLinkedTicket || (modal.isEdit && !canEditCategory)"
                                         required
                                         class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Tipe</option>
@@ -384,13 +413,14 @@
                                         <option :value="key" x-text="key + ' - ' + val"></option>
                                     </template>
                                 </select>
-                                <template x-if="isEditingLockedSurveyPsb || (modal.isEdit && !canEditCategory)">
+                                <template x-if="isEditingLockedSurveyPsb || isEditingLinkedTicket || (modal.isEdit && !canEditCategory)">
                                     <input type="hidden" name="category" :value="modal.data.category">
                                 </template>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb">Task Survey/Pemasangan tidak bisa diedit dari sini — hanya lewat alur Registrasi Pelanggan.</p>
-                                <p class="mt-1 text-[10px] text-text-muted" x-show="!isEditingLockedSurveyPsb && modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLinkedTicket">Tipe gak bisa diubah — task ini nyambung ke Ticket, tipe-nya ngikut tipe ticket-nya.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="!isEditingLockedSurveyPsb && !isEditingLinkedTicket && modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit && !isTicketMode">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
-                                <p class="mt-1 text-[10px] text-primary font-medium" x-show="isTicketMode">Tipe ini ikut alur Ticketing — cari pelanggan lewat CID di bawah, data pelanggan terisi otomatis.</p>
+                                <p class="mt-1 text-[10px] text-primary font-medium" x-show="isTicketMode && !modal.isEdit">Tipe ini ikut alur Ticketing — cari pelanggan lewat CID di bawah, data pelanggan terisi otomatis.</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tanggal & Waktu <span class="text-error">*</span></label>
@@ -452,9 +482,13 @@
                              posting ke FopTaskController::store() yang gak peduli field ini). --}}
                         <input type="hidden" name="origin" value="fop_tasks">
 
-                        {{-- ══ Mode Ticketing (MTN/C-REQ): CID lookup + panel auto-fill, persis /tickets/new ══ --}}
+                        {{-- ══ Mode Ticketing (MTN/C-REQ): CID lookup + panel auto-fill, persis /tickets/new.
+                             Pas EDIT task yang udah nyambung ke ticket, panel ini jadi READ-ONLY —
+                             pelanggan/keluhan/catatan udah dikunci ke ticket aslinya, ganti apa pun
+                             di sini WAJIB lewat Ticketing, bukan dari sini (biar gak ada dua sumber
+                             kebenaran yang bisa menyimpang). ══ --}}
                         <div x-show="isTicketMode" class="space-y-4">
-                            <div class="relative" @click.away="ticketCustomerResults = []">
+                            <div class="relative" @click.away="ticketCustomerResults = []" x-show="!isEditingLinkedTicket">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">CID / Pelanggan <span class="text-error">*</span></label>
                                 <input type="text" x-model="ticketCidQuery" @input.debounce.300ms="searchTicketCustomer()"
                                        :disabled="ticketSelectedCustomer !== null"
@@ -471,10 +505,14 @@
                                 <p x-show="ticketSearching" class="text-[10px] text-text-muted mt-1">Mencari...</p>
                             </div>
 
+                            <p class="text-xs font-medium text-text-secondary" x-show="isEditingLinkedTicket">
+                                CID / Pelanggan <span class="text-[10px] font-normal text-text-muted">(terkunci ke Ticket <span class="font-mono" x-text="modal.data.ticket?.ticket_number"></span> — ganti pelanggan lewat Ticketing)</span>
+                            </p>
+
                             <div x-show="ticketSelectedCustomer" class="border border-border rounded bg-surface-muted overflow-hidden">
                                 <div class="flex items-center justify-between px-3 py-2 bg-surface border-b border-border">
                                     <span class="text-xs font-semibold text-text-secondary">Data Pelanggan</span>
-                                    <button type="button" @click="clearTicketCustomer()" class="text-xs text-primary hover:underline">Ganti</button>
+                                    <button type="button" @click="clearTicketCustomer()" class="text-xs text-primary hover:underline" x-show="!isEditingLinkedTicket">Ganti</button>
                                 </div>
                                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 p-3 text-xs">
                                     <div><dt class="text-text-muted">CID</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.cid || '—'"></dd></div>
@@ -497,13 +535,28 @@
                                 </dl>
                             </div>
 
-                            <div>
+                            {{-- Create: editable. Edit: read-only (edit beneran lewat Ticketing). --}}
+                            <div x-show="!modal.isEdit">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Detail Keluhan <span class="text-error">*</span></label>
-                                <textarea name="detail_keluhan" x-model="modal.data.detail_keluhan" rows="3" :required="isTicketMode" maxlength="2000" placeholder="Jelaskan keluhan pelanggan..." class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary"></textarea>
+                                <textarea name="detail_keluhan" x-model="modal.data.detail_keluhan" rows="3" :required="isTicketMode && !modal.isEdit" maxlength="2000" placeholder="Jelaskan keluhan pelanggan..." class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary"></textarea>
                             </div>
-                            <div>
+                            <div x-show="!modal.isEdit">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Catatan Teknis</label>
                                 <textarea name="catatan_teknis" x-model="modal.data.catatan_teknis" rows="2" maxlength="2000" placeholder="Redaman, indikasi penyebab, dll (opsional)" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary"></textarea>
+                            </div>
+                            <div x-show="modal.isEdit">
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Detail Keluhan</label>
+                                <div class="w-full text-sm text-text-main bg-surface-muted border border-border rounded px-3 py-2 whitespace-pre-line" x-text="modal.data.detail_keluhan || '—'"></div>
+                            </div>
+                            <div x-show="modal.isEdit">
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Catatan Teknis</label>
+                                <div class="w-full text-sm text-text-main bg-surface-muted border border-border rounded px-3 py-2 whitespace-pre-line" x-text="modal.data.catatan_teknis || '—'"></div>
+                            </div>
+                            <div x-show="!modal.isEdit">
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Lampiran</label>
+                                <input type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,application/pdf"
+                                       class="w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-surface-muted file:text-text-main hover:file:bg-border file:cursor-pointer">
+                                <p class="text-[10px] text-text-muted mt-1">Maks. 5 file, tiap file maks. 5 MB. Format: JPG, PNG, WEBP, PDF.</p>
                             </div>
                         </div>
 
@@ -849,13 +902,30 @@
                     id: '', task_number: '', task_date: '', category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
                     detail_keluhan: '', catatan_teknis: '',
+                    // Ticket kembar dari data Ticketing — null buat FopTask yang
+                    // dibuat manual di /fop-tasks (bukan lewat Ticketing). Diisi
+                    // openEditModal() dari task.ticket (eager-loaded controller).
+                    ticket: null,
                     status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 },
                 techs: []
             },
 
+            /**
+             * Edit Task MTN/C-REQ yang asalnya dari Ticketing — panel CID/data
+             * pelanggan/keluhan WAJIB kebaca dari sini (read-only, sumber
+             * kebenarannya tetap Ticketing), bukan form generik yang bisa
+             * ngelepas task dari ticket aslinya lewat pencarian pelanggan ulang.
+             */
+            get isEditingLinkedTicket() {
+                return this.modal.isEdit && this.modal.data.ticket !== null;
+            },
+
             get isTicketMode() {
-                return !this.modal.isEdit && this.ticketValues.includes(this.modal.data.category);
+                if (this.modal.isEdit) {
+                    return this.isEditingLinkedTicket;
+                }
+                return this.ticketValues.includes(this.modal.data.category);
             },
 
             get formAction() {
@@ -1107,11 +1177,38 @@
                 this.modal.data = {
                     id: '', task_number: '', task_date: defaultDate, category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
-                    detail_keluhan: '', catatan_teknis: '',
+                    detail_keluhan: '', catatan_teknis: '', ticket: null,
                     status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 };
                 this.modal.techs = [];
                 this.modal.open = true;
+            },
+
+            /**
+             * Bentuk panel CID/data pelanggan dari ticket yang udah nyambung ke
+             * task ini — SHAPE-nya sengaja disamain sama customerPayload() di
+             * TicketController biar markup panel (yang baca ticketSelectedCustomer)
+             * bisa dipakai ulang tanpa cabang kondisi baru.
+             */
+            ticketPanelFrom(ticket) {
+                const customer = ticket.customer || {};
+                const cid = customer.display_id || customer.cid || customer.customer_code || '';
+                const hasCoords = ticket.customer_latitude && ticket.customer_longitude;
+
+                return {
+                    id: customer.id,
+                    cid: cid,
+                    label: cid,
+                    nama: ticket.customer_name,
+                    alamat: ticket.customer_address,
+                    no_hp: ticket.customer_phone,
+                    pop: customer.pop?.name,
+                    odp: ticket.customer_odp,
+                    paket: ticket.customer_package,
+                    perangkat: ticket.customer_device,
+                    koordinat: hasCoords ? `${ticket.customer_latitude}, ${ticket.customer_longitude}` : null,
+                    maps_url: hasCoords ? `https://www.google.com/maps/search/?api=1&query=${ticket.customer_latitude},${ticket.customer_longitude}` : null,
+                };
             },
 
             openEditModal(task, assignedTechs) {
@@ -1129,11 +1226,22 @@
                     pop_id: task.pop_id || '',
                     issue: task.issue || '',
                     notes: task.notes || '',
+                    detail_keluhan: task.ticket?.detail_keluhan || '',
+                    catatan_teknis: task.ticket?.catatan_teknis || '',
+                    ticket: task.ticket || null,
                     status: task.status,
                     priority: task.priority,
                     pending_reason: task.pending_reason || '',
                     client_request_date: task.client_request_date ? task.client_request_date.substring(0, 10) : ''
                 };
+
+                if (task.ticket) {
+                    this.ticketSelectedCustomer = this.ticketPanelFrom(task.ticket);
+                    this.ticketCidQuery = this.ticketSelectedCustomer.label;
+                } else {
+                    this.clearTicketCustomer();
+                }
+                this.ticketCustomerResults = [];
                 this.modal.techs = Array.isArray(assignedTechs) ? assignedTechs : [];
                 this.modal.open = true;
             },

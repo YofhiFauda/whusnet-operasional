@@ -19,6 +19,8 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 
 **Team** (`FopTaskTeam`) = roster teknisi yang berlaku 1 hari (bisa nyambung ke hari berikutnya kalau ada tiket Pending). **Sejak Task 1 (Auto-Team Formation), Team gak lagi dibuat manual** — kebentuk/berubah sendiri lewat `FopTaskTeamService::rebuildTeamsForDate()` berdasar graf overlap teknisi per tiket (siapa kerja bareng siapa hari itu). FOP cuma perlu drop-in manual (`assign-to-team`) buat kasus solo/konflik, atau pakai **Switch Teknisi** (Task 2) buat mindahin teknisi antar Team dalam 1 submit atomic. Detail algoritma & rasional di [analisa-auto-team.md](analisa-auto-team.md) dan [analisa-sync-execution-task.md](analisa-sync-execution-task.md).
 
+**Integrasi Ticketing (2026-07-23/24):** `FopTask` category MTN & C-REQ bisa punya `ticket` terkait (`FopTask::ticket()`, hasOne ke `Ticket`) — hasil auto-sync dari tiket internal perusahaan yang diajukan helpdesk/NOC/sales, atau dari FOP sendiri yang submit langsung dari modal "Tambah Task FOP" (mode Ticketing otomatis nyala kalau kategori MTN/C-REQ dipilih, termasuk pas Edit kalau tiket udah nyambung). Detail lengkap: [docs/ticketing/README.md](../ticketing/README.md).
+
 ## Dokumen
 
 | Dokumen | Isi |
@@ -50,7 +52,7 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 
 > Route CRUD Team manual (`fop-tasks.teams.store/update/destroy`) **udah dihapus total sejak Task 1** — 404 kalau diakses. Team gak lagi punya endpoint mutasi sendiri, semuanya derived dari assignment teknisi.
 
-**RBAC catatan khusus:** ubah `category` (tipe tiket) & `priority` cuma boleh user dengan permission `fop_tasks.update_sensitive` (lihat `FopTaskController::update()`). Tipe `Survey` & `PSB` (Pemasangan) gak bisa dipilih manual — cuma via auto-sync dari Registrasi Pelanggan (`TaskType::autoOnlyValues()`). Cancel (`status=dibatalkan`) butuh permission terpisah `fop_tasks.cancel` (**Task 12, 2026-07-22**) + `cancel_reason` wajib diisi — role `admin`/`fop` dapet otomatis lewat wildcard `fop_tasks.*`.
+**RBAC catatan khusus:** ubah `category` (tipe tiket) & `priority` cuma boleh user dengan permission `fop_tasks.update_sensitive` (lihat `FopTaskController::update()`). Tipe `Survey` & `PSB` (Pemasangan) gak bisa dipilih manual — cuma via auto-sync dari Registrasi Pelanggan (`TaskType::autoOnlyValues()`). Cancel (`status=dibatalkan`) butuh permission terpisah `fop_tasks.cancel` (**Task 12, 2026-07-22**) + `cancel_reason` wajib diisi — role `admin`/`fop` dapet otomatis lewat wildcard `fop_tasks.*`. Cascade cancel ke `Task` eksekusi (waktu FopTask yang punya `task_id` dibatalkan) lewat `TaskPolicy::cancelViaFopTask()` — otoritasnya tetap `fop_tasks.cancel`, BUKAN `task.cancel` (role `admin` gak punya `task.cancel` tapi harus tetap bisa cancel tiket), detail rasional di [docs/ticketing/business-logic.md §8](../ticketing/business-logic.md#8-rbac-pembatalan--3-lapis-bukan-satu).
 
 ## Views
 
@@ -69,4 +71,4 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 
 ---
 
-**Last updated:** 2026-07-14 (Task 10 Riwayat Lengkap + SLA Dual-Cycle, dan fix reject-sync gap desain final — Task selalu `Selesai` buat Survey/Pemasangan, keputusan customer jadi badge overlay kedua, lihat `docs/project_verifikasi_reject_gap.md`)
+**Last updated:** 2026-07-24 (integrasi penuh Ticketing: modal create/edit ikut mode Ticketing buat MTN/C-REQ, Detail Task nampilin section "Detail Ticket", cascade cancel lewat `TaskPolicy::cancelViaFopTask()`, fix bug FopTask Draft gak naik status meski udah di-assign teknisi — lihat [docs/ticketing/](../ticketing/README.md))
