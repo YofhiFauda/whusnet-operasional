@@ -349,6 +349,15 @@ class FopTaskController extends Controller
             $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
             $oldTechnicianIds = collect($oldValues['technicians'] ?? [])->pluck('id')->sort()->values()->all();
 
+            // Ditangkap SEBELUM field apa pun diubah — dipakai belakangan buat
+            // deteksi transisi Draft→Terjadwal akibat assign teknisi (lihat blok
+            // technicians di bawah). $oldStatus di blok status hanya keisi kalau
+            // request kirim 'status', sedangkan modal Edit SELALU ngirim 'status'
+            // = nilai lama (form itu gak punya pilihan ubah status manual), jadi
+            // gak bisa dipakai buat bedain "status beneran mau diubah user" vs
+            // "cuma echo balik nilai existing".
+            $originalStatus = $fopTask->status instanceof TaskStatus ? $fopTask->status->value : $fopTask->status;
+
             if (isset($validated['category'])) $fopTask->category = $validated['category'];
             if (isset($validated['task_date'])) $fopTask->task_date = $validated['task_date'];
             if (isset($validated['tugas'])) $fopTask->tugas = $validated['tugas'];
@@ -441,6 +450,32 @@ class FopTaskController extends Controller
                 }
 
                 $fopTask->technicians()->sync($technicians);
+
+                // BUG FIX: tiket yang asalnya Draft (biasanya dari Ticketing —
+                // belum ada teknisi/Task eksekusi) dan baru di-assign teknisi di
+                // SINI (lewat modal Edit di tabel, bukan form Create) sebelumnya
+                // status-nya gak pernah ikut naik ke Terjadwal — modal Edit
+                // ngirim 'status' hidden = nilai lama ('draft'), dan blok status
+                // di atas cuma nulis ulang nilai yang sama. Akibatnya Task
+                // eksekusi kebuat + teknisi ke-assign beneran, tapi
+                // fop_tasks.status nyangkut 'draft' selamanya, dan Ticket yang
+                // nyambung ke tiket ini macet di bucket "Ticket Masuk"
+                // (Ticket::scopeInBucket() baca kolom ini apa adanya).
+                if ($originalStatus === TaskStatus::DRAFT->value
+                    && $fopTask->status === TaskStatus::DRAFT
+                    && !empty($technicians)
+                ) {
+                    $fopTask->status = TaskStatus::TERJADWAL;
+                    $fopTask->save();
+
+                    \App\Models\FopTaskStatusHistory::create([
+                        'fop_task_id' => $fopTask->id,
+                        'from_status' => TaskStatus::DRAFT->value,
+                        'to_status'   => TaskStatus::TERJADWAL->value,
+                        'changed_by'  => auth()->id(),
+                        'changed_at'  => now(),
+                    ]);
+                }
 
                 if (!empty($technicians) || $fopTask->task_id) {
                     // Title dibuat polos — prefix "[Nama Team]" diisi oleh
@@ -985,6 +1020,12 @@ class FopTaskController extends Controller
             'task.report',
             'task.teamMembers.user:id,name',
             'task.maintenanceReport',
+            // MTN & C-REQ yang asalnya dari Ticketing — detail keluhan/catatan
+            // teknis/data pelanggan/lampiran/riwayat harus mengikuti apa yang
+            // dilihat di /tickets, bukan cuma issue 255 char yang kepotong.
+            'ticket.creator:id,name',
+            'ticket.attachments.uploader:id,name',
+            'ticket.histories.actor:id,name',
         ]);
 
         $survey = null;

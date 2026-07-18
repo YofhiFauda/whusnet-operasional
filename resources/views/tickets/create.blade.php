@@ -356,11 +356,14 @@
                     </a>
 
                     <div class="flex items-center gap-3">
-                        <button type="submit" name="action" value="draft"
-                                class="px-4 py-2 text-xs font-bold text-sky-600 border border-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg transition-colors cursor-pointer">
-                            SAVE AS DRAFT
-                        </button>
-
+                        {{-- "SAVE AS DRAFT" dulu ada di sini sebagai tombol kedua, tapi
+                             dua-duanya submit ke endpoint & field yang SAMA PERSIS —
+                             gak ada logic backend yang bedain 'action=draft'. Ticket
+                             yang dikirim dari halaman ini SELALU jadi Draft (Ticket
+                             Masuk) apa pun tombolnya, karena FOP yang assign teknisi
+                             belakangan — jadi nawarin 2 tombol seolah ada pilihan
+                             "draft vs langsung jalan" itu nyesatin. Dihapus, disatuin
+                             jadi satu tombol yang jujur sama hasilnya. --}}
                         <button type="submit" :disabled="!selected"
                                 class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-md shadow-sky-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                             <span>CREATE TICKET</span>

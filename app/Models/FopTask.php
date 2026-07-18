@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'task_number',
@@ -104,6 +105,17 @@ class FopTask extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(FopTaskTeam::class, 'team_id');
+    }
+
+    /**
+     * Ticket asal (kalau tiket ini hasil auto-sync dari Ticketing — lihat
+     * TicketService::syncToFopTask()). Null buat FopTask yang dibuat langsung
+     * dari /fop-tasks tanpa lewat Ticketing, termasuk category MTN/C-REQ yang
+     * dibuat manual oleh FOP.
+     */
+    public function ticket(): HasOne
+    {
+        return $this->hasOne(Ticket::class, 'fop_task_id');
     }
 
     /**

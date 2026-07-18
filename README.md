@@ -89,6 +89,31 @@ Dokumentasi flowchart lengkap tersedia di [Flowchart System](docs/flowchart-syst
 | `resources/views/master` | View fitur master. |
 | `docs` | Dokumentasi project. |
 
+## Aturan CID & REQ ID Pelanggan
+
+Identitas pelanggan (`customers.customer_code` / `customers.cid`) mengikuti format berjenjang, tergantung status pelanggan. Detail lengkap (termasuk celah desain yang perlu disiplin operasional) ada di [Business Logic Master POP](docs/master/pop/business-logic.md).
+
+**Struktur CID lengkap** (`Pop::generateComplexCid()`):
+
+```
+D    2      X6C          RQ001296
+│    │      │            └─ REQ ID (nomor registrasi permanen, RQ + 6 digit)
+│    │      └─ Kode Distribusi (Distribution.code, unik global, input manual admin)
+│    └─ Nomor Mini POP (dari mini_pop yang di-assign, fallback pop_code Cabang, fallback olt_number teknis)
+└─ Kode Cabang POP (Pop.cid_prefix, input manual admin)
+```
+
+**Format ID per status pelanggan** (`Pop::resolveDisplayId()`):
+
+| Status | Format tampil | Contoh |
+| --- | --- | --- |
+| Baru daftar / survey / pemasangan (belum ada distribusi) | REQ ID murni | `RQ001296` |
+| Active / Suspended + **sudah** ada distribusi | CID lengkap | `D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH` |
+| Active / Suspended + **belum** ada distribusi | Default cabang | `C00RQ001296` |
+| Terminated / Failed / Rejected / Putus / Gagal | Balik ke REQ ID murni | `RQ001296` |
+
+REQ ID **permanen** — dibuat sekali saat registrasi, gak pernah berubah/hilang seumur hidup pelanggan. CID cuma "dibungkus" beda tergantung status; saat terminate, sistem gak generate ID baru, cuma nampilin lagi REQ ID murni yang dari awal udah ada (`extractBareRegistrationId()`).
+
 ## Database Utama
 
 Tabel utama yang digunakan:
@@ -232,6 +257,7 @@ Bagian ini dibuat sebagai pintu masuk cepat untuk programmer baru. Pilih menu se
 | Melihat master internet package | [Master Internet Package](docs/master/internet-package/README.md) |
 | Melihat master status pelanggan | [Master Status Pelanggan](docs/master/status-pelanggan/README.md) |
 | Melihat master POP (Cabang) | [Master POP](docs/master/pop/README.md) |
+| Memahami aturan generate CID & REQ ID pelanggan | [Business Logic Master POP](docs/master/pop/business-logic.md) |
 | Melihat master Distribusi jaringan | [Master Distribusi](docs/master/distribution/README.md) |
 | Melihat Master Timeline SLA (batas waktu tiket per paket) | [Master Timeline SLA](docs/master/sla-timeline/README.md) |
 

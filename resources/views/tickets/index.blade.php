@@ -188,7 +188,7 @@
                 <div>
                     <p class="text-sm font-bold text-text-main">Tidak ada ticket di {{ $activeBucket->label() }}</p>
                     <p class="text-xs text-text-muted mt-0.5">{{ $activeBucket->description() }}</p>
-                </div>
+                </div> 
             </div>
         @endforelse
     </div>

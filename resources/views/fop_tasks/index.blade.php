@@ -364,7 +364,7 @@
                     </button>
                 </div>
 
-                <form :action="modal.isEdit ? '{{ url('/fop-tasks') }}/' + modal.data.id : '{{ route('fop-tasks.store') }}'" method="POST" @submit="isSubmitting = true">
+                <form :action="formAction" method="POST" @submit="isSubmitting = true">
                     <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
                         @csrf
                         <template x-if="modal.isEdit">
@@ -375,6 +375,7 @@
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tipe Task <span class="text-error">*</span></label>
                                 <select name="category" x-model="modal.data.category"
+                                        @change="onCategoryChange()"
                                         :disabled="isEditingLockedSurveyPsb || (modal.isEdit && !canEditCategory)"
                                         required
                                         class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
@@ -388,7 +389,8 @@
                                 </template>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb">Task Survey/Pemasangan tidak bisa diedit dari sini — hanya lewat alur Registrasi Pelanggan.</p>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="!isEditingLockedSurveyPsb && modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
-                                <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit && !isTicketMode">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-primary font-medium" x-show="isTicketMode">Tipe ini ikut alur Ticketing — cari pelanggan lewat CID di bawah, data pelanggan terisi otomatis.</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tanggal & Waktu <span class="text-error">*</span></label>
@@ -396,10 +398,11 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {{-- POP/Desa: cuma buat tipe non-Ticketing — MTN/C-REQ nurunin dari pelanggan yang dipilih --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="!isTicketMode">
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">POP / Cabang <span class="text-error">*</span></label>
-                                <select name="pop_id" x-model="modal.data.pop_id" :disabled="isEditingLockedSurveyPsb" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <select name="pop_id" x-model="modal.data.pop_id" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Cabang</option>
                                     @foreach($pops as $p)
                                         <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -408,7 +411,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Area (Desa) <span class="text-error">*</span></label>
-                                <select name="village_id" x-model="modal.data.village_id" :disabled="isEditingLockedSurveyPsb" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <select name="village_id" x-model="modal.data.village_id" :disabled="isEditingLockedSurveyPsb" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="">Pilih Desa</option>
                                     @foreach($villages as $v)
                                         <option value="{{ $v->id }}">{{ $v->name }}</option>
@@ -417,7 +420,8 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {{-- Tugas/Issue generik: cuma buat tipe non-Ticketing --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-show="!isTicketMode">
                             <div class="relative" @click.away="customerSearchResults = []">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Penugasan / Pelanggan <span class="text-error">*</span></label>
                                 <input type="text" name="tugas" x-model="modal.data.tugas"
@@ -425,9 +429,8 @@
                                        @keydown.escape="customerSearchResults = []"
                                        autocomplete="off"
                                        :disabled="isEditingLockedSurveyPsb"
-                                       placeholder="Ketik tugas / nama..." required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
-
-                                <input type="hidden" name="customer_id" :value="modal.data.customer_id">
+                                       :required="!isTicketMode"
+                                       placeholder="Ketik tugas / nama..." class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
 
                                 <div x-show="!isEditingLockedSurveyPsb && customerSearchResults.length > 0" class="absolute z-50 w-full bg-surface border border-border rounded mt-1 max-h-48 overflow-y-auto shadow-lg" style="display: none;">
                                     <template x-for="c in customerSearchResults" :key="c.id">
@@ -439,7 +442,68 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Issue / Masalah <span class="text-error">*</span></label>
-                                <input type="text" name="issue" x-model="modal.data.issue" placeholder="Contoh: FO CUT..." required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <input type="text" name="issue" x-model="modal.data.issue" placeholder="Contoh: FO CUT..." :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                            </div>
+                        </div>
+
+                        {{-- customer_id — dipakai DUA-DUANYA (lookup generik ATAU lookup ala Ticketing di bawah) --}}
+                        <input type="hidden" name="customer_id" :value="modal.data.customer_id">
+                        {{-- Selalu dikirim — cuma dibaca TicketController::store() (jalur non-ticket
+                             posting ke FopTaskController::store() yang gak peduli field ini). --}}
+                        <input type="hidden" name="origin" value="fop_tasks">
+
+                        {{-- ══ Mode Ticketing (MTN/C-REQ): CID lookup + panel auto-fill, persis /tickets/new ══ --}}
+                        <div x-show="isTicketMode" class="space-y-4">
+                            <div class="relative" @click.away="ticketCustomerResults = []">
+                                <label class="block text-xs font-medium text-text-secondary mb-1">CID / Pelanggan <span class="text-error">*</span></label>
+                                <input type="text" x-model="ticketCidQuery" @input.debounce.300ms="searchTicketCustomer()"
+                                       :disabled="ticketSelectedCustomer !== null"
+                                       placeholder="Ketik CID atau nama pelanggan..."
+                                       class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+
+                                <div x-show="ticketCustomerResults.length > 0 && !ticketSelectedCustomer" class="absolute z-50 w-full bg-surface border border-border rounded mt-1 max-h-48 overflow-y-auto shadow-lg" style="display: none;">
+                                    <template x-for="c in ticketCustomerResults" :key="c.id">
+                                        <button type="button" @click="pickTicketCustomer(c)" class="w-full text-left px-3 py-2 text-sm bg-surface hover:bg-surface-muted text-text-main border-b border-border last:border-0 outline-none">
+                                            <span x-text="c.label"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                                <p x-show="ticketSearching" class="text-[10px] text-text-muted mt-1">Mencari...</p>
+                            </div>
+
+                            <div x-show="ticketSelectedCustomer" class="border border-border rounded bg-surface-muted overflow-hidden">
+                                <div class="flex items-center justify-between px-3 py-2 bg-surface border-b border-border">
+                                    <span class="text-xs font-semibold text-text-secondary">Data Pelanggan</span>
+                                    <button type="button" @click="clearTicketCustomer()" class="text-xs text-primary hover:underline">Ganti</button>
+                                </div>
+                                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 p-3 text-xs">
+                                    <div><dt class="text-text-muted">CID</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.cid || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">Nama</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.nama || '—'"></dd></div>
+                                    <div class="sm:col-span-2"><dt class="text-text-muted">Alamat</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.alamat || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">No. HP</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.no_hp || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">POP / Cabang</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.pop || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">ODP</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.odp || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">Paket</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.paket || '—'"></dd></div>
+                                    <div><dt class="text-text-muted">Perangkat Pelanggan</dt><dd class="font-medium text-text-main" x-text="ticketSelectedCustomer?.perangkat || '—'"></dd></div>
+                                    <div>
+                                        <dt class="text-text-muted">Koordinat</dt>
+                                        <dd class="font-medium text-text-main">
+                                            <template x-if="ticketSelectedCustomer?.maps_url">
+                                                <a :href="ticketSelectedCustomer.maps_url" target="_blank" rel="noopener" class="text-primary hover:underline" x-text="ticketSelectedCustomer.koordinat"></a>
+                                            </template>
+                                            <template x-if="!ticketSelectedCustomer?.maps_url"><span>—</span></template>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Detail Keluhan <span class="text-error">*</span></label>
+                                <textarea name="detail_keluhan" x-model="modal.data.detail_keluhan" rows="3" :required="isTicketMode" maxlength="2000" placeholder="Jelaskan keluhan pelanggan..." class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-text-secondary mb-1">Catatan Teknis</label>
+                                <textarea name="catatan_teknis" x-model="modal.data.catatan_teknis" rows="2" maxlength="2000" placeholder="Redaman, indikasi penyebab, dll (opsional)" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary"></textarea>
                             </div>
                         </div>
 
@@ -469,14 +533,15 @@
                                     </label>
                                 @endforeach
                             </div>
-                            <input type="hidden" :required="modal.techs.length === 0" class="absolute w-0 h-0 opacity-0" name="technicians_required">
+                            <input type="hidden" :required="!isTicketMode && modal.techs.length === 0" class="absolute w-0 h-0 opacity-0" name="technicians_required">
+                            <p class="mt-1 text-[10px] text-text-muted" x-show="isTicketMode">Teknisi opsional di sini — kosongkan buat masuk sebagai Ticket Masuk dulu, di-assign belakangan.</p>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
+                            <div x-show="!isTicketMode">
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Status <span x-show="!modal.isEdit" class="text-error">*</span></label>
                                 <template x-if="!modal.isEdit">
-                                    <select name="status" x-model="modal.data.status" required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                    <select name="status" x-model="modal.data.status" :required="!isTicketMode" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                         <option value="terjadwal">Terjadwal</option>
                                         <option value="pending">Pending</option>
                                     </select>
@@ -500,7 +565,7 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Prioritas <span class="text-error">*</span></label>
-                                <select name="priority" x-model="modal.data.priority" 
+                                <select name="priority" x-model="modal.data.priority"
                                         :disabled="modal.isEdit && !canEditCategory"
                                         required class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                                     <option value="low">Low</option>
@@ -514,18 +579,18 @@
                             </div>
                         </div>
 
-                        <div x-show="modal.data.status === 'pending'" class="space-y-3 bg-surface-muted border border-border rounded p-3" style="display: none;">
+                        <div x-show="!isTicketMode && modal.data.status === 'pending'" class="space-y-3 bg-surface-muted border border-border rounded p-3" style="display: none;">
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Alasan Pending <span class="text-error">*</span></label>
-                                <input type="text" name="pending_reason" x-model="modal.data.pending_reason" :required="modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
+                                <input type="text" name="pending_reason" x-model="modal.data.pending_reason" :required="!isTicketMode && modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted">
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-text-secondary mb-1">Tgl Request Client <span class="text-error">*</span></label>
-                                <input type="date" name="client_request_date" x-model="modal.data.client_request_date" :required="modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
+                                <input type="date" name="client_request_date" x-model="modal.data.client_request_date" :required="!isTicketMode && modal.data.status === 'pending'" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted font-mono">
                             </div>
                         </div>
 
-                        <div>
+                        <div x-show="!isTicketMode">
                             <label class="block text-xs font-medium text-text-secondary mb-1">Catatan</label>
                             <textarea name="notes" x-model="modal.data.notes" rows="2" class="w-full text-sm bg-surface text-text-main border border-border rounded px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:bg-surface-muted disabled:text-text-muted"></textarea>
                         </div>
@@ -769,15 +834,41 @@
             searchTech: '',
             customerSearchResults: [],
             isSearchingCustomer: false,
+            // Mode Ticketing (MTN/C-REQ) — lookup CID terpisah dari searchCustomer()
+            // generik di atas, karena hasilnya beda bentuk (panel 8 field, bukan
+            // cuma label+pop_id+village_id).
+            ticketValues: @json(\App\Enums\TaskType::ticketValues()),
+            ticketCidQuery: '',
+            ticketCustomerResults: [],
+            ticketSelectedCustomer: null,
+            ticketSearching: false,
             modal: {
                 open: false,
                 isEdit: false,
                 data: {
                     id: '', task_number: '', task_date: '', category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
+                    detail_keluhan: '', catatan_teknis: '',
                     status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 },
                 techs: []
+            },
+
+            get isTicketMode() {
+                return !this.modal.isEdit && this.ticketValues.includes(this.modal.data.category);
+            },
+
+            get formAction() {
+                if (this.modal.isEdit) {
+                    return '{{ url('/fop-tasks') }}/' + this.modal.data.id;
+                }
+                return this.isTicketMode ? '{{ route('tickets.store') }}' : '{{ route('fop-tasks.store') }}';
+            },
+
+            onCategoryChange() {
+                if (!this.isTicketMode) {
+                    this.clearTicketCustomer();
+                }
             },
             cancelModal: { open: false, taskId: null, taskNumber: '', reason: '', isSubmitting: false },
             teamConflictModal: { open: false, conflicts: @json($teamConflicts ?? []) },
@@ -969,11 +1060,46 @@
                 this.customerSearchResults = [];
             },
 
+            // ── Lookup CID mode Ticketing (MTN/C-REQ) ──────────────────
+            async searchTicketCustomer() {
+                const q = this.ticketCidQuery.trim();
+                if (q.length < 2) {
+                    this.ticketCustomerResults = [];
+                    return;
+                }
+                this.ticketSearching = true;
+                try {
+                    const res = await fetch(`{{ route('tickets.lookup-customer') }}?q=${encodeURIComponent(q)}`, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    this.ticketCustomerResults = res.ok ? await res.json() : [];
+                } catch (e) {
+                    this.ticketCustomerResults = [];
+                } finally {
+                    this.ticketSearching = false;
+                }
+            },
+
+            pickTicketCustomer(c) {
+                this.ticketSelectedCustomer = c;
+                this.ticketCidQuery = c.label;
+                this.ticketCustomerResults = [];
+                this.modal.data.customer_id = c.id;
+            },
+
+            clearTicketCustomer() {
+                this.ticketSelectedCustomer = null;
+                this.ticketCidQuery = '';
+                this.ticketCustomerResults = [];
+                this.modal.data.customer_id = '';
+            },
+
             openCreateModal() {
                 this.modal.isEdit = false;
                 this.searchTech = '';
                 this.isSubmitting = false;
-                
+                this.clearTicketCustomer();
+
                 const now = new Date();
                 const pad = (n) => String(n).padStart(2, '0');
                 const defaultDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -981,6 +1107,7 @@
                 this.modal.data = {
                     id: '', task_number: '', task_date: defaultDate, category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
+                    detail_keluhan: '', catatan_teknis: '',
                     status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 };
                 this.modal.techs = [];

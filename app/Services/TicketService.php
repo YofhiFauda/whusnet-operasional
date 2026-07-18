@@ -11,26 +11,36 @@ use App\Models\FopTask;
 use App\Models\Ticket;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * TicketService — pembuatan tiket internal perusahaan + auto-sync ke FopTask.
  *
- * Alur: user non-FOP (helpdesk/NOC/sales/admin) submit tiket → tiket tersimpan
- * sebagai catatan pengirim → satu FopTask ikut dibuat dengan status Draft
- * (BELUM ada teknisi & belum ada Task eksekusi). FOP yang nanti assign teknisi
- * lewat /fop-tasks; saat itulah Task eksekusi dibuat oleh FopTaskController.
+ * Dua jalur masuk, satu logic:
+ *  1. User non-FOP (helpdesk/NOC/sales/admin) submit lewat /tickets/new →
+ *     FopTask kebentuk Draft, BELUM ada teknisi/Task eksekusi. FOP assign
+ *     teknisi belakangan lewat /fop-tasks.
+ *  2. FOP sendiri submit MTN/C-REQ langsung dari halaman Task FOP, sekaligus
+ *     pilih teknisi & jadwal di form yang sama ($assignment terisi) → FopTask
+ *     langsung Terjadwal + Task eksekusi langsung dibuat, gak perlu mampir
+ *     Draft dulu — FOP kan yang paling berwenang nentuin penugasan.
+ *     Otorisasi assignment ini WAJIB dicek oleh caller (TicketController)
+ *     SEBELUM manggil create(), bukan di sini — lihat authorizeAssignment()
+ *     kalau butuh reuse pengecekan yang sama.
  */
 class TicketService
 {
     /**
      * @param  array  $data  Data tervalidasi dari TicketController::store()
      * @param  UploadedFile[]  $attachments
+     * @param  array{technicians?: int[], task_date?: string|null}  $assignment  Cuma dihonor kalau non-empty
+     * @return array{ticket: Ticket, conflicts: array}
      */
-    public function create(array $data, User $actor, array $attachments = []): Ticket
+    public function create(array $data, User $actor, array $attachments = [], array $assignment = []): array
     {
-        return DB::transaction(function () use ($data, $actor, $attachments) {
+        return DB::transaction(function () use ($data, $actor, $attachments, $assignment) {
             /** @var Customer $customer */
             $customer = Customer::query()
                 ->applyUserScope($actor)
@@ -60,10 +70,15 @@ class TicketService
             $ticket->created_by = $actor->id;
             $ticket->save();
 
-            $fopTask = $this->syncToFopTask($ticket, $customer, $actor);
+            $fopTask = $this->syncToFopTask($ticket, $customer, $actor, $assignment['task_date'] ?? null);
 
             $ticket->fop_task_id = $fopTask->id;
             $ticket->save();
+
+            $conflicts = [];
+            if (!empty($assignment['technicians'])) {
+                $conflicts = $this->assignTechnicians($fopTask, $ticket, $assignment['technicians'], $actor);
+            }
 
             foreach ($attachments as $file) {
                 $this->storeAttachment($ticket, $file, $actor);
@@ -80,8 +95,49 @@ class TicketService
                 AuditLog::log($ticket, 'create', null, $ticket->fresh()->toArray());
             }
 
-            return $ticket->load(['customer', 'creator', 'fopTask', 'attachments']);
+            return [
+                'ticket' => $ticket->load(['customer', 'creator', 'fopTask.technicians', 'attachments']),
+                'conflicts' => $conflicts,
+            ];
         });
+    }
+
+    /**
+     * Penugasan teknisi langsung saat submit — SATU-SATUNYA jalur di mana
+     * FopTask hasil Ticketing bisa lompat dari Draft langsung ke Terjadwal
+     * tanpa mampir tabel /fop-tasks dulu. Logic-nya sengaja disalin dari
+     * FopTaskController::store() (bukan dipanggil silang), karena titik
+     * masuknya beda: di sana FopTask baru dibuat lewat form generik, di sini
+     * lewat Ticket yang udah beres duluan (customer_id/pop_id/village_id
+     * udah kefrozen dari snapshot, gak perlu divalidasi ulang).
+     *
+     * @param  int[]  $technicianIds
+     * @return array Konflik team (kalau >1 teknisi) — dipakai controller buat flash session yang sama dengan /fop-tasks.
+     */
+    private function assignTechnicians(FopTask $fopTask, Ticket $ticket, array $technicianIds, User $actor): array
+    {
+        $fopTask->technicians()->sync($technicianIds);
+        $fopTask->status = TaskStatus::TERJADWAL;
+        $fopTask->save();
+
+        $taskData = [
+            'customer_id' => $fopTask->customer_id,
+            'pop_id' => $fopTask->pop_id,
+            'task_type' => $fopTask->category->value,
+            'title' => 'FOP: ' . $fopTask->tugas,
+            'description' => trim($ticket->detail_keluhan . "\n" . ($ticket->catatan_teknis ?? '')),
+            'team_member_ids' => $technicianIds,
+            'scheduled_at' => $fopTask->task_date,
+            'conflict_override' => true,
+        ];
+
+        $task = app(TaskService::class)->create($taskData, $actor);
+        $fopTask->task_id = $task->id;
+        $fopTask->save();
+
+        $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+
+        return count($technicianIds) > 1 ? ($teamResult['conflicts'] ?? []) : [];
     }
 
     /**
@@ -125,13 +181,14 @@ class TicketService
      * Bikin FopTask kembar dari tiket. Sengaja gak lewat FopTaskController::store()
      * — controller itu mewajibkan minimal 1 teknisi dan langsung bikin Task
      * eksekusi, sedangkan tiket dari perusahaan masuk sebagai antrean mentah
-     * yang penugasannya jadi keputusan FOP.
+     * yang penugasannya jadi keputusan FOP (kecuali FOP sendiri yang submit
+     * sambil langsung assign — lihat assignTechnicians()).
      */
-    private function syncToFopTask(Ticket $ticket, Customer $customer, User $actor): FopTask
+    private function syncToFopTask(Ticket $ticket, Customer $customer, User $actor, ?string $taskDate = null): FopTask
     {
         $fopTask = new FopTask();
         $fopTask->task_number = $this->generateFopTaskNumber();
-        $fopTask->task_date = now();
+        $fopTask->task_date = $taskDate ?? now();
         $fopTask->category = $ticket->type;
         $fopTask->tugas = $ticket->type->label() . ': ' . $customer->full_name;
         $fopTask->village_id = $customer->village_id;

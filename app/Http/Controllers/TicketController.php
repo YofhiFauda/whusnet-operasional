@@ -41,7 +41,20 @@ class TicketController extends Controller
         $query = Ticket::query()
             ->applyUserScope()
             ->inBucket($activeBucket)
-            ->with(['customer:id,full_name,cid,customer_code', 'creator:id,name', 'pop:id,name', 'fopTask:id,task_number,status'])
+            ->with([
+                // pop_id/status/distribution_id WAJIB ikut ke-select — dipakai
+                // Customer::getDisplayIdAttribute() buat nebak format CID lengkap
+                // (Pop::resolveDisplayId()). Tanpa kolom-kolom ini, $customer->pop
+                // selalu null (FK-nya gak ke-load) dan display_id diam-diam jatuh
+                // ke customer_code mentah (mis. "RQ000007" tanpa prefix POP/
+                // distribusi), padahal customers.cid udah nyimpen CID lengkap
+                // yang benar (mis. "C1X4CRQ000007").
+                'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id',
+                'customer.pop:id,name,cid_prefix',
+                'creator:id,name',
+                'pop:id,name',
+                'fopTask:id,task_number,status',
+            ])
             ->withCount('attachments');
 
         if ($search = $request->query('q')) {
@@ -140,6 +153,12 @@ class TicketController extends Controller
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'max:5120', 'mimes:jpg,jpeg,png,webp,pdf'],
+            // Cuma dipakai jalur FOP submit langsung dari halaman Task FOP —
+            // dicek permission-nya di bawah, BUKAN cuma divalidasi di sini.
+            'task_date' => ['nullable', 'date'],
+            'technicians' => ['nullable', 'array'],
+            'technicians.*' => ['exists:users,id'],
+            'origin' => ['nullable', 'string', 'in:fop_tasks'],
         ], [
             'type.in' => 'Tipe ticket hanya boleh MTN atau C-REQ.',
             'attachments.max' => 'Maksimal 5 lampiran per ticket.',
@@ -147,11 +166,51 @@ class TicketController extends Controller
             'attachments.*.mimes' => 'Lampiran harus berupa gambar (jpg/png/webp) atau PDF.',
         ]);
 
-        $ticket = $this->ticketService->create(
+        // Penugasan teknisi langsung cuma dihonor buat aktor yang emang
+        // berwenang bikin/assign Task FOP (fop_tasks.create). Kalau bukan —
+        // helpdesk/sales/dll yang submit dari /tickets/new biasa, atau
+        // request yang di-craft manual — dua field ini DIABAIKAN diam-diam,
+        // bukan ditolak 422/403, biar submit ticket normal tetap jalan.
+        $assignment = [];
+        if (!empty($validated['technicians']) && auth()->user()->hasPermission('fop_tasks.create')) {
+            $assignment = [
+                'technicians' => $validated['technicians'],
+                'task_date' => $validated['task_date'] ?? null,
+            ];
+        }
+
+        $result = $this->ticketService->create(
             $validated,
             auth()->user(),
-            $request->file('attachments', [])
+            $request->file('attachments', []),
+            $assignment
         );
+
+        $ticket = $result['ticket'];
+
+        // Submit dari halaman Task FOP — balikin ke situ juga (bukan
+        // tickets.show), gak peduli teknisi diisi atau dikosongin (biar masuk
+        // Ticket Masuk dulu). Origin cuma dihonor buat aktor yang emang
+        // berwenang bikin Task FOP, sama kayak gate assignment di atas —
+        // gak ada insentif nyata buat spoofing (cuma ngubah tujuan redirect,
+        // bukan buka akses baru), tapi tetap dikunci permission yang sama
+        // biar konsisten satu aturan.
+        $fromFopTasksPage = $request->input('origin') === 'fop_tasks'
+            && auth()->user()->hasPermission('fop_tasks.create');
+
+        if ($fromFopTasksPage) {
+            $message = $ticket->fopTask->task_id
+                ? "Ticket {$ticket->ticket_number} dibuat, Task FOP {$ticket->fopTask->task_number} langsung dijadwalkan."
+                : "Ticket {$ticket->ticket_number} dibuat, masuk ke Ticket Masuk — assign teknisi belakangan.";
+
+            $redirect = redirect()->route('fop-tasks.index')->with('success', $message);
+
+            if (!empty($result['conflicts'])) {
+                $redirect = $redirect->with('fop_team_conflicts', $result['conflicts']);
+            }
+
+            return $redirect;
+        }
 
         return redirect()
             ->route('tickets.show', $ticket)

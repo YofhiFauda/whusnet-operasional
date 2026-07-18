@@ -15,6 +15,7 @@ use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\Invoice;
+use App\Models\PopSequence;
 use App\Models\Payment;
 use App\Services\CustomerValidationService;
 use App\Support\IndonesianDate;
@@ -913,6 +914,75 @@ class CustomerController extends Controller
     /**
      * Validate the parsed rows from import (Excel/CSV multi-sheet).
      */
+    /** @var array<string,int|null> */
+    private array $branchPopIdCache = [];
+
+    private function resolveBranchPopId(?string $branchPopCode): ?int
+    {
+        $branchPopCode = trim((string) $branchPopCode);
+        if ($branchPopCode === '') {
+            return null;
+        }
+        if (array_key_exists($branchPopCode, $this->branchPopIdCache)) {
+            return $this->branchPopIdCache[$branchPopCode];
+        }
+
+        return $this->branchPopIdCache[$branchPopCode] = Pop::where('pop_code', $branchPopCode)
+            ->orWhere('code', $branchPopCode)
+            ->value('id');
+    }
+
+    /**
+     * Resolve a customer's DB id from its legacy old_customer_id, scoped to the
+     * given branch POP. Legacy old_customer_id (PE...) is only unique within its
+     * source branch — an unscoped lookup can silently return a different
+     * branch's customer that happens to reuse the same raw legacy code.
+     */
+    private function findScopedCustomerId(?string $oldCustomerId, ?string $branchPopCode): ?int
+    {
+        $oldCustomerId = trim((string) $oldCustomerId);
+        if ($oldCustomerId === '') {
+            return null;
+        }
+
+        $branchPopId = $this->resolveBranchPopId($branchPopCode);
+
+        return $this->scopeToBranchPopDirect(Customer::where('old_customer_id', $oldCustomerId), $branchPopId)->value('id');
+    }
+
+    /**
+     * Restrict a legacy-duplicate-check query to records belonging to the given
+     * branch POP (matches records on that POP directly, or on a mini-POP whose
+     * parent is that branch POP). Pass null $branchPopId to leave unscoped.
+     */
+    private function scopeToBranchPopDirect($query, ?int $branchPopId)
+    {
+        if (!$branchPopId) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($branchPopId) {
+            $q->where('pop_id', $branchPopId)
+                ->orWhereHas('pop', fn ($pq) => $pq->where('parent_id', $branchPopId));
+        });
+    }
+
+    /**
+     * Same as scopeToBranchPopDirect but for models without their own pop_id
+     * (CustomerService, CustomerTechnicalDetail) — scopes via the related customer.
+     */
+    private function scopeToBranchPopViaCustomer($query, ?int $branchPopId)
+    {
+        if (!$branchPopId) {
+            return $query;
+        }
+
+        return $query->whereHas('customer', function ($cq) use ($branchPopId) {
+            $cq->where('pop_id', $branchPopId)
+                ->orWhereHas('pop', fn ($pq) => $pq->where('parent_id', $branchPopId));
+        });
+    }
+
     public function validateImport(Request $request)
     {
         try {
@@ -943,6 +1013,25 @@ class CustomerController extends Controller
         $techDetailsData = $sheets['technical_details'] ?? [];
         $invoicesData = $sheets['invoices'] ?? [];
         $paymentsData = $sheets['payments'] ?? [];
+
+        // Legacy dumps from different branches (e.g. sand_db vs jetis_db) reuse the
+        // same sequential ID scheme (PE000001, RQ000001, ...) starting from 1 in
+        // each source install, so old_customer_id/old_request_id/old_cost_id are
+        // NOT globally unique across branches. Scope "already imported" duplicate
+        // checks below to the branch being imported (via branch_pop_code, set by
+        // MigrateLegacyDataCommand on every sheet row) so importing one branch
+        // doesn't get silently blocked because another branch already used the
+        // same legacy numbering.
+        $branchPopCode = trim((string) (
+            $customersData[0]['branch_pop_code']
+            ?? $servicesData[0]['branch_pop_code']
+            ?? $invoicesData[0]['branch_pop_code']
+            ?? $paymentsData[0]['branch_pop_code']
+            ?? ''
+        ));
+        $branchPopId = $branchPopCode !== ''
+            ? Pop::where('pop_code', $branchPopCode)->orWhere('code', $branchPopCode)->value('id')
+            : null;
 
         // 1. Validate Packages Sheet
         $validatedPackages = [];
@@ -1030,7 +1119,7 @@ class CustomerController extends Controller
                 }
                 $seenCustomerIds[$custKey] = true;
 
-                if (Customer::where('old_customer_id', $oldCustomerId)->exists()) {
+                if ($this->scopeToBranchPopDirect(Customer::where('old_customer_id', $oldCustomerId), $branchPopId)->exists()) {
                     $errors[] = 'ID pelanggan lama sudah terdaftar di database.';
                     $statusRow = 'error';
                 }
@@ -1212,7 +1301,7 @@ class CustomerController extends Controller
                 }
                 $seenRequestIds[$reqKey] = true;
 
-                if (CustomerService::where('old_request_id', $oldRequestId)->exists()) {
+                if ($this->scopeToBranchPopViaCustomer(CustomerService::where('old_request_id', $oldRequestId), $branchPopId)->exists()) {
                     $errors[] = 'ID request lama sudah terdaftar di database.';
                     $statusRow = 'error';
                 }
@@ -1309,7 +1398,7 @@ class CustomerController extends Controller
                 }
                 $seenReportIds[$repKey] = true;
 
-                if (CustomerTechnicalDetail::where('old_report_id', $oldReportId)->exists()) {
+                if ($this->scopeToBranchPopViaCustomer(CustomerTechnicalDetail::where('old_report_id', $oldReportId), $branchPopId)->exists()) {
                     $errors[] = 'ID detail teknis lama sudah terdaftar di database.';
                     $statusRow = 'error';
                 }
@@ -1382,7 +1471,10 @@ class CustomerController extends Controller
                 }
                 $seenInvoiceIds[$invKey] = true;
 
-                if (Invoice::where('old_invoice_id', $legacyInvoiceKey)->orWhere('old_cost_id', $legacyInvoiceKey)->exists()) {
+                $invoiceDupQuery = Invoice::where(function ($q) use ($legacyInvoiceKey) {
+                    $q->where('old_invoice_id', $legacyInvoiceKey)->orWhere('old_cost_id', $legacyInvoiceKey);
+                });
+                if ($this->scopeToBranchPopDirect($invoiceDupQuery, $branchPopId)->exists()) {
                     $errors[] = 'ID invoice/biaya lama sudah terdaftar di database.';
                     $statusRow = 'error';
                 }
@@ -1467,7 +1559,7 @@ class CustomerController extends Controller
                 }
                 $seenPaymentIds[$payKey] = true;
 
-                if (Payment::where('old_payment_id', $oldPaymentId)->exists()) {
+                if ($this->scopeToBranchPopDirect(Payment::where('old_payment_id', $oldPaymentId), $branchPopId)->exists()) {
                     $errors[] = 'ID pembayaran lama sudah terdaftar di database.';
                     $statusRow = 'error';
                 }
@@ -1623,6 +1715,40 @@ class CustomerController extends Controller
                     $insertedCount++;
                 }
 
+                // Pre-seed each target POP's registration-number sequence with the
+                // highest numeric suffix among literal legacy customer_code values
+                // in THIS batch. Without this, a row whose legacy code was cleared
+                // (duplicate) can call Pop::generateRegistrationNumber() before a
+                // later row with a literal code in the same "RQ" namespace is
+                // inserted — the generator only checks already-committed rows, so
+                // it can hand out a number a pending literal-code row needs,
+                // causing a customer_code unique-constraint crash mid-batch.
+                $maxLegacyNumberByPop = [];
+                foreach ($customersData as $row) {
+                    if (($row['status_row'] ?? '') === 'error') {
+                        continue;
+                    }
+                    $code = trim((string) ($row['customer_code'] ?? ''));
+                    $popIdForRow = $row['pop_id'] ?? null;
+                    if ($code === '' || !$popIdForRow) {
+                        continue;
+                    }
+                    if (preg_match('/(\d+)$/', $code, $m)) {
+                        $num = (int) $m[1];
+                        $maxLegacyNumberByPop[$popIdForRow] = max($maxLegacyNumberByPop[$popIdForRow] ?? 0, $num);
+                    }
+                }
+                foreach ($maxLegacyNumberByPop as $popId => $maxNum) {
+                    $seq = PopSequence::firstOrCreate(
+                        ['pop_id' => $popId, 'sequence_type' => PopSequence::TYPE_REGISTRATION],
+                        ['current_number' => 0]
+                    );
+                    if ($seq->current_number < $maxNum) {
+                        $seq->current_number = $maxNum;
+                        $seq->save();
+                    }
+                }
+
                 // 2. Process Customers
                 foreach ($customersData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
@@ -1731,7 +1857,7 @@ class CustomerController extends Controller
                         continue; // skip services for internal accounts
                     }
 
-                    $customerId = $customersMap[$row['old_customer_id']] ?? Customer::where('old_customer_id', $row['old_customer_id'])->value('id');
+                    $customerId = $customersMap[$row['old_customer_id']] ?? $this->findScopedCustomerId($row['old_customer_id'], $row['branch_pop_code'] ?? null);
                     $packageId = $packagesMap[$row['old_package_id']] ?? InternetPackage::where('old_package_id', $row['old_package_id'])->value('id');
 
                     if (!$customerId || !$packageId) {
@@ -1739,7 +1865,14 @@ class CustomerController extends Controller
                         continue;
                     }
 
-                    $existingService = CustomerService::where('old_request_id', $row['old_request_id'])->first();
+                    // Scoped by customer_id, not just old_request_id: legacy request
+                    // codes (RQ...) are only unique within their source branch, so a
+                    // global check here would silently skip a different branch's
+                    // service just because another branch already used the same
+                    // raw legacy number.
+                    $existingService = CustomerService::where('old_request_id', $row['old_request_id'])
+                        ->where('customer_id', $customerId)
+                        ->first();
                     if ($existingService) {
                         continue;
                     }
@@ -1857,14 +1990,14 @@ class CustomerController extends Controller
                         continue; // skip internal account technical details
                     }
 
-                    $customerId = $customersMap[$row['old_customer_id']] ?? Customer::where('old_customer_id', $row['old_customer_id'])->value('id');
+                    $customerId = $customersMap[$row['old_customer_id']] ?? $this->findScopedCustomerId($row['old_customer_id'], $row['branch_pop_code'] ?? null);
 
                     if (!$customerId) {
                         $this->logImportError($batch->id, $row, 'Technical Details', 'Gagal memetakan Customer ID.');
                         continue;
                     }
 
-                    if (!empty($row['old_report_id']) && CustomerTechnicalDetail::where('old_report_id', $row['old_report_id'])->exists()) {
+                    if (!empty($row['old_report_id']) && CustomerTechnicalDetail::where('old_report_id', $row['old_report_id'])->where('customer_id', $customerId)->exists()) {
                         continue;
                     }
 
@@ -1932,9 +2065,12 @@ class CustomerController extends Controller
                         continue; // skip internal accounts
                     }
 
-                    $customerId = $customersMap[$row['old_customer_id'] ?? ''] ?? Customer::where('old_customer_id', $row['old_customer_id'] ?? null)->value('id');
+                    $customerId = $customersMap[$row['old_customer_id'] ?? ''] ?? $this->findScopedCustomerId($row['old_customer_id'] ?? null, $row['branch_pop_code'] ?? null);
                     if (!$customerId && !empty($row['old_request_id'])) {
-                        $customerId = CustomerService::where('old_request_id', $row['old_request_id'])->value('customer_id');
+                        $customerId = $this->scopeToBranchPopViaCustomer(
+                            CustomerService::where('old_request_id', $row['old_request_id']),
+                            $this->resolveBranchPopId($row['branch_pop_code'] ?? null)
+                        )->value('customer_id');
                     }
 
                     if (!$customerId) {
@@ -1953,7 +2089,10 @@ class CustomerController extends Controller
                     $legacyInvoiceId = $row['old_invoice_id'] ?: ($row['old_cost_id'] ?? null);
                     $existingInvoice = null;
                     if ($legacyInvoiceId || !empty($row['old_cost_id'])) {
+                        // Scoped by customer_id: old_invoice_id/old_cost_id (from
+                        // legacy IDBIAYA) are only unique within their source branch.
                         $existingInvoice = Invoice::query()
+                            ->where('customer_id', $customerId)
                             ->where(function ($query) use ($legacyInvoiceId, $row) {
                                 if ($legacyInvoiceId) {
                                     $query->where('old_invoice_id', $legacyInvoiceId);
@@ -1973,7 +2112,14 @@ class CustomerController extends Controller
                         continue;
                     }
 
+                    // old_cost_id (from legacy IDBIAYA) is only unique within its
+                    // source branch, but invoice_number has a global unique
+                    // constraint — disambiguate with the target customer_id when
+                    // another branch already claimed the same raw legacy number.
                     $invoiceNumber = 'INV-' . $legacyInvoiceId;
+                    if (Invoice::where('invoice_number', $invoiceNumber)->exists()) {
+                        $invoiceNumber = 'INV-' . $legacyInvoiceId . '-C' . $customerId;
+                    }
                     $totalAmount = (float)$row['total_amount'];
 
                     // Legacy data mixes biaya pasang (install) & biaya bulanan into one
@@ -2031,10 +2177,6 @@ class CustomerController extends Controller
                         continue; // skip internal account payments
                     }
 
-                    if (Payment::where('old_payment_id', $row['old_payment_id'])->exists()) {
-                        continue;
-                    }
-
                     $invoiceId = $this->resolveLegacyInvoiceId($row, $invoicesMap);
 
                     if (!$invoiceId) {
@@ -2042,8 +2184,21 @@ class CustomerController extends Controller
                         continue;
                     }
 
+                    // Scoped by invoice_id, not just old_payment_id: legacy payment
+                    // codes are only unique within their source branch.
+                    if (Payment::where('old_payment_id', $row['old_payment_id'])->where('invoice_id', $invoiceId)->exists()) {
+                        continue;
+                    }
+
                     $invoice = Invoice::findOrFail($invoiceId);
+                    // old_payment_id's "-PASANG" (installation-fee) variant is
+                    // derived from legacy IDBIAYA, which is only unique within its
+                    // source branch — disambiguate if another branch already
+                    // claimed the same raw payment number.
                     $paymentNumber = 'PAY-' . $row['old_payment_id'];
+                    if (Payment::where('payment_number', $paymentNumber)->exists()) {
+                        $paymentNumber = 'PAY-' . $row['old_payment_id'] . '-I' . $invoiceId;
+                    }
                     $amount = (float)$row['amount'];
 
                     $payment = Payment::create([

@@ -89,6 +89,128 @@
         </div>
     </div>
 
+    @php
+        // MTN & C-REQ yang asalnya dari Ticketing (submit di /tickets, auto-sync
+        // ke FopTask oleh TicketService::syncToFopTask()) — detail keluhan,
+        // catatan teknis, data pelanggan, lampiran di sini WAJIB sama persis
+        // dengan yang dilihat di /tickets/{ticket}, biar FOP gak perlu buka dua
+        // halaman buat baca laporan yang sama. FopTask MTN yang dibuat manual
+        // langsung dari /fop-tasks (bukan dari Ticketing) gak punya $fopTask->ticket,
+        // jadi section ini otomatis gak muncul buat mereka — cuma Info Task biasa.
+        $isTicketOriginType = in_array($fopTask->category, [\App\Enums\TaskType::MAINTENANCE, \App\Enums\TaskType::CREQ], true);
+        $ticket = $fopTask->ticket;
+    @endphp
+
+    @if($isTicketOriginType && $ticket && auth()->user()->hasPermission('tickets.view'))
+    {{-- ══ Detail dari Ticketing (mengikuti /tickets/{ticket}) ══ --}}
+    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Detail Ticket</h2>
+            <a href="{{ route('tickets.show', $ticket) }}" class="text-[11px] font-medium text-blue-600 hover:underline font-ui">
+                {{ $ticket->ticket_number }} — Buka di Ticketing →
+            </a>
+        </div>
+
+        {{-- Data Pelanggan — snapshot saat ticket dibuat, sama kayak panel di /tickets --}}
+        <div class="px-4 pt-3">
+            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-ui mb-2">Data Pelanggan (saat ticket dibuat)</p>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-4 pb-4 text-[11px] font-ui">
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
+                <p class="font-medium text-slate-800">{{ $ticket->customer_name ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
+                <p class="font-medium text-slate-800 font-data">{{ $ticket->customer_phone ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
+                <p class="font-medium text-slate-800 font-data">{{ $ticket->customer_odp ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
+                <p class="font-medium text-slate-800">{{ $ticket->customer_package ?: '—' }}</p>
+            </div>
+            <div class="col-span-2">
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
+                <p class="font-medium text-slate-800">{{ $ticket->customer_address ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
+                <p class="font-medium text-slate-800">{{ $ticket->customer_device ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
+                @if($ticket->customerMapsUrl())
+                    <a href="{{ $ticket->customerMapsUrl() }}" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline font-data">
+                        {{ $ticket->customer_latitude }}, {{ $ticket->customer_longitude }}
+                    </a>
+                @else
+                    <p class="font-medium text-slate-800">—</p>
+                @endif
+            </div>
+        </div>
+
+        {{-- Detail Keluhan & Catatan Teknis — versi utuh, bukan $fopTask->issue
+             yang kepotong 255 karakter --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4 pb-4 text-[11px] font-ui border-t border-slate-100 pt-3">
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1">Detail Keluhan</p>
+                <p class="font-medium text-slate-800 whitespace-pre-line">{{ $ticket->detail_keluhan }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1">Catatan Teknis</p>
+                <p class="font-medium text-slate-800 whitespace-pre-line">{{ $ticket->catatan_teknis ?: '—' }}</p>
+            </div>
+        </div>
+
+        @if($ticket->attachments->isNotEmpty())
+        <div class="px-4 pb-4 border-t border-slate-100 pt-3">
+            <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1.5 font-ui">Lampiran ({{ $ticket->attachments->count() }})</p>
+            <div class="flex flex-wrap gap-3">
+                @foreach($ticket->attachments as $attachment)
+                    <a href="{{ route('tickets.attachments.download', $attachment) }}"
+                       class="inline-flex items-center gap-1.5 text-[11px] text-blue-600 hover:underline font-ui">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {{ $attachment->original_name }}
+                    </a>
+                @endforeach
+            </div>
+        </div>
+        @endif
+    </div>
+
+    {{-- ══ Riwayat Ticketing (dari sisi pengirim, kembaran Histori Status di bawah) ══ --}}
+    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
+            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Riwayat Ticketing</h2>
+        </div>
+        @if($ticket->histories->isNotEmpty())
+        <div class="divide-y divide-slate-100">
+            @foreach($ticket->histories as $ticketHistory)
+            <div class="px-4 py-2.5 flex items-center justify-between gap-3 text-[11px] font-ui">
+                <div class="flex items-center gap-2">
+                    <span class="font-medium text-slate-800">{{ $ticketHistory->action->label() }}</span>
+                    @if($ticketHistory->reason)
+                    <span class="text-slate-400">— {{ $ticketHistory->reason }}</span>
+                    @endif
+                </div>
+                <div class="flex items-center gap-3 text-slate-500 font-data">
+                    <span>{{ $ticketHistory->actor?->name ?? 'Sistem' }}</span>
+                    <span>{{ $ticketHistory->happened_at->format('d/m/Y H:i') }}</span>
+                </div>
+            </div>
+            @endforeach
+        </div>
+        @else
+        <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada riwayat ticketing.</p>
+        @endif
+    </div>
+    @endif
+
     {{-- ══ Durasi & SLA Pengerjaan ══ --}}
     <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
         <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">

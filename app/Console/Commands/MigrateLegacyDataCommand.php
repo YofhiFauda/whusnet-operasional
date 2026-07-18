@@ -980,6 +980,22 @@ protected $signature = 'app:import-legacy-sql
             ];
         }
 
+        // Tag every row with the branch POP code for this import run so the
+        // controller can scope its "already imported" duplicate checks per
+        // branch instead of globally — legacy dumps from different branches
+        // reuse the same sequential ID scheme (PE000001, RQ000001, ...) starting
+        // from 1 in each source install, so old_customer_id/old_request_id/
+        // old_cost_id collide across branches even though they refer to
+        // completely different people.
+        $primaryBranchPopCode = $overrideCode ?: (collect($legacyPopMap)->first()['pop_code'] ?? '');
+        foreach ([&$customersSheet, &$servicesSheet, &$technicalSheet, &$invoicesSheet, &$paymentsSheet] as &$sheetRows) {
+            foreach ($sheetRows as &$sheetRow) {
+                $sheetRow['branch_pop_code'] = $primaryBranchPopCode;
+            }
+            unset($sheetRow);
+        }
+        unset($sheetRows);
+
         $sheets = [
             'packages' => $packagesSheet,
             'customers' => $customersSheet,
