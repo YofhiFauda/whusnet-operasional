@@ -16,10 +16,12 @@ class TaskPolicy
      */
     public function before(User $user, string $ability): ?bool
     {
-        // 'cancel' sengaja DIKELUARIN dari bypass wildcard — SRV/PSB gak boleh
-        // dibatalkan dari Task sama sekali (harus lewat halaman Customer),
-        // aturan ini berlaku buat SEMUA role termasuk owner/admin.
-        if ($ability === 'cancel') {
+        // 'cancel' & 'cancelViaFopTask' sengaja DIKELUARIN dari bypass wildcard —
+        // SRV/PSB gak boleh dibatalkan lewat jalur Task sama sekali (harus lewat
+        // halaman Customer), aturan ini berlaku buat SEMUA role termasuk
+        // owner/admin. Tanpa pengecualian ini, owner ber-permission '*' bakal
+        // nembus invarian SRV/PSB di dua method itu.
+        if (in_array($ability, ['cancel', 'cancelViaFopTask'], true)) {
             return null;
         }
 
@@ -127,6 +129,41 @@ class TaskPolicy
         }
 
         return $this->canTransitionTo($user, $task, 'dibatalkan') && !in_array($task->status->value, ['selesai', 'dibatalkan']);
+    }
+
+    /**
+     * Membatalkan `Task` eksekusi sebagai EFEK IKUTAN dari pembatalan tiket di
+     * /fop-tasks (FopTaskController::update()), bukan lewat tombol Cancel di
+     * halaman Task.
+     *
+     * Kenapa otoritasnya `fop_tasks.cancel` dan BUKAN `task.cancel`:
+     * dua permission itu menjaga dua pintu berbeda ke objek berbeda —
+     * `task.cancel` buat /tasks (objek `Task`), `fop_tasks.cancel` buat
+     * /fop-tasks (objek `FopTask`). Sengaja gak digabung: role `admin` di DB
+     * punya `fop_tasks.*` TAPI gak punya `task.cancel`, jadi maksa `task.cancel`
+     * di sini bakal bikin admin gak bisa lagi membatalkan tiket — padahal itu
+     * kewenangan yang selama ini dia punya. Membatalkan tiket memang SEHARUSNYA
+     * ikut membatalkan pekerjaannya; kalau enggak, Task-nya jadi yatim dan tetap
+     * kelihatan aktif di /tasks-saya walau tiketnya udah batal.
+     *
+     * Nilai tambah method ini dibanding cascade langsung tanpa policy: invarian
+     * dicek terhadap `Task` YANG BENERAN DIBATALIN (task_type & status-nya
+     * sendiri), bukan terhadap `FopTask.category` seperti guard di controller.
+     * Kalau dua kolom itu sampai menyimpang, tiket MTN gak bisa dipakai buat
+     * diam-diam membatalkan Task SURVEY/PSB — jalur sah SRV/PSB tetap cuma
+     * halaman Pelanggan, sama kayak cancel().
+     */
+    public function cancelViaFopTask(User $user, Task $task): bool
+    {
+        if (in_array($task->task_type, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+            return false;
+        }
+
+        if (in_array($task->status->value, ['selesai', 'dibatalkan'], true)) {
+            return false;
+        }
+
+        return $user->hasPermission('fop_tasks.cancel');
     }
 
     /**

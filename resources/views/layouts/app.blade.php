@@ -215,6 +215,37 @@
                 </div>
                 @endif
 
+                @if(auth()->user()->hasPermission('tickets.view'))
+                <!-- TICKETING Dropdown -->
+                <div>
+                    <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')" title="Ticketing" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
+                        <span class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span class="sidebar-text">TICKETING</span>
+                        </span>
+                        <svg id="chevron-ticketing" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('tickets*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <!-- Submenu -->
+                    <div id="submenu-ticketing" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('tickets*') ? '' : 'hidden' }}">
+                        @if(auth()->user()->hasPermission('tickets.create'))
+                            <a href="{{ route('tickets.create') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tickets.create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                New Ticket
+                            </a>
+                        @endif
+
+                        @foreach(\App\Enums\TicketBucket::cases() as $ticketBucket)
+                            <a href="{{ route('tickets.bucket', $ticketBucket->value) }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('tickets/' . $ticketBucket->value) ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                                {{ $ticketBucket->label() }}
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
                 @if(auth()->user()->hasPermission('invoices.view'))
                 <!-- TAGIHAN Dropdown -->
                 <div>

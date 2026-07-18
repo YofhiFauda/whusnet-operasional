@@ -150,4 +150,25 @@ enum TaskType: string
             ->values()
             ->all();
     }
+
+    /**
+     * Tipe yang boleh diajukan lewat modul Ticketing (internal perusahaan).
+     * Tipe lain tetap dibuat langsung dari /fop-tasks (internal FOP) atau
+     * lewat auto-sync Registrasi Pelanggan.
+     */
+    public static function ticketValues(): array
+    {
+        return [self::MAINTENANCE->value, self::CREQ->value];
+    }
+
+    /**
+     * Options (value+label) buat dropdown Tipe Ticket.
+     */
+    public static function ticketOptions(): array
+    {
+        return collect(self::options())
+            ->filter(fn ($t) => in_array($t['value'], self::ticketValues(), true))
+            ->values()
+            ->all();
+    }
 }

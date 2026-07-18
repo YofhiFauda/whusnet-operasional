@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
         $this->call(PackageSlaSettingSeeder::class); //UNTUK MENGATUR DURASI SLA TIAP PACKAGE
         $this->call(SlaTimelineFeatureSeeder::class); //UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
         
-        $this->call(CustomerSeeder::class);
+        // $this->call(CustomerSeeder::class);
         $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);
 

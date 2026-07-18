@@ -26,6 +26,7 @@ use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopTaskController;
+use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 
@@ -355,6 +356,31 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:fop_tasks.delete')->group(function () {
         Route::delete('/fop-tasks/{fop_task}', [FopTaskController::class, 'destroy'])->name('fop-tasks.destroy');
+    });
+
+    // ── Ticketing (internal perusahaan) ───────────────────────────
+    // Beda dari Task FOP (internal FOP): tiket di sini diajukan role mana pun
+    // (helpdesk/NOC/sales/admin) dan otomatis memunculkan FopTask baru.
+    Route::middleware('permission:tickets.create')->group(function () {
+        // Didaftarkan sebelum /tickets/{bucket} & /tickets/{ticket} — kalau di
+        // bawah, '/tickets/new' bakal ketangkep route lain duluan.
+        Route::get('/tickets/new', [TicketController::class, 'create'])->name('tickets.create');
+        Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+        Route::get('/api/tickets/lookup-customer', [TicketController::class, 'lookupCustomer'])->name('tickets.lookup-customer');
+    });
+    Route::middleware('permission:tickets.view')->group(function () {
+        Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
+        Route::get('/ticket-attachments/{attachment}', [TicketController::class, 'download'])->name('tickets.attachments.download');
+
+        // Submenu bucket (masuk|diproses|selesai|dibatalkan). Dibatasi whereIn
+        // biar gak bentrok sama route detail di bawahnya yang cuma nerima angka.
+        Route::get('/tickets/{bucket}', [TicketController::class, 'index'])
+            ->whereIn('bucket', \App\Enums\TicketBucket::values())
+            ->name('tickets.bucket');
+
+        Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
+            ->whereNumber('ticket')
+            ->name('tickets.show');
     });
 
     // Location APIs (used in forms)

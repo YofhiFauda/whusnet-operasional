@@ -387,6 +387,26 @@ class FopTaskController extends Controller
 
             $fopTask->save();
 
+            // Riwayat status sisi FOP buat cancel manual HARUS ditulis di sini.
+            // TaskObserver — yang biasanya nulis fop_task_status_history — udah
+            // keburu early-return begitu FopTask berstatus `dibatalkan`
+            // (TaskObserver.php baris 42, guard biar cancel manual gak
+            // ke-overwrite sync otomatis), jadi sebelum ini pembatalan gak
+            // ninggalin jejak sama sekali di riwayat, termasuk buat tiket yang
+            // belum punya Task eksekusi (tiket Ticketing yang masih Draft).
+            if (isset($validated['status'])
+                && $validated['status'] === TaskStatus::DIBATALKAN->value
+                && $oldStatus !== TaskStatus::DIBATALKAN->value
+            ) {
+                \App\Models\FopTaskStatusHistory::create([
+                    'fop_task_id' => $fopTask->id,
+                    'from_status' => $oldStatus,
+                    'to_status'   => TaskStatus::DIBATALKAN->value,
+                    'changed_by'  => auth()->id(),
+                    'changed_at'  => now(),
+                ]);
+            }
+
             // Cancel dari sisi FOP harus nembus ke Task eksekusi teknisi juga —
             // kalau enggak, Task tetap Terjadwal/Sedang Dikerjakan di Riwayat
             // Task & /tasks-saya walau tiket FOP-nya udah Cancel.
@@ -397,6 +417,13 @@ class FopTaskController extends Controller
             ) {
                 $linkedTask = $fopTask->task;
                 if ($linkedTask && !in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
+                    // Cascade ke Task eksekusi tetap harus nembus policy, bukan
+                    // main panggil TaskService langsung. Guard SRV/PSB di atas
+                    // baca `FopTask.category`; yang dibatalin di sini `Task`,
+                    // jadi tipenya dicek ulang terhadap Task-nya sendiri —
+                    // lihat TaskPolicy::cancelViaFopTask().
+                    $this->authorize('cancelViaFopTask', $linkedTask);
+
                     app(TaskService::class)->cancel($linkedTask, auth()->user(), $validated['cancel_reason'] ?? "Dibatalkan dari Task FOP {$fopTask->task_number}.");
                 }
             }

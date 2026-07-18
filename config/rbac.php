@@ -200,6 +200,11 @@ return [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
         ],
+
+        'tickets' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+        ],
     ],
 
     /*

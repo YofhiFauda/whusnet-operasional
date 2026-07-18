@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use Carbon\Carbon;
+use App\Models\FopTask;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Task;
+use App\Observers\FopTaskObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
@@ -43,6 +45,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Task 9 — sync status Task eksekusi teknisi ke FopTask (status realtime).
         Task::observe(TaskObserver::class);
+
+        // Ticketing — tulis riwayat sisi Ticket saat Task FOP-nya dibatalkan,
+        // dari jalur cancel mana pun.
+        FopTask::observe(FopTaskObserver::class);
 
         // Register Blade Directives for formatting
         \Illuminate\Support\Facades\Blade::directive('rupiah', function ($expression) {
