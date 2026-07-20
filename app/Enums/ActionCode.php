@@ -22,4 +22,5 @@ enum ActionCode: string
     case DOWNLOAD = 'download';
     case VIEW_SENSITIVE = 'view_sensitive';
     case UPDATE_SENSITIVE = 'update_sensitive';
+    case RETRIEVE = 'retrieve';
 }

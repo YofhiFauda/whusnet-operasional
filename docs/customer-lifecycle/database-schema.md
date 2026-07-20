@@ -43,6 +43,7 @@ Migrasi awal: `2026_06_09_035326_create`. Banyak kolom ditambah belakangan lewat
 | `ont_sn`, `ip_address`, `odp_code`, `olt_code`, `vlan_id` | string | Data teknis ringkas di level customer (duplikat sebagian dengan `customer_technical_details`) |
 | `foto_ktp`, `foto_rumah`, `foto_kontrak` | string | Path foto (audit-hidden — gak muncul di payload AuditLog) |
 | `created_by`, `updated_by` | FK users | |
+| `old_customer_id` | string, nullable | Referensi `IDPENGGUNA` legacy — cuma terisi buat hasil `app:import-legacy-sql`. **Load-bearing buat business rule** (baru 2026-07-20): jadi salah satu syarat gate tombol "Aktivasi Manual" (lihat [business-logic.md §7](business-logic.md#aktivasi-manual--jalur-khusus-data-migrasi-customercontrolleractivate-2026-07-20)) — kalau kosong, customer dianggap BUKAN hasil migrasi, gak boleh lewat jalur aktivasi manual. |
 
 ## Tabel `customer_addresses` (1:1)
 
@@ -70,10 +71,13 @@ Migrasi: `2026_06_11_140000_create` + beberapa alter (`add_activated_by_user_id`
 | `monthly_price`, `discount`, `ppn`, `other_fee`, `total_monthly_bill` | decimal | |
 | `activation_date`, `due_date` | date | |
 | `billing_cycle` | string, default `monthly` | |
-| `service_status` | string, default `calon_pelanggan` | `aktif` di-set saat Verifikasi Admin approve |
+| `service_status` | string, default `calon_pelanggan` | `aktif` di-set saat Verifikasi Admin approve. Buat pelanggan migrasi, di-set langsung dari `mapLegacyServiceStatus()` saat import (lihat [business-logic.md §9](business-logic.md#9-migrasi-data-legacy-customercontrollerconfirmimport--migratelegacydatacommand-2026-07-20)) |
 | `billing_status` | string, default `pending` | `active` di-set saat aktivasi |
-| `profile`, `contract_type` | string | |
+| `profile`, `contract_type` | string | `contract_type` (`sewa`/`beli`, lowercase) hasil import diambil dari kolom legacy `STATUSALAT` (fixed 2026-07-20 — sebelumnya salah baca dari `STATUSLANGGANAN` yang kosong di semua data legacy) |
 | `activation_time`, `activated_by_name`, `activated_by_user_id` | | Dicatat di `finalVerify()` |
+| `old_request_id`, `old_cost_id` | string | Referensi ID legacy |
+| `request_status`, `installation_status` | string, nullable | **Raw** status legacy (`STATUS`/`STATUSPASANG` — teks asli, BEDA dari `service_status` yang udah di-mapping ke vocab baru). `request_status` dipakai sebagai salah satu gate "Aktivasi Manual" — harus persis `'ACTIVE'` (huruf besar, nilai legacy asli) |
+| `reason` | text, nullable | `ALASAN` legacy — sumber alasan buat AuditLog sintetis `rejected`/`terminated` (lihat bagian Audit di bawah) |
 
 ## Tabel `customer_surveys` (1:N)
 
@@ -127,6 +131,8 @@ Migrasi: `2026_06_15_000001_create` + `add_cid_olt_slot`, `add_olt_vlan_fields`,
 ## Tabel `customer_devices` (1:1, legacy)
 
 Migrasi: `2026_06_13_120000_create`. Overlap kolom dengan `customer_technical_details` (device_type, brand, model, serial_number, mac_address, PPPoE, WiFi, IP) — dipertahankan untuk backward compatibility (`CustomerInstallationController` nulis ke keduanya sekaligus saat submit laporan).
+
+- `device_retrieved_at` (nullable timestamp, migrasi `2026_07_18_163955_add_device_retrieved_at_to_customer_devices_table`) — **baru**. Dicek buat kolom "Status Alat" di List Putus Langganan (null = "Belum di Ambil", terisi = "Sudah di Ambil"). Diset oleh `CustomerController::retrieveDevice()` ("Ambil Alat"). Sebelum kolom ini ada, gak ada cara sistem tahu status pengambilan alat pelanggan yang putus langganan — lihat [business-logic.md §8](business-logic.md#8-terminasi-layanan-customerterminationcontroller).
 
 ## Tabel `customer_documents` (1:N)
 
@@ -182,3 +188,6 @@ technician(): BelongsTo(User::class)
 
 - `Customer` — trait `RecordsAuditLogs`, module `Data Pelanggan`; `foto_ktp`/`foto_rumah`/`foto_kontrak` di-hide dari payload (`$auditHidden`).
 - Tiap transisi status — `CustomerStatusLog` (khusus histori status) + `AuditLog` module `Customer Workflow` (`CustomerWorkflowService`) atau module `Data Pelanggan`/`customers` (aksi manual di controller seperti `activate_from_verification`, `terminate`).
+- **List Pelanggan Gagal & List Putus Langganan (2026-07-20) baca langsung dari `AuditLog`, bukan kolom dedicated** — `CustomerController::index()` query `AuditLog` per customer buat ambil alasan+tanggal: module `Customer Workflow` action `status_transition` dengan `new_values->status='rejected'` (Pelanggan Gagal), atau module `customers` action `terminate` (Putus Langganan). Dua action baru ditambahkan ke module yang sama: `status_restore` (Kembalikan dari Gagal, `CustomerController::restoreFromFailed()`) dan `reactivate` (Langganan Lagi, `CustomerController::reactivate()`) — dua-duanya nyimpen `old_values`/`new_values.status` tapi **tidak** tercatat di `customer_status_logs` (bypass state machine, lihat [business-logic.md §7](business-logic.md#reject-reject) & [§8](business-logic.md#list-putus-langganan--ambil-alat--langganan-lagi-2026-07-20)).
+- **Kedua list di atas diurut DESC berdasarkan tanggal dari `AuditLog` (2026-07-20)** — subquery `AuditLog::selectRaw('MAX(created_at)')` di-`orderBy()` SEBELUM `paginate()` (bukan `customer_code`), karena tanggal itu bukan kolom asli di `customers`, harus dihitung on-the-fly.
+- **AuditLog sintetis buat pelanggan hasil migrasi (2026-07-20)** — `confirmImport()` set status pelanggan pakai `Customer::updateQuietly()`, yang gak nulis `AuditLog` sama sekali. Biar List Pelanggan Gagal/Putus Langganan gak kosong buat pelanggan migrasi yang `rejected`/`terminated`, `confirmImport()` sekarang bikin `AuditLog` manual dengan format yang sama persis kayak transisi asli (module+action sama), pakai `reason` (`ALASAN` legacy) dan tanggal dari `status_changed_at` (`TGLSELESAI` legacy, fallback `updated_at` baris legacy). `old_values.status` di-default (`registered`/`active`) karena data legacy gak selalu jelas tahap persis sebelumnya — lihat [business-logic.md §9](business-logic.md#9-migrasi-data-legacy-customercontrollerconfirmimport--migratelegacydatacommand-2026-07-20).

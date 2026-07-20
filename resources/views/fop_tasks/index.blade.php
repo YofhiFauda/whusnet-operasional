@@ -322,17 +322,17 @@
                                             </svg>
                                         </button>
                                     </form>
-                                    @else
+                                    @elseif($task->ticket)
                                     <button type="button" disabled
                                             class="text-slate-300 bg-slate-50 p-1.5 rounded cursor-not-allowed"
-                                            title="{{ in_array($task->category->value, ['SURVEY', 'PSB'], true)
-                                                ? 'Task Survey/Pemasangan gak bisa dihapus — kelola lewat halaman Pelanggan.'
-                                                : 'Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.' }}">
+                                            title="Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
                                     </button>
                                     @endif
+                                    {{-- Task Survey/Pemasangan: gak ada action Hapus sama sekali (bukan
+                                         cuma disabled) — kelola lewat halaman Pelanggan (Batal/Gagal). --}}
                                 </div>
                             </td>
                         </tr>

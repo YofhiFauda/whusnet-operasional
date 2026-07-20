@@ -343,6 +343,8 @@ Kalau Task SRV/PSB udah `selesai` (laporan disubmit, tinggal diverifikasi) — b
 
 Detail implementasi, deviasi desain, & test: [analisa-auto-team.md § Task 9](analisa-auto-team.md).
 
+**Delete (hapus permanen) — guard terpisah dari Cancel, diperketat di UI (2026-07-20):** `FopTaskController::destroy()` udah dari awal `abort(422)` buat `category` SURVEY/PSB (pesan: "harus lewat halaman Pelanggan") — beda dari guard Cancel di atas, ini nolak hard-delete row `fop_tasks` sama sekali, alasannya sama: task_type SURVEY/PSB gak boleh ilang tanpa jejak, harus lewat jalur reject/batal resmi di halaman Customer (tabel di atas) biar `Customer.status` ikut ke-update. Sebelumnya di UI (`fop_tasks/index.blade.php`) tombol Delete buat SURVEY/PSB cuma **disabled** (kelihatan abu-abu + tooltip alasan) — sekarang **gak dirender sama sekali** (dianggap gak ada action Delete buat kategori ini). Task dari Ticketing (`$task->ticket` terisi) tetap disabled+tooltip (alasan beda: histori tiket harus tetap traceable, bukan soal SRV/PSB). Task_type lain (MTN/DEAC/RELOKASI/dst, manual & bukan dari Ticketing) tetap bisa dihapus normal.
+
 ## 10. Riwayat Lengkap + SLA Deadline Dual-Cycle (Task 10)
 
 **Baru.** Halaman `GET /fop-tasks/history/{fop_task}` (`FopTaskController::showHistory()` → `fop_tasks/history_detail.blade.php`) — klik row mana pun di tabel Riwayat buka detail lengkap 1 tiket.
@@ -370,11 +372,13 @@ Task eksekusi berubah status
   task_reports row ke-update (1:1 per Task, HasOne)
 ```
 
-Halaman Detail Riwayat nampilin 4 section:
-1. **Info Task** — kategori, tanggal, area, prioritas, teknisi, team, issue, alasan Cancel (manual FOP, kalau ada) DAN alasan Ditolak Verifikasi Admin (kalau ada — section independen, lihat § 11).
-2. **Durasi & SLA Pengerjaan** — dari `task_reports`: mulai, pending terakhir, resume terakhir, selesai, durasi aktual (akumulasi, exclude jeda pending), target SLA, status SLA (Tepat Waktu/Lewat SLA + overrun menit).
-3. **Laporan** — baca LANGSUNG dari `CustomerSurvey`/`CustomerInstallation`/`TaskMaintenance` sesuai `category` (Survey/PSB/MTN), BUKAN duplikasi data ke `task_reports` (itu cuma nyimpen durasi/SLA, bukan konten laporan).
-4. **Histori Status** — list `fop_task_status_history` (terbaru dulu), tiap baris: label granular + `from_status` + siapa yang ubah + kapan. Ini **audit trail utama** buat nelusurin kenapa suatu task nyampe ke status akhirnya (termasuk kapan masuk "Selesai — Menunggu Verifikasi" dan kapan/kenapa berujung "Selesai — Ditolak Verifikasi" — lihat § 11).
+Halaman Detail Riwayat nampilin section berikut (urutan tampil):
+1. **Info Task** — kategori, tanggal, area, POP, prioritas, issue (generik, kepotong — cuma dipakai buat tipe NON-ticket-origin), alasan Cancel (manual FOP, kalau ada) DAN alasan Ditolak Verifikasi Admin (kalau ada — section independen, lihat § 11). Teknisi & Team **gak** di sini lagi — dipindah (2026-07-20) ke section "Detail Registrasi" di bawah biar deket data pelanggan/assignment, bukan tercampur field jadwal.
+2. **Detail Registrasi** (2026-07-20, **baru** — SRV/PSB/MTN-C-REQ native, alias `!$showTicketDetail`) — Teknisi & Team ditonjolkan di atas, lalu data pelanggan LIVE dari `Customer`+relasinya (`customerTechnicalDetail`, `internetPackage`, `customerAddress`, `customerDevice`): CID, Nama, No. HP, ODP, Paket, Alamat, Perangkat Pelanggan, Koordinat. Kalau `FopTask.customer_id` null (task MTN/C-REQ native yang gak nempel ke pelanggan tertentu, mis. perbaikan infrastruktur/ODP) → section tetap tampil tapi cuma placeholder "Task ini tidak terhubung ke pelanggan tertentu". **Sebelum perubahan ini, section ini gak ada sama sekali** buat SRV/PSB/MTN-C-REQ native — cuma MTN/C-REQ asal Ticketing yang punya data pelanggan (lewat "Detail Ticket" di bawah, snapshot dari `Ticket`, bukan `Customer` langsung).
+3. **Detail Ticket** + **Riwayat Ticketing** (MTN/C-REQ asal Ticketing, `$showTicketDetail` true) — data pelanggan snapshot dari `Ticket` (`customer_name`/`phone`/`odp`/`package`/`address`/`device`/koordinat, dicatat SAAT ticket dibuat, bisa beda dari data Customer terkini), Assigned by/Created, Issue/Gangguan + Catatan Teknis versi utuh (bukan `$fopTask->issue` yang kepotong 255 char), lampiran, dan histori aksi ticket — semua ngikutin apa yang dilihat di `/tickets/{ticket}`. Mutually exclusive sama § 2 (satu FopTask cuma tampilin salah satu).
+4. **Durasi & SLA Pengerjaan** — dari `task_reports`: mulai, pending terakhir, resume terakhir, selesai, durasi aktual (akumulasi, exclude jeda pending), target SLA, status SLA (Tepat Waktu/Lewat SLA + overrun menit).
+5. **Laporan** — baca LANGSUNG dari `CustomerSurvey`/`CustomerInstallation`/`TaskMaintenance` sesuai `category` (Survey/PSB/MTN), BUKAN duplikasi data ke `task_reports` (itu cuma nyimpen durasi/SLA, bukan konten laporan). C-REQ gak punya laporan lapangan terstruktur (fallback teks generik), terlepas dari asal ticket atau native.
+6. **Histori Status** — list `fop_task_status_history` (terbaru dulu), tiap baris: label granular + `from_status` + siapa yang ubah + kapan. Ini **audit trail utama** buat nelusurin kenapa suatu task nyampe ke status akhirnya (termasuk kapan masuk "Selesai — Menunggu Verifikasi" dan kapan/kenapa berujung "Selesai — Ditolak Verifikasi" — lihat § 11).
 
 ## 11. Task Tetap "Selesai" Terlepas dari Keputusan Customer (fix reject-sync gap, desain final — REVISI 2026-07-15)
 

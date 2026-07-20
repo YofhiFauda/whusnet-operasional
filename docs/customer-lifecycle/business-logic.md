@@ -114,10 +114,33 @@ Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan �
 
 ### Reject (`reject`)
 
-- Transition ke `rejected` (final, gak bisa balik) — dipakai kalau pelanggan dibatalkan total di titik verifikasi manapun. Pelanggan yang ditolak otomatis masuk list **Pelanggan Gagal** (`CustomerController` statusGroup `failed`, `whereIn('status', ['failed','rejected','gagal'])`) — no-op, gak ada kode tambahan buat ini.
+- Transition ke `rejected` — dipakai kalau pelanggan dibatalkan total di titik verifikasi manapun. Pelanggan yang ditolak otomatis masuk list **Pelanggan Gagal** (`CustomerController` statusGroup `failed`, `whereIn('status', ['failed','rejected','gagal'])`) — no-op, gak ada kode tambahan buat ini.
 - **Stage-aware sejak fix reject-sync gap (2026-07-14):** tahap ditentukan dari `$customer->status` SEBELUM `transition()` dipanggil (transition-nya sendiri ngubah status jadi `rejected`, jadi harus direkam duluan) — `installation_in_progress|revision_installation|installed|verification_admin` = tahap install → target **Task Pemasangan**; selain itu (`waiting_acc|survey_in_progress|surveyed|waiting_installation`) = tahap survey → target **Task Survey** (behavior lama). SEBELUM fix ini, `reject()` SELALU nyentuh Task Survey — kalau ditolak di tahap install, Task Pemasangan gak pernah ke-update, nyangkut permanen di antrian FOP aktif. Detail: `docs/project_verifikasi_reject_gap.md`.
 - Auto-reject Task (Survey atau Pemasangan, sesuai tahap) yang masih `fop_review_status=pending` → `fop_review_status=rejected` + `reject_reason`. `Task.status` **TETAP `selesai`** (beda dari Revisi di bawah yang revert ke `in_progress`) — downstream `TaskObserver` TETAP sync `FopTask` ke `Selesai` (bukan `Cancel` — kerjaan lapangan teknisi sukses, yang ditolak keputusan bisnis customer-nya, 2 hal beda sengaja gak dicampur), cuma label histori granularnya jadi `selesai_ditolak_verifikasi`. Di Riwayat FOP, badge "Verifikasi: Ditolak" muncul sebagai kolom/badge KEDUA (overlay dari `FopTask::verificationStatus()`), terpisah dari badge status utama "Selesai" (lihat [docs/fop-task/flowchart.md § 9](../fop-task/flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9)).
-- UI: tombol "Tolak" tersedia di halaman queue (tahap survey, sudah lama ada) DAN di halaman Verif & Pemasangan `verifications/admin.blade.php` (tahap install, **baru ditambahkan** — sebelumnya cuma ada Approve/Revisi di situ). Modal Tolak eksplisit warning "final, gak bisa dibuka lagi, harus registrasi ulang dari awal".
+- UI: tombol "Tolak" tersedia di halaman queue (tahap survey, sudah lama ada) DAN di halaman Verif & Pemasangan `verifications/admin.blade.php` (tahap install). Modal Tolak eksplisit warning "final, gak bisa dibuka lagi, harus registrasi ulang dari awal" — **catatan: warning ini sekarang gak 100% akurat**, lihat "Kembalikan" di bawah (ditambahkan belakangan sebagai jalur darurat, `allowedNextTransitions()` enum `REJECTED` sendiri tetap kosong/terminal, gak diubah).
+- **Tombol Delete pelanggan dihapus dari `/verifications/queue` (2026-07-20)**: sebelumnya tiap baris antrean punya icon Delete (`customers.destroy`, hard-delete permanen, permission `customers.delete`) tanpa peduli status — berbahaya karena SRV/PSB pada dasarnya gak boleh dihapus (bisa juga crash FK karena `tasks.customer_id` `onDelete('restrict')` kalau customer punya Task terkait). Diganti icon "Batal / Gagal" yang manggil modal reject yang sama (`openRejectModal()`, POST ke `customers.verification.reject`) — sekarang berlaku SERAGAM di semua status queue (`waiting_acc`, `surveyed`, `waiting_installation`, `installation_in_progress`, `revision_installation`, `installed`, `verification_admin`), bukan cuma `surveyed` seperti sebelumnya. Gate permission `customers.detail.installation.validate` (sama kayak permission route reject).
+
+### Kembalikan dari Pelanggan Gagal (`CustomerController::restoreFromFailed`, 2026-07-20)
+
+- List **Pelanggan Gagal** (`/customers?status_group=failed`) dirapikan jadi tabel ringkas: CID, Nama, Alasan, Tanggal Ditolak, Action (Detail + **Kembalikan**). Alasan & tanggal dibaca dari `AuditLog` transisi terakhir ke `rejected` (module `Customer Workflow`, action `status_transition`) — bukan kolom dedicated, karena `Customer`/`CustomerStatusLog` gak punya kolom alasan reject sendiri.
+- **Urut DESC berdasarkan tanggal ditolak (2026-07-20)**: `CustomerController::index()` orderBy subquery `AuditLog::selectRaw('MAX(created_at)')` (scoped ke module+action+`new_values->status=rejected` per customer) — bukan `customer_code` seperti grup status lain. Perlu subquery karena "tanggal ditolak" bukan kolom asli di `customers`, dihitung on-the-fly dari `AuditLog`; sorting harus terjadi SEBELUM `paginate()`, gak bisa sort di PHP setelah data diambil (cuma benar untuk 1 halaman, bukan global).
+- **Kembalikan** — tombol cuma muncul kalau `AuditLog` reject terakhir punya `old_values.status` yang valid (status SEBELUM ditolak). Aksi ini **bypass** `WorkflowTransition::REJECTED->allowedNextTransitions()` (yang tetap kosong di enum, gak diubah) — set `customer.status` langsung balik ke status sebelum ditolak lewat `Customer::update()`, BUKAN lewat `CustomerWorkflowService::transition()`. Konsekuensi: gak tercatat di `customer_status_logs` (state-machine log resmi), cuma di `AuditLog` module `Customer Workflow` action baru `status_restore`.
+- Permission: `customers.detail.installation.validate` (sama dengan permission Reject/Approve/Revisi — no perm baru).
+- **Implikasi ke narasi "final, harus registrasi ulang dari awal"**: sekarang ada jalur resmi buat mengembalikan pelanggan yang ditolak TANPA registrasi ulang, asal FOP/Admin punya alasan (mis. reject keliru pencet). Ini keputusan bisnis eksplisit dari user session 2026-07-20 — beda dari desain awal reject (`docs/project_verifikasi_reject_gap.md`) yang mendeklarasikan reject 100% terminal.
+
+### Aktivasi Manual — jalur khusus data migrasi (`CustomerController::activate`, 2026-07-20)
+
+Escape hatch buat pelanggan hasil **migrasi legacy** yang di sistem lama udah lama aktif (bayar, terpasang), tapi di sistem baru nyangkut belum `active` karena gak pernah punya Task Survey/Pemasangan di sini (alur normal §4-§7 gak pernah kelewatan). Tombol "Aktivasi Manual" muncul di halaman detail Customer (bukan di alur SRV/PSB manapun) HANYA kalau **SEMUA** syarat ini kepenuhi:
+
+1. Permission `customers.detail.installation.activate`.
+2. `customer.old_customer_id` terisi (bukti hasil import legacy, bukan pelanggan baru).
+3. `customer.customerService.request_status === 'ACTIVE'` (bukti di sistem lama BENAR sudah aktif — bukan `PENGAJUAN`/`DIPROSES`/`GAGAL`. Lihat §10 buat detail nilai legacy ini).
+4. Belum ada `Task` type Survey/Pemasangan sama sekali buat customer ini (belum pernah kesentuh alur normal sistem baru).
+5. Belum `active`/`siap_billing`.
+
+Kalau salah satu gak kepenuhi (termasuk pelanggan migrasi yang di sistem lama JUGA masih stuck di tahap survey/pemasangan — `request_status` bukan `ACTIVE`), tombol disembunyikan **dan** endpoint nolak walau di-POST langsung (guard server-side, bukan cuma UI). Efeknya sama kayak `finalVerify()` normal: generate CID (`Pop::generateComplexCid()`), `status=active`, `customer_status=aktif`, `data_completeness_status=siap_billing`, `service_status=aktif`, `billing_status=active` — tapi **tanpa** bikin Invoice awal manual (beda dari §7 approve normal) dan **tanpa** lewat `CustomerWorkflowService::transition()` (update langsung, gak tercatat di `customer_status_logs`).
+
+**Kenapa gak boleh dipakai buat pelanggan SRV/PSB yang lagi jalan**: kalau gate #4 (no-Task) doang dipakai, pelanggan migrasi yang di sistem lama JUGA stuck di tahap survey (`request_status=PENGAJUAN`/`DIPROSES`) bisa ketuker lolos juga (kebetulan belum ada Task di sistem baru) — makanya gate #3 (`request_status=ACTIVE`) ditambah, biar cuma pelanggan yang TERBUKTI udah aktif di sistem lama yang bisa lewat jalur ini. Pelanggan migrasi yang stuck SRV/PSB di sistem lama harus tetap lewat alur normal §4-§7 di sistem baru.
 
 ### Revisi (`revisi`)
 
@@ -128,10 +151,45 @@ Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan �
 ## 8. Terminasi Layanan (`CustomerTerminationController`)
 
 - Endpoint tunggal `__invoke()` — set `customer.status=terminated`, `customer_service.service_status=berhenti`.
-- **Tidak lewat `CustomerWorkflowService::transition()`** — update status langsung tanpa validasi state machine (beda dari semua transisi lain di atas). Implikasi: terminasi bisa terjadi dari status manapun (termasuk yang secara teori gak valid menurut tabel `WorkflowTransition`), dan **tidak** tercatat di `customer_status_logs` (cuma di `AuditLog` biasa, module `customers`).
+- **Tidak lewat `CustomerWorkflowService::transition()`** — update status langsung tanpa validasi state machine (beda dari semua transisi lain di atas). Implikasi: terminasi bisa terjadi dari status manapun (termasuk yang secara teori gak valid menurut tabel `WorkflowTransition`), dan **tidak** tercatat di `customer_status_logs` (cuma di `AuditLog` biasa, module `customers`, action `terminate`).
 - Alasan `required` di form — disimpan cuma di `AuditLog.new_values`, gak ada kolom dedicated buat alasan terminasi di tabel manapun.
 
-## 9. Kaitan dengan Modul Lain
+### List Putus Langganan + Ambil Alat + Langganan Lagi (2026-07-20)
+
+- List **Putus Langganan** (`/customers?status_group=terminated`) dirapikan jadi tabel: ID, Nama, Kontrak (Sewa/Beli — dari `customer_service.contract_type`), Alasan Putus, Tanggal Pemutusan (dibaca dari `AuditLog` module `customers` action `terminate`, sama pola kayak Pelanggan Gagal — bukan kolom dedicated), Status Alat, Action.
+- **Urut DESC berdasarkan Tanggal Pemutusan (2026-07-20)**: sama pola persis kayak Pelanggan Gagal di atas — subquery `AuditLog::selectRaw('MAX(created_at)')` (module `customers`, action `terminate`), bukan `customer_code`.
+- **Status Alat** — kolom baru `customer_devices.device_retrieved_at` (nullable timestamp, migrasi `2026_07_18_163955_add_device_retrieved_at_to_customer_devices_table`). Null = "Belum di Ambil", terisi = "Sudah di Ambil". **Tidak ada kolom ini sebelumnya** — sebelum perubahan ini, gak ada cara sistem tahu status pengambilan alat pelanggan yang putus.
+- **Ambil Alat** (`CustomerController::retrieveDevice`) — cuma muncul kalau alat belum diambil, set `device_retrieved_at = now()`. Guard: `customer.status === 'terminated'` dan `customerDevice` harus ada. Permission `customers.detail.devices.retrieve` *(dipisah dari `customers.update` 2026-07-20, lihat [docs/rbac/business-logic.md § 3.1](../rbac/business-logic.md#31-langkah-nambah-permission-baru-fitur-existing--contoh-nyata-customersdetaildevicesretrieve))*.
+- **Langganan Lagi** (`CustomerController::reactivate`) — muncul di SEMUA baris terminated (gak digate status alat). Set `customer.status = 'active'` LANGSUNG (bukan lewat alur survey/verifikasi ulang, keputusan bisnis eksplisit: infrastruktur dianggap masih terpasang) + `customer_service.service_status = 'aktif'`. Sama kayak Kembalikan (§7), ini **bypass** `CustomerWorkflowService::transition()` — `terminated` di enum `WorkflowTransition` tetap `[]` (terminal, gak diubah), transisi balik dicatat cuma di `AuditLog` action baru `reactivate`, BUKAN di `customer_status_logs`. Permission `customers.detail.installation.validate`.
+- **Implikasi:** `terminated` sekarang, kayak `rejected`, punya jalur resmi buat "gak beneran final" — dua-duanya ($7 Kembalikan & sini) sengaja gak ubah state machine enum, cuma nambah endpoint yang mem-bypass-nya dengan guard longgar (status check doang, gak ada validasi `allowedNextTransitions()`).
+
+## 9. Migrasi Data Legacy (`CustomerController::confirmImport` + `MigrateLegacyDataCommand`, 2026-07-20)
+
+Data lama (`sand_db_sandya.sql`, `jetis_db_aplikasi_jetis.sql`, tabel `prosedure_permintaan_wifi`) diimport lewat `php artisan app:import-legacy-sql` → internal call ke `CustomerController::validateImport()` + `confirmImport()`. Status `Customer` hasil import ditentukan dari `mapLegacyServiceStatus()`, yang menerjemahkan `prosedure_permintaan_wifi.STATUS` (legacy) ke `WorkflowTransition` (baru):
+
+| STATUS legacy | Arti (dari kolom `DISURVEY`/`DIACC`/`DIPROSES`) | Status baru |
+|---|---|---|
+| `PENGAJUAN` | Request masuk, `DISURVEY` masih kosong — belum disurvey sama sekali | `waiting_survey` |
+| `DISURVEI` | `DISURVEY` & `DIACC` keduanya terisi, `DIPROSES` masih kosong — survey selesai + admin sudah ACC, tinggal nunggu tim pasang | `waiting_installation` |
+| `ACTIVE` | Semua tahap (survey/ACC/proses) terisi | `active` |
+| `GAGAL` | — | `rejected` |
+| `PUTUS` | — | `terminated` |
+
+**Riwayat bug yang udah diperbaiki** (jangan diulang kalau nambah mapping baru): `DISURVEI` sempat ke-mapping ke `waiting_survey` (harusnya `waiting_installation`) dan `PENGAJUAN` sempat ke-mapping ke `registered` (harusnya `waiting_survey`, karena `registered` bukan status yang disinggahi di alur normal — lihat §1) — dua-duanya bikin pelanggan migrasi nyasar ke antrean/hilang dari antrean yang salah (Survey vs Verif & Pemasangan ketuker).
+
+### Kontrak (Sewa/Beli) — sumber kolom salah (fixed 2026-07-20)
+
+`customer_services.contract_type` sebelumnya diisi dari `STATUSLANGGANAN` (kosong di semua data legacy yang ada) — harusnya dari `STATUSALAT` (isinya `SEWA`/`BELI`). Nilai dinormalisasi lowercase (`strtolower`) saat import karena `resources/views/customers/index.blade.php` (`match()` di tabel Putus Langganan) match case-sensitive ke `'sewa'`/`'beli'`.
+
+### AuditLog sintetis buat alasan + tanggal (fixed 2026-07-20)
+
+List Pelanggan Gagal & Putus Langganan baca alasan/tanggal dari `AuditLog` (lihat §7 & §8) — tapi `confirmImport()` set status pakai `Customer::updateQuietly()`, yang **gak** lewat `CustomerWorkflowService::transition()` sehingga gak pernah nulis `AuditLog`. Hasilnya: pelanggan migrasi yang `rejected`/`terminated` selalu kosong alasan+tanggalnya. Fix: `confirmImport()` sekarang bikin `AuditLog` manual pas `$serviceStatus` resolve ke `rejected` (module `Customer Workflow`, action `status_transition`, format sama kayak transition asli) atau `terminated` (module `customers`, action `terminate`) — alasan dari `ALASAN` legacy (`CustomerService.reason`), tanggal dari field baru `status_changed_at` (`MigrateLegacyDataCommand`: `TGLSELESAI` kalau ada, fallback ke `updated_at` baris legacy — BUKAN tanggal karangan/`now()`, konsisten dengan aturan anti-fabrikasi tanggal yang udah ada di `activation_date`).
+
+**Catatan batas**: `old_values.status` di AuditLog sintetis ini di-default `'registered'` (buat rejected) / `'active'` (buat terminated) — data legacy gak selalu jelas tahap PERSIS sebelum gagal/putus, jadi tombol **Kembalikan** (§7)/**Langganan Lagi** (§8) buat pelanggan migrasi yang gagal bakal balikin ke `registered`, bukan ke tahap SRV/PSB terakhir yang sebenarnya.
+
+Lihat juga §7 "Aktivasi Manual" — jalur aktivasi khusus buat pelanggan migrasi yang TERBUKTI `request_status=ACTIVE` di data lama tapi belum kesentuh alur normal di sistem baru.
+
+## 10. Kaitan dengan Modul Lain
 
 - **FOP Task** — `CustomerWorkflowService` auto-create `Task` (bukan `FopTask`) saat masuk `waiting_survey`/`waiting_installation`. `FopTaskController::autoSyncAndCalculatePriority()` yang kemudian sinkron `FopTask` dari status `Customer` (lihat [docs/fop-task/flowchart.md](../fop-task/flowchart.md)) — jadi ada **2 lapis auto-sync** yang jalan independen: satu bikin `Task` (level workflow), satu bikin `FopTask` (level tiket FOP).
 - **FOP Task — status Task selesai + nunggu keputusan**: begitu `Task.status=selesai` (tahap survey maupun install, nunggu aksi Approve/Revisi/Tolak di modul ini), `FopTask` terkait LANGSUNG `selesai` (unifikasi enum 2026-07-20 — `FopTask.status` sekarang mirror langsung `Task.status`, bukan mapping bucket `FopTaskStatus` yang udah dihapus) — otomatis udah gak nangkring di antrian FOP aktif (selesai emang gak pernah masuk antrian, gak butuh logic exclude khusus). Nasib keputusan (Menunggu/Diterima/Ditolak) tampil sebagai badge KEDUA di Riwayat FOP (`FopTask::verificationStatus()`), + link balik ke halaman verifikasi ini kalau masih Menunggu. Keputusan sebenarnya (Approve/Revisi/Tolak) TETAP di modul Customer ini, Riwayat FOP cuma informasional. Lihat `docs/fop-task/flowchart.md` § 11 & `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).

@@ -142,6 +142,159 @@
 
     <!-- Table Container -->
     <div class="overflow-x-auto">
+        @if($statusGroup === 'failed')
+        <table class="w-full border-collapse text-left text-sm text-slate-700">
+            <thead>
+                <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
+                    <th class="px-6 py-3.5 w-12 text-center">NO</th>
+                    <th class="px-6 py-3.5">CID</th>
+                    <th class="px-6 py-3.5">NAMA</th>
+                    <th class="px-6 py-3.5">POP</th>
+                    <th class="px-6 py-3.5">ALASAN</th>
+                    <th class="px-6 py-3.5">TGL PEMUTUSAN</th>
+                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @forelse($customers as $customer)
+                <tr class="hover:bg-slate-50/45 transition-colors">
+                    <td class="px-6 py-3.5 text-center text-slate-400 data-text">
+                        {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
+                        {{ $customer->display_id }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
+                        {{ $customer->full_name }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                        {{ $customer->pop->name ?? '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 max-w-xs text-slate-700">
+                        {{ $customer->reject_reason ?? '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
+                        {{ $customer->rejected_at ? \App\Support\IndonesianDate::date($customer->rejected_at) : '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-2">
+                            <a href="{{ route('customers.show', $customer->id) }}"
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 transition-colors border border-sky-200 hover:bg-sky-50 rounded px-2.5 py-1 cursor-pointer">
+                                Detail
+                            </a>
+                            @if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject)
+                            <form action="{{ route('customers.restore-from-failed', $customer->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengembalikan {{ $customer->full_name }} ke proses sebelum ditolak?', this);">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 hover:bg-amber-50 rounded px-2.5 py-1 cursor-pointer">
+                                    Kembalikan
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">
+                        Tidak ada data pelanggan gagal.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+        @elseif($statusGroup === 'terminated')
+        <table class="w-full border-collapse text-left text-sm text-slate-700">
+            <thead>
+                <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
+                    <th class="px-6 py-3.5 w-12 text-center">NO</th>
+                    <th class="px-6 py-3.5">ID</th>
+                    <th class="px-6 py-3.5">NAMA</th>
+                    <th class="px-6 py-3.5">POP</th>
+                    <th class="px-6 py-3.5">KONTRAK</th>
+                    <th class="px-6 py-3.5">ALASAN PUTUS</th>
+                    <th class="px-6 py-3.5">TGL PEMUTUSAN</th>
+                    <th class="px-6 py-3.5 text-center">STATUS ALAT</th>
+                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @forelse($customers as $customer)
+                @php
+                    $contractType = match($customer->customerService->contract_type ?? null) {
+                        'sewa' => 'Sewa',
+                        'beli' => 'Beli',
+                        default => '-',
+                    };
+                    $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                @endphp
+                <tr class="hover:bg-slate-50/45 transition-colors">
+                    <td class="px-6 py-3.5 text-center text-slate-400 data-text">
+                        {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
+                        {{ $customer->display_id }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
+                        {{ $customer->full_name }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                        {{ $customer->pop->name ?? '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                        {{ $contractType }}
+                    </td>
+                    <td class="px-6 py-3.5 max-w-xs text-slate-700">
+                        {{ $customer->termination_reason ?? '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
+                        {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
+                    </td>
+                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100' }}">
+                            {{ $isDeviceRetrieved ? 'Sudah di Ambil' : 'Belum di Ambil' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-2">
+                            <a href="{{ route('customers.show', $customer->id) }}"
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 transition-colors border border-sky-200 hover:bg-sky-50 rounded px-2.5 py-1 cursor-pointer">
+                                Detail
+                            </a>
+                            @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                            <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); window.confirmAction('Tandai alat {{ $customer->full_name }} sudah diambil?', this);">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors border border-slate-200 hover:bg-slate-50 rounded px-2.5 py-1 cursor-pointer">
+                                    Ambil Alat
+                                </button>
+                            </form>
+                            @endif
+                            @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
+                            <form action="{{ route('customers.reactivate', $customer->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 transition-colors border border-emerald-200 hover:bg-emerald-50 rounded px-2.5 py-1 cursor-pointer">
+                                    Langganan Lagi
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="9" class="px-6 py-8 text-center text-slate-400">
+                        Tidak ada data pelanggan putus langganan.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+        @else
         <table class="w-full border-collapse text-left text-sm text-slate-700">
             <thead>
                 <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
@@ -301,6 +454,7 @@
                 @endforelse
             </tbody>
         </table>
+        @endif
     </div>
 
     <!-- Pagination Footer -->

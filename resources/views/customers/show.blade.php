@@ -16,7 +16,11 @@
     </div>
     <div class="flex gap-2">
         @can('customers.detail.installation.activate')
-            @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active')
+            @php
+                $hasWorkflowTask = $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])->isNotEmpty();
+                $isProvenLegacyActive = $customer->old_customer_id && $customer->customerService?->request_status === 'ACTIVE';
+            @endphp
+            @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active' && !$hasWorkflowTask && $isProvenLegacyActive)
                 <form action="{{ route('customers.activate', $customer->id) }}" method="POST" class="inline" onsubmit="event.preventDefault(); window.confirmAction('Pelanggan ini belum aktif lewat proses verifikasi normal. Aktifkan manual sekarang? CID akan dibuat dan tagihan pertama akan diterbitkan.', this);">
                     @csrf
                     <button type="submit"

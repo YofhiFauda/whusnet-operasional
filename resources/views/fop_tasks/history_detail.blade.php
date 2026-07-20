@@ -73,14 +73,6 @@
                 <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Prioritas</p>
                 <p class="font-medium text-slate-800">{{ $fopTask->priority->value }}</p>
             </div>
-            <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Teknisi</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Team</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</p>
-            </div>
             {{-- Issue generik ($fopTask->issue, kepotong 255 char) cuma relevan
                  buat tipe NON-Ticketing. MTN/C-REQ dari Ticketing nampilin versi
                  utuh & proper di section "Detail Ticket" di bawah — lihat situ,
@@ -106,6 +98,78 @@
             @endif
         </div>
     </div>
+
+    {{-- ══ Detail Registrasi (SRV/PSB/MTN-C-REQ native) — data pelanggan live
+         dari Customer model, setara sama "Data Pelanggan" yang MTN/C-REQ asal
+         Ticketing tampilkan dari snapshot Ticket di bawah. Gak dipakai buat
+         tipe ticket-origin karena datanya udah ada di blok "Detail Ticket". ══ --}}
+    @unless($showTicketDetail)
+    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
+            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Detail Registrasi</h2>
+        </div>
+
+        @if($fopTask->customer)
+        @php $regCustomer = $fopTask->customer; @endphp
+
+        {{-- Teknisi & Team ditonjolkan di sini (dipindah dari Info Task),
+             setara posisi "Assigned by" di blok Detail Ticket. --}}
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 pt-3 text-[11px] font-ui">
+            <p><span class="text-slate-400">Teknisi:</span> <span class="font-medium text-slate-800">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
+            <p><span class="text-slate-400">Team:</span> <span class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</span></p>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 text-[11px] font-ui">
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
+                <p class="font-medium text-blue-700 font-data">{{ $regCustomer->display_id ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
+                <p class="font-medium text-slate-800">{{ $regCustomer->full_name ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
+                <p class="font-medium text-slate-800 font-data">{{ $regCustomer->primary_phone ?: ($regCustomer->phone ?: '—') }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
+                <p class="font-medium text-slate-800 font-data">{{ $regCustomer->customerTechnicalDetail?->odp_number ?: '—' }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
+                <p class="font-medium text-slate-800">{{ $regCustomer->internetPackage ? $regCustomer->internetPackage->package_code . ' - ' . $regCustomer->internetPackage->name : '—' }}</p>
+            </div>
+            <div class="col-span-2">
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
+                <p class="font-medium text-slate-800">{{ $regCustomer->address ?: ($regCustomer->customerAddress?->village ?: '—') }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
+                <p class="font-medium text-slate-800">
+                    {{ $regCustomer->customerDevice ? trim(($regCustomer->customerDevice->device_type ?? '') . ' ' . ($regCustomer->customerDevice->brand ?? '') . ' ' . ($regCustomer->customerDevice->model ?? '')) ?: '—' : '—' }}
+                </p>
+            </div>
+            <div>
+                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
+                @if($regCustomer->latitude && $regCustomer->longitude)
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ $regCustomer->latitude }},{{ $regCustomer->longitude }}" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline font-data">
+                        {{ $regCustomer->latitude }}, {{ $regCustomer->longitude }}
+                    </a>
+                @else
+                    <p class="font-medium text-slate-800">—</p>
+                @endif
+            </div>
+        </div>
+        @else
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-[11px] font-ui">
+            <p><span class="text-slate-400">Teknisi:</span> <span class="font-medium text-slate-800">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
+            <p><span class="text-slate-400">Team:</span> <span class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</span></p>
+        </div>
+        <p class="px-4 pb-4 text-[11px] text-slate-400 italic font-ui">Task ini tidak terhubung ke pelanggan tertentu.</p>
+        @endif
+    </div>
+    @endunless
 
     @if($showTicketDetail)
     {{-- ══ Detail dari Ticketing (mengikuti /tickets/{ticket}) ══ --}}

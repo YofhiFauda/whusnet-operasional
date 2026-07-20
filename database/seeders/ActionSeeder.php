@@ -104,6 +104,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Update Timer SLA',
                 'description' => 'Mengubah data sensitif',
             ],
+            [
+                'code' => ActionCode::RETRIEVE,
+                'name' => 'Retrieve',
+                'description' => 'Mengambil kembali alat/aset dari pelanggan',
+            ],
         ];
 
         foreach ($actions as $action) {

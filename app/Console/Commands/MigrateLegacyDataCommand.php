@@ -2,20 +2,29 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ParsesLegacySqlDump;
+use App\Enums\Gender;
+use App\Http\Controllers\CustomerController;
+use App\Models\Customer;
 use App\Models\Distribution;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class MigrateLegacyDataCommand extends Command
 {
+    use ParsesLegacySqlDump;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-protected $signature = 'app:import-legacy-sql 
+    protected $signature = 'app:import-legacy-sql 
                         {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql} 
                         {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)} 
                         {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}';
@@ -35,8 +44,9 @@ protected $signature = 'app:import-legacy-sql
         $fileName = $this->argument('file') ?: 'sand_db_sandya.sql';
         $sqlPath = base_path($fileName);
 
-        if (!file_exists($sqlPath)) {
+        if (! file_exists($sqlPath)) {
             $this->error("File {$fileName} does not exist in root directory.");
+
             return \Symfony\Component\Console\Command\Command::FAILURE;
         }
 
@@ -44,7 +54,7 @@ protected $signature = 'app:import-legacy-sql
         $sql = file_get_contents($sqlPath);
 
         // Parse tables
-        $this->info("Parsing SQL dump...");
+        $this->info('Parsing SQL dump...');
         $cabangRows = $this->parseTableData($sql, 'cabang');
         $paketRows = $this->parseTableData($sql, 'paket');
         $penggunaRows = $this->parseTableData($sql, 'pengguna');
@@ -62,10 +72,10 @@ protected $signature = 'app:import-legacy-sql
         foreach ($buktiRows as $row) {
             $dateOnly = '';
             try {
-                $dateOnly = \Carbon\Carbon::parse($row['INSERTED_AT'] ?? '')->format('Y-m-d');
+                $dateOnly = Carbon::parse($row['INSERTED_AT'] ?? '')->format('Y-m-d');
             } catch (\Exception $e) {
             }
-            $signature = ($row['IDPERMINTAAN'] ?? '') . '|' . (int) ($row['BAYAR'] ?? 0) . '|' . $dateOnly;
+            $signature = ($row['IDPERMINTAAN'] ?? '').'|'.(int) ($row['BAYAR'] ?? 0).'|'.$dateOnly;
             if (isset($buktiDedupSeen[$signature])) {
                 continue;
             }
@@ -83,23 +93,23 @@ protected $signature = 'app:import-legacy-sql
         $buktiPemasanganRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksipemasangan');
         $riwayatPelangganRows = $this->parseTableData($sql, 'riwayat_pelanggan');
 
-        $this->info("Parsed counts:");
-        $this->line("- cabang: " . count($cabangRows));
-        $this->line("- paket: " . count($paketRows));
-        $this->line("- pengguna: " . count($penggunaRows));
-        $this->line("- prosedure_permintaan_wifi: " . count($layananRows));
-        $this->line("- laporan_pemasangan_wifi: " . count($laporanRows));
-        $this->line("- biaya_tagihan: " . count($biayaRows));
-        $this->line("- apikeuangan_buktitransaksitagihan: " . count($buktiRows));
-        $this->line("- survey_pemasangan_wifi: " . count($surveyRows));
-        $this->line("- olt_slot_register: " . count($oltRows));
-        $this->line("- kode_kontrol_distribusi: " . count($distribusiRows));
-        $this->line("- barang: " . count($barangRows));
-        $this->line("- merk_barang: " . count($merkBarangRows));
-        $this->line("- riwayatstatus_penggunabarang: " . count($riwayatBarangRows));
-        $this->line("- apikeuangan_buktitransaksilunas: " . count($buktiLunasRows));
-        $this->line("- apikeuangan_buktitransaksipemasangan: " . count($buktiPemasanganRows));
-        $this->line("- riwayat_pelanggan: " . count($riwayatPelangganRows));
+        $this->info('Parsed counts:');
+        $this->line('- cabang: '.count($cabangRows));
+        $this->line('- paket: '.count($paketRows));
+        $this->line('- pengguna: '.count($penggunaRows));
+        $this->line('- prosedure_permintaan_wifi: '.count($layananRows));
+        $this->line('- laporan_pemasangan_wifi: '.count($laporanRows));
+        $this->line('- biaya_tagihan: '.count($biayaRows));
+        $this->line('- apikeuangan_buktitransaksitagihan: '.count($buktiRows));
+        $this->line('- survey_pemasangan_wifi: '.count($surveyRows));
+        $this->line('- olt_slot_register: '.count($oltRows));
+        $this->line('- kode_kontrol_distribusi: '.count($distribusiRows));
+        $this->line('- barang: '.count($barangRows));
+        $this->line('- merk_barang: '.count($merkBarangRows));
+        $this->line('- riwayatstatus_penggunabarang: '.count($riwayatBarangRows));
+        $this->line('- apikeuangan_buktitransaksilunas: '.count($buktiLunasRows));
+        $this->line('- apikeuangan_buktitransaksipemasangan: '.count($buktiPemasanganRows));
+        $this->line('- riwayat_pelanggan: '.count($riwayatPelangganRows));
 
         // Real activation timestamp map: IDPERMINTAAN => earliest "Berhasil Active"
         // TGLTINDAKAN. prosedure_permintaan_wifi's own TGL_AKTIFPUTUS/TGLSELESAI/
@@ -126,13 +136,13 @@ protected $signature = 'app:import-legacy-sql
         // laporan_pemasangan_wifi's own MACADDR_ROOTER/SNROOTER_FIBER are empty.
         $barangByCode = [];
         foreach ($barangRows as $row) {
-            if (!empty($row['KODEBARANG'])) {
+            if (! empty($row['KODEBARANG'])) {
                 $barangByCode[$row['KODEBARANG']] = $row;
             }
         }
         $merkBarangById = [];
         foreach ($merkBarangRows as $row) {
-            if (!empty($row['IDMERK'])) {
+            if (! empty($row['IDMERK'])) {
                 $merkBarangById[$row['IDMERK']] = $row;
             }
         }
@@ -170,31 +180,30 @@ protected $signature = 'app:import-legacy-sql
         $installationPaidAt = [];
         foreach ($buktiPemasanganRows as $row) {
             $invoiceCode = $row['IDPERMINTAAN'] ?? '';
-            if ($invoiceCode !== '' && !isset($installationPaidAt[$invoiceCode])) {
+            if ($invoiceCode !== '' && ! isset($installationPaidAt[$invoiceCode])) {
                 $installationPaidAt[$invoiceCode] = $row['TGLBAYAR'] ?? null;
             }
         }
 
         if (empty($paketRows) && empty($penggunaRows)) {
-            $this->error("No data parsed. Make sure the SQL format matches.");
+            $this->error('No data parsed. Make sure the SQL format matches.');
+
             return \Symfony\Component\Console\Command\Command::FAILURE;
         }
-
 
         $overrideCode = $this->option('branch-code');
         $overrideName = $this->option('branch-name');
 
-
         // Create POPs from the legacy cabang table so this command can migrate
         // multiple branches from any dump with the same schema.
-            // Kirimkan override ke pembuatan Map POP
+        // Kirimkan override ke pembuatan Map POP
         $legacyPopMap = $this->createLegacyPopMap($cabangRows, $overrideCode, $overrideName);
-        
+
         if ($legacyPopMap === []) {
             // Fallback jika tabel cabang kosong
             $defaultCode = $overrideCode ?: 'C';
             $defaultName = $overrideName ?: 'Jetis';
-            
+
             $defaultPop = Pop::firstOrCreate(
                 ['pop_code' => $defaultCode],
                 [
@@ -215,12 +224,12 @@ protected $signature = 'app:import-legacy-sql
             ];
         }
 
-        $this->info("Mapping data to sheets...");
+        $this->info('Mapping data to sheets...');
 
         // Pre-build maps for lookup
         $penggunaMap = [];
         foreach ($penggunaRows as $row) {
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $penggunaMap[$row['IDPENGGUNA']] = $row;
             }
         }
@@ -250,7 +259,7 @@ protected $signature = 'app:import-legacy-sql
             $legacyPop = $this->resolveLegacyPopForBranch($branchId, $legacyPopMap);
             $branchPop = $legacyPop['pop_model'];
             $miniSegment = $this->normalizeLegacyMiniPopSegment($row['kategori_perangkat_jaringan'] ?? null);
-            $miniPopCode = $legacyPop['pop_code'] . $miniSegment;
+            $miniPopCode = $legacyPop['pop_code'].$miniSegment;
             $distributionCode = strtoupper(trim((string) ($row['kode_kontrol_distribusi'] ?? '')));
             if ($distributionCode === '0') {
                 $distributionCode = '';
@@ -271,8 +280,8 @@ protected $signature = 'app:import-legacy-sql
 
             if ($distributionCode !== '' && $distributionCode !== '0') {
                 $meta = $distribusiMetaMap[$distributionCode] ?? [];
-                $distName = (!empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $distributionCode;
-                $distDesc = (!empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi ' . $distributionCode;
+                $distName = (! empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $distributionCode;
+                $distDesc = (! empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi '.$distributionCode;
 
                 Distribution::firstOrCreate(
                     [
@@ -291,15 +300,15 @@ protected $signature = 'app:import-legacy-sql
                 $requestToCustomerMap[$requestId] = $customerId;
             }
 
-            if ($customerId !== '' && $requestId !== '' && !isset($legacyRequestByCustomer[$customerId])) {
+            if ($customerId !== '' && $requestId !== '' && ! isset($legacyRequestByCustomer[$customerId])) {
                 $legacyRequestByCustomer[$customerId] = $requestId;
             }
 
-            if ($customerId !== '' && !isset($legacyMiniPopByCustomer[$customerId])) {
+            if ($customerId !== '' && ! isset($legacyMiniPopByCustomer[$customerId])) {
                 $legacyMiniPopByCustomer[$customerId] = $miniPopCode;
             }
 
-            if ($customerId !== '' && !isset($legacyDistributionByCustomer[$customerId])) {
+            if ($customerId !== '' && ! isset($legacyDistributionByCustomer[$customerId])) {
                 $legacyDistributionByCustomer[$customerId] = $distributionCode;
             }
         }
@@ -309,7 +318,7 @@ protected $signature = 'app:import-legacy-sql
         $firstPop = collect($legacyPopMap)->first();
         if ($firstPop) {
             $branchPop = $firstPop['pop_model'];
-            $defaultMiniPopCode = $firstPop['pop_code'] . '1';
+            $defaultMiniPopCode = $firstPop['pop_code'].'1';
             $defaultMiniPop = Pop::firstOrCreate(
                 ['pop_code' => $defaultMiniPopCode],
                 [
@@ -324,9 +333,9 @@ protected $signature = 'app:import-legacy-sql
             );
 
             foreach ($distribusiMetaMap as $code => $meta) {
-                if (!isset($createdDistributions[$code])) {
-                    $distName = (!empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $code;
-                    $distDesc = (!empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi ' . $code;
+                if (! isset($createdDistributions[$code])) {
+                    $distName = (! empty($meta['name']) && $meta['name'] !== '-') ? $meta['name'] : $code;
+                    $distDesc = (! empty($meta['description']) && $meta['description'] !== '-') ? $meta['description'] : 'Distribusi '.$code;
 
                     Distribution::firstOrCreate(
                         [
@@ -349,41 +358,41 @@ protected $signature = 'app:import-legacy-sql
 
         $billingExtraByRequest = [];
         foreach ($biayaRows as $row) {
-            if (!empty($row['IDPERMINTAAN'])) {
+            if (! empty($row['IDPERMINTAAN'])) {
                 $billingExtraByRequest[$row['IDPERMINTAAN']] = (int) ($row['BIAYALAINLAIN'] ?? 0);
             }
         }
 
         $surveyMap = [];
         foreach ($surveyRows as $row) {
-            if (!empty($row['IDPERMINTAAN'])) {
+            if (! empty($row['IDPERMINTAAN'])) {
                 $surveyMap[$row['IDPERMINTAAN']] = $row;
             }
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $surveyMap[$row['IDPENGGUNA']] = $row;
             }
-            if (!empty($row['IDSURVEY'])) {
+            if (! empty($row['IDSURVEY'])) {
                 $surveyMap[$row['IDSURVEY']] = $row;
             }
         }
 
         $laporanMap = [];
         foreach ($laporanRows as $row) {
-            if (!empty($row['IDPERMINTAAN'])) {
+            if (! empty($row['IDPERMINTAAN'])) {
                 $laporanMap[$row['IDPERMINTAAN']] = $row;
             }
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $laporanMap[$row['IDPENGGUNA']] = $row;
             }
         }
 
         $oltMap = [];
         foreach ($oltRows as $row) {
-            if (!empty($row['IDPELANGGAN'])) {
+            if (! empty($row['IDPELANGGAN'])) {
                 $oltMap[$row['IDPELANGGAN']] = $row;
             }
         }
-        
+
         // Sheet 1: packages
         $packagesSheet = [];
         foreach ($paketRows as $row) {
@@ -401,32 +410,32 @@ protected $signature = 'app:import-legacy-sql
         // Sheet 2: customers
         $customersSheet = [];
         $usedCustomerCodes = [];
-        
+
         foreach ($penggunaRows as $row) {
             // Filter: skip internal users starting with PG
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
-            $fullName = trim(($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? ''));
+            $fullName = trim(($row['NAMADEPAN'] ?? '').' '.($row['NAMABELAKANG'] ?? ''));
             $fullName = ucwords(str_replace('-', ' ', $fullName));
             if (empty($fullName)) {
                 $fullName = $row['IDPENGGUNA'];
             }
 
             // Standardize gender
-            $gender = \App\Enums\Gender::LAKI_LAKI->value;
+            $gender = Gender::LAKI_LAKI->value;
             if (isset($row['JENISKELAMIN'])) {
                 if (strtoupper($row['JENISKELAMIN']) === 'P') {
-                    $gender = \App\Enums\Gender::PEREMPUAN->value;
+                    $gender = Gender::PEREMPUAN->value;
                 }
             }
 
             // Date formatting
             $regDate = now()->format('Y-m-d');
-            if (!empty($row['inserted_at'])) {
+            if (! empty($row['inserted_at'])) {
                 try {
-                    $regDate = \Carbon\Carbon::parse($row['inserted_at'])->format('Y-m-d');
+                    $regDate = Carbon::parse($row['inserted_at'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
@@ -447,7 +456,7 @@ protected $signature = 'app:import-legacy-sql
             foreach ($layananRows as $lRow) {
                 if (($lRow['IDPENGGUNA'] ?? '') === $row['IDPENGGUNA']) {
                     $salesCode = $lRow['CREATED'] ?? '';
-                    if (!$custLaporan) {
+                    if (! $custLaporan) {
                         $custLaporan = $laporanMap[$lRow['IDPERMINTAAN']] ?? null;
                     }
                 }
@@ -456,14 +465,30 @@ protected $signature = 'app:import-legacy-sql
 
             $legacyBranchId = trim((string) ($row['IDCABANG'] ?? ''));
             $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
-            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'] . '1');
+            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'].'1');
 
+            // customer_code is only required to be unique WITHIN a branch (cid_prefix
+            // differs per cabang, so the full CID stays unique even if two different
+            // branches preserve the exact same legacy RQ number as customer_code).
+            // Scope the "already used" check to this row's cabang — a mini-pop
+            // sibling under the same cabang shares the same cid_prefix too, so the
+            // check must cover the whole cabang subtree, not just the exact pop_id.
+            $branchCabangPop = $legacyPop['pop_model'];
             $candidateCode = $legacyRequestByCustomer[$row['IDPENGGUNA']] ?? '';
             if ($candidateCode !== '') {
-                if (isset($usedCustomerCodes[$candidateCode]) || \App\Models\Customer::query()->where('customer_code', $candidateCode)->exists()) {
-                    $candidateCode = ''; // Duplicate found, clear it so it gets auto-generated later
+                $usedKey = $branchCabangPop->id.':'.$candidateCode;
+                $alreadyUsedInBranch = Customer::query()
+                    ->where('customer_code', $candidateCode)
+                    ->where(function ($q) use ($branchCabangPop) {
+                        $q->where('pop_id', $branchCabangPop->id)
+                            ->orWhereHas('pop', fn ($pq) => $pq->where('parent_id', $branchCabangPop->id));
+                    })
+                    ->exists();
+
+                if (isset($usedCustomerCodes[$usedKey]) || $alreadyUsedInBranch) {
+                    $candidateCode = ''; // Duplicate found within this branch, clear it so it gets auto-generated later
                 } else {
-                    $usedCustomerCodes[$candidateCode] = true;
+                    $usedCustomerCodes[$usedKey] = true;
                 }
             }
 
@@ -508,7 +533,7 @@ protected $signature = 'app:import-legacy-sql
         $servicesSheet = [];
         foreach ($layananRows as $row) {
             // Filter: skip internal users
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
@@ -519,22 +544,22 @@ protected $signature = 'app:import-legacy-sql
             // fools any code that reasons about "billed this activation period"
             // (e.g. GenerateMonthlyInvoicesCommand's double-bill guard).
             $actDate = null;
-            $isZeroDate = fn($v) => empty($v) || str_starts_with((string) $v, '0000-00-00');
-            if (!$isZeroDate($row['TGL_AKTIFPUTUS'] ?? null)) {
+            $isZeroDate = fn ($v) => empty($v) || str_starts_with((string) $v, '0000-00-00');
+            if (! $isZeroDate($row['TGL_AKTIFPUTUS'] ?? null)) {
                 $actDate = $row['TGL_AKTIFPUTUS'];
-            } elseif (!$isZeroDate($row['TGLSELESAI'] ?? null)) {
+            } elseif (! $isZeroDate($row['TGLSELESAI'] ?? null)) {
                 try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
+                    $actDate = Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
-            } elseif (!$isZeroDate($row['TGLDIPROSES'] ?? null)) {
+            } elseif (! $isZeroDate($row['TGLDIPROSES'] ?? null)) {
                 try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLDIPROSES'])->format('Y-m-d');
+                    $actDate = Carbon::parse($row['TGLDIPROSES'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
-            } elseif (!$isZeroDate($row['TGLDIACC'] ?? null)) {
+            } elseif (! $isZeroDate($row['TGLDIACC'] ?? null)) {
                 try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLDIACC'])->format('Y-m-d');
+                    $actDate = Carbon::parse($row['TGLDIACC'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
@@ -542,16 +567,16 @@ protected $signature = 'app:import-legacy-sql
             // Last resort: riwayat_pelanggan's "Berhasil Active" status-change log.
             // prosedure_permintaan_wifi's own date fields are often blank/zero, but
             // this history table almost always has the real event timestamp.
-            if ($actDate === null && !empty($activationLogByRequest[$row['IDPERMINTAAN'] ?? ''])) {
+            if ($actDate === null && ! empty($activationLogByRequest[$row['IDPERMINTAAN'] ?? ''])) {
                 try {
-                    $actDate = \Carbon\Carbon::parse($activationLogByRequest[$row['IDPERMINTAAN']])->format('Y-m-d');
+                    $actDate = Carbon::parse($activationLogByRequest[$row['IDPERMINTAAN']])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
             // Lookup package profile
             $profile = '';
-            if (!empty($row['IDPAKET'])) {
+            if (! empty($row['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $row['IDPAKET']);
                 $profile = $pkg['PROFILPPP'] ?? $pkg['PROFILOLT'] ?? '';
             }
@@ -560,18 +585,20 @@ protected $signature = 'app:import-legacy-sql
             $survey = $this->resolveLegacySurveyRow($row, $surveyMap);
             $surveyDate = null;
             $surveyStartTime = null;
-            if ($survey && !empty($survey['TGLSURVEY'])) {
+            if ($survey && ! empty($survey['TGLSURVEY'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($survey['TGLSURVEY']);
+                    $cDate = Carbon::parse($survey['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
-            } elseif (!empty($row['TGLSURVEY'])) {
+                } catch (\Exception $e) {
+                }
+            } elseif (! empty($row['TGLSURVEY'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLSURVEY']);
+                    $cDate = Carbon::parse($row['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
             // Lookup installation info
@@ -579,21 +606,23 @@ protected $signature = 'app:import-legacy-sql
             $installDate = null;
             $installStartTime = null;
             $installEndTime = null;
-            if (!empty($row['TGLSELESAI'])) {
+            if (! empty($row['TGLSELESAI'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLSELESAI']);
+                    $cDate = Carbon::parse($row['TGLSELESAI']);
                     $installDate = $cDate->format('Y-m-d');
                     $installEndTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
-            if (!empty($row['TGLDIPROSES'])) {
+            if (! empty($row['TGLDIPROSES'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLDIPROSES']);
-                    if (!$installDate) {
+                    $cDate = Carbon::parse($row['TGLDIPROSES']);
+                    if (! $installDate) {
                         $installDate = $cDate->format('Y-m-d');
                     }
                     $installStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
             $servicesSheet[] = [
@@ -609,14 +638,28 @@ protected $signature = 'app:import-legacy-sql
                 'service_status' => $row['STATUS'] ?? '',
                 'activation_date' => $actDate,
                 'due_date' => '',
-                
+                // Kapan status terakhir (GAGAL/PUTUS/dst) ini terjadi di sistem
+                // lama. TGLSELESAI adalah tanggal proses ditutup (paling akurat);
+                // kalau kosong (banyak baris GAGAL lama gak isi TGLSELESAI sama
+                // sekali), fallback ke updated_at baris ini — proxy realistis
+                // "terakhir disentuh", BUKAN tanggal karangan/now().
+                'status_changed_at' => ! $isZeroDate($row['TGLSELESAI'] ?? null)
+                    ? $row['TGLSELESAI']
+                    : (! empty($row['updated_at']) ? $row['updated_at'] : null),
+
                 // New survey/FOP/Installation fields
                 'profile' => $profile,
-                'contract_type' => $row['STATUSLANGGANAN'] ?? '',
-                'activation_time' => !empty($row['VERIFIED_AT']) ? \Carbon\Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
+                // STATUSLANGGANAN kosongan di data lama — jenis kontrak
+                // (Sewa/Beli alat) sebenarnya kesimpan di STATUSALAT.
+                'contract_type' => strtolower(trim((string) ($row['STATUSALAT'] ?? ''))),
+                // Status Alat (List Putus Langganan) — beda field dari STATUSALAT
+                // (jenis kontrak) di atas. STATUSTINDAKANALAT cuma keisi kalau
+                // STATUS='PUTUS', nilainya 'Sudah diambil' / 'Proses ambil' / kosong.
+                'device_retrieved_status' => trim((string) ($row['STATUSTINDAKANALAT'] ?? '')),
+                'activation_time' => ! empty($row['VERIFIED_AT']) ? Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
                 'activated_by_name' => $this->resolveLegacyUserLabel($row['VERIFIED'] ?? '', $penggunaMap),
                 'other_fee' => $billingExtraByRequest[$row['IDPERMINTAAN']] ?? 0,
-                
+
                 'survey_date' => $surveyDate,
                 'survey_start_time' => $surveyStartTime,
                 'survey_end_time' => null,
@@ -643,7 +686,7 @@ protected $signature = 'app:import-legacy-sql
         $technicalSheet = [];
         foreach ($laporanRows as $row) {
             // Filter: skip internal users
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
@@ -658,24 +701,25 @@ protected $signature = 'app:import-legacy-sql
             $reqTime = null;
             $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN'])
                 ?? collect($layananRows)->firstWhere('IDPENGGUNA', $row['IDPENGGUNA'] ?? null);
-            if ($req && !empty($req['TGLSELESAI'])) {
+            if ($req && ! empty($req['TGLSELESAI'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($req['TGLSELESAI']);
+                    $cDate = Carbon::parse($req['TGLSELESAI']);
                     $reqDate = $cDate->format('Y-m-d');
                     $reqTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
             // Jitter / Latency
-            $jitter = is_numeric($row['PINGGATEWAY'] ?? null) ? (int)$row['PINGGATEWAY'] : null;
-            $latency = is_numeric($row['PINGGOOGLE'] ?? null) ? (int)$row['PINGGOOGLE'] : null;
-            
+            $jitter = is_numeric($row['PINGGATEWAY'] ?? null) ? (int) $row['PINGGATEWAY'] : null;
+            $latency = is_numeric($row['PINGGOOGLE'] ?? null) ? (int) $row['PINGGOOGLE'] : null;
+
             // Speed conformity
             $conformity = null;
-            if ($req && !empty($req['IDPAKET'])) {
+            if ($req && ! empty($req['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
                 $pkgSpeed = $pkg['SPEEDDOWN'] ?? 0;
-                $testSpeed = is_numeric($row['TESTDOWN'] ?? null) ? (float)$row['TESTDOWN'] * 1000 : 0; // Convert to kbps
+                $testSpeed = is_numeric($row['TESTDOWN'] ?? null) ? (float) $row['TESTDOWN'] * 1000 : 0; // Convert to kbps
                 if ($pkgSpeed > 0 && $testSpeed > 0) {
                     $conformity = min(100, round(($testSpeed / $pkgSpeed) * 100, 2));
                 }
@@ -687,9 +731,9 @@ protected $signature = 'app:import-legacy-sql
             $ontSn = $row['SNROOTER_FIBER'] ?: ($asset['serial'] ?? '');
             $routerMac = $row['MACADDR_ROOTER'] ?: ($asset['mac'] ?? '');
             $note = trim((string) ($row['KETERANGAN'] ?? ''));
-            if (!empty($asset['brand_label']) && !str_contains($note, $asset['brand_label'])) {
-                $assetNote = 'Perangkat: ' . $asset['brand_label'] . ' (dari data aset migrasi)';
-                $note = $note !== '' ? $note . ' | ' . $assetNote : $assetNote;
+            if (! empty($asset['brand_label']) && ! str_contains($note, $asset['brand_label'])) {
+                $assetNote = 'Perangkat: '.$asset['brand_label'].' (dari data aset migrasi)';
+                $note = $note !== '' ? $note.' | '.$assetNote : $assetNote;
             }
 
             $technicalSheet[] = [
@@ -723,8 +767,8 @@ protected $signature = 'app:import-legacy-sql
                 'branch_number' => $penggunaMap[$row['IDPENGGUNA']]['IDCABANG'] ?? '',
                 'pop_number' => $penggunaMap[$row['IDPENGGUNA']]['IDWILAYAH'] ?? '',
                 'router_number' => $routerMac,
-                'initial_attenuation' => $this->cleanDecimal(is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null), -999.99, 999.99),
-                'actual_attenuation' => $this->cleanDecimal(is_numeric($actualAttenuation) ? (float)$actualAttenuation : null, -999.99, 999.99),
+                'initial_attenuation' => $this->cleanDecimal(is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float) $row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float) $row['SIGNAL_WIRELESS'] : null), -999.99, 999.99),
+                'actual_attenuation' => $this->cleanDecimal(is_numeric($actualAttenuation) ? (float) $actualAttenuation : null, -999.99, 999.99),
                 'test_date' => $reqDate,
                 'test_time' => $reqTime,
                 'speedtest_photo' => $row['FOTOSPEED'] ?? '',
@@ -734,7 +778,7 @@ protected $signature = 'app:import-legacy-sql
                 'test_download' => $row['TESTDOWN'] ?? null,
                 'packet_loss_percent' => 0.00,
                 'speed_conformity_percent' => $conformity,
-                'quality_score' => is_numeric($row['SINYAL'] ?? null) ? (int)$row['SINYAL'] : 5,
+                'quality_score' => is_numeric($row['SINYAL'] ?? null) ? (int) $row['SINYAL'] : 5,
             ];
         }
 
@@ -750,7 +794,7 @@ protected $signature = 'app:import-legacy-sql
         foreach ($biayaRows as $row) {
             $dateOnly = '';
             try {
-                $dateOnly = \Carbon\Carbon::parse($row['TGLINSERT'] ?? '')->format('Y-m-d');
+                $dateOnly = Carbon::parse($row['TGLINSERT'] ?? '')->format('Y-m-d');
             } catch (\Exception $e) {
             }
             $signature = implode('|', [
@@ -761,7 +805,7 @@ protected $signature = 'app:import-legacy-sql
                 $row['BIAYALAINLAIN'] ?? '',
                 $dateOnly,
             ]);
-            if (!isset($dedupSeen[$signature])) {
+            if (! isset($dedupSeen[$signature])) {
                 $dedupSeen[$signature] = $row['IDBIAYA'];
             }
             $canonicalCostId[$row['IDBIAYA']] = $dedupSeen[$signature];
@@ -793,20 +837,20 @@ protected $signature = 'app:import-legacy-sql
 
             // Filter: skip internal users
             $cust = $row['IDPELANGGAN'] ?? $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
-            if (!str_starts_with($cust, 'PE')) {
+            if (! str_starts_with($cust, 'PE')) {
                 continue;
             }
 
             $issueDate = now()->format('Y-m-d');
-            if (!empty($row['TGLINSERT'])) {
+            if (! empty($row['TGLINSERT'])) {
                 try {
-                    $issueDate = \Carbon\Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
+                    $issueDate = Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
-            $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
-            $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
+            $dueDate = Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
+            $billingPeriod = Carbon::parse($issueDate)->format('Y-m');
 
             $costId = $row['IDBIAYA'];
             $installationFee = (int) ($row['BIAYAPASANG'] ?? 0);
@@ -846,8 +890,8 @@ protected $signature = 'app:import-legacy-sql
 
                 $invoiceTypeByCostId[$costId] = 'awal';
                 $invoicesSheet[] = array_merge($baseInvoice, [
-                    'old_invoice_id' => $costId . '-AWAL',
-                    'old_cost_id' => $costId . '-AWAL',
+                    'old_invoice_id' => $costId.'-AWAL',
+                    'old_cost_id' => $costId.'-AWAL',
                     'invoice_type' => 'awal',
                     'total_amount' => $totalAmount,
                     'monthly_fee' => null,
@@ -858,8 +902,8 @@ protected $signature = 'app:import-legacy-sql
             } elseif ($monthlyFee > 0) {
                 $invoiceTypeByCostId[$costId] = 'bulanan';
                 $invoicesSheet[] = array_merge($baseInvoice, [
-                    'old_invoice_id' => $costId . '-BULANAN',
-                    'old_cost_id' => $costId . '-BULANAN',
+                    'old_invoice_id' => $costId.'-BULANAN',
+                    'old_cost_id' => $costId.'-BULANAN',
                     'invoice_type' => 'bulanan',
                     'total_amount' => $monthlyFee,
                     'monthly_fee' => $monthlyFee,
@@ -886,22 +930,22 @@ protected $signature = 'app:import-legacy-sql
             $cust = $invCust ?: $reqCust;
 
             // Filter: skip internal users
-            if ($cust !== '' && !str_starts_with($cust, 'PE')) {
+            if ($cust !== '' && ! str_starts_with($cust, 'PE')) {
                 continue;
             }
 
             $payDate = now()->format('Y-m-d');
-            if (!empty($row['INSERTED_AT'])) {
+            if (! empty($row['INSERTED_AT'])) {
                 try {
-                    $payDate = \Carbon\Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
+                    $payDate = Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
             $billingPeriod = now()->format('Y-m');
-            if (!empty($row['BULANTAGIHAN'])) {
+            if (! empty($row['BULANTAGIHAN'])) {
                 try {
-                    $billingPeriod = \Carbon\Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
+                    $billingPeriod = Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
                 } catch (\Exception $e) {
                 }
             }
@@ -919,7 +963,7 @@ protected $signature = 'app:import-legacy-sql
 
             $paymentsSheet[] = [
                 'old_payment_id' => $row['IDUNIQ'],
-                'old_invoice_id' => $costId . '-' . $invoiceType,
+                'old_invoice_id' => $costId.'-'.$invoiceType,
                 'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'old_customer_id' => $cust,
@@ -953,23 +997,23 @@ protected $signature = 'app:import-legacy-sql
             }
 
             $cust = $row['IDPELANGGAN'] ?? '';
-            if (!str_starts_with($cust, 'PE')) {
+            if (! str_starts_with($cust, 'PE')) {
                 continue;
             }
 
             $payDate = now()->format('Y-m-d');
             try {
-                $payDate = \Carbon\Carbon::parse($paidAt)->format('Y-m-d');
+                $payDate = Carbon::parse($paidAt)->format('Y-m-d');
             } catch (\Exception $e) {
             }
 
             $paymentsSheet[] = [
-                'old_payment_id' => $invoiceCode . '-PASANG',
-                'old_invoice_id' => $invoiceCode . '-AWAL',
+                'old_payment_id' => $invoiceCode.'-PASANG',
+                'old_invoice_id' => $invoiceCode.'-AWAL',
                 'old_transaction_id' => $invoiceCode,
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'old_customer_id' => $cust,
-                'billing_period' => \Carbon\Carbon::parse($payDate)->format('Y-m'),
+                'billing_period' => Carbon::parse($payDate)->format('Y-m'),
                 'amount' => $installationFee,
                 'payment_date' => $payDate,
                 'payment_method' => 'cash',
@@ -1010,13 +1054,13 @@ protected $signature = 'app:import-legacy-sql
             $q->where('name', 'Owner');
         })->first();
 
-        if (!$admin) {
+        if (! $admin) {
             $admin = User::first();
         }
 
-        if (!$admin) {
+        if (! $admin) {
             // Create a system user if none exists
-            $ownerRole = \App\Models\Role::where('code', 'owner')->first();
+            $ownerRole = Role::where('code', 'owner')->first();
 
             $admin = User::create([
                 'name' => 'System Admin',
@@ -1026,32 +1070,33 @@ protected $signature = 'app:import-legacy-sql
                 'status' => 'active',
                 'role_id' => $ownerRole?->id,
             ]);
-            $this->info("Created a fallback System Admin user.");
+            $this->info('Created a fallback System Admin user.');
         }
 
         if ($admin) {
-            \Illuminate\Support\Facades\Auth::login($admin);
-            $this->info("Logged in programmatically as: " . $admin->name);
+            Auth::login($admin);
+            $this->info('Logged in programmatically as: '.$admin->name);
         } else {
-            $this->warn("No user found. Migration might fail audit log validation.");
+            $this->warn('No user found. Migration might fail audit log validation.');
         }
 
-        $this->info("Validating import data via internal controller call...");
-        
+        $this->info('Validating import data via internal controller call...');
+
         $requestValidate = Request::create('/customers/import/validate', 'POST', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
-        
-        $controller = app(\App\Http\Controllers\CustomerController::class);
+
+        $controller = app(CustomerController::class);
         $validateResponse = $controller->validateImport($requestValidate);
-        
+
         $validateData = json_decode($validateResponse->getContent(), true);
-        if (!$validateData['success']) {
-            $this->error("Validation failed. " . json_encode($validateData['errors'] ?? []));
+        if (! $validateData['success']) {
+            $this->error('Validation failed. '.json_encode($validateData['errors'] ?? []));
+
             return \Symfony\Component\Console\Command\Command::FAILURE;
         }
 
-        $this->info("Validation successful. Confirming import...");
+        $this->info('Validation successful. Confirming import...');
 
         $requestConfirm = Request::create('/customers/import/confirm', 'POST', [
             'sheets' => json_encode($validateData['sheets']),
@@ -1060,19 +1105,21 @@ protected $signature = 'app:import-legacy-sql
 
         try {
             $confirmResponse = $controller->confirmImport($requestConfirm);
-            
+
             // Output flash messages
             if (session()->has('success')) {
-                $this->info("Success: " . session('success'));
+                $this->info('Success: '.session('success'));
             }
             if (session()->has('errors')) {
-                $this->error("Errors: " . json_encode(session('errors')->getBag('default')->all()));
+                $this->error('Errors: '.json_encode(session('errors')->getBag('default')->all()));
             }
 
-            $this->info("Data migration execution completed.");
+            $this->info('Data migration execution completed.');
+
             return \Symfony\Component\Console\Command\Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error("Migration failed with exception: " . $e->getMessage());
+            $this->error('Migration failed with exception: '.$e->getMessage());
+
             return \Symfony\Component\Console\Command\Command::FAILURE;
         }
     }
@@ -1084,7 +1131,7 @@ protected $signature = 'app:import-legacy-sql
             $row['IDPENGGUNA'] ?? null,
             $row['IDSURVEY'] ?? null,
         ] as $key) {
-            if (!empty($key) && isset($surveyMap[$key])) {
+            if (! empty($key) && isset($surveyMap[$key])) {
                 return $surveyMap[$key];
             }
         }
@@ -1095,7 +1142,7 @@ protected $signature = 'app:import-legacy-sql
     private function resolveLegacyAddressText(array $row): string
     {
         $streetAddress = trim((string) ($row['ALMT'] ?? $row['ALAMAT'] ?? ''));
-        if ($streetAddress !== '' && !in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
+        if ($streetAddress !== '' && ! in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
             return $streetAddress;
         }
 
@@ -1130,6 +1177,7 @@ protected $signature = 'app:import-legacy-sql
 
             if (isset($penggunaMap[$token])) {
                 $labels[] = $this->buildLegacyUserName($penggunaMap[$token]) ?: $token;
+
                 continue;
             }
 
@@ -1143,7 +1191,7 @@ protected $signature = 'app:import-legacy-sql
 
     private function buildLegacyUserName(array $row): string
     {
-        $name = trim((string) (($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? '')));
+        $name = trim((string) (($row['NAMADEPAN'] ?? '').' '.($row['NAMABELAKANG'] ?? '')));
         $name = preg_replace('/\s+/', ' ', $name) ?: '';
 
         return $name !== '' ? $name : trim((string) ($row['IDPENGGUNA'] ?? ''));
@@ -1176,7 +1224,7 @@ protected $signature = 'app:import-legacy-sql
             if ($overrideName) {
                 $popName = $overrideName;
             } else {
-                $popName = $this->ask("Masukkan Nama POP baru untuk cabang ini", $legacyBranchName ?: $popCode);
+                $popName = $this->ask('Masukkan Nama POP baru untuk cabang ini', $legacyBranchName ?: $popCode);
             }
 
             $pop = Pop::firstOrCreate(
@@ -1203,7 +1251,6 @@ protected $signature = 'app:import-legacy-sql
         return $map;
     }
 
-
     private function resolveLegacyBranchPopCode(string $legacyBranchName, string $legacyBranchId): string
     {
         $branchName = strtoupper(trim($legacyBranchName));
@@ -1214,7 +1261,7 @@ protected $signature = 'app:import-legacy-sql
 
         $branchId = preg_replace('/[^A-Z0-9]+/', '', strtoupper(trim($legacyBranchId))) ?: '';
         if ($branchId !== '') {
-            return 'C' . $branchId;
+            return 'C'.$branchId;
         }
 
         return 'C';
@@ -1223,7 +1270,7 @@ protected $signature = 'app:import-legacy-sql
     /**
      * Resolve the POP context for a legacy branch id.
      *
-     * @param array<string, array{pop_code: string, pop_name: string, pop_model: Pop}> $legacyPopMap
+     * @param  array<string, array{pop_code: string, pop_name: string, pop_model: Pop}>  $legacyPopMap
      * @return array{pop_code: string, pop_name: string, pop_model: Pop}
      */
     private function resolveLegacyPopForBranch(string $legacyBranchId, array $legacyPopMap): array
@@ -1293,100 +1340,7 @@ protected $signature = 'app:import-legacy-sql
         $fallback = strtoupper(trim($fallback));
         $fallback = preg_replace('/[^A-Z0-9]+/', '', $fallback) ?: '';
 
-        return $fallback !== '' ? 'CB' . $fallback : 'UNASSIGNED';
-    }
-
-    private function parseTableData(string $sql, string $tableName): array
-    {
-        $insertMatches = [];
-        preg_match_all('/INSERT INTO `' . $tableName . '` \(([^\)]+)\) VALUES\s*(.*?);/s', $sql, $insertMatches);
-
-        $rows = [];
-        foreach ($insertMatches[1] as $idx => $columnsList) {
-            // Extract actual columns from this INSERT block
-            $columnMatches = [];
-            preg_match_all('/`([^`]+)`/', $columnsList, $columnMatches);
-            $columns = $columnMatches[1];
-
-            $valuesBlock = $insertMatches[2][$idx];
-
-            // Trim whitespace
-            $valuesBlock = trim($valuesBlock);
-            
-            // Remove the first '(' and last ')'
-            if (str_starts_with($valuesBlock, '(')) {
-                $valuesBlock = substr($valuesBlock, 1);
-            }
-            if (str_ends_with($valuesBlock, ')')) {
-                $valuesBlock = substr($valuesBlock, 0, -1);
-            }
-
-            // Split by '),(' or '),\n(' or '),\r\n('
-            $rowStrings = preg_split('/\),\s*\(/', $valuesBlock);
-
-            foreach ($rowStrings as $rowString) {
-                $values = $this->splitSqlValues($rowString);
-
-                $rowData = [];
-                foreach ($columns as $index => $colName) {
-                    $val = $values[$index] ?? null;
-                    $rowData[$colName] = $val;
-                }
-                $rows[] = $rowData;
-            }
-        }
-
-        return $rows;
-    }
-
-    private function splitSqlValues(string $rowString): array
-    {
-        $values = [];
-        $currentVal = '';
-        $inString = false;
-        $escape = false;
-
-        for ($i = 0; $i < strlen($rowString); $i++) {
-            $char = $rowString[$i];
-
-            if ($escape) {
-                $currentVal .= $char;
-                $escape = false;
-                continue;
-            }
-
-            if ($char === '\\') {
-                $escape = true;
-                continue;
-            }
-
-            if ($char === "'") {
-                $inString = !$inString;
-                continue;
-            }
-
-            if ($char === ',' && !$inString) {
-                $values[] = $this->cleanParsedValue($currentVal);
-                $currentVal = '';
-            } else {
-                $currentVal .= $char;
-            }
-        }
-        
-        $values[] = $this->cleanParsedValue($currentVal);
-        return $values;
-    }
-
-    private function cleanParsedValue(?string $val): ?string
-    {
-        if ($val === null) {
-            return null;
-        }
-        $val = trim($val);
-        if (strtolower($val) === 'null') {
-            return null;
-        }
-        return $val;
+        return $fallback !== '' ? 'CB'.$fallback : 'UNASSIGNED';
     }
 
     private function normalizeCoordinate(mixed $value): ?string
@@ -1406,7 +1360,7 @@ protected $signature = 'app:import-legacy-sql
         // Keep only digits, dots, minus sign
         $value = preg_replace('/[^\d\.\-]/', '', $value);
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return null;
         }
 
@@ -1417,7 +1371,7 @@ protected $signature = 'app:import-legacy-sql
             // Strip any existing dot or minus sign to get only digits
             $isNegative = str_starts_with($value, '-');
             $digits = preg_replace('/[^\d]/', '', $value);
-            
+
             if ($digits === '') {
                 return null;
             }
@@ -1425,16 +1379,16 @@ protected $signature = 'app:import-legacy-sql
             if ($isNegative) {
                 // Negative coordinates in Indonesia are always latitude (around -7 or -8)
                 // Place the dot after the first digit
-                $normalized = '-' . substr($digits, 0, 1) . '.' . substr($digits, 1);
+                $normalized = '-'.substr($digits, 0, 1).'.'.substr($digits, 1);
             } else {
                 // Positive coordinates
                 if (str_starts_with($digits, '1')) {
                     // Longitude in Indonesia is around 110-115
                     // Place the dot after the first 3 digits
-                    $normalized = substr($digits, 0, 3) . '.' . substr($digits, 3);
+                    $normalized = substr($digits, 0, 3).'.'.substr($digits, 3);
                 } else {
                     // Positive latitude
-                    $normalized = substr($digits, 0, 1) . '.' . substr($digits, 1);
+                    $normalized = substr($digits, 0, 1).'.'.substr($digits, 1);
                 }
             }
             $value = $normalized;
@@ -1460,11 +1414,12 @@ protected $signature = 'app:import-legacy-sql
         // Keep only digits, dots, minus sign
         $value = preg_replace('/[^\d\.\-]/', '', $value);
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return null;
         }
 
         $val = (float) $value;
+
         return ($val >= $min && $val <= $max) ? $val : null;
     }
 }

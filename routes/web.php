@@ -1,34 +1,44 @@
 <?php
 
-use App\Http\Controllers\Auth\LoginController;
+use App\Enums\TicketBucket;
 use App\Http\Controllers\AuditLogController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
-use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\Master\RegionController;
-use App\Http\Controllers\Master\DistributionController;
-use App\Http\Controllers\Master\InternetPackageController;
-use App\Http\Controllers\Master\SlaTimelineController;
-use App\Http\Controllers\Master\SubscriptionStatusController;
-use App\Http\Controllers\Master\PopController;
-use App\Http\Controllers\CustomerReportController;
-use App\Http\Controllers\InvoiceReportController;
-use App\Http\Controllers\PaymentReportController;
-use App\Http\Controllers\CustomerVerificationController;
 use App\Http\Controllers\CustomerInstallationController;
-use App\Http\Controllers\CustomerTestReportController;
+use App\Http\Controllers\CustomerNetworkAssignmentController;
+use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\CustomerSurveyController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\TaskStatusController;
-use App\Http\Controllers\TaskEvidenceController;
+use App\Http\Controllers\CustomerTerminationController;
+use App\Http\Controllers\CustomerTestReportController;
+use App\Http\Controllers\CustomerVerificationController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopTaskController;
+use App\Http\Controllers\ImportReportController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceReportController;
+use App\Http\Controllers\Master\DistributionController;
+use App\Http\Controllers\Master\InternetPackageController;
+use App\Http\Controllers\Master\PopController;
+use App\Http\Controllers\Master\RegionController;
+use App\Http\Controllers\Master\SlaTimelineController;
+use App\Http\Controllers\Master\SubscriptionStatusController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentReportController;
+use App\Http\Controllers\RolePermissionController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskEvidenceController;
+use App\Http\Controllers\TaskMaintenanceController;
+use App\Http\Controllers\TaskStatusController;
+use App\Http\Controllers\TaskTeamController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\UserController;
+use App\Models\City;
+use App\Models\District;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Carbon;
 
 // Guest Routes
 Route::middleware('guest')->group(function () {
@@ -42,34 +52,34 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Notifications
-    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
-    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.markRead');
-    Route::post('/notifications/{id}/unread', [\App\Http\Controllers\NotificationController::class, 'markAsUnread'])->name('notifications.markUnread');
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markRead');
+    Route::post('/notifications/{id}/unread', [NotificationController::class, 'markAsUnread'])->name('notifications.markUnread');
 
     // Role & Permission Management
     Route::middleware('permission:roles.view|roles.update')->group(function () {
-        Route::get('/roles', [\App\Http\Controllers\RolePermissionController::class, 'index'])->name('roles.index');
-        Route::post('/roles', [\App\Http\Controllers\RolePermissionController::class, 'store'])->name('roles.store')->middleware('permission:roles.create');
-        Route::put('/roles/{role}', [\App\Http\Controllers\RolePermissionController::class, 'updateRole'])->name('roles.update_role')->middleware('permission:roles.update');
-        Route::delete('/roles/{role}', [\App\Http\Controllers\RolePermissionController::class, 'destroy'])->name('roles.destroy')->middleware('permission:roles.delete');
-        Route::get('/roles/{role}/matrix', [\App\Http\Controllers\RolePermissionController::class, 'matrix'])->name('roles.matrix');
-        Route::put('/roles/{role}/matrix', [\App\Http\Controllers\RolePermissionController::class, 'update'])->name('roles.update');
+        Route::get('/roles', [RolePermissionController::class, 'index'])->name('roles.index');
+        Route::post('/roles', [RolePermissionController::class, 'store'])->name('roles.store')->middleware('permission:roles.create');
+        Route::put('/roles/{role}', [RolePermissionController::class, 'updateRole'])->name('roles.update_role')->middleware('permission:roles.update');
+        Route::delete('/roles/{role}', [RolePermissionController::class, 'destroy'])->name('roles.destroy')->middleware('permission:roles.delete');
+        Route::get('/roles/{role}/matrix', [RolePermissionController::class, 'matrix'])->name('roles.matrix');
+        Route::put('/roles/{role}/matrix', [RolePermissionController::class, 'update'])->name('roles.update');
     });
 
     // User Management
     Route::middleware('permission:users.view')->group(function () {
-        Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
     });
 
     Route::middleware('permission:users.create|users.update')->group(function () {
-        Route::get('/users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create');
-        Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store');
-        Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
-        Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
-        Route::get('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'editPops'])->name('users.pops.edit');
-        Route::put('/users/{user}/pops', [\App\Http\Controllers\UserController::class, 'updatePops'])->name('users.pops.update');
-        Route::post('/users/preview-access', [\App\Http\Controllers\UserController::class, 'previewAccess'])->name('users.preview-access');
+        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::get('/users/{user}/pops', [UserController::class, 'editPops'])->name('users.pops.edit');
+        Route::put('/users/{user}/pops', [UserController::class, 'updatePops'])->name('users.pops.update');
+        Route::post('/users/preview-access', [UserController::class, 'previewAccess'])->name('users.preview-access');
     });
 
     // Customers Management - Static Routes First
@@ -96,7 +106,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
-        Route::post('/customers/{customer}/terminate', [\App\Http\Controllers\CustomerTerminationController::class, '__invoke'])->name('customers.terminate');
+        Route::post('/customers/{customer}/terminate', [CustomerTerminationController::class, '__invoke'])->name('customers.terminate');
+    });
+
+    Route::middleware('permission:customers.detail.devices.retrieve')->group(function () {
+        Route::post('/customers/{customer}/retrieve-device', [CustomerController::class, 'retrieveDevice'])->name('customers.retrieve-device');
     });
 
     Route::middleware('permission:customers.detail.installation.activate')->group(function () {
@@ -238,8 +252,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/verifications/{customer}/final', [CustomerVerificationController::class, 'finalVerify'])->name('customers.verification.final');
         Route::post('/verifications/{customer}/revisi', [CustomerVerificationController::class, 'revisi'])->name('customers.verification.revisi');
         Route::post('/verifications/{customer}/reject', [CustomerVerificationController::class, 'reject'])->name('customers.verification.reject');
-        Route::get('/customers/{customer}/network-assignment', [\App\Http\Controllers\CustomerNetworkAssignmentController::class, 'data'])->name('customers.network-assignment.data');
-        Route::put('/customers/{customer}/network-assignment', [\App\Http\Controllers\CustomerNetworkAssignmentController::class, 'update'])->name('customers.network-assignment.update');
+        Route::post('/customers/{customer}/restore-from-failed', [CustomerController::class, 'restoreFromFailed'])->name('customers.restore-from-failed');
+        Route::post('/customers/{customer}/reactivate', [CustomerController::class, 'reactivate'])->name('customers.reactivate');
+        Route::get('/customers/{customer}/network-assignment', [CustomerNetworkAssignmentController::class, 'data'])->name('customers.network-assignment.data');
+        Route::put('/customers/{customer}/network-assignment', [CustomerNetworkAssignmentController::class, 'update'])->name('customers.network-assignment.update');
     });
 
     Route::middleware('permission:customers.detail.devices.create|customers.detail.devices.update')->group(function () {
@@ -262,9 +278,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
         Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
         Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
-        Route::get('/reports/imports', [\App\Http\Controllers\ImportReportController::class, 'index'])->name('reports.imports.index');
-        Route::get('/reports/imports/{batch}', [\App\Http\Controllers\ImportReportController::class, 'show'])->name('reports.imports.show');
-        Route::get('/reports/imports/{batch}/export', [\App\Http\Controllers\ImportReportController::class, 'export'])->name('reports.imports.export');
+        Route::get('/reports/imports', [ImportReportController::class, 'index'])->name('reports.imports.index');
+        Route::get('/reports/imports/{batch}', [ImportReportController::class, 'show'])->name('reports.imports.show');
+        Route::get('/reports/imports/{batch}/export', [ImportReportController::class, 'export'])->name('reports.imports.export');
     });
 
     // ── FOP Dashboard ────────────────────────────────────────────
@@ -289,7 +305,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:task.manage|task.assign.team')->group(function () {
-        Route::patch('/tasks/{task}/team', [\App\Http\Controllers\TaskTeamController::class, 'update'])->name('tasks.team.update');
+        Route::patch('/tasks/{task}/team', [TaskTeamController::class, 'update'])->name('tasks.team.update');
     });
 
     Route::middleware('permission:task.cancel')->group(function () {
@@ -319,10 +335,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{task}/start', [TaskStatusController::class, 'start'])->name('tasks.start');
 
     Route::post('/tasks/{task}/complete', [TaskStatusController::class, 'complete'])->name('tasks.complete');
-    
+
     // Maintenance Report
-    Route::get('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
-    Route::post('/tasks/{task}/maintenance-report', [\App\Http\Controllers\TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
+    Route::get('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'report'])->name('tasks.maintenance.report');
+    Route::post('/tasks/{task}/maintenance-report', [TaskMaintenanceController::class, 'store'])->name('tasks.maintenance.store');
 
     Route::middleware('permission:task.execute')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
@@ -375,7 +391,7 @@ Route::middleware('auth')->group(function () {
         // Submenu bucket (masuk|diproses|selesai|dibatalkan). Dibatasi whereIn
         // biar gak bentrok sama route detail di bawahnya yang cuma nerima angka.
         Route::get('/tickets/{bucket}', [TicketController::class, 'index'])
-            ->whereIn('bucket', \App\Enums\TicketBucket::values())
+            ->whereIn('bucket', TicketBucket::values())
             ->name('tickets.bucket');
 
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
@@ -384,11 +400,10 @@ Route::middleware('auth')->group(function () {
     });
 
     // Location APIs (used in forms)
-    Route::get('/api/districts/{district}/villages', function (\App\Models\District $district) {
+    Route::get('/api/districts/{district}/villages', function (District $district) {
         return response()->json($district->villages()->orderBy('name')->get());
     });
-    Route::get('/api/cities/{city}/districts', function (\App\Models\City $city) {
+    Route::get('/api/cities/{city}/districts', function (City $city) {
         return response()->json($city->districts()->orderBy('name')->get());
     });
 });
-

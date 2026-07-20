@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Pop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
-
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class PopController extends Controller
 {
@@ -28,9 +28,9 @@ class PopController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%")
-                      ->orWhere('pop_code', 'like', "%{$search}%")
-                      ->orWhere('pic_name', 'like', "%{$search}%");
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('pop_code', 'like', "%{$search}%")
+                        ->orWhere('pic_name', 'like', "%{$search}%");
                 });
             })
             ->when($type && in_array($type, ['pusat', 'cabang', 'mini_pop']), function ($query) use ($type) {
@@ -43,7 +43,7 @@ class PopController extends Controller
 
         // Build the tree hierarchy from the filtered collection
         $roots = $allItems->filter(function ($pop) use ($allItems) {
-            return is_null($pop->parent_id) || !$allItems->contains('id', $pop->parent_id);
+            return is_null($pop->parent_id) || ! $allItems->contains('id', $pop->parent_id);
         })->sortBy('name');
 
         $sortedPops = collect();
@@ -77,12 +77,12 @@ class PopController extends Controller
     {
         $item->depth = $depth;
         $result = collect([$item]);
-        
+
         $children = $allCollection->where('parent_id', $item->id)->sortBy('name');
         foreach ($children as $child) {
             $result = $result->merge($this->flattenTree($child, $allCollection, $depth + 1));
         }
-        
+
         return $result;
     }
 
@@ -105,11 +105,20 @@ class PopController extends Controller
     {
         $this->normalizeIdentifierInput($request);
 
+        // cid_prefix cuma wajib unik ANTAR cabang — mini_pop memang sengaja
+        // mewarisi cid_prefix cabang induknya (jadi CID tetap terbaca satu
+        // cabang). Uniqueness ini yang menjamin customer_code hasil
+        // migrasi/registrasi antar cabang boleh sama tanpa CID akhir tabrakan.
+        $cidPrefixRules = ['required', 'string', 'max:10', 'regex:/^[A-Z0-9]+$/'];
+        if ($request->input('type') === 'cabang') {
+            $cidPrefixRules[] = Rule::unique('pops', 'cid_prefix')->where('type', 'cabang');
+        }
+
         $validated = $request->validate([
             'code' => 'required|string|max:50|unique:pops,code',
             'pop_code' => 'required|string|max:20|regex:/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/|unique:pops,pop_code',
             'registration_prefix' => 'required|string|max:10|regex:/^[A-Z0-9]+$/',
-            'cid_prefix' => 'required|string|max:10|regex:/^[A-Z0-9]+$/',
+            'cid_prefix' => $cidPrefixRules,
             'name' => 'required|string|max:150',
             'type' => 'required|string|in:pusat,cabang,mini_pop',
             'parent_id' => 'nullable|integer|exists:pops,id',
@@ -165,11 +174,16 @@ class PopController extends Controller
     {
         $this->normalizeIdentifierInput($request);
 
+        $cidPrefixRules = ['required', 'string', 'max:10', 'regex:/^[A-Z0-9]+$/'];
+        if ($request->input('type') === 'cabang') {
+            $cidPrefixRules[] = Rule::unique('pops', 'cid_prefix')->where('type', 'cabang')->ignore($pop->id);
+        }
+
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:pops,code,' . $pop->id,
-            'pop_code' => 'required|string|max:20|regex:/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/|unique:pops,pop_code,' . $pop->id,
+            'code' => 'required|string|max:50|unique:pops,code,'.$pop->id,
+            'pop_code' => 'required|string|max:20|regex:/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/|unique:pops,pop_code,'.$pop->id,
             'registration_prefix' => 'required|string|max:10|regex:/^[A-Z0-9]+$/',
-            'cid_prefix' => 'required|string|max:10|regex:/^[A-Z0-9]+$/',
+            'cid_prefix' => $cidPrefixRules,
             'name' => 'required|string|max:150',
             'type' => 'required|string|in:pusat,cabang,mini_pop',
             'parent_id' => 'nullable|integer|exists:pops,id',
@@ -222,6 +236,7 @@ class PopController extends Controller
             $ids[] = $child->id;
             $ids = array_merge($ids, $this->getDescendantIds($child));
         }
+
         return $ids;
     }
 

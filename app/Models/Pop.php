@@ -3,21 +3,17 @@
 namespace App\Models;
 
 use App\Models\Concerns\RecordsAuditLogs;
-use App\Models\Customer;
-use App\Models\Distribution;
-use App\Models\PopSequence;
-use App\Models\User;
-use App\Models\UserRoleScopeTarget;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use LogicException;
-    
+
 #[Fillable([
     'code',
     'pop_code',
@@ -38,7 +34,7 @@ use LogicException;
 ])]
 class Pop extends Model
 {
-    use RecordsAuditLogs, HasFactory;
+    use HasFactory, RecordsAuditLogs;
 
     protected string $auditModule = 'POP/Cabang';
 
@@ -61,6 +57,7 @@ class Pop extends Model
 
     /**
      * Get the parent POP.
+     *
      * @return BelongsTo<Pop, $this>
      */
     public function parent(): BelongsTo
@@ -106,7 +103,7 @@ class Pop extends Model
     /**
      * Get the users assigned to this POP.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<User, $this>
+     * @return BelongsToMany<User, $this>
      */
     public function users()
     {
@@ -116,15 +113,15 @@ class Pop extends Model
     /**
      * Scope a query to only include POPs accessible by the given user.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \App\Models\User|null $user
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  User|null  $user
+     * @return Builder
      */
     public function scopeForUser($query, $user = null)
     {
         $user = $user ?? Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return $query->whereRaw('1 = 0'); // return empty if no user
         }
 
@@ -149,23 +146,29 @@ class Pop extends Model
      */
     public function generateRegistrationNumber(): string
     {
-        if (!$this->cid_prefix) {
+        if (! $this->cid_prefix) {
             throw new LogicException('POP cid_prefix belum dikonfigurasi.');
         }
-        if (!$this->registration_prefix) {
+        if (! $this->registration_prefix) {
             throw new LogicException('POP registration_prefix belum dikonfigurasi.');
         }
 
         $prefix = $this->registration_prefix;
 
-        $candidateCode = DB::transaction(function () use ($prefix): string {
+        // customer_code only needs to be unique within a branch (mini-pops share
+        // their cabang's cid_prefix, so the collision check must cover the whole
+        // cabang subtree — not just this exact POP row — to stay consistent with
+        // the (pop_id, customer_code) DB constraint's real-world guarantee).
+        $branchPopId = $this->parent_id ?? $this->id;
+
+        $candidateCode = DB::transaction(function () use ($prefix, $branchPopId): string {
             $sequence = PopSequence::query()
                 ->where('pop_id', $this->id)
                 ->where('sequence_type', PopSequence::TYPE_REGISTRATION)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$sequence) {
+            if (! $sequence) {
                 $sequence = PopSequence::create([
                     'pop_id' => $this->id,
                     'sequence_type' => PopSequence::TYPE_REGISTRATION,
@@ -178,7 +181,7 @@ class Pop extends Model
             // akibat data import/migrasi yang memiliki kode lebih tinggi dari counter).
             $prefixLen = strlen($prefix) + 1;
             $maxExistingNumber = Customer::where('pop_id', $this->id)
-                ->where('customer_code', 'like', $prefix . '%')
+                ->where('customer_code', 'like', $prefix.'%')
                 ->selectRaw("MAX(CAST(SUBSTRING(customer_code, {$prefixLen}) AS UNSIGNED)) as max_num")
                 ->value('max_num') ?? 0;
 
@@ -186,11 +189,18 @@ class Pop extends Model
                 $sequence->current_number = $maxExistingNumber;
             }
 
-            // Loop sampai menemukan kode yang belum dipakai
+            // Loop sampai menemukan kode yang belum dipakai DI CABANG INI
             do {
                 $sequence->current_number++;
                 $candidate = sprintf('%s%06d', $prefix, $sequence->current_number);
-            } while (Customer::where('customer_code', $candidate)->exists());
+            } while (
+                Customer::where('customer_code', $candidate)
+                    ->where(function ($q) use ($branchPopId) {
+                        $q->where('pop_id', $branchPopId)
+                            ->orWhereHas('pop', fn ($pq) => $pq->where('parent_id', $branchPopId));
+                    })
+                    ->exists()
+            );
 
             $sequence->save();
 
@@ -212,7 +222,7 @@ class Pop extends Model
     public function extractBareRegistrationId(string $customerCode): string
     {
         $prefix = $this->cid_prefix;
-        if ($prefix !== '' && str_starts_with($customerCode, $prefix . '00')) {
+        if ($prefix !== '' && str_starts_with($customerCode, $prefix.'00')) {
             return substr($customerCode, strlen($prefix) + 2);
         }
 
@@ -235,9 +245,6 @@ class Pop extends Model
      *   Status active/suspended + belum punya distribusi
      *     → Format default: "{cid_prefix}00{req_id}"
      *       Contoh: C00RQ001296
-     *
-     * @param Customer $customer
-     * @return string
      */
     public function resolveDisplayId(Customer $customer): string
     {
@@ -329,7 +336,7 @@ class Pop extends Model
         }
 
         // 3. Fallback terakhir: olt_number free-text dari laporan teknis instalasi.
-        if (!empty($fallback)) {
+        if (! empty($fallback)) {
             $fallback = preg_replace('/[^A-Z0-9]/i', '', (string) $fallback) ?: '';
             if ($fallback !== '') {
                 return $fallback;
@@ -345,7 +352,7 @@ class Pop extends Model
      */
     public function generateCid(): string
     {
-        if (!$this->cid_prefix) {
+        if (! $this->cid_prefix) {
             throw new LogicException('POP cid_prefix belum dikonfigurasi.');
         }
 
@@ -356,7 +363,7 @@ class Pop extends Model
                 ->lockForUpdate()
                 ->first();
 
-            if (!$sequence) {
+            if (! $sequence) {
                 $sequence = PopSequence::create([
                     'pop_id' => $this->id,
                     'sequence_type' => PopSequence::TYPE_CID,

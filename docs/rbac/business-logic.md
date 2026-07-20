@@ -30,6 +30,27 @@ Permission **gak diketik satu-satu** di seeder. Sumber kebenaran: `config/rbac.p
 
 Contoh kombinasi granular yang udah ada: `customers.detail.devices` punya action `view_sensitive`/`update_sensitive` — pola ini dipakai juga di `fop_tasks.update_sensitive` (kontrol siapa boleh ubah kategori & prioritas tiket FOP, lihat [docs/fop-task](../fop-task/README.md)).
 
+### 3.1 Langkah Nambah Permission Baru (Fitur Existing) — contoh nyata: `customers.detail.devices.retrieve`
+
+Studi kasus: fitur "Ambil Alat" di List Putus Langganan (`CustomerController::retrieveDevice()`) awalnya numpang di permission generik `customers.update` — gak granular, siapapun yang bisa edit data pelanggan otomatis bisa Ambil Alat juga, padahal itu 2 kewenangan beda (edit data vs aksi fisik di lapangan). Dipisah jadi permission sendiri (2026-07-20):
+
+1. **Action baru (kalau action code-nya belum ada)** — tambah case di `App\Enums\ActionCode` (mis. `RETRIEVE = 'retrieve'`), lalu daftarkan di `database/seeders/ActionSeeder.php` (`Action::updateOrCreate(['code' => ...], ['name' => ..., 'description' => ...])` — idempotent, aman dijalanin ulang kapan aja, TIDAK menghapus action lain).
+2. **Daftarkan action ke feature target** di `config/rbac.php` → `allowed_actions['customers.detail.devices']`, tambah `ActionCode::RETRIEVE->value` ke array-nya. Feature `customers.detail.devices` sendiri udah ada (gak perlu bikin Feature baru — cek dulu `database/seeders/FeatureSeeder.php`, cuma bikin Feature baru kalau fiturnya beneran belum terdaftar).
+3. **Label tampilan (opsional tapi disarankan)** — tambah entry di `config/rbac.php` → `permission_name_overrides['customers.detail.devices.retrieve'] = 'Ambil Alat Pelanggan Putus Langganan'`, biar gak nongol sebagai label generik "Retrieve" di halaman matrix role.
+4. **Generate permission row** — jalankan `php artisan db:seed --class=ActionSeeder` (kalau ada action baru) lalu `php artisan rbac:generate-permissions`. Dua-duanya **cuma nambah row baru** (`updateOrCreate`/skip-if-exists) — aman, gak nyentuh permission/action lain yang udah ada.
+5. **Assign ke role** — ini satu-satunya langkah yang butuh hati-hati. `database/seeders/RolePermissionSeeder.php` daftarin permission per role dalam array PHP hardcoded, tapi eksekusinya `$role->permissions()->sync($permissionIds)` — **FULL SYNC, ngoverwrite semua permission role itu** ke persis isi array di kode, termasuk kalau ada perubahan manual lewat UI matrix role yang belum sempet disinkron balik ke seeder. **Jangan langsung `php artisan db:seed --class=RolePermissionSeeder`** di environment yang permission role-nya udah dikustom lewat UI — assign permission baru ke role tertentu secara **additive** aja:
+   ```php
+   $perm = Permission::where('code', 'customers.detail.devices.retrieve')->first();
+   foreach (['admin', 'noc', 'fop', 'pop_admin'] as $code) {
+       Role::where('code', $code)->first()?->permissions()->syncWithoutDetaching([$perm->id]);
+   }
+   ```
+   Tetap update array di `RolePermissionSeeder.php` juga (biar seeder tetep jadi source-of-truth yang akurat buat environment baru/fresh install), tapi eksekusi assignment ke environment yang udah jalan pakai `syncWithoutDetaching` manual di atas, bukan re-run seeder penuh.
+6. **Clear cache permission** — `app(EffectiveAccessService::class)->clearCache($user)` per user yang role-nya diubah (§4), atau tunggu TTL 1 jam abis sendiri.
+7. **Pasang guard-nya** — route (`Route::middleware('permission:customers.detail.devices.retrieve')`), controller (`abort_unless(auth()->user()->hasPermission('customers.detail.devices.retrieve'), 403)`), dan view (`@if(auth()->user()->hasPermission('customers.detail.devices.retrieve'))`) — TIGA-tiganya, satu aja kelewat = ada celah (guard client-side doang, atau guard server doang tapi UI tetep nampilin tombol ke yang gak berhak).
+
+Role yang di-assign buat `customers.detail.devices.retrieve`: `admin`, `noc`, `fop` (eksplisit) + `pop_admin` (otomatis lewat wildcard `customers.detail.*`, gak perlu eksplisit) + `owner` (bypass `*`, gak lewat DB). `teknisi`/`sales`/`atasan`/`helpdesk` sengaja TIDAK dapet — Ambil Alat itu keputusan admin/FOP/NOC, bukan kerjaan teknisi lapangan atau sales.
+
 ## 4. Precedence Cek Permission (`EffectiveAccessService::userCan()`)
 
 Urutan match, berhenti di match pertama:

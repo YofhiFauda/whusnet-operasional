@@ -2,29 +2,51 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Models\Customer;
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
+use App\Enums\PaymentStatus;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
+use App\Http\Requests\CustomerRegistrationRequest;
+use App\Models\AuditLog;
 use App\Models\City;
-use App\Models\District;
-use App\Models\Village;
-use App\Models\InternetPackage;
-use App\Models\Distribution;
-use App\Models\SubscriptionStatus;
-use App\Models\Pop;
+use App\Models\Customer;
 use App\Models\CustomerAddress;
+use App\Models\CustomerDevice;
+use App\Models\CustomerInstallation;
 use App\Models\CustomerService;
+use App\Models\CustomerStatusLog;
+use App\Models\CustomerSurvey;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\Distribution;
+use App\Models\District;
+use App\Models\ImportBatch;
+use App\Models\ImportError;
+use App\Models\InternetPackage;
 use App\Models\Invoice;
-use App\Models\PopSequence;
 use App\Models\Payment;
+use App\Models\Pop;
+use App\Models\PopSequence;
+use App\Models\SubscriptionStatus;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\Village;
 use App\Services\CustomerValidationService;
+use App\Services\CustomerWorkflowService;
+use App\Services\FileUploadService;
+use App\Services\TelegramBotService;
 use App\Support\IndonesianDate;
-use Illuminate\Http\UploadedFile;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Spatie\SimpleExcel\SimpleExcelWriter;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Spatie\SimpleExcel\SimpleExcelReader;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Spatie\SimpleExcel\SimpleExcelWriter;
 
 class CustomerController extends Controller
 {
@@ -44,20 +66,20 @@ class CustomerController extends Controller
 
         $query = Customer::query()
             ->applyUserScope()
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress']);
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice']);
 
         // Search filter
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('customer_code', 'like', "%{$search}%")
-                  ->orWhere('old_customer_id', 'like', "%{$search}%")
-                  ->orWhere('old_request_id', 'like', "%{$search}%")
-                  ->orWhere('cid', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('primary_phone', 'like', "%{$search}%")
-                  ->orWhere('identity_number', 'like', "%{$search}%");
+                    ->orWhere('customer_code', 'like', "%{$search}%")
+                    ->orWhere('old_customer_id', 'like', "%{$search}%")
+                    ->orWhere('old_request_id', 'like', "%{$search}%")
+                    ->orWhere('cid', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('primary_phone', 'like', "%{$search}%")
+                    ->orWhere('identity_number', 'like', "%{$search}%");
             });
         }
 
@@ -72,7 +94,7 @@ class CustomerController extends Controller
                 'terminated' => ['terminated', 'putus'],
                 default => []
             };
-            if (!empty($statuses)) {
+            if (! empty($statuses)) {
                 $query->whereIn('status', $statuses);
             }
         } else {
@@ -100,7 +122,79 @@ class CustomerController extends Controller
             $query->where('data_completeness_status', $completenessStatus);
         }
 
-        $customers = $query->orderBy('customer_code', 'asc')->paginate(10)->withQueryString();
+        if ($statusGroup === 'failed') {
+            // Urut berdasarkan tanggal ditolak (dari AuditLog transisi 'rejected'
+            // terakhir per customer), bukan customer_code — subquery karena
+            // rejected_at bukan kolom asli, dihitung dari AuditLog.
+            $query->orderBy(
+                AuditLog::selectRaw('MAX(created_at)')
+                    ->whereColumn('auditable_id', 'customers.id')
+                    ->where('auditable_type', Customer::class)
+                    ->where('module', 'Customer Workflow')
+                    ->where('action', 'status_transition')
+                    ->whereJsonContains('new_values->status', 'rejected'),
+                'desc'
+            );
+        } elseif ($statusGroup === 'terminated') {
+            // Urut berdasarkan tanggal putus (dari AuditLog terminate terakhir
+            // per customer) — sama pola kayak grup 'failed' di atas.
+            $query->orderBy(
+                AuditLog::selectRaw('MAX(created_at)')
+                    ->whereColumn('auditable_id', 'customers.id')
+                    ->where('auditable_type', Customer::class)
+                    ->where('module', 'customers')
+                    ->where('action', 'terminate'),
+                'desc'
+            );
+        } else {
+            $query->orderBy('customer_code', 'asc');
+        }
+
+        $customers = $query->paginate(10)->withQueryString();
+
+        // Untuk grup "failed" (Pelanggan Gagal), ambil alasan & tanggal penolakan
+        // dari AuditLog transisi terakhir ke status 'rejected' per customer.
+        if ($statusGroup === 'failed' && $customers->count() > 0) {
+            $customerIds = $customers->pluck('id')->all();
+            $rejectLogs = AuditLog::where('auditable_type', Customer::class)
+                ->whereIn('auditable_id', $customerIds)
+                ->where('module', 'Customer Workflow')
+                ->where('action', 'status_transition')
+                ->whereJsonContains('new_values->status', 'rejected')
+                ->orderByDesc('created_at')
+                ->get()
+                ->unique('auditable_id')
+                ->keyBy('auditable_id');
+
+            foreach ($customers as $customer) {
+                $log = $rejectLogs->get($customer->id);
+                $note = $log?->new_values['note'] ?? null;
+                $customer->reject_reason = $note ? preg_replace('/^Ditolak:\s*/', '', $note) : '-';
+                $customer->rejected_at = $log?->created_at;
+                $customer->status_before_reject = $log?->old_values['status'] ?? null;
+            }
+        }
+
+        // Untuk grup "terminated" (Putus Langganan), ambil alasan & tanggal
+        // pemutusan dari AuditLog terminate per customer.
+        if ($statusGroup === 'terminated' && $customers->count() > 0) {
+            $customerIds = $customers->pluck('id')->all();
+            $terminateLogs = AuditLog::where('auditable_type', Customer::class)
+                ->whereIn('auditable_id', $customerIds)
+                ->where('module', 'customers')
+                ->where('action', 'terminate')
+                ->orderByDesc('created_at')
+                ->get()
+                ->unique('auditable_id')
+                ->keyBy('auditable_id');
+
+            foreach ($customers as $customer) {
+                $log = $terminateLogs->get($customer->id);
+                $customer->termination_reason = $log?->new_values['reason'] ?? '-';
+                $customer->terminated_at = $log?->created_at;
+                $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
+            }
+        }
 
         // Data for filter selects
         $districts = District::orderBy('name')->get();
@@ -121,11 +215,11 @@ class CustomerController extends Controller
         $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
 
         return view('customers.index', compact(
-            'customers', 
-            'districts', 
-            'packages', 
+            'customers',
+            'districts',
+            'packages',
             'pops',
-            'statusCounts', 
+            'statusCounts',
             'totalCustomers',
             'subscriptionStatuses',
             'search',
@@ -139,21 +233,125 @@ class CustomerController extends Controller
     }
 
     /**
+     * Kembalikan pelanggan yang ditolak (rejected) ke status sebelum penolakan,
+     * supaya bisa lanjut diproses lagi tanpa daftar ulang dari nol.
+     */
+    public function restoreFromFailed(Customer $customer)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
+
+        if ($customer->status !== 'rejected') {
+            return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status ditolak.');
+        }
+
+        $lastRejectLog = AuditLog::where('auditable_type', Customer::class)
+            ->where('auditable_id', $customer->id)
+            ->where('module', 'Customer Workflow')
+            ->where('action', 'status_transition')
+            ->whereJsonContains('new_values->status', 'rejected')
+            ->orderByDesc('created_at')
+            ->first();
+
+        $previousStatus = $lastRejectLog?->old_values['status'] ?? null;
+        if (! $previousStatus || ! WorkflowTransition::tryFrom($previousStatus)) {
+            return redirect()->back()->with('error', 'Status sebelum penolakan tidak ditemukan, tidak bisa dikembalikan otomatis.');
+        }
+
+        DB::transaction(function () use ($customer, $previousStatus) {
+            $oldStatus = $customer->status;
+            $customer->update(['status' => $previousStatus]);
+
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'module' => 'Customer Workflow',
+                'action' => 'status_restore',
+                'auditable_type' => Customer::class,
+                'auditable_id' => $customer->id,
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => ['status' => $previousStatus, 'note' => 'Dikembalikan dari Ditolak'],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Pelanggan berhasil dikembalikan ke proses sebelumnya.');
+    }
+
+    /**
+     * Tandai alat pelanggan putus langganan sebagai sudah diambil.
+     */
+    public function retrieveDevice(Customer $customer)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.devices.retrieve'), 403);
+
+        if ($customer->status !== 'terminated') {
+            return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
+        }
+
+        $device = $customer->customerDevice;
+        if (! $device) {
+            return redirect()->back()->with('error', 'Data alat pelanggan tidak ditemukan.');
+        }
+
+        $device->update(['device_retrieved_at' => now()]);
+
+        return redirect()->back()->with('success', 'Alat pelanggan berhasil ditandai sudah diambil.');
+    }
+
+    /**
+     * Aktifkan kembali pelanggan yang putus langganan ("Langganan Lagi"),
+     * langsung ke status active tanpa lewat survey/verifikasi ulang.
+     */
+    public function reactivate(Customer $customer)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
+
+        if ($customer->status !== 'terminated') {
+            return redirect()->back()->with('error', 'Pelanggan ini tidak dalam status putus langganan.');
+        }
+
+        DB::transaction(function () use ($customer) {
+            $customer->update(['status' => 'active']);
+
+            if ($customer->customerService) {
+                $customer->customerService->update(['service_status' => 'aktif']);
+            }
+
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'module' => 'customers',
+                'action' => 'reactivate',
+                'auditable_type' => Customer::class,
+                'auditable_id' => $customer->id,
+                'old_values' => ['status' => 'terminated'],
+                'new_values' => ['status' => 'active', 'note' => 'Langganan Lagi'],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'created_at' => now(),
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Pelanggan berhasil diaktifkan kembali.');
+    }
+
+    /**
      * Show the form for creating a new customer.
      */
     public function create()
     {
-        $districts = \App\Models\District::orderBy('name')->get();
-        $packages = \App\Models\InternetPackage::orderBy('name')->get();
-        $cities = \App\Models\City::orderBy('name')->get();
-        $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
+        $districts = District::orderBy('name')->get();
+        $packages = InternetPackage::orderBy('name')->get();
+        $cities = City::orderBy('name')->get();
+        $pops = Pop::forUser()->where('type', 'cabang')->get();
+
         return view('customers.create', compact('districts', 'packages', 'cities', 'pops'));
     }
 
     /**
      * Store a newly created customer in storage.
      */
-    public function store(\App\Http\Requests\CustomerRegistrationRequest $request)
+    public function store(CustomerRegistrationRequest $request)
     {
         $validated = $request->validated();
 
@@ -187,36 +385,36 @@ class CustomerController extends Controller
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = \Illuminate\Support\Facades\DB::transaction(function() use ($validated, $fotoKtp, $fotoRumah, $fotoKontrak) {
+        $customer = DB::transaction(function () use ($validated, $fotoKtp, $fotoRumah, $fotoKontrak) {
             // 1. Create customer record
             $customer = Customer::create($validated);
 
             $updates = [];
             if ($fotoKtp instanceof UploadedFile) {
-                $updates['foto_ktp'] = \App\Services\FileUploadService::uploadCustomerRegistrationDoc($fotoKtp, $customer, 'ktp');
+                $updates['foto_ktp'] = FileUploadService::uploadCustomerRegistrationDoc($fotoKtp, $customer, 'ktp');
             }
             if ($fotoRumah instanceof UploadedFile) {
-                $updates['foto_rumah'] = \App\Services\FileUploadService::uploadSurveyPhoto($fotoRumah, $customer, 'house');
+                $updates['foto_rumah'] = FileUploadService::uploadSurveyPhoto($fotoRumah, $customer, 'house');
             }
             if ($fotoKontrak instanceof UploadedFile) {
-                $updates['foto_kontrak'] = \App\Services\FileUploadService::uploadInstallationPhoto($fotoKontrak, $customer, 'kontrak');
+                $updates['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($fotoKontrak, $customer, 'kontrak');
             }
-            if (!empty($updates)) {
+            if (! empty($updates)) {
                 $customer->update($updates);
             }
 
             // 2. Create customer address
             $cityName = null;
-            if (!empty($validated['city_id'])) {
-                $cityName = \App\Models\City::where('id', $validated['city_id'])->value('name');
+            if (! empty($validated['city_id'])) {
+                $cityName = City::where('id', $validated['city_id'])->value('name');
             }
             $districtName = null;
-            if (!empty($validated['district_id'])) {
-                $districtName = \App\Models\District::where('id', $validated['district_id'])->value('name');
+            if (! empty($validated['district_id'])) {
+                $districtName = District::where('id', $validated['district_id'])->value('name');
             }
             $villageName = null;
-            if (!empty($validated['village_id'])) {
-                $villageName = \App\Models\Village::where('id', $validated['village_id'])->value('name');
+            if (! empty($validated['village_id'])) {
+                $villageName = Village::where('id', $validated['village_id'])->value('name');
             }
 
             $customer->customerAddress()->create([
@@ -236,25 +434,25 @@ class CustomerController extends Controller
             ]);
 
             // 3. Create customer service if package is chosen
-            if (!empty($validated['internet_package_id'])) {
-                $package = \App\Models\InternetPackage::findOrFail($validated['internet_package_id']);
-                
-                $monthlyPrice = (float)$package->monthly_price;
-                $discount = (float)($validated['discount_amount'] ?? 0.00);
-                $ppn = (float)($validated['tax_percent'] ?? 0.00);
-                $otherFee = (float)($validated['other_fee'] ?? 0.00);
+            if (! empty($validated['internet_package_id'])) {
+                $package = InternetPackage::findOrFail($validated['internet_package_id']);
+
+                $monthlyPrice = (float) $package->monthly_price;
+                $discount = (float) ($validated['discount_amount'] ?? 0.00);
+                $ppn = (float) ($validated['tax_percent'] ?? 0.00);
+                $otherFee = (float) ($validated['other_fee'] ?? 0.00);
 
                 // Calculate total bill
                 $discountedPrice = max(0, $monthlyPrice - $discount);
                 $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
-                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
-                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
+                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
+                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
 
                 $activationDate = $validated['registration_date'] ?? null;
                 $dueDate = null;
                 if ($activationDate) {
-                    $dueDate = \Carbon\Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                    $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
                 }
 
                 $customer->customerService()->create([
@@ -283,22 +481,22 @@ class CustomerController extends Controller
 
             if (! empty($completenessResult['missing_required'])) {
                 $missingLabels = array_values($completenessResult['missing_required']);
-                session()->flash('warning', 'Data pelanggan disimpan sebagai "' . ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])) . '", tetapi masih memerlukan data berikut agar Lengkap: ' . implode(', ', $missingLabels));
+                session()->flash('warning', 'Data pelanggan disimpan sebagai "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
             }
 
             // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey)
-            $year  = date('Y');
-            $count = \App\Models\Task::whereYear('created_at', $year)->count() + 1;
-            \App\Models\Task::create([
+            $year = date('Y');
+            $count = Task::whereYear('created_at', $year)->count() + 1;
+            Task::create([
                 'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                'task_type'   => \App\Enums\TaskType::SURVEY->value,
-                'title'       => 'Survey Calon Pelanggan: ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
                 'description' => null,
-                'pop_id'      => $customer->pop_id,
+                'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status'      => \App\Enums\TaskStatus::PENDING->value,
-                'created_by'  => auth()->id() ?? 1,
-                'updated_by'  => auth()->id() ?? 1,
+                'status' => TaskStatus::PENDING->value,
+                'created_by' => auth()->id() ?? 1,
+                'updated_by' => auth()->id() ?? 1,
             ]);
 
             return $customer;
@@ -310,7 +508,7 @@ class CustomerController extends Controller
     /**
      * Assign a survey to a technician and transition status to waiting_survey.
      */
-    public function assignSurvey(Request $request, Customer $customer, \App\Services\CustomerWorkflowService $workflowService)
+    public function assignSurvey(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
     {
         abort_unless(auth()->user()->hasPermission('customers.update'), 403);
 
@@ -320,9 +518,9 @@ class CustomerController extends Controller
             'note' => 'nullable|string',
         ]);
 
-        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated, $workflowService) {
+        DB::transaction(function () use ($customer, $validated, $workflowService) {
             // Create the initial customer_surveys record with pending status
-            \App\Models\CustomerSurvey::create([
+            CustomerSurvey::create([
                 'customer_id' => $customer->id,
                 'technician_id' => $validated['technician_id'],
                 'survey_date' => $validated['scheduled_date'],
@@ -332,7 +530,7 @@ class CustomerController extends Controller
             ]);
 
             // Transition customer status
-            $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_SURVEY, 'Assigned to survey');
+            $workflowService->transition($customer, WorkflowTransition::WAITING_SURVEY, 'Assigned to survey');
         });
 
         return redirect()->back()->with('success', 'Pelanggan berhasil di-assign ke tim survey.');
@@ -343,14 +541,15 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer)
     {
-        if (!$customer->exists) {
+        if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
         }
 
-        $districts = \App\Models\District::orderBy('name')->get();
-        $packages = \App\Models\InternetPackage::orderBy('name')->get();
-        $cities = \App\Models\City::orderBy('name')->get();
-        $pops = \App\Models\Pop::forUser()->where('type', 'cabang')->get();
+        $districts = District::orderBy('name')->get();
+        $packages = InternetPackage::orderBy('name')->get();
+        $cities = City::orderBy('name')->get();
+        $pops = Pop::forUser()->where('type', 'cabang')->get();
+
         return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops'));
     }
 
@@ -360,7 +559,7 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer)
     {
         // Ensure customer is resolved even if route model binding is bypassed in tests
-        if (!$customer->exists) {
+        if (! $customer->exists) {
             $customer = Customer::findOrFail($request->route('customer'));
         }
 
@@ -384,19 +583,19 @@ class CustomerController extends Controller
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
-            
+
             // Referrals
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
-            
+
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
             'ip_address' => 'nullable|string|max:45',
             'odp_code' => 'nullable|string|max:50',
             'olt_code' => 'nullable|string|max:50',
             'vlan_id' => 'nullable|string|max:20',
-            
+
             // Status
             'status' => 'required|string|max:50',
         ]);
@@ -445,16 +644,16 @@ class CustomerController extends Controller
 
         // Handle new uploads
         if ($request->hasFile('foto_ktp')) {
-            $validated['foto_ktp'] = \App\Services\FileUploadService::uploadCustomerRegistrationDoc($request->file('foto_ktp'), $customer, 'ktp');
+            $validated['foto_ktp'] = FileUploadService::uploadCustomerRegistrationDoc($request->file('foto_ktp'), $customer, 'ktp');
         }
         if ($request->hasFile('foto_rumah')) {
-            $validated['foto_rumah'] = \App\Services\FileUploadService::uploadSurveyPhoto($request->file('foto_rumah'), $customer, 'house');
+            $validated['foto_rumah'] = FileUploadService::uploadSurveyPhoto($request->file('foto_rumah'), $customer, 'house');
         }
         if ($request->hasFile('foto_kontrak')) {
-            $validated['foto_kontrak'] = \App\Services\FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
+            $validated['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function() use ($customer, $validated) {
+        DB::transaction(function () use ($customer, $validated) {
             // 1. Update customer record
             $customer->update($validated);
 
@@ -489,16 +688,16 @@ class CustomerController extends Controller
 
             // 2. Update address record
             $cityName = null;
-            if (!empty($validated['city_id'])) {
-                $cityName = \App\Models\City::where('id', $validated['city_id'])->value('name');
+            if (! empty($validated['city_id'])) {
+                $cityName = City::where('id', $validated['city_id'])->value('name');
             }
             $districtName = null;
-            if (!empty($validated['district_id'])) {
-                $districtName = \App\Models\District::where('id', $validated['district_id'])->value('name');
+            if (! empty($validated['district_id'])) {
+                $districtName = District::where('id', $validated['district_id'])->value('name');
             }
             $villageName = null;
-            if (!empty($validated['village_id'])) {
-                $villageName = \App\Models\Village::where('id', $validated['village_id'])->value('name');
+            if (! empty($validated['village_id'])) {
+                $villageName = Village::where('id', $validated['village_id'])->value('name');
             }
 
             $customer->customerAddress()->updateOrCreate([], [
@@ -518,25 +717,25 @@ class CustomerController extends Controller
             ]);
 
             // 3. Update customer service
-            if (!empty($validated['internet_package_id'])) {
-                $package = \App\Models\InternetPackage::findOrFail($validated['internet_package_id']);
-                
-                $monthlyPrice = (float)$package->monthly_price;
-                $discount = (float)($validated['discount_amount'] ?? 0.00);
-                $ppn = (float)($validated['tax_percent'] ?? 0.00);
-                $otherFee = (float)($validated['other_fee'] ?? 0.00);
+            if (! empty($validated['internet_package_id'])) {
+                $package = InternetPackage::findOrFail($validated['internet_package_id']);
+
+                $monthlyPrice = (float) $package->monthly_price;
+                $discount = (float) ($validated['discount_amount'] ?? 0.00);
+                $ppn = (float) ($validated['tax_percent'] ?? 0.00);
+                $otherFee = (float) ($validated['other_fee'] ?? 0.00);
 
                 // Calculate total bill
                 $discountedPrice = max(0, $monthlyPrice - $discount);
                 $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
-                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
-                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
+                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
+                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
 
                 $activationDate = $validated['registration_date'] ?? null;
                 $dueDate = null;
                 if ($activationDate) {
-                    $dueDate = \Carbon\Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                    $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
                 }
 
                 $customer->customerService()->updateOrCreate([], [
@@ -567,13 +766,13 @@ class CustomerController extends Controller
 
             if (! empty($completenessResult['missing_required'])) {
                 $missingLabels = array_values($completenessResult['missing_required']);
-                session()->flash('warning', 'Data pelanggan berhasil diperbarui dengan status "' . ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])) . '", tetapi masih memerlukan data berikut agar Lengkap: ' . implode(', ', $missingLabels));
+                session()->flash('warning', 'Data pelanggan berhasil diperbarui dengan status "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
             }
         });
 
         foreach ($originalFiles as $field => $path) {
             if ($path && $path !== ($validated[$field] ?? null)) {
-                $disk = \Illuminate\Support\Facades\Storage::disk('public');
+                $disk = Storage::disk('public');
                 $disk->delete($path);
 
                 $absolutePath = $disk->path($path);
@@ -592,31 +791,31 @@ class CustomerController extends Controller
     public function destroy(Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.delete'), 403);
-        
-        \Illuminate\Support\Facades\DB::transaction(function() use ($customer) {
+
+        DB::transaction(function () use ($customer) {
             $customer->delete();
         });
-        
-        return redirect()->back()->with('success', "Data pelanggan berhasil dihapus!");
+
+        return redirect()->back()->with('success', 'Data pelanggan berhasil dihapus!');
     }
 
     public function show(Customer $customer)
     {
-        if (!$customer->exists) {
+        if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
         }
 
         $customer->load([
-            'city', 
-            'district', 
-            'village', 
-            'internetPackage', 
-            'subscriptionStatus', 
-            'pop', 
-            'customerAddress', 
-            'customerService', 
+            'city',
+            'district',
+            'village',
+            'internetPackage',
+            'subscriptionStatus',
+            'pop',
+            'customerAddress',
+            'customerService',
             'customerTechnicalDetail',
-            'creator', 
+            'creator',
             'updater',
             'installations.technician',
             'customerDevice',
@@ -630,8 +829,8 @@ class CustomerController extends Controller
         ]);
 
         $status = $customer->status;
-        $regDate = \Carbon\Carbon::parse($customer->registration_date);
-        
+        $regDate = Carbon::parse($customer->registration_date);
+
         // Dynamic completeness calculation
         $completeness = $customer->dataCompleteness();
 
@@ -647,13 +846,13 @@ class CustomerController extends Controller
         // Mini POP (OLT) di bawah Cabang POP customer ini — buat modal assignment
         // Mini POP + Distribusi pasca pemasangan/aktivasi (lihat CustomerNetworkAssignmentController).
         $availableMiniPops = $customer->pop_id
-            ? \App\Models\Pop::where('parent_id', $customer->pop_id)
+            ? Pop::where('parent_id', $customer->pop_id)
                 ->where('type', 'mini_pop')
                 ->orderBy('name')
                 ->get(['id', 'name', 'pop_code'])
             : collect();
 
-        $availableDistributions = \App\Models\Distribution::whereIn('pop_id', $availableMiniPops->pluck('id'))
+        $availableDistributions = Distribution::whereIn('pop_id', $availableMiniPops->pluck('id'))
             ->orderBy('code')
             ->get(['id', 'pop_id', 'code', 'name']);
 
@@ -678,15 +877,15 @@ class CustomerController extends Controller
                 'step' => 'Registrasi',
                 'title' => 'Pendaftaran Pelanggan',
                 'date' => IndonesianDate::date($regDate),
-                'notes' => 'Pendaftaran berhasil dengan kode registrasi ' . $customer->customer_code,
+                'notes' => 'Pendaftaran berhasil dengan kode registrasi '.$customer->customer_code,
                 'status' => 'completed',
             ],
             [
                 'step' => 'Survey',
                 'title' => 'Survey Lokasi & Kelayakan',
                 'date' => $statusRank >= 3 ? IndonesianDate::date($regDate->copy()->addDays(2)) : '-',
-                'notes' => $statusRank >= 3 
-                    ? 'Hasil: LAYAK (Kabel dropcore 85m, ODP terdekat: ' . ($customer->odp_code ?? '-') . ')'
+                'notes' => $statusRank >= 3
+                    ? 'Hasil: LAYAK (Kabel dropcore 85m, ODP terdekat: '.($customer->odp_code ?? '-').')'
                     : ($statusRank == 2 ? 'Sedang dijadwalkan / dalam antrean.' : 'Menunggu penyelesaian tahap sebelumnya.'),
                 'status' => $statusRank >= 3 ? 'completed' : ($statusRank == 2 ? 'current' : 'pending'),
             ],
@@ -694,8 +893,8 @@ class CustomerController extends Controller
                 'step' => 'Pemasangan',
                 'title' => 'Penarikan Kabel & Pemasangan ONT',
                 'date' => $statusRank >= 5 ? IndonesianDate::date($regDate->copy()->addDays(4)) : '-',
-                'notes' => $statusRank >= 5 
-                    ? 'Pemasangan ONT selesai (SN: ' . ($customer->ont_sn ?? '-') . '). Redaman awal: -17.80 dBm'
+                'notes' => $statusRank >= 5
+                    ? 'Pemasangan ONT selesai (SN: '.($customer->ont_sn ?? '-').'). Redaman awal: -17.80 dBm'
                     : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Menunggu penyelesaian tahap sebelumnya.'),
                 'status' => $statusRank >= 5 ? 'completed' : ($statusRank == 4 ? 'current' : 'pending'),
             ],
@@ -703,10 +902,10 @@ class CustomerController extends Controller
                 'step' => 'Aktivasi',
                 'title' => 'Aktivasi PPPoE Billing',
                 'date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
-                'notes' => $statusRank >= 6 
+                'notes' => $statusRank >= 6
                     ? ($status === 'active' ? 'Layanan telah aktif sepenuhnya.' : ($status === 'suspended' ? 'Layanan diisolir sementara.' : 'Layanan diterminasi.'))
                     : 'Menunggu proses pemasangan & uji speedtest selesai.',
-                'status' => $statusRank >= 6 
+                'status' => $statusRank >= 6
                     ? ($status === 'suspended' ? 'warning' : ($status === 'terminated' ? 'danger' : 'completed'))
                     : 'pending',
             ],
@@ -714,22 +913,22 @@ class CustomerController extends Controller
 
         // 1. Audit Logs untuk Riwayat Perubahan Data Pelanggan
         $auditableConditions = [
-            [\App\Models\Customer::class, $customer->id],
+            [Customer::class, $customer->id],
         ];
         if ($customer->customerAddress) {
-            $auditableConditions[] = [\App\Models\CustomerAddress::class, $customer->customerAddress->id];
+            $auditableConditions[] = [CustomerAddress::class, $customer->customerAddress->id];
         }
         if ($customer->customerService) {
-            $auditableConditions[] = [\App\Models\CustomerService::class, $customer->customerService->id];
+            $auditableConditions[] = [CustomerService::class, $customer->customerService->id];
         }
         if ($customer->customerDevice) {
-            $auditableConditions[] = [\App\Models\CustomerDevice::class, $customer->customerDevice->id];
+            $auditableConditions[] = [CustomerDevice::class, $customer->customerDevice->id];
         }
         if ($customer->customerTechnicalDetail) {
-            $auditableConditions[] = [\App\Models\CustomerTechnicalDetail::class, $customer->customerTechnicalDetail->id];
+            $auditableConditions[] = [CustomerTechnicalDetail::class, $customer->customerTechnicalDetail->id];
         }
 
-        $auditLogs = \App\Models\AuditLog::with('user.role')
+        $auditLogs = AuditLog::with('user.role')
             ->where(function ($q) use ($auditableConditions) {
                 foreach ($auditableConditions as $index => $condition) {
                     $method = $index === 0 ? 'where' : 'orWhere';
@@ -742,7 +941,7 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $statusLogs = \App\Models\CustomerStatusLog::with('user.role')
+        $statusLogs = CustomerStatusLog::with('user.role')
             ->where('customer_id', $customer->id)
             ->orderBy('created_at', 'desc')
             ->get();
@@ -750,11 +949,11 @@ class CustomerController extends Controller
         // 2. Tasks & FopTasks untuk Riwayat Ticketing
         $customerTasks = $customer->tasks()
             ->with([
-                'teamMembers.user', 
-                'evidences', 
-                'creator', 
-                'fop', 
-                'auditLogs.user.role'
+                'teamMembers.user',
+                'evidences',
+                'creator',
+                'fop',
+                'auditLogs.user.role',
             ])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -765,7 +964,7 @@ class CustomerController extends Controller
             ->get();
 
         // Daftar user aktif untuk dropdown petugas (survey, pemasangan)
-        $activeUsers = \App\Models\User::where('status', 'active')
+        $activeUsers = User::where('status', 'active')
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -791,19 +990,19 @@ class CustomerController extends Controller
     public function paymentInfo(Customer $customer)
     {
         // Pastikan user punya akses ke POP pelanggan
-        if (!auth()->user()->hasFullAccess() && !in_array($customer->pop_id, auth()->user()->pops()->pluck('pops.id')->toArray())) {
+        if (! auth()->user()->hasFullAccess() && ! in_array($customer->pop_id, auth()->user()->pops()->pluck('pops.id')->toArray())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Cari invoice terbaru yang belum lunas
         $latestInvoice = $customer->invoices()
-            ->whereIn('invoice_status', [\App\Enums\InvoiceStatus::BELUM_DIBAYAR->value, \App\Enums\InvoiceStatus::SEBAGIAN->value])
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
             ->latest('issue_date')
             ->first();
 
         // Hitung total piutang (sum dari remaining_amount semua invoice yang belum lunas)
         $totalPiutang = $customer->invoices()
-            ->whereIn('invoice_status', [\App\Enums\InvoiceStatus::BELUM_DIBAYAR->value, \App\Enums\InvoiceStatus::SEBAGIAN->value])
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
             ->sum('remaining_amount');
 
         return response()->json([
@@ -823,9 +1022,9 @@ class CustomerController extends Controller
      */
     public function importForm()
     {
-        $packages = \App\Models\InternetPackage::orderBy('name')->get(['id', 'package_code', 'name', 'monthly_price']);
-        $villages = \App\Models\Village::with('district')->orderBy('name')->get(['id', 'name', 'district_id']);
-        
+        $packages = InternetPackage::orderBy('name')->get(['id', 'package_code', 'name', 'monthly_price']);
+        $villages = Village::with('district')->orderBy('name')->get(['id', 'name', 'district_id']);
+
         return view('customers.import', compact('packages', 'villages'));
     }
 
@@ -834,7 +1033,7 @@ class CustomerController extends Controller
      */
     public function importHistory()
     {
-        $batches = \App\Models\ImportBatch::with('user')
+        $batches = ImportBatch::with('user')
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
@@ -846,7 +1045,7 @@ class CustomerController extends Controller
      */
     public function importBatchDetail($id)
     {
-        $batch = \App\Models\ImportBatch::with(['user', 'errors'])
+        $batch = ImportBatch::with(['user', 'errors'])
             ->findOrFail($id);
 
         return view('customers.import_batch_detail', compact('batch'));
@@ -860,41 +1059,41 @@ class CustomerController extends Controller
         $sheets = [
             'customers' => [
                 'headers' => ['old_customer_id', 'old_request_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name', 'distribution_code', 'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
-                'data' => [['PE000001', 'RQ000001', 'C00RQ000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']]
+                'data' => [['PE000001', 'RQ000001', 'C00RQ000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']],
             ],
             'packages' => [
                 'headers' => ['old_package_id', 'name', 'package_type', 'category', 'monthly_price', 'upload_speed', 'download_speed', 'upload_limit', 'download_limit', 'olt_profile', 'ppp_profile', 'bonus', 'description'],
-                'data' => [['PK000001', 'WHUSNET 20 Mbps', 'Broadband', 'Paket Home Broadband', '150000', '20', '20', '', '', 'OLT-20M', 'PPP-20M', '', 'Paket legacy']]
+                'data' => [['PK000001', 'WHUSNET 20 Mbps', 'Broadband', 'Paket Home Broadband', '150000', '20', '20', '', '', 'OLT-20M', 'PPP-20M', '', 'Paket legacy']],
             ],
             'services' => [
-                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason', 'profile', 'contract_type', 'activation_time', 'activated_by_name', 'survey_date', 'survey_start_time', 'survey_end_time', 'surveyors', 'survey_assigned_at', 'survey_fop_id', 'required_tools', 'survey_photo', 'survey_note', 'survey_duration_minutes', 'installation_date', 'installation_start_time', 'installation_end_time', 'installation_technicians', 'installation_photo', 'installation_note', 'installation_assigned_at', 'installation_fop_id', 'other_fee'],
-                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001', '0']]
+                'headers' => ['old_request_id', 'old_customer_id', 'old_package_id', 'old_cost_id', 'request_status', 'installation_status', 'service_status', 'activation_date', 'survey_at', 'approved_at', 'processed_at', 'finished_at', 'verified_at', 'network_type', 'member_type', 'reason', 'profile', 'contract_type', 'activation_time', 'activated_by_name', 'survey_date', 'survey_start_time', 'survey_end_time', 'surveyors', 'survey_assigned_at', 'survey_fop_id', 'required_tools', 'survey_photo', 'survey_note', 'survey_duration_minutes', 'installation_date', 'installation_start_time', 'installation_end_time', 'installation_technicians', 'installation_photo', 'installation_note', 'installation_assigned_at', 'installation_fop_id', 'other_fee', 'device_retrieved_status'],
+                'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001', '0', '']],
             ],
             'technical_details' => [
                 'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'ip_address', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo', 'passive_device', 'branch_number', 'pop_number', 'router_number', 'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'],
-                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '192.168.1.10', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '', 'FAT-01', 'CB001', 'WL0001', 'RTR-001', '-18.5', '-19.2', '2025-05-06', '11:00:00', '2.5', '12.0', '0.00', '95.0', '5']]
+                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '192.168.1.10', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '', 'FAT-01', 'CB001', 'WL0001', 'RTR-001', '-18.5', '-19.2', '2025-05-06', '11:00:00', '2.5', '12.0', '0.00', '95.0', '5']],
             ],
             'invoices' => [
                 'headers' => ['old_invoice_id', 'old_cost_id', 'old_customer_id', 'old_request_id', 'billing_period', 'issue_date', 'due_date', 'installation_fee', 'monthly_fee', 'other_fee', 'total_amount', 'status', 'prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee'],
-                'data' => [['INVOICE-0001', 'IN000001', 'PE000001', 'RQ000001', '2025-05', '2025-05-06', '2025-05-10', '0', '150000', '0', '150000', 'belum_dibayar', '', '0', '0', '0']]
+                'data' => [['INVOICE-0001', 'IN000001', 'PE000001', 'RQ000001', '2025-05', '2025-05-06', '2025-05-10', '0', '150000', '0', '150000', 'belum_dibayar', '', '0', '0', '0']],
             ],
             'payments' => [
                 'headers' => ['old_payment_id', 'old_transaction_id', 'old_invoice_id', 'old_customer_id', 'old_request_id', 'payment_date', 'billing_period', 'payment_method', 'amount', 'received_by_old', 'deposited_by_old', 'note', 'status'],
-                'data' => [['PAY000001', 'IN000001', '', 'PE000001', 'RQ000001', '2025-05-07', '2025-05', 'cash', '150000', 'PG000005', '', 'Pembayaran legacy', 'valid']]
+                'data' => [['PAY000001', 'IN000001', '', 'PE000001', 'RQ000001', '2025-05-07', '2025-05', 'cash', '150000', 'PG000005', '', 'Pembayaran legacy', 'valid']],
             ],
         ];
 
-        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'temp-template-import-' . uniqid() . '.xlsx';
+        $tempFile = sys_get_temp_dir().DIRECTORY_SEPARATOR.'temp-template-import-'.uniqid().'.xlsx';
 
-        if (!class_exists(\ZipArchive::class)) {
+        if (! class_exists(\ZipArchive::class)) {
             // Fallback for environment lacking ZipArchive extension (e.g. host machine's CLI)
             file_put_contents($tempFile, 'Dummy Excel Content (Missing ZipArchive)');
         } else {
             $writer = SimpleExcelWriter::create($tempFile);
-            
+
             $isFirstSheet = true;
             foreach ($sheets as $sheetName => $sheet) {
-                if (!$isFirstSheet) {
+                if (! $isFirstSheet) {
                     $writer->addNewSheetAndMakeItCurrent();
                 }
                 $writer->nameCurrentSheet($sheetName);
@@ -902,10 +1101,10 @@ class CustomerController extends Controller
                 $writer->addRows($sheet['data']);
                 $isFirstSheet = false;
             }
-            
+
             $writer->close();
         }
-        
+
         return response()->download($tempFile, 'template-import-pelanggan.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend(true);
@@ -957,7 +1156,7 @@ class CustomerController extends Controller
      */
     private function scopeToBranchPopDirect($query, ?int $branchPopId)
     {
-        if (!$branchPopId) {
+        if (! $branchPopId) {
             return $query;
         }
 
@@ -973,7 +1172,7 @@ class CustomerController extends Controller
      */
     private function scopeToBranchPopViaCustomer($query, ?int $branchPopId)
     {
-        if (!$branchPopId) {
+        if (! $branchPopId) {
             return $query;
         }
 
@@ -1003,10 +1202,10 @@ class CustomerController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal membaca file Excel. Pastikan format file sesuai template dan memiliki 6 sheet lengkap (customers, packages, services, technical_details, invoices, payments).',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 422);
         }
-        
+
         $customersData = $sheets['customers'] ?? [];
         $packagesData = $sheets['packages'] ?? [];
         $servicesData = $sheets['services'] ?? [];
@@ -1037,10 +1236,10 @@ class CustomerController extends Controller
         $validatedPackages = [];
         $seenPackageIds = [];
         foreach ($packagesData as $index => $row) {
-            $oldPackageId = trim((string)($row['old_package_id'] ?? ''));
-            $name = trim((string)($row['name'] ?? ''));
-            $monthlyPriceInput = trim((string)($row['monthly_price'] ?? ''));
-            
+            $oldPackageId = trim((string) ($row['old_package_id'] ?? ''));
+            $name = trim((string) ($row['name'] ?? ''));
+            $monthlyPriceInput = trim((string) ($row['monthly_price'] ?? ''));
+
             $errors = [];
             $warnings = [];
             $statusRow = 'valid';
@@ -1065,7 +1264,7 @@ class CustomerController extends Controller
             if ($monthlyPriceInput === '') {
                 $errors[] = 'Harga paket wajib diisi.';
                 $statusRow = 'error';
-            } elseif (!is_numeric($monthlyPriceInput)) {
+            } elseif (! is_numeric($monthlyPriceInput)) {
                 $errors[] = 'Harga paket harus berupa angka.';
                 $statusRow = 'error';
             }
@@ -1074,7 +1273,7 @@ class CustomerController extends Controller
                 'original_no' => $index + 1,
                 'old_package_id' => $oldPackageId,
                 'name' => $name,
-                'monthly_price' => is_numeric($monthlyPriceInput) ? (float)$monthlyPriceInput : null,
+                'monthly_price' => is_numeric($monthlyPriceInput) ? (float) $monthlyPriceInput : null,
                 'status_row' => $statusRow,
                 'errors' => $errors,
                 'warnings' => $warnings,
@@ -1222,7 +1421,7 @@ class CustomerController extends Controller
                     })
                     ->first();
 
-                if (!$pop) {
+                if (! $pop) {
                     $warnings[] = 'POP tidak ditemukan atau tidak aktif; pelanggan tetap diimport untuk review dan belum siap billing.';
                 }
             }
@@ -1232,7 +1431,7 @@ class CustomerController extends Controller
             $normalizedLat = $this->normalizeCoordinate($rawLat);
             $normalizedLon = $this->normalizeCoordinate($rawLon);
 
-            if (($rawLat !== null && $rawLat !== '' && $normalizedLat === null) || 
+            if (($rawLat !== null && $rawLat !== '' && $normalizedLat === null) ||
                 ($rawLon !== null && $rawLon !== '' && $normalizedLon === null)) {
                 $warnings[] = 'Format koordinat latitude/longitude tidak valid; nilai diabaikan.';
             }
@@ -1285,7 +1484,7 @@ class CustomerController extends Controller
             $oldPackageId = $this->cleanLegacyValue($row['old_package_id'] ?? null) ?? '';
             $requestStatus = $this->cleanLegacyValue($row['request_status'] ?? null);
             $serviceStatusInput = $this->cleanLegacyValue($row['service_status'] ?? null) ?? $requestStatus ?? '';
-            
+
             $errors = [];
             $warnings = [];
             $statusRow = 'valid';
@@ -1313,7 +1512,7 @@ class CustomerController extends Controller
             } else {
                 $customerInSheet = collect($validatedCustomers)->firstWhere('old_customer_id', $oldCustomerId);
                 $customerInDb = Customer::where('old_customer_id', $oldCustomerId)->exists();
-                if (!$customerInSheet && !$customerInDb) {
+                if (! $customerInSheet && ! $customerInDb) {
                     $errors[] = "Pelanggan dengan ID '{$oldCustomerId}' tidak ditemukan.";
                     $statusRow = 'error';
                 }
@@ -1329,7 +1528,7 @@ class CustomerController extends Controller
                     ->orWhere('package_code', $oldPackageId)
                     ->first();
 
-                if (!$packageInSheet && !$packageInDb) {
+                if (! $packageInSheet && ! $packageInDb) {
                     $errors[] = "Paket dengan ID '{$oldPackageId}' tidak ditemukan.";
                     $statusRow = 'error';
                 } else {
@@ -1343,7 +1542,7 @@ class CustomerController extends Controller
             if ($serviceStatusInput === '') {
                 $warnings[] = 'Status layanan kosong; dimapping ke registered untuk review.';
                 $serviceStatus = 'registered';
-            } elseif (!in_array($serviceStatus, $validStatuses, true)) {
+            } elseif (! in_array($serviceStatus, $validStatuses, true)) {
                 $errors[] = "Status layanan '{$serviceStatusInput}' tidak didukung.";
                 $statusRow = 'error';
             }
@@ -1362,7 +1561,7 @@ class CustomerController extends Controller
                 'package_id' => $package instanceof InternetPackage ? $package->id : ($package['old_package_id'] ?? null),
                 'package_name' => $package instanceof InternetPackage ? $package->name : ($package['name'] ?? null),
                 'monthly_price' => $package instanceof InternetPackage ? $package->monthly_price : ($package['monthly_price'] ?? 0),
-                'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float)$row['other_fee'] : 0,
+                'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float) $row['other_fee'] : 0,
                 'service_status' => $serviceStatus,
                 'activation_date' => $this->normalizeLegacyDate($row['activation_date'] ?? $row['finished_at'] ?? null),
                 'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null),
@@ -1376,12 +1575,12 @@ class CustomerController extends Controller
         $validatedTechDetails = [];
         $seenReportIds = [];
         foreach ($techDetailsData as $index => $row) {
-            $oldReportId = trim((string)($row['old_report_id'] ?? ''));
-            $oldCustomerId = trim((string)($row['old_customer_id'] ?? ''));
+            $oldReportId = trim((string) ($row['old_report_id'] ?? ''));
+            $oldCustomerId = trim((string) ($row['old_customer_id'] ?? ''));
             if ($this->isInternalLegacyAccountId($oldCustomerId)) {
                 continue; // Skip tech details belonging to internal users
             }
-            $oldRequestId = trim((string)($row['old_request_id'] ?? ''));
+            $oldRequestId = trim((string) ($row['old_request_id'] ?? ''));
 
             $errors = [];
             $warnings = [];
@@ -1410,7 +1609,7 @@ class CustomerController extends Controller
             } else {
                 $customerInSheet = collect($validatedCustomers)->firstWhere('old_customer_id', $oldCustomerId);
                 $customerInDb = Customer::where('old_customer_id', $oldCustomerId)->exists();
-                if (!$customerInSheet && !$customerInDb) {
+                if (! $customerInSheet && ! $customerInDb) {
                     $errors[] = "Pelanggan dengan ID '{$oldCustomerId}' tidak ditemukan.";
                     $statusRow = 'error';
                 }
@@ -1421,12 +1620,12 @@ class CustomerController extends Controller
                 'old_report_id' => $oldReportId,
                 'old_customer_id' => $oldCustomerId,
                 'old_request_id' => $oldRequestId,
-                'connection_type' => trim((string)($row['connection_type'] ?? 'FTTH')),
-                'ont_sn' => trim((string)($row['router_or_ont_serial'] ?? $row['ont_sn'] ?? '')),
-                'ip_address' => trim((string)($row['ip_address'] ?? '')),
-                'odp_code' => trim((string)($row['odp_number'] ?? $row['odp_code'] ?? '')),
-                'olt_code' => trim((string)($row['olt_port'] ?? $row['olt_code'] ?? '')),
-                'vlan_id' => trim((string)($row['vlan_id'] ?? '')),
+                'connection_type' => trim((string) ($row['connection_type'] ?? 'FTTH')),
+                'ont_sn' => trim((string) ($row['router_or_ont_serial'] ?? $row['ont_sn'] ?? '')),
+                'ip_address' => trim((string) ($row['ip_address'] ?? '')),
+                'odp_code' => trim((string) ($row['odp_number'] ?? $row['odp_code'] ?? '')),
+                'olt_code' => trim((string) ($row['olt_port'] ?? $row['olt_code'] ?? '')),
+                'vlan_id' => trim((string) ($row['vlan_id'] ?? '')),
                 'initial_attenuation' => $this->cleanDecimal($row['initial_attenuation'] ?? null, -999.99, 999.99),
                 'actual_attenuation' => $this->cleanDecimal($row['actual_attenuation'] ?? null, -999.99, 999.99),
                 'jitter_ms' => $this->cleanDecimal($row['jitter_ms'] ?? null, -999999.99, 999999.99),
@@ -1486,7 +1685,7 @@ class CustomerController extends Controller
             } elseif ($oldCustomerId !== '') {
                 $customerInSheet = collect($validatedCustomers)->firstWhere('old_customer_id', $oldCustomerId);
                 $customerInDb = Customer::where('old_customer_id', $oldCustomerId)->exists();
-                if (!$customerInSheet && !$customerInDb) {
+                if (! $customerInSheet && ! $customerInDb) {
                     $warnings[] = "Pelanggan dengan ID '{$oldCustomerId}' belum ditemukan saat validasi; akan dicoba cocok lewat request saat import.";
                 }
             }
@@ -1494,7 +1693,7 @@ class CustomerController extends Controller
             if ($billingPeriod === '') {
                 $errors[] = 'Periode tagihan (YYYY-MM) wajib diisi.';
                 $statusRow = 'error';
-            } elseif (!preg_match('/^\d{4}-\d{2}$/', $billingPeriod)) {
+            } elseif (! preg_match('/^\d{4}-\d{2}$/', $billingPeriod)) {
                 $errors[] = 'Format periode tagihan harus YYYY-MM.';
                 $statusRow = 'error';
             }
@@ -1502,7 +1701,7 @@ class CustomerController extends Controller
             if ($totalAmountInput === '') {
                 $errors[] = 'Total tagihan wajib diisi.';
                 $statusRow = 'error';
-            } elseif (!is_numeric($totalAmountInput)) {
+            } elseif (! is_numeric($totalAmountInput)) {
                 $errors[] = 'Total tagihan harus berupa angka.';
                 $statusRow = 'error';
             }
@@ -1514,12 +1713,12 @@ class CustomerController extends Controller
                 'old_request_id' => $oldRequestId,
                 'old_customer_id' => $oldCustomerId,
                 'billing_period' => $billingPeriod,
-                'total_amount' => is_numeric($totalAmountInput) ? (float)$totalAmountInput : 0,
+                'total_amount' => is_numeric($totalAmountInput) ? (float) $totalAmountInput : 0,
                 'issue_date' => $this->normalizeLegacyDate($row['issue_date'] ?? null) ?? now()->format('Y-m-d'),
                 'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null) ?? now()->addDays(10)->format('Y-m-d'),
-                'installation_fee' => is_numeric($row['installation_fee'] ?? null) ? (float)$row['installation_fee'] : 0,
-                'monthly_fee' => is_numeric($row['monthly_fee'] ?? null) ? (float)$row['monthly_fee'] : null,
-                'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float)$row['other_fee'] : 0,
+                'installation_fee' => is_numeric($row['installation_fee'] ?? null) ? (float) $row['installation_fee'] : 0,
+                'monthly_fee' => is_numeric($row['monthly_fee'] ?? null) ? (float) $row['monthly_fee'] : null,
+                'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float) $row['other_fee'] : 0,
                 'status' => $this->mapLegacyInvoiceStatus($row['status'] ?? null),
                 'status_row' => $statusRow,
                 'errors' => $errors,
@@ -1568,10 +1767,10 @@ class CustomerController extends Controller
             if (empty($oldInvoiceId) && empty($oldTransactionId) && empty($oldRequestId)) {
                 $errors[] = 'ID invoice, ID transaksi, atau ID request lama wajib diisi.';
                 $statusRow = 'error';
-            } elseif (!empty($oldInvoiceId)) {
+            } elseif (! empty($oldInvoiceId)) {
                 $invoiceInSheet = collect($validatedInvoices)->firstWhere('old_invoice_id', $oldInvoiceId);
                 $invoiceInDb = Invoice::where('old_invoice_id', $oldInvoiceId)->exists();
-                if (!$invoiceInSheet && !$invoiceInDb) {
+                if (! $invoiceInSheet && ! $invoiceInDb) {
                     $warnings[] = "Invoice dengan ID '{$oldInvoiceId}' belum ditemukan saat validasi; akan dicoba cocok lewat transaksi/request saat import.";
                 }
             }
@@ -1579,7 +1778,7 @@ class CustomerController extends Controller
             if ($amountInput === '') {
                 $errors[] = 'Nominal bayar wajib diisi.';
                 $statusRow = 'error';
-            } elseif (!is_numeric($amountInput)) {
+            } elseif (! is_numeric($amountInput)) {
                 $errors[] = 'Nominal bayar harus berupa angka.';
                 $statusRow = 'error';
             }
@@ -1600,7 +1799,7 @@ class CustomerController extends Controller
                 'old_request_id' => $oldRequestId,
                 'old_customer_id' => $oldCustomerId,
                 'billing_period' => $billingPeriod,
-                'amount' => is_numeric($amountInput) ? (float)$amountInput : 0,
+                'amount' => is_numeric($amountInput) ? (float) $amountInput : 0,
                 'payment_date' => $paymentDateInput,
                 'payment_method' => $this->mapLegacyPaymentMethod($row['payment_method'] ?? null),
                 'received_by_old' => $this->cleanLegacyValue($row['received_by_old'] ?? null),
@@ -1660,8 +1859,8 @@ class CustomerController extends Controller
             }
         }
 
-        $batch = \App\Models\ImportBatch::create([
-            'batch_number' => \App\Models\ImportBatch::generateBatchNumber(),
+        $batch = ImportBatch::create([
+            'batch_number' => ImportBatch::generateBatchNumber(),
             'file_name' => $fileName,
             'uploaded_by' => auth()->id(),
             'total_rows' => $totalRows,
@@ -1673,7 +1872,7 @@ class CustomerController extends Controller
         $insertedCount = 0;
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function() use (
+            DB::transaction(function () use (
                 $customersData, $packagesData, $servicesData, $techDetailsData, $invoicesData, $paymentsData,
                 $batch, &$insertedCount
             ) {
@@ -1686,6 +1885,7 @@ class CustomerController extends Controller
                 foreach ($packagesData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Packages', 'Baris error pada sheet Packages.');
+
                         continue;
                     }
 
@@ -1694,7 +1894,7 @@ class CustomerController extends Controller
                         ->orWhere('package_code', $row['old_package_id'])
                         ->first();
 
-                    if (!$package) {
+                    if (! $package) {
                         $package = InternetPackage::create([
                             'package_code' => $row['old_package_id'],
                             'old_package_id' => $row['old_package_id'],
@@ -1704,7 +1904,7 @@ class CustomerController extends Controller
                             'total_price' => $row['monthly_price'],
                             'category' => $row['category'] ?? 'Paket Home Broadband',
                             'package_group' => $row['package_type'] ?? 'Broadband',
-                            'bandwidth_label' => ($row['download_speed'] ?? '10') . ' Mbps',
+                            'bandwidth_label' => ($row['download_speed'] ?? '10').' Mbps',
                             'download_speed_mbps' => $row['download_speed'] ?? 10.00,
                             'upload_speed_mbps' => $row['upload_speed'] ?? 10.00,
                             'is_active' => true,
@@ -1730,7 +1930,7 @@ class CustomerController extends Controller
                     }
                     $code = trim((string) ($row['customer_code'] ?? ''));
                     $popIdForRow = $row['pop_id'] ?? null;
-                    if ($code === '' || !$popIdForRow) {
+                    if ($code === '' || ! $popIdForRow) {
                         continue;
                     }
                     if (preg_match('/(\d+)$/', $code, $m)) {
@@ -1753,11 +1953,13 @@ class CustomerController extends Controller
                 foreach ($customersData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Customers', 'Baris error pada sheet Customers.');
+
                         continue;
                     }
 
                     if (empty($row['old_customer_id'])) {
                         $this->logImportError($batch->id, $row, 'Customers', 'ID pelanggan lama kosong.');
+
                         continue;
                     }
 
@@ -1765,7 +1967,7 @@ class CustomerController extends Controller
                         continue; // skip internal accounts in confirm
                     }
 
-                    $pop = !empty($row['pop_id']) ? Pop::find($row['pop_id']) : null;
+                    $pop = ! empty($row['pop_id']) ? Pop::find($row['pop_id']) : null;
                     $distribution = null;
                     $distributionCode = trim((string) ($row['distribution_code'] ?? ''));
                     if ($distributionCode === '0') {
@@ -1782,7 +1984,7 @@ class CustomerController extends Controller
                             ]
                         );
                     }
-                    $customerCode = !empty($row['customer_code']) ? $row['customer_code'] : ($pop?->generateRegistrationNumber() ?: $row['old_customer_id']);
+                    $customerCode = ! empty($row['customer_code']) ? $row['customer_code'] : ($pop?->generateRegistrationNumber() ?: $row['old_customer_id']);
 
                     $customer = Customer::create([
                         'customer_code' => $customerCode,
@@ -1850,6 +2052,7 @@ class CustomerController extends Controller
                 foreach ($servicesData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Services', 'Baris error pada sheet Services.');
+
                         continue;
                     }
 
@@ -1860,8 +2063,9 @@ class CustomerController extends Controller
                     $customerId = $customersMap[$row['old_customer_id']] ?? $this->findScopedCustomerId($row['old_customer_id'], $row['branch_pop_code'] ?? null);
                     $packageId = $packagesMap[$row['old_package_id']] ?? InternetPackage::where('old_package_id', $row['old_package_id'])->value('id');
 
-                    if (!$customerId || !$packageId) {
+                    if (! $customerId || ! $packageId) {
                         $this->logImportError($batch->id, $row, 'Services', 'Gagal memetakan Customer ID atau Package ID.');
+
                         continue;
                     }
 
@@ -1878,9 +2082,9 @@ class CustomerController extends Controller
                     }
 
                     $package = InternetPackage::findOrFail($packageId);
-                    $monthlyPrice = (float)($row['monthly_price'] ?? $package->monthly_price);
+                    $monthlyPrice = (float) ($row['monthly_price'] ?? $package->monthly_price);
                     $ppnPercent = 0.00; // Legacy data uses 0% PPN
-                    $otherFee = (float)($row['other_fee'] ?? 0);
+                    $otherFee = (float) ($row['other_fee'] ?? 0);
                     $totalBill = $monthlyPrice; // Biaya bulanan hanya berdasarkan dari Harga paket, biaya diluar standar (other_fee) tidak masuk ke tagihan bulanan rutin
 
                     $customer = Customer::findOrFail($customerId);
@@ -1921,8 +2125,8 @@ class CustomerController extends Controller
                     ]);
 
                     // Survey creation
-                    if (!empty($row['survey_date']) || !empty($row['surveyors'])) {
-                        \App\Models\CustomerSurvey::create([
+                    if (! empty($row['survey_date']) || ! empty($row['surveyors'])) {
+                        CustomerSurvey::create([
                             'customer_id' => $customerId,
                             'survey_status' => 'completed',
                             'survey_date' => $row['survey_date'] ?? null,
@@ -1939,8 +2143,8 @@ class CustomerController extends Controller
                     }
 
                     // Installation creation
-                    if (!empty($row['installation_date']) || !empty($row['installation_technicians'])) {
-                        \App\Models\CustomerInstallation::create([
+                    if (! empty($row['installation_date']) || ! empty($row['installation_technicians'])) {
+                        CustomerInstallation::create([
                             'customer_id' => $customerId,
                             'installation_status' => 'completed',
                             'scheduled_date' => $row['installation_date'] ?? null,
@@ -1976,6 +2180,61 @@ class CustomerController extends Controller
                     $customer->updateQuietly($updateData);
                     $customer->recalculateCompleteness();
 
+                    // Halaman "Pelanggan Gagal"/"Putus Langganan" nampilin alasan +
+                    // tanggal dari AuditLog transisi asli — data import gak pernah
+                    // lewat transisi itu (updateQuietly di atas gak nyatet apa-apa),
+                    // jadi kolom itu kosong buat pelanggan migrasi. Bikin AuditLog
+                    // sintetis pakai ALASAN/tanggal legacy biar dua halaman itu bisa
+                    // nampilin data yang sama seperti di sistem lama.
+                    $legacyChangedAt = ! empty($row['status_changed_at'])
+                        ? Carbon::parse($row['status_changed_at'])
+                        : $customer->created_at;
+                    $legacyReason = trim((string) ($row['reason'] ?? '')) ?: 'Data migrasi dari sistem lama (alasan tidak tercatat).';
+
+                    if ($serviceStatus === 'rejected') {
+                        AuditLog::create([
+                            'user_id' => $batch->uploaded_by,
+                            'module' => 'Customer Workflow',
+                            'action' => 'status_transition',
+                            'auditable_type' => Customer::class,
+                            'auditable_id' => $customer->id,
+                            'old_values' => ['status' => 'registered'],
+                            'new_values' => ['status' => 'rejected', 'note' => $legacyReason],
+                            'ip_address' => null,
+                            'user_agent' => null,
+                            'created_at' => $legacyChangedAt,
+                        ]);
+                    } elseif ($serviceStatus === 'terminated') {
+                        AuditLog::create([
+                            'user_id' => $batch->uploaded_by,
+                            'module' => 'customers',
+                            'action' => 'terminate',
+                            'auditable_type' => Customer::class,
+                            'auditable_id' => $customer->id,
+                            'old_values' => ['status' => 'active'],
+                            'new_values' => ['status' => 'terminated', 'reason' => $legacyReason],
+                            'ip_address' => null,
+                            'user_agent' => null,
+                            'created_at' => $legacyChangedAt,
+                        ]);
+
+                        // Status Alat (List Putus Langganan) — pelanggan migrasi gak
+                        // pernah lewat CustomerInstallationController (yang biasanya
+                        // bikin CustomerDevice), jadi row-nya harus dibikin manual di
+                        // sini juga, disinkron ke device_retrieved_at kalau data lama
+                        // udah nyatet 'Sudah diambil'. Tanpa ini, Status Alat SELALU
+                        // "Belum di Ambil" buat semua pelanggan hasil import legacy,
+                        // gak peduli data aslinya gimana.
+                        $deviceRetrievedStatus = trim((string) ($row['device_retrieved_status'] ?? ''));
+                        if (! $customer->customerDevice) {
+                            CustomerDevice::create([
+                                'customer_id' => $customer->id,
+                                'device_type' => 'Data Migrasi Legacy',
+                                'device_retrieved_at' => $deviceRetrievedStatus === 'Sudah diambil' ? $legacyChangedAt : null,
+                            ]);
+                        }
+                    }
+
                     $insertedCount++;
                 }
 
@@ -1983,6 +2242,7 @@ class CustomerController extends Controller
                 foreach ($techDetailsData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Technical Details', 'Baris error pada sheet Technical Details.');
+
                         continue;
                     }
 
@@ -1992,12 +2252,13 @@ class CustomerController extends Controller
 
                     $customerId = $customersMap[$row['old_customer_id']] ?? $this->findScopedCustomerId($row['old_customer_id'], $row['branch_pop_code'] ?? null);
 
-                    if (!$customerId) {
+                    if (! $customerId) {
                         $this->logImportError($batch->id, $row, 'Technical Details', 'Gagal memetakan Customer ID.');
+
                         continue;
                     }
 
-                    if (!empty($row['old_report_id']) && CustomerTechnicalDetail::where('old_report_id', $row['old_report_id'])->where('customer_id', $customerId)->exists()) {
+                    if (! empty($row['old_report_id']) && CustomerTechnicalDetail::where('old_report_id', $row['old_report_id'])->where('customer_id', $customerId)->exists()) {
                         continue;
                     }
 
@@ -2058,6 +2319,7 @@ class CustomerController extends Controller
                 foreach ($invoicesData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Invoices', 'Baris error pada sheet Invoices.');
+
                         continue;
                     }
 
@@ -2066,29 +2328,31 @@ class CustomerController extends Controller
                     }
 
                     $customerId = $customersMap[$row['old_customer_id'] ?? ''] ?? $this->findScopedCustomerId($row['old_customer_id'] ?? null, $row['branch_pop_code'] ?? null);
-                    if (!$customerId && !empty($row['old_request_id'])) {
+                    if (! $customerId && ! empty($row['old_request_id'])) {
                         $customerId = $this->scopeToBranchPopViaCustomer(
                             CustomerService::where('old_request_id', $row['old_request_id']),
                             $this->resolveBranchPopId($row['branch_pop_code'] ?? null)
                         )->value('customer_id');
                     }
 
-                    if (!$customerId) {
+                    if (! $customerId) {
                         $this->logImportError($batch->id, $row, 'Invoices', 'Gagal memetakan Customer ID.');
+
                         continue;
                     }
 
                     $customer = Customer::findOrFail($customerId);
                     $service = $customer->customerService;
 
-                    if (!$service) {
+                    if (! $service) {
                         $this->logImportError($batch->id, $row, 'Invoices', 'Layanan aktif untuk pelanggan tidak ditemukan.');
+
                         continue;
                     }
 
                     $legacyInvoiceId = $row['old_invoice_id'] ?: ($row['old_cost_id'] ?? null);
                     $existingInvoice = null;
-                    if ($legacyInvoiceId || !empty($row['old_cost_id'])) {
+                    if ($legacyInvoiceId || ! empty($row['old_cost_id'])) {
                         // Scoped by customer_id: old_invoice_id/old_cost_id (from
                         // legacy IDBIAYA) are only unique within their source branch.
                         $existingInvoice = Invoice::query()
@@ -2097,7 +2361,7 @@ class CustomerController extends Controller
                                 if ($legacyInvoiceId) {
                                     $query->where('old_invoice_id', $legacyInvoiceId);
                                 }
-                                if (!empty($row['old_cost_id'])) {
+                                if (! empty($row['old_cost_id'])) {
                                     $query->orWhere('old_cost_id', $row['old_cost_id']);
                                 }
                             })
@@ -2106,9 +2370,10 @@ class CustomerController extends Controller
 
                     if ($existingInvoice) {
                         $invoicesMap[$legacyInvoiceId] = $existingInvoice->id;
-                        if (!empty($row['old_cost_id'])) {
+                        if (! empty($row['old_cost_id'])) {
                             $invoicesMap[$row['old_cost_id']] = $existingInvoice->id;
                         }
+
                         continue;
                     }
 
@@ -2116,18 +2381,18 @@ class CustomerController extends Controller
                     // source branch, but invoice_number has a global unique
                     // constraint — disambiguate with the target customer_id when
                     // another branch already claimed the same raw legacy number.
-                    $invoiceNumber = 'INV-' . $legacyInvoiceId;
+                    $invoiceNumber = 'INV-'.$legacyInvoiceId;
                     if (Invoice::where('invoice_number', $invoiceNumber)->exists()) {
-                        $invoiceNumber = 'INV-' . $legacyInvoiceId . '-C' . $customerId;
+                        $invoiceNumber = 'INV-'.$legacyInvoiceId.'-C'.$customerId;
                     }
-                    $totalAmount = (float)$row['total_amount'];
+                    $totalAmount = (float) $row['total_amount'];
 
                     // Legacy data mixes biaya pasang (install) & biaya bulanan into one
                     // record; MigrateLegacyDataCommand now splits it into two invoice
                     // rows (suffixed -AWAL/-BULANAN) and tags each with the real type.
-                    $invoiceType = \App\Enums\InvoiceType::tryFrom((string)($row['invoice_type'] ?? ''))
-                        ?? \App\Enums\InvoiceType::BULANAN;
-                    $subtotal = $invoiceType === \App\Enums\InvoiceType::AWAL
+                    $invoiceType = InvoiceType::tryFrom((string) ($row['invoice_type'] ?? ''))
+                        ?? InvoiceType::BULANAN;
+                    $subtotal = $invoiceType === InvoiceType::AWAL
                         ? (float) ($row['installation_fee'] ?? 0) + (float) ($row['other_fee'] ?? 0) + (float) ($row['prorate_amount'] ?? 0)
                         : ($row['monthly_fee'] ?? $service->monthly_price);
 
@@ -2160,7 +2425,7 @@ class CustomerController extends Controller
                     ]);
 
                     $invoicesMap[$legacyInvoiceId] = $invoice->id;
-                    if (!empty($row['old_cost_id'])) {
+                    if (! empty($row['old_cost_id'])) {
                         $invoicesMap[$row['old_cost_id']] = $invoice->id;
                     }
                     $insertedCount++;
@@ -2170,6 +2435,7 @@ class CustomerController extends Controller
                 foreach ($paymentsData as $row) {
                     if (($row['status_row'] ?? '') === 'error') {
                         $this->logImportError($batch->id, $row, 'Payments', 'Baris error pada sheet Payments.');
+
                         continue;
                     }
 
@@ -2179,8 +2445,9 @@ class CustomerController extends Controller
 
                     $invoiceId = $this->resolveLegacyInvoiceId($row, $invoicesMap);
 
-                    if (!$invoiceId) {
+                    if (! $invoiceId) {
                         $this->logImportError($batch->id, $row, 'Payments', 'Gagal memetakan Invoice ID.');
+
                         continue;
                     }
 
@@ -2195,11 +2462,11 @@ class CustomerController extends Controller
                     // derived from legacy IDBIAYA, which is only unique within its
                     // source branch — disambiguate if another branch already
                     // claimed the same raw payment number.
-                    $paymentNumber = 'PAY-' . $row['old_payment_id'];
+                    $paymentNumber = 'PAY-'.$row['old_payment_id'];
                     if (Payment::where('payment_number', $paymentNumber)->exists()) {
-                        $paymentNumber = 'PAY-' . $row['old_payment_id'] . '-I' . $invoiceId;
+                        $paymentNumber = 'PAY-'.$row['old_payment_id'].'-I'.$invoiceId;
                     }
-                    $amount = (float)$row['amount'];
+                    $amount = (float) $row['amount'];
 
                     $payment = Payment::create([
                         'payment_number' => $paymentNumber,
@@ -2221,11 +2488,11 @@ class CustomerController extends Controller
                     ]);
 
                     // Update invoice paid & remaining amounts
-                    $newPaidAmount = (float)$invoice->payments()->where('payment_status', \App\Enums\PaymentStatus::VALID->value)->sum('amount');
-                    $newRemaining = max(0.00, (float)$invoice->total_amount - $newPaidAmount);
+                    $newPaidAmount = (float) $invoice->payments()->where('payment_status', PaymentStatus::VALID->value)->sum('amount');
+                    $newRemaining = max(0.00, (float) $invoice->total_amount - $newPaidAmount);
                     $newStatus = $newPaidAmount <= 0
-                        ? \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value
-                        : ($newRemaining <= 0 ? \App\Enums\InvoiceStatus::LUNAS->value : \App\Enums\InvoiceStatus::SEBAGIAN->value);
+                        ? InvoiceStatus::BELUM_DIBAYAR->value
+                        : ($newRemaining <= 0 ? InvoiceStatus::LUNAS->value : InvoiceStatus::SEBAGIAN->value);
 
                     $invoice->update([
                         'paid_amount' => $newPaidAmount,
@@ -2237,7 +2504,7 @@ class CustomerController extends Controller
                 }
 
                 // Log audit batch
-                \App\Models\AuditLog::create([
+                AuditLog::create([
                     'user_id' => auth()->id(),
                     'module' => 'Import Pelanggan',
                     'action' => 'confirm',
@@ -2255,8 +2522,9 @@ class CustomerController extends Controller
             });
         } catch (\Exception $e) {
             $batch->update(['status' => 'failed']);
-            \Illuminate\Support\Facades\Log::error('Multi-sheet Import Error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return redirect()->route('customers.import')->withErrors('Gagal meng-import data: ' . $e->getMessage());
+            Log::error('Multi-sheet Import Error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            return redirect()->route('customers.import')->withErrors('Gagal meng-import data: '.$e->getMessage());
         }
 
         return redirect()->route('customers.index')->with('success', "Berhasil meng-import {$insertedCount} baris data dari sheet migrasi! (Batch: {$batch->batch_number})");
@@ -2266,43 +2534,47 @@ class CustomerController extends Controller
     {
         $villages = Village::with('district.city')->get();
         $matches = [];
-        
+
         foreach ($villages as $v) {
             $vName = $v->name;
             $dName = $v->district->name;
             $cName = $v->district->city->name;
-            
+
             if (stripos($address, $vName) !== false) {
                 $hasDistrict = stripos($address, $dName) !== false;
                 $hasCity = stripos($address, $cName) !== false;
-                
+
                 $score = 1;
-                if ($hasDistrict) $score += 2;
-                if ($hasCity) $score += 1;
-                
+                if ($hasDistrict) {
+                    $score += 2;
+                }
+                if ($hasCity) {
+                    $score += 1;
+                }
+
                 if ($hasDistrict && (preg_match('/kec\b/i', $address) || preg_match('/kecamatan\b/i', $address))) {
-                    if (preg_match('/kec(amatan)?\s*' . preg_quote($dName, '/') . '/i', $address)) {
+                    if (preg_match('/kec(amatan)?\s*'.preg_quote($dName, '/').'/i', $address)) {
                         $score += 2;
                     }
                 }
-                
+
                 $matches[] = [
                     'village' => $v,
-                    'score' => $score
+                    'score' => $score,
                 ];
             }
         }
-        
+
         if (empty($matches)) {
             return null;
         }
-        
-        usort($matches, function($a, $b) {
+
+        usort($matches, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
-        
+
         $best = $matches[0]['village'];
-        
+
         return [
             'village_id' => $best->id,
             'village_name' => $best->name,
@@ -2315,11 +2587,11 @@ class CustomerController extends Controller
 
     private function logImportError($batchId, $row, $sheetName, $message)
     {
-        \App\Models\ImportError::create([
+        ImportError::create([
             'import_batch_id' => $batchId,
             'row_number' => $row['original_no'] ?? null,
             'field_name' => $sheetName,
-            'error_message' => "[{$sheetName}] " . $message,
+            'error_message' => "[{$sheetName}] ".$message,
             'raw_data' => $row,
         ]);
     }
@@ -2334,7 +2606,7 @@ class CustomerController extends Controller
     private function resolveLegacyAddressText(array $row): string
     {
         $streetAddress = trim((string) ($row['full_address'] ?? $row['address'] ?? $row['ALMT'] ?? $row['ALAMAT'] ?? ''));
-        if ($streetAddress !== '' && !in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
+        if ($streetAddress !== '' && ! in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
             return $streetAddress;
         }
 
@@ -2373,7 +2645,7 @@ class CustomerController extends Controller
         }
 
         try {
-            return \Carbon\Carbon::parse($value)->format('Y-m-d');
+            return Carbon::parse($value)->format('Y-m-d');
         } catch (\Throwable) {
             return null;
         }
@@ -2391,7 +2663,7 @@ class CustomerController extends Controller
         }
 
         try {
-            return \Carbon\Carbon::parse($value)->format('Y-m');
+            return Carbon::parse($value)->format('Y-m');
         } catch (\Throwable) {
             return $value;
         }
@@ -2410,7 +2682,7 @@ class CustomerController extends Controller
         // Keep only digits, dots, minus sign
         $value = preg_replace('/[^\d\.\-]/', '', $value);
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return null;
         }
 
@@ -2421,7 +2693,7 @@ class CustomerController extends Controller
             // Strip any existing dot or minus sign to get only digits
             $isNegative = str_starts_with($value, '-');
             $digits = preg_replace('/[^\d]/', '', $value);
-            
+
             if ($digits === '') {
                 return null;
             }
@@ -2429,16 +2701,16 @@ class CustomerController extends Controller
             if ($isNegative) {
                 // Negative coordinates in Indonesia are always latitude (around -7 or -8)
                 // Place the dot after the first digit
-                $normalized = '-' . substr($digits, 0, 1) . '.' . substr($digits, 1);
+                $normalized = '-'.substr($digits, 0, 1).'.'.substr($digits, 1);
             } else {
                 // Positive coordinates
                 if (str_starts_with($digits, '1')) {
                     // Longitude in Indonesia is around 110-115
                     // Place the dot after the first 3 digits
-                    $normalized = substr($digits, 0, 3) . '.' . substr($digits, 3);
+                    $normalized = substr($digits, 0, 3).'.'.substr($digits, 3);
                 } else {
                     // Positive latitude
-                    $normalized = substr($digits, 0, 1) . '.' . substr($digits, 1);
+                    $normalized = substr($digits, 0, 1).'.'.substr($digits, 1);
                 }
             }
             $value = $normalized;
@@ -2460,11 +2732,12 @@ class CustomerController extends Controller
         // Keep only digits, dots, minus sign
         $cleaned = preg_replace('/[^\d\.\-]/', '', $cleaned);
 
-        if (!is_numeric($cleaned)) {
+        if (! is_numeric($cleaned)) {
             return null;
         }
 
         $val = (float) $cleaned;
+
         return ($val >= $min && $val <= $max) ? $val : null;
     }
 
@@ -2480,10 +2753,21 @@ class CustomerController extends Controller
             'terminated' => 'terminated',
             'gagal' => 'rejected',
             'rejected' => 'rejected',
-            'disurvei' => 'waiting_survey',
+            // 'DISURVEI' di sistem lama = survey SUDAH selesai + admin sudah ACC
+            // (DISURVEY & DIACC keduanya terisi, DIPROSES masih kosong) — itu
+            // tahap "Verif & Pemasangan" (nunggu tim instalasi), BUKAN "Survey"
+            // (yang berarti belum disurvey sama sekali). Ketuker sebelumnya bikin
+            // pelanggan migrasi nyasar ke antrian Survey padahal harusnya di
+            // antrian Verif & Pemasangan.
+            'disurvei' => 'waiting_installation',
             'survey' => 'waiting_survey',
             'menunggu_survey' => 'waiting_survey',
-            'pengajuan' => 'registered',
+            // 'PENGAJUAN' = request udah diajukan di sistem lama (masuk tabel
+            // prosedure_permintaan_wifi), DISURVEY masih kosong = belum disurvey
+            // sama sekali. Itu tahap "Survey" (nunggu dijadwalkan), bukan
+            // "registered" polos — kalau dipetakan ke registered, pelanggan ini
+            // gak nongol di antrian Survey sampai ada yang manual mulai survey.
+            'pengajuan' => 'waiting_survey',
             'calon_pelanggan' => 'registered',
             'terdaftar' => 'registered',
             'registered' => 'registered',
@@ -2500,11 +2784,11 @@ class CustomerController extends Controller
         $normalized = strtolower(str_replace([' ', '-'], '_', $this->cleanLegacyValue($status) ?? ''));
 
         return match ($normalized) {
-            'lunas', 'paid' => \App\Enums\InvoiceStatus::LUNAS->value,
-            'sebagian', 'partial' => \App\Enums\InvoiceStatus::SEBAGIAN->value,
-            'batal', 'cancelled' => \App\Enums\InvoiceStatus::BATAL->value,
-            'belum_dibayar', 'unpaid', '' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
-            default => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
+            'lunas', 'paid' => InvoiceStatus::LUNAS->value,
+            'sebagian', 'partial' => InvoiceStatus::SEBAGIAN->value,
+            'batal', 'cancelled' => InvoiceStatus::BATAL->value,
+            'belum_dibayar', 'unpaid', '' => InvoiceStatus::BELUM_DIBAYAR->value,
+            default => InvoiceStatus::BELUM_DIBAYAR->value,
         };
     }
 
@@ -2526,16 +2810,16 @@ class CustomerController extends Controller
         $normalized = strtolower(str_replace([' ', '-'], '_', $this->cleanLegacyValue($status) ?? 'valid'));
 
         return match ($normalized) {
-            'valid', 'diterima', 'lunas', '' => \App\Enums\PaymentStatus::VALID->value,
-            'pending' => \App\Enums\PaymentStatus::PENDING->value,
-            'ditolak', 'rejected', 'batal' => \App\Enums\PaymentStatus::DITOLAK->value,
-            default => \App\Enums\PaymentStatus::VALID->value,
+            'valid', 'diterima', 'lunas', '' => PaymentStatus::VALID->value,
+            'pending' => PaymentStatus::PENDING->value,
+            'ditolak', 'rejected', 'batal' => PaymentStatus::DITOLAK->value,
+            default => PaymentStatus::VALID->value,
         };
     }
 
     /**
-     * @param array<string, mixed> $row
-     * @param array<string, int> $invoicesMap
+     * @param  array<string, mixed>  $row
+     * @param  array<string, int>  $invoicesMap
      */
     private function resolveLegacyInvoiceId(array $row, array $invoicesMap): ?int
     {
@@ -2546,21 +2830,21 @@ class CustomerController extends Controller
             }
         }
 
-        if (!empty($row['old_invoice_id'])) {
+        if (! empty($row['old_invoice_id'])) {
             $invoiceId = Invoice::where('old_invoice_id', $row['old_invoice_id'])->value('id');
             if ($invoiceId) {
                 return (int) $invoiceId;
             }
         }
 
-        if (!empty($row['old_transaction_id'])) {
+        if (! empty($row['old_transaction_id'])) {
             $invoiceId = Invoice::where('old_cost_id', $row['old_transaction_id'])->value('id');
             if ($invoiceId) {
                 return (int) $invoiceId;
             }
         }
 
-        if (!empty($row['old_request_id']) && !empty($row['billing_period'])) {
+        if (! empty($row['old_request_id']) && ! empty($row['billing_period'])) {
             $invoiceId = Invoice::where('old_request_id', $row['old_request_id'])
                 ->where('billing_period', $row['billing_period'])
                 ->value('id');
@@ -2572,26 +2856,43 @@ class CustomerController extends Controller
         return null;
     }
 
-
     public function activate(Customer $customer)
     {
-        if (!$customer->exists) {
+        if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
         }
 
+        $hasWorkflowTask = $customer->tasks()
+            ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
+            ->exists();
+        if ($hasWorkflowTask) {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Aktivasi manual hanya untuk data migrasi lama. Pelanggan ini punya riwayat Task Survey/Pemasangan, harus diaktifkan lewat alur verifikasi normal.');
+        }
+
+        // Hanya untuk pelanggan migrasi yang TERBUKTI sudah aktif di sistem lama
+        // (request_status legacy = ACTIVE). Pelanggan migrasi yang di sistem lama
+        // masih nyangkut di SRV/PSB (PENGAJUAN/DIPROSES/GAGAL) tetap harus lewat
+        // alur SRV/PSB normal di sistem baru, bukan di-bypass di sini.
+        $legacyRequestStatus = $customer->customerService?->request_status;
+        if (! $customer->old_customer_id || $legacyRequestStatus !== 'ACTIVE') {
+            return redirect()->route('customers.show', $customer->id)
+                ->with('error', 'Aktivasi manual hanya untuk pelanggan migrasi yang terbukti sudah aktif di sistem lama.');
+        }
+
         $completeness = $customer->dataCompleteness();
-        if (!$completeness['is_ready_billing']) {
+        if (! $completeness['is_ready_billing']) {
             return redirect()->route('customers.show', $customer->id)
                 ->with('error', 'Pelanggan tidak bisa diaktifkan karena data wajib belum lengkap.');
         }
 
-        if (!$customer->internet_package_id) {
+        if (! $customer->internet_package_id) {
             return redirect()->route('customers.show', $customer->id)
                 ->with('error', 'Pelanggan tidak memiliki paket internet aktif.');
         }
 
         $service = $customer->customerService;
-        if (!$service) {
+        if (! $service) {
             return redirect()->route('customers.show', $customer->id)
                 ->with('error', 'Data layanan pelanggan tidak ditemukan.');
         }
@@ -2602,19 +2903,19 @@ class CustomerController extends Controller
         }
 
         $pop = $customer->pop;
-        if (!$pop) {
+        if (! $pop) {
             return redirect()->route('customers.show', $customer->id)
                 ->with('error', 'POP/Cabang pelanggan tidak ditemukan.');
         }
 
-        if (!$pop->cid_prefix) {
+        if (! $pop->cid_prefix) {
             return redirect()->route('customers.show', $customer->id)
                 ->with('error', 'Konfigurasi prefix CID pada POP asal pelanggan belum lengkap. Pastikan field cid_prefix terisi.');
         }
 
         // Load relasi teknis dan distribusi untuk generate CID kompleks
         $customer->loadMissing(['customerTechnicalDetail', 'distribution', 'village']);
-        \Illuminate\Support\Facades\DB::transaction(function () use ($customer, $service, $pop) {
+        DB::transaction(function () use ($customer, $service, $pop) {
             // Generate CID kompleks: {pop.cid_prefix}{olt_number}{dist_code}{customer_code}_{village}_{name}
             // Contoh: D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH
             $distribution = $customer->distribution;
@@ -2653,7 +2954,7 @@ class CustomerController extends Controller
                 'billing_status' => 'active',
             ];
 
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'Data Pelanggan',
                 'action' => 'activate',
@@ -2667,16 +2968,16 @@ class CustomerController extends Controller
             ]);
 
             try {
-                $telegram = app(\App\Services\TelegramBotService::class);
+                $telegram = app(TelegramBotService::class);
                 $message = "🎉 <b>Pelanggan Aktif</b>\n";
                 $message .= "Pelanggan: {$customer->full_name}\n";
                 $message .= "CID: {$cid}\n";
                 $message .= "No. HP: {$customer->phone}\n";
                 $message .= "POP: {$customer->pop->name}\n";
-                $message .= "Telah berhasil diaktivasi dan masuk siklus penagihan.";
+                $message .= 'Telah berhasil diaktivasi dan masuk siklus penagihan.';
                 $telegram->sendMessage($message);
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Gagal mengirim notifikasi Telegram: ' . $e->getMessage());
+                Log::error('Gagal mengirim notifikasi Telegram: '.$e->getMessage());
             }
         });
 
@@ -2710,56 +3011,56 @@ class CustomerController extends Controller
      */
     public function storeManualInvoice(Request $request, Customer $customer)
     {
-        if (!$customer->exists) {
+        if (! $customer->exists) {
             $customer = Customer::findOrFail($request->route('customer'));
         }
 
         // 1. Authorization checks
-        if (!auth()->user()->hasPermission('invoices.create')) {
+        if (! auth()->user()->hasPermission('invoices.create')) {
             abort(403, 'Anda tidak memiliki akses untuk membuat tagihan.');
         }
 
         // Scope check for user's assigned POPs
-        if (!Customer::query()->applyUserScope()->where('id', $customer->id)->exists()) {
+        if (! Customer::query()->applyUserScope()->where('id', $customer->id)->exists()) {
             abort(403, 'Anda tidak memiliki akses ke data pelanggan di POP ini.');
         }
 
         // 2. Validate request
         $validated = $request->validate([
-            'billing_period'          => 'required|date_format:Y-m',
-            'issue_date'              => 'required|date',
-            'due_date'                => 'required|date|after_or_equal:issue_date',
-            'invoice_type'            => ['required', \Illuminate\Validation\Rule::enum(\App\Enums\InvoiceType::class)],
-            'prorate_amount'          => 'nullable|numeric|min:0',
-            'extra_cable_fee'         => 'nullable|numeric|min:0',
-            'extra_installation_fee'  => 'nullable|numeric|min:0',
-            'extra_pole_fee'          => 'nullable|numeric|min:0',
+            'billing_period' => 'required|date_format:Y-m',
+            'issue_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:issue_date',
+            'invoice_type' => ['required', Rule::enum(InvoiceType::class)],
+            'prorate_amount' => 'nullable|numeric|min:0',
+            'extra_cable_fee' => 'nullable|numeric|min:0',
+            'extra_installation_fee' => 'nullable|numeric|min:0',
+            'extra_pole_fee' => 'nullable|numeric|min:0',
         ]);
 
-        $billingPeriod        = $validated['billing_period'];
-        $issueDate            = $validated['issue_date'];
-        $dueDate              = $validated['due_date'];
-        $invoiceType          = \App\Enums\InvoiceType::from($validated['invoice_type']);
-        $prorateAmount        = (float)($validated['prorate_amount'] ?? 0);
-        $extraCableFee        = (float)($validated['extra_cable_fee'] ?? 0);
-        $extraInstallationFee = (float)($validated['extra_installation_fee'] ?? 0);
-        $extraPoleFee         = (float)($validated['extra_pole_fee'] ?? 0);
+        $billingPeriod = $validated['billing_period'];
+        $issueDate = $validated['issue_date'];
+        $dueDate = $validated['due_date'];
+        $invoiceType = InvoiceType::from($validated['invoice_type']);
+        $prorateAmount = (float) ($validated['prorate_amount'] ?? 0);
+        $extraCableFee = (float) ($validated['extra_cable_fee'] ?? 0);
+        $extraInstallationFee = (float) ($validated['extra_installation_fee'] ?? 0);
+        $extraPoleFee = (float) ($validated['extra_pole_fee'] ?? 0);
 
         // 3. Business logic checks
         // Cek pelanggan aktif/siap billing
-        if (!in_array($customer->status, ['active', 'suspended']) && $customer->data_completeness_status !== 'siap_billing') {
+        if (! in_array($customer->status, ['active', 'suspended']) && $customer->data_completeness_status !== 'siap_billing') {
             return redirect()->back()->withErrors(['error' => 'Tagihan hanya bisa dibuat untuk pelanggan dengan status aktif atau siap billing.']);
         }
 
         $service = $customer->customerService;
-        if (!$service) {
+        if (! $service) {
             return redirect()->back()->withErrors(['error' => 'Pelanggan tidak memiliki layanan aktif.']);
         }
 
         // Cek invoice dobel untuk periode + jenis tagihan yang sama (bukan
         // seluruh periode, karena AWAL dan BULANAN sah muncul bersamaan di
         // periode yang sama — misal saat reaktivasi).
-        $exists = \App\Models\Invoice::where('customer_id', $customer->id)
+        $exists = Invoice::where('customer_id', $customer->id)
             ->where('billing_period', $billingPeriod)
             ->where('invoice_type', $invoiceType->value)
             ->exists();
@@ -2770,12 +3071,12 @@ class CustomerController extends Controller
 
         // 4. Generate invoice number sequentially (e.g., format INV-YYYYMM-[counter] where counter increment is locked for update)
         $periodCode = str_replace('-', '', $billingPeriod);
-        
-        $invoice = \Illuminate\Support\Facades\DB::transaction(function () use (
+
+        $invoice = DB::transaction(function () use (
             $customer, $service, $billingPeriod, $issueDate, $dueDate, $periodCode, $invoiceType,
             $prorateAmount, $extraCableFee, $extraInstallationFee, $extraPoleFee
         ) {
-            $lastInvoice = \App\Models\Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
+            $lastInvoice = Invoice::where('invoice_number', 'like', "INV-{$periodCode}-%")
                 ->orderBy('invoice_number', 'desc')
                 ->lockForUpdate()
                 ->first();
@@ -2784,52 +3085,52 @@ class CustomerController extends Controller
             if ($lastInvoice) {
                 $parts = explode('-', $lastInvoice->invoice_number);
                 if (count($parts) === 3) {
-                    $nextSeq = ((int)$parts[2]) + 1;
+                    $nextSeq = ((int) $parts[2]) + 1;
                 }
             }
             $invoiceNumber = sprintf('INV-%s-%04d', $periodCode, $nextSeq);
 
             // Rincian biaya dari service snapshot
-            $subtotal    = (float)$service->monthly_price;
-            $discount    = (float)($service->discount ?? 0.00);
-            $ppnPercent  = (float)($service->ppn ?? 0.00);
+            $subtotal = (float) $service->monthly_price;
+            $discount = (float) ($service->discount ?? 0.00);
+            $ppnPercent = (float) ($service->ppn ?? 0.00);
 
             // Hitung PPN dari (subtotal - discount) × rate
             $afterDiscount = max(0, $subtotal - $discount);
-            $ppnAmount     = round($afterDiscount * ($ppnPercent / 100), 2);
-            $nettMonthly   = $afterDiscount + $ppnAmount;
+            $ppnAmount = round($afterDiscount * ($ppnPercent / 100), 2);
+            $nettMonthly = $afterDiscount + $ppnAmount;
 
             // Total = tagihan bulanan nett + semua biaya tambahan
-            $totalAmount     = $nettMonthly + $prorateAmount + $extraCableFee + $extraInstallationFee + $extraPoleFee;
-            $paidAmount      = 0.00;
+            $totalAmount = $nettMonthly + $prorateAmount + $extraCableFee + $extraInstallationFee + $extraPoleFee;
+            $paidAmount = 0.00;
             $remainingAmount = $totalAmount;
 
-            $newInvoice = \App\Models\Invoice::create([
-                'invoice_number'          => $invoiceNumber,
-                'invoice_type'            => $invoiceType->value,
-                'customer_id'             => $customer->id,
-                'pop_id'                  => $customer->pop_id,
-                'customer_service_id'     => $service->id,
-                'internet_package_id'     => $service->internet_package_id,
-                'billing_period'          => $billingPeriod,
-                'issue_date'              => $issueDate,
-                'due_date'                => $dueDate,
-                'subtotal'                => $subtotal,
-                'discount'                => $discount,
-                'ppn'                     => $ppnPercent,
-                'prorate_amount'          => $prorateAmount > 0 ? $prorateAmount : null,
-                'extra_cable_fee'         => $extraCableFee > 0 ? $extraCableFee : null,
-                'extra_installation_fee'  => $extraInstallationFee > 0 ? $extraInstallationFee : null,
-                'extra_pole_fee'          => $extraPoleFee > 0 ? $extraPoleFee : null,
-                'total_amount'            => $totalAmount,
-                'paid_amount'             => $paidAmount,
-                'remaining_amount'        => $remainingAmount,
-                'invoice_status'          => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
-                'created_by'              => auth()->id(),
+            $newInvoice = Invoice::create([
+                'invoice_number' => $invoiceNumber,
+                'invoice_type' => $invoiceType->value,
+                'customer_id' => $customer->id,
+                'pop_id' => $customer->pop_id,
+                'customer_service_id' => $service->id,
+                'internet_package_id' => $service->internet_package_id,
+                'billing_period' => $billingPeriod,
+                'issue_date' => $issueDate,
+                'due_date' => $dueDate,
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'ppn' => $ppnPercent,
+                'prorate_amount' => $prorateAmount > 0 ? $prorateAmount : null,
+                'extra_cable_fee' => $extraCableFee > 0 ? $extraCableFee : null,
+                'extra_installation_fee' => $extraInstallationFee > 0 ? $extraInstallationFee : null,
+                'extra_pole_fee' => $extraPoleFee > 0 ? $extraPoleFee : null,
+                'total_amount' => $totalAmount,
+                'paid_amount' => $paidAmount,
+                'remaining_amount' => $remainingAmount,
+                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
+                'created_by' => auth()->id(),
             ]);
 
             // Save changes to audit log (Sprint 8: audit_logs)
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'Tagihan',
                 'action' => 'create',
@@ -2848,5 +3149,4 @@ class CustomerController extends Controller
         return redirect()->route('customers.show', $customer->id)
             ->with('success', "Tagihan manual dengan nomor {$invoice->invoice_number} berhasil dibuat!");
     }
-
 }

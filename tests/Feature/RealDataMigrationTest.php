@@ -2,20 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\City;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\Customer;
-use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\CustomerTechnicalDetail;
-use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
-use App\Models\Village;
+use Carbon\Carbon;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class RealDataMigrationTest extends TestCase
@@ -26,7 +23,7 @@ class RealDataMigrationTest extends TestCase
     {
         parent::setUp();
         // Disable CSRF for testing the post request directly
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(VerifyCsrfToken::class);
     }
 
     /**
@@ -41,12 +38,12 @@ class RealDataMigrationTest extends TestCase
 
         // 2. Read the sql dump
         $sqlPath = base_path('sand_db_sandya.sql');
-        $this->assertFileExists($sqlPath, "File sand_db_sandya.sql must exist in root directory.");
+        $this->assertFileExists($sqlPath, 'File sand_db_sandya.sql must exist in root directory.');
         $sql = file_get_contents($sqlPath);
 
         // 3. Parse and construct sheets using helper
         $sheets = $this->parseSqlToSheets($sql);
-        
+
         $packagesSheet = $sheets['packages'];
         $customersSheet = $sheets['customers'];
         $servicesSheet = $sheets['services'];
@@ -55,12 +52,12 @@ class RealDataMigrationTest extends TestCase
         $paymentsSheet = $sheets['payments'];
 
         // Output counts for logging/reconciliation verification
-        dump("Parsed counts from sand_db_sandya.sql:");
-        dump("- paket: " . count($packagesSheet));
-        dump("- pengguna: " . count($customersSheet));
+        dump('Parsed counts from sand_db_sandya.sql:');
+        dump('- paket: '.count($packagesSheet));
+        dump('- pengguna: '.count($customersSheet));
 
-        $this->assertNotEmpty($packagesSheet, "Should have parsed packages.");
-        $this->assertNotEmpty($customersSheet, "Should have parsed customers.");
+        $this->assertNotEmpty($packagesSheet, 'Should have parsed packages.');
+        $this->assertNotEmpty($customersSheet, 'Should have parsed customers.');
 
         $legacySurveyRow = collect($servicesSheet)->firstWhere('old_request_id', 'RQ000006');
         if ($legacySurveyRow) {
@@ -82,7 +79,7 @@ class RealDataMigrationTest extends TestCase
 
         // 5. POST to validate endpoint
         $validateResponse = $this->postJson('/customers/import/validate', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
 
         $validateResponse->assertStatus(200);
@@ -101,8 +98,8 @@ class RealDataMigrationTest extends TestCase
             throw $e;
         }
 
-        dump("Response Status: " . $confirmResponse->status());
-        dump("Redirect Target: " . $confirmResponse->headers->get('Location'));
+        dump('Response Status: '.$confirmResponse->status());
+        dump('Redirect Target: '.$confirmResponse->headers->get('Location'));
         if (session('errors')) {
             dump(session('errors'));
         }
@@ -158,14 +155,14 @@ class RealDataMigrationTest extends TestCase
                 $this->assertEquals((float) ($svc['other_fee'] ?? 0), (float) ($dbSvc->other_fee ?? 0));
 
                 // Verify Survey & Installation matches
-                if (!empty($svc['survey_date']) || !empty($svc['surveyors'])) {
+                if (! empty($svc['survey_date']) || ! empty($svc['surveyors'])) {
                     $this->assertDatabaseHas('customer_surveys', [
                         'customer_id' => $dbSvc->customer_id,
                         'surveyors' => empty($svc['surveyors']) ? null : $svc['surveyors'],
                         'fop_id' => $svc['survey_fop_id'],
                     ]);
                 }
-                if (!empty($svc['installation_date']) || !empty($svc['installation_technicians'])) {
+                if (! empty($svc['installation_date']) || ! empty($svc['installation_technicians'])) {
                     $this->assertDatabaseHas('customer_installations', [
                         'customer_id' => $dbSvc->customer_id,
                         'technicians' => empty($svc['installation_technicians']) ? null : $svc['installation_technicians'],
@@ -182,7 +179,7 @@ class RealDataMigrationTest extends TestCase
                 'old_report_id' => $sampleTech['old_report_id'],
                 'router_or_ont_serial' => $sampleTech['ont_sn'],
                 'passive_device' => empty($sampleTech['passive_device']) ? null : $sampleTech['passive_device'],
-                'initial_attenuation' => $sampleTech['initial_attenuation'] !== null ? number_format((float)$sampleTech['initial_attenuation'], 2, '.', '') : null,
+                'initial_attenuation' => $sampleTech['initial_attenuation'] !== null ? number_format((float) $sampleTech['initial_attenuation'], 2, '.', '') : null,
             ]);
         }
 
@@ -217,12 +214,12 @@ class RealDataMigrationTest extends TestCase
             }
         }
 
-        dump("End-to-end legacy database migration verified successfully!");
+        dump('End-to-end legacy database migration verified successfully!');
     }
 
     private function mapLegacyServiceStatus(?string $status): string
     {
-        $normalized = strtolower(str_replace([' ', '-', '/'], '_', trim((string)$status)));
+        $normalized = strtolower(str_replace([' ', '-', '/'], '_', trim((string) $status)));
 
         return [
             'active' => 'active',
@@ -254,7 +251,7 @@ class RealDataMigrationTest extends TestCase
             $row['IDPENGGUNA'] ?? null,
             $row['IDSURVEY'] ?? null,
         ] as $key) {
-            if (!empty($key) && isset($surveyMap[$key])) {
+            if (! empty($key) && isset($surveyMap[$key])) {
                 return $surveyMap[$key];
             }
         }
@@ -265,7 +262,7 @@ class RealDataMigrationTest extends TestCase
     private function resolveLegacyAddressText(array $row): string
     {
         $streetAddress = trim((string) ($row['ALMT'] ?? $row['ALAMAT'] ?? ''));
-        if ($streetAddress !== '' && !in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
+        if ($streetAddress !== '' && ! in_array(strtolower($streetAddress), ['-', 'null', 'n/a'], true)) {
             return $streetAddress;
         }
 
@@ -300,6 +297,7 @@ class RealDataMigrationTest extends TestCase
 
             if (isset($penggunaMap[$token])) {
                 $labels[] = $this->buildLegacyUserName($penggunaMap[$token]) ?: $token;
+
                 continue;
             }
 
@@ -313,7 +311,7 @@ class RealDataMigrationTest extends TestCase
 
     private function buildLegacyUserName(array $row): string
     {
-        $name = trim((string) (($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? '')));
+        $name = trim((string) (($row['NAMADEPAN'] ?? '').' '.($row['NAMABELAKANG'] ?? '')));
         $name = preg_replace('/\s+/', ' ', $name) ?: '';
 
         return $name !== '' ? $name : trim((string) ($row['IDPENGGUNA'] ?? ''));
@@ -324,21 +322,21 @@ class RealDataMigrationTest extends TestCase
      */
     private function parseTableData(string $sql, string $tableName): array
     {
-        preg_match_all('/INSERT INTO\s+`?' . $tableName . '`?\s*\(([^)]+)\)\s*VALUES\s*(.+?);/is', $sql, $matches);
-        
+        preg_match_all('/INSERT INTO\s+`?'.$tableName.'`?\s*\(([^)]+)\)\s*VALUES\s*(.+?);/is', $sql, $matches);
+
         $rows = [];
         if (empty($matches[0])) {
             return $rows;
         }
-        
+
         foreach ($matches[1] as $matchIndex => $columnsStr) {
-            $columns = array_map(function($col) {
+            $columns = array_map(function ($col) {
                 return trim($col, " `\t\n\r");
             }, explode(',', $columnsStr));
-            
+
             $valuesStr = $matches[2][$matchIndex];
             $valuesList = $this->splitSqlValues($valuesStr);
-            
+
             foreach ($valuesList as $valStr) {
                 $rowValues = $this->parseSqlRowValues($valStr);
                 if (count($columns) === count($rowValues)) {
@@ -346,7 +344,7 @@ class RealDataMigrationTest extends TestCase
                 }
             }
         }
-        
+
         return $rows;
     }
 
@@ -358,27 +356,34 @@ class RealDataMigrationTest extends TestCase
         $quoteChar = '';
         $inRow = false;
         $currentRow = '';
-        
+
         for ($i = 0; $i < $length; $i++) {
             $char = $valuesStr[$i];
-            
+
             if ($char === '\\') {
-                if ($inRow) $currentRow .= $char . ($valuesStr[$i + 1] ?? '');
+                if ($inRow) {
+                    $currentRow .= $char.($valuesStr[$i + 1] ?? '');
+                }
                 $i++;
+
                 continue;
             }
-            
-            if (($char === "'" || $char === '"') && !$inQuote) {
+
+            if (($char === "'" || $char === '"') && ! $inQuote) {
                 $inQuote = true;
                 $quoteChar = $char;
-                if ($inRow) $currentRow .= $char;
+                if ($inRow) {
+                    $currentRow .= $char;
+                }
             } elseif ($char === $quoteChar && $inQuote) {
                 $inQuote = false;
-                if ($inRow) $currentRow .= $char;
-            } elseif ($char === '(' && !$inQuote && !$inRow) {
+                if ($inRow) {
+                    $currentRow .= $char;
+                }
+            } elseif ($char === '(' && ! $inQuote && ! $inRow) {
                 $inRow = true;
                 $currentRow = '';
-            } elseif ($char === ')' && !$inQuote && $inRow) {
+            } elseif ($char === ')' && ! $inQuote && $inRow) {
                 $inRow = false;
                 $rows[] = $currentRow;
             } else {
@@ -387,7 +392,7 @@ class RealDataMigrationTest extends TestCase
                 }
             }
         }
-        
+
         return $rows;
     }
 
@@ -398,30 +403,32 @@ class RealDataMigrationTest extends TestCase
         $inQuote = false;
         $quoteChar = '';
         $currentVal = '';
-        
+
         for ($i = 0; $i < $length; $i++) {
             $char = $rowStr[$i];
-            
+
             if ($char === '\\') {
                 $currentVal .= $rowStr[$i + 1] ?? '';
                 $i++;
+
                 continue;
             }
-            
-            if (($char === "'" || $char === '"') && !$inQuote) {
+
+            if (($char === "'" || $char === '"') && ! $inQuote) {
                 $inQuote = true;
                 $quoteChar = $char;
             } elseif ($char === $quoteChar && $inQuote) {
                 $inQuote = false;
-            } elseif ($char === ',' && !$inQuote) {
+            } elseif ($char === ',' && ! $inQuote) {
                 $values[] = $this->cleanParsedValue($currentVal);
                 $currentVal = '';
             } else {
                 $currentVal .= $char;
             }
         }
-        
+
         $values[] = $this->cleanParsedValue($currentVal);
+
         return $values;
     }
 
@@ -434,6 +441,7 @@ class RealDataMigrationTest extends TestCase
         if (strtolower($val) === 'null') {
             return null;
         }
+
         return $val;
     }
 
@@ -449,12 +457,12 @@ class RealDataMigrationTest extends TestCase
 
         // 2. Read the sql dump
         $sqlPath = base_path('sand_db_sandya.sql');
-        $this->assertFileExists($sqlPath, "File sand_db_sandya.sql must exist in root directory.");
+        $this->assertFileExists($sqlPath, 'File sand_db_sandya.sql must exist in root directory.');
         $sql = file_get_contents($sqlPath);
 
         // 3. Parse and construct sheets using helper
         $sheets = $this->parseSqlToSheets($sql);
-        
+
         $packagesSheet = $sheets['packages'];
         $customersSheet = $sheets['customers'];
         $servicesSheet = $sheets['services'];
@@ -476,7 +484,7 @@ class RealDataMigrationTest extends TestCase
 
         // First execution of import
         $validateResponse1 = $this->postJson('/customers/import/validate', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
         $validateResponse1->assertStatus(200);
         $validateData1 = $validateResponse1->json();
@@ -498,7 +506,7 @@ class RealDataMigrationTest extends TestCase
 
         // 2. Second execution of import (checking idempotency/duplikasi check)
         $validateResponse2 = $this->postJson('/customers/import/validate', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
         $validateResponse2->assertStatus(200);
         $validateData2 = $validateResponse2->json();
@@ -510,12 +518,12 @@ class RealDataMigrationTest extends TestCase
         $confirmResponse2->assertRedirect('/customers');
 
         // Verify that database counts have not changed (idempotent / duplicate prevention)
-        $this->assertEquals($initialPkgCount, InternetPackage::count('*'), "Internet packages count should remain idempotent.");
-        $this->assertEquals($initialCustCount, Customer::count('*'), "Customers count should remain idempotent.");
-        $this->assertEquals($initialSvcCount, CustomerService::count('*'), "Customer services count should remain idempotent.");
-        $this->assertEquals($initialTechCount, CustomerTechnicalDetail::count('*'), "Technical details count should remain idempotent.");
-        $this->assertEquals($initialInvCount, Invoice::count('*'), "Invoices count should remain idempotent.");
-        $this->assertEquals($initialPmtCount, Payment::count('*'), "Payments count should remain idempotent.");
+        $this->assertEquals($initialPkgCount, InternetPackage::count('*'), 'Internet packages count should remain idempotent.');
+        $this->assertEquals($initialCustCount, Customer::count('*'), 'Customers count should remain idempotent.');
+        $this->assertEquals($initialSvcCount, CustomerService::count('*'), 'Customer services count should remain idempotent.');
+        $this->assertEquals($initialTechCount, CustomerTechnicalDetail::count('*'), 'Technical details count should remain idempotent.');
+        $this->assertEquals($initialInvCount, Invoice::count('*'), 'Invoices count should remain idempotent.');
+        $this->assertEquals($initialPmtCount, Payment::count('*'), 'Payments count should remain idempotent.');
 
         // 3. Edge Cases: empty fields & broken relationships
         // Inject an invalid customer row (missing name and broken POP)
@@ -551,7 +559,7 @@ class RealDataMigrationTest extends TestCase
         ];
 
         $validateEdge = $this->postJson('/customers/import/validate', [
-            'sheets' => $edgeSheets
+            'sheets' => $edgeSheets,
         ]);
         $validateEdge->assertStatus(200);
         $edgeData = $validateEdge->json();
@@ -590,7 +598,7 @@ class RealDataMigrationTest extends TestCase
             'data_completeness_status' => 'perlu_dilengkapi',
         ]);
 
-        dump("Idempotency, duplication prevention, empty fields, and broken relations tested successfully on real data!");
+        dump('Idempotency, duplication prevention, empty fields, and broken relations tested successfully on real data!');
     }
 
     /**
@@ -610,7 +618,7 @@ class RealDataMigrationTest extends TestCase
         // Pre-build maps for lookup
         $penggunaMap = [];
         foreach ($penggunaRows as $row) {
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $penggunaMap[$row['IDPENGGUNA']] = $row;
             }
         }
@@ -625,7 +633,7 @@ class RealDataMigrationTest extends TestCase
                 $requestToCustomerMap[$requestId] = $customerId;
             }
 
-            if ($customerId !== '' && $requestId !== '' && !isset($legacyRequestByCustomer[$customerId])) {
+            if ($customerId !== '' && $requestId !== '' && ! isset($legacyRequestByCustomer[$customerId])) {
                 $legacyRequestByCustomer[$customerId] = $requestId;
             }
         }
@@ -637,30 +645,30 @@ class RealDataMigrationTest extends TestCase
 
         $surveyMap = [];
         foreach ($surveyRows as $row) {
-            if (!empty($row['IDPERMINTAAN'])) {
+            if (! empty($row['IDPERMINTAAN'])) {
                 $surveyMap[$row['IDPERMINTAAN']] = $row;
             }
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $surveyMap[$row['IDPENGGUNA']] = $row;
             }
-            if (!empty($row['IDSURVEY'])) {
+            if (! empty($row['IDSURVEY'])) {
                 $surveyMap[$row['IDSURVEY']] = $row;
             }
         }
 
         $laporanMap = [];
         foreach ($laporanRows as $row) {
-            if (!empty($row['IDPERMINTAAN'])) {
+            if (! empty($row['IDPERMINTAAN'])) {
                 $laporanMap[$row['IDPERMINTAAN']] = $row;
             }
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $laporanMap[$row['IDPENGGUNA']] = $row;
             }
         }
 
         $oltMap = [];
         foreach ($oltRows as $row) {
-            if (!empty($row['IDPELANGGAN'])) {
+            if (! empty($row['IDPELANGGAN'])) {
                 $oltMap[$row['IDPELANGGAN']] = $row;
             }
         }
@@ -682,11 +690,11 @@ class RealDataMigrationTest extends TestCase
         // Sheet 2: customers
         $customersSheet = [];
         foreach ($penggunaRows as $row) {
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
-            $fullName = trim(($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? ''));
+            $fullName = trim(($row['NAMADEPAN'] ?? '').' '.($row['NAMABELAKANG'] ?? ''));
             $fullName = ucwords(str_replace('-', ' ', $fullName));
             if (empty($fullName)) {
                 $fullName = $row['IDPENGGUNA'];
@@ -700,9 +708,9 @@ class RealDataMigrationTest extends TestCase
             }
 
             $regDate = now()->format('Y-m-d');
-            if (!empty($row['inserted_at'])) {
+            if (! empty($row['inserted_at'])) {
                 try {
-                    $regDate = \Carbon\Carbon::parse($row['inserted_at'])->format('Y-m-d');
+                    $regDate = Carbon::parse($row['inserted_at'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
@@ -721,7 +729,7 @@ class RealDataMigrationTest extends TestCase
             foreach ($layananRows as $lRow) {
                 if (($lRow['IDPENGGUNA'] ?? '') === $row['IDPENGGUNA']) {
                     $salesCode = $lRow['CREATED'] ?? '';
-                    if (!$custLaporan) {
+                    if (! $custLaporan) {
                         $custLaporan = $laporanMap[$lRow['IDPERMINTAAN']] ?? null;
                     }
                 }
@@ -765,22 +773,22 @@ class RealDataMigrationTest extends TestCase
         // Sheet 3: services
         $servicesSheet = [];
         foreach ($layananRows as $row) {
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
             $actDate = now()->format('Y-m-d');
-            if (!empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
+            if (! empty($row['TGL_AKTIFPUTUS']) && $row['TGL_AKTIFPUTUS'] !== '0000-00-00') {
                 $actDate = $row['TGL_AKTIFPUTUS'];
-            } elseif (!empty($row['TGLSELESAI'])) {
+            } elseif (! empty($row['TGLSELESAI'])) {
                 try {
-                    $actDate = \Carbon\Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
+                    $actDate = Carbon::parse($row['TGLSELESAI'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
             $profile = '';
-            if (!empty($row['IDPAKET'])) {
+            if (! empty($row['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $row['IDPAKET']);
                 $profile = $pkg['PROFILPPP'] ?? $pkg['PROFILOLT'] ?? '';
             }
@@ -788,39 +796,43 @@ class RealDataMigrationTest extends TestCase
             $survey = $this->resolveLegacySurveyRow($row, $surveyMap);
             $surveyDate = null;
             $surveyStartTime = null;
-            if ($survey && !empty($survey['TGLSURVEY'])) {
+            if ($survey && ! empty($survey['TGLSURVEY'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($survey['TGLSURVEY']);
+                    $cDate = Carbon::parse($survey['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
-            } elseif (!empty($row['TGLSURVEY'])) {
+                } catch (\Exception $e) {
+                }
+            } elseif (! empty($row['TGLSURVEY'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLSURVEY']);
+                    $cDate = Carbon::parse($row['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
             $laporan = $laporanMap[$row['IDPERMINTAAN']] ?? $laporanMap[$row['IDPENGGUNA'] ?? ''] ?? null;
             $installDate = null;
             $installStartTime = null;
             $installEndTime = null;
-            if (!empty($row['TGLSELESAI'])) {
+            if (! empty($row['TGLSELESAI'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLSELESAI']);
+                    $cDate = Carbon::parse($row['TGLSELESAI']);
                     $installDate = $cDate->format('Y-m-d');
                     $installEndTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
-            if (!empty($row['TGLDIPROSES'])) {
+            if (! empty($row['TGLDIPROSES'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($row['TGLDIPROSES']);
-                    if (!$installDate) {
+                    $cDate = Carbon::parse($row['TGLDIPROSES']);
+                    if (! $installDate) {
                         $installDate = $cDate->format('Y-m-d');
                     }
                     $installStartTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
             $servicesSheet[] = [
@@ -837,8 +849,8 @@ class RealDataMigrationTest extends TestCase
                 'activation_date' => $actDate,
                 'due_date' => '',
                 'profile' => $profile,
-                'contract_type' => $row['STATUSLANGGANAN'] ?? '',
-                'activation_time' => !empty($row['VERIFIED_AT']) ? \Carbon\Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
+                'contract_type' => strtolower(trim((string) ($row['STATUSALAT'] ?? ''))),
+                'activation_time' => ! empty($row['VERIFIED_AT']) ? Carbon::parse($row['VERIFIED_AT'])->format('H:i:s') : null,
                 'activated_by_name' => $this->resolveLegacyUserLabel($row['VERIFIED'] ?? '', $penggunaMap),
                 'survey_date' => $surveyDate,
                 'survey_start_time' => $surveyStartTime,
@@ -864,7 +876,7 @@ class RealDataMigrationTest extends TestCase
         // Sheet 4: technical_details
         $technicalSheet = [];
         foreach ($laporanRows as $row) {
-            if (!str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
                 continue;
             }
 
@@ -877,22 +889,23 @@ class RealDataMigrationTest extends TestCase
             $reqTime = null;
             $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN'])
                 ?? collect($layananRows)->firstWhere('IDPENGGUNA', $row['IDPENGGUNA'] ?? null);
-            if ($req && !empty($req['TGLSELESAI'])) {
+            if ($req && ! empty($req['TGLSELESAI'])) {
                 try {
-                    $cDate = \Carbon\Carbon::parse($req['TGLSELESAI']);
+                    $cDate = Carbon::parse($req['TGLSELESAI']);
                     $reqDate = $cDate->format('Y-m-d');
                     $reqTime = $cDate->format('H:i:s');
-                } catch (\Exception $e) {}
+                } catch (\Exception $e) {
+                }
             }
 
-            $jitter = is_numeric($row['PINGGATEWAY'] ?? null) ? (int)$row['PINGGATEWAY'] : null;
-            $latency = is_numeric($row['PINGGOOGLE'] ?? null) ? (int)$row['PINGGOOGLE'] : null;
+            $jitter = is_numeric($row['PINGGATEWAY'] ?? null) ? (int) $row['PINGGATEWAY'] : null;
+            $latency = is_numeric($row['PINGGOOGLE'] ?? null) ? (int) $row['PINGGOOGLE'] : null;
 
             $conformity = null;
-            if ($req && !empty($req['IDPAKET'])) {
+            if ($req && ! empty($req['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
                 $pkgSpeed = $pkg['SPEEDDOWN'] ?? 0;
-                $testSpeed = is_numeric($row['TESTDOWN'] ?? null) ? (float)$row['TESTDOWN'] * 1000 : 0;
+                $testSpeed = is_numeric($row['TESTDOWN'] ?? null) ? (float) $row['TESTDOWN'] * 1000 : 0;
                 if ($pkgSpeed > 0 && $testSpeed > 0) {
                     $conformity = min(100, round(($testSpeed / $pkgSpeed) * 100, 2));
                 }
@@ -914,8 +927,8 @@ class RealDataMigrationTest extends TestCase
                 'branch_number' => $penggunaMap[$row['IDPENGGUNA']]['IDCABANG'] ?? '',
                 'pop_number' => $penggunaMap[$row['IDPENGGUNA']]['IDWILAYAH'] ?? '',
                 'router_number' => $row['MACADDR_ROOTER'] ?? '',
-                'initial_attenuation' => is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float)$row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float)$row['SIGNAL_WIRELESS'] : null),
-                'actual_attenuation' => is_numeric($actualAttenuation) ? (float)$actualAttenuation : null,
+                'initial_attenuation' => is_numeric($row['SIGNAL_KABEL'] ?? null) ? (float) $row['SIGNAL_KABEL'] : (is_numeric($row['SIGNAL_WIRELESS'] ?? null) ? (float) $row['SIGNAL_WIRELESS'] : null),
+                'actual_attenuation' => is_numeric($actualAttenuation) ? (float) $actualAttenuation : null,
                 'test_date' => $reqDate,
                 'test_time' => $reqTime,
                 'speedtest_photo' => $row['FOTOSPEED'] ?? '',
@@ -925,7 +938,7 @@ class RealDataMigrationTest extends TestCase
                 'test_download' => $row['TESTDOWN'] ?? null,
                 'packet_loss_percent' => 0.00,
                 'speed_conformity_percent' => $conformity,
-                'quality_score' => is_numeric($row['SINYAL'] ?? null) ? (int)$row['SINYAL'] : 5,
+                'quality_score' => is_numeric($row['SINYAL'] ?? null) ? (int) $row['SINYAL'] : 5,
             ];
         }
 
@@ -933,25 +946,25 @@ class RealDataMigrationTest extends TestCase
         $invoicesSheet = [];
         foreach ($biayaRows as $row) {
             $cust = $row['IDPELANGGAN'] ?? $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
-            if (!str_starts_with($cust, 'PE')) {
+            if (! str_starts_with($cust, 'PE')) {
                 continue;
             }
 
             $issueDate = now()->format('Y-m-d');
-            if (!empty($row['TGLINSERT'])) {
+            if (! empty($row['TGLINSERT'])) {
                 try {
-                    $issueDate = \Carbon\Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
+                    $issueDate = Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
-            $dueDate = \Carbon\Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
-            $billingPeriod = \Carbon\Carbon::parse($issueDate)->format('Y-m');
+            $dueDate = Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
+            $billingPeriod = Carbon::parse($issueDate)->format('Y-m');
 
             $req = collect($layananRows)->firstWhere('IDPERMINTAAN', $row['IDPERMINTAAN'])
                 ?? collect($layananRows)->firstWhere('IDPENGGUNA', $row['IDPENGGUNA'] ?? null);
             $pkgPrice = 0;
-            if ($req && !empty($req['IDPAKET'])) {
+            if ($req && ! empty($req['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $req['IDPAKET']);
                 $pkgPrice = (int) ($pkg['HARGA'] ?? 0);
             }
@@ -989,22 +1002,22 @@ class RealDataMigrationTest extends TestCase
             $invCust = $invoiceToCustomerMap[$row['IDTRANSAKSI'] ?? ''] ?? '';
             $cust = $invCust ?: $reqCust;
 
-            if ($cust !== '' && !str_starts_with($cust, 'PE')) {
+            if ($cust !== '' && ! str_starts_with($cust, 'PE')) {
                 continue;
             }
 
             $payDate = now()->format('Y-m-d');
-            if (!empty($row['INSERTED_AT'])) {
+            if (! empty($row['INSERTED_AT'])) {
                 try {
-                    $payDate = \Carbon\Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
+                    $payDate = Carbon::parse($row['INSERTED_AT'])->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
             }
 
             $billingPeriod = now()->format('Y-m');
-            if (!empty($row['BULANTAGIHAN'])) {
+            if (! empty($row['BULANTAGIHAN'])) {
                 try {
-                    $billingPeriod = \Carbon\Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
+                    $billingPeriod = Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
                 } catch (\Exception $e) {
                 }
             }

@@ -145,10 +145,11 @@ return [
         ],
         
         'customers.detail.devices' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::VIEW_SENSITIVE->value, 
-            ActionCode::UPDATE_SENSITIVE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
+            ActionCode::VIEW_SENSITIVE->value,
+            ActionCode::UPDATE_SENSITIVE->value,
+            ActionCode::RETRIEVE->value
         ],
         
         'customers.detail.documents' => [
@@ -250,5 +251,6 @@ return [
         'fop_tasks.update_sensitive' => 'Ubah Kategori & Prioritas Tiket',
         'customers.detail.devices.update_sensitive' => 'Ubah Data Sensitif Perangkat',
         'customers.detail.devices.view_sensitive' => 'Lihat Data Sensitif Perangkat',
+        'customers.detail.devices.retrieve' => 'Ambil Alat Pelanggan Putus Langganan',
     ],
 ];

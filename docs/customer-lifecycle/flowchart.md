@@ -222,6 +222,81 @@ FOP/Admin buka /verifications/{c}/admin (status: installed atau verification_adm
 
 **Reject di tahap Survey** (dari `verifications/queue.blade.php`, tombol Batalkan/Gagal — behavior lama, gak berubah): sama persis alur di atas, tapi target Task **Survey** (bukan Pemasangan), karena `customer->status` masih `waiting_acc|survey_in_progress|surveyed|waiting_installation` pas reject dipanggil.
 
+**Tombol Delete dihapus dari `/verifications/queue` (2026-07-20):** sebelumnya tiap baris (semua status) punya icon Delete → `customers.destroy` (hard-delete permanen). Diganti icon "Batal" yang manggil modal reject yang sama seperti di atas — jadi SEMUA status di antrean ini sekarang punya jalur batal resmi (sebelumnya cuma `surveyed` yang punya).
+
+## 5b. Aktivasi Manual — pelanggan migrasi legacy (baru 2026-07-20)
+
+```
+Admin buka detail Customer, klik "Aktivasi Manual"
+        │
+        ▼
+   punya permission customers.detail.installation.activate? ──tidak──▶ tombol gak muncul
+        │ ya
+        ▼
+   customer.old_customer_id kosong? ──ya──▶ TOLAK (bukan hasil migrasi)
+        │ tidak
+        ▼
+   ada Task type Survey/Pemasangan buat customer ini? ──ya──▶ TOLAK
+        │                                                     (harus lewat alur normal §2-§5)
+        │ tidak
+        ▼
+   customerService.request_status !== 'ACTIVE'? ──ya──▶ TOLAK
+        │                                               (di sistem lama pun masih stuck SRV/PSB,
+        │                                                harus lewat alur normal, bukan bypass)
+        │ tidak
+        ▼
+   status udah active/siap_billing? ──ya──▶ TOLAK (redundant)
+        │ tidak
+        ▼
+   is_ready_billing (data wajib lengkap)? ──tidak──▶ tombol muncul tapi disabled
+        │ ya
+        ▼
+Generate CID (Pop::generateComplexCid())
+customer.status=active, customer_status=aktif, data_completeness_status=siap_billing
+customer_service.service_status=aktif, billing_status=active
+   (BEDA dari finalVerify §5: gak bikin Invoice awal, gak lewat
+    CustomerWorkflowService::transition() — update langsung, gak
+    tercatat di customer_status_logs)
+```
+
+## 5c. Migrasi Legacy → Mapping Status (baru 2026-07-20)
+
+```
+php artisan app:import-legacy-sql
+        │
+        ▼
+CustomerController::validateImport() → confirmImport()
+        │
+        ▼
+tiap baris services: mapLegacyServiceStatus(STATUS legacy)
+        │
+        ├─ PENGAJUAN (belum disurvey) ─────────▶ waiting_survey
+        ├─ DISURVEI (survey+ACC selesai,
+        │            DIPROSES masih kosong) ───▶ waiting_installation
+        ├─ ACTIVE ──────────────────────────────▶ active (+ generate CID)
+        ├─ GAGAL ───────────────────────────────▶ rejected
+        └─ PUTUS ───────────────────────────────▶ terminated
+        │
+        ▼
+customer->updateQuietly([...])  ← LANGSUNG, BUKAN lewat transition()
+        │
+        ▼
+   $serviceStatus == rejected atau terminated?
+        │ ya
+        ▼
+Bikin AuditLog manual (module+action match transition asli)
+  alasan = CustomerService.reason (dari ALASAN legacy)
+  tanggal = status_changed_at (TGLSELESAI, fallback updated_at
+            baris legacy — bukan now())
+        │
+        ▼
+List Pelanggan Gagal / Putus Langganan bisa nampilin
+alasan+tanggal pelanggan migrasi (sebelumnya kosong,
+karena updateQuietly() gak pernah nulis AuditLog)
+```
+
+`contract_type` (Sewa/Beli) diambil dari kolom `STATUSALAT` (bukan `STATUSLANGGANAN`, yang kosong di semua data legacy) — dinormalisasi lowercase saat import.
+
 ## 6. Auto-Sync Task Lintas Layer
 
 ```

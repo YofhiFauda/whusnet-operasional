@@ -2,25 +2,31 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FopTask;
-use App\Models\FopTaskTeam;
-use App\Models\Village;
-use App\Models\User;
-use App\Models\Pop;
-use App\Models\Task;
 use App\Enums\FopTaskPriority;
+use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\FopTask;
+use App\Models\FopTaskStatusHistory;
+use App\Models\FopTaskTeam;
+use App\Models\Pop;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\CustomerWorkflowService;
+use App\Services\FopTaskTeamService;
+use App\Services\TaskService;
+use App\Support\ReasonValidationRule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
-use App\Enums\TaskType;
-use App\Services\TaskService;
-use App\Services\FopTaskTeamService;
 
 class FopTaskController extends Controller
 {
@@ -30,7 +36,7 @@ class FopTaskController extends Controller
     public function index(Request $request)
     {
         $this->authorizeAccess();
-        
+
         $this->autoSyncAndCalculatePriority();
 
         $query = FopTask::with([
@@ -41,8 +47,8 @@ class FopTaskController extends Controller
             'customer:id,created_at,updated_at',
             'customer.tasks' => function ($q) {
                 $q->where('task_type', TaskType::SURVEY->value)
-                  ->where('status', TaskStatus::SELESAI->value)
-                  ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
+                    ->where('status', TaskStatus::SELESAI->value)
+                    ->select('id', 'customer_id', 'task_type', 'status', 'completed_at');
             },
             // MTN/C-REQ yang asalnya dari Ticketing — dipakai modal Edit biar
             // form-nya nampilin CID/data pelanggan yang sama kayak /tickets,
@@ -54,21 +60,21 @@ class FopTaskController extends Controller
             'ticket.customer.pop:id,name,cid_prefix',
         ])
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
-            ->orderByRaw("CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END", [now()->addDay()->toDateString()])
+            ->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
             ->orderByRaw(
-                'CASE priority ' . self::priorityOrderCaseSql() . ' ELSE 5 END',
+                'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
                 self::priorityOrderBindings()
             )
-            ->orderByRaw("CASE WHEN category IN (?, ?) THEN created_at END ASC", TaskType::autoOnlyValues())
-            ->orderByRaw("CASE WHEN category NOT IN (?, ?) THEN created_at END DESC", TaskType::autoOnlyValues());
+            ->orderByRaw('CASE WHEN category IN (?, ?) THEN created_at END ASC', TaskType::autoOnlyValues())
+            ->orderByRaw('CASE WHEN category NOT IN (?, ?) THEN created_at END DESC', TaskType::autoOnlyValues());
 
         // Search filter
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
-                  ->orWhere('tugas', 'like', "%{$search}%")
-                  ->orWhere('issue', 'like', "%{$search}%");
+                    ->orWhere('tugas', 'like', "%{$search}%")
+                    ->orWhere('issue', 'like', "%{$search}%");
             });
         }
 
@@ -117,7 +123,7 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function($q) {
+        $technicians = User::whereHas('role', function ($q) {
             $q->where('code', 'teknisi');
         })->where('status', 'active')->orderBy('name', 'asc')->get();
 
@@ -141,7 +147,7 @@ class FopTaskController extends Controller
             ->get()
             ->map(function (FopTaskTeam $team) {
                 $activeCount = $team->fopTasks->filter(
-                    fn ($t) => !in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                    fn ($t) => ! in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 )->count();
 
                 $workload = $team->fopTasks
@@ -149,16 +155,16 @@ class FopTaskController extends Controller
                     ->countBy('id');
 
                 return [
-                    'id'         => $team->id,
-                    'name'       => $team->name,
-                    'work_date'  => $team->work_date->format('Y-m-d'),
-                    'members'    => $team->members->map(fn ($m) => [
-                        'id'    => $m->id,
-                        'name'  => $m->name,
+                    'id' => $team->id,
+                    'name' => $team->name,
+                    'work_date' => $team->work_date->format('Y-m-d'),
+                    'members' => $team->members->map(fn ($m) => [
+                        'id' => $m->id,
+                        'name' => $m->name,
                         'count' => $workload->get($m->id, 0),
                     ])->values(),
                     'task_count' => $team->fopTasks->count(),
-                    'is_active'  => $activeCount > 0,
+                    'is_active' => $activeCount > 0,
                 ];
             });
 
@@ -201,7 +207,7 @@ class FopTaskController extends Controller
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'pending', 255),
+            'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
             'technicians' => ['required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
@@ -210,10 +216,10 @@ class FopTaskController extends Controller
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
         ]);
 
-        return DB::transaction(function () use ($validated, $request) {
+        return DB::transaction(function () use ($validated) {
             $taskNumber = $this->generateTaskNumber();
 
-            $fopTask = new FopTask();
+            $fopTask = new FopTask;
             $fopTask->task_number = $taskNumber;
             $fopTask->task_date = $validated['task_date'];
             $fopTask->category = $validated['category'];
@@ -235,7 +241,7 @@ class FopTaskController extends Controller
 
             $fopTask->save();
 
-            if (!empty($validated['technicians'])) {
+            if (! empty($validated['technicians'])) {
                 $technicians = $validated['technicians'];
                 $fopTask->technicians()->sync($technicians);
 
@@ -246,8 +252,8 @@ class FopTaskController extends Controller
                     'customer_id' => $fopTask->customer_id,
                     'pop_id' => $fopTask->pop_id,
                     'task_type' => $fopTask->category->value,
-                    'title' => 'FOP: ' . $fopTask->tugas,
-                    'description' => trim($fopTask->issue . "\n" . $fopTask->notes),
+                    'title' => 'FOP: '.$fopTask->tugas,
+                    'description' => trim($fopTask->issue."\n".$fopTask->notes),
                     'team_member_ids' => $technicians,
                     'scheduled_at' => $fopTask->task_date,
                     'conflict_override' => true,
@@ -304,9 +310,9 @@ class FopTaskController extends Controller
             'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'required', 'string', Rule::enum(TaskStatus::class)],
             'priority' => ['sometimes', 'required', 'string', Rule::enum(FopTaskPriority::class)],
-            'pending_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'pending', 255),
+            'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
-            'cancel_reason' => \App\Support\ReasonValidationRule::requiredIf('status', 'dibatalkan', 500),
+            'cancel_reason' => ReasonValidationRule::requiredIf('status', 'dibatalkan', 500),
             'technicians' => ['sometimes', 'required', 'array', 'min:1'],
             'technicians.*' => ['exists:users,id'],
         ], [
@@ -332,7 +338,7 @@ class FopTaskController extends Controller
         }
 
         // RBAC: hanya user dgn fop_tasks.update_sensitive yang boleh ubah Tipe Task & Prioritas.
-        if (!auth()->user()->hasPermission('fop_tasks.update_sensitive')) {
+        if (! auth()->user()->hasPermission('fop_tasks.update_sensitive')) {
             unset($validated['category']);
             unset($validated['priority']);
         }
@@ -344,7 +350,7 @@ class FopTaskController extends Controller
         $effectiveCategory = $validated['category'] ?? $fopTask->category?->value ?? $fopTask->category;
         if (
             ($validated['status'] ?? null) === TaskStatus::DIBATALKAN->value
-            && in_array($effectiveCategory, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value], true)
+            && in_array($effectiveCategory, [TaskType::SURVEY->value, TaskType::PEMASANGAN->value], true)
         ) {
             abort(422, 'Task SRV/PSB gak bisa dibatalkan dari sini — batalkan lewat halaman Pelanggan (tab Survey/Pemasangan).');
         }
@@ -353,7 +359,7 @@ class FopTaskController extends Controller
         // permission eksplisit `fop_tasks.cancel`, bukan cuma `fop_tasks.update` biasa.
         if (
             ($validated['status'] ?? null) === TaskStatus::DIBATALKAN->value
-            && !auth()->user()->hasPermission('fop_tasks.cancel')
+            && ! auth()->user()->hasPermission('fop_tasks.cancel')
         ) {
             abort(403, 'Anda tidak memiliki hak akses untuk membatalkan Task FOP.');
         }
@@ -372,15 +378,33 @@ class FopTaskController extends Controller
             // "cuma echo balik nilai existing".
             $originalStatus = $fopTask->status instanceof TaskStatus ? $fopTask->status->value : $fopTask->status;
 
-            if (isset($validated['category'])) $fopTask->category = $validated['category'];
-            if (isset($validated['task_date'])) $fopTask->task_date = $validated['task_date'];
-            if (isset($validated['tugas'])) $fopTask->tugas = $validated['tugas'];
-            if (array_key_exists('village_id', $validated)) $fopTask->village_id = $validated['village_id'];
-            if (array_key_exists('pop_id', $validated)) $fopTask->pop_id = $validated['pop_id'];
-            if (array_key_exists('customer_id', $validated)) $fopTask->customer_id = $validated['customer_id'];
-            if (array_key_exists('issue', $validated)) $fopTask->issue = $validated['issue'];
-            if (array_key_exists('notes', $validated)) $fopTask->notes = $validated['notes'];
-            if (isset($validated['priority'])) $fopTask->priority = $validated['priority'];
+            if (isset($validated['category'])) {
+                $fopTask->category = $validated['category'];
+            }
+            if (isset($validated['task_date'])) {
+                $fopTask->task_date = $validated['task_date'];
+            }
+            if (isset($validated['tugas'])) {
+                $fopTask->tugas = $validated['tugas'];
+            }
+            if (array_key_exists('village_id', $validated)) {
+                $fopTask->village_id = $validated['village_id'];
+            }
+            if (array_key_exists('pop_id', $validated)) {
+                $fopTask->pop_id = $validated['pop_id'];
+            }
+            if (array_key_exists('customer_id', $validated)) {
+                $fopTask->customer_id = $validated['customer_id'];
+            }
+            if (array_key_exists('issue', $validated)) {
+                $fopTask->issue = $validated['issue'];
+            }
+            if (array_key_exists('notes', $validated)) {
+                $fopTask->notes = $validated['notes'];
+            }
+            if (isset($validated['priority'])) {
+                $fopTask->priority = $validated['priority'];
+            }
 
             if (isset($validated['status'])) {
                 $oldStatus = $fopTask->status->value ?? $fopTask->status;
@@ -421,12 +445,12 @@ class FopTaskController extends Controller
                 && $validated['status'] === TaskStatus::DIBATALKAN->value
                 && $oldStatus !== TaskStatus::DIBATALKAN->value
             ) {
-                \App\Models\FopTaskStatusHistory::create([
+                FopTaskStatusHistory::create([
                     'fop_task_id' => $fopTask->id,
                     'from_status' => $oldStatus,
-                    'to_status'   => TaskStatus::DIBATALKAN->value,
-                    'changed_by'  => auth()->id(),
-                    'changed_at'  => now(),
+                    'to_status' => TaskStatus::DIBATALKAN->value,
+                    'changed_by' => auth()->id(),
+                    'changed_at' => now(),
                 ]);
             }
 
@@ -439,7 +463,7 @@ class FopTaskController extends Controller
                 && $fopTask->task_id
             ) {
                 $linkedTask = $fopTask->task;
-                if ($linkedTask && !in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
+                if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])) {
                     // Cascade ke Task eksekusi tetap harus nembus policy, bukan
                     // main panggil TaskService langsung. Guard SRV/PSB di atas
                     // baca `FopTask.category`; yang dibatalin di sini `Task`,
@@ -477,35 +501,35 @@ class FopTaskController extends Controller
                 // (Ticket::scopeInBucket() baca kolom ini apa adanya).
                 if ($originalStatus === TaskStatus::DRAFT->value
                     && $fopTask->status === TaskStatus::DRAFT
-                    && !empty($technicians)
+                    && ! empty($technicians)
                 ) {
                     $fopTask->status = TaskStatus::TERJADWAL;
                     $fopTask->save();
 
-                    \App\Models\FopTaskStatusHistory::create([
+                    FopTaskStatusHistory::create([
                         'fop_task_id' => $fopTask->id,
                         'from_status' => TaskStatus::DRAFT->value,
-                        'to_status'   => TaskStatus::TERJADWAL->value,
-                        'changed_by'  => auth()->id(),
-                        'changed_at'  => now(),
+                        'to_status' => TaskStatus::TERJADWAL->value,
+                        'changed_by' => auth()->id(),
+                        'changed_at' => now(),
                     ]);
                 }
 
-                if (!empty($technicians) || $fopTask->task_id) {
+                if (! empty($technicians) || $fopTask->task_id) {
                     // Title dibuat polos — prefix "[Nama Team]" diisi oleh
                     // FopTaskTeamService::rebuildTeamsForDate() setelah ini (bukan ditebak di sini).
                     $taskData = [
                         'customer_id' => $fopTask->customer_id,
                         'pop_id' => $fopTask->pop_id,
                         'task_type' => $fopTask->category->value,
-                        'title' => 'FOP: ' . $fopTask->tugas,
-                        'description' => trim($fopTask->issue . "\n" . $fopTask->notes),
+                        'title' => 'FOP: '.$fopTask->tugas,
+                        'description' => trim($fopTask->issue."\n".$fopTask->notes),
                         'team_member_ids' => $technicians,
                         'scheduled_at' => $fopTask->task_date,
                         'conflict_override' => true,
                     ];
 
-                    if (!$fopTask->task_id && !empty($technicians)) {
+                    if (! $fopTask->task_id && ! empty($technicians)) {
                         $task = app(TaskService::class)->create($taskData, auth()->user());
                         $fopTask->task_id = $task->id;
                         $fopTask->save();
@@ -523,7 +547,7 @@ class FopTaskController extends Controller
 
             $conflicts = [];
             if ($fopTask->task_date) {
-                if ($oldTaskDate && !$oldTaskDate->isSameDay($fopTask->task_date)) {
+                if ($oldTaskDate && ! $oldTaskDate->isSameDay($fopTask->task_date)) {
                     app(FopTaskTeamService::class)->rebuildTeamsForDate($oldTaskDate);
                 }
 
@@ -535,9 +559,10 @@ class FopTaskController extends Controller
             }
 
             if ($request->wantsJson()) {
-                if (!empty($conflicts)) {
+                if (! empty($conflicts)) {
                     session()->flash('fop_team_conflicts', $conflicts);
                 }
+
                 return response()->json([
                     'success' => true,
                     'message' => "Task FOP {$fopTask->task_number} berhasil diperbarui.",
@@ -549,7 +574,7 @@ class FopTaskController extends Controller
             $redirect = redirect()->route('fop-tasks.index')
                 ->with('success', "Task FOP {$fopTask->task_number} berhasil diperbarui.");
 
-            if (!empty($conflicts)) {
+            if (! empty($conflicts)) {
                 $redirect = $redirect->with('fop_team_conflicts', $conflicts);
             }
 
@@ -586,17 +611,17 @@ class FopTaskController extends Controller
             $oldValues = $fopTask->load('technicians')->toArray();
 
             // Jika merupakan task auto-sync (Survey / PSB), ubah status customer menjadi REJECTED agar tidak terbuat lagi secara otomatis
-            if ($fopTask->customer_id && in_array($fopTask->category->value, \App\Enums\TaskType::autoOnlyValues(), true)) {
+            if ($fopTask->customer_id && in_array($fopTask->category->value, TaskType::autoOnlyValues(), true)) {
                 $customer = $fopTask->customer;
                 if ($customer && $customer->status !== 'rejected') {
                     try {
-                        app(\App\Services\CustomerWorkflowService::class)->transition(
+                        app(CustomerWorkflowService::class)->transition(
                             $customer,
-                            \App\Enums\WorkflowTransition::REJECTED,
+                            WorkflowTransition::REJECTED,
                             'Tiket FOP dihapus oleh FOP.'
                         );
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::warning("Could not transition customer to rejected during FopTask deletion: " . $e->getMessage());
+                        Log::warning('Could not transition customer to rejected during FopTask deletion: '.$e->getMessage());
                     }
                 }
             }
@@ -628,14 +653,14 @@ class FopTaskController extends Controller
             'team_id' => ['nullable', 'integer', 'exists:fop_task_teams,id'],
         ]);
 
-        if (!$fopTask->task_date) {
+        if (! $fopTask->task_date) {
             return back()->withErrors(['team_id' => 'Task ini belum punya tanggal jadwal.']);
         }
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
             $workDate = $fopTask->task_date->toDateString();
 
-            if (!empty($validated['team_id'])) {
+            if (! empty($validated['team_id'])) {
                 $team = FopTaskTeam::findOrFail($validated['team_id']);
 
                 if ($team->work_date->toDateString() !== $workDate) {
@@ -722,7 +747,7 @@ class FopTaskController extends Controller
         $fromTask = FopTask::with('technicians')->findOrFail($validated['from_task_id']);
         $toTask = FopTask::with('technicians')->findOrFail($validated['to_task_id']);
 
-        if (!$fromTask->technicians->contains('id', $validated['technician_id'])) {
+        if (! $fromTask->technicians->contains('id', $validated['technician_id'])) {
             return $this->switchTechnicianError($request, 'technician_id', 'Teknisi yang dipilih bukan anggota Task asal.');
         }
 
@@ -734,7 +759,7 @@ class FopTaskController extends Controller
             return $this->switchTechnicianError($request, 'replacement_technician_id', 'Pengganti tidak boleh teknisi yang sama dengan yang dipindah.');
         }
 
-        if (!$fromTask->task_date || !$toTask->task_date || !$fromTask->task_date->isSameDay($toTask->task_date)) {
+        if (! $fromTask->task_date || ! $toTask->task_date || ! $fromTask->task_date->isSameDay($toTask->task_date)) {
             return $this->switchTechnicianError($request, 'to_task_id', 'Switch teknisi cuma boleh intra-hari (tanggal Task asal & tujuan harus sama). Task beda hari, pakai jalur Pending/reschedule.');
         }
 
@@ -807,7 +832,7 @@ class FopTaskController extends Controller
             $conflicts = $teamResult['conflicts'];
 
             if ($request->wantsJson()) {
-                if (!empty($conflicts)) {
+                if (! empty($conflicts)) {
                     session()->flash('fop_team_conflicts', $conflicts);
                 }
 
@@ -836,7 +861,7 @@ class FopTaskController extends Controller
      */
     private function syncSwitchedExecutionTask(FopTask $fopTask, array $technicianIds): void
     {
-        if (!$fopTask->task_id || !$fopTask->task) {
+        if (! $fopTask->task_id || ! $fopTask->task) {
             return;
         }
 
@@ -856,7 +881,7 @@ class FopTaskController extends Controller
     private function notifySwitchedTechnician(int $userId, string $message): void
     {
         $user = User::find($userId);
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
@@ -864,7 +889,7 @@ class FopTaskController extends Controller
             title: 'Switch Teknisi',
             message: $message,
             actionUrl: route('fop-tasks.index'),
-            type: \App\Enums\NotificationType::INFO
+            type: NotificationType::INFO
         ));
     }
 
@@ -911,7 +936,7 @@ class FopTaskController extends Controller
     protected function authorizeAccess()
     {
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             abort(401);
         }
 
@@ -942,10 +967,10 @@ class FopTaskController extends Controller
         // Search filter
         if ($request->filled('search')) {
             $search = $request->input('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('task_number', 'like', "%{$search}%")
-                  ->orWhere('tugas', 'like', "%{$search}%")
-                  ->orWhere('issue', 'like', "%{$search}%");
+                    ->orWhere('tugas', 'like', "%{$search}%")
+                    ->orWhere('issue', 'like', "%{$search}%");
             });
         }
 
@@ -962,7 +987,6 @@ class FopTaskController extends Controller
                 $query->whereRaw('1=0');
             }
         }
-
 
         if ($request->filled('priority')) {
             $query->where('priority', $request->input('priority'));
@@ -985,7 +1009,7 @@ class FopTaskController extends Controller
         $pops = Pop::orderBy('name', 'asc')->get();
 
         // Get technicians for assignee selector
-        $technicians = User::whereHas('role', function($q) {
+        $technicians = User::whereHas('role', function ($q) {
             $q->where('code', 'teknisi');
         })->where('status', 'active')->orderBy('name', 'asc')->get();
 
@@ -1008,7 +1032,7 @@ class FopTaskController extends Controller
             ->get()
             ->map(function (FopTaskTeam $team) {
                 $activeCount = $team->fopTasks->filter(
-                    fn ($t) => !in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+                    fn ($t) => ! in_array($t->status->value, [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 )->count();
 
                 $workload = $team->fopTasks
@@ -1016,16 +1040,16 @@ class FopTaskController extends Controller
                     ->countBy('id');
 
                 return [
-                    'id'         => $team->id,
-                    'name'       => $team->name,
-                    'work_date'  => $team->work_date->format('Y-m-d'),
-                    'members'    => $team->members->map(fn ($m) => [
-                        'id'    => $m->id,
-                        'name'  => $m->name,
+                    'id' => $team->id,
+                    'name' => $team->name,
+                    'work_date' => $team->work_date->format('Y-m-d'),
+                    'members' => $team->members->map(fn ($m) => [
+                        'id' => $m->id,
+                        'name' => $m->name,
                         'count' => $workload->get($m->id, 0),
                     ])->values(),
                     'task_count' => $team->fopTasks->count(),
-                    'is_active'  => $activeCount > 0,
+                    'is_active' => $activeCount > 0,
                 ];
             });
 
@@ -1045,7 +1069,14 @@ class FopTaskController extends Controller
         $fopTask->load([
             'village',
             'pop',
-            'customer',
+            // Detail Registrasi (SRV/PSB/MTN-C-REQ native) butuh data pelanggan
+            // lengkap — bukan cuma nama, biar setara sama Data Pelanggan yang
+            // ditampilkan buat MTN/C-REQ asal Ticketing di bawah.
+            'customer.pop',
+            'customer.customerAddress',
+            'customer.customerTechnicalDetail',
+            'customer.internetPackage',
+            'customer.customerDevice',
             'technicians',
             'team:id,name',
             'statusHistories.changedByUser:id,name',
@@ -1099,7 +1130,7 @@ class FopTaskController extends Controller
                 'task_number' => $taskNumber,
                 'task_date' => now(),
                 'category' => TaskType::SURVEY,
-                'tugas' => $c->display_id . '_' . $c->full_name,
+                'tugas' => $c->display_id.'_'.$c->full_name,
                 'village_id' => $c->village_id ?? 1,
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,
@@ -1123,7 +1154,7 @@ class FopTaskController extends Controller
                 'task_number' => $taskNumber,
                 'task_date' => now(),
                 'category' => TaskType::PEMASANGAN,
-                'tugas' => $c->display_id . '_' . $c->full_name,
+                'tugas' => $c->display_id.'_'.$c->full_name,
                 'village_id' => $c->village_id ?? 1,
                 'pop_id' => $c->pop_id ?? 1,
                 'customer_id' => $c->id,
@@ -1135,21 +1166,23 @@ class FopTaskController extends Controller
 
         // --- 3. Dynamic Priority Update ---
         // Menggunakan eager loading (N+1 safe) agar query tidak dilooping
-        $activeTasks = FopTask::with(['customer.tasks' => function($q) {
-            $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
-              ->where('status', TaskStatus::SELESAI->value)
-              ->orderByDesc('completed_at');
+        $activeTasks = FopTask::with(['customer.tasks' => function ($q) {
+            $q->where('task_type', TaskType::SURVEY->value)
+                ->where('status', TaskStatus::SELESAI->value)
+                ->orderByDesc('completed_at');
         }])
             ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
             ->whereIn('category', TaskType::autoOnlyValues())
             ->whereNotNull('customer_id')
             ->get();
-            
+
         $now = Carbon::now();
 
         foreach ($activeTasks as $task) {
             $customer = $task->customer;
-            if (!$customer) continue;
+            if (! $customer) {
+                continue;
+            }
 
             $totalSeconds = 0;
             $remainSeconds = 0;
@@ -1176,7 +1209,7 @@ class FopTaskController extends Controller
 
             if ($totalSeconds > 0) {
                 $percentage = ($remainSeconds / $totalSeconds) * 100;
-                
+
                 $newPriority = FopTaskPriority::LOW;
                 if ($percentage < 0) {
                     $newPriority = FopTaskPriority::URGENT;
@@ -1185,7 +1218,7 @@ class FopTaskController extends Controller
                 } elseif ($percentage <= 50) {
                     $newPriority = FopTaskPriority::MEDIUM;
                 }
-                
+
                 if ($task->priority !== $newPriority) {
                     $task->update(['priority' => $newPriority]);
                 }
