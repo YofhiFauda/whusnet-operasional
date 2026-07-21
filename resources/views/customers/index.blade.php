@@ -146,7 +146,6 @@
                 @elseif($statusGroup === 'terminated') Daftar Pelanggan Putus
                 @endif
             </span>
-            <a href="/customers" class="text-xs font-medium text-sky-600 hover:text-sky-800 hover:underline">(Kembali ke Semua Pelanggan)</a>
         </div>
     </div>
     @endif

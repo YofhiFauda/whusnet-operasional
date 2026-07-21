@@ -20,6 +20,8 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 | [flowchart.md](flowchart.md) | Alur pembuatan invoice (auto & manual), alur pembayaran, status transition |
 | [user-flow.md](user-flow.md) | Langkah admin di `/invoices`, `/payments`, bulk-pay, laporan |
 | [database-schema.md](database-schema.md) | Tabel, kolom, relasi, index dedup-guard |
+| [perbandingan-tagihan-awal-vs-bulanan-legacy.md](perbandingan-tagihan-awal-vs-bulanan-legacy.md) | Cara membedakan tagihan awal vs bulanan: sistem lama vs sekarang, rumus prorata, celah yang tidak diwarisi |
+| [analisa-ux-form-verifikasi-aktivasi.md](analisa-ux-form-verifikasi-aktivasi.md) | Rencana sederhanakan form tagihan pertama jadi kwitansi (4 input, sisanya turunan) |
 | [archive/](archive/) | Analisa & rencana historis (sebagian sudah diimplementasi, sebagian belum) |
 
 ## Routes & Permission

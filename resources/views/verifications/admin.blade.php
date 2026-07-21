@@ -4,12 +4,36 @@
 @section('page_title', 'Verifikasi Admin')
 
 @section('content')
+@php
+    $status = $customer->status;
+    $isSurveyStage = in_array($status, ['waiting_survey', 'survey_in_progress']);
+    $isWaitingAccStage = in_array($status, ['waiting_acc', 'surveyed']);
+    $isInstallationStage = in_array($status, ['waiting_installation', 'installation_in_progress', 'revision_installation']);
+    $isVerifAdminStage = in_array($status, ['installed', 'verification_admin', 'active']);
+
+    $showTabSurvey = !$isSurveyStage;
+    $showTabPemasangan = !$isSurveyStage && !$isWaitingAccStage;
+    $showTabPengujian = $isVerifAdminStage;
+    $showTabVerifikasi = $isVerifAdminStage;
+
+    $breadcrumbQueueName = $isSurveyStage ? 'Antrean Survey' : 'Antrean Verifikasi & Pemasangan';
+    $breadcrumbQueueRoute = $isSurveyStage ? route('surveys.queue') : route('verifications.queue');
+
+    $stageBadgeLabel = match(true) {
+        $isSurveyStage => 'Antrean Survey',
+        $isWaitingAccStage => 'Menunggu ACC Survey',
+        $isInstallationStage => 'Proses Pemasangan',
+        $isVerifAdminStage => 'Verifikasi Admin',
+        default => Str::headline($status),
+    };
+@endphp
+
 {{-- Breadcrumbs --}}
 <div class="mb-6">
     <nav class="flex text-xs font-semibold text-slate-400 uppercase tracking-wider gap-2 items-center">
-        <a href="{{ route('verifications.queue') }}" class="hover:text-slate-700 transition-colors">Antrean Verifikasi</a>
+        <a href="{{ $breadcrumbQueueRoute }}" class="hover:text-slate-700 transition-colors">{{ $breadcrumbQueueName }}</a>
         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        <span class="text-slate-600">Verifikasi Admin</span>
+        <span class="text-slate-600">Detail Pelanggan</span>
         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
         <span class="text-slate-800 font-bold">{{ $customer->full_name }}</span>
     </nav>
@@ -38,10 +62,10 @@
         <div class="flex items-center gap-3">
             <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Verifikasi Admin
+                {{ $stageBadgeLabel }}
             </span>
             <a href="{{ route('customers.show', $customer) }}" class="text-xs font-semibold text-slate-500 hover:text-sky-600 transition-colors px-3 py-1.5 border border-slate-200 rounded-md hover:border-sky-200 hover:bg-sky-50">
-                Detail Pelanggan →
+                Detail Profil →
             </a>
         </div>
     </div>
@@ -58,6 +82,7 @@
                             Data Registrasi
                         </span>
                     </button>
+                    @if($showTabSurvey)
                     <button type="button" onclick="switchTab('survey')" id="tab-btn-survey"
                         class="tab-btn flex-1 px-4 py-4 text-sm font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all focus:outline-none">
                         <span class="flex items-center justify-center gap-2">
@@ -65,6 +90,8 @@
                             Survey
                         </span>
                     </button>
+                    @endif
+                    @if($showTabPemasangan)
                     <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan"
                         class="tab-btn flex-1 px-4 py-4 text-sm font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all focus:outline-none">
                         <span class="flex items-center justify-center gap-2">
@@ -72,6 +99,8 @@
                             Pemasangan
                         </span>
                     </button>
+                    @endif
+                    @if($showTabPengujian)
                     <button type="button" onclick="switchTab('pengujian')" id="tab-btn-pengujian"
                         class="tab-btn flex-1 px-4 py-4 text-sm font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all focus:outline-none">
                         <span class="flex items-center justify-center gap-2">
@@ -79,6 +108,8 @@
                             Pengujian
                         </span>
                     </button>
+                    @endif
+                    @if($showTabVerifikasi)
                     <button type="button" onclick="switchTab('verifikasi')" id="tab-btn-verifikasi"
                         class="tab-btn flex-1 px-4 py-4 text-sm font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all focus:outline-none">
                         <span class="flex items-center justify-center gap-2">
@@ -87,6 +118,7 @@
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">Aksi</span>
                         </span>
                     </button>
+                    @endif
                 </div>
 
         {{-- ============================================================ --}}
@@ -309,6 +341,28 @@
                 </div>
                 @endif
             </div>
+
+            @if($isWaitingAccStage)
+                @can('customers.detail.installation.validate')
+                <div class="mt-6 p-5 bg-amber-50 border border-amber-200 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h5 class="text-sm font-bold text-amber-900">Persetujuan Hasil Survey</h5>
+                        <p class="text-xs text-amber-700 mt-0.5">Survey telah selesai dilaporkan. Periksa data registrasi dan hasil survey di atas, lalu tentukan keputusan persetujuan.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button type="button" onclick="openRejectModal()" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer">
+                            Batalkan / Gagal
+                        </button>
+                        <form action="{{ route('customers.verification.process-to-team', $customer) }}" method="POST" onsubmit="event.preventDefault(); window.confirmAction('Setujui hasil survey dan proses pelanggan ini ke tim pemasangan?', this);">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors cursor-pointer">
+                                Setujui & Proses ke Tim Pemasangan
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                @endcan
+            @endif
 
             @else
             <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-center gap-3">
@@ -642,7 +696,7 @@
                         </div>
                         <div>
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">PPN</span>
-                            <span class="block text-sm font-mono text-slate-800">Rp {{ number_format($service->ppn ?? 0, 0, ',', '.') }}</span>
+                            <span class="block text-sm font-mono text-slate-800">{{ number_format($service->ppn ?? 0, 0, ',', '.') }}%</span>
                         </div>
                     </div>
                 </div>
@@ -686,13 +740,18 @@
                             <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Rincian Tagihan & Biaya Pemasangan</h5>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label for="subtotal" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">BIAYA BERLANGGANAN</label>
+                                    <label for="subtotal" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
+                                        <span>SUBTOTAL (PRORATA + BIAYA)</span>
+                                        <span class="text-[9px] text-slate-400 font-normal">Harga paket Rp {{ number_format($service->monthly_price ?? 0, 0, ',', '.') }}/bln</span>
+                                    </label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
                                         <input type="number" step="0.01" name="subtotal" id="fv_subtotal"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                                            value="{{ old('subtotal', $service->total_monthly_bill ?? 0) }}" readonly>
-                                        <input type="hidden" id="base_monthly_bill" value="{{ $service->total_monthly_bill ?? 0 }}">
+                                            value="{{ old('subtotal', $service->monthly_price ?? 0) }}" readonly>
+                                        {{-- Basis prorata pakai harga paket SEBELUM PPN; PPN ditambahkan
+                                             sekali di akhir, bukan ikut terbawa di basis. --}}
+                                        <input type="hidden" id="base_monthly_bill" value="{{ $service->monthly_price ?? 0 }}">
                                     </div>
                                 </div>
                                 <div>
@@ -750,9 +809,9 @@
                                     </div>
                                 </div>
                                 <div>
-                                    <label for="ppn" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PPN</label>
+                                    <label for="ppn" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PPN (%)</label>
                                     <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">%</span>
                                         <input type="number" step="0.01" name="ppn" id="fv_ppn"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
                                             value="{{ old('ppn', $service->ppn ?? 0) }}" readonly>
@@ -946,12 +1005,16 @@
     }
 
     // ── CALCULATION LOGIC ──────────────────────────────────────────────
+    // PREVIEW SAJA. Angka final dihitung ulang server di
+    // App\Services\InitialInvoiceService — rumus di sini wajib dijaga identik
+    // supaya yang dilihat admin sama dengan yang tersimpan, tapi kalau menyimpang
+    // yang menang tetap server.
     function calculateFees() {
         // Parse inputs
         const baseMonthly = parseFloat(document.getElementById('base_monthly_bill').value) || 0;
         const discount = parseFloat(document.getElementById('fv_discount').value) || 0;
-        const ppn = parseFloat(document.getElementById('fv_ppn').value) || 0;
-        
+        const ppnRate = parseFloat(document.getElementById('fv_ppn').value) || 0;
+
         const instFee = parseFloat(document.getElementById('fv_extra_installation_fee').value) || 0;
         const cableFee = parseFloat(document.getElementById('fv_extra_cable_fee').value) || 0;
         const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
@@ -981,10 +1044,15 @@
 
         // Apply
         document.getElementById('fv_prorate_amount').value = prorateAmount;
-        
-        // Calculation Total = Prorate + Fees - Discount + PPN
-        const total = prorateAmount + instFee + cableFee + poleFee - discount + ppn;
-        document.getElementById('fv_total_amount').value = total;
+
+        // Subtotal = prorata + biaya sekali bayar; PPN dihitung dari subtotal
+        // setelah diskon (persen, sama seperti render di invoices/show.blade.php).
+        const subtotal = prorateAmount + instFee + cableFee + poleFee;
+        const afterDiscount = Math.max(0, subtotal - discount);
+        const ppnAmount = Math.round(afterDiscount * (ppnRate / 100) * 100) / 100;
+
+        document.getElementById('fv_subtotal').value = subtotal;
+        document.getElementById('fv_total_amount').value = afterDiscount + ppnAmount;
     }
 
     // ── CONFIRM ACTIVATION ─────────────────────────────────────────────

@@ -11,7 +11,44 @@ Aplikasi saat ini telah dilengkapi dengan infrastruktur modern yang siap menduku
 
 ---
 
-## 2. Perbandingan Dua Metode Real-Time Frontend
+## 2. Pemetaan Fitur yang Membutuhkan Real-Time (SPA-Like)
+
+Berikut adalah pemetaan seluruh fitur operasional Whusnet yang memerlukan update reaktif secara real-time tanpa refresh halaman:
+
+### 2.1. Kategori Kritis (High Priority / Crucial Operational Realtime)
+Fitur pada kategori ini dikerjakan oleh **banyak user sekaligus dalam satu waktu**. Tanpa realtime, berisiko terjadi *data stale* (data basi), *race condition* (duplikasi penugasan), atau keterlambatan penanganan gangguan di lapangan.
+
+| No | Fitur | Role Terkait | Event Reverb | Alasan Membutuhkan SPA-Like Realtime |
+|---|---|---|---|---|
+| 1 | **FOP / Task Management Teknisi** *(Penugasan Survey, Pemasangan, Maintenance)* | FOP, Teknisi, Helpdesk, NOC | `TaskScheduled`<br>`TaskStatusUpdated`<br>`TaskTeamAssigned` | • Dispatcher/FOP melihat pergerakan status tugas teknisi di lapangan secara instan.<br>• Teknisi di lapangan langsung mendapatkan notifikasi tugas baru / perubahan rute di layar HP tanpa perlu refresh. |
+| 2 | **Kasir & Loket Pembayaran (Payment Desk)** | Kasir / Finance, Admin POP | `PaymentReceived`<br>`InvoiceStatusUpdated` | • Saat kasir mengonfirmasi pembayaran tagihan, status invoice langsung berubah jadi `PAID` di seluruh layar cabang/pusat.<br>• Mencegah ganda cetak kwitansi atau klaim bayar ulang oleh kasir lain. |
+| 3 | **Antrean & Escalation Tiket Pengaduan (Helpdesk)** | Helpdesk, NOC, Admin POP | `TicketCreated`<br>`TicketAssigned`<br>`TicketStatusChanged` | • Tiket gangguan baru dari pelanggan langsung *pop-up* / masuk ke antrean Helpdesk secara *live*.<br>• Mencegah 2 petugas Helpdesk mengambil tiket penanganan yang sama (*overlapping*). |
+| 4 | **Live Progress Import Pelanggan (Bulk Import CSV/Excel)** | Admin Pusat, Admin POP | `ImportProgressUpdated`<br>`ImportBatchCompleted` | • Menampilkan *Progress Bar* secara *live* (misal: *140/500 baris sukses*) beserta log error tanpa membuat halaman *freeze* atau minta di-reload. |
+
+---
+
+### 2.2. Kategori Efisiensi Operasional (Medium Priority / Workflow Booster)
+Fitur yang mempermudah interaksi harian antar divisi agar alur kerja berjalan cepat tanpa harus sering berpindah halaman atau menekan tombol F5.
+
+| No | Fitur | Role Terkait | Event Reverb | Alasan Membutuhkan SPA-Like Realtime |
+|---|---|---|---|---|
+| 5 | **Quick Action & Quick View Modal Pelanggan** | Helpdesk, NOC, Finance, CS | `CustomerUpdated`<br>`CustomerDeviceStatusChanged` | • Pengguna dapat mengubah paket, menguji perangkat, atau memperbarui data dari modal samping/pop-up; baris di tabel utama pelanggan langsung ter-update di background. |
+| 6 | **Proses Aktivasi & Perubahan Status Layanan** | NOC, Admin POP, CS | `CustomerStatusActivated`<br>`CustomerSuspended` | • Ketika status pelanggan diubah dari *Perlu Dilengkapi* → *Lengkap* → *Siap Billing* / *Aktif*, perubahan badge status langsung terfleksi di seluruh modul billing & FOP. |
+| 7 | **Notifikasi Center & Alert Bar (Top Nav Notification)** | Seluruh Role | `UserNotificationSent`<br>`SystemAlertBroadcast` | • Indikator lonceng notifikasi di navbar menyala instan saat ada tugas baru atau alert sistem tanpa mengganggu form yang sedang diisi pengguna. |
+
+---
+
+### 2.3. Kategori Executive & Monitoring (Low Priority / Visual Dashboards)
+Fitur yang berfokus pada aspek statistik & transparansi bagi jajaran manajemen / Owner.
+
+| No | Fitur | Role Terkait | Event Reverb | Alasan Membutuhkan SPA-Like Realtime |
+|---|---|---|---|---|
+| 8 | **Live Feed Audit Log & Ticker Aktivitas System** | Owner, Admin Pusat | `AuditLogCreated` | • Stream log aktivitas internal secara *live* (siapa yang memverifikasi pembayaran, menghapus data, atau login ke sistem). |
+| 9 | **Dashboard Stat Cards (KPI Counter)** | Owner, Admin Pusat, Finance | `DashboardMetricsUpdated` | • Counter angka statistik (contoh: *Pemasukan Hari Ini*, *Total Pelanggan Aktif*, *Tiket Open*) naik/turun secara dinamis begitu ada transaksi baru. |
+
+---
+
+## 3. Perbandingan Dua Metode Real-Time Frontend
 
 Untuk merancang UI yang reaktif tanpa refresh manual, auto refresh, atau polling, terdapat dua pilihan metode utama di sisi frontend:
 
@@ -80,7 +117,7 @@ Pendekatan ini menyimpan seluruh data data tabular atau list ke dalam variabel *
 
 ---
 
-## 3. Langkah Implementasi dengan Pendekatan Alpine.js State
+## 4. Langkah Implementasi dengan Pendekatan Alpine.js State
 
 Untuk menerapkan **Alpine.js State** pada modul seperti **Task FOP**, ikuti spesifikasi berikut:
 
@@ -207,7 +244,7 @@ Ubah looping tabel di template Blade agar sepenuhnya dibaca dari state Alpine.js
 
 ---
 
-## 4. Keuntungan Penerapan Pola Real-Time
+## 5. Keuntungan Penerapan Pola Real-Time
 1.  **Penghematan Resource Server & Bandwidth:** Mengurangi overhead database dan jaringan dibandingkan metode *polling* (request AJAX berulang setiap sekian detik).
 2.  **Meningkatkan Kepuasan Pengguna (Wow Factor):** Aplikasi terasa responsif, modern, dan bernilai premium.
 3.  **Konsistensi Data Multi-User:** Meminimalisir kesalahan operasional akibat data yang basi (stale data) di layar admin yang berbeda.

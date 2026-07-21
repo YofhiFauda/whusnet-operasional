@@ -8,19 +8,19 @@ use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
+use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
-use App\Models\Invoice;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
 use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
-use Database\Seeders\InternetPackageSeeder;
-use Database\Seeders\PonorogoRegionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -131,7 +131,7 @@ class CustomerFinalVerificationTest extends TestCase
         ]);
 
         $response->assertStatus(403);
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
     }
@@ -181,7 +181,11 @@ class CustomerFinalVerificationTest extends TestCase
         $invoice = Invoice::where('customer_id', $customer->id)->first();
         $this->assertNotNull($invoice);
         $this->assertEquals('2026-06', $invoice->billing_period);
-        $this->assertEquals(166500, $invoice->total_amount);
+        // Nominal dihitung server (InitialInvoiceService), bukan diambil dari
+        // total_amount kiriman form: prorata 30/30 x harga paket + PPN 11%.
+        $expectedSubtotal = (float) $customer->customerService->monthly_price;
+        $this->assertEquals($expectedSubtotal, (float) $invoice->subtotal);
+        $this->assertEquals(round($expectedSubtotal * 1.11, 2), (float) $invoice->total_amount);
         $this->assertEquals('belum_dibayar', $invoice->invoice_status->value);
     }
 }

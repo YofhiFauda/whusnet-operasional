@@ -124,72 +124,47 @@
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                 </svg>
                             </button>
-                            <a href="{{ route('customers.show', $customer) }}" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            </a>
-                            @can('customers.detail.installation.validate')
-                            <button type="button" onclick="openRejectModal('{{ $customer->id }}')" class="text-text-muted hover:text-error transition-colors p-1" title="Batal / Gagal">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                            @endcan
-                            
+
                             @if($customer->status === 'waiting_acc' || $customer->status === 'surveyed')
-                                @php
-                                    $latestSurvey = $customer->latestSurvey;
-                                    $surveyNote = $latestSurvey?->survey_note ?? '';
-                                    $mediaType = '—';
-                                    if (preg_match('/Media:\s*(Fiber|Wireless|UTP)/i', $surveyNote, $matches)) {
-                                        $mediaType = $matches[1];
-                                    }
-                                    $surveyStatus = $latestSurvey?->survey_status;
-                                    $resultLabel = match ($surveyStatus) {
-                                        'completed' => 'Layak',
-                                        'failed'    => 'Tidak Layak',
-                                        'pending'   => 'Kunjungan Ulang',
-                                        default     => '—'
-                                    };
-                                    $surveyData = [
-                                        'id' => $customer->id,
-                                        'survey_result' => $resultLabel,
-                                        'survey_distance' => $latestSurvey?->cable_estimation_meter ? $latestSurvey->cable_estimation_meter . 'm' : '—',
-                                        'survey_media' => $mediaType,
-                                        'survey_odp' => $latestSurvey?->nearest_odp ?? '—',
-                                        'survey_notes' => $surveyNote,
-                                    ];
-                                @endphp
                                 @can('customers.detail.installation.validate')
-                                <form action="{{ route('customers.verification.process-to-team', $customer) }}" method="POST" class="inline-block m-0 p-0" onsubmit="event.preventDefault(); window.confirmAction('Setujui hasil survey dan proses pelanggan ini ke tim pemasangan?', this);">
-                                    @csrf
-                                    <button type="submit" class="bg-primary hover:bg-primary/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer">
-                                        Proses ke Tim
-                                    </button>
-                                </form>
-                                <button type="button" onclick="openRejectModal('{{ $customer->id }}')" class="bg-error/10 hover:bg-error/20 text-error text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer">
-                                    Batalkan / Gagal
-                                </button>
+                                <a href="{{ route('customers.verification.admin', $customer) }}" class="bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    Detail & Review
+                                </a>
                                 @endcan
-                            @elseif($customer->status === 'waiting_installation')
-                                <form action="{{ route('customers.installation.start', $customer) }}" method="POST" class="inline-block m-0 p-0" onsubmit="event.preventDefault(); window.confirmAction('Mulai proses pemasangan untuk pelanggan ini?', this);">
-                                    @csrf
-                                    <button type="submit" class="bg-primary hover:bg-primary/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer">
-                                        Start Proses
-                                    </button>
-                                </form>
-                            @elseif($customer->status === 'installation_in_progress')
-                                <a href="{{ route('customers.installation.report', $customer) }}" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
-                                    Lapor Pemasangan
-                                </a>
-                            @elseif($customer->status === 'revision_installation')
-                                <a href="{{ route('customers.installation.report', $customer) }}" class="bg-error hover:bg-error/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
-                                    Revisi
-                                </a>
                             @elseif($customer->status === 'installed' || $customer->status === 'verification_admin')
                                 @can('customers.detail.installation.validate')
                                 <a href="{{ route('customers.verification.admin', $customer) }}" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Verifikasi
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Verifikasi Admin
                                 </a>
                                 @endcan
+                            @else
+                                <a href="{{ route('customers.verification.admin', $customer) }}" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                </a>
+                                @can('customers.detail.installation.validate')
+                                <button type="button" onclick="openRejectModal('{{ $customer->id }}')" class="text-text-muted hover:text-error transition-colors p-1" title="Batal / Gagal">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                                @endcan
+
+                                @if($customer->status === 'waiting_installation')
+                                    <form action="{{ route('customers.installation.start', $customer) }}" method="POST" class="inline-block m-0 p-0" onsubmit="event.preventDefault(); window.confirmAction('Mulai proses pemasangan untuk pelanggan ini?', this);">
+                                        @csrf
+                                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer">
+                                            Start Proses
+                                        </button>
+                                    </form>
+                                @elseif($customer->status === 'installation_in_progress')
+                                    <a href="{{ route('customers.installation.report', $customer) }}" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
+                                        Lapor Pemasangan
+                                    </a>
+                                @elseif($customer->status === 'revision_installation')
+                                    <a href="{{ route('customers.installation.report', $customer) }}" class="bg-error hover:bg-error/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
+                                        Revisi
+                                    </a>
+                                @endif
                             @endif
                         </div>
                     </td>

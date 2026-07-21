@@ -45,10 +45,10 @@ class CustomerSurvey extends Model
     {
         return [
             'survey_date' => 'date',
-            'end_date'    => 'date',
+            'end_date' => 'date',
             'assigned_at' => 'datetime',
-            'started_at'  => 'datetime',
-            'completed_at'=> 'datetime',
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -82,5 +82,13 @@ class CustomerSurvey extends Model
     public function surveyor3(): BelongsTo
     {
         return $this->belongsTo(User::class, 'surveyor_3_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function fop(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fop_id');
     }
 }

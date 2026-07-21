@@ -2,10 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
+use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\Invoice;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\CustomerWorkflowService;
+use App\Services\EffectiveAccessService;
+use App\Services\InitialInvoiceService;
+use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CustomerVerificationController extends Controller
@@ -16,40 +29,40 @@ class CustomerVerificationController extends Controller
 
         $statuses = [
             'waiting_acc',
-            'surveyed', 
-            'waiting_installation', 
-            'installation_in_progress', 
+            'surveyed',
+            'waiting_installation',
+            'installation_in_progress',
             'revision_installation',
-            'installed', 
-            'verification_admin'
+            'installed',
+            'verification_admin',
         ];
 
         $query = Customer::with([
-            'village.district', 
-            'pop', 
-            'customerService', 
-            'latestInstallation.technician', 
+            'village.district',
+            'pop',
+            'customerService',
+            'latestInstallation.technician',
             'latestSurvey',
             'tasks' => function ($q) {
-                $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
-                  ->where('status', \App\Enums\TaskStatus::SELESAI->value)
-                  ->orderByDesc('completed_at')
-                  ->limit(1);
-            }
+                $q->where('task_type', TaskType::SURVEY->value)
+                    ->where('status', TaskStatus::SELESAI->value)
+                    ->orderByDesc('completed_at')
+                    ->limit(1);
+            },
         ])->whereIn('status', $statuses);
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('id_number', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%");
+                    ->orWhere('id_number', 'like', "%{$search}%")
+                    ->orWhere('phone_number', 'like', "%{$search}%");
             });
         }
 
         $customers = $query->latest()->paginate(15);
 
-        $accessService = app(\App\Services\EffectiveAccessService::class);
+        $accessService = app(EffectiveAccessService::class);
         $allowedPopIds = $accessService->getAllowedPopIds(auth()->user());
         $teknisiList = $this->getTeknisiList($allowedPopIds);
 
@@ -58,21 +71,30 @@ class CustomerVerificationController extends Controller
 
     public function showAdmin(Customer $customer)
     {
-        abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
-
-        if (!in_array($customer->status, ['installed', 'verification_admin'])) {
-            return redirect()->route('verifications.queue')
-                ->with('error', 'Pelanggan tidak dalam status Verifikasi Admin.');
-        }
+        $user = auth()->user();
+        $hasPermission = $user->hasPermission('customers.detail.installation.validate')
+            || $user->hasPermission('customers.detail.installation.view')
+            || $user->hasPermission('customers.detail.survey.view')
+            || $user->hasPermission('customers.detail.survey.update')
+            || $user->hasPermission('customers.view')
+            || $user->hasPermission('*');
+        abort_unless($hasPermission, 403);
 
         $customer->loadMissing([
             'customerDevice',
             'customerTechnicalDetail',
-            'latestInstallation',
+            'latestInstallation.technician',
+            'latestInstallation.technician2',
+            'latestInstallation.technician3',
+            'latestInstallation.fop',
+            'latestSurvey.technician',
+            'latestSurvey.surveyor2',
+            'latestSurvey.surveyor3',
             'customerService',
             'internetPackage',
             'pop',
             'village.district',
+            'city',
         ]);
 
         return view('verifications.admin', compact('customer'));
@@ -98,22 +120,22 @@ class CustomerVerificationController extends Controller
                 ->latest()
                 ->first();
 
-            if (!$installation) {
+            if (! $installation) {
                 $customer->installations()->create([
                     'installation_status' => 'scheduled',
-                    'fop_id'              => auth()->id(),
-                    'assigned_at'         => now(),
+                    'fop_id' => auth()->id(),
+                    'assigned_at' => now(),
                 ]);
             }
 
             // B. Transition Customer status to waiting_installation
             // Ini secara otomatis membuat Task Pemasangan dengan status 'pending' di CustomerWorkflowService
-            $workflowService->transition($customer, \App\Enums\WorkflowTransition::WAITING_INSTALLATION, 'Survey disetujui. Diproses ke TIM Pemasangan');
+            $workflowService->transition($customer, WorkflowTransition::WAITING_INSTALLATION, 'Survey disetujui. Diproses ke TIM Pemasangan');
 
             // C. Otomatis setujui (approve) Task Survey yang terkait
-            $surveyTask = \App\Models\Task::where('customer_id', $customer->id)
-                ->where('task_type', \App\Enums\TaskType::SURVEY->value)
-                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+            $surveyTask = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::SURVEY->value)
+                ->where('status', TaskStatus::SELESAI->value)
                 ->where('fop_review_status', 'pending')
                 ->latest()
                 ->first();
@@ -129,7 +151,8 @@ class CustomerVerificationController extends Controller
             return redirect()->back()->with('success', 'Survey berhasil disetujui. Pelanggan beralih ke status Menunggu Pemasangan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal memproses: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal memproses: '.$e->getMessage());
         }
     }
 
@@ -137,27 +160,33 @@ class CustomerVerificationController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
 
+        // Hanya field yang benar-benar diinput admin yang divalidasi di sini.
+        // subtotal/discount/ppn/prorate_amount/total_amount memang dikirim form
+        // (input readonly hasil hitungan JavaScript), tapi SENGAJA tidak dipakai —
+        // readonly cuma penghalang UI, POST manual bisa mengirim nominal apa pun.
+        // Nominal otoritatif dihitung ulang di InitialInvoiceService di bawah.
         $validated = $request->validate([
             'billing_period' => 'required|string',
-            'issue_date'     => 'required|date',
-            'due_date'       => 'required|date',
-            'subtotal'       => 'required|numeric',
-            'discount'       => 'required|numeric',
-            'ppn'            => 'required|numeric',
-            'prorate_amount' => 'required|numeric',
-            'extra_installation_fee' => 'nullable|numeric',
-            'extra_cable_fee' => 'nullable|numeric',
-            'extra_pole_fee' => 'nullable|numeric',
-            'total_amount'   => 'required|numeric'
+            'issue_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:issue_date',
+            'extra_installation_fee' => 'nullable|numeric|min:0',
+            'extra_cable_fee' => 'nullable|numeric|min:0',
+            'extra_pole_fee' => 'nullable|numeric|min:0',
         ]);
 
         $service = $customer->customerService;
-        if (!$service) {
+        if (! $service) {
             return redirect()->back()->with('error', 'Data layanan pelanggan tidak ditemukan.');
         }
 
+        $billing = app(InitialInvoiceService::class)->calculate(
+            $service,
+            $validated['issue_date'],
+            $validated
+        );
+
         $pop = $customer->pop;
-        if (!$pop || !$pop->cid_prefix) {
+        if (! $pop || ! $pop->cid_prefix) {
             return redirect()->back()->with('error', 'Konfigurasi POP/Cabang pelanggan belum lengkap.');
         }
 
@@ -165,11 +194,11 @@ class CustomerVerificationController extends Controller
             DB::beginTransaction();
 
             // 1. Generate Invoice
-            $invoiceNumber = 'INV-' . now()->format('Ymd') . '-' . strtoupper(uniqid());
+            $invoiceNumber = 'INV-'.now()->format('Ymd').'-'.strtoupper(uniqid());
 
-            $invoice = \App\Models\Invoice::create([
+            $invoice = Invoice::create([
                 'invoice_number' => $invoiceNumber,
-                'invoice_type' => \App\Enums\InvoiceType::AWAL->value,
+                'invoice_type' => InvoiceType::AWAL->value,
                 'customer_id' => $customer->id,
                 'pop_id' => $customer->pop_id,
                 'customer_service_id' => $service->id,
@@ -177,17 +206,17 @@ class CustomerVerificationController extends Controller
                 'billing_period' => $validated['billing_period'],
                 'issue_date' => $validated['issue_date'],
                 'due_date' => $validated['due_date'],
-                'subtotal' => $validated['subtotal'],
-                'discount' => $validated['discount'],
-                'ppn' => $validated['ppn'],
-                'prorate_amount' => $validated['prorate_amount'],
-                'extra_installation_fee' => $validated['extra_installation_fee'] ?? 0,
-                'extra_cable_fee' => $validated['extra_cable_fee'] ?? 0,
-                'extra_pole_fee' => $validated['extra_pole_fee'] ?? 0,
-                'total_amount' => $validated['total_amount'],
-                'remaining_amount' => $validated['total_amount'],
+                'subtotal' => $billing['subtotal'],
+                'discount' => $billing['discount'],
+                'ppn' => $billing['ppn'],
+                'prorate_amount' => $billing['prorate_amount'],
+                'extra_installation_fee' => $billing['extra_installation_fee'],
+                'extra_cable_fee' => $billing['extra_cable_fee'],
+                'extra_pole_fee' => $billing['extra_pole_fee'],
+                'total_amount' => $billing['total_amount'],
+                'remaining_amount' => $billing['total_amount'],
                 'paid_amount' => 0,
-                'invoice_status' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
+                'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
                 'created_by' => auth()->id(),
             ]);
 
@@ -228,7 +257,7 @@ class CustomerVerificationController extends Controller
                 'billing_status' => 'active',
             ];
 
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'Data Pelanggan',
                 'action' => 'activate_from_verification',
@@ -243,21 +272,21 @@ class CustomerVerificationController extends Controller
 
             // Optionally notify telegram
             try {
-                $telegram = app(\App\Services\TelegramBotService::class);
+                $telegram = app(TelegramBotService::class);
                 $message = "🎉 <b>Pelanggan Aktif (Dari Verifikasi)</b>\n";
                 $message .= "Pelanggan: {$customer->full_name}\n";
                 $message .= "CID: {$cid}\n";
-                $message .= "Tagihan Awal: Rp " . number_format($validated['total_amount'], 0, ',', '.') . "\n";
-                $message .= "Diaktifkan oleh: " . auth()->user()->name;
+                $message .= 'Tagihan Awal: Rp '.number_format($billing['total_amount'], 0, ',', '.')."\n";
+                $message .= 'Diaktifkan oleh: '.auth()->user()->name;
                 $telegram->sendMessage($message);
             } catch (\Exception $e) {
                 // Ignore telegram errors
             }
 
             // Otomatis setujui (approve) Task Pemasangan yang terkait
-            $installTask = \App\Models\Task::where('customer_id', $customer->id)
-                ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
-                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+            $installTask = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->where('status', TaskStatus::SELESAI->value)
                 ->where('fop_review_status', 'pending')
                 ->latest()
                 ->first();
@@ -272,16 +301,16 @@ class CustomerVerificationController extends Controller
 
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
     public function reject(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
-        
+
         $request->validate([
-            'reason' => 'required|string|max:255'
+            'reason' => 'required|string|max:255',
         ]);
 
         // Tahap ditentukan dari status SEBELUM transition (transition di bawah
@@ -293,18 +322,18 @@ class CustomerVerificationController extends Controller
         try {
             DB::beginTransaction();
 
-            $workflowService->transition($customer, \App\Enums\WorkflowTransition::REJECTED, 'Ditolak: ' . $request->reason);
+            $workflowService->transition($customer, WorkflowTransition::REJECTED, 'Ditolak: '.$request->reason);
 
             // Otomatis tolak (reject) Task Survey atau Pemasangan yang terkait,
             // tergantung tahap penolakan. Reject di tahap survey TIDAK boleh
             // menyentuh Task Pemasangan (belum tentu ada), begitu juga sebaliknya.
             $rejectedTaskType = $isInstallStage
-                ? \App\Enums\TaskType::PEMASANGAN
-                : \App\Enums\TaskType::SURVEY;
+                ? TaskType::PEMASANGAN
+                : TaskType::SURVEY;
 
-            $rejectedTask = \App\Models\Task::where('customer_id', $customer->id)
+            $rejectedTask = Task::where('customer_id', $customer->id)
                 ->where('task_type', $rejectedTaskType->value)
-                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+                ->where('status', TaskStatus::SELESAI->value)
                 ->where('fop_review_status', 'pending')
                 ->latest()
                 ->first();
@@ -317,45 +346,47 @@ class CustomerVerificationController extends Controller
             }
 
             DB::commit();
+
             return redirect()->back()->with('success', 'Pelanggan berhasil ditolak.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
     public function revisi(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
-        
+
         $request->validate([
-            'reason' => 'required|string|max:500'
+            'reason' => 'required|string|max:500',
         ]);
 
         try {
             DB::beginTransaction();
-            
+
             // Mark the latest installation as failed or needing revision
             $latestInstallation = $customer->latestInstallation;
             if ($latestInstallation) {
                 $latestInstallation->update([
                     'installation_status' => 'in_progress', // Maintain in_progress so technician can update it
-                    'installation_note' => "REVISI ADMIN: " . $request->reason . "\n\n" . ($latestInstallation->installation_note ?? '')
+                    'installation_note' => 'REVISI ADMIN: '.$request->reason."\n\n".($latestInstallation->installation_note ?? ''),
                 ]);
             }
 
-            $workflowService->transition($customer, \App\Enums\WorkflowTransition::REVISION_INSTALLATION, 'Revisi Pemasangan: ' . $request->reason);
+            $workflowService->transition($customer, WorkflowTransition::REVISION_INSTALLATION, 'Revisi Pemasangan: '.$request->reason);
 
             // Otomatis kembalikan (revert) Task Pemasangan yang terkait ke status In Progress
-            $installTask = \App\Models\Task::where('customer_id', $customer->id)
-                ->where('task_type', \App\Enums\TaskType::PEMASANGAN->value)
-                ->where('status', \App\Enums\TaskStatus::SELESAI->value)
+            $installTask = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->where('status', TaskStatus::SELESAI->value)
                 ->where('fop_review_status', 'pending')
                 ->latest()
                 ->first();
             if ($installTask) {
                 $installTask->update([
-                    'status' => \App\Enums\TaskStatus::IN_PROGRESS->value,
+                    'status' => TaskStatus::IN_PROGRESS->value,
                     'fop_review_status' => 'rejected',
                     'reject_reason' => $request->reason,
                     'updated_by' => auth()->id(),
@@ -363,43 +394,45 @@ class CustomerVerificationController extends Controller
             }
 
             DB::commit();
+
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan dikembalikan ke antrean pemasangan untuk revisi.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
-    private function getTeknisiList(array $allowedPopIds): \Illuminate\Support\Collection
+    private function getTeknisiList(array $allowedPopIds): Collection
     {
-        $today = \Illuminate\Support\Carbon::today();
+        $today = Carbon::today();
         $query = User::with(['roleScopes.targets'])
             ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
             ->orderBy('name');
 
-        if (!empty($allowedPopIds)) {
+        if (! empty($allowedPopIds)) {
             $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
         }
 
         return $query->get()->map(function (User $teknisi) use ($today) {
             // Task in progress aktif
-            $activeTask = \App\Models\Task::with('customer')
+            $activeTask = Task::with('customer')
                 ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
-                ->where('status', \App\Enums\TaskStatus::IN_PROGRESS->value)
+                ->where('status', TaskStatus::IN_PROGRESS->value)
                 ->latest('started_at')
                 ->first();
 
             // Hitung task terjadwal hari ini + task terjadwal/in_progress overdue
-            $taskCount = \App\Models\Task::whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
+            $taskCount = Task::whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
                 ->where(function ($q) use ($today) {
                     $q->where(function ($q1) use ($today) {
-                        $q1->where('status', \App\Enums\TaskStatus::TERJADWAL->value)
-                           ->whereDate('scheduled_at', $today);
+                        $q1->where('status', TaskStatus::TERJADWAL->value)
+                            ->whereDate('scheduled_at', $today);
                     })
-                    ->orWhere(function ($q2) use ($today) {
-                        $q2->whereIn('status', [\App\Enums\TaskStatus::TERJADWAL->value, \App\Enums\TaskStatus::IN_PROGRESS->value])
-                           ->whereDate('scheduled_at', '<', $today);
-                    });
+                        ->orWhere(function ($q2) use ($today) {
+                            $q2->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                                ->whereDate('scheduled_at', '<', $today);
+                        });
                 })
                 ->count();
 
@@ -411,10 +444,10 @@ class CustomerVerificationController extends Controller
             }
 
             return [
-                'id'          => $teknisi->id,
-                'name'        => $teknisi->name,
-                'status'      => $status,
-                'task_count'  => $taskCount,
+                'id' => $teknisi->id,
+                'name' => $teknisi->name,
+                'status' => $status,
+                'task_count' => $taskCount,
             ];
         });
     }
