@@ -49,7 +49,7 @@
                     </option>
                     @endforeach
                 </select>
-                <p class="mt-1.5 text-[11px] text-text-muted">Survey &amp; Pemasangan Baru tidak tersedia di sini.</p>
+                <p class="mt-1.5 text-[11px] text-text-muted">Survey, Pemasangan Baru, &amp; Ambil Modem tidak tersedia di sini.</p>
             </div>
             @else
             <div class="p-5">

@@ -66,4 +66,11 @@ Invoice gak punya unique index setara (data lama sebelum fix migrasi masih ada p
 
 ---
 
+## Pola Redirect (PRG)
+
+Catat pembayaran (`store`) → redirect ke `invoices.show` (Detail invoice induk, aturan "aksi child →
+Detail parent"). Aturan lengkap + kenapa: **[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.
+
+---
+
 **Last updated:** 2026-07-07

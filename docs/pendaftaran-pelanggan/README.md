@@ -18,3 +18,10 @@ Berikut adalah daftar dokumentasi yang berkaitan dengan proses onboarding:
 ## Service Terkait
 - `CustomerWorkflowService`: Mengatur transisi *state machine* status pelanggan secara terpusat.
 - Laravel Scheduler (`php artisan schedule:run`): Mengatur SLA Auto-Reminder untuk pelanggan yang *stuck* di tahapan tertentu lebih dari batas waktu SLA.
+
+## Pola Redirect (PRG)
+
+Setelah registrasi berhasil (`store`) → redirect ke `customers.show` (halaman Detail pelanggan baru),
+bukan ke daftar. Registrasi = awal workflow, user langsung lanjut di record itu. Validasi gagal →
+`back()` + errors + old input. Aturan lengkap + visualisasi:
+**[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.

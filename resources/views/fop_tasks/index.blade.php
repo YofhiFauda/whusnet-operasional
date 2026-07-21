@@ -416,10 +416,11 @@
                                 <template x-if="isEditingLockedSurveyPsb || isEditingLinkedTicket || (modal.isEdit && !canEditCategory)">
                                     <input type="hidden" name="category" :value="modal.data.category">
                                 </template>
-                                <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb">Task Survey/Pemasangan tidak bisa diedit dari sini — hanya lewat alur Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb && modal.data.category !== 'DEAC'">Task Survey/Pemasangan tidak bisa diedit dari sini — hanya lewat alur Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLockedSurveyPsb && modal.data.category === 'DEAC'">Task Ambil Modem tidak bisa diedit dari sini — asalnya dari tombol "Ambil Alat" di List Putus Langganan.</p>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="isEditingLinkedTicket">Tipe gak bisa diubah — task ini nyambung ke Ticket, tipe-nya ngikut tipe ticket-nya.</p>
                                 <p class="mt-1 text-[10px] text-text-muted" x-show="!isEditingLockedSurveyPsb && !isEditingLinkedTicket && modal.isEdit && !canEditCategory">Anda tidak punya izin ubah tipe task.</p>
-                                <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit && !isTicketMode">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan.</p>
+                                <p class="mt-1 text-[10px] text-text-muted" x-show="!modal.isEdit && !isTicketMode">Survey &amp; Pemasangan Baru otomatis dibuat saat Registrasi Pelanggan. Ambil Modem otomatis dibuat lewat tombol "Ambil Alat" di List Putus Langganan.</p>
                                 <p class="mt-1 text-[10px] text-primary font-medium" x-show="isTicketMode && !modal.isEdit">Tipe ini ikut alur Ticketing — cari pelanggan lewat CID di bawah, data pelanggan terisi otomatis.</p>
                             </div>
                             <div>

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Create Service Ticket — ISP NOC')
+@section('title', 'Create Service Ticket')
 @section('page_title', 'Create Service Ticket')
 
 @section('content')
@@ -21,7 +21,7 @@
 
         <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            NOC Draft Mode
+            Draft Mode
         </div>
     </div>
 
@@ -38,7 +38,7 @@
                     Create Service Ticket
                 </h1>
                 <p class="text-[11px] text-text-muted font-medium uppercase tracking-wider mt-0.5">
-                    Internal Operations / NOC Entry & FOP Sync
+                    Internal Operations Entry & FOP Sync
                 </p>
             </div>
             
@@ -286,7 +286,7 @@
                     {{-- Catatan Teknis (NOC Monospace Box) --}}
                     <div class="space-y-1.5">
                         <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                            Catatan Teknis (Initial NOC Notes)
+                            Catatan Teknis
                         </label>
                         <textarea name="catatan_teknis" rows="3" maxlength="2000"
                                   placeholder="NOC assessment, ping results, optical power checks (-dBm), redaman OPM, atau petunjuk awal untuk teknisi FOP..."

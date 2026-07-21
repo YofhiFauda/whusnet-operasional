@@ -21,6 +21,7 @@ use App\Models\CustomerSurvey;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\Distribution;
 use App\Models\District;
+use App\Models\FopTask;
 use App\Models\ImportBatch;
 use App\Models\ImportError;
 use App\Models\InternetPackage;
@@ -36,6 +37,7 @@ use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\TelegramBotService;
+use App\Services\TicketService;
 use App\Support\IndonesianDate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -88,8 +90,16 @@ class CustomerController extends Controller
             $query->where('status', $status);
         } elseif ($statusGroup !== '') {
             $statuses = match ($statusGroup) {
-                'survey' => ['waiting_survey', 'surveyed'],
-                'verification' => ['waiting_installation', 'installed'],
+                // Fase survey s/d siap-pemasangan. Semua status antara sengaja
+                // masuk sini: tanpa ini `survey_in_progress` & `waiting_acc` gak
+                // dipetakan ke grup mana pun DAN bukan default (active/suspended),
+                // jadi pelanggan yang lagi diproses — atau yang dikembalikan dari
+                // "Pelanggan Gagal" ke tahap ini — lenyap dari SEMUA daftar.
+                'survey' => ['waiting_survey', 'survey_in_progress', 'surveyed', 'waiting_acc'],
+                // Fase pemasangan s/d verifikasi admin. Alasan sama:
+                // `installation_in_progress`, `verification_admin`,
+                // `revision_installation` dulu invisible di mana-mana.
+                'verification' => ['waiting_installation', 'installation_in_progress', 'installed', 'verification_admin', 'revision_installation'],
                 'failed' => ['failed', 'rejected', 'gagal'],
                 'terminated' => ['terminated', 'putus'],
                 default => []
@@ -275,13 +285,26 @@ class CustomerController extends Controller
             ]);
         });
 
-        return redirect()->back()->with('success', 'Pelanggan berhasil dikembalikan ke proses sebelumnya.');
+        // Arahkan ke halaman detail, bukan redirect()->back() ke daftar "Pelanggan
+        // Gagal". Pelanggan yang dikembalikan sudah keluar dari daftar itu, jadi
+        // kalau balik ke sana user melihatnya "menghilang". Landing di detail bikin
+        // pelanggannya langsung kelihatan, plus pesan menyebut tahap tujuannya biar
+        // jelas ke mana dia pindah (dan di tab mana bisa dicari lagi).
+        $statusLabel = SubscriptionStatus::where('code', $previousStatus)->value('name') ?? $previousStatus;
+
+        return redirect()->route('customers.show', $customer->id)
+            ->with('success', "Pelanggan dikembalikan ke tahap \"{$statusLabel}\" dan bisa dilanjutkan prosesnya.");
     }
 
     /**
-     * Tandai alat pelanggan putus langganan sebagai sudah diambil.
+     * Ajukan pengambilan alat pelanggan putus langganan — bikin Task FOP
+     * kategori Ambil Modem (DEAC), bukan langsung tandai `device_retrieved_at`.
+     * FOP assign teknisi lewat /fop-tasks seperti biasa; `device_retrieved_at`
+     * baru keisi otomatis setelah teknisi menyelesaikan task itu (lihat
+     * TaskService::complete()). Alurnya sengaja disamakan dengan MTN/C-REQ
+     * (detail + pelaporan/evidence lewat pipeline Task FOP yang sama).
      */
-    public function retrieveDevice(Customer $customer)
+    public function retrieveDevice(Customer $customer, TicketService $ticketService)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.devices.retrieve'), 403);
 
@@ -294,9 +317,26 @@ class CustomerController extends Controller
             return redirect()->back()->with('error', 'Data alat pelanggan tidak ditemukan.');
         }
 
-        $device->update(['device_retrieved_at' => now()]);
+        if ($device->device_retrieved_at) {
+            return redirect()->back()->with('error', 'Alat pelanggan ini sudah ditandai diambil.');
+        }
 
-        return redirect()->back()->with('success', 'Alat pelanggan berhasil ditandai sudah diambil.');
+        if (! $customer->pop_id || ! $customer->village_id) {
+            return redirect()->back()->with('error', 'Pelanggan ini belum lengkap POP/Desa — lengkapi dulu datanya sebelum membuat task pengambilan alat.');
+        }
+
+        $hasOpenTask = FopTask::where('customer_id', $customer->id)
+            ->where('category', TaskType::AMBIL_MODEM->value)
+            ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+            ->exists();
+
+        if ($hasOpenTask) {
+            return redirect()->back()->with('error', 'Sudah ada task pengambilan alat yang masih berjalan untuk pelanggan ini.');
+        }
+
+        $fopTask = $ticketService->createDeviceRetrievalTask($customer, auth()->user());
+
+        return redirect()->back()->with('success', "Task FOP {$fopTask->task_number} untuk pengambilan alat berhasil dibuat. Alat akan otomatis ditandai diambil setelah teknisi menyelesaikan task.");
     }
 
     /**
@@ -502,7 +542,11 @@ class CustomerController extends Controller
             return $customer;
         });
 
-        return redirect()->route('customers.index')->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
+        // Landing di detail (bukan list) setelah registrasi: registrasi = awal
+        // workflow pelanggan (draft → survey → verifikasi), jadi user biasanya
+        // lanjut kerja di record yang baru dibuat (lengkapi data, assign survey).
+        // Sekalian menyeragamkan dengan update/ticket/task yang sudah ke detail.
+        return redirect()->route('customers.show', $customer->id)->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
     }
 
     /**
@@ -2443,7 +2487,23 @@ class CustomerController extends Controller
                         continue; // skip internal account payments
                     }
 
-                    $invoiceId = $this->resolveLegacyInvoiceId($row, $invoicesMap);
+                    // Resolve the payment's owning customer FIRST, scoped to the
+                    // branch being imported. Legacy RQ/PE/IDBIAYA numbers restart
+                    // from 1 in every branch dump, so the invoice lookup below MUST
+                    // be constrained to this customer — kalau tidak, pembayaran bisa
+                    // nyangkut ke invoice cabang lain yang kebetulan pakai nomor
+                    // legacy yang sama (mis. RQ000005 ada di jetis_db & sand_db,
+                    // masing-masing milik pelanggan berbeda: Hanif vs Eva).
+                    $paymentCustomerId = $customersMap[$row['old_customer_id'] ?? '']
+                        ?? $this->findScopedCustomerId($row['old_customer_id'] ?? null, $row['branch_pop_code'] ?? null);
+                    if (! $paymentCustomerId && ! empty($row['old_request_id'])) {
+                        $paymentCustomerId = $this->scopeToBranchPopViaCustomer(
+                            CustomerService::where('old_request_id', $row['old_request_id']),
+                            $this->resolveBranchPopId($row['branch_pop_code'] ?? null)
+                        )->value('customer_id');
+                    }
+
+                    $invoiceId = $this->resolveLegacyInvoiceId($row, $invoicesMap, $paymentCustomerId ? (int) $paymentCustomerId : null);
 
                     if (! $invoiceId) {
                         $this->logImportError($batch->id, $row, 'Payments', 'Gagal memetakan Invoice ID.');
@@ -2820,8 +2880,11 @@ class CustomerController extends Controller
     /**
      * @param  array<string, mixed>  $row
      * @param  array<string, int>  $invoicesMap
+     * @param  int|null  $customerId  Pelanggan pemilik pembayaran (sudah di-scope
+     *                                per cabang). Semua fallback DB di bawah
+     *                                dibatasi ke pelanggan ini.
      */
-    private function resolveLegacyInvoiceId(array $row, array $invoicesMap): ?int
+    private function resolveLegacyInvoiceId(array $row, array $invoicesMap, ?int $customerId = null): ?int
     {
         foreach (['old_invoice_id', 'old_transaction_id'] as $field) {
             $key = $row[$field] ?? null;
@@ -2830,24 +2893,32 @@ class CustomerController extends Controller
             }
         }
 
+        // Tiap fallback DB di bawah mencocokkan nomor legacy mentah
+        // (old_invoice_id / old_cost_id / old_request_id) yang HANYA unik dalam
+        // cabang asalnya. Batasi tiap lookup ke pelanggan pemilik pembayaran biar
+        // tabrakan lintas cabang (nomor RQ/IDBIAYA yang sama dipakai ulang di
+        // cabang lain) gak diam-diam menempelkan pembayaran ini ke invoice milik
+        // pelanggan cabang lain. Tanpa scope ini, pembayaran Eva (sand_db,
+        // RQ000005) bisa nyangkut ke invoice Hanif (jetis_db, RQ000005).
+        $scope = fn ($query) => $customerId ? $query->where('customer_id', $customerId) : $query;
+
         if (! empty($row['old_invoice_id'])) {
-            $invoiceId = Invoice::where('old_invoice_id', $row['old_invoice_id'])->value('id');
+            $invoiceId = $scope(Invoice::where('old_invoice_id', $row['old_invoice_id']))->value('id');
             if ($invoiceId) {
                 return (int) $invoiceId;
             }
         }
 
         if (! empty($row['old_transaction_id'])) {
-            $invoiceId = Invoice::where('old_cost_id', $row['old_transaction_id'])->value('id');
+            $invoiceId = $scope(Invoice::where('old_cost_id', $row['old_transaction_id']))->value('id');
             if ($invoiceId) {
                 return (int) $invoiceId;
             }
         }
 
         if (! empty($row['old_request_id']) && ! empty($row['billing_period'])) {
-            $invoiceId = Invoice::where('old_request_id', $row['old_request_id'])
-                ->where('billing_period', $row['billing_period'])
-                ->value('id');
+            $invoiceId = $scope(Invoice::where('old_request_id', $row['old_request_id'])
+                ->where('billing_period', $row['billing_period']))->value('id');
             if ($invoiceId) {
                 return (int) $invoiceId;
             }

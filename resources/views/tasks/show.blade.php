@@ -353,40 +353,6 @@
                         </div>
                     </div>
 
-                    @elseif($task->task_type === \App\Enums\TaskType::RELOKASI)
-                    @php
-                        $device = $task->customer?->customerDevice;
-                        $isEksternal = stripos($task->title . ' ' . $task->description, 'pindah rumah') !== false || stripos($task->title . ' ' . $task->description, 'eksternal') !== false || stripos($task->title . ' ' . $task->description, 'alamat') !== false;
-                    @endphp
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                            <div>
-                                <span class="block text-[9px] text-text-muted font-bold uppercase font-ui">Tipe Relokasi</span>
-                                <span class="text-xs font-bold text-text-main mt-0.5 block font-ui">{{ $isEksternal ? 'Relokasi Eksternal' : 'Relokasi Internal' }}</span>
-                            </div>
-                            <div>
-                                <span class="block text-[9px] text-text-muted font-bold uppercase font-ui">Status ODP & Kabel</span>
-                                <span class="text-xs text-text-main font-medium leading-relaxed mt-0.5 block font-ui">
-                                    {{ $isEksternal ? 'Wajib survei ulang ODP terdekat di alamat baru.' : 'Melakukan perpanjangan dropcore / LAN indoor.' }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="pt-3 border-t border-border space-y-2">
-                            <span class="block text-[9px] text-text-muted font-bold uppercase font-ui">Alamat Asal vs Alamat Tujuan</span>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                <div class="p-2.5 bg-background rounded border border-border">
-                                    <span class="block text-[9px] font-bold text-text-muted uppercase mb-0.5 font-ui font-ui">Alamat Asal</span>
-                                    <p class="text-text-main font-medium leading-relaxed font-ui">{{ $task->customer?->address ?: '-' }}</p>
-                                </div>
-                                <div class="p-2.5 bg-background rounded border border-border">
-                                    <span class="block text-[9px] font-bold text-primary uppercase mb-0.5 font-ui font-ui">Alamat Tujuan</span>
-                                    <p class="text-text-main font-bold leading-relaxed font-ui">{{ $task->description ?: 'Lihat rincian task' }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     @elseif($task->task_type === \App\Enums\TaskType::AMBIL_MODEM)
                     @php
                         $device = $task->customer?->customerDevice;

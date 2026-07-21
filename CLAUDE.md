@@ -65,7 +65,7 @@ php artisan horizon
 
 ### Enum — jangan bikin string baru
 - `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`
-- `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `RELOKASI`, `C-REQ`, `O-REQ`, `INFR REQ`
+- `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `C-REQ`, `O-REQ`, `INFR REQ`. `SURVEY`/`PSB`/`DEAC` = `autoOnlyValues()` — gak bisa dipilih manual, `DEAC` cuma lewat tombol "Ambil Alat" di List Putus Langganan. `RELOKASI` dihapus permanen dari sistem.
 - `TicketBucket`: `masuk`, `diproses`, `selesai`, `dibatalkan`
   → **Tiap `TaskStatus` baru wajib dipetakan ke bucket.** Ada test yang sengaja gagal kalau lupa.
 - `InvoiceStatus`: `belum_dibayar`, `sebagian`, `lunas`, `batal`
@@ -185,6 +185,7 @@ Lampiran tiket disimpan di disk **`local` (privat)**, bukan `public` — isinya 
 
 - **Komentar bahasa Indonesia yang menjelaskan *kenapa*, bukan *apa*.** Repo ini komentarnya panjang dan argumentatif di titik-titik rawan (observer, sync, guard). Waktu menyentuh area itu, ikuti gaya yang sama — jelaskan keputusan dan konsekuensi kalau dilanggar.
 - **Urutan route: static dulu, dynamic belakangan.** `routes/web.php` menandai ini eksplisit (`// Customers Management - Static Routes First` … `- Dynamic Routes Last`). Route `{id}` yang naik ke atas akan menelan route statis.
+- **Redirect setelah simpan pakai pola PRG.** Handler `POST`/`PUT`/`DELETE` selalu redirect (jangan render view langsung — refresh = double-submit). Create/update satu record → halaman Detail (`*.show`); list/board hanya untuk aksi list-oriented (import massal, papan FOP). Aturan + peta lengkap: `docs/PRG_REDIRECT_CONVENTION.md`.
 - Sederhana, tidak overengineered. Hindari abstraksi sebelum dibutuhkan, otomatisasi sebelum flow manual stabil, tabel baru kalau kolom cukup, campur banyak modul dalam satu task.
 - Jalankan `vendor/bin/pint` sebelum commit.
 

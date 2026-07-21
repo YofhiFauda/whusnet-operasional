@@ -58,3 +58,35 @@ Halaman detail menyusun informasi pelanggan dalam beberapa area operasional:
 5. Pemasangan (teknisi).
 6. Aktivasi & Billing.
 
+## Perubahan Terbaru (2026-07-21)
+
+Rangkuman lengkap + test regresi: `docs/ANALISA_BUG_LIST_PELANGGAN_DAN_MIGRASI_REQ_ID.md`.
+
+### 1. Visibilitas daftar per grup status (`CustomerController::index()`)
+
+Daftar default hanya menampilkan `active`+`suspended`. Semua status workflow lain hanya terlihat lewat
+tab `?status_group=...`. Peta grup **wajib menutup seluruh pipeline** — kalau ada status yang tidak
+terpetakan, pelanggan di status itu lenyap dari semua daftar (mirip aturan "tiap `TaskStatus` wajib
+punya `TicketBucket`"). Peta sekarang:
+
+| `status_group` | Status yang tercakup |
+| --- | --- |
+| `survey` | `waiting_survey`, `survey_in_progress`, `surveyed`, `waiting_acc` |
+| `verification` | `waiting_installation`, `installation_in_progress`, `installed`, `verification_admin`, `revision_installation` |
+| `failed` | `rejected` (+ legacy `failed`/`gagal`) |
+| `terminated` | `terminated` (+ legacy `putus`) |
+| _(default)_ | `active`, `suspended` |
+
+> **Aturan:** menambah state baru di `WorkflowTransition` → wajib update `match()` di `index()`.
+
+### 2. Filter mempertahankan konteks tab (`customers/index.blade.php`)
+
+Form filter (`GET /customers`) membawa hidden input `status_group` & `status` bila ada nilainya.
+Tanpa ini, "Cari" dari daftar Gagal/Putus kehilangan konteks dan jatuh ke daftar default.
+
+### 3. Redirect setelah registrasi → halaman Detail
+
+`store()` mengarahkan ke `customers.show` (bukan `customers.index`) — konsisten dengan update/ticket/
+task, dan mendaratkan user di record baru untuk lanjut workflow. Import massal tetap ke daftar
+(list-oriented). Pola & visualisasi PRG lengkap: **[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.
+

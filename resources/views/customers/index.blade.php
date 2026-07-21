@@ -44,6 +44,17 @@
 <!-- Filter & Search Panel -->
 <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
     <form action="/customers" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 items-end">
+        {{-- Pertahankan konteks tab/grup saat submit filter. Tanpa ini, mencari di
+             daftar "Pelanggan Gagal"/"Putus" (?status_group=...) atau tab
+             Active/Suspend (?status=...) akan kehilangan parameter itu dan
+             controller jatuh ke tampilan default (active+suspended) — user seolah
+             "dilempar balik" ke List Pelanggan dan tak bisa mencari di grup. --}}
+        @if($statusGroup !== '')
+            <input type="hidden" name="status_group" value="{{ $statusGroup }}">
+        @endif
+        @if($status !== '')
+            <input type="hidden" name="status" value="{{ $status }}">
+        @endif
         <!-- Search -->
         <div>
             <label for="search" class="block text-xs font-semibold text-slate-500 mb-2">CARI PELANGGAN</label>
@@ -264,7 +275,7 @@
                             </a>
                             @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Tandai alat {{ $customer->full_name }} sudah diambil?', this);">
+                                  onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
                                 @csrf
                                 <button type="submit"
                                         class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors border border-slate-200 hover:bg-slate-50 rounded px-2.5 py-1 cursor-pointer">

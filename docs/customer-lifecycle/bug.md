@@ -43,3 +43,31 @@ Jalur di atas (form Lapor Survey lengkap) cuma bisa dipicu **teknisi** yang lagi
 - **Tidak ada state baru** di `WorkflowTransition`/`TaskStatus` — sepenuhnya reuse `REJECTED` dan `DIBATALKAN` yang sudah ada, konsisten dengan jalur reject-verifikasi (`CustomerVerificationController::reject()`).
 - **Tidak ada perubahan skema database** — `survey_note` (kolom existing) dipakai sebagai alasan, `cancel_reason` (kolom existing di `tasks`) dipakai sebagai alasan pembatalan task.
 - Pelanggan yang sudah `REJECTED` lewat jalur ini **tidak bisa di-follow-up ulang** (state final, `allowedNextTransitions()` kosong) — sama seperti pelanggan yang direject di tahap verifikasi.
+
+---
+
+# Gap — Pelanggan Gagal "Hilang" Setelah Ditekan "Kembalikan"
+
+**Status:** ✅ Fixed 2026-07-21.
+**Severity:** Sedang — pelanggan yang dikembalikan dari daftar "Pelanggan Gagal" lenyap dari semua daftar, user mengira datanya hilang.
+
+Detail + test regresi: `docs/ANALISA_BUG_LIST_PELANGGAN_DAN_MIGRASI_REQ_ID.md` (Bug #2).
+
+## Ringkasan
+
+`CustomerController::restoreFromFailed()` mengembalikan `customer.status` ke status sebelum penolakan (mis. `verification_admin`, `installation_in_progress`). Itu benar — pelanggan keluar dari daftar Gagal. Tapi:
+
+1. **Peta grup di `index()` dulu tidak lengkap** — hanya memetakan `waiting_survey`/`surveyed` (survey) dan `waiting_installation`/`installed` (verification). Status intermediate seperti `survey_in_progress`, `waiting_acc`, `installation_in_progress`, `verification_admin`, `revision_installation` **tidak masuk grup mana pun dan bukan default** → invisible di semua daftar. Bug visibilitas ini lebih luas: berlaku untuk SEMUA pelanggan in-progress di status itu, bukan cuma hasil restore.
+2. **`restoreFromFailed()` redirect `back()`** ke daftar Gagal — pelanggan sudah keluar dari sana, jadi terlihat "menghilang".
+
+## Perbaikan Diterapkan
+
+1. **`index()`** — peta `match($statusGroup)` diperluas menutup seluruh pipeline (lihat tabel di `docs/data-pelanggan/README.md`).
+2. **`restoreFromFailed()`** — redirect ke `customers.show` (halaman detail) dengan pesan menyebut tahap tujuan (label dari `subscription_statuses.name`), bukan `back()`. Pelanggan langsung terlihat, dan pesan memberi tahu di tab mana ia bisa dicari.
+
+Test: `tests/Feature/RestoredFailedCustomerStaysVisibleTest.php`.
+
+## Yang Sengaja Tidak Diubah
+
+- **Tidak ada state baru** — hanya memetakan ulang status existing ke grup daftar.
+- **Tidak ada perubahan skema database.**

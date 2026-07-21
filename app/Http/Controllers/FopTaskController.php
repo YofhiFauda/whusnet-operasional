@@ -65,8 +65,14 @@ class FopTaskController extends Controller
                 'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
                 self::priorityOrderBindings()
             )
-            ->orderByRaw('CASE WHEN category IN (?, ?) THEN created_at END ASC', TaskType::autoOnlyValues())
-            ->orderByRaw('CASE WHEN category NOT IN (?, ?) THEN created_at END DESC', TaskType::autoOnlyValues());
+            ->orderByRaw(
+                'CASE WHEN category IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END ASC',
+                TaskType::autoOnlyValues()
+            )
+            ->orderByRaw(
+                'CASE WHEN category NOT IN ('.implode(',', array_fill(0, count(TaskType::autoOnlyValues()), '?')).') THEN created_at END DESC',
+                TaskType::autoOnlyValues()
+            );
 
         // Search filter
         if ($request->filled('search')) {

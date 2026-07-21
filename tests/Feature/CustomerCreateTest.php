@@ -2,14 +2,16 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CustomerCreateTest extends TestCase
@@ -77,13 +79,14 @@ class CustomerCreateTest extends TestCase
             'odp_code' => 'ODP-PON-999',
             'olt_code' => 'OLT-ZTE-C320',
             'vlan_id' => '1024',
-            'foto_ktp' => \Illuminate\Http\UploadedFile::fake()->image('ktp.jpg'),
+            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
         ];
 
         $response = $this->post('/customers', $data);
 
-        // Assert redirect to customer list
-        $response->assertRedirect('/customers');
+        // Registrasi mengarahkan ke halaman detail pelanggan baru (bukan list).
+        $newCustomer = Customer::where('full_name', 'Fajar Pratama')->firstOrFail();
+        $response->assertRedirect("/customers/{$newCustomer->id}");
         $response->assertSessionHas('success');
 
         // Assert database persistence
@@ -144,7 +147,7 @@ class CustomerCreateTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
         $pop = Pop::create([
             'code' => 'SMN',
@@ -180,26 +183,25 @@ class CustomerCreateTest extends TestCase
             'discount_amount' => 10000,
             'tax_percent' => 11,
             'status' => 'registered',
-            
+
             // Faked uploads
-            'foto_ktp' => \Illuminate\Http\UploadedFile::fake()->image('ktp.jpg'),
-            'foto_rumah' => \Illuminate\Http\UploadedFile::fake()->image('rumah.jpg'),
-            'foto_kontrak' => \Illuminate\Http\UploadedFile::fake()->create('contract.pdf', 500),
+            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
+            'foto_rumah' => UploadedFile::fake()->image('rumah.jpg'),
+            'foto_kontrak' => UploadedFile::fake()->create('contract.pdf', 500),
         ];
 
         $response = $this->post('/customers', $data);
 
-        $response->assertRedirect('/customers');
+        $customer = Customer::where('full_name', 'Fajar Pratama Upload')->firstOrFail();
+        $response->assertRedirect("/customers/{$customer->id}");
         $response->assertSessionHas('success');
 
-        $customer = Customer::where('full_name', 'Fajar Pratama Upload')->firstOrFail();
-        
         $this->assertNotNull($customer->foto_ktp);
         $this->assertNotNull($customer->foto_rumah);
         $this->assertNotNull($customer->foto_kontrak);
 
-        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($customer->foto_ktp);
-        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($customer->foto_rumah);
-        \Illuminate\Support\Facades\Storage::disk('public')->assertExists($customer->foto_kontrak);
+        Storage::disk('public')->assertExists($customer->foto_ktp);
+        Storage::disk('public')->assertExists($customer->foto_rumah);
+        Storage::disk('public')->assertExists($customer->foto_kontrak);
     }
 }

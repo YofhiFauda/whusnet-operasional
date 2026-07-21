@@ -83,4 +83,11 @@ Task (1 pekerjaan lapangan)
 
 ---
 
+## Pola Redirect (PRG)
+
+Ubah task (`update`) → `tasks.show` (Detail). Batalkan task (`cancel`) → `fop.dashboard` (papan kerja,
+pengecualian sadar). Aturan lengkap + kenapa: **[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.
+
+---
+
 **Last updated:** 2026-07-14 (cross-reference `TaskObserver`/Task 10 SLA dual-cycle + klarifikasi 2 jalur reject beda efek)

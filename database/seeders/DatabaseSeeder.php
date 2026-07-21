@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SlaTimelineFeatureSeeder::class); //UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
         
         // $this->call(CustomerSeeder::class);
-        $this->call(MasterPopSeeder::class);
+        // $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);
 
         // User::factory(10)->create();

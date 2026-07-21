@@ -71,4 +71,13 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 
 ---
 
+## Pola Redirect (PRG)
+
+Assign team / switch teknisi → redirect ke `fop-tasks.index` (papan kerja). Ini **pengecualian sadar**
+dari aturan "create/update → Detail": FOP Task **tidak punya halaman detail** (hanya index + edit modal
++ history), papan `fop-tasks.index` adalah surface kerjanya. Aturan lengkap:
+**[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.
+
+---
+
 **Last updated:** 2026-07-24 (integrasi penuh Ticketing: modal create/edit ikut mode Ticketing buat MTN/C-REQ, Detail Task nampilin section "Detail Ticket", cascade cancel lewat `TaskPolicy::cancelViaFopTask()`, fix bug FopTask Draft gak naik status meski udah di-assign teknisi — lihat [docs/ticketing/](../ticketing/README.md))

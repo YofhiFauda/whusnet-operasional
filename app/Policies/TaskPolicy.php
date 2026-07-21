@@ -2,8 +2,11 @@
 
 namespace App\Policies;
 
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WorkflowTransitionPermission;
 
 /**
  * TaskPolicy — semua pengecekan via $user->can() / permission dinamis.
@@ -81,7 +84,7 @@ class TaskPolicy
      */
     public function edit(User $user, Task $task): bool
     {
-        if (!$user->hasPermission('task.manage')) {
+        if (! $user->hasPermission('task.manage')) {
             return false;
         }
 
@@ -94,6 +97,13 @@ class TaskPolicy
      */
     public function editType(User $user, Task $task): bool
     {
+        // Tipe auto-only (Survey/Pemasangan/Ambil Modem) gak boleh diubah dari
+        // sini sama sekali — asalnya dari alur auto-sync (Registrasi Pelanggan
+        // / tombol Ambil Alat), bukan pilihan manual. Lihat TaskType::autoOnlyValues().
+        if (in_array($task->task_type->value, TaskType::autoOnlyValues(), true)) {
+            return false;
+        }
+
         return $user->hasPermission('task.edit.type') && $task->status->isEditable();
     }
 
@@ -105,6 +115,7 @@ class TaskPolicy
         if ($user->hasPermission('task.manage') || $user->hasPermission('task.assign.team')) {
             return $task->status->isEditable();
         }
+
         return $this->canTransitionTo($user, $task, 'terjadwal') && $task->status->isEditable();
     }
 
@@ -124,11 +135,11 @@ class TaskPolicy
         // SRV/PSB terikat ke workflow Customer (List Pelanggan Gagal) — cancel
         // buat 2 tipe ini WAJIB lewat halaman Customer (CustomerSurveyController/
         // CustomerInstallationController::cancel()), bukan tombol Task langsung.
-        if (in_array($task->task_type, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+        if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
             return false;
         }
 
-        return $this->canTransitionTo($user, $task, 'dibatalkan') && !in_array($task->status->value, ['selesai', 'dibatalkan']);
+        return $this->canTransitionTo($user, $task, 'dibatalkan') && ! in_array($task->status->value, ['selesai', 'dibatalkan']);
     }
 
     /**
@@ -155,7 +166,7 @@ class TaskPolicy
      */
     public function cancelViaFopTask(User $user, Task $task): bool
     {
-        if (in_array($task->task_type, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+        if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
             return false;
         }
 
@@ -206,10 +217,10 @@ class TaskPolicy
     public function statusStart(User $user, Task $task): bool
     {
         $canTransition = $this->canTransitionTo($user, $task, 'in_progress');
-        
-        $statusValue = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
 
-        if (!$canTransition && ($user->hasPermission('task.execute') || $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value)) {
+        $statusValue = $task->status instanceof TaskStatus ? $task->status->value : $task->status;
+
+        if (! $canTransition && ($user->hasPermission('task.execute') || $task->task_type->value === TaskType::MAINTENANCE->value)) {
             $canTransition = in_array($statusValue, ['terjadwal', 'pending']);
         }
 
@@ -222,9 +233,10 @@ class TaskPolicy
     public function statusComplete(User $user, Task $task): bool
     {
         $canTransition = $this->canTransitionTo($user, $task, 'selesai');
-        if (!$canTransition && $task->status === \App\Enums\TaskStatus::PENDING && in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])) {
+        if (! $canTransition && $task->status === TaskStatus::PENDING && in_array($task->task_type->value, [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])) {
             $canTransition = true;
         }
+
         return $canTransition && $task->isMember($user->id);
     }
 
@@ -263,19 +275,19 @@ class TaskPolicy
      */
     private function canTransitionTo(User $user, Task $task, string $newStatus): bool
     {
-        $fromStatus = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
+        $fromStatus = $task->status instanceof TaskStatus ? $task->status->value : $task->status;
 
-        $rule = \App\Models\WorkflowTransitionPermission::where('from_status', $fromStatus)
+        $rule = WorkflowTransitionPermission::where('from_status', $fromStatus)
             ->where('to_status', $newStatus)
             ->first();
 
-        if (!$rule) {
+        if (! $rule) {
             return false;
         }
 
         // Cek apakah role user terhubung dengan rule transisi status ini
         $hasRole = $rule->roles()->where('roles.id', $user->role_id)->exists();
-        if (!$hasRole) {
+        if (! $hasRole) {
             return false;
         }
 

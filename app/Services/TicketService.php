@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketHistoryAction;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomerDevice;
 use App\Models\FopTask;
 use App\Models\Ticket;
 use App\Models\User;
@@ -53,7 +55,7 @@ class TicketService
 
             // tickets.pop_id & fop_tasks butuh POP buat scoping — pelanggan tanpa
             // POP bakal bikin insert gagal dengan error FK yang gak kebaca user.
-            if (!$customer->pop_id) {
+            if (! $customer->pop_id) {
                 throw ValidationException::withMessages([
                     'customer_id' => 'Pelanggan ini belum punya POP/Cabang — lengkapi dulu data pelanggannya sebelum buat tiket.',
                 ]);
@@ -61,7 +63,7 @@ class TicketService
 
             $type = TaskType::from($data['type']);
 
-            $ticket = new Ticket();
+            $ticket = new Ticket;
             $ticket->ticket_number = $this->generateTicketNumber();
             $ticket->type = $type;
             $ticket->customer_id = $customer->id;
@@ -79,7 +81,7 @@ class TicketService
             $ticket->save();
 
             $conflicts = [];
-            if (!empty($assignment['technicians'])) {
+            if (! empty($assignment['technicians'])) {
                 $conflicts = $this->assignTechnicians($fopTask, $ticket, $assignment['technicians'], $actor);
             }
 
@@ -88,9 +90,9 @@ class TicketService
             }
 
             $ticket->histories()->create([
-                'action'      => TicketHistoryAction::DIBUAT,
-                'to_status'   => $fopTask->status->value,
-                'actor_id'    => $actor->id,
+                'action' => TicketHistoryAction::DIBUAT,
+                'to_status' => $fopTask->status->value,
+                'actor_id' => $actor->id,
                 'happened_at' => now(),
             ]);
 
@@ -102,6 +104,44 @@ class TicketService
                 'ticket' => $ticket->load(['customer', 'creator', 'fopTask.technicians', 'attachments']),
                 'conflicts' => $conflicts,
             ];
+        });
+    }
+
+    /**
+     * Bikin FopTask category DEAC (Ambil Modem) dari tombol "Ambil Alat" di
+     * List Putus Langganan (CustomerController::retrieveDevice()). Gak lewat
+     * Ticket sama sekali (DEAC bukan tipe yang boleh diajukan lewat Ticketing —
+     * lihat TaskType::ticketValues()), tapi tetap dibikin Draft-unassigned
+     * kayak syncToFopTask() supaya alur eksekusinya (assign teknisi → Task →
+     * evidence/report → review) SAMA PERSIS dengan MTN/C-REQ, bukan lagi
+     * langsung tandai device_retrieved_at sekali klik. Nomor TFOP- tetap
+     * lewat generateFopTaskNumber() yang sama biar gak nyimpang dari deret
+     * yang dipakai FopTaskController::generateTaskNumber() (lihat CLAUDE.md
+     * § Sinkronisasi Ticket ↔ FopTask ↔ Task). device_retrieved_at sendiri
+     * baru keisi otomatis saat Task-nya selesai (lihat TaskService::complete()).
+     */
+    public function createDeviceRetrievalTask(Customer $customer, User $actor): FopTask
+    {
+        return DB::transaction(function () use ($customer, $actor) {
+            $fopTask = new FopTask;
+            $fopTask->task_number = $this->generateFopTaskNumber();
+            $fopTask->task_date = now();
+            $fopTask->category = TaskType::AMBIL_MODEM;
+            $fopTask->tugas = $customer->display_id.'_'.$customer->full_name;
+            $fopTask->village_id = $customer->village_id;
+            $fopTask->pop_id = $customer->pop_id;
+            $fopTask->customer_id = $customer->id;
+            $fopTask->issue = 'Pengambilan alat pelanggan putus langganan.';
+            $fopTask->notes = "Ambil Alat — diajukan oleh {$actor->name} dari List Putus Langganan.";
+            $fopTask->status = TaskStatus::DRAFT;
+            $fopTask->priority = FopTaskPriority::MEDIUM;
+            $fopTask->save();
+
+            if (class_exists(AuditLog::class)) {
+                AuditLog::log($fopTask, 'create', null, $fopTask->fresh()->toArray());
+            }
+
+            return $fopTask;
         });
     }
 
@@ -127,8 +167,8 @@ class TicketService
             'customer_id' => $fopTask->customer_id,
             'pop_id' => $fopTask->pop_id,
             'task_type' => $fopTask->category->value,
-            'title' => 'FOP: ' . $fopTask->tugas,
-            'description' => trim($ticket->detail_keluhan . "\n" . ($ticket->catatan_teknis ?? '')),
+            'title' => 'FOP: '.$fopTask->tugas,
+            'description' => trim($ticket->detail_keluhan."\n".($ticket->catatan_teknis ?? '')),
             'team_member_ids' => $technicianIds,
             'scheduled_at' => $fopTask->task_date,
             'conflict_override' => true,
@@ -169,9 +209,9 @@ class TicketService
      * Cuma field non-sensitif — SN/MAC/PPPoE sengaja gak ikut, itu dikunci
      * permission customers.detail.devices.view_sensitive di modul Pelanggan.
      */
-    private function deviceSummary(?\App\Models\CustomerDevice $device): ?string
+    private function deviceSummary(?CustomerDevice $device): ?string
     {
-        if (!$device) {
+        if (! $device) {
             return null;
         }
 
@@ -189,7 +229,7 @@ class TicketService
      */
     private function syncToFopTask(Ticket $ticket, Customer $customer, User $actor, ?string $taskDate = null): FopTask
     {
-        $fopTask = new FopTask();
+        $fopTask = new FopTask;
         $fopTask->task_number = $this->generateFopTaskNumber();
         $fopTask->task_date = $taskDate ?? now();
         $fopTask->category = $ticket->type;
@@ -197,7 +237,7 @@ class TicketService
         // konsisten sama identitas pelanggan yang dipakai di seluruh sistem
         // (CID/REQ ID, lihat docs/master/pop/business-logic.md), bukan label
         // tipe tiket generik kayak "Maintenance: ...".
-        $fopTask->tugas = $customer->display_id . '_' . $customer->full_name;
+        $fopTask->tugas = $customer->display_id.'_'.$customer->full_name;
         $fopTask->village_id = $customer->village_id;
         $fopTask->pop_id = $customer->pop_id;
         $fopTask->customer_id = $customer->id;

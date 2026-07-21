@@ -83,4 +83,11 @@ Task (eksekusi teknisi lapangan)
 
 ---
 
+## Pola Redirect (PRG)
+
+Buat tiket (`store`) & ubah tiket (`update`) → redirect ke `tickets.show` (Detail), mengikuti
+konvensi PRG global. Aturan lengkap + kenapa: **[`docs/PRG_REDIRECT_CONVENTION.md`](../PRG_REDIRECT_CONVENTION.md)**.
+
+---
+
 **Last updated:** 2026-07-24 (sinkronisasi penuh Ticketing ↔ Task FOP: create/edit modal ikut Ticketing, Detail Task lengkap, fix CID & Draft-macet)

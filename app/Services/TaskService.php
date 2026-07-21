@@ -189,6 +189,17 @@ class TaskService
         ]);
 
         $task = $task->refresh();
+
+        // Task Ambil Modem (DEAC) selesai → alat otomatis ditandai diambil.
+        // Ini pengganti klik manual "Ambil Alat" jaman FopTask belum dibuat
+        // (lihat CustomerController::retrieveDevice() & TicketService::createDeviceRetrievalTask()).
+        if ($task->task_type === TaskType::AMBIL_MODEM && $task->customer_id) {
+            $device = $task->customer?->customerDevice;
+            if ($device && ! $device->device_retrieved_at) {
+                $device->update(['device_retrieved_at' => $task->completed_at]);
+            }
+        }
+
         broadcast(new TaskCompleted($task));
 
         // Notify FOP users in the same POP
