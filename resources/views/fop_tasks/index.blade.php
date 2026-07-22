@@ -23,7 +23,7 @@
                 <span>Konflik Team (<span x-text="teamConflictModal.conflicts.length"></span>)</span>
             </button>
             <button @click="openCreateModal()"
-                    class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui">
+                    class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
@@ -192,7 +192,7 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 @if($task->team)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-100">
                                         {{ $task->team->name }}
                                     </span>
                                 @elseif($task->technicians->count() === 1)
@@ -783,7 +783,7 @@
                                         <span class="text-xs font-semibold text-text-main group-hover:text-primary transition-colors" x-text="t.name"></span>
                                         <div class="flex items-center gap-1.5 mt-1">
                                             <template x-for="m in t.members" :key="m.id">
-                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100" x-text="m.name"></span>
+                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-sky-50 text-sky-700 border border-sky-100" x-text="m.name"></span>
                                             </template>
                                         </div>
                                     </div>

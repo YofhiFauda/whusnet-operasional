@@ -182,8 +182,9 @@ class CustomerFinalVerificationTest extends TestCase
         $this->assertNotNull($invoice);
         $this->assertEquals('2026-06', $invoice->billing_period);
         // Nominal dihitung server (InitialInvoiceService), bukan diambil dari
-        // total_amount kiriman form: prorata 30/30 x harga paket + PPN 11%.
-        $expectedSubtotal = (float) $customer->customerService->monthly_price;
+        // total_amount kiriman form. Aktivasi 1 Juni: hari aktivasi digratiskan,
+        // jadi 30 - 1 = 29 dari 30 hari, lalu PPN 11%.
+        $expectedSubtotal = round((float) $customer->customerService->monthly_price * 29 / 30);
         $this->assertEquals($expectedSubtotal, (float) $invoice->subtotal);
         $this->assertEquals(round($expectedSubtotal * 1.11, 2), (float) $invoice->total_amount);
         $this->assertEquals('belum_dibayar', $invoice->invoice_status->value);

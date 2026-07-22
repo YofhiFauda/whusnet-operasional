@@ -55,7 +55,7 @@ class CustomerRegistrationTest extends TestCase
             'monthly_price' => 150000,
         ]);
 
-        $role = Role::create(['name' => 'Owner']);
+        $role = Role::firstOrCreate(['code' => 'owner'], ['name' => 'Owner']);
         $this->admin = User::factory()->create(['role_id' => $role->id]);
     }
 

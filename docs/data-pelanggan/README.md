@@ -2,6 +2,8 @@
 
 Fitur Data Pelanggan adalah modul utama untuk mengelola calon pelanggan dan pelanggan ISP. Modul ini mencakup pendaftaran pelanggan, antrean survey, verifikasi lapangan, pemasangan, hingga aktivasi dan import batch.
 
+> **Usulan terbuka:** [analisa-identitas-pelanggan-person-uuid.md](analisa-identitas-pelanggan-person-uuid.md) — REQ ID bukan identitas orang (39 `customer_code` kembar lintas POP, 25 orang punya >1 RQ). Usulan layer `persons` + UUIDv7. Belum diimplementasi.
+
 ## File Terkait
 
 | Bagian | File |

@@ -1,27 +1,31 @@
 # Design.md — WHUSNET Admin Payment
-## ISP Billing Enterprise · Modern & Comfortable UI
+## ISP Billing Enterprise · Clean, Minimalist & Modern UI
 
 **Project:** WHUSNET Admin Payment  
 **Stack:** Laravel · Blade · Tailwind CSS · Alpine.js · Laravel Reverb · Filament  
-**Design System Base:** Design-System-Enterprise-Grade-v3 (Sky Blue & Slate · Light & Dark)  
-**Version:** `v1.0.0`  
-**Status:** Production-Ready Design Specification  
-**Last Updated:** 2026-06-27
+**Design System Base:** Design-System-Enterprise-Grade-v3  
+**Design Theme:** Modern Sky Blue & Slate Neutral (Light & Dark)  
+**Version:** `v2.0.0`  
+**Status:** Primary UI/UX Design Specification — sumber tunggal, menggantikan seluruh varian sebelumnya  
+**Last Updated:** 2026-07-22
 **Patch Tambahan**  Mencegah AI default ke "card-per-section"
 
 ---
 
 ## Filosofi Desain WHUSNET Admin Payment
 
-WHUSNET Admin Payment adalah aplikasi billing dan manajemen pelanggan ISP yang digunakan setiap hari oleh tim Finance, NOC, dan Admin POP. Desain harus mencapai keseimbangan antara:
+WHUSNET Admin Payment adalah aplikasi billing dan manajemen pelanggan ISP yang digunakan setiap hari oleh tim Finance, NOC, dan Admin POP. Antarmuka tidak boleh terasa berat, kaku, atau melelahkan. Desain harus mencapai keseimbangan antara:
 
-> **Enterprise-grade** (aman, presisi, auditable) + **Modern & Nyaman** (bersih, cepat, intuitif)
+> **Enterprise-grade** (aman, presisi, auditable) + **Clean & Minimalist** (bersih, lega, cepat dibaca)
 
-Tiga prinsip utama:
+Empat prinsip utama:
 
 1. **Calm Productivity** — UI tidak membuat user lelah setelah 8 jam penggunaan. Warna bersih, spacing konsisten, tidak ada dekorasi yang membuang perhatian.
-2. **Data Clarity First** — Angka rupiah, ID pelanggan, status jaringan harus terbaca seketika tanpa harus squinting atau zoom-in.
-3. **Action Confidence** — Setiap tombol, form, dan alur kerja dirancang sehingga user tahu persis apa yang akan terjadi sebelum mereka mengklik.
+2. **Clean & Breathable** — spacing seimbang (tidak terlalu rapat, tidak terlalu renggang), struktur visual bersih tanpa dekorasi berlebihan. Whitespace dan garis 1px adalah pembatas, bukan tumpukan box.
+3. **Data Clarity First** — Angka rupiah, ID pelanggan, status jaringan harus terbaca seketika tanpa harus squinting atau zoom-in. *Tabular digits* dan *monospace* untuk semua nilai teknis.
+4. **Action Confidence** — Setiap tombol, form, dan alur kerja dirancang sehingga user tahu persis apa yang akan terjadi sebelum mereka mengklik.
+
+**Aksen warna:** *Sky Blue* (`#0284C7` / `#0EA5E9`) memberi kesan modern, ramah, dan profesional; dipadu *Slate* (`#0F172A` / `#F8FAFC`) yang tenang dan ramah mata untuk sesi kerja panjang.
 
 ---
 
@@ -31,7 +35,7 @@ Tiga prinsip utama:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Topbar (64px) — Logo, Global Search, Notifications, User Menu  │
+│ Topbar (64px) — Breadcrumb, Global Search, Tema, Notif, User    │
 ├──────────────────┬──────────────────────────────────────────────┤
 │ Sidebar (256px)  │ Main Content Area                            │
 │                  │ ┌─────────────────────────────────────────┐ │
@@ -258,6 +262,42 @@ AI yang menghasilkan salah satu pattern ini harus di-regenerate.
 </div>
 ```
 
+### ❌ DILARANG: Radius campur-campur
+
+Satu skala radius untuk seluruh aplikasi. Panel, card, tombol, input, select,
+dan modal semuanya **8px** (`rounded-lg`). Pengecualian hanya dua:
+
+| Elemen | Radius | Alasan |
+|---|---|---|
+| Panel, card, modal, tombol, select | `8px` | Skala dasar |
+| Search input, badge, pill, chip | `9999px` | Bentuk pill memang disengaja |
+| Avatar kotak, icon box | `8px` | Ikut skala dasar |
+
+```html
+<!-- SALAH — tiga radius berbeda dalam satu layar -->
+<div class="rounded-2xl">   <!-- 16px panel -->
+  <button class="rounded-xl">  <!-- 12px tombol -->
+    <select class="rounded-lg">  <!-- 8px select -->
+
+<!-- BENAR — satu skala -->
+<div class="rounded-lg"><button class="rounded-lg"><select class="rounded-lg">
+```
+
+### ❌ DILARANG: Gradient sebagai warna elemen
+
+Tombol utama, logo mark, dan badge memakai **warna solid** dari token.
+Gradient (`bg-gradient-to-r from-… to-…`) tidak ada di design token dan
+membuat warna primary punya dua nilai berbeda tergantung posisi piksel —
+menyulitkan pengecekan kontras dan tidak bisa direplikasi di dark mode.
+
+```html
+<!-- SALAH -->
+<button class="bg-gradient-to-r from-skybrand-500 to-skybrand-600 shadow-md shadow-skybrand-500/25">
+
+<!-- BENAR -->
+<button class="bg-skybrand-600 hover:bg-skybrand-700">
+```
+
 ### ❌ DILARANG: Warna background pada section container
 
 ```html
@@ -458,6 +498,11 @@ Berlaku untuk SEMUA halaman:
   max-width: 360px;
 }
 
+.filter-search:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);   /* sky-600 @ 12% */
+}
+
 .filter-search input {
   border: none;
   background: transparent;
@@ -539,10 +584,33 @@ UNIVERSAL PROHIBITIONS:
 5. Tab content tidak punya card sendiri — ada di dalam panel yang sama dengan tabs
 6. Warna warning/error/success hanya pada badge/teks — bukan background section
 7. Section titles = 10px Inter uppercase #707881 — bukan heading besar
+8. Satu skala radius: 8px (rounded-lg). Tidak ada gradient untuk tombol/logo/badge.
+9. Status di baris tabel = badge BACA-SAJA. Tidak ada toggle/switch pengubah
+   status layanan. Aksi destruktif lewat dropdown [···] + modal konfirmasi.
+
+SHELL RULES:
+- Breadcrumb selalu 3 ruas: Home > {item sidebar} > {halaman aktif}
+- Zona tengah topbar = global search. Zona kanan = tema, bantuan, notif, user menu.
+- Sub-item sidebar aktif tidak boleh lebih mencolok dari menu induknya
+
+OPERATOR ERGONOMICS (halaman list, §6.10):
+- Wajib checkbox seleksi + bulk action bar (naked, muncul saat ada seleksi)
+- Select-all header hanya menyapu halaman aktif, bukan seluruh hasil filter
+- Tabel wajib bisa dioperasikan tanpa mouse (arrow/Space/Enter/PgUp/PgDn)
+- Baris aktif keyboard punya outline sendiri, bukan sekadar hover
+- Font sel default 13px (longgar); 11px hanya mode "rapat" opt-in
+- Paginasi nyata + Per Page 10/25/50/100, default 25
 
 TYPOGRAPHY (non-negotiable):
 - Inter: semua teks UI, navigasi, label, tombol, deskripsi
 - JetBrains Mono: CID, IP, MAC, timestamp, currency, invoice number, uptime
+- font-mono WAJIB di-remap ke JetBrains Mono di tailwind.config
+
+DARK MODE (non-negotiable):
+- darkMode: 'class'. SETIAP permukaan wajib punya pasangan dark:
+- Dilarang menghasilkan bg-white / text-slate-900 / border-slate-200 telanjang
+- Peta token ada di §18.4. Warna solid (tombol primary, badge) TIDAK dipetakan
+- Kelas 'dark' dipasang script inline di <head>, sebelum body
 
 [Paste DESIGN.md content here]
 ```
@@ -556,15 +624,15 @@ Seluruh nilai di dokumen ini mengacu pada token dari Design System Enterprise Gr
 
 | Token | Light Mode Hex | Dark Mode Hex | Penggunaan di WHUSNET |
 |---|---:|---:|---|
-| `--color-primary` | `#4F46E5` | `#4F46E5` | Tombol utama, active nav, link aksi (Cobalt/Indigo) |
-| `--color-primary-hover` | `#4338CA` | `#4338CA` | Hover state |
-| `--color-primary-soft` | `#F5F3FF` | `#1E1B4B` | Active sidebar item background |
-| `--color-primary-border`| `#C7D2FE` | `#312E81` | Accent border untuk active state / focus |
-| `--color-background` | `#F8FAFC` | `#090D16` | App background |
-| `--color-surface` | `#FFFFFF` | `#111827` | Card, tabel, modal |
-| `--color-surface-muted`| `#F1F5F9` | `#1F2937` | Sidebar, input background, hover card |
-| `--color-border` | `#E2E8F0` | `#1E293B` | Garis pembatas halus |
-| `--color-border-strong`| `#CBD5E1` | `#334155` | Garis pembatas tebal / focus border |
+| `--color-primary` | `#0284C7` | `#38BDF8` | Sky Blue 600 — Tombol utama, active nav, link aksi, active tab |
+| `--color-primary-hover` | `#0369A1` | `#0284C7` | Sky Blue 700 — Hover state elemen interaktif utama |
+| `--color-primary-soft` | `#F0F9FF` | `#0C4A6E` | Sky Blue 50 — Active sidebar item background, hover row lembut |
+| `--color-primary-border`| `#BAE6FD` | `#0369A1` | Sky Blue 200 — Accent border untuk active state / focus |
+| `--color-background` | `#F8FAFC` | `#0F172A` | Slate 50/900 — App background / main canvas |
+| `--color-surface` | `#FFFFFF` | `#1E293B` | White / Slate 800 — Card, tabel, modal |
+| `--color-surface-muted`| `#F1F5F9` | `#334155` | Slate 100/700 — Sidebar, input background, hover card |
+| `--color-border` | `#E2E8F0` | `#334155` | Slate 200/700 — Garis pembatas halus (`dark:border-slate-700`) |
+| `--color-border-strong`| `#CBD5E1` | `#475569` | Slate 300/600 — Garis pembatas tebal / focus border |
 | `--color-text-main` | `#0F172A` | `#F8FAFC` | Teks utama |
 | `--color-text-secondary`| `#334155` | `#CBD5E1` | Teks sekunder / body |
 | `--color-text-muted` | `#64748B` | `#94A3B8` | Label, helper, metadata |
@@ -583,7 +651,40 @@ Seluruh nilai di dokumen ini mengacu pada token dari Design System Enterprise Gr
 
 ```css
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, monospace;
+}
 ```
+
+**JetBrains Mono adalah font mono default aplikasi.** Utility `font-mono` di Tailwind wajib
+di-remap ke JetBrains Mono — kalau tidak, nilai teknis jatuh ke monospace bawaan OS
+(Consolas di Windows, Menlo di macOS) dan tampilan jadi tidak konsisten antar mesin.
+
+### 2.2.1 Tailwind Config
+
+```js
+theme: {
+  extend: {
+    fontFamily: {
+      sans: ['Inter', 'sans-serif'],
+      mono: ['JetBrains Mono', 'monospace'],   // wajib — jangan andalkan default OS
+    },
+    colors: {
+      skybrand: {
+        50:  '#f0f9ff',  100: '#e0f2fe',  200: '#bae6fd',
+        300: '#7dd3fc',  400: '#38bdf8',  500: '#0ea5e9',
+        600: '#0284c7',  700: '#0369a1',  800: '#075985',
+        900: '#0c4a6e',
+      },
+    },
+  },
+}
+```
+
+`skybrand-600` = `--color-primary`. `skybrand-700` = hover. `skybrand-50` = soft/active background.
+Slate dipakai apa adanya dari palet bawaan Tailwind.
 
 ### 2.3 Status Warna Operasional ISP
 
@@ -628,6 +729,59 @@ PENGATURAN
 ```
 
 > **Catatan:** Gunakan ikon SVG dari Lucide Icons, bukan emoji di implementasi aktual.
+
+### 3.1.1 Aturan Pengelompokan Menu
+
+1. **Label grup tidak boleh sama dengan label item di dalamnya.**
+   Grup `MASTER DATA` yang isinya item `Master Data` adalah redundansi —
+   pembaca membaca kata yang sama dua kali tanpa dapat informasi tambahan.
+   Kalau sebuah grup hanya berisi satu item bernama sama, hapus grupnya dan
+   gabungkan item itu ke grup terdekat yang relevan.
+
+2. **Item harus benar-benar milik grupnya.** `Laporan Keuangan` di dalam
+   grup `MASTER DATA` salah — laporan adalah keluaran, bukan data master.
+   Kalau ragu, tanya: "apakah semua item di grup ini menjawab pertanyaan
+   yang sama?" Kalau tidak, pecah grupnya.
+
+3. **Grup minimal 2 item**, kecuali grup itu memang akan bertambah.
+
+### 3.1.2 Semantik Chevron
+
+Satu bentuk = satu arti. Jangan dicampur:
+
+| Ikon | Arti | Dipakai pada |
+|---|---|---|
+| `chevron-down` (rotate saat terbuka) | Item ini **punya submenu** yang bisa dibuka-tutup | `<button>` collapsible |
+| `chevron-right` | Item ini **membuka halaman lain** | `<a>` navigasi biasa |
+| *(tanpa chevron)* | Item daun, langsung ke halaman | `<a>` sederhana |
+
+Menempelkan `chevron-right` pada item yang sebenarnya punya submenu (atau
+sebaliknya) membuat user menebak-nebak apa yang terjadi saat diklik.
+
+### 3.1.3 Hierarki Active State — Anak Tidak Boleh Melebihi Induk
+
+Ini kesalahan yang paling sering muncul: sub-item aktif diberi pill solid
+(`bg-primary text-white shadow`), sementara induknya yang juga aktif hanya
+`bg-primary-soft`. Hasilnya **hierarki terbalik** — anak berteriak lebih
+keras daripada induknya.
+
+```
+❌ SALAH                              ✅ BENAR
+▼ Pelanggan      (soft, lembut)      ▼ Pelanggan      (soft)
+  ┌──────────────────────────┐         │ List Pelanggan  (soft + border-left)
+  │ List Pelanggan           │  ← solid biru, paling mencolok
+  └──────────────────────────┘
+```
+
+Bobot visual harus menurun ke bawah, bukan naik:
+
+| Level | Active state |
+|---|---|
+| Item induk | `bg-primary-soft` + `text-primary-hover` + `font-semibold` |
+| Sub-item | `bg-primary-soft` + `text-primary-hover` + `font-semibold` + `border-left: 2px solid primary` |
+
+Sub-item dibedakan lewat **garis kiri tipis**, bukan lewat background yang
+lebih pekat. Tambahkan `aria-current="page"` pada item halaman aktif.
 
 ### 3.2 CSS Sidebar Item
 
@@ -721,8 +875,117 @@ PENGATURAN
 ### 4.1 Anatomi Topbar
 
 ```
-[≡ Toggle] [WHUSNET Logo]    [🔍 Cari pelanggan, invoice, ID...]    [🔔] [?] [Avatar ▾]
+[≡]  Home › Pelanggan › List Pelanggan  [🔍 Cari pelanggan, invoice, ID… /]  [🌙] [?] [🔔³] │ [SU Super Admin ▾]
+└── kiri: toggle + breadcrumb ──┘       └──── tengah: global search ────┘    └───── kanan: aksi ─────┘
 ```
+
+Tiga zona, urutannya tidak boleh ditukar:
+
+| Zona | Isi | Catatan |
+|---|---|---|
+| Kiri | Toggle sidebar (mobile) + **breadcrumb** | Breadcrumb di topbar, bukan di page header — hemat ruang vertikal |
+| Tengah | **Global search** | Wajib ada. Lihat §4.3 |
+| Kanan | **Toggle tema** + **bantuan** + notifikasi + separator + **user menu** | Urutan tetap: tema → `?` → bell → garis → avatar |
+
+Zona kanan urutannya dari yang paling sering dipakai ke paling jarang:
+toggle tema (ikut cahaya ruangan, bisa beberapa kali sehari), bantuan
+(sering di minggu-minggu awal, lalu jarang), notifikasi (dicek berkala),
+user menu (jarang). Separator tipis memisahkan aksi cepat dari identitas
+akun.
+
+Ikon bantuan `?` di sini **tidak menggantikan** item "Bantuan & Pintasan"
+di dalam user menu — keduanya wajib ada. Lihat §6.10.5.
+
+**Global search wajib ada di setiap halaman.** Ini alat yang paling sering
+dipakai di sistem dengan ribuan pelanggan lintas POP. Jangan diisi elemen
+dekoratif (jam, tanggal, badge status) — itu merampas ruang paling berharga
+di layar untuk sesuatu yang tidak bisa diklik.
+
+Shortcut `/` memfokuskan global search dari mana saja, kecuali saat kursor
+sedang berada di input lain.
+
+---
+
+### 4.1.1 Breadcrumb — Pola `Home › Menu › Sub Menu`
+
+Breadcrumb selalu **tepat tiga ruas**, konsisten di seluruh aplikasi:
+
+```
+Home  ›  {Menu}  ›  {Sub Menu}
+```
+
+| Ruas | Isi | Interaksi |
+|---|---|---|
+| `Home` | Ikon rumah + teks "Home" | Link ke Dashboard |
+| `{Menu}` | **Nama item induk di sidebar** | Link ke landing menu tersebut |
+| `{Sub Menu}` | Halaman aktif | **Bukan link**, `aria-current="page"`, warna primary |
+
+Aturan:
+
+1. **Ruas tengah = label item sidebar, bukan label grup sidebar.**
+   Sidebar punya grup (`OPERASIONAL`, `LAPORAN`) dan item (`Pelanggan`,
+   `Tagihan`). Breadcrumb memakai **item**, karena itu yang bisa diklik
+   dan punya halaman. Menulis `Home › Operasional › List Pelanggan` salah —
+   "Operasional" hanya label kategori, tidak ada halamannya.
+2. **Halaman tanpa sub-menu tetap tiga ruas** dengan ruas ketiga = nama
+   halaman itu sendiri (`Home › Tagihan › Daftar Tagihan`).
+3. **Halaman detail** memakai identitas record di ruas ketiga
+   (`Home › Pelanggan › Budi Santoso`).
+4. Separator memakai ikon `chevron-right` 10px `slate-300`, bukan karakter
+   `/` atau `>` literal.
+5. Ruas panjang di-`truncate`, bukan dibungkus ke baris kedua — topbar
+   tingginya tetap 64px.
+
+```html
+<nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-sm text-slate-500">
+  <a href="/dashboard" class="flex items-center gap-1.5 hover:text-slate-700">
+    <x-lucide-house class="w-4 h-4 text-slate-400" />
+    <span class="hidden sm:inline">Home</span>
+  </a>
+  <x-lucide-chevron-right class="w-2.5 h-2.5 text-slate-300" />
+  <a href="/customers" class="hover:text-slate-700 truncate">Pelanggan</a>
+  <x-lucide-chevron-right class="w-2.5 h-2.5 text-slate-300" />
+  <span aria-current="page" class="font-semibold text-skybrand-600 truncate">List Pelanggan</span>
+</nav>
+```
+
+---
+
+### 4.1.2 User Menu (Zona Kanan)
+
+Avatar bukan sekadar hiasan — ini pintu masuk ke profil, preferensi akun,
+dan keluar sesi.
+
+> **Toggle tema tidak di sini.** Ganti terang/gelap adalah aksi cepat yang
+> mengikuti kondisi cahaya ruangan, bukan pengaturan akun — tempatnya
+> tombol ikon tersendiri di topbar. Lihat §18.1.
+
+```
+[SU] Super Admin        ▾      ← avatar + nama + "Owner · Semua POP"
+     Owner · Semua POP
+     ┌────────────────────────┐
+     │ Super Admin            │
+     │ admin@whusnet.id       │
+     ├────────────────────────┤
+     │ 👤 Profil Saya         │
+     │ ⚙  Preferensi          │
+     ├────────────────────────┤
+     │ ⏻  Keluar   (danger)   │
+     └────────────────────────┘
+```
+
+Baris kedua avatar menampilkan **role + POP scope efektif**. Untuk sistem
+multi-cabang, user harus bisa melihat sekali lihat sedang bekerja di scope
+mana — salah scope berarti salah data.
+
+**Hanya satu menu boleh terbuka pada satu waktu.** User menu dan row action
+menu saling menutup; keduanya tutup saat klik di luar atau `Esc`.
+
+### 4.1.3 Notifikasi
+
+Bell menampilkan **angka** jumlah belum dibaca, bukan titik polos. Titik
+memberi tahu "ada sesuatu" tapi tidak "seberapa mendesak" — untuk NOC yang
+memantau gangguan, selisih antara 1 dan 23 menentukan prioritas.
 
 ### 4.2 Spesifikasi
 
@@ -904,57 +1167,157 @@ Recent Activity (2 kolom: 1fr + 1fr)
 
 ### 6.1 Daftar Pelanggan
 
+Halaman **Type A** — card budget = 1 (hanya table panel).
+
 ```
-Page Header:
+Page Header — NAKED:
   Pelanggan
   Kelola data pelanggan, layanan aktif, status billing, dan dokumen.
-  [Import Excel]  [Tambah Pelanggan →]
+                                      [Import Excel]  [+ Tambah Pelanggan]
 
-──────────────────────────────────────────────────────────────────
+Summary Strip — FLAT BAR, 1 border membungkus semua kolom:
+  ┌────────────┬────────────┬────────────┬─────────────────┐
+  │ TOTAL      │ AKTIF      │ ISOLIR     │ LEWAT TEMPO     │
+  │ 1.488      │ 1.482      │ 6          │ 87              │
+  │ +12,4% bln │ 99,6% up   │ blokir     │ Rp 21.300.000   │
+  └────────────┴────────────┴────────────┴─────────────────┘
 
-Filter Bar:
-  [🔍 Cari nama / CID / HP]  [Status ▾]  [POP ▾]  [Paket ▾]  [Bulan ▾]
-  Filter aktif: Status: Aktif × | POP: Madiun ×                [Reset Filter]
+Filter Bar — NAKED:
+  [ Semua | Aktif | Isolir ]              [🔍 Cari nama, CID, HP, desa…]
+  [POP ▾] [Desa ▾] [Paket ▾] [Berkas ▾]                 [Reset Filter]
 
-──────────────────────────────────────────────────────────────────
-
-Tabel Pelanggan (compact density):
-  ┌──────────────┬───────────────┬──────────────┬──────────┬────────────┬──────────┬────────┐
-  │ CID          │ Nama Pelanggan│ Paket        │ Status   │ Jatuh Tempo│ Tagihan  │ Aksi   │
-  ├──────────────┼───────────────┼──────────────┼──────────┼────────────┼──────────┼────────┤
-  │ C00100042    │ Budi Santoso  │ Fiber 50Mbps │ ● Aktif  │ 10 Jul 26  │ Rp 250rb │ [···]  │
-  │ C00100043    │ Siti Rahayu   │ Fiber 30Mbps │ ● Overdue│ 05 Jun 26  │ Rp 200rb │ [···]  │
-  │ C00100044    │ Ahmad Fauzi   │ Business 1G  │ ● Isolir │ —          │ Rp 850rb │ [···]  │
-  └──────────────┴───────────────┴──────────────┴──────────┴────────────┴──────────┴────────┘
-
-  Menampilkan 1–25 dari 1.284 data
-  [← Prev]  [1] [2] [3] ... [52]  [Next →]     Per halaman: [25 ▾]
+┌─ TABLE PANEL (1 card) ────────────────────────────────────────────────────┐
+│ ID PELANGGAN │ NAMA        │ POP·DESA   │ … │ JATUH TEMPO │ TAGIHAN │STATUS│AKSI│
+├──────────────┼─────────────┼────────────┼───┼─────────────┼─────────┼──────┼────┤
+│ C00100042    │ Budi Santoso│ Jetis·Winong│  │ 10 Agu 2026 │Rp 165.000│●Aktif│[···]│
+│              │             │            │   │             │ Belum   │      │    │
+│ C00100043    │ Siti Rahayu │ Jetis·Jetis │  │ 10 Jul 2026 │Rp 198.000│●Aktif│[···]│
+│              │             │            │   │ (merah)     │Lewat tempo│     │    │
+│ C00100044    │ Ahmad Fauzi │ Sandya·Kauman│ │ 10 Jun 2026 │Rp 220.000│●Isolir│[···]│
+├──────────────┴─────────────┴────────────┴───┴─────────────┴─────────┴──────┴────┤
+│ Menampilkan 1–25 dari 1.488 pelanggan   [← Prev] [1][2][3]…[52] [Next →]        │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 6.2 Spesifikasi Kolom Tabel Pelanggan
 
-| Kolom | Lebar | Font | Alignment | Catatan |
-|---|---:|---|---|---|
-| CID | `120px` | JetBrains Mono | Left | Link ke detail |
-| Nama Pelanggan | `flex` | Inter | Left | Truncate + tooltip |
-| Paket | `140px` | Inter | Left | Nama paket |
-| Status | `110px` | Inter (badge) | Left | Badge berwarna |
-| Jatuh Tempo | `120px` | JetBrains Mono | Left | Merah jika overdue |
-| Tagihan | `110px` | JetBrains Mono | Right | Format Rp |
-| Aksi | `80px` | — | Right | Dropdown menu [···] |
+| Kolom | Font | Alignment | Catatan |
+|---|---|---|---|
+| ID Pelanggan (CID) | JetBrains Mono | Left | Link ke detail, warna primary |
+| Nama Lengkap | Inter | Left | Avatar inisial + nama, truncate |
+| POP · Desa | Inter | Left | **Satu kolom**, POP jadi chip + desa teks muted |
+| Paket Internet | JetBrains Mono | Left | Kode paket + nama |
+| No. Telepon | JetBrains Mono | Left | Link `wa.me`, ikon WhatsApp |
+| Jatuh Tempo | JetBrains Mono | Left | **Merah + semibold** jika lewat tempo |
+| Tagihan | JetBrains Mono | Right | Format Rp + sub-teks status bayar |
+| Berkas | JetBrains Mono | Center | Persentase; hijau ≥80%, amber di bawahnya |
+| Status | Inter (badge) | Center | **Baca-saja.** Lihat §6.2.2 |
+| Aksi | — | Center | Tombol `[···]` → dropdown, lihat §6.3 |
+
+#### 6.2.1 Kolom yang Dilarang di Halaman List
+
+**❌ Nomor urut baris.** Angka 1–10 yang di-reset tiap halaman adalah
+informasi palsu: baris "3" di halaman 2 bukan pelanggan ketiga. Tidak ada
+yang bisa dilakukan dengan angka itu — ia hanya memakan kolom. Identitas
+baris sudah dipegang CID.
+
+**❌ Dot-meter untuk persentase.** Lima titik untuk mewakili kelengkapan
+berkas terlihat rapi tapi tidak informatif — `round(83% × 5)` dan
+`round(75% × 5)` sama-sama menghasilkan 4 titik, jadi dua nilai berbeda
+tampil identik. Kalau angkanya sudah ditampilkan, dot-nya redundan; kalau
+belum, dot-nya menyesatkan. Tulis persentasenya.
+
+**❌ Kolom yang memecah satu konsep jadi dua.** POP dan Desa selalu dibaca
+bersama (desa berada di bawah POP) — gabungkan jadi satu kolom.
+
+#### 6.2.2 Data Billing Wajib Ada di List Pelanggan
+
+Ini sistem billing. Pertanyaan pertama yang dibawa admin ke halaman daftar
+pelanggan adalah **"siapa yang nunggak?"**. Halaman yang tidak bisa
+menjawabnya gagal pada fungsi utamanya, seberapa pun rapi tampilannya.
+
+Kolom `Jatuh Tempo` dan `Tagihan` **wajib** ada. Status tagihan diturunkan,
+bukan disimpan sebagai kolom terpisah:
+
+```
+paid == true            → lunas    (hijau)
+due  <  hari ini        → overdue  (merah, semibold)
+selain itu              → belum    (netral)
+```
+
+Summary strip halaman ini mengikuti prioritas yang sama:
+`Total · Aktif · Isolir · Lewat Tempo (jumlah + nominal)`.
+Metrik "rata-rata kelengkapan berkas" bukan informasi yang dipakai untuk
+mengambil keputusan harian — jangan menempati salah satu dari empat slot itu.
 
 ### 6.3 Action Dropdown per Row
 
 ```
-[Lihat Detail]
-[Edit Data]
-─────────────
-[Cetak Tagihan]
-[Kirim WhatsApp]
-─────────────
-[Isolir Layanan]   ← warning color
-[Terminasi]        ← danger color, butuh konfirmasi
+┌────────────────────────┐
+│ Budi Santoso           │  ← header: nama + CID, konfirmasi konteks
+│ C00100042              │
+├────────────────────────┤
+│ 👁  Lihat Detail        │
+│ ✎  Edit Data           │
+├────────────────────────┤
+│ ⎙  Cetak Tagihan       │
+│ ⌾  Kirim WhatsApp      │
+├────────────────────────┤
+│ ⊘  Isolir Layanan      │  ← warning color, WAJIB modal konfirmasi
+│ 🗑  Terminasi           │  ← danger color, WAJIB modal konfirmasi
+└────────────────────────┘
 ```
+
+Aturan teknis:
+
+1. **Header menu menampilkan nama + CID.** Menu melayang jauh dari barisnya;
+   tanpa header, user bisa salah menyangka sedang mengaksi baris lain.
+2. **Satu elemen menu dipakai ulang untuk semua baris**, diposisikan
+   `position: fixed` lewat JS. Dropdown `absolute` di dalam `<td>` akan
+   terpotong oleh `overflow-x-auto` pada wrapper tabel.
+3. Menu **membalik ke atas** kalau tidak muat di bawah viewport.
+4. Tutup saat: klik di luar, `Esc`, atau membuka menu lain.
+
+---
+
+### 6.3.1 Perubahan Status Layanan — Larangan Kontrol Sekali Klik
+
+**Status layanan di tabel adalah badge baca-saja. Titik.**
+
+Dilarang menaruh toggle switch, checkbox, atau kontrol apa pun di baris
+tabel yang langsung mengubah status layanan pelanggan.
+
+```html
+<!-- ❌ SALAH — memutus internet pelanggan dengan satu klik tak sengaja -->
+<td>
+  <button onclick="toggleConnection(i)" class="... rounded-full ...">
+    <span class="... translate-x-4"></span>
+  </button>
+</td>
+
+<!-- ✅ BENAR — badge baca-saja; perubahan lewat menu aksi + konfirmasi -->
+<td class="text-center">
+  <span class="badge badge-success"><span class="badge-dot"></span> Aktif</span>
+</td>
+```
+
+Alasannya bukan estetika:
+
+1. **Tidak ada konfirmasi.** Toggle dirancang untuk preferensi yang murah
+   dibatalkan (dark mode, notifikasi), bukan untuk tindakan yang memutus
+   layanan orang yang membayar.
+2. **Tidak ada alasan tercatat.** Isolir wajib punya jejak: siapa, kapan,
+   kenapa. Toggle tidak menyediakan tempat untuk itu.
+3. **Tidak ada gerbang permission.** Kontrol yang tampil di setiap baris
+   sulit di-gate per-role. Teknisi tidak boleh mengeksekusi aksi billing —
+   di dalam dropdown, item-nya bisa disembunyikan per permission.
+4. **Status layanan bukan boolean.** Ia mengikuti transisi status pelanggan
+   yang punya aturan sendiri (aktif → isolir → terminasi, tidak sembarang
+   arah). Flag `true/false` memodelkannya secara salah sejak awal.
+
+Aksi yang membalik keadaan ke arah yang **menguntungkan** pelanggan
+(buka isolir, aktifkan kembali) boleh tanpa modal — cukup toast. Yang
+merugikan wajib modal.
 
 ### 6.4 Halaman Detail Pelanggan
 
@@ -2068,7 +2431,7 @@ visual weight besar.
 .detail-section-title .section-icon {
   width: 14px;
   height: 14px;
-  color: var(--color-primary);  /* #006194 */
+  color: var(--color-primary);  /* #0284C7 */
   margin-right: 6px;
 }
 
@@ -2111,6 +2474,187 @@ visual weight besar.
 ```
 
 
+
+---
+
+## 6.10 Ergonomi Operator — Shift 8–9 Jam
+
+Bagian ini mengatur hal-hal yang tidak terlihat di screenshot tapi menentukan
+apakah aplikasi ini enak dipakai seharian. Staf billing dan admin POP membuka
+halaman list selama satu shift penuh, memproses ratusan baris. Desain yang
+"terlihat rapi" tapi memaksa klik berulang, memaksa tangan bolak-balik ke
+mouse, atau memaksa mata membaca teks 11px selama 9 jam adalah desain yang
+gagal — kegagalannya cuma tidak muncul di demo lima menit.
+
+Empat aturan berikut wajib untuk **semua halaman Type A**.
+
+---
+
+### 6.10.1 Seleksi & Aksi Massal (Wajib)
+
+**Setiap halaman list wajib punya kolom checkbox dan bulk action bar.**
+
+Tanpa itu, pekerjaan berulang jadi beban fisik: menagih 50 pelanggan lewat
+tempo lewat menu per-baris berarti 50× buka menu + 50× pilih item + 50×
+konfirmasi = **150+ klik untuk satu aksi yang sama**. Dengan seleksi massal,
+alurnya jadi: filter → pilih semua → satu klik.
+
+```
+[ ✓ ] ← checkbox header (select-all halaman ini)
+┌──────────────────────────────────────────────────────────────┐
+│ ✓ 12 baris dipilih   Batalkan   [Space] pilih baris aktif    │
+│                    [⎙ Cetak] [⌾ WhatsApp] [⊘ Isolir]         │
+└──────────────────────────────────────────────────────────────┘
+   ↑ naked bar, muncul hanya saat ada seleksi — bukan card,
+     supaya card budget halaman tetap 1
+```
+
+Aturan:
+
+1. **Kolom checkbox paling kiri**, sebelum kolom identitas.
+2. **Bulk bar muncul hanya saat ada baris terpilih**, menampilkan jumlah
+   terpilih + tombol batalkan + aksi massal.
+3. **Select-all header hanya menyapu baris di halaman yang sedang tampil.**
+   Ini bukan keterbatasan — ini disengaja. Centang yang diam-diam memilih
+   1.488 baris tak terlihat terlalu berbahaya untuk aksi seperti Isolir.
+   Kalau user memang perlu memilih lintas halaman, naikkan dulu Per Page.
+4. **Checkbox header punya state `indeterminate`** saat sebagian baris
+   terpilih — bukan sekadar checked/unchecked.
+5. **Aksi massal destruktif tetap wajib modal konfirmasi**, dan jumlah target
+   dihitung ulang di dalam modal (yang sudah berstatus Isolir dikecualikan,
+   dan judulnya menyebut angka: "Isolir 12 Layanan?").
+6. **Seleksi dikosongkan setelah aksi selesai**, supaya tidak ada sisa
+   pilihan yang tidak terlihat lalu tereksekusi lagi.
+
+---
+
+### 6.10.2 Navigasi Keyboard (Wajib)
+
+Operator yang memproses ratusan baris tidak boleh dipaksa memindahkan tangan
+ke mouse untuk tiap baris. Selain lambat, klik berulang sepanjang shift
+adalah penyumbang nyata **Repetitive Strain Injury** di pergelangan tangan.
+
+Kontrak pintasan — sama di semua halaman list:
+
+| Tombol | Aksi | Cakupan |
+|---|---|---|
+| `↑` `↓` | Pindah baris aktif | Tabel |
+| `Home` `End` | Baris pertama / terakhir | Tabel |
+| `PgUp` `PgDn` | Halaman sebelum / sesudah | Tabel |
+| `Space` | Pilih / lepas baris aktif | Tabel |
+| `Enter` | Buka menu aksi baris aktif | Tabel |
+| `/` | Fokus global search | Global |
+| `Alt` + `N` | Tambah record baru | Global |
+| `Esc` | Tutup menu / modal | Global |
+| `?` | Buka panel bantuan | Global |
+
+Aturan:
+
+1. **Baris aktif wajib punya penanda visual sendiri** (`outline: 2px solid
+   primary`, `outline-offset: -2px`) — tidak boleh hanya mengandalkan hover,
+   karena hover mengikuti mouse yang justru sedang tidak dipakai.
+2. **Baris aktif ikut ter-scroll** ke dalam viewport (`scrollIntoView`
+   dengan `block: 'nearest'`).
+3. **Pintasan mati saat user sedang mengetik** (`INPUT`, `TEXTAREA`,
+   `SELECT`) atau saat modal terbuka. Pengecualian: `Alt`+`N` berlaku di
+   mana saja karena tidak bertabrakan dengan pengetikan.
+4. **Baris aktif direset** setiap tabel dirender ulang (filter, ganti
+   halaman, ganti per-page).
+
+---
+
+### 6.10.3 Kerapatan Tabel (Density)
+
+Satu ukuran font tidak melayani semua orang. Data-density tinggi enak untuk
+screenshot, menyiksa untuk 9 jam menatap nominal rupiah dan tanggal jatuh
+tempo — apalagi di monitor resolusi rendah.
+
+| Mode | Font sel | Padding vertikal | Untuk |
+|---|---:|---:|---|
+| **Longgar** (default) | `13px` | `16px` | Kerja harian, shift panjang |
+| Rapat | `11px` | `10px` | Menyapu banyak baris sekaligus |
+
+**Default wajib Longgar.** Rapat adalah opt-in, bukan sebaliknya —
+kenyamanan mata adalah kondisi normal, kepadatan adalah pengecualian.
+
+Pilihan disimpan di `localStorage` dan dipulihkan saat halaman dibuka.
+
+Implementasi memakai CSS custom property pada selektor **ID**, bukan utility
+per-sel:
+
+```css
+#customerTable          { --cell-py: 16px; --cell-fs: 13px; --cell-sub-fs: 11px; }
+html.density-compact
+#customerTable          { --cell-py: 10px; --cell-fs: 11px; --cell-sub-fs: 10px; }
+
+#customerTable tbody td { padding-block: var(--cell-py); font-size: var(--cell-fs); }
+#customerTable tbody
+  .cell-sub             { font-size: var(--cell-sub-fs); }
+```
+
+Selektor ID punya specificity `1-0-1`, mengalahkan utility Tailwind `0-1-0`
+tanpa perlu `!important`. Konsekuensinya: **jangan menulis `text-[11px]` atau
+`py-3.5` pada `<td>`** — ukuran sel milik density, bukan milik markup baris.
+
+---
+
+### 6.10.4 Paginasi & Per Page
+
+**Paginasi wajib nyata, bukan tombol hardcoded.** Deret `1 2 3 … 149` yang
+tidak terhubung ke data adalah kebohongan UI: tombolnya bisa diklik tapi
+tidak memindahkan apa pun.
+
+| Elemen | Aturan |
+|---|---|
+| Per Page | Dropdown `10 / 25 / 50 / 100`, **default 25**, disimpan di `localStorage` |
+| Info | `Menampilkan X–Y dari Z` — ketiganya dihitung dari data, mono |
+| Deret halaman | Elipsis di tengah: `1 … 9 [10] 11 … 20` |
+| Prev / Next | `disabled` di ujung, bukan disembunyikan |
+| Ganti filter | Selalu kembali ke halaman 1 |
+| Ganti per-page | Kembali ke halaman 1, seleksi dipertahankan |
+
+Default 25 (bukan 10) karena staf yang memproses ratusan baris lebih butuh
+melihat banyak sekaligus daripada menekan Next berulang kali.
+
+---
+
+### 6.10.5 Panel Bantuan
+
+Pintasan yang hanya hidup di dokumentasi tidak akan pernah dihafal. Panel
+bantuan wajib punya **minimal tiga pintu masuk**:
+
+1. **Ikon `?` di topbar** — untuk ditemukan tanpa dicari
+2. **Item di user menu** (di bawah Preferensi) — untuk yang refleksnya
+   mencari di menu akun
+3. **Tombol `?` di keyboard** — untuk yang sudah tahu
+
+Isi panel dibagi dua tab di dalam satu panel yang sama (tab bar dipisah
+`border-bottom`, bukan card baru):
+
+| Tab | Isi |
+|---|---|
+| **Pintasan** | Tabel pintasan §6.10.2 + catatan kapan pintasan tidak aktif |
+| **Tombol Aksi** | Arti tiap item menu `[···]`, aturan aksi massal, cara membaca warna kolom tagihan |
+
+Tab "Tombol Aksi" bukan pelengkap — ikon `⊘` dan `🗑` di dropdown tidak
+menjelaskan dirinya sendiri. Yang wajib dijelaskan eksplisit:
+
+- **Beda Isolir dan Terminasi** disebut di judulnya sendiri:
+  *"Isolir Layanan — bisa dibatalkan"* vs *"Terminasi — permanen"*,
+  lengkap dengan cara mengembalikan isolir.
+- **Arti warna kolom tagihan** (hijau lunas / netral belum / merah lewat
+  tempo). Warna adalah konvensi yang dipelajari sekali.
+
+**Petunjuk in-context wajib menyertai.** Panel bantuan jarang dibuka dua
+kali, jadi pintasan juga ditempel di tempat aksinya terjadi:
+
+- Footer row menu: `↑↓ pindah · Enter buka` + tautan "Apa ini?" yang membuka
+  panel langsung ke tab Tombol Aksi
+- Bulk bar: `Space pilih baris aktif`
+- Item user menu: `kbd` `?` di sisi kanan
+
+Orang membaca petunjuk ini sambil mengerjakan tugasnya, bukan saat sedang
+mencari bantuan — itu yang membuatnya menempel.
 
 ---
 
@@ -2832,12 +3376,107 @@ Setiap halaman wajib memenuhi:
 
 WHUSNET mendukung dark mode untuk operator NOC yang bekerja di lingkungan low-light.
 
-Toggle dark mode tersedia di **User Menu** di Topbar, dan state disimpan di `localStorage`.
+### 18.1 Penempatan Toggle
+
+Toggle tema adalah **tombol ikon tersendiri di Topbar**, bersebelahan dengan
+bell notifikasi — bukan item tersembunyi di dalam user menu. Mengganti tema
+adalah aksi yang sering dilakukan (ikut kondisi cahaya ruangan, bukan ikut
+identitas user), jadi tidak boleh butuh dua klik.
+
+**Ikon menunjukkan tujuan, bukan keadaan.** Saat mode terang aktif, tombol
+menampilkan ikon `moon` ("klik untuk gelap"); saat gelap, ikon `sun`.
+Menampilkan ikon mode yang sedang aktif membuat user ragu apakah tombol itu
+indikator atau saklar.
+
+### 18.2 Resolusi Tema
+
+```
+localStorage['whusnet-theme']  →  ada?  pakai itu           (pilihan user menang)
+                                  tidak? ikuti prefers-color-scheme OS
+```
+
+Setelah user menekan toggle sekali, pilihannya tersimpan permanen dan
+perubahan setting OS **tidak lagi menimpanya**. Listener `prefers-color-scheme`
+tetap dipasang, tapi langsung keluar kalau `localStorage` sudah terisi.
+
+### 18.3 Anti-Flash (Wajib)
+
+Kelas `dark` harus dipasang **sebelum** body dirender. Kalau menunggu
+Alpine/DOMContentLoaded, akan ada kedipan putih sekejap tiap kali membuka
+halaman dalam mode gelap — sangat mengganggu di ruangan gelap, yang justru
+alasan dark mode ada.
 
 ```html
-<html x-data="{ dark: localStorage.getItem('theme') === 'dark' }"
-      :class="{ 'dark': dark }">
+<head>
+  <script>
+    (function () {
+      const saved = localStorage.getItem('whusnet-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <!-- baru setelah ini: CSS, Tailwind, dst -->
+</head>
 ```
+
+Tambahkan juga `color-scheme` supaya kontrol bawaan browser (scrollbar,
+dropdown select, autofill) ikut gelap:
+
+```css
+html       { color-scheme: light; }
+html.dark  { color-scheme: dark; }
+```
+
+### 18.4 Peta Token Terang → Gelap
+
+Tailwind memakai strategi `darkMode: 'class'`. Setiap permukaan wajib punya
+pasangan; jangan menyisakan satu pun `bg-white` tanpa `dark:`.
+
+| Peran | Light | Dark |
+|---|---|---|
+| App background | `bg-slate-50` | `dark:bg-slate-900` |
+| Surface (panel, card, modal, sidebar) | `bg-white` | `dark:bg-slate-800` |
+| Surface muted (footer, header tabel) | `bg-slate-50/50`, `bg-slate-100/70` | `dark:bg-slate-900/40`, `dark:bg-slate-900/50` |
+| Border halus | `border-slate-200` | `dark:border-slate-700` |
+| Border sangat halus | `border-slate-100` | `dark:border-slate-700/60` |
+| Teks utama | `text-slate-900` | `dark:text-slate-50` |
+| Teks sekunder | `text-slate-600` | `dark:text-slate-300` |
+| Teks muted / label | `text-slate-500` | `dark:text-slate-400` |
+| Ikon muted | `text-slate-400` | `dark:text-slate-500` |
+| Primary teks / link | `text-skybrand-600` | `dark:text-skybrand-400` |
+| Primary soft background | `bg-skybrand-50` | `dark:bg-skybrand-900/30` |
+| Badge status (bg) | `bg-{warna}-50` | `dark:bg-{warna}-900/30` |
+| Badge status (teks) | `text-{warna}-700` | `dark:text-{warna}-300` |
+| Badge status (border) | `border-{warna}-200` | `dark:border-{warna}-800` |
+| Ring pemisah avatar/dot | `ring-white` | `dark:ring-slate-800` |
+| Overlay modal | `bg-slate-900/50` | `dark:bg-slate-950/70` |
+
+**Header tabel harus lebih gelap dari panelnya.** Di light, `bg-slate-100/70`
+lebih gelap dari `bg-white`. Di dark, memetakannya ke `slate-800` membuatnya
+menyatu dengan panel — pakai `dark:bg-slate-900/50` supaya tetap terbaca
+sebagai header.
+
+**Warna solid tidak dipetakan.** Tombol primary (`bg-skybrand-600`), badge
+notifikasi (`bg-rose-500`), dan teks di atasnya (`text-white`) sudah cukup
+kontras di kedua mode — jangan diberi varian `dark:` yang menggeser warnanya.
+
+### 18.5 Warna di Luar Tailwind
+
+Nilai warna yang hidup di blok `<style>` (bukan utility) tidak ikut terbawa
+`darkMode: 'class'` dan harus ditulis manual:
+
+```css
+.glass-header      { background: rgba(255, 255, 255, 0.85); }
+.dark .glass-header{ background: rgba(30, 41, 59, 0.85); }   /* slate-800 */
+
+.dark ::-webkit-scrollbar-track      { background: #0f172a; }
+.dark ::-webkit-scrollbar-thumb      { background: #475569; }
+.dark ::-webkit-scrollbar-thumb:hover{ background: #64748b; }
+```
+
+### 18.6 CSS Variables Dark
 
 ```css
 .dark {
@@ -2846,12 +3485,14 @@ Toggle dark mode tersedia di **User Menu** di Topbar, dan state disimpan di `loc
   --color-surface-muted: #334155;
   --color-border: #334155;
   --color-border-strong: #475569;
-  --color-text-main: #F1F5F9;
+  --color-text-main: #F8FAFC;
   --color-text-secondary: #CBD5E1;
   --color-text-muted: #94A3B8;
   --color-text-disabled: #475569;
-  --color-primary-soft: #0C2A3D;
-  --color-primary-border: #164B6D;
+  --color-primary: #38BDF8;
+  --color-primary-hover: #0284C7;
+  --color-primary-soft: #0C4A6E;
+  --color-primary-border: #0369A1;
   --color-success-bg: #052E16;
   --color-warning-bg: #2D1B00;
   --color-error-bg: #2D0A0A;
@@ -2859,11 +3500,18 @@ Toggle dark mode tersedia di **User Menu** di Topbar, dan state disimpan di `loc
 }
 ```
 
-Dark mode notes untuk WHUSNET:
+Nilai di atas adalah sumber kebenaran untuk peta utility di §18.4 —
+`--color-surface: #1E293B` itulah yang jadi `dark:bg-slate-800`, dan
+`--color-background: #0F172A` jadi `dark:bg-slate-900`. Kalau salah satu
+diubah, peta di §18.4 wajib ikut diperbarui.
+
+Catatan tambahan:
 - Metric card values tetap mudah dibaca di dark mode.
-- Badge text tidak berubah, hanya background lebih gelap.
+- Badge text tidak berubah, hanya background lebih gelap (`{warna}-900/30`).
 - Grafik chart tidak perlu adjustment khusus — warna chart sudah cukup kontras.
-- Tabel row hover: gunakan `#1E2D3D` (bukan pure black).
+- Tabel row hover memakai tint primary (`dark:hover:bg-skybrand-900/20`),
+  bukan abu-abu netral — supaya baris aktif tetap terbaca sebagai "sedang
+  disorot", sama seperti di light mode.
 
 ---
 
@@ -2996,6 +3644,23 @@ Urutan implementasi yang disarankan berdasarkan nilai bisnis:
 - Jangan nested card lebih dari 1 level.
 - Jangan tampilkan error state saat loading state masih aktif.
 - Jangan gunakan font Inter untuk nilai rupiah, IP, atau ID.
+- Jangan andalkan `font-mono` default OS — remap ke JetBrains Mono di tailwind.config.
+- Jangan pakai warna aksen selain Sky Blue (`skybrand`) untuk elemen interaktif.
+- Jangan buat 4 card KPI terpisah di halaman list — pakai flat summary strip.
+- Jangan taruh toggle pengubah status layanan di baris tabel.
+- Jangan buat halaman list tanpa checkbox seleksi dan bulk action bar.
+- Jangan bikin select-all yang menyapu seluruh hasil filter, bukan halaman aktif.
+- Jangan bikin tabel yang hanya bisa dioperasikan dengan mouse.
+- Jangan tandai baris aktif keyboard hanya dengan style hover.
+- Jangan jadikan 11px sebagai ukuran font tabel default.
+- Jangan tulis `text-[11px]` atau `py-3.5` di `<td>` — itu wilayah density.
+- Jangan pasang deret tombol paginasi hardcoded yang tidak terhubung data.
+- Jangan sembunyikan pintasan hanya di panel bantuan.
+- Jangan pakai gradient untuk tombol, logo, atau badge.
+- Jangan campur radius (16px / 12px / 8px) dalam satu layar.
+- Jangan isi zona tengah topbar dengan elemen dekoratif — itu milik global search.
+- Jangan tulis label grup sidebar di breadcrumb; pakai label item.
+- Jangan beri sub-item aktif bobot visual lebih besar dari menu induknya.
 - Jangan buat pagination tanpa menampilkan total record.
 
 ---
@@ -3035,4 +3700,69 @@ CRITICAL RULES — NEVER VIOLATE:
 
 8. NO COLORED BACKGROUNDS: Warna warning/error/success hanya pada badge 
    teks dan ikon. Background selalu var(--color-surface) = #FFFFFF.
+
+9. SKY BLUE ONLY: Aksen interaksi = #0284C7 (skybrand-600), hover #0369A1,
+   soft #F0F9FF. Bukan indigo, bukan violet, bukan cobalt. Semua lewat
+   CSS variable / token Tailwind — tidak ada hex hardcode di markup.
+
+10. JETBRAINS MONO IS THE DEFAULT MONO: font-mono harus di-remap ke
+    JetBrains Mono di tailwind.config. CID, invoice, rupiah, IP, MAC,
+    dan timestamp TIDAK BOLEH pakai Inter maupun monospace bawaan OS.
+
+11. TYPE A KPI IS A FLAT STRIP: Halaman list (Pelanggan, Tagihan,
+    Pembayaran, POP, Audit Log) punya card budget = 1 (table panel).
+    Ringkasan KPI = satu bar flat dengan divider vertikal, BUKAN 4 card
+    terpisah. Filter bar dan page header selalu naked.
+
+12. STATUS IS READ-ONLY IN TABLES: Dilarang menaruh toggle/switch/checkbox
+    di baris tabel yang mengubah status layanan. Status = badge baca-saja.
+    Semua perubahan lewat dropdown [···]; yang merugikan pelanggan
+    (isolir, terminasi) WAJIB modal konfirmasi.
+
+13. BREADCRUMB IS ALWAYS Home › Menu › Sub Menu: Tepat tiga ruas. Ruas
+    tengah = label ITEM sidebar (Pelanggan), bukan label GRUP sidebar
+    (Operasional). Ruas terakhir bukan link, pakai aria-current="page".
+
+14. GLOBAL SEARCH IS MANDATORY: Zona tengah topbar milik global search.
+    Jangan diisi jam, tanggal, atau badge dekoratif. Zona kanan urutannya
+    tetap: toggle tema → notifikasi → separator → avatar/user menu.
+
+15. ONE RADIUS SCALE, NO GRADIENTS: Semua panel/tombol/input/modal 8px
+    (rounded-lg); hanya search input, badge, dan pill yang boleh full-round.
+    Warna elemen selalu solid dari token — tidak ada bg-gradient-to-*.
+
+16. BILLING DATA BELONGS IN THE CUSTOMER LIST: Kolom Jatuh Tempo dan
+    Tagihan wajib ada. Dilarang kolom nomor urut baris dan dot-meter
+    persentase.
+
+17. EVERY SURFACE NEEDS A DARK PAIR: darkMode 'class'. Tidak boleh ada
+    bg-white / text-slate-900 / border-slate-200 tanpa pasangan dark:.
+    Kelas 'dark' dipasang lewat script inline di <head> SEBELUM body
+    dirender — kalau tidak, ada flash putih. Toggle tema = tombol ikon
+    tersendiri di topbar, ikonnya menunjukkan tujuan (moon saat terang).
+
+18. BULK SELECTION IS MANDATORY ON LIST PAGES: Kolom checkbox + bulk action
+    bar (naked, muncul saat ada seleksi). Select-all header HANYA menyapu
+    halaman yang sedang tampil, tidak pernah seluruh hasil filter. State
+    indeterminate wajib. Aksi massal destruktif tetap lewat modal.
+
+19. TABLE MUST BE USABLE WITHOUT A MOUSE: ↑↓ pindah baris, Home/End,
+    PgUp/PgDn, Space pilih, Enter buka menu aksi, / cari, Alt+N tambah,
+    Esc tutup, ? bantuan. Baris aktif wajib punya outline sendiri — tidak
+    boleh hanya mengandalkan hover. Pintasan mati saat mengetik/modal
+    terbuka, kecuali Alt+N.
+
+20. DENSITY DEFAULTS TO COMFORTABLE: Font sel 13px default, 11px hanya
+    sebagai mode "rapat" opt-in. Ukuran sel diatur CSS var di selektor ID
+    (#table), BUKAN utility text-[11px]/py-3.5 di <td>. Disimpan di
+    localStorage.
+
+21. PAGINATION MUST BE REAL: Dilarang deret tombol hardcoded. Per Page
+    10/25/50/100 default 25. Info "Menampilkan X–Y dari Z" dihitung dari
+    data. Ganti filter → kembali ke halaman 1.
+
+22. SHORTCUTS NEED THREE DOORS: Panel bantuan wajib bisa dibuka dari ikon
+    ? di topbar, item di user menu, DAN tombol ?. Petunjuk pintasan juga
+    ditempel in-context (footer row menu, bulk bar) — panel bantuan saja
+    tidak cukup untuk membuat orang hafal.
 ```

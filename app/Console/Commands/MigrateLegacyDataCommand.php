@@ -161,18 +161,38 @@ class MigrateLegacyDataCommand extends Command
             ];
         }
 
-        // Payment-truth map: IDTRANSAKSI => first (oldest) real payment proof row,
-        // sourced from apikeuangan_buktitransaksilunas which has the real payment
-        // method/receiver/note (unlike apikeuangan_buktitransaksitagihan).
+        // Metode/penerima/catatan pembayaran yang sebenarnya, dari
+        // apikeuangan_buktitransaksilunas (apikeuangan_buktitransaksitagihan tidak
+        // menyimpannya).
+        //
+        // Tabel ini kena penyakit yang sama dengan buktitransaksitagihan: di-key
+        // `IDTRANSAKSI` yang konstan seumur hidup pelanggan, jadi satu cost id bisa
+        // punya banyak baris lintas bulan (13 cost id di jetis_db, 2 di antaranya
+        // beda bulan, 5 beda metode bayar). Mengambil satu baris lalu mencapkannya
+        // ke SEMUA pembayaran cost id itu bikin kuitansi Desember mencatut metode
+        // & penerima pembayaran November.
+        //
+        // Bedanya dengan buktitransaksitagihan: `BULANTAGIHAN` di tabel ini KOSONG
+        // di seluruh 52 baris, jadi periode hanya bisa ditebak dari bulan TGLBAYAR.
+        // Karena itu tetap disiapkan dua peta — per periode kalau ketemu, dan baris
+        // tertua sebagai cadangan.
         $lunasByTransaction = [];
+        $lunasByTransactionPeriod = [];
         foreach ($buktiLunasRows as $row) {
             $transactionId = $row['IDTRANSAKSI'] ?? '';
             if ($transactionId === '') {
                 continue;
             }
+
             $existing = $lunasByTransaction[$transactionId] ?? null;
             if ($existing === null || strcmp((string) $row['TGLBAYAR'], (string) $existing['TGLBAYAR']) < 0) {
                 $lunasByTransaction[$transactionId] = $row;
+            }
+
+            $period = $this->legacyBillingPeriod(null, $row['TGLBAYAR'] ?? null);
+            $existingForPeriod = $lunasByTransactionPeriod[$transactionId][$period] ?? null;
+            if ($existingForPeriod === null || strcmp((string) $row['TGLBAYAR'], (string) $existingForPeriod['TGLBAYAR']) < 0) {
+                $lunasByTransactionPeriod[$transactionId][$period] = $row;
             }
         }
 
@@ -363,6 +383,23 @@ class MigrateLegacyDataCommand extends Command
             }
         }
 
+        // Harga bulanan yang benar-benar ditagihkan per permintaan, dipakai
+        // sebagai sumber kebenaran saat `paket.HARGA` legacy bernilai 0 (paket
+        // 'default'/'undefined' di data lama). Tanpa ini `monthly_price` layanan
+        // ikut 0 dan tagihan bulanan berikutnya terbit Rp 0 untuk pelanggan yang
+        // sebenarnya bayar penuh tiap bulan.
+        // Ambil nilai TERBARU (baris biaya paling akhir menang) karena harga
+        // paket pelanggan bisa naik di tengah masa langganan.
+        $monthlyFeeByRequest = [];
+        foreach ($biayaRows as $row) {
+            $requestId = $row['IDPERMINTAAN'] ?? '';
+            $monthlyFee = (int) ($row['BIAYABULANAN'] ?? 0);
+            if ($requestId === '' || $monthlyFee <= 0) {
+                continue;
+            }
+            $monthlyFeeByRequest[$requestId] = $monthlyFee;
+        }
+
         $surveyMap = [];
         foreach ($surveyRows as $row) {
             if (! empty($row['IDPERMINTAAN'])) {
@@ -411,9 +448,23 @@ class MigrateLegacyDataCommand extends Command
         $customersSheet = [];
         $usedCustomerCodes = [];
 
+        $skippedWithoutRequest = 0;
+
         foreach ($penggunaRows as $row) {
             // Filter: skip internal users starting with PG
             if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+                continue;
+            }
+
+            // Akun ber-prefix PE tapi tidak punya satu pun baris di
+            // prosedure_permintaan_wifi bukan pelanggan: tidak pernah ada
+            // permintaan layanan, tidak pernah ditagih. Di dump Jetis ini
+            // menjaring akun internal PE21000001 yang lolos filter prefix di
+            // atas. Kalau diimport, hasilnya pelanggan yatim tanpa layanan yang
+            // mengotori daftar pelanggan dan hitungan kelengkapan data.
+            if (! isset($legacyRequestByCustomer[$row['IDPENGGUNA']])) {
+                $skippedWithoutRequest++;
+
                 continue;
             }
 
@@ -531,6 +582,7 @@ class MigrateLegacyDataCommand extends Command
 
         // Sheet 3: services
         $servicesSheet = [];
+        $servicesWithoutPackage = 0;
         foreach ($layananRows as $row) {
             // Filter: skip internal users
             if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
@@ -567,6 +619,18 @@ class MigrateLegacyDataCommand extends Command
             // Last resort: riwayat_pelanggan's "Berhasil Active" status-change log.
             // prosedure_permintaan_wifi's own date fields are often blank/zero, but
             // this history table almost always has the real event timestamp.
+            //
+            // Kalau SEMUA sumber di atas kosong, `activation_date` sengaja
+            // dibiarkan NULL. Keputusan owner 2026-07-21: lebih baik kosong dan
+            // jujur daripada terisi angka perkiraan. Jangan tambahkan fallback
+            // ke `biaya_tagihan.TGLINSERT` (tanggal tagihan DIBUAT, bukan tanggal
+            // layanan menyala) atau ke `now()` — keduanya pernah diusulkan dan
+            // ditolak. Per 2026-07-21 ada 146 dari 1.956 baris legacy yang
+            // kosong karena ini.
+            //
+            // Aman dibiarkan kosong: penjaga tagihan dobel tidak lagi bergantung
+            // pada kolom ini sejak BILLING-B0c memakai pengecekan lintas-jenis
+            // invoice. Lihat docs/billing-pembayaran/analisa-pencegahan-tagihan-dobel.md.
             if ($actDate === null && ! empty($activationLogByRequest[$row['IDPERMINTAAN'] ?? ''])) {
                 try {
                     $actDate = Carbon::parse($activationLogByRequest[$row['IDPERMINTAAN']])->format('Y-m-d');
@@ -579,6 +643,43 @@ class MigrateLegacyDataCommand extends Command
             if (! empty($row['IDPAKET'])) {
                 $pkg = collect($paketRows)->firstWhere('KODEPAKET', $row['IDPAKET']);
                 $profile = $pkg['PROFILPPP'] ?? $pkg['PROFILOLT'] ?? '';
+            }
+
+            // `IDPAKET` kosong bikin baris ini ditolak validasi import ("ID paket
+            // lama wajib diisi") sehingga pelanggannya masuk tanpa layanan sama
+            // sekali — yatim di daftar pelanggan. Jatuhkan ke paket placeholder
+            // legacy supaya layanannya tetap terbentuk dan pelanggan bisa
+            // dilengkapi manual belakangan. Harga tetap diambil dari
+            // `biaya_tagihan` di bawah, jadi placeholder ini tidak menyeret
+            // harga jadi 0 kalau pelanggannya memang pernah ditagih.
+            $packageId = trim((string) ($row['IDPAKET'] ?? ''));
+            if ($packageId === '') {
+                $placeholder = collect($paketRows)->firstWhere('KODEPAKET', 'PK21000001')
+                    ?? collect($paketRows)->first();
+                $packageId = $placeholder['KODEPAKET'] ?? '';
+                $servicesWithoutPackage++;
+            }
+
+            // Harga bulanan: `paket.HARGA` legacy bernilai 0 untuk paket
+            // 'default'/'undefined', jadi pakai nominal yang benar-benar
+            // ditagihkan di `biaya_tagihan` sebagai sumber utama. Dikirim
+            // kosong kalau dua-duanya tidak ada, biar importer yang memutuskan
+            // (dia jatuh ke harga paket) ketimbang kita menebak angka.
+            $legacyMonthlyPrice = $monthlyFeeByRequest[$row['IDPERMINTAAN'] ?? ''] ?? null;
+
+            // Tanggal jatuh tempo layanan mengikuti konvensi jalur manual
+            // (CustomerController::store): aktivasi + 1 bulan. Sebelumnya field
+            // ini dikirim string kosong dan tidak pernah terisi, yang membuat
+            // SEMUA pelanggan migrasi tertahan di 'perlu_dilengkapi' — jatuh
+            // tempo adalah salah satu field wajib di CustomerValidationService.
+            // Dibiarkan null kalau tanggal aktivasi memang tidak diketahui;
+            // jangan karang dari now() (lihat catatan panjang di atas).
+            $dueDate = null;
+            if ($actDate !== null) {
+                try {
+                    $dueDate = Carbon::parse($actDate)->addMonth()->format('Y-m-d');
+                } catch (\Exception $e) {
+                }
             }
 
             // Lookup survey info
@@ -628,8 +729,9 @@ class MigrateLegacyDataCommand extends Command
             $servicesSheet[] = [
                 'old_request_id' => $row['IDPERMINTAAN'],
                 'old_customer_id' => $row['IDPENGGUNA'] ?? '',
-                'old_package_id' => $row['IDPAKET'] ?? '',
+                'old_package_id' => $packageId,
                 'old_cost_id' => $row['IDBIAYA'] ?? '',
+                'monthly_price' => $legacyMonthlyPrice,
                 'request_status' => $row['STATUS'] ?? '',
                 'installation_status' => $row['STATUSPASANG'] ?? '',
                 'network_type' => $row['JENISJARINGAN'] ?? '',
@@ -637,7 +739,7 @@ class MigrateLegacyDataCommand extends Command
                 'reason' => $row['ALASAN'] ?? '',
                 'service_status' => $row['STATUS'] ?? '',
                 'activation_date' => $actDate,
-                'due_date' => '',
+                'due_date' => $dueDate,
                 // Kapan status terakhir (GAGAL/PUTUS/dst) ini terjadi di sistem
                 // lama. TGLSELESAI adalah tanggal proses ditutup (paling akurat);
                 // kalau kosong (banyak baris GAGAL lama gak isi TGLSELESAI sama
@@ -811,24 +913,99 @@ class MigrateLegacyDataCommand extends Command
             $canonicalCostId[$row['IDBIAYA']] = $dedupSeen[$signature];
         }
 
-        // Sum of apikeuangan_buktitransaksitagihan.BAYAR per cost id (IDTRANSAKSI,
-        // falling back to IDPERMINTAAN), used below to grab the amount legacy
-        // admins actually collected instead of recomputing it.
-        $costPaymentMap = [];
+        // Dedup lapis kedua untuk bukti pembayaran: satu baris per
+        // (cost id kanonik, BULANTAGIHAN).
+        //
+        // Lapis pertama (dekat parsing) memakai signature IDPERMINTAAN|BAYAR|tanggal
+        // insert, jadi hanya menangkap retry yang terjadi di hari yang sama. Sistem
+        // lama juga pernah menjalankan batch re-insert berbulan-bulan kemudian:
+        // Ardiyanto (IN000035) punya dua bukti dengan BULANTAGIHAN identik
+        // (2022-11-02) tapi INSERTED_AT 2022-11-02 dan 2022-12-27 — satu pembayaran
+        // yang tercatat dobel, bukan pembayaran bulan berikutnya.
+        //
+        // Aturan pembedanya: IDTRANSAKSI + BULANTAGIHAN sama = duplikat. Kalau
+        // BULANTAGIHAN berbeda, itu dua periode yang sah dan keduanya dipertahankan.
+        $buktiByCostPeriod = [];
+        $conflictingProofs = [];
         foreach ($buktiRows as $row) {
-            $costId = $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'];
+            $costId = $row['IDTRANSAKSI'] ?: ($row['IDPERMINTAAN'] ?? '');
             if ($costId === '') {
                 continue;
             }
             $costId = $canonicalCostId[$costId] ?? $costId;
-            $costPaymentMap[$costId] = ($costPaymentMap[$costId] ?? 0) + (int) ($row['BAYAR'] ?? 0);
+            $period = $this->legacyBillingPeriod($row['BULANTAGIHAN'] ?? null, $row['INSERTED_AT'] ?? null);
+            $key = $costId.'|'.$period;
+
+            $existing = $buktiByCostPeriod[$key] ?? null;
+            if ($existing === null) {
+                $buktiByCostPeriod[$key] = $row;
+
+                continue;
+            }
+
+            $amount = (int) ($row['BAYAR'] ?? 0);
+            $existingAmount = (int) ($existing['BAYAR'] ?? 0);
+            if ($amount === $existingAmount) {
+                continue; // duplikat murni, aman dibuang
+            }
+
+            // Nominal berbeda = bukan duplikat murni. Di jetis_db selisihnya selalu
+            // tepat Rp 11.000 (materai) — kemungkinan besar koreksi manual admin
+            // lama. Pertahankan yang bermaterai dan laporkan supaya bisa ditinjau
+            // tim billing; jangan dibuang diam-diam.
+            $conflictingProofs[] = sprintf(
+                '%s periode %s: %s vs %s',
+                $costId,
+                $period,
+                number_format($existingAmount, 0, ',', '.'),
+                number_format($amount, 0, ',', '.')
+            );
+            if ($amount > $existingAmount) {
+                $buktiByCostPeriod[$key] = $row;
+            }
+        }
+        $buktiRows = array_values($buktiByCostPeriod);
+
+        // Uang yang benar-benar tertagih, di-key per (cost id, periode tagihan).
+        //
+        // KRUSIAL: legacy `IDBIAYA` konstan seumur hidup pelanggan — dia nomor
+        // kontrak biaya, BUKAN nomor invoice. Seluruh pembayaran bulanan pelanggan
+        // memakai IDTRANSAKSI yang sama; yang membedakan periode hanya BULANTAGIHAN.
+        // Map ini dulu di-key `costId` saja, sehingga semua pembayaran sepanjang masa
+        // langganan dijumlahkan jadi satu "tagihan awal" raksasa (Ardiyanto:
+        // 2 × 165.000 = 330.000 padahal paketnya 165.000).
+        // Dua peta terpisah, sengaja:
+        //  - $periodsByCost  : SEMUA periode yang punya jejak tagihan, termasuk yang
+        //                      BAYAR=0. Baris BAYAR=0 tetap dipakai karena
+        //                      `BULANTAGIHAN`-nya satu-satunya penanda periode yang
+        //                      bisa dipercaya untuk tagihan yang belum dibayar
+        //                      (mis. baris reaktivasi Boyke Santiago IN001619:
+        //                      BAYAR=0, BULANTAGIHAN 2025-05). Kalau ikut dibuang,
+        //                      invoicenya jatuh ke periode aktivasi pertama dan
+        //                      menabrak tagihan lama pelanggan yang sama.
+        //  - $paidByCostPeriod: nominal, hanya dari baris BAYAR>0.
+        $periodsByCost = [];
+        $paidByCostPeriod = [];
+        foreach ($buktiRows as $row) {
+            $costId = $row['IDTRANSAKSI'] ?: ($row['IDPERMINTAAN'] ?? '');
+            if ($costId === '') {
+                continue;
+            }
+            $costId = $canonicalCostId[$costId] ?? $costId;
+            $period = $this->legacyBillingPeriod($row['BULANTAGIHAN'] ?? null, $row['INSERTED_AT'] ?? null);
+            $periodsByCost[$costId][$period] = true;
+
+            if ((int) ($row['BAYAR'] ?? 0) > 0) {
+                $paidByCostPeriod[$costId][$period] = ($paidByCostPeriod[$costId][$period] ?? 0) + (int) $row['BAYAR'];
+            }
         }
 
         // Sheet 5: invoices
         $invoicesSheet = [];
-        // IDBIAYA => 'awal' | 'bulanan', so the payments loop below can route each
-        // buktiRow to the invoice actually generated for its cost id.
-        $invoiceTypeByCostId = [];
+        // (IDBIAYA kanonik => periode 'Y-m' => old_invoice_id), supaya loop payments
+        // di bawah bisa merutekan tiap bukti bayar ke invoice periodenya sendiri.
+        $invoiceKeyByCostPeriod = [];
+        $skippedActivationLogRows = 0;
         foreach ($biayaRows as $row) {
             // Skip duplicate rows collapsed into an earlier canonical row.
             if (($canonicalCostId[$row['IDBIAYA']] ?? $row['IDBIAYA']) !== $row['IDBIAYA']) {
@@ -841,76 +1018,120 @@ class MigrateLegacyDataCommand extends Command
                 continue;
             }
 
-            $issueDate = now()->format('Y-m-d');
-            if (! empty($row['TGLINSERT'])) {
-                try {
-                    $issueDate = Carbon::parse($row['TGLINSERT'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
-            $dueDate = Carbon::parse($issueDate)->addDays(10)->format('Y-m-d');
-            $billingPeriod = Carbon::parse($issueDate)->format('Y-m');
-
             $costId = $row['IDBIAYA'];
+            $requestId = $row['IDPERMINTAAN'] ?? '';
             $installationFee = (int) ($row['BIAYAPASANG'] ?? 0);
             $otherFee = (int) ($row['BIAYALAINLAIN'] ?? 0);
             $monthlyFee = (int) ($row['BIAYABULANAN'] ?? 0);
 
+            // Legacy menulis satu baris `biaya_tagihan` setiap kali admin menekan
+            // "Berhasil Active" — bukan setiap kali tagihan terbit. Baris dengan
+            // BIAYAPASANG=0 DAN BIAYABULANAN=0 tidak menagihkan apa pun (isinya cuma
+            // materai): itu jejak log aktivasi, bukan tagihan. Wiyono Wonoketro
+            // punya sembilan baris seperti ini dari sembilan klik dalam dua menit,
+            // dan sebelumnya salah satunya jadi utang hantu Rp 11.000 yang tidak
+            // pernah ada di sistem lama. Sisi pembayaran sudah menolak BAYAR<=0;
+            // sisi invoice sekarang ikut menolak supaya guard-nya tidak asimetris.
+            if ($installationFee <= 0 && $monthlyFee <= 0) {
+                $skippedActivationLogRows++;
+
+                continue;
+            }
+
+            // Hanya BIAYAPASANG>0 yang benar-benar tagihan pemasangan. BIAYALAINLAIN
+            // (materai Rp 11.000) menempel di hampir semua baris termasuk pelanggan
+            // lama, jadi ikut memakainya sebagai penanda registrasi bikin 1.707 dari
+            // 1.707 invoice berlabel "awal" padahal di jetis_db cuma 29 baris yang
+            // punya BIAYAPASANG > 0.
+            $isRegistrationRow = $installationFee > 0;
+
+            $periods = array_keys($periodsByCost[$costId] ?? []);
+            sort($periods);
+
+            // `TGLINSERT` adalah kolom ON UPDATE current_timestamp() — nilainya waktu
+            // perubahan TERAKHIR, bukan tanggal tagihan terbit (IN000037 bertanggal
+            // 2025-05 padahal pembayarannya November 2022). Karena itu periode acuan
+            // diambil dari riwayat "Berhasil Active" dulu, lalu periode pembayaran
+            // paling awal, dan TGLINSERT hanya jaring pengaman terakhir.
+            $activatedAt = $activationLogByRequest[$requestId] ?? null;
+            $anchorPeriod = $this->resolveLegacyAnchorPeriod($activatedAt, $periods, $row['TGLINSERT'] ?? null);
+
+            $billedTotal = $installationFee + $otherFee + $monthlyFee;
+
             $baseInvoice = [
-                'old_request_id' => $row['IDPERMINTAAN'] ?? '',
+                'old_request_id' => $requestId,
                 'old_customer_id' => $row['IDPELANGGAN'] ?: $cust,
-                'billing_period' => $billingPeriod,
-                'issue_date' => $issueDate,
-                'due_date' => $dueDate,
                 'status' => 'belum_dibayar',
                 'extra_cable_fee' => 0,
-                'extra_installation_fee' => 0,
                 'extra_pole_fee' => 0,
             ];
 
-            // `biaya_tagihan` doubles as both the one-time PSB/registration bill
-            // (rows with BIAYAPASANG/BIAYALAINLAIN) and, for long-standing
-            // customers, a genuine recurring monthly billing log (rows without
-            // those fees). Only the registration row bundles a possibly-prorated
-            // first month; regular rows are always flat.
-            $isRegistrationRow = $installationFee > 0 || $otherFee > 0;
+            // `$invoiceOtherFee` sengaja tidak selalu ikut `$otherFee` legacy:
+            // untuk periode yang SUDAH dibayar, totalnya adalah uang yang benar-benar
+            // masuk dan tidak bisa dipecah lagi jadi komponen (materai sering memang
+            // tidak ditagihkan). Mengisi `other_fee` di situ bikin rinciannya bohong.
+            $pushInvoice = function (string $period, string $type, int $totalAmount, ?int $prorate, int $invoiceOtherFee) use (
+                &$invoicesSheet, &$invoiceKeyByCostPeriod, $baseInvoice, $costId, $installationFee, $monthlyFee, $activatedAt
+            ) {
+                $isAwal = $type === 'awal';
+                $invoiceKey = $costId.'-'.($isAwal ? 'AWAL' : str_replace('-', '', $period));
+                $issueDate = $this->legacyPeriodIssueDate($period, $isAwal ? $activatedAt : null);
 
-            if ($isRegistrationRow) {
-                $billedTotal = $installationFee + $otherFee + $monthlyFee;
-
-                // Legacy admins hand-prorate the registration bill and never write
-                // that number back into biaya_tagihan — grab what was actually
-                // collected (tagihan proof + pemasangan proof) as the real total
-                // instead of recomputing pasang + lainlain + bulanan.
-                $paidFromTagihan = $costPaymentMap[$costId] ?? 0;
-                $paidFromPasang = ($installationPaidAt[$costId] ?? null) !== null ? $installationFee : 0;
-                $actualPaid = $paidFromTagihan + $paidFromPasang;
-                $totalAmount = $actualPaid > 0 ? $actualPaid : $billedTotal;
-
-                $invoiceTypeByCostId[$costId] = 'awal';
                 $invoicesSheet[] = array_merge($baseInvoice, [
-                    'old_invoice_id' => $costId.'-AWAL',
-                    'old_cost_id' => $costId.'-AWAL',
-                    'invoice_type' => 'awal',
+                    'old_invoice_id' => $invoiceKey,
+                    'old_cost_id' => $invoiceKey,
+                    'invoice_type' => $type,
+                    'billing_period' => $period,
+                    'issue_date' => $issueDate,
+                    'due_date' => Carbon::parse($issueDate)->addDays(10)->format('Y-m-d'),
                     'total_amount' => $totalAmount,
-                    'monthly_fee' => null,
-                    'installation_fee' => $installationFee,
-                    'other_fee' => $otherFee,
-                    'prorate_amount' => $totalAmount < $billedTotal ? $totalAmount : null,
+                    'monthly_fee' => $isAwal ? null : $monthlyFee,
+                    'extra_installation_fee' => $isAwal ? $installationFee : 0,
+                    'installation_fee' => $isAwal ? $installationFee : 0,
+                    'other_fee' => $invoiceOtherFee,
+                    'prorate_amount' => $prorate,
                 ]);
-            } elseif ($monthlyFee > 0) {
-                $invoiceTypeByCostId[$costId] = 'bulanan';
-                $invoicesSheet[] = array_merge($baseInvoice, [
-                    'old_invoice_id' => $costId.'-BULANAN',
-                    'old_cost_id' => $costId.'-BULANAN',
-                    'invoice_type' => 'bulanan',
-                    'total_amount' => $monthlyFee,
-                    'monthly_fee' => $monthlyFee,
-                    'installation_fee' => 0,
-                    'other_fee' => 0,
-                    'prorate_amount' => null,
-                ]);
+                $invoiceKeyByCostPeriod[$costId][$period] = $invoiceKey;
+            };
+
+            // Tidak ada satu pun jejak tagihan untuk cost id ini: tetap terbitkan satu
+            // tagihan supaya tunggakan legacy tidak hilang begitu saja di sistem baru.
+            if ($periods === []) {
+                $pushInvoice($anchorPeriod, $isRegistrationRow ? 'awal' : 'bulanan', $billedTotal, null, $otherFee);
+
+                continue;
+            }
+
+            foreach ($periods as $index => $period) {
+                $paidForPeriod = $paidByCostPeriod[$costId][$period] ?? 0;
+                $isAnchor = $index === 0;
+
+                // Periode pertama pada baris registrasi = tagihan awal. Sisanya —
+                // dan seluruh periode pada baris non-registrasi — adalah tagihan
+                // bulanan yang dulu ikut ditelan invoice AWAL.
+                if ($isRegistrationRow && $isAnchor) {
+                    // Admin lama memprorata tagihan awal secara manual dan tidak
+                    // pernah menuliskannya balik ke biaya_tagihan, jadi pakai yang
+                    // benar-benar tertagih (bukti tagihan + bukti pemasangan)
+                    // ketimbang menghitung ulang pasang + materai + bulanan.
+                    $paidFromPasang = ($installationPaidAt[$costId] ?? null) !== null ? $installationFee : 0;
+                    $actualPaid = $paidForPeriod + $paidFromPasang;
+                    $totalAmount = $actualPaid > 0 ? $actualPaid : $billedTotal;
+
+                    $pushInvoice($period, 'awal', $totalAmount, $totalAmount < $billedTotal ? $totalAmount : null, $otherFee);
+
+                    continue;
+                }
+
+                if ($paidForPeriod > 0) {
+                    $pushInvoice($period, 'bulanan', $paidForPeriod, null, 0);
+
+                    continue;
+                }
+
+                // Belum dibayar. Materai cuma menempel di tagihan pertama baris ini;
+                // periode lanjutan flat sebesar biaya bulanan.
+                $pushInvoice($period, 'bulanan', $monthlyFee + ($isAnchor ? $otherFee : 0), null, $isAnchor ? $otherFee : 0);
             }
         }
 
@@ -942,28 +1163,38 @@ class MigrateLegacyDataCommand extends Command
                 }
             }
 
-            $billingPeriod = now()->format('Y-m');
-            if (! empty($row['BULANTAGIHAN'])) {
-                try {
-                    $billingPeriod = Carbon::parse($row['BULANTAGIHAN'])->format('Y-m');
-                } catch (\Exception $e) {
-                }
-            }
+            $billingPeriod = $this->legacyBillingPeriod($row['BULANTAGIHAN'] ?? null, $row['INSERTED_AT'] ?? null);
 
-            // Enrich with the real payment proof (method/receiver/note) from
-            // apikeuangan_buktitransaksilunas, keyed by the same invoice/transaction code.
-            $lunas = $lunasByTransaction[$row['IDTRANSAKSI'] ?? ''] ?? null;
+            // Metode/penerima/catatan diambil dari bukti lunas PERIODE INI dulu; baru
+            // jatuh ke baris tertua cost id yang sama kalau periodenya tidak ketemu.
+            // Tanpa langkah pertama, pembayaran bulan kedua dan seterusnya mencatut
+            // metode & penerima pembayaran pertama (lihat catatan di peta itu).
+            $transactionId = $row['IDTRANSAKSI'] ?? '';
+            $lunas = $lunasByTransactionPeriod[$transactionId][$billingPeriod]
+                ?? $lunasByTransaction[$transactionId]
+                ?? null;
 
             $costId = $row['IDTRANSAKSI'] ?: $row['IDPERMINTAAN'];
             $costId = $canonicalCostId[$costId] ?? $costId;
-            // Route to whichever invoice was actually generated for this cost id
-            // (registration/AWAL vs. flat recurring/BULANAN); default to BULANAN
-            // when the cost id wasn't seen in Sheet 5 (e.g. filtered-out row).
-            $invoiceType = strtoupper($invoiceTypeByCostId[$costId] ?? 'bulanan');
+
+            // Rutekan ke invoice PERIODE-nya sendiri, bukan ke satu invoice per cost
+            // id. Sebelumnya semua bukti bayar sepanjang masa langganan menempel ke
+            // `{costId}-AWAL` karena peta tipenya cuma bernilai tunggal per cost id —
+            // itu yang bikin satu tagihan awal punya dua "pembayaran awal".
+            $invoiceKey = $invoiceKeyByCostPeriod[$costId][$billingPeriod] ?? null;
+            if ($invoiceKey === null) {
+                // Periodenya tidak punya invoice (mis. baris biaya-nya dibuang sebagai
+                // log aktivasi). Jatuhkan ke invoice paling awal milik cost id yang
+                // sama supaya uangnya tidak hilang; kalau memang tidak ada invoice
+                // sama sekali, importer yang akan mencatatnya sebagai gagal petakan.
+                $fallback = $invoiceKeyByCostPeriod[$costId] ?? [];
+                ksort($fallback);
+                $invoiceKey = $fallback === [] ? $costId.'-AWAL' : reset($fallback);
+            }
 
             $paymentsSheet[] = [
                 'old_payment_id' => $row['IDUNIQ'],
-                'old_invoice_id' => $costId.'-'.$invoiceType,
+                'old_invoice_id' => $invoiceKey,
                 'old_transaction_id' => $row['IDTRANSAKSI'] ?? '',
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'old_customer_id' => $cust,
@@ -1039,6 +1270,22 @@ class MigrateLegacyDataCommand extends Command
             unset($sheetRow);
         }
         unset($sheetRows);
+
+        if ($skippedWithoutRequest > 0) {
+            $this->warn("Dilewati {$skippedWithoutRequest} akun ber-prefix PE tanpa permintaan layanan (bukan pelanggan).");
+        }
+        if ($servicesWithoutPackage > 0) {
+            $this->warn("{$servicesWithoutPackage} layanan tanpa IDPAKET dijatuhkan ke paket placeholder legacy — cek manual setelah import.");
+        }
+        if ($skippedActivationLogRows > 0) {
+            $this->warn("Dilewati {$skippedActivationLogRows} baris biaya_tagihan tanpa biaya pasang & biaya bulanan (jejak klik 'Berhasil Active', bukan tagihan).");
+        }
+        if ($conflictingProofs !== []) {
+            $this->warn(count($conflictingProofs).' bukti bayar dobel dengan NOMINAL BERBEDA — yang terbesar dipakai, tinjau manual:');
+            foreach ($conflictingProofs as $line) {
+                $this->line('  - '.$line);
+            }
+        }
 
         $sheets = [
             'packages' => $packagesSheet,
@@ -1157,6 +1404,79 @@ class MigrateLegacyDataCommand extends Command
         }
 
         return $streetAddress !== '' ? $streetAddress : '-';
+    }
+
+    /**
+     * Periode tagihan legacy (`Y-m`) dari `BULANTAGIHAN`, dengan `INSERTED_AT`
+     * sebagai cadangan saat kolomnya kosong atau `0000-00-00`.
+     *
+     * Ini satu-satunya pembeda periode di `apikeuangan_buktitransaksitagihan` —
+     * `IDTRANSAKSI` konstan seumur hidup pelanggan, jadi tanpa kolom ini semua
+     * pembayaran terlihat seperti pembayaran yang sama.
+     */
+    private function legacyBillingPeriod(?string $bulanTagihan, ?string $fallback): string
+    {
+        foreach ([$bulanTagihan, $fallback] as $candidate) {
+            if (empty($candidate) || str_starts_with((string) $candidate, '0000')) {
+                continue;
+            }
+
+            try {
+                return Carbon::parse($candidate)->format('Y-m');
+            } catch (\Exception $e) {
+            }
+        }
+
+        return now()->format('Y-m');
+    }
+
+    /**
+     * Periode acuan sebuah baris `biaya_tagihan`.
+     *
+     * Urutan: tanggal aktivasi asli (riwayat "Berhasil Active") → periode
+     * pembayaran paling awal → `TGLINSERT`. `TGLINSERT` sengaja ditaruh paling
+     * belakang karena kolomnya `ON UPDATE current_timestamp()`, jadi nilainya
+     * waktu perubahan terakhir dan bisa meleset bertahun-tahun dari tanggal
+     * tagihan yang sebenarnya.
+     *
+     * @param  array<int, string>  $paymentPeriods  periode 'Y-m' terurut menaik
+     */
+    private function resolveLegacyAnchorPeriod(?string $activatedAt, array $paymentPeriods, ?string $insertedAt): string
+    {
+        if (! empty($activatedAt) && ! str_starts_with((string) $activatedAt, '0000')) {
+            try {
+                return Carbon::parse($activatedAt)->format('Y-m');
+            } catch (\Exception $e) {
+            }
+        }
+
+        if ($paymentPeriods !== []) {
+            return $paymentPeriods[0];
+        }
+
+        return $this->legacyBillingPeriod(null, $insertedAt);
+    }
+
+    /**
+     * Tanggal terbit sebuah invoice periode `Y-m`.
+     *
+     * Pakai tanggal asli (mis. tanggal aktivasi) kalau memang jatuh di periode
+     * yang sama — kalau tidak, tanggal 1 bulan itu. Yang penting invoice tidak
+     * lagi bertanggal `TGLINSERT` yang bisa berada di tahun yang salah.
+     */
+    private function legacyPeriodIssueDate(string $period, ?string $preferredDate = null): string
+    {
+        if (! empty($preferredDate) && ! str_starts_with((string) $preferredDate, '0000')) {
+            try {
+                $parsed = Carbon::parse($preferredDate);
+                if ($parsed->format('Y-m') === $period) {
+                    return $parsed->format('Y-m-d');
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        return $period.'-01';
     }
 
     private function resolveLegacyUserLabel(mixed $value, array $penggunaMap): string

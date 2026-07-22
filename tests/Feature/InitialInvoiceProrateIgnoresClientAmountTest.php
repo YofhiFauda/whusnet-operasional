@@ -117,7 +117,7 @@ class InitialInvoiceProrateIgnoresClientAmountTest extends TestCase
 
         $customer = $this->createCustomerSiapVerifikasi(300000, 0);
 
-        // Aktivasi 16 Juni: 15 dari 30 hari (hari aktivasi ikut ditagih).
+        // Aktivasi 16 Juni: 14 dari 30 hari (hari aktivasi digratiskan).
         $response = $this->post(route('customers.verification.final', $customer->id), [
             'billing_period' => '2026-06',
             'issue_date' => '2026-06-16',
@@ -137,10 +137,11 @@ class InitialInvoiceProrateIgnoresClientAmountTest extends TestCase
 
         $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
 
-        $this->assertEquals(150000, (float) $invoice->prorate_amount);
-        $this->assertEquals(250000, (float) $invoice->subtotal);
-        $this->assertEquals(250000, (float) $invoice->total_amount);
-        $this->assertEquals(250000, (float) $invoice->remaining_amount);
+        // Aktivasi 16 Juni: hari aktivasi digratiskan, 30 - 16 = 14 hari.
+        $this->assertEquals(140000, (float) $invoice->prorate_amount);
+        $this->assertEquals(240000, (float) $invoice->subtotal);
+        $this->assertEquals(240000, (float) $invoice->total_amount);
+        $this->assertEquals(240000, (float) $invoice->remaining_amount);
     }
 
     public function test_ppn_disimpan_sebagai_persen_bukan_nominal(): void
@@ -149,7 +150,7 @@ class InitialInvoiceProrateIgnoresClientAmountTest extends TestCase
 
         $customer = $this->createCustomerSiapVerifikasi(200000, 11);
 
-        // Aktivasi tanggal 1 = prorata penuh (30/30).
+        // Aktivasi tanggal 1 Juni: 30 - 1 = 29 dari 30 hari.
         $this->post(route('customers.verification.final', $customer->id), [
             'billing_period' => '2026-06',
             'issue_date' => '2026-06-01',
@@ -159,9 +160,10 @@ class InitialInvoiceProrateIgnoresClientAmountTest extends TestCase
 
         $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
 
+        // 29/30 × 200.000 = 193.333,33 → 193.333; + PPN 11% = 214.599,63
         $this->assertEquals(11, (float) $invoice->ppn);
-        $this->assertEquals(200000, (float) $invoice->subtotal);
-        $this->assertEquals(222000, (float) $invoice->total_amount);
+        $this->assertEquals(193333, (float) $invoice->subtotal);
+        $this->assertEquals(214599.63, (float) $invoice->total_amount);
     }
 
     public function test_biaya_tambahan_negatif_ditolak(): void

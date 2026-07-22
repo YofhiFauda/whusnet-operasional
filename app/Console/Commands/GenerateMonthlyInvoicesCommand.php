@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Models\Customer;
 use App\Models\Invoice;
+use Carbon\Carbon;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -37,13 +39,14 @@ class GenerateMonthlyInvoicesCommand extends Command
         $skipped = 0;
         $failed = 0;
 
-        $periodStart = \Carbon\Carbon::parse($billingPeriod . '-01');
+        $periodStart = Carbon::parse($billingPeriod.'-01');
 
         foreach ($customers as $customer) {
             $service = $customer->customerService;
 
-            if (!$service || (float) $service->monthly_price <= 0) {
+            if (! $service || (float) $service->monthly_price <= 0) {
                 $skipped++;
+
                 continue;
             }
 
@@ -53,22 +56,38 @@ class GenerateMonthlyInvoicesCommand extends Command
             // period — recurring billing only starts the month AFTER activation.
             if ($service->activation_date && $service->activation_date->isSameMonth($periodStart)) {
                 $skipped++;
+
                 continue;
             }
 
+            // Pertanyaannya "sudah ada tagihan LANGGANAN untuk periode ini?",
+            // bukan "sudah ada tagihan BULANAN?". Dulu dicek per invoice_type,
+            // sehingga invoice AWAL bulan aktivasi tidak terlihat di sini dan
+            // satu-satunya yang menahan dobel adalah pengecekan activation_date
+            // di atas — satu kolom, tanpa cadangan. Kalau kolom itu salah isi
+            // (dulu terisi registration_date), pelanggan menerima AWAL + BULANAN
+            // untuk periode yang sama.
+            //
+            // REAKTIVASI sengaja tidak dihitung: pelanggan yang disuspend lalu
+            // aktif lagi di bulan yang sama memang boleh punya dua record.
+            // Invoice BATAL juga tidak dihitung, kalau tidak tagihan yang sudah
+            // dibatalkan akan memblokir penerbitan penggantinya.
             $alreadyExists = Invoice::where('customer_id', $customer->id)
                 ->where('billing_period', $billingPeriod)
-                ->where('invoice_type', InvoiceType::BULANAN->value)
+                ->whereIn('invoice_type', [InvoiceType::AWAL->value, InvoiceType::BULANAN->value])
+                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
                 ->exists();
 
             if ($alreadyExists) {
                 $skipped++;
+
                 continue;
             }
 
             if ($dryRun) {
-                $this->line("Would create BULANAN invoice for {$customer->customer_code} ({$billingPeriod}, Rp " . number_format((float) $service->monthly_price, 0, ',', '.') . ")");
+                $this->line("Would create BULANAN invoice for {$customer->customer_code} ({$billingPeriod}, Rp ".number_format((float) $service->monthly_price, 0, ',', '.').')');
                 $created++;
+
                 continue;
             }
 
@@ -106,15 +125,20 @@ class GenerateMonthlyInvoicesCommand extends Command
                         // Fixed calendar window: bill issued the 1st, due the 10th —
                         // not "run date + 10 days", which would drift if the
                         // scheduled command runs late or is triggered manually.
+                        // `day(10)` states that rule directly. The previous
+                        // `addDays(9)` only landed on the 10th because
+                        // $periodStart happens to be the 1st — an offset that
+                        // silently produces the wrong due date the moment anyone
+                        // changes where $periodStart points.
                         'issue_date' => $periodStart->format('Y-m-d'),
-                        'due_date' => $periodStart->copy()->addDays(9)->format('Y-m-d'),
+                        'due_date' => $periodStart->copy()->day(10)->format('Y-m-d'),
                         'subtotal' => $subtotal,
                         'discount' => $discount,
                         'ppn' => $ppnPercent,
                         'total_amount' => $totalAmount,
                         'paid_amount' => 0,
                         'remaining_amount' => $totalAmount,
-                        'invoice_status' => \App\Enums\InvoiceStatus::BELUM_DIBAYAR->value,
+                        'invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value,
                         'created_by' => null,
                     ]);
                 });
@@ -126,7 +150,7 @@ class GenerateMonthlyInvoicesCommand extends Command
             }
         }
 
-        $this->info("Periode {$billingPeriod}: " . ($dryRun ? 'akan dibuat' : 'dibuat') . " {$created}, dilewati {$skipped}, gagal {$failed}.");
+        $this->info("Periode {$billingPeriod}: ".($dryRun ? 'akan dibuat' : 'dibuat')." {$created}, dilewati {$skipped}, gagal {$failed}.");
 
         return self::SUCCESS;
     }

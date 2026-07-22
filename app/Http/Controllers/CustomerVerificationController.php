@@ -165,19 +165,34 @@ class CustomerVerificationController extends Controller
         // (input readonly hasil hitungan JavaScript), tapi SENGAJA tidak dipakai —
         // readonly cuma penghalang UI, POST manual bisa mengirim nominal apa pun.
         // Nominal otoritatif dihitung ulang di InitialInvoiceService di bawah.
+        //
+        // `billing_period` dan `due_date` juga tidak lagi diterima dari klien:
+        // keduanya turunan matematis dari tanggal aktivasi, bukan keputusan
+        // admin. Waktu masih diinput terpisah, admin bisa mengirim periode Juni
+        // untuk prorata Juli — invoice tercetak dengan periode yang berbeda dari
+        // bulan yang sebenarnya ditagih, dan bulan yang dilewati
+        // GenerateMonthlyInvoicesCommand (dari `activation_date` = `issue_date`)
+        // bukan bulan yang tertulis di tagihan.
         $validated = $request->validate([
-            'billing_period' => 'required|string',
             'issue_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:issue_date',
             'extra_installation_fee' => 'nullable|numeric|min:0',
             'extra_cable_fee' => 'nullable|numeric|min:0',
             'extra_pole_fee' => 'nullable|numeric|min:0',
+            'other_fee' => 'nullable|numeric|min:0',
         ]);
 
         $service = $customer->customerService;
         if (! $service) {
             return redirect()->back()->with('error', 'Data layanan pelanggan tidak ditemukan.');
         }
+
+        $issueDate = Carbon::parse($validated['issue_date']);
+
+        // Tagihan awal dibayar di tempat saat aktivasi, bukan menunggu tempo.
+        // Tempo tanggal 10 hanya berlaku untuk tagihan bulanan
+        // (GenerateMonthlyInvoicesCommand), jangan disamakan.
+        $billingPeriod = $issueDate->format('Y-m');
+        $dueDate = $issueDate->format('Y-m-d');
 
         $billing = app(InitialInvoiceService::class)->calculate(
             $service,
@@ -203,9 +218,9 @@ class CustomerVerificationController extends Controller
                 'pop_id' => $customer->pop_id,
                 'customer_service_id' => $service->id,
                 'internet_package_id' => $service->internet_package_id,
-                'billing_period' => $validated['billing_period'],
+                'billing_period' => $billingPeriod,
                 'issue_date' => $validated['issue_date'],
-                'due_date' => $validated['due_date'],
+                'due_date' => $dueDate,
                 'subtotal' => $billing['subtotal'],
                 'discount' => $billing['discount'],
                 'ppn' => $billing['ppn'],
@@ -213,6 +228,7 @@ class CustomerVerificationController extends Controller
                 'extra_installation_fee' => $billing['extra_installation_fee'],
                 'extra_cable_fee' => $billing['extra_cable_fee'],
                 'extra_pole_fee' => $billing['extra_pole_fee'],
+                'other_fee' => $billing['other_fee'],
                 'total_amount' => $billing['total_amount'],
                 'remaining_amount' => $billing['total_amount'],
                 'paid_amount' => 0,
@@ -231,6 +247,7 @@ class CustomerVerificationController extends Controller
                 'data_completeness_status' => $customer->data_completeness_status,
                 'service_status' => $service->service_status,
                 'billing_status' => $service->billing_status,
+                'activation_date' => $service->activation_date?->format('Y-m-d'),
             ];
 
             $customer->update([
@@ -240,9 +257,28 @@ class CustomerVerificationController extends Controller
                 'data_completeness_status' => 'siap_billing',
             ]);
 
+            // `activation_date` WAJIB ditimpa di sini, tidak boleh dipertahankan.
+            // Saat pendaftaran nilainya diisi `registration_date` (lihat
+            // CustomerController::store) — itu tanggal DAFTAR, bukan tanggal
+            // layanan menyala. Kalau dibiarkan, pelanggan yang daftar Juni lalu
+            // aktif 21 Juli punya activation_date Juni, sementara invoice AWAL
+            // berperiode Juli. GenerateMonthlyInvoicesCommand melewati bulan
+            // aktivasi berdasarkan kolom ini, jadi bulan Juli tidak dilewati dan
+            // pelanggan menerima invoice BULANAN Juli DI ATAS invoice AWAL Juli.
+            // Dua lapis penjaga sisanya tidak menangkap ini: keduanya (query
+            // `alreadyExists` di command dan InvoiceObserver::creating) di-scope
+            // per `invoice_type`, sedangkan AWAL vs BULANAN jenisnya beda. Tabel
+            // `invoices` juga tidak punya unique index (migration duplicate_guard
+            // hanya memasangnya di `payments`).
+            //
+            // Sumbernya `issue_date`, bukan `now()`: itu tanggal yang dipakai
+            // InitialInvoiceService menghitung prorata. Basis prorata dan penanda
+            // bulan aktivasi harus tanggal yang sama, kalau tidak celah dobel
+            // tagih tadi terbuka lagi lewat pintu lain (verifikasi mundur/maju).
             $service->update([
                 'service_status' => 'aktif',
                 'billing_status' => 'active',
+                'activation_date' => $validated['issue_date'],
                 'activated_by_name' => auth()->user()->name,
                 'activated_by_user_id' => auth()->id(),
                 'activation_time' => $service->activation_time ?? now()->format('H:i:s'),
@@ -255,6 +291,7 @@ class CustomerVerificationController extends Controller
                 'data_completeness_status' => 'siap_billing',
                 'service_status' => 'aktif',
                 'billing_status' => 'active',
+                'activation_date' => $validated['issue_date'],
             ];
 
             AuditLog::create([

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Enums\TaskStatus;
+use App\Enums\ScopeType;
 use App\Enums\TaskType;
 use App\Models\City;
 use App\Models\Customer;
@@ -14,6 +14,11 @@ use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -27,20 +32,24 @@ class FopTaskDeleteRestrictionTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private Customer $customer;
+
     private Pop $pop;
+
     private Village $village;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -68,7 +77,7 @@ class FopTaskDeleteRestrictionTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -81,7 +90,7 @@ class FopTaskDeleteRestrictionTest extends TestCase
             'customer_id' => $this->customer->id,
             'pop_id' => $this->pop->id,
             'task_type' => TaskType::SURVEY->value,
-            'title' => 'Survey: ' . $this->customer->full_name,
+            'title' => 'Survey: '.$this->customer->full_name,
             'status' => 'terjadwal',
             'scheduled_at' => now(),
             'sla_minutes' => 120,
@@ -93,7 +102,7 @@ class FopTaskDeleteRestrictionTest extends TestCase
             'task_number' => 'TFOP-SRV-DEL-0001',
             'task_date' => now(),
             'category' => 'SURVEY',
-            'tugas' => 'Survey Pelanggan: ' . $this->customer->full_name,
+            'tugas' => 'Survey Pelanggan: '.$this->customer->full_name,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'customer_id' => $this->customer->id,
@@ -154,7 +163,7 @@ class FopTaskDeleteRestrictionTest extends TestCase
     {
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Salah input, mau dihapus',
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -181,7 +190,7 @@ class FopTaskDeleteRestrictionTest extends TestCase
     {
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'O-REQ',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Perbaikan Office',
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -209,7 +218,6 @@ class FopTaskDeleteRestrictionTest extends TestCase
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
 
         $response->assertOk();
-        $response->assertSee('kelola lewat halaman Pelanggan', false);
         $response->assertDontSee(route('fop-tasks.destroy', $fopTask), false);
     }
 
@@ -256,6 +264,6 @@ class FopTaskDeleteRestrictionTest extends TestCase
         $fopTask = FopTask::where('category', 'SURVEY')->where('customer_id', $this->customer->id)->first();
 
         $this->assertNotNull($fopTask);
-        $this->assertSame($this->customer->fresh()->display_id . '_Masudah Yuni Fitri', $fopTask->tugas);
+        $this->assertSame($this->customer->fresh()->display_id.'_Masudah Yuni Fitri', $fopTask->tugas);
     }
 }

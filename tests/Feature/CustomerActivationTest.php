@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -12,15 +13,14 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
-use App\Models\AuditLog;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
 use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
-use Database\Seeders\InternetPackageSeeder;
-use Database\Seeders\PonorogoRegionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -49,6 +49,7 @@ class CustomerActivationTest extends TestCase
         $village = Village::query()->where('district_id', $district->id)->firstOrFail();
 
         $customer = Customer::create([
+            'old_customer_id' => 'OLD-001',
             'customer_code' => 'D00C000001',  // format baru: {cid_prefix}00{registration_prefix}{######}
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
@@ -90,6 +91,7 @@ class CustomerActivationTest extends TestCase
             'activation_date' => '2026-06-01',
             'due_date' => '2026-07-01',
             'service_status' => 'menunggu_pemasangan',
+            'request_status' => 'ACTIVE',
             'billing_status' => 'pending',
         ]);
 
@@ -104,7 +106,6 @@ class CustomerActivationTest extends TestCase
             'status' => 'active',
         ]);
         /** @var User $user */
-
         $pop = Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
@@ -123,7 +124,7 @@ class CustomerActivationTest extends TestCase
         $response = $this->post("/customers/{$customer->id}/activate");
 
         $response->assertStatus(403);
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
         $this->assertNull($customer->cid);
@@ -159,7 +160,7 @@ class CustomerActivationTest extends TestCase
 
         $response->assertRedirect("/customers/{$customer->id}");
         $response->assertSessionHas('error');
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
         $this->assertNull($customer->cid);
@@ -214,7 +215,7 @@ class CustomerActivationTest extends TestCase
             'auditable_id' => $customer->id,
         ]);
 
-        $log = AuditLog::where('auditable_id', $customer->id)->firstOrFail();
+        $log = AuditLog::where('auditable_id', $customer->id)->where('action', 'activate')->firstOrFail();
         $this->assertNotNull($log->old_values);
         $this->assertNotNull($log->new_values);
         $this->assertEquals('active', $log->new_values['status']);

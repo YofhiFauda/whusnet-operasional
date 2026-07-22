@@ -21,7 +21,9 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 | [user-flow.md](user-flow.md) | Langkah admin di `/invoices`, `/payments`, bulk-pay, laporan |
 | [database-schema.md](database-schema.md) | Tabel, kolom, relasi, index dedup-guard |
 | [perbandingan-tagihan-awal-vs-bulanan-legacy.md](perbandingan-tagihan-awal-vs-bulanan-legacy.md) | Cara membedakan tagihan awal vs bulanan: sistem lama vs sekarang, rumus prorata, celah yang tidak diwarisi |
-| [analisa-ux-form-verifikasi-aktivasi.md](analisa-ux-form-verifikasi-aktivasi.md) | Rencana sederhanakan form tagihan pertama jadi kwitansi (4 input, sisanya turunan) |
+| [analisa-ux-form-verifikasi-aktivasi.md](analisa-ux-form-verifikasi-aktivasi.md) | Form tagihan pertama jadi kwitansi (5 input, sisanya turunan server) |
+| [analisa-pencegahan-tagihan-dobel.md](analisa-pencegahan-tagihan-dobel.md) | Lima lapis pencegahan tagihan dobel, mana yang bolong, urutan perbaikan (BILLING-B0b–B0e) |
+| [analisa-duplikasi-tagihan-pembayaran-migrasi-legacy.md](analisa-duplikasi-tagihan-pembayaran-migrasi-legacy.md) | Enam cacat migrasi legacy yang bikin tagihan & pembayaran dobel (kasus Ardiyanto, Wiyono) |
 | [archive/](archive/) | Analisa & rencana historis (sebagian sudah diimplementasi, sebagian belum) |
 
 ## Routes & Permission

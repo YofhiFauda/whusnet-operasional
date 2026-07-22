@@ -181,15 +181,15 @@
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 Layanan Terpilih
             </h4>
-            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mb-3">
+            <div class="bg-sky-50 border border-sky-100 rounded-xl p-5 mb-3">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-indigo-400 mb-1">Paket Internet</span>
-                        <span class="block text-sm font-bold text-indigo-900">{{ $customer->internetPackage->name ?? '-' }}</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1">Paket Internet</span>
+                        <span class="block text-sm font-bold text-sky-900">{{ $customer->internetPackage->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-indigo-400 mb-1">Biaya Berlangganan</span>
-                        <span class="block text-sm font-mono font-bold text-indigo-900">Rp {{ number_format($customer->customerService->total_monthly_bill ?? 0, 0, ',', '.') }}</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1">Biaya Berlangganan</span>
+                        <span class="block text-sm font-mono font-bold text-sky-900">Rp {{ number_format($customer->customerService->total_monthly_bill ?? 0, 0, ',', '.') }}</span>
                     </div>
                 </div>
             </div>
@@ -565,9 +565,9 @@
                     <span class="block text-xs text-slate-400 mt-1">Mbps</span>
                 </div>
 
-                <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-1">Upload</span>
-                    <span class="block text-2xl font-extrabold font-mono text-indigo-700">{{ $uploadSpeed ?? '-' }}</span>
+                <div class="bg-sky-50 border border-sky-200 rounded-xl p-4 text-center">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-sky-600 mb-1">Upload</span>
+                    <span class="block text-2xl font-extrabold font-mono text-sky-700">{{ $uploadSpeed ?? '-' }}</span>
                     <span class="block text-xs text-slate-400 mt-1">Mbps</span>
                 </div>
 
@@ -713,69 +713,58 @@
                     <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Form Penerbitan Tagihan Pertama</h4>
                     <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-5 shadow-sm">
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-                            <div>
-                                <label for="billing_period" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PERIODE TAGIHAN <span class="text-red-500">*</span></label>
-                                <input type="month" name="billing_period" id="billing_period"
-                                    class="w-full text-sm px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 bg-white"
-                                    required value="{{ old('billing_period', date('Y-m')) }}">
-                            </div>
-                            <div>
-                                <label for="issue_date" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">TANGGAL AKTIVASI / TERBIT <span class="text-red-500">*</span></label>
-                                <input type="date" name="issue_date" id="issue_date"
-                                    class="w-full text-sm px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 bg-white"
-                                    required value="{{ old('issue_date', date('Y-m-d')) }}" onchange="calculateFees()">
-                                <p class="text-[10px] text-slate-400 mt-1">Tanggal ini digunakan untuk menghitung tagihan Prorate.</p>
-                            </div>
-                        </div>
-
+                        {{-- Periode tagihan & jatuh tempo TIDAK diinput di sini. Keduanya
+                             turunan dari tanggal aktivasi dan dihitung server di
+                             CustomerVerificationController::finalVerify(); waktu masih
+                             jadi field terpisah, admin bisa mengirim periode Juni untuk
+                             prorata Juli. --}}
                         <div class="mb-5">
-                            <label for="due_date" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">JATUH TEMPO <span class="text-red-500">*</span></label>
-                            <input type="date" name="due_date" id="due_date"
+                            <label for="issue_date" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">TANGGAL AKTIVASI <span class="text-red-500">*</span></label>
+                            <input type="date" name="issue_date" id="issue_date"
                                 class="w-full text-sm px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 bg-white"
-                                required value="{{ old('due_date', date('Y-m-d', strtotime('+7 days'))) }}">
+                                required value="{{ old('issue_date', date('Y-m-d')) }}" onchange="calculateFees()">
+                            <p class="text-[10px] text-slate-400 mt-1">
+                                Menentukan tagihan prorata, periode tagihan (<span id="derived_period_info" class="font-semibold text-slate-500">—</span>),
+                                dan jatuh tempo. Tagihan pertama dibayar saat aktivasi, jadi jatuh temponya tanggal ini juga.
+                            </p>
                         </div>
 
                         <div class="border-t border-slate-100 pt-5">
-                            <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Rincian Tagihan & Biaya Pemasangan</h5>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label for="subtotal" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
-                                        <span>SUBTOTAL (PRORATA + BIAYA)</span>
-                                        <span class="text-[9px] text-slate-400 font-normal">Harga paket Rp {{ number_format($service->monthly_price ?? 0, 0, ',', '.') }}/bln</span>
-                                    </label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="subtotal" id="fv_subtotal"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                                            value="{{ old('subtotal', $service->monthly_price ?? 0) }}" readonly>
-                                        {{-- Basis prorata pakai harga paket SEBELUM PPN; PPN ditambahkan
-                                             sekali di akhir, bukan ikut terbawa di basis. --}}
-                                        <input type="hidden" id="base_monthly_bill" value="{{ $service->monthly_price ?? 0 }}">
-                                    </div>
-                                </div>
-                                <div>
-                                    <label for="prorate_amount" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex justify-between">
-                                        <span>TAGIHAN PRORATE <span class="text-red-500">*</span></span>
-                                        <span id="prorate_info" class="text-[9px] text-emerald-600 font-normal">S/d akhir bulan</span>
-                                    </label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="prorate_amount" id="fv_prorate_amount"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                                            value="{{ old('prorate_amount', 0) }}" readonly>
-                                    </div>
-                                </div>
-                            </div>
+                            <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Biaya Sekali Bayar</h5>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            {{-- Nominal turunan (prorata, subtotal, diskon, PPN, total) TIDAK lagi
+                                 jadi input. Server menghitung ulang semuanya di InitialInvoiceService
+                                 dan mengabaikan kiriman klien, jadi input readonly cuma bikin admin
+                                 ragu-ragu memverifikasi aritmatika yang bukan urusannya. Angkanya
+                                 tampil di kwitansi di bawah. Basis prorata dan parameter layanan
+                                 dititipkan di data-* — bukan <input>, supaya tidak ikut ter-POST. --}}
+                            <div id="billing_params" class="hidden"
+                                data-monthly-price="{{ $service->monthly_price ?? 0 }}"
+                                data-discount="{{ $service->discount ?? 0 }}"
+                                data-ppn="{{ $service->ppn ?? 0 }}"></div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                                 <div>
                                     <label for="extra_installation_fee" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">BIAYA PEMASANGAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
+                                        {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
+                                             boleh digratiskan/promo. `?? 0` wajib — ada paket yang
+                                             installation_fee-nya null (lihat InternetPackageSeeder). --}}
                                         <input type="number" step="0.01" name="extra_installation_fee" id="fv_extra_installation_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-white font-mono text-slate-700 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                                            value="{{ old('extra_installation_fee', 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                            value="{{ old('extra_installation_fee', $customer->internetPackage->installation_fee ?? 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="other_fee" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">MATERAI</label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
+                                        {{-- Hanya ada di tagihan awal, tidak pernah ikut tagihan bulanan.
+                                             Default 0: tidak semua pemasangan pakai materai. --}}
+                                        <input type="number" step="0.01" name="other_fee" id="fv_other_fee"
+                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-white font-mono text-slate-700 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                                            value="{{ old('other_fee', 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
                                 </div>
                                 <div>
@@ -798,35 +787,61 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="discount" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">DISKON</label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="discount" id="fv_discount"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                                            value="{{ old('discount', $service->discount ?? 0) }}" readonly>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label for="ppn" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">PPN (%)</label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">%</span>
-                                        <input type="number" step="0.01" name="ppn" id="fv_ppn"
-                                            class="w-full pl-9 text-sm px-3 py-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-700"
-                                            value="{{ old('ppn', $service->ppn ?? 0) }}" readonly>
-                                    </div>
-                                </div>
-                            </div>
+                            {{-- KWITANSI. Bahasa manusia, bukan kalkulator: "10 dari 31 hari"
+                                 menjelaskan prorata tanpa menyebut kata prorata. Baris terakhir
+                                 menjawab pertanyaan pelanggan yang paling sering ("bulan depan
+                                 bayar berapa?") tanpa admin perlu menghitung sendiri. --}}
+                            <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                                <p id="kwitansi_header" class="text-xs font-semibold text-slate-500 mb-4">—</p>
 
-                            <div class="mt-4 p-4 bg-sky-50 border border-sky-200 rounded-xl">
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">TOTAL TAGIHAN (PRORATE + BIAYA)</label>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sky-700 text-base font-extrabold">Rp</span>
-                                    <input type="number" step="0.01" name="total_amount" id="fv_total_amount"
-                                        class="w-full pl-10 text-xl font-extrabold font-mono py-3 px-3 border border-sky-300 rounded-lg bg-sky-50 text-sky-700 focus:outline-none focus:border-sky-500"
-                                        value="{{ old('total_amount', 0) }}" readonly>
+                                <dl class="space-y-2 text-sm">
+                                    <div class="flex justify-between gap-4">
+                                        <dt id="kwitansi_langganan_label" class="text-slate-600">Langganan bulan ini</dt>
+                                        <dd id="kwitansi_prorata" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">Biaya pemasangan</dt>
+                                        <dd id="kwitansi_pemasangan" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">Materai</dt>
+                                        <dd id="kwitansi_materai" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">Kabel tambahan</dt>
+                                        <dd id="kwitansi_kabel" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">Tiang tambahan</dt>
+                                        <dd id="kwitansi_tiang" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+
+                                    {{-- Diskon & PPN cuma muncul kalau memang ada. Untuk semua paket
+                                         saat ini PPN sudah termasuk harga (rate 0), jadi barisnya
+                                         tidak pernah tampil — field-nya tetap dipertahankan di
+                                         kolom invoices.ppn sebagai cadangan. --}}
+                                    @if((float) ($service->discount ?? 0) > 0)
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">Diskon</dt>
+                                        <dd id="kwitansi_diskon" class="font-mono text-emerald-700 shrink-0">Rp 0</dd>
+                                    </div>
+                                    @endif
+
+                                    @if((float) ($service->ppn ?? 0) > 0)
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-slate-600">PPN {{ rtrim(rtrim(number_format($service->ppn, 2, ',', '.'), '0'), ',') }}%</dt>
+                                        <dd id="kwitansi_ppn" class="font-mono text-slate-800 shrink-0">Rp 0</dd>
+                                    </div>
+                                    @endif
+                                </dl>
+
+                                <div class="mt-4 pt-4 border-t border-slate-300 flex justify-between gap-4 items-baseline">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Tagihan Pertama</span>
+                                    <span id="kwitansi_total" class="text-xl font-extrabold font-mono text-sky-700 shrink-0">Rp 0</span>
                                 </div>
+
+                                <p class="text-xs text-slate-500 mt-2">Dibayar saat aktivasi.</p>
+                                <p id="kwitansi_bulan_depan" class="text-xs text-slate-500 mt-1">—</p>
                             </div>
                         </div>
 
@@ -1009,15 +1024,20 @@
     // App\Services\InitialInvoiceService — rumus di sini wajib dijaga identik
     // supaya yang dilihat admin sama dengan yang tersimpan, tapi kalau menyimpang
     // yang menang tetap server.
+    const rupiah = (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n * 100) / 100);
+    const namaBulan = (d) => new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(d);
+
     function calculateFees() {
-        // Parse inputs
-        const baseMonthly = parseFloat(document.getElementById('base_monthly_bill').value) || 0;
-        const discount = parseFloat(document.getElementById('fv_discount').value) || 0;
-        const ppnRate = parseFloat(document.getElementById('fv_ppn').value) || 0;
+        // Parameter layanan dititipkan di data-* supaya tidak ikut ter-POST.
+        const params = document.getElementById('billing_params').dataset;
+        const baseMonthly = parseFloat(params.monthlyPrice) || 0;
+        const discount = parseFloat(params.discount) || 0;
+        const ppnRate = parseFloat(params.ppn) || 0;
 
         const instFee = parseFloat(document.getElementById('fv_extra_installation_fee').value) || 0;
         const cableFee = parseFloat(document.getElementById('fv_extra_cable_fee').value) || 0;
         const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
+        const otherFee = parseFloat(document.getElementById('fv_other_fee').value) || 0;
 
         // Calculate Prorate
         const issueDateInput = document.getElementById('issue_date').value;
@@ -1032,27 +1052,72 @@
             const date = issueDateObj.getDate();
             
             daysInMonth = new Date(year, month + 1, 0).getDate();
-            daysActive = daysInMonth - date + 1; // Termasuk hari ini
+
+            // Hari aktivasi TIDAK ditagih (konvensi legacy); aktivasi di hari
+            // terakhir bulan ditagih sebulan penuh. Wajib identik dengan
+            // App\Services\InitialInvoiceService::calculate().
+            daysActive = daysInMonth - date;
+            if (daysActive <= 0) {
+                daysActive = daysInMonth;
+            }
 
             // Prorate formula = (daysActive / daysInMonth) * baseMonthly
             prorateAmount = Math.round((daysActive / daysInMonth) * baseMonthly);
-            
-            document.getElementById('prorate_info').textContent = `${daysActive} dari ${daysInMonth} hari bulan ini`;
+
+            const bulanAktivasi = namaBulan(issueDateObj);
+            const tanggalAktivasi = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(issueDateObj);
+
+            document.getElementById('kwitansi_header').textContent =
+                `Aktif ${tanggalAktivasi} · ditagih ${daysActive} dari ${daysInMonth} hari`;
+            document.getElementById('kwitansi_langganan_label').textContent =
+                `Langganan ${bulanAktivasi} (${daysActive} dari ${daysInMonth} hari)`;
+
+            // Periode & jatuh tempo tidak lagi diinput admin — tampilkan hasil
+            // turunannya supaya tetap terlihat sebelum submit.
+            const periodInfo = document.getElementById('derived_period_info');
+            if (periodInfo) {
+                periodInfo.textContent = bulanAktivasi;
+            }
+
+            // Bulan berikutnya: harga penuh, tanpa prorata dan tanpa materai.
+            // Wajib sama dengan next_month_amount di InitialInvoiceService dan
+            // dengan nominal yang nanti diterbitkan GenerateMonthlyInvoicesCommand.
+            const bulanDepanObj = new Date(issueDateObj.getFullYear(), issueDateObj.getMonth() + 1, 1);
+            const nextAfterDiscount = Math.max(0, baseMonthly - discount);
+            const nextMonthAmount = nextAfterDiscount + Math.round(nextAfterDiscount * (ppnRate / 100) * 100) / 100;
+            document.getElementById('kwitansi_bulan_depan').textContent =
+                `Mulai ${namaBulan(bulanDepanObj)}: ${rupiah(nextMonthAmount)}/bulan, jatuh tempo tanggal 10.`;
         } else {
             prorateAmount = baseMonthly;
         }
 
-        // Apply
-        document.getElementById('fv_prorate_amount').value = prorateAmount;
-
-        // Subtotal = prorata + biaya sekali bayar; PPN dihitung dari subtotal
-        // setelah diskon (persen, sama seperti render di invoices/show.blade.php).
-        const subtotal = prorateAmount + instFee + cableFee + poleFee;
+        // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
+        // dari subtotal setelah diskon (persen, sama seperti render di
+        // invoices/show.blade.php).
+        const subtotal = prorateAmount + instFee + cableFee + poleFee + otherFee;
         const afterDiscount = Math.max(0, subtotal - discount);
         const ppnAmount = Math.round(afterDiscount * (ppnRate / 100) * 100) / 100;
+        const total = afterDiscount + ppnAmount;
 
-        document.getElementById('fv_subtotal').value = subtotal;
-        document.getElementById('fv_total_amount').value = afterDiscount + ppnAmount;
+        document.getElementById('kwitansi_prorata').textContent = rupiah(prorateAmount);
+        document.getElementById('kwitansi_pemasangan').textContent = rupiah(instFee);
+        document.getElementById('kwitansi_materai').textContent = rupiah(otherFee);
+        document.getElementById('kwitansi_kabel').textContent = rupiah(cableFee);
+        document.getElementById('kwitansi_tiang').textContent = rupiah(poleFee);
+        document.getElementById('kwitansi_total').textContent = rupiah(total);
+
+        // Baris diskon & PPN hanya dirender kalau nilainya > 0 (lihat Blade).
+        const diskonEl = document.getElementById('kwitansi_diskon');
+        if (diskonEl) {
+            diskonEl.textContent = '− ' + rupiah(Math.min(discount, subtotal));
+        }
+        const ppnEl = document.getElementById('kwitansi_ppn');
+        if (ppnEl) {
+            ppnEl.textContent = rupiah(ppnAmount);
+        }
+
+        // Dipakai dialog konfirmasi sebelum submit.
+        document.getElementById('verifyForm').dataset.totalAmount = total;
     }
 
     // ── CONFIRM ACTIVATION ─────────────────────────────────────────────
@@ -1064,7 +1129,7 @@
         if (verifyForm) {
             verifyForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                const total = document.getElementById('fv_total_amount').value;
+                const total = verifyForm.dataset.totalAmount || 0;
                 const totalFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(total);
 
                 const message = `

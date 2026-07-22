@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -15,6 +16,7 @@ use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -32,60 +34,60 @@ class FopDashboardController extends Controller
     {
         $this->authorize('viewAll', Task::class);
 
-        $user            = auth()->user();
+        $user = auth()->user();
         $hasAllPopAccess = $this->accessService->hasAllPopAccess($user);
-        $allowedPopIds   = $this->accessService->getAllowedPopIds($user);
-        $today           = Carbon::today();
+        $allowedPopIds = $this->accessService->getAllowedPopIds($user);
+        $today = Carbon::today();
 
         // ── Antrean survey: pelanggan yang belum disurvey ───────────
         // Countdown Survey: (customers.created_at + 1 hari) - sekarang
         $surveyQueue = Customer::with(['pop'])
-            ->when(!$hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+            ->when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
             ->orderBy('created_at', 'asc') // terlama di atas — paling prioritas
             ->limit(50)
             ->get()
             ->map(function (Customer $c) {
-                $deadline     = Carbon::parse($c->created_at)->addDay();
-                $nowTs        = Carbon::now();
-                $secondsLeft  = $deadline->diffInSeconds($nowTs, false); // negatif = belum lewat
+                $deadline = Carbon::parse($c->created_at)->addDay();
+                $nowTs = Carbon::now();
+                $secondsLeft = $deadline->diffInSeconds($nowTs, false); // negatif = belum lewat
                 $totalSeconds = 86400; // 1×24 jam
                 // diffInSeconds dengan false: positif = deadline sudah lewat, negatif = belum
                 $remainSeconds = -$secondsLeft; // positif = sisa waktu, negatif = terlambat
 
                 return [
-                    'id'             => $c->id,
-                    'name'           => $c->full_name,
-                    'cid'            => $c->display_id ?? $c->customer_code,
-                    'pop_name'       => $c->pop?->name ?? '—',
-                    'registered_at'  => $c->created_at->format('d M Y H:i'),
-                    'deadline_iso'   => $deadline->toIso8601String(),
+                    'id' => $c->id,
+                    'name' => $c->full_name,
+                    'cid' => $c->display_id ?? $c->customer_code,
+                    'pop_name' => $c->pop?->name ?? '—',
+                    'registered_at' => $c->created_at->format('d M Y H:i'),
+                    'deadline_iso' => $deadline->toIso8601String(),
                     'remain_seconds' => $remainSeconds,
-                    'total_seconds'  => $totalSeconds,
-                    'is_late'        => $remainSeconds < 0,
+                    'total_seconds' => $totalSeconds,
+                    'is_late' => $remainSeconds < 0,
                 ];
             });
 
         // ── Stat cards ──────────────────────────────────────────────
 
         // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
-        $overdueSurvey = Customer::when(!$hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+        $overdueSurvey = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
-            ->whereRaw('DATE_ADD(created_at, INTERVAL 1 DAY) < NOW()')
+            ->where('created_at', '<', now()->subDay())
             ->count();
 
         // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
         // Join dengan task survey terbaru yang selesai untuk ambil completed_at
-        $overdueInstallation = Customer::when(!$hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+        $overdueInstallation = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
             ->whereHas('tasks', function ($q) {
-                $q->where('task_type', \App\Enums\TaskType::SURVEY->value)
-                  ->where('status', TaskStatus::SELESAI->value)
-                  ->whereRaw('DATE_ADD(completed_at, INTERVAL 3 DAY) < NOW()');
+                $q->where('task_type', TaskType::SURVEY->value)
+                    ->where('status', TaskStatus::SELESAI->value)
+                    ->where('completed_at', '<', now()->subDays(3));
             })
             ->count();
 
-        $perluAksiFopCount = Customer::when(!$hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+        $perluAksiFopCount = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
             ->whereIn('status', ['waiting_acc', 'surveyed'])
             ->count();
 
@@ -95,12 +97,12 @@ class FopDashboardController extends Controller
             ->get(['status']);
 
         $stats = [
-            'antrian_survey'       => $surveyQueue->count(),
-            'perlu_aksi_fop'       => $perluAksiFopCount,
-            'berjalan'             => $todayTaskCounts->where('status.value', TaskStatus::IN_PROGRESS->value)->count(),
-            'selesai_hari_ini'     => $todayTaskCounts->where('status.value', TaskStatus::SELESAI->value)->count(),
-            'total_hari_ini'       => $todayTaskCounts->count(),
-            'overdue_survey'       => $overdueSurvey,
+            'antrian_survey' => $surveyQueue->count(),
+            'perlu_aksi_fop' => $perluAksiFopCount,
+            'berjalan' => $todayTaskCounts->where('status.value', TaskStatus::IN_PROGRESS->value)->count(),
+            'selesai_hari_ini' => $todayTaskCounts->where('status.value', TaskStatus::SELESAI->value)->count(),
+            'total_hari_ini' => $todayTaskCounts->count(),
+            'overdue_survey' => $overdueSurvey,
             'overdue_installation' => $overdueInstallation,
         ];
 
@@ -122,14 +124,14 @@ class FopDashboardController extends Controller
                 }
 
                 return [
-                    'task_id'       => $task->id,
-                    'team_name'     => $teamName,
-                    'members'       => $task->teamMembers->map(fn($m) => $m->user?->name)->filter()->toArray(),
-                    'task_title'    => preg_replace('/^\[.*?\]\s*/', '', $task->title),
-                    'task_type'     => $task->task_type->label(),
-                    'address'       => $task->customer?->clean_address ?? '—',
-                    'status'        => $task->status->label(),
-                    'status_color'  => $task->status->value === TaskStatus::IN_PROGRESS->value ? 'warning' : 'info',
+                    'task_id' => $task->id,
+                    'team_name' => $teamName,
+                    'members' => $task->teamMembers->map(fn ($m) => $m->user?->name)->filter()->toArray(),
+                    'task_title' => preg_replace('/^\[.*?\]\s*/', '', $task->title),
+                    'task_type' => $task->task_type->label(),
+                    'address' => $task->customer?->clean_address ?? '—',
+                    'status' => $task->status->label(),
+                    'status_color' => $task->status->value === TaskStatus::IN_PROGRESS->value ? 'warning' : 'info',
                 ];
             });
 
@@ -141,11 +143,11 @@ class FopDashboardController extends Controller
             'members',
             'fopTasks.technicians',
             'fopTasks.customer',
-            'fopTasks.task'
+            'fopTasks.task',
         ])
             ->get()
             ->filter->isActive()
-            ->when(!$hasAllPopAccess, fn ($teams) => $teams->filter(
+            ->when(! $hasAllPopAccess, fn ($teams) => $teams->filter(
                 fn (FopTaskTeam $team) => $team->fopTasks->contains(
                     fn (FopTask $t) => in_array($t->pop_id, $allowedPopIds)
                 )
@@ -161,49 +163,49 @@ class FopDashboardController extends Controller
                     $statusValue = $refStatus->value;
                     $status = $refStatus->displayLabel($reportDeferred);
 
-                    $statusStyle = match(true) {
-                        $statusValue === 'terjadwal'   => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
+                    $statusStyle = match (true) {
+                        $statusValue === 'terjadwal' => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
                         $statusValue === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
-                        $statusValue === 'selesai'     => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
-                        $statusValue === 'dibatalkan'  => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
+                        $statusValue === 'selesai' => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
+                        $statusValue === 'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
                         $statusValue === 'pending' && $reportDeferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
-                        $statusValue === 'pending'     => 'background:#fefce8; color:#a16207; border-color:#fde68a',
+                        $statusValue === 'pending' => 'background:#fefce8; color:#a16207; border-color:#fde68a',
                         default => 'background:var(--color-surface-muted); color:var(--color-text-main); border-color:var(--color-border)',
                     };
 
                     return [
-                        'fop_task_id'  => $t->id,
-                        'task_id'      => $t->task_id,
-                        'task_number'  => $t->task_number,
-                        'tugas'        => $t->tugas,
-                        'status'       => $status,
+                        'fop_task_id' => $t->id,
+                        'task_id' => $t->task_id,
+                        'task_number' => $t->task_number,
+                        'tugas' => $t->tugas,
+                        'status' => $status,
                         'status_value' => $statusValue,
                         'status_style' => $statusStyle,
-                        'draggable'    => !in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress'], true),
+                        'draggable' => ! in_array($statusValue, ['selesai', 'dibatalkan', 'in_progress'], true),
                         'category_label' => $t->category->value,
-                        'badge_classes'  => $t->category->badgeClasses(),
+                        'badge_classes' => $t->category->badgeClasses(),
                         'customer_name' => $t->customer?->full_name ?? '—',
                         'customer_address' => $t->customer?->clean_address ?? '—',
-                        'technicians'  => $t->technicians->pluck('name')->values(),
+                        'technicians' => $t->technicians->pluck('name')->values(),
                     ];
                 })->values();
 
-                $totalTasks     = $mappedTasks->count();
+                $totalTasks = $mappedTasks->count();
                 $completedTasks = $mappedTasks->filter(fn ($t) => $t['status_value'] === 'selesai')->count();
 
                 return [
-                    'id'               => $team->id,
-                    'name'             => $team->name,
-                    'work_date'        => $team->work_date->format('d M Y'),
-                    'total_tasks'      => $totalTasks,
-                    'completed_tasks'  => $completedTasks,
+                    'id' => $team->id,
+                    'name' => $team->name,
+                    'work_date' => $team->work_date->format('d M Y'),
+                    'total_tasks' => $totalTasks,
+                    'completed_tasks' => $completedTasks,
                     'progress_percent' => $totalTasks > 0 ? (int) round($completedTasks / $totalTasks * 100) : 0,
-                    'members'          => $team->members->map(fn (User $m) => [
-                        'id'       => $m->id,
-                        'name'     => $m->name,
+                    'members' => $team->members->map(fn (User $m) => [
+                        'id' => $m->id,
+                        'name' => $m->name,
                         'initials' => $this->initials($m->name),
                     ])->values(),
-                    'tasks'            => $mappedTasks,
+                    'tasks' => $mappedTasks,
                 ];
             })
             ->values();
@@ -229,18 +231,18 @@ class FopDashboardController extends Controller
     public function switchTeam(Request $request, FopTask $fopTask)
     {
         $user = auth()->user();
-        if (!$user) {
+        if (! $user) {
             abort(401);
         }
 
-        if (!$user->hasRole('owner') && !$user->hasFullAccess() && !$user->hasPermission('fop_tasks.update')) {
+        if (! $user->hasRole('owner') && ! $user->hasFullAccess() && ! $user->hasPermission('fop_tasks.update')) {
             abort(403, 'Anda tidak memiliki hak akses ke modul ini.');
         }
 
         $validated = $request->validate([
-            'to_team_id'         => ['required', 'integer', 'exists:fop_task_teams,id'],
-            'technician_ids'     => ['required', 'array', 'min:1'],
-            'technician_ids.*'   => ['integer', 'exists:users,id'],
+            'to_team_id' => ['required', 'integer', 'exists:fop_task_teams,id'],
+            'technician_ids' => ['required', 'array', 'min:1'],
+            'technician_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
         $fopTask->load(['technicians', 'task', 'team']);
@@ -259,7 +261,7 @@ class FopDashboardController extends Controller
             return $this->switchTeamError($request, 'to_team_id', 'Task sudah berada di Team tersebut.');
         }
 
-        if (!$fopTask->task_date || $toTeam->work_date->toDateString() !== $fopTask->task_date->toDateString()) {
+        if (! $fopTask->task_date || $toTeam->work_date->toDateString() !== $fopTask->task_date->toDateString()) {
             return $this->switchTeamError($request, 'to_team_id', "Team \"{$toTeam->name}\" bukan untuk tanggal task ini.");
         }
 
@@ -329,13 +331,13 @@ class FopDashboardController extends Controller
 
     // ─── Private Helpers ─────────────────────────────────────────
 
-    private function getTeknisiList(bool $hasAllPopAccess, array $allowedPopIds, Carbon $today): \Illuminate\Support\Collection
+    private function getTeknisiList(bool $hasAllPopAccess, array $allowedPopIds, Carbon $today): Collection
     {
         $query = User::with(['roleScopes.targets'])
             ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
             ->orderBy('name');
 
-        if (!$hasAllPopAccess) {
+        if (! $hasAllPopAccess) {
             $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
         }
 
@@ -352,12 +354,12 @@ class FopDashboardController extends Controller
                 ->where(function ($q) use ($today) {
                     $q->where(function ($q1) use ($today) {
                         $q1->where('status', TaskStatus::TERJADWAL->value)
-                           ->whereDate('scheduled_at', $today);
+                            ->whereDate('scheduled_at', $today);
                     })
-                    ->orWhere(function ($q2) use ($today) {
-                        $q2->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-                           ->whereDate('scheduled_at', '<', $today);
-                    });
+                        ->orWhere(function ($q2) use ($today) {
+                            $q2->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                                ->whereDate('scheduled_at', '<', $today);
+                        });
                 })
                 ->count();
 
@@ -373,12 +375,12 @@ class FopDashboardController extends Controller
             $location = $activeTask ? ($activeTask->customer?->clean_address ?? 'Tidak Diketahui') : '-';
 
             return [
-                'id'          => $teknisi->id,
-                'name'        => $teknisi->name,
-                'initials'    => $this->initials($teknisi->name),
-                'status'      => $status,
-                'task_count'  => $taskCount,
-                'location'    => $location,
+                'id' => $teknisi->id,
+                'name' => $teknisi->name,
+                'initials' => $this->initials($teknisi->name),
+                'status' => $status,
+                'task_count' => $taskCount,
+                'location' => $location,
             ];
         });
     }
@@ -386,6 +388,7 @@ class FopDashboardController extends Controller
     private function initials(string $name): string
     {
         $words = explode(' ', trim($name));
+
         return strtoupper(
             implode('', array_map(fn ($w) => substr($w, 0, 1), array_slice($words, 0, 2)))
         );

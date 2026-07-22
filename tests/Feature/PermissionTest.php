@@ -15,7 +15,7 @@ class PermissionTest extends TestCase
     {
         $this->seed(PermissionSeeder::class);
 
-        $this->assertSame(26, Permission::query()->count());
+        $this->assertSame(37, Permission::query()->count());
 
         $expectedPermissions = [
             'manage_pop',

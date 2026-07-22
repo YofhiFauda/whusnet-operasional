@@ -1,7 +1,7 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
-Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1 & BATCH 2)
-Current Task: MIGRASI-T002 — Perbaikan Tagihan Legacy BATCH 2 (Done)
+Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1, BATCH 2 & BATCH 3)
+Current Task: MIGRASI-T003 — Duplikasi Tagihan & Pembayaran Hasil Migrasi (Done, DB sudah di-import ulang)
 
 > **S8.10-T003 (FOP Notification Dashboard):** ⏸️ PAUSED — Siap dilanjutkan setelah BATCH 1 & BATCH 2 selesai
 > **Sprint 8.9 Tasks:** T001–T006 (Done)
@@ -2031,6 +2031,65 @@ Sprint 11 sampai Sprint 15 adalah sprint lanjutan setelah fitur MVP utama selesa
 
 
 ## Done
+
+### MIGRASI-T003 — Duplikasi Tagihan & Pembayaran Hasil Migrasi Legacy (BATCH 3)
+Status: Done (kode & test). Remediasi data produksi BELUM dijalankan.
+
+Dipicu laporan: Ardiyanto Cahyo Nugroho paket Rp 165.000 tapi tagihan Rp 330.000 dengan
+dua pembayaran awal, dan Wiyono Wonoketro punya dua invoice AWAL (Rp 120.032 + Rp 11.000).
+
+Analisa lengkap: `docs/billing-pembayaran/analisa-duplikasi-tagihan-pembayaran-migrasi-legacy.md`
+
+Enam cacat yang diperbaiki:
+- [x] Bug 1 — `costPaymentMap` menjumlahkan semua pembayaran bulanan jadi total tagihan awal
+      (`IDBIAYA` konstan seumur hidup pelanggan). Sekarang di-key `costId|BULANTAGIHAN`.
+- [x] Bug 2 — semua pembayaran dirutekan ke satu invoice AWAL. Sekarang satu invoice per
+      periode, dirutekan lewat `$invoiceKeyByCostPeriod`.
+- [x] Bug 3 — `TGLINSERT` (kolom `ON UPDATE`) dipakai sebagai tanggal terbit & periode.
+      Sekarang periode dari `BULANTAGIHAN`, anchor dari riwayat "Berhasil Active".
+- [x] Bug 4 — materai `BIAYALAINLAIN` dianggap penanda registrasi. Sekarang hanya
+      `BIAYAPASANG > 0`.
+- [x] Bug 5 — baris log aktivasi (`BIAYAPASANG=0` & `BIAYABULANAN=0`) tetap jadi invoice.
+      Sekarang dilewati; guard-nya simetris dengan sisi pembayaran.
+- [x] Bug 6 — `subtotal` dobel hitung materai. Sekarang `subtotal = total - ppn + discount`.
+- [x] Dedup lapis kedua bukti bayar per `(IDTRANSAKSI, BULANTAGIHAN)`; nominal berbeda
+      dilaporkan untuk tinjauan manual, tidak dibuang diam-diam.
+- [x] Bug 7 (ketahuan saat verifikasi) — bukti `BAYAR=0` ikut dibuang dari peta periode,
+      padahal `BULANTAGIHAN`-nya penanda periode satu-satunya untuk tagihan belum
+      dibayar. Invoice reaktivasi jatuh ke periode aktivasi pertama & menabrak tagihan
+      lama. Dipisah jadi `$periodsByCost` (semua periode) vs `$paidByCostPeriod`
+      (nominal, `BAYAR>0`). Tabrakan periode 8 → 4.
+- [x] Bug 8 (hasil sapuan pola serupa) — `lunasByTransaction` di-key `IDTRANSAKSI` saja,
+      jadi metode/penerima/catatan satu baris dicap ke semua pembayaran cost id itu
+      (13 cost id punya >1 baris lunas, 2 beda bulan, 5 beda metode). Ditambah peta
+      per periode dari bulan `TGLBAYAR`, baris tertua jadi cadangan.
+- [x] Import ulang dari nol dijalankan 2026-07-22 (DB 100% data migrasi, nol data
+      sistem baru — jadi tidak perlu command remediasi). Hasil di §9 dokumen analisa.
+- [x] Sapuan pola serupa di seluruh jalur migrasi — hasil di §10 dokumen analisa.
+
+File diubah:
+- `app/Console/Commands/MigrateLegacyDataCommand.php`
+- `app/Http/Controllers/CustomerController.php` (blok import invoices)
+- `tests/fixtures/legacy/duplikasi-tagihan-migrasi.sql` (baru)
+- `tests/Feature/MigrasiLegacyTagihanDobelPerPeriodeTest.php` (baru, 8 test)
+
+Perintah import ulang (butuh memory 2G & Redis mati → pakai driver array):
+```bash
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan migrate:fresh --seed --force
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=J --branch-name=Sandya
+```
+
+Belum dikerjakan (keputusan bisnis, bukan bug):
+- [ ] Tim billing memutuskan 3 grup pembayaran nominal berbeda (IN000119, IN000168,
+      IN000214) — selisihnya tepat materai, command mencetaknya tiap import
+- [ ] Tim billing memutuskan 4 tabrakan periode nyata (RQ000289, RQ000306, RQ000308,
+      RQ000311) — dua pembayaran nyata di bulan yang sama, bukan duplikat migrasi
+
+---
 
 ### Sprint 5 — Modul Import Excel/CSV Data Pelanggan Lama
 Status: Done
@@ -5298,7 +5357,112 @@ Acceptance Criteria:
 ---
 
 ## Blocked
-Belum ada.
+
+> **Analisa induk:** `docs/billing-pembayaran/analisa-pencegahan-tagihan-dobel.md`
+> — lima lapis pencegahan tagihan dobel, mana yang bolong, urutan pengerjaan.
+> B0c sudah selesai (entri di bawah dipertahankan sebagai catatan). Sisanya:
+> B0d bisa langsung dikerjakan, B0b sudah dapat keputusan sumber tanggal, B0e
+> masih perlu keputusan per kasus.
+
+### BILLING-B0c — Penjaga dobel lintas-jenis invoice
+**Status**: **Done** (2026-07-21)
+
+**Hasil**: `GenerateMonthlyInvoicesCommand` dan `InvoiceObserver::creating()`
+sekarang bertanya "sudah ada tagihan langganan untuk periode ini?"
+(`whereIn([AWAL, BULANAN])`, kecuali `BATAL`), bukan lagi per `invoice_type`.
+`REAKTIVASI` dan invoice ber-`old_invoice_id` (replay legacy) dikecualikan.
+Aturan burst-dedup lama di observer tetap dipertahankan — beda gejala.
+
+**Test**: `tests/Feature/SatuTagihanLanggananPerPeriodeTest.php` (6 kasus).
+Terbukti gagal tanpa guard: 2 dari 6 gagal waktu perubahan di-stash. Suite penuh
+519 test, 7 error + 12 failure — identik dengan baseline, tidak ada regresi.
+
+**Efek**: `activation_date` yang salah isi tidak lagi bisa memproduksi tagihan
+dobel baru. BILLING-B0b turun dari "darurat" jadi "rapikan data".
+
+**Masalah**: `alreadyExists` di `GenerateMonthlyInvoicesCommand` dan
+`InvoiceObserver::creating()` sama-sama di-scope `invoice_type`, jadi AWAL dan
+BULANAN pada periode yang sama dianggap bukan duplikat. Akibatnya seluruh
+pencegahan tagihan dobel bertumpu pada satu kolom, `activation_date`.
+
+**Rencana**: ubah pertanyaannya dari "sudah ada tagihan BULANAN?" jadi "sudah ada
+tagihan langganan untuk periode ini?" — `whereIn([AWAL, BULANAN])`, kecualikan
+`REAKTIVASI` (suspend lalu aktif lagi di bulan sama itu sah) dan invoice
+berstatus `BATAL` (kalau tidak, tagihan yang dibatalkan memblokir penggantinya).
+
+**Kenapa penting**: setelah ini, `activation_date` yang salah tidak lagi bisa
+memproduksi tagihan dobel baru — B0b turun dari "darurat" jadi "rapikan data".
+
+**Test**: pelanggan punya invoice AWAL Juli + `activation_date` sengaja diisi
+bulan lain → cron Juli tetap tidak menerbitkan BULANAN.
+
+### BILLING-B0d — Command audit tagihan dobel
+**Status**: **Done** (2026-07-21)
+
+`php artisan billing:audit-duplicate-invoices [--period=YYYY-MM] [--strict]` —
+read-only, melaporkan pelanggan dengan >1 tagihan langganan pada periode sama.
+Temuan dipisah `legacy` (semua baris punya `old_invoice_id`) vs `PERLU CEK`
+(ada jalur berjalan yang lolos guard). Ikut menghitung nominal yang sudah
+terbayar di grup dobel. Tidak ada `--fix` — keputusan pembatalan & nasib uang
+yang terlanjur dibayar adalah keputusan bisnis per kasus.
+
+**Test**: `tests/Feature/AuditTagihanDobelTest.php` (8 kasus). Suite penuh 527
+test, 7 error + 12 failure — identik baseline.
+
+**Hasil eksekusi di DB development**: 5 grup dobel, semuanya legacy,
+`perlu dicek: 0`, nominal terbayar Rp 1.153.291. Rinciannya di
+`docs/billing-pembayaran/analisa-pencegahan-tagihan-dobel.md` bagian 7.
+
+### BILLING-B0e — Bersihkan dobel legacy + unique index `invoices`
+**Status**: Blocked
+**Pemblokir**: butuh keputusan per kasus untuk 5 grup dobel warisan migrasi.
+
+Unique index `(customer_id, billing_period)` untuk jenis langganan belum bisa
+dipasang selama pelanggaran historis masih ada. Urutannya: bersihkan dulu, baru
+pasang index. Index parsial (`WHERE ...`) tidak portabel ke MySQL, jadi tidak ada
+jalan pintas.
+
+Aturan penanganan: invoice yang salah di-set `InvoiceStatus::BATAL` + alasan +
+audit log — **jangan dihapus**. Kalau yang dobel sudah dibayar, uangnya harus
+jadi kredit atau dikembalikan; sistem belum punya konsep kredit pelanggan.
+
+### BILLING-B0b — Backfill `activation_date` data lama
+**Status**: **Done** (2026-07-21) — command siap, eksekusi produksi menunggu owner
+**Keputusan bisnis 2026-07-21**: urutan sumber tanggal disetujui — nota/invoice
+`AWAL` lebih dulu, lalu catatan pemasangan, lalu data sistem lama. Kalau
+ketiganya kosong: **jangan menebak**, laporkan untuk review manual.
+
+**Kenapa perlu**: fix BILLING-B0 (`CustomerVerificationController::finalVerify` menimpa `activation_date` dengan `issue_date`) hanya menutup pelanggan yang diaktivasi **mulai sekarang**. Baris lama yang `activation_date`-nya masih berisi `registration_date` tetap rawan dobel tagih di bulan aktivasinya — `GenerateMonthlyInvoicesCommand` membandingkan bulan yang salah, dan dua lapis penjaga lain di-scope per `invoice_type` sehingga AWAL + BULANAN periode sama tetap lolos.
+
+**Rencana**: `php artisan billing:backfill-activation-date`, default dry-run, menulis hanya dengan `--force`. Output tabel `customer_code | activation_date sekarang | usulan | sumber`.
+
+**Urutan sumber (disetujui 2026-07-21)**:
+1. `issue_date` invoice `AWAL` milik pelanggan tersebut
+2. `customer_installations.installation_date`
+3. `finished_at` legacy
+4. lewati + laporkan sebagai butuh review manual (jangan tebak)
+
+**Hasil**: `php artisan billing:backfill-activation-date [--force] [--limit=N]`.
+Default hanya mencetak daftar usulan; `--force` menulis dan mencatat setiap
+perubahan ke audit log (`action = backfill_activation_date`, berikut sumbernya).
+
+**Penyesuaian dari rencana awal**: sumber ketiga (`finished_at` legacy) ternyata
+tidak ada sebagai kolom tersendiri — waktu import, nilainya langsung masuk ke
+`activation_date` (`CustomerController::importCustomerServices`). Jadi baris
+legacy (`old_request_id`/`old_cost_id` terisi) **dilewati seluruhnya**: nilainya
+memang sudah tanggal aktivasi, bukan placeholder pendaftaran. Menimpanya justru
+merusak data yang benar. Sumber efektif tinggal dua: invoice AWAL → pemasangan →
+lapor manual.
+
+**Test**: `tests/Feature/BackfillActivationDateTest.php` (11 kasus), termasuk
+integrasi: setelah backfill, cron bulan aktivasi tidak lagi menerbitkan tagihan
+kedua. Suite penuh 538 test, 7 error + 12 failure — identik baseline.
+
+**Menunggu owner**: eksekusi di produksi. DB development tidak punya pelanggan
+aktif, jadi jumlah baris terdampak belum diketahui — jalankan tanpa `--force`
+dulu, baca daftarnya, baru putuskan.
+
+**Catatan data**: di DB development jumlah `customer_services` `service_status = aktif` adalah 0, jadi dampaknya belum bisa diukur di sini — angka sebenarnya harus diambil dari produksi lewat dry-run. 5 grup customer+periode dobel yang ada semuanya produk migrasi legacy (2022-12, 2023-01, 2025-07), bukan produk bug ini, dan **tidak** boleh dibereskan oleh command ini.
 
 ## Notes
 AI hanya boleh mengerjakan task dengan status `In Progress`.
@@ -5323,6 +5487,32 @@ Catatan hardening legacy mapping:
 - Legacy request ID sekarang ikut disimpan di `customers.old_request_id`, dan migrasi legacy memakai prefix `RQ`/`C` agar data REQ/CID tetap konsisten dengan histori operasional.
 - Hierarki legacy sekarang juga dipetakan ke cabang POP, mini POP, dan distribusi: `KODEAPP`/cabang legacy menjadi POP induk, `kategori_perangkat_jaringan` menjadi mini POP child, dan `kode_kontrol_distribusi` disimpan sebagai distribusi untuk mendukung format CID operasional.
 - Verifikasi terbaru lulus: `php artisan test tests/Feature/RealDataMigrationTest.php` dan `php artisan test tests/Feature/CustomerImportTest.php`.
+
+Catatan fix di luar sprint — BILLING-B0 (activation_date stale), 2026-07-21:
+- Gejala: pelanggan daftar Juni lalu aktif 21 Juli menerima dua tagihan periode Juli (AWAL prorata + BULANAN penuh).
+- Sebab: `customer_services.activation_date` diisi `registration_date` saat pendaftaran (`CustomerController::store`) dan tidak pernah ditimpa saat aktivasi, sehingga penjaga "lewati bulan aktivasi" di `GenerateMonthlyInvoicesCommand` tidak pernah kena. Dua lapis penjaga lain di-scope per `invoice_type` (AWAL vs BULANAN dianggap bukan duplikat) dan tabel `invoices` tidak punya unique index.
+- Fix: `CustomerVerificationController::finalVerify()` menimpa `activation_date` dengan `issue_date` (tanggal yang sama dengan basis prorata) dan mencatatnya di audit log.
+- Test: `tests/Feature/AktivasiTertagihDobelKarenaActivationDateStaleTest.php` (3 passed). Terbukti gagal tanpa fix (2 invoice untuk periode Juli).
+- Belum dikerjakan: backfill `activation_date` untuk data lama, dan 5 grup customer+periode dobel yang semuanya berasal dari migrasi legacy (2022–2023, 2025-07) — perlu keputusan terpisah.
+
+Catatan fix di luar sprint — BILLING-B2 (periode/tempo diturunkan server + materai), 2026-07-21:
+- `finalVerify()` tidak lagi menerima `billing_period` & `due_date` dari form; keduanya diturunkan dari `issue_date` (periode = bulan aktivasi, tempo = tanggal aktivasi, karena tagihan awal dibayar di tempat).
+- `InitialInvoiceService::calculate()` menerima `other_fee` (materai) ke subtotal dan mengembalikan `next_month_amount` untuk baris "mulai bulan depan" di kwitansi.
+- Form verifikasi: input periode & jatuh tempo dihapus, field materai ditambah, biaya pemasangan prefill dari `internet_packages.installation_fee` dengan fallback 0.
+- Test: `tests/Feature/TagihanAwalPeriodeIkutTanggalAktivasiTest.php` (5) + 4 kasus baru di `tests/Unit/InitialInvoiceProrateFormulaTest.php`. Semua lulus.
+- Suite penuh: 503 test, 7 error + 12 failure — jumlah dan daftarnya identik dengan baseline sebelum perubahan (491 test), jadi tidak ada regresi baru. Kegagalan itu milik modul lain (RolePermissionMatrix, RealDataMigration, ReportCustomer, dll).
+Catatan fix di luar sprint — BILLING-B3 (panel hitungan jadi kwitansi), 2026-07-21:
+- Input nominal `readonly` (`subtotal`, `prorate_amount`, `discount`, `ppn`, `total_amount`) dihapus dari `verifications/admin.blade.php`, diganti kwitansi read-only. Server memang sudah mengabaikan field-field itu sejak `InitialInvoiceService` dipakai, jadi menghapusnya tidak menyentuh backend.
+- Form tersisa 5 input: tanggal aktivasi, biaya pemasangan, materai, kabel, tiang.
+- Parameter layanan (harga paket, diskon, PPN) dipindah ke `data-*` pada `#billing_params`, bukan `<input type="hidden">` — supaya tidak ikut ter-POST dan tidak bisa disalahartikan sebagai kiriman admin.
+- Baris diskon & PPN hanya dirender kalau nilainya > 0. Untuk semua paket saat ini PPN sudah termasuk harga, jadi barisnya tidak pernah tampil.
+- Baris "Mulai <bulan depan>: Rp X/bulan, jatuh tempo tanggal 10" memakai rumus yang sama dengan `next_month_amount` dan `GenerateMonthlyInvoicesCommand`.
+- Test: 4 kasus baru di `TagihanAwalPeriodeIkutTanggalAktivasiTest` (total 9). Suite penuh 510 test, 7 error + 12 failure — identik dengan baseline, tidak ada regresi baru.
+
+Catatan koreksi konvensi prorata, 2026-07-21:
+- Keputusan bisnis: konvensi hari **legacy** yang benar — hari aktivasi TIDAK ditagih (`hari_dalam_bulan - tanggal`), pembulatan `round`. Angka kanonik 21 Juli paket 110.000 = **35.484** (bukan 39.032, bukan 35.483).
+- Aktivasi di hari terakhir bulan ditagih **sebulan penuh** (cabang legacy "besok tanggal 1 → 1 hari" tidak direplikasi). Ada tebing disengaja: aktif 30 Juli bayar 3.548, aktif 31 Juli bayar 110.000.
+- `InitialInvoiceProrateIgnoresClientAmountTest` & `CustomerFinalVerificationTest` ikut disesuaikan karena mengasumsikan konvensi lama.
 
 Setelah task selesai:
 1. Pindahkan task ke Done.

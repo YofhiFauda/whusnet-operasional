@@ -71,7 +71,7 @@
 
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="font-mono font-bold text-xs text-indigo-700">{{ $task->task_number }}</span>
+                                    <span class="font-mono font-bold text-xs text-sky-700">{{ $task->task_number }}</span>
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold border {{ $typeBadge }}">{{ strtoupper($typeLabel) }}</span>
                                     <span class="px-2 py-0.5 rounded text-[10px] font-semibold border {{ $statusBadge }}">{{ $statusLabel }}</span>
                                 </div>
@@ -91,7 +91,7 @@
                                 </span>
                             </div>
 
-                            <div class="flex items-center gap-1.5 text-indigo-600 font-bold text-xs shrink-0 bg-indigo-50 px-3 py-2 rounded-lg group hover:bg-indigo-100 transition-colors">
+                            <div class="flex items-center gap-1.5 text-sky-600 font-bold text-xs shrink-0 bg-sky-50 px-3 py-2 rounded-lg group hover:bg-sky-100 transition-colors">
                                 <span>Lihat Riwayat</span>
                                 <svg id="arrow_{{ $uniqueId }}" class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -130,7 +130,7 @@
                                 @if($task->evidences->count() > 0)
                                     <div class="bg-white p-4 rounded-xl border border-slate-200">
                                         <h5 class="text-xs font-bold text-slate-800 mb-2.5 flex items-center gap-1.5">
-                                            <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
+                                            <svg class="w-3.5 h-3.5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
                                             Bukti Foto Pekerjaan (Evidence)
                                         </h5>
                                         <div class="grid grid-cols-3 gap-2">
@@ -148,15 +148,15 @@
                         <!-- Step-by-Step Ticket Audit History -->
                         <div class="bg-white p-5 rounded-xl border border-slate-200">
                             <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <svg class="w-4 h-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 Riwayat Log Penanganan Tiket Ini
                             </h5>
 
                             @if($task->auditLogs->count() > 0)
-                                <div class="relative pl-5 border-l-2 border-indigo-100 space-y-4 ml-1">
+                                <div class="relative pl-5 border-l-2 border-sky-100 space-y-4 ml-1">
                                     @foreach($task->auditLogs as $alog)
                                         <div class="relative">
-                                            <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-indigo-600 border-2 border-white shadow-sm"></div>
+                                            <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-sky-600 border-2 border-white shadow-sm"></div>
                                             <div class="text-xs">
                                                 <div class="flex items-center justify-between gap-2">
                                                     <span class="font-bold text-slate-800">
@@ -193,7 +193,7 @@
                                 <div class="relative pl-5 border-l-2 border-slate-200 space-y-4 ml-1">
                                     @if($task->created_at)
                                     <div class="relative">
-                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-indigo-600 border-2 border-white"></div>
+                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-sky-600 border-2 border-white"></div>
                                         <div class="text-xs">
                                             <span class="font-bold text-slate-800">Tiket Diterbitkan</span>
                                             <p class="text-slate-500">Dibuat oleh {{ $task->creator ? $task->creator->name : 'System' }} pada {{ \Carbon\Carbon::parse($task->created_at)->translatedFormat('d M Y, H:i') }} WIB</p>

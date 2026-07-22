@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
-use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\SubscriptionStatus;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -112,6 +111,11 @@ class ReportCustomerTest extends TestCase
 
         // Assign popA only
         $user->pops()->attach($popA->id);
+        $scope = $user->roleScopes()->create([
+            'role_id' => $user->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        $scope->targets()->create(['pop_id' => $popA->id]);
 
         Customer::query()->delete();
 
@@ -245,6 +249,11 @@ class ReportCustomerTest extends TestCase
         ]);
 
         $user->pops()->attach($popA->id);
+        $scope = $user->roleScopes()->create([
+            'role_id' => $user->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        $scope->targets()->create(['pop_id' => $popA->id]);
 
         Customer::query()->delete();
 
@@ -278,13 +287,13 @@ class ReportCustomerTest extends TestCase
         $response = $this->actingAs($user)->get('/reports/customers/export');
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        
+
         $content = $response->streamedContent();
         $this->assertStringContainsString('Export Pelanggan SDA', $content);
         $this->assertStringNotContainsString('Export Pelanggan SBY', $content);
 
         // Export specifically POP B (which they don't have access to) -> should return 403
-        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/customers/export?pop_id=' . $popB->id);
+        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/customers/export?pop_id='.$popB->id);
         $responseUnauthorizedExport->assertStatus(403);
     }
 }

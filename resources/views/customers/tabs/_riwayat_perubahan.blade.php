@@ -3,7 +3,7 @@
     <div class="border border-slate-200 rounded-xl p-5 bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -20,10 +20,10 @@
         @endphp
 
         @if($activationDate)
-        <div class="bg-indigo-50/80 border border-indigo-200 rounded-lg px-3.5 py-2.5 text-right shrink-0">
-            <span class="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Tanggal Aktivasi Layanan</span>
-            <span class="text-xs font-bold text-indigo-950">{{ \App\Support\IndonesianDate::date($activationDate) }}</span>
-            <span class="block text-[10px] text-indigo-600 mt-0.5 font-medium">Perubahan setelah tanggal ini berstatus Pasca Aktivasi</span>
+        <div class="bg-sky-50/80 border border-sky-200 rounded-lg px-3.5 py-2.5 text-right shrink-0">
+            <span class="block text-[10px] font-bold text-sky-500 uppercase tracking-wider">Tanggal Aktivasi Layanan</span>
+            <span class="text-xs font-bold text-sky-950">{{ \App\Support\IndonesianDate::date($activationDate) }}</span>
+            <span class="block text-[10px] text-sky-600 mt-0.5 font-medium">Perubahan setelah tanggal ini berstatus Pasca Aktivasi</span>
         </div>
         @elseif($customer->status === 'active')
         <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2.5 text-right shrink-0">
@@ -155,7 +155,7 @@
             $hasStatus = count(array_intersect($changedKeys, $statusKeys)) > 0;
 
             if ($hasPackage) {
-                return ['label' => 'Perbaruan Paket Layanan & Biaya', 'icon' => '📦', 'badge_class' => 'bg-indigo-100 text-indigo-800 border-indigo-200'];
+                return ['label' => 'Perbaruan Paket Layanan & Biaya', 'icon' => '📦', 'badge_class' => 'bg-sky-100 text-sky-800 border-sky-200'];
             }
             if ($hasTech) {
                 return ['label' => 'Perbaruan Perangkat & Teknis Jaringan', 'icon' => '🔧', 'badge_class' => 'bg-teal-100 text-teal-800 border-teal-200'];
@@ -289,7 +289,7 @@
         </div>
     @else
         <!-- Timeline List Perbaruan Data -->
-        <div class="relative pl-6 border-l-2 border-indigo-200 space-y-6 ml-2 my-4">
+        <div class="relative pl-6 border-l-2 border-sky-200 space-y-6 ml-2 my-4">
             @foreach($groupedUpdates as $group)
                 @php
                     $changedKeysList = array_map(fn($item) => $item['key'], $group['changes']);
@@ -298,7 +298,7 @@
 
                 <div class="relative group">
                     <!-- Timeline Bullet Indicator -->
-                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-sm {{ $group['is_post_activation'] ? 'bg-indigo-600 text-white' : 'bg-slate-500 text-white' }}">
+                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-sm {{ $group['is_post_activation'] ? 'bg-sky-600 text-white' : 'bg-slate-500 text-white' }}">
                         <span class="text-xs leading-none">{{ $categoryInfo['icon'] }}</span>
                     </div>
 
@@ -314,7 +314,7 @@
 
                             <div class="flex items-center gap-2 text-xs">
                                 @if($group['is_post_activation'])
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
                                         Pasca Aktivasi
                                     </span>
                                 @else

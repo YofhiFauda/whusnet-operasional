@@ -14,13 +14,13 @@ use PHPUnit\Framework\TestCase;
  * Rumusnya satu: `hari_ditagih × (harga_paket / hari_dalam_bulan)`. Yang rawan
  * bergeser adalah cara menghitung `hari_ditagih`:
  *
- *   sekarang : hari_dalam_bulan - tanggal_aktivasi + 1   (hari aktivasi DITAGIH)
- *   legacy   : hari_dalam_bulan - tanggal_aktivasi       (hari aktivasi GRATIS)
+ *   berlaku : hari_dalam_bulan - tanggal_aktivasi       (hari aktivasi GRATIS)
+ *   salah   : hari_dalam_bulan - tanggal_aktivasi + 1   (hari aktivasi ditagih)
  *
  * Angka kanonik hasil konfirmasi bisnis 2026-07-21: pasang 21 Juli, paket
- * Rp 110.000 → Rp 39.032. Kalau test ini mendarat di 35.484, konvensinya
- * diam-diam kembali ke legacy. Lihat
- * docs/billing-pembayaran/perbandingan-tagihan-awal-vs-bulanan-legacy.md.
+ * Rp 110.000 → Rp 35.484 (10 hari, dibulatkan `round` seperti legacy). Kalau
+ * test ini mendarat di 39.032, ada yang menambahkan hari aktivasi ke hitungan.
+ * Lihat docs/billing-pembayaran/perbandingan-tagihan-awal-vs-bulanan-legacy.md.
  *
  * Unit test murni: tidak menyentuh database, model cuma wadah atribut.
  */
@@ -37,23 +37,45 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     }
 
     #[Test]
-    public function pasang_21_juli_paket_110rb_menghasilkan_39032(): void
+    public function pasang_21_juli_paket_110rb_menghasilkan_35484(): void
     {
         $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
 
-        $this->assertSame(11, $result['prorate_days'], 'Hari aktivasi harus ikut ditagih (21-31 Juli = 11 hari).');
+        $this->assertSame(10, $result['prorate_days'], 'Hari aktivasi digratiskan (22-31 Juli = 10 hari).');
         $this->assertSame(31, $result['days_in_month']);
-        $this->assertEqualsWithDelta(39032, $result['prorate_amount'], 0.01);
-        $this->assertEqualsWithDelta(39032, $result['total_amount'], 0.01);
+        $this->assertEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
+        $this->assertEqualsWithDelta(35484, $result['total_amount'], 0.01);
     }
 
     #[Test]
-    public function konvensi_legacy_ditolak(): void
+    public function hari_aktivasi_tidak_boleh_ikut_ditagih(): void
     {
         $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
 
-        // 10/31 × 110.000 = 35.484 — angka yang muncul kalau hari aktivasi digratiskan.
-        $this->assertNotEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
+        // 11/31 × 110.000 = 39.032 — angka yang muncul kalau hari aktivasi ikut ditagih.
+        $this->assertNotEqualsWithDelta(39032, $result['prorate_amount'], 0.01);
+    }
+
+    #[Test]
+    public function pembulatan_mengikuti_legacy_round_bukan_floor(): void
+    {
+        // 10 × (110.000 / 31) = 35.483,87. Legacy memakai round() — nominal
+        // tagihan awal hasil migrasi dicocokkan angka per angka dengan ini.
+        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21');
+
+        $this->assertEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
+        $this->assertNotEqualsWithDelta(35483, $result['prorate_amount'], 0.01);
+    }
+
+    #[Test]
+    public function aktivasi_hari_terakhir_bulan_ditagih_sebulan_penuh(): void
+    {
+        // 31 - 31 = 0 hari sisa. Keputusan bisnis: tagih penuh, bukan gratis dan
+        // bukan 1 hari. Tebing di ujung bulan disengaja — lihat docblock service.
+        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-31');
+
+        $this->assertSame(31, $result['prorate_days']);
+        $this->assertEqualsWithDelta(110000, $result['prorate_amount'], 0.01);
     }
 
     /**
@@ -63,10 +85,11 @@ class InitialInvoiceProrateFormulaTest extends TestCase
     {
         return [
             // label => [harga, tanggal aktivasi, hari ditagih, hari sebulan, prorata]
-            'aktivasi tanggal 1 = sebulan penuh' => [110000, '2026-07-01', 31, 31, 110000],
-            'aktivasi hari terakhir = 1 hari' => [110000, '2026-07-31', 1, 31, 3548],
-            'bulan 30 hari' => [110000, '2026-06-21', 10, 30, 36667],
-            'februari tahun kabisat' => [110000, '2028-02-21', 9, 29, 34138],
+            'aktivasi tanggal 1 = sebulan kurang sehari' => [110000, '2026-07-01', 30, 31, 106452],
+            'aktivasi hari terakhir = sebulan penuh' => [110000, '2026-07-31', 31, 31, 110000],
+            'aktivasi sehari sebelum akhir bulan = 1 hari' => [110000, '2026-07-30', 1, 31, 3548],
+            'bulan 30 hari' => [110000, '2026-06-21', 9, 30, 33000],
+            'februari tahun kabisat' => [110000, '2028-02-21', 8, 29, 30345],
         ];
     }
 
@@ -107,7 +130,58 @@ class InitialInvoiceProrateFormulaTest extends TestCase
         ]);
 
         // Prorata tetap murni dari harga paket — biaya pemasangan tidak ikut diprorata.
-        $this->assertEqualsWithDelta(39032, $result['prorate_amount'], 0.01);
-        $this->assertEqualsWithDelta(164032, $result['subtotal'], 0.01);
+        $this->assertEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
+        $this->assertEqualsWithDelta(160484, $result['subtotal'], 0.01);
+    }
+
+    #[Test]
+    public function materai_masuk_subtotal_tapi_bukan_basis_prorata(): void
+    {
+        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+            'extra_installation_fee' => 125000,
+            'other_fee' => 10000,
+        ]);
+
+        $this->assertEqualsWithDelta(35484, $result['prorate_amount'], 0.01);
+        $this->assertEqualsWithDelta(10000, $result['other_fee'], 0.01);
+        $this->assertEqualsWithDelta(170484, $result['subtotal'], 0.01);
+        $this->assertEqualsWithDelta(170484, $result['total_amount'], 0.01);
+    }
+
+    #[Test]
+    public function materai_negatif_dianggap_nol(): void
+    {
+        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+            'other_fee' => -50000,
+        ]);
+
+        $this->assertEqualsWithDelta(0, $result['other_fee'], 0.01);
+        $this->assertEqualsWithDelta(35484, $result['subtotal'], 0.01);
+    }
+
+    #[Test]
+    public function nominal_bulan_berikutnya_penuh_tanpa_prorata_dan_materai(): void
+    {
+        // Baris terakhir kwitansi: "Mulai bulan depan Rp X/bulan". Harus sama
+        // dengan yang nanti diterbitkan GenerateMonthlyInvoicesCommand, kalau
+        // tidak admin menjanjikan angka yang berbeda dari tagihan yang datang.
+        $result = (new InitialInvoiceService)->calculate($this->serviceWith(110000), '2026-07-21', [
+            'extra_installation_fee' => 125000,
+            'other_fee' => 10000,
+        ]);
+
+        $this->assertEqualsWithDelta(110000, $result['next_month_amount'], 0.01);
+    }
+
+    #[Test]
+    public function nominal_bulan_berikutnya_ikut_diskon_dan_ppn(): void
+    {
+        $result = (new InitialInvoiceService)->calculate(
+            $this->serviceWith(200000, ppn: 11, discount: 20000),
+            '2026-07-21'
+        );
+
+        // (200.000 - 20.000) + 11% = 199.800
+        $this->assertEqualsWithDelta(199800, $result['next_month_amount'], 0.01);
     }
 }

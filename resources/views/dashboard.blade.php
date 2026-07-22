@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Dashboard - Whusnet Operasional')
-@section('page_title', 'Dashboard Ringkasan')
+@section('page_title', 'Dashboard')
 
 @section('content')
 @php

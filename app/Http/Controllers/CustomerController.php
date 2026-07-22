@@ -593,8 +593,9 @@ class CustomerController extends Controller
         $packages = InternetPackage::orderBy('name')->get();
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
+        $distributions = Distribution::orderBy('code')->get();
 
-        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops'));
+        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops', 'distributions'));
     }
 
     /**
@@ -616,6 +617,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:100',
             'registration_date' => 'required|date',
             'pop_id' => 'required|exists:pops,id',
+            'distribution_id' => 'nullable|exists:distributions,id',
             'address' => 'nullable|string',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -1029,7 +1031,7 @@ class CustomerController extends Controller
     }
 
     /**
-     * Get payment info for the customer action modal.
+     * Get payment info & quick hub details for the customer action modal.
      */
     public function paymentInfo(Customer $customer)
     {
@@ -1049,6 +1051,30 @@ class CustomerController extends Controller
             ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
             ->sum('remaining_amount');
 
+        // Recent payments (3 pembayaran terakhir)
+        $recentPayments = Payment::where('customer_id', $customer->id)
+            ->with('invoice:id,invoice_number')
+            ->orderByDesc('payment_date')
+            ->take(3)
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'date' => IndonesianDate::date($p->payment_date),
+                    'amount' => (float) $p->amount,
+                    'method' => ucfirst($p->payment_method),
+                    'invoice_number' => $p->invoice?->invoice_number ?? '-',
+                ];
+            });
+
+        $service = $customer->customerService;
+        $device = $customer->customerDevice;
+        $address = $customer->customerAddress;
+        $completeness = $customer->dataCompleteness();
+
+        $lat = $address?->latitude;
+        $lng = $address?->longitude;
+        $mapsUrl = ($lat && $lng) ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}" : null;
+
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
             'invoice_number' => $latestInvoice ? $latestInvoice->invoice_number : null,
@@ -1058,6 +1084,28 @@ class CustomerController extends Controller
             'total_piutang' => (float) $totalPiutang,
             'billing_period' => $latestInvoice ? $latestInvoice->billing_period : null,
             'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
+            'technical' => [
+                'pppoe_username' => $service?->pppoe_username ?? '-',
+                'ip_address' => $service?->ip_address ?? '-',
+                'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
+                'router_sn' => $device?->router_sn ?? '-',
+                'device_brand' => $device?->device_brand ?? '-',
+                'contract_type' => match ($service?->contract_type) {
+                    'sewa' => 'Sewa', 'beli' => 'Beli', default => '-'
+                },
+                'distribution' => $customer->distribution?->name ?? '-',
+                'pop_name' => $customer->pop?->name ?? '-',
+            ],
+            'location' => [
+                'latitude' => $lat ?? '',
+                'longitude' => $lng ?? '',
+                'maps_url' => $mapsUrl,
+            ],
+            'recent_payments' => $recentPayments,
+            'completeness' => [
+                'percentage' => $completeness['percentage'],
+                'missing_required' => $completeness['missing_required'],
+            ],
         ]);
     }
 
@@ -1604,7 +1652,14 @@ class CustomerController extends Controller
                 'reason' => $this->cleanLegacyValue($row['reason'] ?? null),
                 'package_id' => $package instanceof InternetPackage ? $package->id : ($package['old_package_id'] ?? null),
                 'package_name' => $package instanceof InternetPackage ? $package->name : ($package['name'] ?? null),
-                'monthly_price' => $package instanceof InternetPackage ? $package->monthly_price : ($package['monthly_price'] ?? 0),
+                // Harga di sheet menang atas harga paket kalau terisi dan > 0:
+                // data legacy punya paket 'default'/'undefined' berharga 0 yang
+                // dipakai puluhan pelanggan yang sebenarnya bayar penuh. Harga
+                // paket cuma dipakai sebagai fallback, bukan sebaliknya, supaya
+                // tagihan bulanan berikutnya tidak terbit Rp 0.
+                'monthly_price' => is_numeric($row['monthly_price'] ?? null) && (float) $row['monthly_price'] > 0
+                    ? (float) $row['monthly_price']
+                    : ($package instanceof InternetPackage ? $package->monthly_price : ($package['monthly_price'] ?? 0)),
                 'other_fee' => is_numeric($row['other_fee'] ?? null) ? (float) $row['other_fee'] : 0,
                 'service_status' => $serviceStatus,
                 'activation_date' => $this->normalizeLegacyDate($row['activation_date'] ?? $row['finished_at'] ?? null),
@@ -2432,13 +2487,22 @@ class CustomerController extends Controller
                     $totalAmount = (float) $row['total_amount'];
 
                     // Legacy data mixes biaya pasang (install) & biaya bulanan into one
-                    // record; MigrateLegacyDataCommand now splits it into two invoice
-                    // rows (suffixed -AWAL/-BULANAN) and tags each with the real type.
+                    // record; MigrateLegacyDataCommand now splits it into one invoice
+                    // per billing period and tags each with the real type.
                     $invoiceType = InvoiceType::tryFrom((string) ($row['invoice_type'] ?? ''))
                         ?? InvoiceType::BULANAN;
-                    $subtotal = $invoiceType === InvoiceType::AWAL
-                        ? (float) ($row['installation_fee'] ?? 0) + (float) ($row['other_fee'] ?? 0) + (float) ($row['prorate_amount'] ?? 0)
-                        : ($row['monthly_fee'] ?? $service->monthly_price);
+
+                    // `subtotal` diturunkan dari `total_amount`, bukan dijumlah ulang
+                    // dari komponennya. Rumus lama (pasang + materai + prorata)
+                    // menghitung materai DUA KALI karena `prorate_amount` yang dikirim
+                    // command sudah termasuk materai, dan `installation_fee` tidak
+                    // pernah ikut tersimpan — hasilnya 1.687 dari 1.707 invoice AWAL
+                    // punya subtotal yang tidak nyambung dengan totalnya (mis. subtotal
+                    // Rp 11.000 untuk tagihan Rp 330.000). Invoice legacy selalu
+                    // PPN 0% & diskon 0, jadi subtotal = total.
+                    $legacyPpn = 0.00;
+                    $legacyDiscount = 0.00;
+                    $subtotal = $totalAmount - $legacyPpn + $legacyDiscount;
 
                     $invoice = Invoice::create([
                         'invoice_number' => $invoiceNumber,
@@ -2454,8 +2518,8 @@ class CustomerController extends Controller
                         'issue_date' => $this->normalizeLegacyDate($row['issue_date'] ?? null) ?? now()->format('Y-m-d'),
                         'due_date' => $this->normalizeLegacyDate($row['due_date'] ?? null) ?? now()->addDays(10)->format('Y-m-d'),
                         'subtotal' => $subtotal,
-                        'discount' => 0.00,
-                        'ppn' => 0.00, // Legacy invoices use 0% PPN
+                        'discount' => $legacyDiscount,
+                        'ppn' => $legacyPpn, // Legacy invoices use 0% PPN
                         'total_amount' => $totalAmount,
                         'paid_amount' => 0.00,
                         'remaining_amount' => $totalAmount,
@@ -2527,6 +2591,9 @@ class CustomerController extends Controller
                         $paymentNumber = 'PAY-'.$row['old_payment_id'].'-I'.$invoiceId;
                     }
                     $amount = (float) $row['amount'];
+                    if ($amount <= 0) {
+                        continue;
+                    }
 
                     $payment = Payment::create([
                         'payment_number' => $paymentNumber,

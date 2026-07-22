@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 Panduan kerja AI di repo ini. Bahasa kerja: Indonesia (kode, komentar, commit, dokumentasi).
 
 ## Project

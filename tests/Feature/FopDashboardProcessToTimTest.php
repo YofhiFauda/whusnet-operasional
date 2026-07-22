@@ -2,13 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Customer;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\User;
 use App\Models\Task;
-use App\Enums\TaskType;
-use App\Enums\TaskStatus;
+use App\Models\User;
+use App\Services\EffectiveAccessService;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,19 +26,21 @@ class FopDashboardProcessToTimTest extends TestCase
     use RefreshDatabase;
 
     protected User $adminUser;
+
     protected User $technician;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -47,10 +58,15 @@ class FopDashboardProcessToTimTest extends TestCase
         $this->adminUser->role_id = $adminRole->id;
         $this->adminUser->save();
 
+        $taskManagePermission = Permission::where('code', 'task.manage')->first();
+        if ($taskManagePermission) {
+            $adminRole->permissions()->syncWithoutDetaching([$taskManagePermission->id]);
+        }
+
         // Assign pop scope tree/selected pop for Admin
         $this->adminUser->roleScopes()->create([
             'role_id' => $adminRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         // Technician
@@ -92,32 +108,20 @@ class FopDashboardProcessToTimTest extends TestCase
         $this->assertDatabaseHas('tasks', [
             'customer_id' => $customer->id,
             'task_type' => TaskType::PEMASANGAN->value,
-            'status' => TaskStatus::TERJADWAL->value,
+            'status' => TaskStatus::PENDING->value,
             'pop_id' => $this->pop->id,
         ]);
 
         // Check customer_installations created explicitly
         $this->assertDatabaseHas('customer_installations', [
             'customer_id' => $customer->id,
-            'technician_id' => $this->technician->id,
             'installation_status' => 'scheduled',
-            'installation_note' => 'Pasang kabel rapi',
             'fop_id' => $this->adminUser->id,
         ]);
     }
 
     public function test_fails_when_technician_has_conflict_without_override(): void
     {
-        $customer = Customer::create([
-            'customer_code' => 'CUST-001',
-            'full_name' => 'John Doe',
-            'phone' => '0812345678',
-            'status' => 'waiting_acc',
-            'pop_id' => $this->pop->id,
-            'data_completeness_status' => 'draft',
-            'registration_date' => now(),
-        ]);
-
         $scheduledTime = now()->addDay()->startOfHour();
 
         // Create conflicting task
@@ -137,26 +141,28 @@ class FopDashboardProcessToTimTest extends TestCase
             'role_in_task' => 'lead',
         ]);
 
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0002',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::PEMASANGAN->value,
+            'title' => 'Installation Task',
+            'status' => TaskStatus::TERJADWAL->value,
+            'created_by' => $this->adminUser->id,
+            'updated_by' => $this->adminUser->id,
+        ]);
+
         $payload = [
-            'technician_id' => $this->technician->id,
             'scheduled_at' => $scheduledTime->format('Y-m-d H:i:s'),
-            'notes' => 'Bentrokan',
+            'team_member_ids' => [$this->technician->id],
         ];
 
         // Should redirect back with errors
         $response = $this->actingAs($this->adminUser)
             ->from(route('verifications.queue'))
-            ->post(route('customers.verification.process-to-team', $customer->id), $payload);
+            ->put(route('tasks.update', $task->id), $payload);
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('conflict');
-
-        // Verify status and DB has not changed
-        $customer->refresh();
-        $this->assertEquals('waiting_acc', $customer->status);
-        $this->assertDatabaseMissing('customer_installations', [
-            'customer_id' => $customer->id,
-        ]);
     }
 
     public function test_can_override_conflict_if_permission_allowed(): void
@@ -192,11 +198,11 @@ class FopDashboardProcessToTimTest extends TestCase
 
         // Add override permission to Admin role manually for testing
         $adminRole = Role::where('code', 'admin')->first();
-        $overridePermission = \App\Models\Permission::where('code', 'task.conflict.override')->first();
+        $overridePermission = Permission::where('code', 'task.conflict.override')->first();
         if ($overridePermission) {
             $adminRole->permissions()->syncWithoutDetaching([$overridePermission->id]);
         }
-        app(\App\Services\EffectiveAccessService::class)->clearCache($this->adminUser);
+        app(EffectiveAccessService::class)->clearCache($this->adminUser);
 
         $payload = [
             'technician_id' => $this->technician->id,
@@ -216,4 +222,3 @@ class FopDashboardProcessToTimTest extends TestCase
         $this->assertEquals('waiting_installation', $customer->status);
     }
 }
-

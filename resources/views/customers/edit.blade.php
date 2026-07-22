@@ -186,6 +186,16 @@
                             <p class="text-[10px] text-slate-400 mt-1">Mini POP & Distribusi diatur terpisah lewat modal "Atur Mini POP & Distribusi" di halaman detail pelanggan (pasca pemasangan).</p>
                         </div>
 
+                        <div>
+                            <label for="distribution_id" class="block mb-2 uppercase tracking-wide">KODE DISTRIBUSI (ODP)</label>
+                            <select name="distribution_id" id="distribution_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                                <option value="">Pilih Kode Distribusi</option>
+                                @foreach($distributions ?? [] as $dist)
+                                    <option value="{{ $dist->id }}" {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>{{ $dist->code }} - {{ $dist->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
                         <div class="md:col-span-2">
                             <label for="address" class="block mb-2 uppercase tracking-wide">ALAMAT INSTALASI LENGKAP <span class="text-red-500">*</span></label>
                             <textarea name="address" id="address" rows="2" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Nama Jalan, RT/RW, nomor rumah, detail lainnya...">{{ old('address', $customer->address) }}</textarea>
