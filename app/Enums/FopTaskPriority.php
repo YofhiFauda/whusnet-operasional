@@ -19,9 +19,9 @@ enum FopTaskPriority: string
     {
         return match ($this) {
             self::URGENT => 1,
-            self::HIGH   => 2,
+            self::HIGH => 2,
             self::MEDIUM => 3,
-            self::LOW    => 4,
+            self::LOW => 4,
         };
     }
 }

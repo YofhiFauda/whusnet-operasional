@@ -20,15 +20,15 @@ return new class extends Migration
             $table->date('registration_date');
             $table->string('status', 50)->default('registered');
             $table->text('address')->nullable();
-            
+
             // Region relationships
             $table->foreignId('city_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('district_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('village_id')->nullable()->constrained()->nullOnDelete();
-            
+
             // Package relationship
             $table->foreignId('internet_package_id')->nullable()->constrained('internet_packages')->nullOnDelete();
-            
+
             $table->timestamps();
         });
     }

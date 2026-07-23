@@ -60,7 +60,7 @@ class InternetPackageController extends Controller
 
         return redirect()
             ->route('master.paket.index')
-            ->with('success', 'Paket internet "' . $validated['package_code'] . '" berhasil ditambahkan.');
+            ->with('success', 'Paket internet "'.$validated['package_code'].'" berhasil ditambahkan.');
     }
 
     public function edit(InternetPackage $paket): View
@@ -78,7 +78,7 @@ class InternetPackageController extends Controller
 
         return redirect()
             ->route('master.paket.index')
-            ->with('success', 'Paket internet "' . $paket->package_code . '" berhasil diperbarui.');
+            ->with('success', 'Paket internet "'.$paket->package_code.'" berhasil diperbarui.');
     }
 
     public function toggleStatus(InternetPackage $paket): RedirectResponse

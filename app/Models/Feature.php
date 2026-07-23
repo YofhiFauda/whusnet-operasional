@@ -5,10 +5,10 @@ namespace App\Models;
 use App\Enums\FeatureType;
 use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Collection;
 
 #[Fillable([
     'parent_id',
@@ -23,6 +23,7 @@ class Feature extends Model
     use RecordsAuditLogs;
 
     protected string $auditModule = 'Master Fitur RBAC';
+
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     /**
@@ -72,8 +73,6 @@ class Feature extends Model
 
     /**
      * Helper static untuk mengambil seluruh hierarki Feature Tree.
-     *
-     * @return Collection
      */
     public static function getTree(): Collection
     {

@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DocumentType;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
-use App\Models\AuditLog;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -27,12 +28,12 @@ class CustomerDocumentController extends Controller
         $type = $validated['document_type'];
 
         $path = match ($type) {
-            'ktp' => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
-            'rumah' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
-            'survey' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
-            'kontrak' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),
-            'pemasangan' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'pemasangan'),
-            default => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, $type),
+            'ktp' => FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
+            'rumah' => FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
+            'survey' => FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
+            'kontrak' => FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),
+            'pemasangan' => FileUploadService::uploadInstallationPhoto($file, $customer, 'pemasangan'),
+            default => FileUploadService::uploadCustomerRegistrationDoc($file, $customer, $type),
         };
 
         $document = CustomerDocument::create([

@@ -2,12 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Models\City;
 use App\Models\Customer;
-use App\Models\Pop;
-use App\Models\User;
-use App\Models\Role;
+use App\Models\District;
 use App\Models\InternetPackage;
-use App\Models\SubscriptionStatus;
+use App\Models\Pop;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
+use App\Models\Village;
+use Carbon\Carbon;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -125,13 +131,13 @@ class CustomerListTest extends TestCase
         // Assign Admin to POP 1 only
         $adminCabang->pops()->attach($pop1->id);
 
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $adminCabang->id,
             'role_id' => $branchAdminRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        
-        \App\Models\UserRoleScopeTarget::create([
+
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $pop1->id,
         ]);
@@ -299,10 +305,10 @@ class CustomerListTest extends TestCase
             'data_completeness_status' => 'draft',
         ]);
 
-        $city = \App\Models\City::firstOrFail();
-        $district = \App\Models\District::where('city_id', $city->id)->firstOrFail();
-        $village = \App\Models\Village::where('district_id', $district->id)->firstOrFail();
-        $package = \App\Models\InternetPackage::firstOrFail();
+        $city = City::firstOrFail();
+        $district = District::where('city_id', $city->id)->firstOrFail();
+        $village = Village::where('district_id', $district->id)->firstOrFail();
+        $package = InternetPackage::firstOrFail();
 
         $c2 = Customer::create([
             'customer_code' => 'C-PON-000002',
@@ -334,16 +340,16 @@ class CustomerListTest extends TestCase
             'ppn' => 11,
             'total_monthly_bill' => $package->monthly_price * 1.11,
             'activation_date' => $c2->registration_date,
-            'due_date' => \Carbon\Carbon::parse($c2->registration_date)->addMonth(),
+            'due_date' => Carbon::parse($c2->registration_date)->addMonth(),
             'service_status' => 'aktif',
             'billing_status' => 'active',
         ]);
 
-        $response = $this->get("/customers?completeness_status=draft&status=");
+        $response = $this->get('/customers?completeness_status=draft&status=');
         $response->assertSee('Ahmad Subarjo');
         $response->assertDontSee('Bambang Tri');
 
-        $response = $this->get("/customers?completeness_status=lengkap&status=");
+        $response = $this->get('/customers?completeness_status=lengkap&status=');
         $response->assertSee('Bambang Tri');
         $response->assertDontSee('Ahmad Subarjo');
     }

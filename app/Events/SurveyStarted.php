@@ -2,9 +2,9 @@
 
 namespace App\Events;
 
+use App\Models\Customer;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -14,13 +14,14 @@ class SurveyStarted implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public \App\Models\Customer $customer;
+    public Customer $customer;
+
     public string $startedAt;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(\App\Models\Customer $customer)
+    public function __construct(Customer $customer)
     {
         $this->customer = $customer;
         $survey = $customer->latestSurvey()->first();
@@ -31,23 +32,23 @@ class SurveyStarted implements ShouldBroadcast
      * Broadcast ke channel FOP yang bertanggung jawab atas POP customer ini.
      * Channel fop.{pop_id} digunakan agar FOP Dashboard bisa refresh kanban real-time.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('fop.' . $this->customer->pop_id),
+            new PrivateChannel('fop.'.$this->customer->pop_id),
         ];
     }
 
     public function broadcastWith(): array
     {
         return [
-            'customer_id'   => $this->customer->id,
+            'customer_id' => $this->customer->id,
             'customer_name' => $this->customer->full_name,
-            'status'        => $this->customer->status,
-            'pop_id'        => $this->customer->pop_id,
-            'started_at'    => $this->startedAt,
+            'status' => $this->customer->status,
+            'pop_id' => $this->customer->pop_id,
+            'started_at' => $this->startedAt,
         ];
     }
 }

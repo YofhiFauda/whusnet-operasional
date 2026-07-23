@@ -3,9 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
-use App\Models\Pop;
 use App\Models\Distribution;
+use App\Models\Pop;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,7 +17,7 @@ class CustomerDistributionEditTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+        $this->withoutMiddleware([ValidateCsrfToken::class]);
     }
 
     public function test_customer_edit_view_shows_distribution_field(): void
@@ -101,7 +102,7 @@ class CustomerDistributionEditTest extends TestCase
         $response = $this->put("/customers/{$customer->id}", $updatedData);
 
         $response->assertRedirect("/customers/{$customer->id}");
-        
+
         $this->assertDatabaseHas('customers', [
             'id' => $customer->id,
             'distribution_id' => $distribution->id,

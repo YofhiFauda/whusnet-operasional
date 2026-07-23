@@ -17,6 +17,7 @@ class Action extends Model
     use RecordsAuditLogs;
 
     protected string $auditModule = 'Master Aksi RBAC';
+
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     /**

@@ -180,9 +180,14 @@ class FopTaskController extends Controller
         // TERPISAH dari $fopTasks (yang kena filter/paginate dari request), soalnya "Task
         // Tujuan" harus nampilin SEMUA task aktif (lintas team, lintas filter/halaman
         // berapapun), bukan cuma yang lagi kebetulan tampil di tabel.
+        // Hanya kolom yang benar-benar dipakai map di bawah, dan hanya task yang
+        // punya task_date: switchTeam() menolak task tanpa task_date (team tujuan
+        // wajib se-tanggal), jadi task tanpa tanggal tidak pernah bisa jadi target
+        // dan cuma membebani JSON yang di-render ke halaman.
         $switchTargetTasks = FopTask::whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+            ->whereNotNull('task_date')
             ->with('technicians:id,name')
-            ->get()
+            ->get(['id', 'task_number', 'tugas', 'task_date'])
             ->map(fn (FopTask $t) => [
                 'id' => $t->id,
                 'task_number' => $t->task_number,
@@ -665,6 +670,8 @@ class FopTaskController extends Controller
 
         return DB::transaction(function () use ($validated, $fopTask, $request) {
             $workDate = $fopTask->task_date->toDateString();
+            $workDateStart = $fopTask->task_date->copy()->startOfDay();
+            $workDateEnd = $fopTask->task_date->copy()->endOfDay();
 
             if (! empty($validated['team_id'])) {
                 $team = FopTaskTeam::findOrFail($validated['team_id']);
@@ -690,8 +697,11 @@ class FopTaskController extends Controller
 
             // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda
             foreach ($fopTask->technicians as $tech) {
+                // task_date bertipe datetime (bukan date) — rentang eksplisit
+                // supaya index task_date bisa dipakai; whereDate() membungkusnya
+                // jadi DATE(task_date) dan membuat index itu tidak pernah terpilih.
                 $otherTasks = FopTask::where('id', '!=', $fopTask->id)
-                    ->whereDate('task_date', $workDate)
+                    ->whereBetween('task_date', [$workDateStart, $workDateEnd])
                     ->whereHas('technicians', fn ($q) => $q->where('users.id', $tech->id))
                     ->whereNotNull('team_id')
                     ->where('team_id', '!=', $team->id)

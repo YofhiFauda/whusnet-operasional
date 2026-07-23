@@ -15,7 +15,7 @@ class FileUploadService
      */
     public static function getCustomerIdentifier(?Customer $customer): string
     {
-        if (!$customer) {
+        if (! $customer) {
             return 'UNKNOWN';
         }
 
@@ -28,11 +28,12 @@ class FileUploadService
      */
     public static function getCustomerName(?Customer $customer): string
     {
-        if (!$customer) {
+        if (! $customer) {
             return 'Pelanggan';
         }
 
         $name = trim(preg_replace('/[^A-Za-z0-9 _-]/', '', $customer->full_name ?? 'Pelanggan'));
+
         return $name !== '' ? $name : 'Pelanggan';
     }
 
@@ -82,6 +83,7 @@ class FileUploadService
         }
 
         $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
         return $file->storeAs($folder, $fileName, 'public');
     }
 

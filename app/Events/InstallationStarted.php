@@ -14,12 +14,13 @@ class InstallationStarted implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public Customer $customer;
+
     public string $startedAt;
 
     public function __construct(Customer $customer)
     {
-        $this->customer  = $customer;
-        $installation    = $customer->installations()
+        $this->customer = $customer;
+        $installation = $customer->installations()
             ->whereIn('installation_status', ['in_progress'])
             ->latest('started_at')
             ->first();
@@ -31,23 +32,23 @@ class InstallationStarted implements ShouldBroadcast
     /**
      * Broadcast ke channel FOP yang bertanggung jawab atas POP customer ini.
      *
-     * @return array<int, \Illuminate\Broadcasting\PrivateChannel>
+     * @return array<int, PrivateChannel>
      */
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('fop.' . $this->customer->pop_id),
+            new PrivateChannel('fop.'.$this->customer->pop_id),
         ];
     }
 
     public function broadcastWith(): array
     {
         return [
-            'customer_id'   => $this->customer->id,
+            'customer_id' => $this->customer->id,
             'customer_name' => $this->customer->full_name,
-            'status'        => $this->customer->status,
-            'pop_id'        => $this->customer->pop_id,
-            'started_at'    => $this->startedAt,
+            'status' => $this->customer->status,
+            'pop_id' => $this->customer->pop_id,
+            'started_at' => $this->startedAt,
         ];
     }
 }

@@ -19,12 +19,12 @@ class PermissionGeneratorService
     public function generate(): array
     {
         $allowedActions = Config::get('rbac.allowed_actions', []);
-        
+
         $summary = [
             'total_features_processed' => 0,
             'permissions_created' => 0,
             'permissions_skipped' => 0,
-            'errors' => []
+            'errors' => [],
         ];
 
         $nameOverrides = Config::get('rbac.permission_name_overrides', []);
@@ -38,8 +38,9 @@ class PermissionGeneratorService
 
             foreach ($allowedActions as $featureCode => $actionCodes) {
                 // Ensure feature exists
-                if (!$features->has($featureCode)) {
+                if (! $features->has($featureCode)) {
                     $summary['errors'][] = "Feature code '{$featureCode}' not found in database.";
+
                     continue;
                 }
 
@@ -48,8 +49,9 @@ class PermissionGeneratorService
 
                 foreach ($actionCodes as $actionCode) {
                     // Ensure action exists
-                    if (!$actions->has($actionCode)) {
+                    if (! $actions->has($actionCode)) {
                         $summary['errors'][] = "Action code '{$actionCode}' not found in database.";
+
                         continue;
                     }
 
@@ -61,7 +63,7 @@ class PermissionGeneratorService
                         ->where('action_id', $action->id)
                         ->first();
 
-                    if (!$existing) {
+                    if (! $existing) {
                         // Create new permission
                         Permission::create([
                             'feature_id' => $feature->id,
@@ -92,7 +94,7 @@ class PermissionGeneratorService
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to generate permissions: ' . $e->getMessage());
+            Log::error('Failed to generate permissions: '.$e->getMessage());
             throw $e;
         }
 

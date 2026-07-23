@@ -25,7 +25,7 @@ return new class extends Migration
             ->pluck('d');
 
         foreach ($dates as $d) {
-            if (!$d) {
+            if (! $d) {
                 continue;
             }
 

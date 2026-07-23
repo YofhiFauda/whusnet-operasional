@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ class CustomerTerminationController extends Controller
             }
 
             // Log activity
-            \App\Models\AuditLog::create([
+            AuditLog::create([
                 'user_id' => auth()->id(),
                 'module' => 'customers',
                 'action' => 'terminate',

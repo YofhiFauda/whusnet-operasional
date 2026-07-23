@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\SubscriptionStatus;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerReportController extends Controller
@@ -17,9 +17,9 @@ class CustomerReportController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        
+
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -36,7 +36,7 @@ class CustomerReportController extends Controller
 
         // Jika user memfilter POP tertentu, pastikan POP itu ada di dalam POP yang diizinkan untuknya
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 $popId = '';
             }
         }
@@ -59,11 +59,16 @@ class CustomerReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('registration_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(registration_date) dan
+            // mematikan index. Batasnya ditulis eksplisit startOfDay/endOfDay
+            // karena sqlite (dipakai test) menyimpan kolom date sebagai
+            // '2026-07-22 00:00:00' — `<= '2026-07-22'` di sana akan membuang
+            // seluruh isi hari terakhir tanpa suara.
+            $query->where('registration_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('registration_date', '<=', $endDate);
+            $query->where('registration_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         // Urutkan berdasarkan tanggal registrasi terbaru
@@ -93,7 +98,7 @@ class CustomerReportController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $user = auth()->user();
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -106,7 +111,7 @@ class CustomerReportController extends Controller
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user ini
         $allowedPopIds = Pop::forUser()->pluck('id')->toArray();
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 abort(403, 'Unauthorized action.');
             }
         }
@@ -128,28 +133,38 @@ class CustomerReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('registration_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(registration_date) dan
+            // mematikan index. Batasnya ditulis eksplisit startOfDay/endOfDay
+            // karena sqlite (dipakai test) menyimpan kolom date sebagai
+            // '2026-07-22 00:00:00' — `<= '2026-07-22'` di sana akan membuang
+            // seluruh isi hari terakhir tanpa suara.
+            $query->where('registration_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('registration_date', '<=', $endDate);
+            $query->where('registration_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
-        $customers = $query->orderByDesc('registration_date')
+        // Query dieksekusi di dalam closure stream pakai `lazy()` — lihat alasan
+        // yang sama di InvoiceReportController::export().
+        // `id` ditambahkan sebagai tiebreak: registration_date + created_at tidak
+        // unik, dan lazy() memotong hasil per-chunk pakai offset. Tanpa urutan
+        // yang deterministik, baris bisa terlewat atau kebagi dua antar chunk.
+        $query->orderByDesc('registration_date')
             ->orderByDesc('created_at')
-            ->get();
+            ->orderByDesc('id');
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="laporan-pelanggan-' . now()->format('YmdHis') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="laporan-pelanggan-'.now()->format('YmdHis').'.csv"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
 
-        $callback = function () use ($customers) {
+        $callback = function () use ($query) {
             $file = fopen('php://output', 'w');
-            
+
             // Add UTF-8 BOM for proper Excel compatibility
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
@@ -171,7 +186,7 @@ class CustomerReportController extends Controller
                 'Tanggal Registrasi',
             ]);
 
-            foreach ($customers as $customer) {
+            foreach ($query->lazy(500) as $customer) {
                 fputcsv($file, [
                     $customer->customer_code ?? '-',
                     $customer->old_customer_id ?? '-',
@@ -182,8 +197,8 @@ class CustomerReportController extends Controller
                     $customer->email ?? '-',
                     $customer->pop->name ?? '-',
                     $customer->internetPackage->name ?? '-',
-                    $customer->internetPackage ? ($customer->internetPackage->download_speed_mbps . ' Mbps') : '-',
-                    $customer->internetPackage ? ($customer->internetPackage->upload_speed_mbps . ' Mbps') : '-',
+                    $customer->internetPackage ? ($customer->internetPackage->download_speed_mbps.' Mbps') : '-',
+                    $customer->internetPackage ? ($customer->internetPackage->upload_speed_mbps.' Mbps') : '-',
                     ucfirst(str_replace('_', ' ', $customer->data_completeness_status)),
                     $customer->subscriptionStatus->name ?? ucfirst(str_replace('_', ' ', $customer->status)),
                     $customer->registration_date ? $customer->registration_date->format('Y-m-d') : '-',

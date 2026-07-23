@@ -4,22 +4,22 @@ namespace App\Enums;
 
 enum TaskStatus: string
 {
-    case DRAFT                 = 'draft';
-    case TERJADWAL             = 'terjadwal';
-    case IN_PROGRESS           = 'in_progress';
-    case SELESAI               = 'selesai';
-    case DIBATALKAN            = 'dibatalkan';
-    case PENDING               = 'pending';
+    case DRAFT = 'draft';
+    case TERJADWAL = 'terjadwal';
+    case IN_PROGRESS = 'in_progress';
+    case SELESAI = 'selesai';
+    case DIBATALKAN = 'dibatalkan';
+    case PENDING = 'pending';
 
     public function label(): string
     {
         return match ($this) {
-            self::DRAFT                 => 'Draft',
-            self::TERJADWAL             => 'Terjadwal',
-            self::IN_PROGRESS           => 'Sedang Dikerjakan',
-            self::SELESAI               => 'Selesai',
-            self::DIBATALKAN            => 'Dibatalkan',
-            self::PENDING               => 'Pending',
+            self::DRAFT => 'Draft',
+            self::TERJADWAL => 'Terjadwal',
+            self::IN_PROGRESS => 'Sedang Dikerjakan',
+            self::SELESAI => 'Selesai',
+            self::DIBATALKAN => 'Dibatalkan',
+            self::PENDING => 'Pending',
         };
     }
 
@@ -41,12 +41,12 @@ enum TaskStatus: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::DRAFT                 => 'bg-gray-100 text-gray-700',
-            self::TERJADWAL             => 'bg-blue-100 text-blue-700',
-            self::IN_PROGRESS           => 'bg-amber-100 text-amber-700',
-            self::SELESAI               => 'bg-green-100 text-green-700',
-            self::DIBATALKAN            => 'bg-red-100 text-red-700 line-through',
-            self::PENDING               => 'bg-yellow-100 text-yellow-700',
+            self::DRAFT => 'bg-gray-100 text-gray-700',
+            self::TERJADWAL => 'bg-blue-100 text-blue-700',
+            self::IN_PROGRESS => 'bg-amber-100 text-amber-700',
+            self::SELESAI => 'bg-green-100 text-green-700',
+            self::DIBATALKAN => 'bg-red-100 text-red-700 line-through',
+            self::PENDING => 'bg-yellow-100 text-yellow-700',
         };
     }
 
@@ -63,12 +63,12 @@ enum TaskStatus: string
         }
 
         return match ($this) {
-            self::DRAFT       => 'border-slate-200 text-slate-600 bg-slate-50',
-            self::TERJADWAL   => 'border-blue-200 text-blue-700 bg-blue-50',
+            self::DRAFT => 'border-slate-200 text-slate-600 bg-slate-50',
+            self::TERJADWAL => 'border-blue-200 text-blue-700 bg-blue-50',
             self::IN_PROGRESS => 'border-amber-200 text-amber-700 bg-amber-50',
-            self::SELESAI     => 'border-green-200 text-green-700 bg-green-50',
-            self::DIBATALKAN  => 'border-red-200 text-red-700 bg-red-50',
-            self::PENDING     => 'border-yellow-200 text-yellow-700 bg-yellow-50',
+            self::SELESAI => 'border-green-200 text-green-700 bg-green-50',
+            self::DIBATALKAN => 'border-red-200 text-red-700 bg-red-50',
+            self::PENDING => 'border-yellow-200 text-yellow-700 bg-yellow-50',
         };
     }
 

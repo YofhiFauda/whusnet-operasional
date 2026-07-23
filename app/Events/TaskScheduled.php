@@ -2,6 +2,8 @@
 
 namespace App\Events;
 
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Task;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -27,20 +29,20 @@ class TaskScheduled implements ShouldBroadcast
      */
     public function __construct(Task $task, string $eventType = 'created')
     {
-        $this->task      = $task;
+        $this->task = $task;
         $this->eventType = $eventType;
     }
 
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
         $this->task->loadMissing('teamMembers');
 
-        return $this->task->teamMembers->map(fn ($member) => new PrivateChannel('teknisi.' . $member->user_id))->all();
+        return $this->task->teamMembers->map(fn ($member) => new PrivateChannel('teknisi.'.$member->user_id))->all();
     }
 
     public function broadcastWith(): array
@@ -48,18 +50,18 @@ class TaskScheduled implements ShouldBroadcast
         $this->task->loadMissing(['customer', 'pop']);
 
         return [
-            'id'           => $this->task->id,
-            'task_number'  => $this->task->task_number,
-            'title'        => $this->task->title,
-            'description'  => $this->task->description,
-            'task_type'    => $this->task->task_type instanceof \App\Enums\TaskType ? $this->task->task_type->value : $this->task->task_type,
-            'status'       => $this->task->status instanceof \App\Enums\TaskStatus ? $this->task->status->value : $this->task->status,
+            'id' => $this->task->id,
+            'task_number' => $this->task->task_number,
+            'title' => $this->task->title,
+            'description' => $this->task->description,
+            'task_type' => $this->task->task_type instanceof TaskType ? $this->task->task_type->value : $this->task->task_type,
+            'status' => $this->task->status instanceof TaskStatus ? $this->task->status->value : $this->task->status,
             'scheduled_at' => $this->task->scheduled_at ? $this->task->scheduled_at->toIso8601String() : null,
-            'sla_minutes'  => $this->task->sla_minutes,
-            'pop_id'       => $this->task->pop_id,
-            'event_type'   => $this->eventType,
-            'customer'     => $this->task->customer ? [
-                'id'   => $this->task->customer->id,
+            'sla_minutes' => $this->task->sla_minutes,
+            'pop_id' => $this->task->pop_id,
+            'event_type' => $this->eventType,
+            'customer' => $this->task->customer ? [
+                'id' => $this->task->customer->id,
                 'name' => $this->task->customer->name,
             ] : null,
         ];

@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UserRoleScopeTarget extends Model
 {
     public $timestamps = false;
+
     public $incrementing = false;
+
     protected $primaryKey = ['user_role_scope_id', 'pop_id'];
 
     protected $fillable = [
@@ -22,7 +24,8 @@ class UserRoleScopeTarget extends Model
     protected function setKeysForSaveQuery($query)
     {
         $query->where('user_role_scope_id', $this->getAttribute('user_role_scope_id'))
-              ->where('pop_id', $this->getAttribute('pop_id'));
+            ->where('pop_id', $this->getAttribute('pop_id'));
+
         return $query;
     }
 

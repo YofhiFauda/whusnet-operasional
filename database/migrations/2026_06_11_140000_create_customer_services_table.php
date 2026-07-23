@@ -1,9 +1,10 @@
 <?php
 
+use Carbon\Carbon;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -46,14 +47,14 @@ return new class extends Migration
                     $totalBill = $discountedPrice * (1 + $ppn / 100);
 
                     // Speeds labels
-                    $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps . ' Mbps' : null;
-                    $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps . ' Mbps' : null;
+                    $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
+                    $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
 
                     // Activation & Due dates
                     $activationDate = $customer->registration_date ?? null;
                     $dueDate = null;
                     if ($activationDate) {
-                        $dueDate = \Carbon\Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
+                        $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
                     }
 
                     // Statuses mapping

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -11,6 +12,8 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -83,12 +86,12 @@ class ReportPaymentTest extends TestCase
 
         // Assign popA only
         $user->pops()->attach($popA->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $adminCabangRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $popA->id,
         ]);
@@ -125,12 +128,12 @@ class ReportPaymentTest extends TestCase
 
         // 1. POP A, method: cash, status: valid, date: 2026-06-01
         $payment1 = $this->createPayment($invoiceA, 'PAY-001', '2026-06-01', 'cash', 'valid', 150000);
-        
+
         // 2. POP B, method: transfer, status: pending, date: 2026-07-10
         $payment2 = $this->createPayment($invoiceB, 'PAY-002', '2026-07-10', 'transfer', 'pending', 120000);
 
         // Filter pop_id = popA
-        $responsePop = $this->actingAs($user)->get('/reports/payments?pop_id=' . $popA->id);
+        $responsePop = $this->actingAs($user)->get('/reports/payments?pop_id='.$popA->id);
         $responsePop->assertSee('PAY-001');
         $responsePop->assertDontSee('PAY-002');
 
@@ -161,12 +164,12 @@ class ReportPaymentTest extends TestCase
         $popA = $this->createPop('SDA', 'SDA', 'POP Sidoarjo');
         $popB = $this->createPop('SBY', 'SBY', 'POP Surabaya');
         $user->pops()->attach($popA->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $adminCabangRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $popA->id,
         ]);
@@ -181,13 +184,13 @@ class ReportPaymentTest extends TestCase
         $response = $this->actingAs($user)->get('/reports/payments/export');
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        
+
         $content = $response->streamedContent();
         $this->assertStringContainsString('PAY-SDA-991', $content);
         $this->assertStringNotContainsString('PAY-SBY-992', $content);
 
         // Export specifically POP B (which they don't have access to) -> should return 403
-        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/payments/export?pop_id=' . $popB->id);
+        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/payments/export?pop_id='.$popB->id);
         $responseUnauthorizedExport->assertStatus(403);
     }
 

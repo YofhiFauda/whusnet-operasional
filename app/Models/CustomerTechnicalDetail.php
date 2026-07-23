@@ -91,7 +91,7 @@ class CustomerTechnicalDetail extends Model
     protected function testDownload(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value !== null ? (float) str_replace(',', '.', (string)$value) : null,
+            get: fn ($value) => $value !== null ? (float) str_replace(',', '.', (string) $value) : null,
         );
     }
 
@@ -101,7 +101,7 @@ class CustomerTechnicalDetail extends Model
     protected function testUpload(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value !== null ? (float) str_replace(',', '.', (string)$value) : null,
+            get: fn ($value) => $value !== null ? (float) str_replace(',', '.', (string) $value) : null,
         );
     }
 

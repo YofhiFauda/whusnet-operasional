@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\TaskEvidence;
+use App\Services\FileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class TaskEvidenceController extends Controller
 {
@@ -18,28 +20,28 @@ class TaskEvidenceController extends Controller
         $this->authorize('uploadEvidence', $task);
 
         $validated = $request->validate([
-            'photo'   => 'required|image|mimes:jpg,jpeg,png|max:5120', // max 5MB
+            'photo' => 'required|image|mimes:jpg,jpeg,png|max:5120', // max 5MB
             'caption' => 'nullable|string|max:255',
         ]);
 
         $file = $validated['photo'];
-        $path = \App\Services\FileUploadService::uploadTaskEvidence($file, $task);
+        $path = FileUploadService::uploadTaskEvidence($file, $task);
 
         $evidence = TaskEvidence::create([
-            'task_id'     => $task->id,
+            'task_id' => $task->id,
             'uploaded_by' => auth()->id(),
-            'file_path'   => $path,
-            'caption'     => $validated['caption'] ?? null,
+            'file_path' => $path,
+            'caption' => $validated['caption'] ?? null,
         ]);
 
         $task->refresh();
 
         return response()->json([
-            'success'      => true,
-            'evidence'     => [
-                'id'          => $evidence->id,
-                'url'         => asset('storage/' . $evidence->file_path),
-                'caption'     => $evidence->caption,
+            'success' => true,
+            'evidence' => [
+                'id' => $evidence->id,
+                'url' => asset('storage/'.$evidence->file_path),
+                'caption' => $evidence->caption,
                 'uploaded_by' => auth()->user()->name,
             ],
             'can_complete' => $task->canComplete(),
@@ -58,14 +60,14 @@ class TaskEvidenceController extends Controller
         abort_unless($evidence->task_id === $task->id, 404);
 
         // Hapus file dari storage
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        if (Storage::disk('public')->exists($evidence->file_path)) {
+            Storage::disk('public')->delete($evidence->file_path);
         }
 
         $evidence->delete();
 
         return response()->json([
-            'success'        => true,
+            'success' => true,
             'evidence_count' => $task->evidences()->count(),
         ]);
     }

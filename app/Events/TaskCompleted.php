@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Enums\TaskStatus;
 use App\Models\Task;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -27,12 +28,12 @@ class TaskCompleted implements ShouldBroadcast
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('fop.' . $this->task->pop_id),
+            new PrivateChannel('fop.'.$this->task->pop_id),
         ];
     }
 
@@ -44,7 +45,7 @@ class TaskCompleted implements ShouldBroadcast
             'id' => $this->task->id,
             'task_number' => $this->task->task_number,
             'title' => $this->task->title,
-            'status' => $this->task->status instanceof \App\Enums\TaskStatus ? $this->task->status->value : $this->task->status,
+            'status' => $this->task->status instanceof TaskStatus ? $this->task->status->value : $this->task->status,
             'pop_id' => $this->task->pop_id,
             'completed_at' => $this->task->completed_at ? $this->task->completed_at->toIso8601String() : now()->toIso8601String(),
             'team_members' => $this->task->teamMembers->map(fn ($member) => [

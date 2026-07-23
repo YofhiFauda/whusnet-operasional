@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Enums\ScopeType;
+use App\Models\User;
+use App\Services\EffectiveAccessService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Carbon;
 
 class NotificationController extends Controller
 {
@@ -13,40 +18,43 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $allowedPopIds = app(\App\Services\EffectiveAccessService::class)->getAllowedPopIds($user);
-        $scopeType = app(\App\Services\EffectiveAccessService::class)->getScopeType($user);
+        $allowedPopIds = app(EffectiveAccessService::class)->getAllowedPopIds($user);
+        $scopeType = app(EffectiveAccessService::class)->getScopeType($user);
 
-        $query = \Illuminate\Notifications\DatabaseNotification::query();
+        $query = DatabaseNotification::query();
 
         // POP Scope Enforcement
-        if ($scopeType !== \App\Enums\ScopeType::ALL_POP) {
+        if ($scopeType !== ScopeType::ALL_POP) {
             // Users with task.view.all permission (e.g. FOP, NOC, CS, Admin) can see all notifications in their POP scope
             if ($user->hasPermission('task.view.all')) {
-                $query->whereHasMorph('notifiable', [\App\Models\User::class], function ($q) use ($allowedPopIds) {
+                $query->whereHasMorph('notifiable', [User::class], function ($q) use ($allowedPopIds) {
                     $q->where(function ($sub) use ($allowedPopIds) {
-                        $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
-                            ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
+                        $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', ScopeType::ALL_POP->value))
+                            ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
                                 ->whereHas('targets', fn ($t) => $t->whereIn('pop_id', $allowedPopIds))
                             );
                     });
                 });
             } else {
                 // Otherwise, normal users (e.g. Technician) only see their own notifications
-                $query->where('notifiable_type', \App\Models\User::class)
+                $query->where('notifiable_type', User::class)
                     ->where('notifiable_id', $user->id);
             }
         } else {
             // For Owner/Admin Pusat (all_pop):
             // If they don't have task.view.all, restrict to their own
-            if (!$user->hasPermission('task.view.all')) {
-                $query->where('notifiable_type', \App\Models\User::class)
+            if (! $user->hasPermission('task.view.all')) {
+                $query->where('notifiable_type', User::class)
                     ->where('notifiable_id', $user->id);
             }
         }
 
         // Apply Filters
         if ($request->filled('date')) {
-            $query->whereDate('created_at', $request->date);
+            // created_at bertipe timestamp — rentang eksplisit, bukan whereDate()
+            // yang membungkusnya jadi DATE(created_at) dan mematikan index.
+            $tanggal = Carbon::parse($request->date);
+            $query->whereBetween('created_at', [$tanggal->copy()->startOfDay(), $tanggal->copy()->endOfDay()]);
         }
 
         if ($request->filled('type')) {
@@ -60,11 +68,13 @@ class NotificationController extends Controller
         $notifications = $query->orderBy('created_at', 'desc')->paginate(15)->withQueryString();
 
         // Fetch users for dropdown filtering (scoped by POP)
-        $usersQuery = \App\Models\User::query();
-        if ($scopeType !== \App\Enums\ScopeType::ALL_POP) {
+        // `role` dipakai per baris di dropdown (notifications/index.blade.php:34) —
+        // tanpa eager load ini satu query per user yang tampil di filter.
+        $usersQuery = User::with('role:id,name');
+        if ($scopeType !== ScopeType::ALL_POP) {
             $usersQuery->where(function ($sub) use ($allowedPopIds) {
-                $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
-                    ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
+                $sub->whereHas('roleScopes', fn ($rs) => $rs->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($rs) => $rs->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
                         ->whereHas('targets', fn ($t) => $t->whereIn('pop_id', $allowedPopIds))
                     );
             });
@@ -83,6 +93,7 @@ class NotificationController extends Controller
         if ($notification) {
             $notification->markAsRead();
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -95,6 +106,7 @@ class NotificationController extends Controller
         if ($notification) {
             $notification->update(['read_at' => null]);
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -104,6 +116,7 @@ class NotificationController extends Controller
     public function markAllAsRead(Request $request): JsonResponse
     {
         $request->user()->unreadNotifications->markAsRead();
+
         return response()->json(['success' => true]);
     }
 }

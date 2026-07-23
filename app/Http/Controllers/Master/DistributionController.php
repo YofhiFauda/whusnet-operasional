@@ -7,8 +7,8 @@ use App\Models\Distribution;
 use App\Models\Pop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class DistributionController extends Controller
 {
@@ -25,8 +25,8 @@ class DistributionController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('code', 'like', "%{$search}%")
-                      ->orWhere('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->when($pop_id, function ($query) use ($pop_id) {

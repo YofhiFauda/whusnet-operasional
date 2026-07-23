@@ -31,7 +31,7 @@ class GeneratePermissionsCommand extends Command
         try {
             $summary = $service->generate();
 
-            $this->info("Generation completed.");
+            $this->info('Generation completed.');
             $this->table(
                 ['Metric', 'Value'],
                 [
@@ -41,17 +41,19 @@ class GeneratePermissionsCommand extends Command
                 ]
             );
 
-            if (!empty($summary['errors'])) {
-                $this->error("Encountered " . count($summary['errors']) . " errors:");
+            if (! empty($summary['errors'])) {
+                $this->error('Encountered '.count($summary['errors']).' errors:');
                 foreach ($summary['errors'] as $error) {
                     $this->line(" - $error");
                 }
+
                 return self::FAILURE;
             }
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error("Failed to generate permissions: " . $e->getMessage());
+            $this->error('Failed to generate permissions: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

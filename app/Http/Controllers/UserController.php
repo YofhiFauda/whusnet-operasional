@@ -2,17 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ScopeType;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
-use App\Models\Role;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
-use App\Models\UserRoleScope;
+use App\Services\EffectiveAccessService;
+use App\Services\UserScopeManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
-use App\Services\UserScopeManagementService;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -95,7 +96,7 @@ class UserController extends Controller
 
     public function create()
     {
-        $roles   = Role::orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
         $popTree = $this->buildPopTree();
 
         return view('users.create', compact('roles', 'popTree'));
@@ -182,7 +183,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $roles   = Role::orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
         $popTree = $this->buildPopTree();
 
         return view('users.edit', compact('user', 'roles', 'popTree'));
@@ -250,7 +251,7 @@ class UserController extends Controller
             'role_id' => $validated['role_id'],
         ]);
 
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
         }
 
@@ -276,6 +277,7 @@ class UserController extends Controller
     public function editPops(User $user)
     {
         $popTree = $this->buildPopTree();
+
         return view('users.edit_pops', compact('user', 'popTree'));
     }
 
@@ -283,7 +285,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'pop_ids' => 'nullable|array',
-            'pop_ids.*' => 'exists:pops,id'
+            'pop_ids.*' => 'exists:pops,id',
         ], [
             'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
             'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
@@ -295,7 +297,7 @@ class UserController extends Controller
         $user->pops()->sync($validated['pop_ids'] ?? []);
 
         // Clear access cache
-        app(\App\Services\EffectiveAccessService::class)->clearCache($user);
+        app(EffectiveAccessService::class)->clearCache($user);
 
         if ($oldPopIds !== $newPopIds) {
             AuditLog::create([
@@ -315,20 +317,18 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'POP assignment updated successfully.');
     }
 
-
-
     public function previewAccess(Request $request)
     {
         $roleId = $request->input('role_id');
         $scopeType = $request->input('scope_type');
         $popIds = $request->input('pop_ids', []);
 
-        if (!$roleId) {
+        if (! $roleId) {
             return response()->json(['error' => 'Role tidak dipilih'], 400);
         }
 
         $role = Role::with(['permissions.feature', 'permissions.action'])->find($roleId);
-        if (!$role) {
+        if (! $role) {
             return response()->json(['error' => 'Role tidak valid'], 400);
         }
 
@@ -340,7 +340,7 @@ class UserController extends Controller
             $actionName = $permission->name ?? $permission->action->name ?? '';
             $actionCode = $permission->action->code ?? '';
 
-            if (!isset($featuresSummary[$featureName])) {
+            if (! isset($featuresSummary[$featureName])) {
                 $featuresSummary[$featureName] = [];
             }
             $featuresSummary[$featureName][] = ucfirst($actionName);
@@ -352,20 +352,20 @@ class UserController extends Controller
 
         $formattedFeatures = [];
         if ($role->code === 'owner' || $role->name === 'Owner') {
-            $formattedFeatures[] = "Semua Fitur (Akses Penuh / Full Access)";
-            $sensitiveActions[] = "Dapat melakukan SEMUA tindakan sensitif (Bypass Akses)";
+            $formattedFeatures[] = 'Semua Fitur (Akses Penuh / Full Access)';
+            $sensitiveActions[] = 'Dapat melakukan SEMUA tindakan sensitif (Bypass Akses)';
         } else {
             foreach ($featuresSummary as $feature => $actions) {
                 $actionsStr = implode(', ', array_unique($actions));
                 $formattedFeatures[] = "$feature ($actionsStr)";
             }
             if (empty($formattedFeatures)) {
-                $formattedFeatures[] = "Belum ada hak akses (Permission) yang diatur untuk jabatan ini. Silakan atur di menu Role & Permission.";
+                $formattedFeatures[] = 'Belum ada hak akses (Permission) yang diatur untuk jabatan ini. Silakan atur di menu Role & Permission.';
             }
         }
 
         $popNames = [];
-        if (in_array($scopeType, ['selected_pop', 'pop_tree']) && !empty($popIds)) {
+        if (in_array($scopeType, ['selected_pop', 'pop_tree']) && ! empty($popIds)) {
             $popNames = Pop::whereIn('id', $popIds)->pluck('name')->toArray();
         }
 
@@ -373,7 +373,7 @@ class UserController extends Controller
             'role_name' => $role->name,
             'is_system' => $role->is_system,
             'scope_type' => $scopeType,
-            'scope_label' => \App\Enums\ScopeType::tryFrom($scopeType)?->label() ?? $scopeType,
+            'scope_label' => ScopeType::tryFrom($scopeType)?->label() ?? $scopeType,
             'pops' => $popNames,
             'features' => $formattedFeatures,
             'sensitive_actions' => array_unique($sensitiveActions),
@@ -391,8 +391,8 @@ class UserController extends Controller
                 $q2->orderBy('name');
             }]);
         }])
-        ->whereNull('parent_id')
-        ->orderBy('name')
-        ->get();
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get();
     }
 }

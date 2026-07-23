@@ -15,10 +15,10 @@ use App\Models\User;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
+use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CustomerVerificationController extends Controller
@@ -62,9 +62,16 @@ class CustomerVerificationController extends Controller
 
         $customers = $query->latest()->paginate(15);
 
+        // Pakai hasAllPopAccess(), bukan `! empty($allowedPopIds)`: getAllowedPopIds()
+        // mengembalikan array kosong untuk ALL_POP *dan* untuk user yang scope-nya
+        // belum di-setup. Menafsirkan kosong = "jangan filter" membuat user tanpa
+        // scope melihat seluruh teknisi lintas cabang (CLAUDE.md, bagian POP Scope).
         $accessService = app(EffectiveAccessService::class);
-        $allowedPopIds = $accessService->getAllowedPopIds(auth()->user());
-        $teknisiList = $this->getTeknisiList($allowedPopIds);
+        $user = auth()->user();
+        $teknisiList = app(TeknisiWorkloadService::class)->summarize(
+            $accessService->hasAllPopAccess($user),
+            $accessService->getAllowedPopIds($user),
+        );
 
         return view('verifications.queue', compact('customers', 'teknisiList'));
     }
@@ -438,54 +445,5 @@ class CustomerVerificationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
-    }
-
-    private function getTeknisiList(array $allowedPopIds): Collection
-    {
-        $today = Carbon::today();
-        $query = User::with(['roleScopes.targets'])
-            ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
-            ->orderBy('name');
-
-        if (! empty($allowedPopIds)) {
-            $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
-        }
-
-        return $query->get()->map(function (User $teknisi) use ($today) {
-            // Task in progress aktif
-            $activeTask = Task::with('customer')
-                ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
-                ->where('status', TaskStatus::IN_PROGRESS->value)
-                ->latest('started_at')
-                ->first();
-
-            // Hitung task terjadwal hari ini + task terjadwal/in_progress overdue
-            $taskCount = Task::whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
-                ->where(function ($q) use ($today) {
-                    $q->where(function ($q1) use ($today) {
-                        $q1->where('status', TaskStatus::TERJADWAL->value)
-                            ->whereDate('scheduled_at', $today);
-                    })
-                        ->orWhere(function ($q2) use ($today) {
-                            $q2->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-                                ->whereDate('scheduled_at', '<', $today);
-                        });
-                })
-                ->count();
-
-            $status = 'standby';
-            if ($activeTask) {
-                $status = 'aktif';
-            } elseif ($taskCount > 0) {
-                $status = 'terjadwal';
-            }
-
-            return [
-                'id' => $teknisi->id,
-                'name' => $teknisi->name,
-                'status' => $status,
-                'task_count' => $taskCount,
-            ];
-        });
     }
 }

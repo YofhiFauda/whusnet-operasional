@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Task;
-use App\Models\TaskMaintenance;
+use App\Services\FileUploadService;
+use App\Services\TaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Enums\TaskStatus;
-use App\Services\TaskService;
 
 class TaskMaintenanceController extends Controller
 {
@@ -15,12 +16,12 @@ class TaskMaintenanceController extends Controller
     {
         $this->authorize('statusComplete', $task);
 
-        if (!in_array($task->status->value, [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])) {
+        if (! in_array($task->status->value, [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])) {
             return redirect()->route('tasks.show', $task)->with('error', 'Status task tidak valid untuk pelaporan maintenance.');
         }
 
         // Pastikan bukan task survey atau pemasangan (yang punya form laporan khusus)
-        if (in_array($task->task_type, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN])) {
+        if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN])) {
             return redirect()->route('tasks.show', $task)->with('error', 'Gunakan form laporan khusus untuk Survey / Pemasangan.');
         }
 
@@ -32,13 +33,13 @@ class TaskMaintenanceController extends Controller
         $this->authorize('statusComplete', $task);
 
         $validated = $request->validate([
-            'kendala_teknis'  => 'required|string',
-            'kabel'           => 'nullable|string|max:100',
-            'modem'           => 'nullable|string|max:100',
-            'patchcord'       => 'nullable|string|max:100',
-            'sleeve'          => 'nullable|string|max:100',
-            'lainnya'         => 'nullable|string|max:255',
-            'opm_photo'       => 'required|image|max:2048',
+            'kendala_teknis' => 'required|string',
+            'kabel' => 'nullable|string|max:100',
+            'modem' => 'nullable|string|max:100',
+            'patchcord' => 'nullable|string|max:100',
+            'sleeve' => 'nullable|string|max:100',
+            'lainnya' => 'nullable|string|max:255',
+            'opm_photo' => 'required|image|max:2048',
             'speedtest_photo' => 'required|image|max:2048',
         ]);
 
@@ -48,22 +49,22 @@ class TaskMaintenanceController extends Controller
             $task->loadMissing('customer');
             $opmPhotoPath = null;
             if ($request->hasFile('opm_photo')) {
-                $opmPhotoPath = \App\Services\FileUploadService::uploadMaintenancePhoto($request->file('opm_photo'), $task->customer, 'opm');
+                $opmPhotoPath = FileUploadService::uploadMaintenancePhoto($request->file('opm_photo'), $task->customer, 'opm');
             }
 
             $speedtestPhotoPath = null;
             if ($request->hasFile('speedtest_photo')) {
-                $speedtestPhotoPath = \App\Services\FileUploadService::uploadMaintenancePhoto($request->file('speedtest_photo'), $task->customer, 'speedtest');
+                $speedtestPhotoPath = FileUploadService::uploadMaintenancePhoto($request->file('speedtest_photo'), $task->customer, 'speedtest');
             }
 
             $task->maintenanceReport()->create([
-                'kendala_teknis'  => $validated['kendala_teknis'],
-                'kabel'           => $validated['kabel'] ?? null,
-                'modem'           => $validated['modem'] ?? null,
-                'patchcord'       => $validated['patchcord'] ?? null,
-                'sleeve'          => $validated['sleeve'] ?? null,
-                'lainnya'         => $validated['lainnya'] ?? null,
-                'opm_photo'       => $opmPhotoPath,
+                'kendala_teknis' => $validated['kendala_teknis'],
+                'kabel' => $validated['kabel'] ?? null,
+                'modem' => $validated['modem'] ?? null,
+                'patchcord' => $validated['patchcord'] ?? null,
+                'sleeve' => $validated['sleeve'] ?? null,
+                'lainnya' => $validated['lainnya'] ?? null,
+                'opm_photo' => $opmPhotoPath,
                 'speedtest_photo' => $speedtestPhotoPath,
             ]);
 
@@ -76,7 +77,8 @@ class TaskMaintenanceController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+
+            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 }

@@ -1,8 +1,8 @@
 <?php
 
+use App\Enums\ScopeType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use App\Enums\ScopeType;
 
 return new class extends Migration
 {
@@ -16,8 +16,8 @@ return new class extends Migration
 
         foreach ($userPops as $userPop) {
             $user = DB::table('users')->where('id', $userPop->user_id)->first();
-            
-            if (!$user || !$user->role_id) {
+
+            if (! $user || ! $user->role_id) {
                 continue;
             }
 

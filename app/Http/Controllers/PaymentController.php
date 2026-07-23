@@ -7,8 +7,11 @@ use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
+use App\Services\FileUploadService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -61,12 +64,15 @@ class PaymentController extends Controller
             $query->where('pop_id', $popId);
         }
 
+        // whereDate() membungkus kolom jadi DATE(payment_date) dan mematikan
+        // index. Batas ditulis eksplisit startOfDay/endOfDay — lihat alasan
+        // lengkapnya di CustomerReportController::index().
         if ($dateFrom !== '') {
-            $query->whereDate('payment_date', '>=', $dateFrom);
+            $query->where('payment_date', '>=', Carbon::parse($dateFrom)->startOfDay());
         }
 
         if ($dateTo !== '') {
-            $query->whereDate('payment_date', '<=', $dateTo);
+            $query->where('payment_date', '<=', Carbon::parse($dateTo)->endOfDay());
         }
 
         if ($method !== '' && in_array($method, $allowedMethods, true)) {
@@ -138,7 +144,7 @@ class PaymentController extends Controller
     /**
      * Store payment and update invoice paid/remaining amounts.
      */
-    public function store(Request $request, Invoice $invoice): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function store(Request $request, Invoice $invoice): RedirectResponse|JsonResponse
     {
         $this->authorizeInvoiceAccess($invoice);
 
@@ -165,7 +171,7 @@ class PaymentController extends Controller
         $validated = $request->validate([
             'payment_date' => 'required|date',
             'payment_method' => 'required|in:cash,transfer,qris,lainnya',
-            'amount' => 'required|numeric|min:1|max:' . (float) $invoice->remaining_amount,
+            'amount' => 'required|numeric|min:1|max:'.(float) $invoice->remaining_amount,
             'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
             'note' => 'nullable|string|max:1000',
         ]);
@@ -173,7 +179,7 @@ class PaymentController extends Controller
         $proofPath = null;
         if ($request->hasFile('proof_file')) {
             $invoice->loadMissing('customer');
-            $proofPath = \App\Services\FileUploadService::uploadPaymentProof(
+            $proofPath = FileUploadService::uploadPaymentProof(
                 $request->file('proof_file'),
                 $invoice->customer,
                 $invoice->invoice_type?->value,
@@ -252,7 +258,7 @@ class PaymentController extends Controller
      * menyetorkan banyak pembayaran bulanan flat sekaligus, tanpa buka invoice
      * satu-satu.
      */
-    public function bulkStore(Request $request): \Illuminate\Http\JsonResponse
+    public function bulkStore(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'invoice_ids' => 'required|array|min:1',
@@ -312,7 +318,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "{$paid} tagihan berhasil dibayar" . ($failed > 0 ? ", {$failed} gagal" : '') . '.',
+            'message' => "{$paid} tagihan berhasil dibayar".($failed > 0 ? ", {$failed} gagal" : '').'.',
             'paid' => $paid,
             'failed' => $failed,
         ]);

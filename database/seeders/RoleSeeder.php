@@ -107,7 +107,7 @@ class RoleSeeder extends Seeder
                     'code' => $roleData['code'],
                     'guard_name' => 'web',
                     'description' => $roleData['description'],
-                    'is_system' => $roleData['is_system']
+                    'is_system' => $roleData['is_system'],
                 ]
             );
         }

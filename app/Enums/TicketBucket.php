@@ -14,17 +14,17 @@ namespace App\Enums;
  */
 enum TicketBucket: string
 {
-    case MASUK      = 'masuk';
-    case DIPROSES   = 'diproses';
-    case SELESAI    = 'selesai';
+    case MASUK = 'masuk';
+    case DIPROSES = 'diproses';
+    case SELESAI = 'selesai';
     case DIBATALKAN = 'dibatalkan';
 
     public function label(): string
     {
         return match ($this) {
-            self::MASUK      => 'Ticket Masuk',
-            self::DIPROSES   => 'Ticket di Proses',
-            self::SELESAI    => 'Ticket Selesai',
+            self::MASUK => 'Ticket Masuk',
+            self::DIPROSES => 'Ticket di Proses',
+            self::SELESAI => 'Ticket Selesai',
             self::DIBATALKAN => 'Ticket Dibatalkan',
         };
     }
@@ -32,9 +32,9 @@ enum TicketBucket: string
     public function description(): string
     {
         return match ($this) {
-            self::MASUK      => 'Ticket baru yang belum ditugaskan FOP ke teknisi.',
-            self::DIPROSES   => 'Sudah dijadwalkan, sedang dikerjakan, pending, atau lapor nanti.',
-            self::SELESAI    => 'Pekerjaan teknisi sudah selesai.',
+            self::MASUK => 'Ticket baru yang belum ditugaskan FOP ke teknisi.',
+            self::DIPROSES => 'Sudah dijadwalkan, sedang dikerjakan, pending, atau lapor nanti.',
+            self::SELESAI => 'Pekerjaan teknisi sudah selesai.',
             self::DIBATALKAN => 'Ticket dibatalkan, atau Task FOP-nya sudah dihapus.',
         };
     }
@@ -51,9 +51,9 @@ enum TicketBucket: string
     public function statuses(): array
     {
         return match ($this) {
-            self::MASUK      => [TaskStatus::DRAFT],
-            self::DIPROSES   => [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS, TaskStatus::PENDING],
-            self::SELESAI    => [TaskStatus::SELESAI],
+            self::MASUK => [TaskStatus::DRAFT],
+            self::DIPROSES => [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS, TaskStatus::PENDING],
+            self::SELESAI => [TaskStatus::SELESAI],
             self::DIBATALKAN => [TaskStatus::DIBATALKAN],
         };
     }
@@ -79,9 +79,9 @@ enum TicketBucket: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::MASUK      => 'bg-sky-50 border-sky-200 text-sky-700',
-            self::DIPROSES   => 'bg-amber-50 border-amber-200 text-amber-700',
-            self::SELESAI    => 'bg-emerald-50 border-emerald-200 text-emerald-700',
+            self::MASUK => 'bg-sky-50 border-sky-200 text-sky-700',
+            self::DIPROSES => 'bg-amber-50 border-amber-200 text-amber-700',
+            self::SELESAI => 'bg-emerald-50 border-emerald-200 text-emerald-700',
             self::DIBATALKAN => 'bg-slate-50 border-slate-200 text-slate-600',
         };
     }
@@ -94,9 +94,9 @@ enum TicketBucket: string
     public function borderAccentClasses(): string
     {
         return match ($this) {
-            self::MASUK      => 'border-l-sky-500',
-            self::DIPROSES   => 'border-l-amber-500',
-            self::SELESAI    => 'border-l-emerald-500',
+            self::MASUK => 'border-l-sky-500',
+            self::DIPROSES => 'border-l-amber-500',
+            self::SELESAI => 'border-l-emerald-500',
             self::DIBATALKAN => 'border-l-slate-400',
         };
     }

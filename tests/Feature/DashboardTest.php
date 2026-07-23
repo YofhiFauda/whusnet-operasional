@@ -2,8 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Models\Customer;
+use App\Models\CustomerService;
+use App\Models\InternetPackage;
+use App\Models\Invoice;
+use App\Models\Permission;
+use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -32,12 +41,12 @@ class DashboardTest extends TestCase
             'guard_name' => 'web',
             'description' => 'No dashboard access',
         ]);
-        
+
         $user = User::factory()->create([
             'role_id' => $emptyRole->id,
             'status' => 'active',
         ]);
-        
+
         $response = $this->actingAs($user)->get('/');
         $response->assertStatus(403);
     }
@@ -49,19 +58,19 @@ class DashboardTest extends TestCase
             'guard_name' => 'web',
             'description' => 'Technician with own task view',
         ]);
-        
-        $taskOwnPerm = \App\Models\Permission::firstOrCreate([
+
+        $taskOwnPerm = Permission::firstOrCreate([
             'code' => 'task.view.own',
         ], [
             'name' => 'Lihat Task Sendiri',
         ]);
         $role->permissions()->attach($taskOwnPerm->id);
-        
+
         $user = User::factory()->create([
             'role_id' => $role->id,
             'status' => 'active',
         ]);
-        
+
         $response = $this->actingAs($user)->get('/');
         $response->assertRedirect(route('tasks.own'));
     }
@@ -139,7 +148,7 @@ class DashboardTest extends TestCase
             'guard_name' => 'web',
             'description' => 'Role with no permissions',
         ]);
-        $dashboardViewPerm = \App\Models\Permission::where('code', 'dashboard.view')->first();
+        $dashboardViewPerm = Permission::where('code', 'dashboard.view')->first();
         if ($dashboardViewPerm) {
             $emptyRole->permissions()->attach($dashboardViewPerm->id);
         }
@@ -155,7 +164,7 @@ class DashboardTest extends TestCase
         // Should not see Pelanggan or Master Data dropdowns at all
         $response->assertDontSee('PELANGGAN');
         $response->assertDontSee('Master Data');
-        
+
         // Quick Actions should show empty state message
         $response->assertSee('Tidak ada akses cepat yang tersedia untuk peran Anda.');
     }
@@ -169,7 +178,7 @@ class DashboardTest extends TestCase
         ]);
 
         // Create 2 POPs
-        $popA = \App\Models\Pop::create([
+        $popA = Pop::create([
             'name' => 'POP Sidoarjo',
             'code' => 'SDA',
             'pop_code' => 'SDA',
@@ -179,7 +188,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $popB = \App\Models\Pop::create([
+        $popB = Pop::create([
             'name' => 'POP Surabaya',
             'code' => 'SBY',
             'pop_code' => 'SBY',
@@ -192,21 +201,21 @@ class DashboardTest extends TestCase
         // Assign popA to the user
         $user->pops()->attach($popA->id);
 
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $adminCabangRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $popA->id,
         ]);
 
         // Clear existing customers to have clean assertion counts
-        \App\Models\Customer::query()->delete();
+        Customer::query()->delete();
 
         // Create customer in popA (assigned)
-        \App\Models\Customer::create([
+        Customer::create([
             'full_name' => 'Customer POP A',
             'customer_code' => 'C-SDA-000001',
             'phone' => '081122334455',
@@ -220,7 +229,7 @@ class DashboardTest extends TestCase
         ]);
 
         // Create customer in popB (unassigned)
-        \App\Models\Customer::create([
+        Customer::create([
             'full_name' => 'Customer POP B',
             'customer_code' => 'C-SBY-000001',
             'phone' => '089988776655',
@@ -238,7 +247,7 @@ class DashboardTest extends TestCase
 
         // Statistics total_customers for popA should be 1, popB's customer should not be included
         $this->assertEquals(1, $response->viewData('stats')['total_customers']);
-        
+
         // Also check if popA is in the pop list dropdown, but not popB
         $response->assertSee('POP Sidoarjo');
         $response->assertDontSee('POP Surabaya');
@@ -252,7 +261,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $popA = \App\Models\Pop::create([
+        $popA = Pop::create([
             'name' => 'POP Kediri',
             'code' => 'KDR',
             'pop_code' => 'KDR',
@@ -262,7 +271,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $popB = \App\Models\Pop::create([
+        $popB = Pop::create([
             'name' => 'POP Malang',
             'code' => 'MLG',
             'pop_code' => 'MLG',
@@ -272,10 +281,10 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        \App\Models\Customer::query()->delete();
+        Customer::query()->delete();
 
         // Create customer in popA
-        \App\Models\Customer::create([
+        Customer::create([
             'full_name' => 'Customer Kediri',
             'customer_code' => 'C-KDR-000001',
             'phone' => '081122334455',
@@ -289,7 +298,7 @@ class DashboardTest extends TestCase
         ]);
 
         // Create customer in popB
-        \App\Models\Customer::create([
+        Customer::create([
             'full_name' => 'Customer Malang',
             'customer_code' => 'C-MLG-000001',
             'phone' => '089988776655',
@@ -307,7 +316,7 @@ class DashboardTest extends TestCase
         $this->assertEquals(2, $responseAll->viewData('stats')['total_customers']);
 
         // Request with pop_id = popA
-        $responseFiltered = $this->actingAs($user)->get('/?pop_id=' . $popA->id);
+        $responseFiltered = $this->actingAs($user)->get('/?pop_id='.$popA->id);
         $this->assertEquals(1, $responseFiltered->viewData('stats')['total_customers']);
     }
 
@@ -319,7 +328,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        $pop = \App\Models\Pop::create([
+        $pop = Pop::create([
             'name' => 'POP Jember',
             'code' => 'JMR',
             'pop_code' => 'JMR',
@@ -330,7 +339,7 @@ class DashboardTest extends TestCase
         ]);
 
         // Create customer first
-        $customer = \App\Models\Customer::create([
+        $customer = Customer::create([
             'full_name' => 'Customer Period Test',
             'customer_code' => 'C-JMR-000001',
             'phone' => '081234567890',
@@ -343,10 +352,10 @@ class DashboardTest extends TestCase
             'registration_date' => '2026-06-01',
         ]);
 
-        $package = \App\Models\InternetPackage::firstOrFail();
+        $package = InternetPackage::firstOrFail();
 
         // Create CustomerService for relation
-        $service = \App\Models\CustomerService::create([
+        $service = CustomerService::create([
             'customer_id' => $customer->id,
             'internet_package_id' => $package->id,
             'package_name_snapshot' => $package->name,
@@ -363,10 +372,10 @@ class DashboardTest extends TestCase
         ]);
 
         // Clean invoices
-        \App\Models\Invoice::query()->delete();
+        Invoice::query()->delete();
 
         // Invoice month 1 (2026-05)
-        \App\Models\Invoice::create([
+        Invoice::create([
             'invoice_number' => 'INV-0001',
             'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
@@ -386,7 +395,7 @@ class DashboardTest extends TestCase
         ]);
 
         // Invoice month 2 (2026-06)
-        \App\Models\Invoice::create([
+        Invoice::create([
             'invoice_number' => 'INV-0002',
             'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,

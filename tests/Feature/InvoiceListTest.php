@@ -10,6 +10,8 @@ use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -63,13 +65,13 @@ class InvoiceListTest extends TestCase
         $popB = $this->createPop('POP-B', 'PONB', 'POP B');
         $adminCabang->pops()->attach($popA->id);
 
-        $userScope = \App\Models\UserRoleScope::create([
+        $userScope = UserRoleScope::create([
             'user_id' => $adminCabang->id,
             'role_id' => $role->id,
             'scope_type' => 'selected_pop',
         ]);
-        
-        \App\Models\UserRoleScopeTarget::create([
+
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $userScope->id,
             'pop_id' => $popA->id,
         ]);

@@ -114,12 +114,12 @@ class InternetPackage extends Model
 
     public function getMonthlyPriceFormattedAttribute(): string
     {
-        return 'Rp ' . number_format((float) $this->monthly_price, 0, ',', '.');
+        return 'Rp '.number_format((float) $this->monthly_price, 0, ',', '.');
     }
 
     public function getTotalPriceFormattedAttribute(): string
     {
-        return 'Rp ' . number_format((float) $this->total_price, 0, ',', '.');
+        return 'Rp '.number_format((float) $this->total_price, 0, ',', '.');
     }
 
     public function getInstallationFeeFormattedAttribute(): string
@@ -128,6 +128,6 @@ class InternetPackage extends Model
             return $this->installation_fee_label ?? '-';
         }
 
-        return 'Rp ' . number_format((float) $this->installation_fee, 0, ',', '.');
+        return 'Rp '.number_format((float) $this->installation_fee, 0, ',', '.');
     }
 }

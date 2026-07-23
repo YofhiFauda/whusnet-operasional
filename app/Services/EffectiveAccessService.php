@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Enums\ScopeType;
-use App\Models\User;
 use App\Models\Pop;
+use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 class EffectiveAccessService
@@ -26,14 +26,14 @@ class EffectiveAccessService
     {
         return Cache::remember("user.{$user->id}.permissions", self::CACHE_TTL, function () use ($user) {
             $role = $this->getRole($user);
-            if (!$role) {
+            if (! $role) {
                 return [];
             }
-            
+
             if ($role->code === 'owner') {
                 return ['*'];
             }
-            
+
             return $role->permissions()->pluck('code')->toArray();
         });
     }
@@ -45,7 +45,7 @@ class EffectiveAccessService
     {
         $permissions = $this->getPermissions($user);
         $code = $actionCode ? "{$featureCode}.{$actionCode}" : $featureCode;
-        
+
         // 1. Exact match
         if (in_array($code, $permissions)) {
             return true;
@@ -59,19 +59,19 @@ class EffectiveAccessService
         // 3. Feature wildcard match (e.g., customers.* or nested customers.import.*)
         $parts = explode('.', $code);
         if (count($parts) > 1) {
-            $featureWildcard = $parts[0] . '.*';
+            $featureWildcard = $parts[0].'.*';
             if (in_array($featureWildcard, $permissions)) {
                 return true;
             }
-            
+
             // Nested feature wildcard match (e.g., checking customers.import, user has customers.import.*)
-            $nestedWildcard = $code . '.*';
+            $nestedWildcard = $code.'.*';
             if (in_array($nestedWildcard, $permissions)) {
                 return true;
             }
         } else {
             // Single part code (e.g., checking pops, user has pops.*)
-            $featureWildcard = $code . '.*';
+            $featureWildcard = $code.'.*';
             if (in_array($featureWildcard, $permissions)) {
                 return true;
             }
@@ -79,7 +79,7 @@ class EffectiveAccessService
 
         // 4. Prefix match for features (e.g., checking customers.import, user has customers.import.view)
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission, $code . '.')) {
+            if (str_starts_with($permission, $code.'.')) {
                 return true;
             }
         }
@@ -109,6 +109,7 @@ class EffectiveAccessService
     {
         return Cache::remember("user.{$user->id}.scope_type", self::CACHE_TTL, function () use ($user) {
             $scope = $user->roleScopes()->first();
+
             return $scope ? $scope->scope_type : null;
         });
     }
@@ -121,7 +122,7 @@ class EffectiveAccessService
     {
         return Cache::remember("user.{$user->id}.allowed_pop_ids", self::CACHE_TTL, function () use ($user) {
             $scopeType = $this->getScopeType($user);
-            if (!$scopeType) {
+            if (! $scopeType) {
                 return [];
             }
 
@@ -135,11 +136,13 @@ class EffectiveAccessService
                 case ScopeType::SELECTED_POP:
                     // Cabang POP: data dari cabang yang dipilih + sub-POP di bawahnya (via pop_tree resolver)
                     $basePopIds = $scope->targets->pluck('pop_id')->toArray();
+
                     return $this->resolvePopTree($basePopIds);
 
                 case ScopeType::POP_TREE:
                     // Legacy support untuk data lama yang masih pakai pop_tree
                     $basePopIds = $scope->targets->pluck('pop_id')->toArray();
+
                     return $this->resolvePopTree($basePopIds);
             }
 
@@ -155,11 +158,11 @@ class EffectiveAccessService
         $resolvedIds = [];
         $toProcess = $basePopIds;
 
-        while (!empty($toProcess)) {
+        while (! empty($toProcess)) {
             $currentId = array_shift($toProcess);
-            if (!in_array($currentId, $resolvedIds)) {
+            if (! in_array($currentId, $resolvedIds)) {
                 $resolvedIds[] = $currentId;
-                
+
                 $childrenIds = Pop::where('parent_id', $currentId)->pluck('id')->toArray();
                 $toProcess = array_merge($toProcess, $childrenIds);
             }

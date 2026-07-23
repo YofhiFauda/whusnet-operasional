@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -20,12 +20,12 @@ return new class extends Migration
             $table->string('city', 100)->nullable();
             $table->string('district', 100)->nullable();
             $table->string('village', 100)->nullable();
-            
+
             // Relational region keys
             $table->foreignId('city_id')->nullable()->constrained('cities')->nullOnDelete();
             $table->foreignId('district_id')->nullable()->constrained('districts')->nullOnDelete();
             $table->foreignId('village_id')->nullable()->constrained('villages')->nullOnDelete();
-            
+
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->string('house_photo')->nullable();

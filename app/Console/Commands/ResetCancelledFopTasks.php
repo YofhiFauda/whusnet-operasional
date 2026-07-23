@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Enums\TaskStatus;
-use App\Models\FopTask;
 use App\Models\AuditLog;
+use App\Models\FopTask;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 class ResetCancelledFopTasks extends Command
 {
     protected $signature = 'fop:reset-cancelled-tasks';
+
     protected $description = 'Reset FOP tasks with status dibatalkan back to in_progress on the next day';
 
     /**
@@ -28,6 +29,7 @@ class ResetCancelledFopTasks extends Command
 
         if ($tasksToReset->isEmpty()) {
             $this->info('Tidak ada task FOP Cancelled yang perlu di-reset hari ini.');
+
             return 0;
         }
 
@@ -56,6 +58,7 @@ class ResetCancelledFopTasks extends Command
         }
 
         $this->info("Berhasil me-reset {$count} task FOP.");
+
         return 0;
     }
 }

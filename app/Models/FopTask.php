@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Enums\FopTaskPriority;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 #[Fillable([
     'task_number',
@@ -37,9 +41,9 @@ class FopTask extends Model
             'task_date' => 'datetime',
             'client_request_date' => 'date',
             'cancelled_at' => 'datetime',
-            'status' => \App\Enums\TaskStatus::class,
-            'priority' => \App\Enums\FopTaskPriority::class,
-            'category' => \App\Enums\TaskType::class,
+            'status' => TaskStatus::class,
+            'priority' => FopTaskPriority::class,
+            'category' => TaskType::class,
         ];
     }
 
@@ -88,7 +92,7 @@ class FopTask extends Model
     public function technicians(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'fop_task_user', 'fop_task_id', 'user_id')
-                    ->withTimestamps();
+            ->withTimestamps();
     }
 
     /**
@@ -130,7 +134,7 @@ class FopTask extends Model
      */
     public function verificationStatus(): ?string
     {
-        if (!in_array($this->category, [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN], true)) {
+        if (! in_array($this->category, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
             return null;
         }
 
@@ -171,18 +175,18 @@ class FopTask extends Model
      * - Pemasangan belum ditugaskan → completed_at survey terakhir (fallback customer.updated_at) + Master Timeline (jam).
      * - Tipe lain belum ditugaskan → task_date (create/auto-sync) + Master Timeline (jam).
      */
-    public function slaDeadline(): \Illuminate\Support\Carbon
+    public function slaDeadline(): Carbon
     {
         if ($this->task?->scheduled_at) {
-            return \Illuminate\Support\Carbon::parse($this->task->scheduled_at)
+            return Carbon::parse($this->task->scheduled_at)
                 ->addMinutes($this->category->slaMinutes());
         }
 
-        if ($this->category === \App\Enums\TaskType::SURVEY && $this->customer) {
-            return \Illuminate\Support\Carbon::parse($this->customer->created_at)->addHours($this->handlingSlaHours());
+        if ($this->category === TaskType::SURVEY && $this->customer) {
+            return Carbon::parse($this->customer->created_at)->addHours($this->handlingSlaHours());
         }
 
-        if ($this->category === \App\Enums\TaskType::PEMASANGAN && $this->customer) {
+        if ($this->category === TaskType::PEMASANGAN && $this->customer) {
             // NB: ini Collection::where (in-memory), bukan query builder — 'task_type'
             // & 'status' attribute-nya di-cast ke enum (TaskType/TaskStatus), jadi
             // bandingnya harus ke enum instance, BUKAN ->value string. Enum vs
@@ -190,17 +194,17 @@ class FopTask extends Model
             // sebelum fix ini, $surveyTask SELALU null (2 kondisi ini dulu gak
             // pernah match sekaligus).
             $surveyTask = $this->customer->tasks
-                ->where('task_type', \App\Enums\TaskType::SURVEY)
-                ->where('status', \App\Enums\TaskStatus::SELESAI)
+                ->where('task_type', TaskType::SURVEY)
+                ->where('status', TaskStatus::SELESAI)
                 ->sortByDesc('completed_at')
                 ->first();
 
             $ref = $surveyTask?->completed_at ?? $this->customer->updated_at;
 
-            return \Illuminate\Support\Carbon::parse($ref)->addHours($this->handlingSlaHours());
+            return Carbon::parse($ref)->addHours($this->handlingSlaHours());
         }
 
-        return \Illuminate\Support\Carbon::parse($this->task_date)->addHours($this->handlingSlaHours());
+        return Carbon::parse($this->task_date)->addHours($this->handlingSlaHours());
     }
 
     /**
@@ -208,7 +212,7 @@ class FopTask extends Model
      */
     public function slaTotalSeconds(): int
     {
-        if (!$this->task?->scheduled_at) {
+        if (! $this->task?->scheduled_at) {
             return $this->handlingSlaHours() * 3600;
         }
 

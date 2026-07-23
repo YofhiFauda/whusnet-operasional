@@ -42,22 +42,22 @@ class CustomerRegistrationRequest extends FormRequest
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
-            
+
             // Referrals
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
-            
+
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
             'ip_address' => 'nullable|string|max:45',
             'odp_code' => 'nullable|string|max:50',
             'olt_code' => 'nullable|string|max:50',
             'vlan_id' => 'nullable|string|max:20',
-            
+
             // Status is auto-assigned to registered in controller for creation
             'status' => 'nullable|string|max:50',
-            
+
             // Documents
             'foto_ktp' => 'required|file|image|mimes:jpeg,png,jpg|max:2048',
             'foto_rumah' => 'nullable|file|image|mimes:jpeg,png,jpg|max:2048',

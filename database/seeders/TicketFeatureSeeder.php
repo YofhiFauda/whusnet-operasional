@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\FeatureType;
 use App\Models\Feature;
+use App\Services\PermissionGeneratorService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -25,15 +26,15 @@ class TicketFeatureSeeder extends Seeder
         Feature::updateOrCreate(
             ['code' => 'tickets'],
             [
-                'name'       => 'Ticketing',
-                'type'       => FeatureType::ROOT,
+                'name' => 'Ticketing',
+                'type' => FeatureType::ROOT,
                 'sort_order' => 8,
-                'is_active'  => true,
-                'parent_id'  => null,
+                'is_active' => true,
+                'parent_id' => null,
             ]
         );
 
-        app(\App\Services\PermissionGeneratorService::class)->generate();
+        app(PermissionGeneratorService::class)->generate();
 
         $this->command->info('TicketFeatureSeeder: feature tickets + permission digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
     }

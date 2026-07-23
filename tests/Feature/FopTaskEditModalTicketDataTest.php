@@ -2,16 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskType;
 use App\Models\City;
 use App\Models\Customer;
-use App\Models\District;
 use App\Models\Distribution;
+use App\Models\District;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,19 +32,22 @@ class FopTaskEditModalTicketDataTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private Pop $pop;
+
     private Village $village;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -60,7 +69,7 @@ class FopTaskEditModalTicketDataTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -120,7 +129,7 @@ class FopTaskEditModalTicketDataTest extends TestCase
     {
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'O-REQ',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Task Kantor Manual',
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,

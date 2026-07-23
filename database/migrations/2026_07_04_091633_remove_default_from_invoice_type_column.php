@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL");
+            DB::statement('ALTER TABLE invoices MODIFY invoice_type VARCHAR(30) NOT NULL');
         }
     }
 

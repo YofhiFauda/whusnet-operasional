@@ -4,9 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,11 +24,11 @@ class CustomerDeviceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         // RolePermissionSeeder does not reliably attach the device permissions used
         // by this test suite (same gap worked around in CustomerDeviceSensitiveFieldTest),
@@ -42,7 +48,7 @@ class CustomerDeviceTest extends TestCase
 
     private function attachPermission(Role $role, string $code): void
     {
-        $permission = \App\Models\Permission::firstOrCreate(
+        $permission = Permission::firstOrCreate(
             ['code' => $code],
             ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']
         );
@@ -261,7 +267,7 @@ class CustomerDeviceTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -271,7 +277,7 @@ class CustomerDeviceTest extends TestCase
     {
         return Customer::create([
             'customer_code' => $code,
-            'full_name' => 'Customer Device ' . $code,
+            'full_name' => 'Customer Device '.$code,
             'phone' => '0812345678',
             'pop_id' => $pop->id,
             'status' => 'installed',

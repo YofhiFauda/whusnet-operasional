@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\FopTask;
-use App\Models\Village;
-use App\Models\District;
 use App\Models\City;
+use App\Models\District;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\Permission;
 use App\Models\User;
+use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -19,11 +22,17 @@ class FopTasksTest extends TestCase
     use RefreshDatabase;
 
     private User $ownerUser;
+
     private User $fopUser;
+
     private User $unauthorizedUser;
+
     private Village $village;
+
     private Pop $pop;
+
     private User $technician1;
+
     private User $technician2;
 
     protected function setUp(): void
@@ -31,10 +40,10 @@ class FopTasksTest extends TestCase
         parent::setUp();
 
         // Generate features, actions, roles and permissions first
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         // Fetch populated roles
         $ownerRole = Role::where('code', 'owner')->first();
@@ -56,7 +65,7 @@ class FopTasksTest extends TestCase
         $this->village = Village::create([
             'district_id' => $district->id,
             'name' => 'Polorejo',
-            'postal_code' => '63491'
+            'postal_code' => '63491',
         ]);
 
         $this->pop = Pop::create([
@@ -65,7 +74,7 @@ class FopTasksTest extends TestCase
             'type' => 'branch',
             'address' => 'Polorejo',
             'status' => 'active',
-            'city_id' => $city->id
+            'city_id' => $city->id,
         ]);
     }
 
@@ -92,7 +101,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'FO CUT di tiang 5',
             'status' => 'terjadwal',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
@@ -113,14 +122,14 @@ class FopTasksTest extends TestCase
             'issue' => 'Request khusus',
             'status' => 'terjadwal',
             'priority' => 'Medium',
-            'technicians' => [$this->technician1->id, $this->technician2->id]
+            'technicians' => [$this->technician1->id, $this->technician2->id],
         ]);
 
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseHas('fop_tasks', [
             'category' => 'C-REQ',
             'tugas' => 'Instalasi Jalur Baru Kantor',
-            'status' => 'terjadwal'
+            'status' => 'terjadwal',
         ]);
 
         $task = FopTask::where('tugas', 'Instalasi Jalur Baru Kantor')->first();
@@ -138,7 +147,7 @@ class FopTasksTest extends TestCase
             'issue' => 'Backbone LOS',
             'status' => 'pending',
             'priority' => 'Urgent',
-            'technicians' => [$this->technician1->id]
+            'technicians' => [$this->technician1->id],
         ]);
 
         $response->assertSessionHasErrors(['pending_reason', 'client_request_date']);
@@ -158,14 +167,14 @@ class FopTasksTest extends TestCase
             'priority' => 'Urgent',
             'pending_reason' => 'Menunggu perizinan warga',
             'client_request_date' => $reqDate,
-            'technicians' => [$this->technician1->id]
+            'technicians' => [$this->technician1->id],
         ]);
 
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseHas('fop_tasks', [
             'status' => 'pending',
             'pending_reason' => 'Menunggu perizinan warga',
-            'client_request_date' => $reqDate . ' 00:00:00'
+            'client_request_date' => $reqDate.' 00:00:00',
         ]);
     }
 
@@ -180,7 +189,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
             'status' => 'terjadwal',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->put(route('fop-tasks.update', $task->id), [
@@ -206,7 +215,7 @@ class FopTasksTest extends TestCase
             'issue' => 'LOS',
             'status' => 'dibatalkan',
             'priority' => 'High',
-            'cancelled_at' => Carbon::yesterday()
+            'cancelled_at' => Carbon::yesterday(),
         ]);
 
         // 2. Task cancelled today
@@ -220,7 +229,7 @@ class FopTasksTest extends TestCase
             'issue' => 'LOS',
             'status' => 'dibatalkan',
             'priority' => 'High',
-            'cancelled_at' => Carbon::now()
+            'cancelled_at' => Carbon::now(),
         ]);
 
         $this->artisan('fop:reset-cancelled-tasks')->assertExitCode(0);
@@ -248,7 +257,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
             'status' => 'terjadwal',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->delete(route('fop-tasks.destroy', $task->id));
@@ -279,7 +288,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
             'status' => 'selesai',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.history'));
@@ -301,7 +310,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
             'status' => 'selesai',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $cancelledTask = FopTask::create([
@@ -313,7 +322,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'Cancelled',
             'status' => 'dibatalkan',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $activeTask = FopTask::create([
@@ -325,7 +334,7 @@ class FopTasksTest extends TestCase
             'pop_id' => $this->pop->id,
             'issue' => 'Proses',
             'status' => 'terjadwal',
-            'priority' => 'High'
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
@@ -342,7 +351,7 @@ class FopTasksTest extends TestCase
         $tri = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Tri']);
         $suci = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Suci']);
 
-        $date = now()->format('Y-m-d') . ' 08:00:00';
+        $date = now()->format('Y-m-d').' 08:00:00';
 
         $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
@@ -380,7 +389,7 @@ class FopTasksTest extends TestCase
         $abdul = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Abdul']);
         $ajis = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Ajis']);
 
-        $date = now()->format('Y-m-d') . ' 08:00:00';
+        $date = now()->format('Y-m-d').' 08:00:00';
 
         $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
@@ -410,6 +419,6 @@ class FopTasksTest extends TestCase
         $content = $response->getContent();
         $tableSection = substr($content, 0, strpos($content, 'allTasksData:'));
         $this->assertStringNotContainsString($taskC->task_number, $tableSection, 'Task C seharusnya gak nongol di baris tabel karena kefilter team_id.');
-        $response->assertSee('"task_number":"' . $taskC->task_number . '"', false);
+        $response->assertSee('"task_number":"'.$taskC->task_number.'"', false);
     }
 }

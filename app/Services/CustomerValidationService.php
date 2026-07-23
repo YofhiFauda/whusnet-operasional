@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\CustomerService;
 
 /**
  * S3-T007 — Validasi Kelengkapan Data Pelanggan
@@ -32,19 +33,19 @@ class CustomerValidationService
      * Key = nama field di Customer model, Value = label ramah pengguna.
      */
     public const REQUIRED_FIELDS = [
-        'full_name'          => 'Nama Lengkap',
-        'primary_phone'      => 'Nomor HP Utama',
-        'address'            => 'Alamat Lengkap',
-        'village_id'         => 'Desa / Kelurahan',
-        'district_id'        => 'Kecamatan',
-        'city_id'            => 'Kota / Kabupaten',
-        'pop_id'             => 'POP / Cabang',
-        'internet_package_id'=> 'Paket Internet',
+        'full_name' => 'Nama Lengkap',
+        'primary_phone' => 'Nomor HP Utama',
+        'address' => 'Alamat Lengkap',
+        'village_id' => 'Desa / Kelurahan',
+        'district_id' => 'Kecamatan',
+        'city_id' => 'Kota / Kabupaten',
+        'pop_id' => 'POP / Cabang',
+        'internet_package_id' => 'Paket Internet',
         // Service-level required fields (checked via relation):
-        'service_monthly_price'   => 'Harga Bulanan',
+        'service_monthly_price' => 'Harga Bulanan',
         'service_activation_date' => 'Tanggal Aktivasi',
-        'service_due_date'        => 'Tanggal Jatuh Tempo',
-        'status'                  => 'Status Layanan',
+        'service_due_date' => 'Tanggal Jatuh Tempo',
+        'status' => 'Status Layanan',
     ];
 
     /**
@@ -53,17 +54,17 @@ class CustomerValidationService
      */
     public const OPTIONAL_FIELDS = [
         'identity_number' => 'NIK / Nomor Identitas',
-        'gender'          => 'Jenis Kelamin',
-        'email'           => 'Alamat Email',
-        'latitude'        => 'Koordinat Latitude',
-        'longitude'       => 'Koordinat Longitude',
-        'sales_code'      => 'Kode Sales',
-        'agent_code'      => 'Kode Agent',
-        'ont_sn'          => 'ONT Serial Number',
-        'ip_address'      => 'IP Address',
-        'odp_code'        => 'Kode ODP',
-        'olt_code'        => 'Kode OLT',
-        'vlan_id'         => 'VLAN ID',
+        'gender' => 'Jenis Kelamin',
+        'email' => 'Alamat Email',
+        'latitude' => 'Koordinat Latitude',
+        'longitude' => 'Koordinat Longitude',
+        'sales_code' => 'Kode Sales',
+        'agent_code' => 'Kode Agent',
+        'ont_sn' => 'ONT Serial Number',
+        'ip_address' => 'IP Address',
+        'odp_code' => 'Kode ODP',
+        'olt_code' => 'Kode OLT',
+        'vlan_id' => 'VLAN ID',
     ];
 
     /**
@@ -78,7 +79,7 @@ class CustomerValidationService
      *   - is_ready_billing  (bool)   : true if all required fields are filled
      *   - completeness_status (string): derived status string
      *
-     * @param  \App\Models\Customer  $customer  Must have customerService relation loaded
+     * @param  Customer  $customer  Must have customerService relation loaded
      * @return array<string, mixed>
      */
     public function validate(Customer $customer): array
@@ -92,7 +93,7 @@ class CustomerValidationService
 
         $missingRequired = [];
         $missingOptional = [];
-        $filledCount     = 0;
+        $filledCount = 0;
 
         $totalFields = count(self::REQUIRED_FIELDS) + count(self::OPTIONAL_FIELDS);
 
@@ -116,19 +117,19 @@ class CustomerValidationService
             }
         }
 
-        $percentage     = $totalFields > 0 ? (int) round(($filledCount / $totalFields) * 100) : 0;
+        $percentage = $totalFields > 0 ? (int) round(($filledCount / $totalFields) * 100) : 0;
         $isReadyBilling = count($missingRequired) === 0;
 
         // Derive status
         $completenessStatus = $this->deriveCompletenessStatus($customer, $isReadyBilling, $missingRequired);
 
         return [
-            'percentage'          => $percentage,
-            'filled_count'        => $filledCount,
-            'total_count'         => $totalFields,
-            'missing_required'    => $missingRequired,   // [key => label]
-            'missing_optional'    => $missingOptional,   // [key => label]
-            'is_ready_billing'    => $isReadyBilling,
+            'percentage' => $percentage,
+            'filled_count' => $filledCount,
+            'total_count' => $totalFields,
+            'missing_required' => $missingRequired,   // [key => label]
+            'missing_optional' => $missingOptional,   // [key => label]
+            'is_ready_billing' => $isReadyBilling,
             'completeness_status' => $completenessStatus,
         ];
     }
@@ -153,8 +154,8 @@ class CustomerValidationService
         }
 
         if (! $isReadyBilling) {
-            $requiredTotal  = count(self::REQUIRED_FIELDS);
-            $missingCount   = count($missingRequired);
+            $requiredTotal = count(self::REQUIRED_FIELDS);
+            $missingCount = count($missingRequired);
             $filledRequired = $requiredTotal - $missingCount;
 
             // Draft: less than half of required fields filled
@@ -165,8 +166,11 @@ class CustomerValidationService
             return 'perlu_dilengkapi';
         }
 
-        // All required filled — check if optional fields are also filled
-        $customer->load('customerService');
+        // All required filled — check if optional fields are also filled.
+        // loadMissing(), bukan load(): dataCompleteness() dipanggil PER BARIS di
+        // daftar pelanggan (customers/index.blade.php:332) yang sudah meng-eager-load
+        // customerService, dan load() tetap menembak DB walau relasinya sudah ada.
+        $customer->loadMissing('customerService');
         $service = $customer->customerService;
         foreach (self::OPTIONAL_FIELDS as $key => $label) {
             if (! $this->isFieldFilled($customer, $service, $key)) {
@@ -184,10 +188,7 @@ class CustomerValidationService
      * Service-level fields are prefixed with "service_" and are
      * looked up on the related customerService model.
      *
-     * @param  \App\Models\Customer               $customer
-     * @param  \App\Models\CustomerService|null   $service
-     * @param  string                             $key
-     * @return bool
+     * @param  CustomerService|null  $service
      */
     private function isFieldFilled(Customer $customer, $service, string $key): bool
     {
@@ -213,6 +214,7 @@ class CustomerValidationService
         }
 
         $stringValue = trim((string) $value);
+
         return $stringValue !== '' && $stringValue !== '0';
     }
 }

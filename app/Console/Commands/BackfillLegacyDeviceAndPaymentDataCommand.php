@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PaymentStatus;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\Invoice;
 use App\Models\Payment;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -29,8 +31,9 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
         $fileName = $this->argument('file') ?: 'jetis_db_aplikasi_jetis.sql';
         $sqlPath = base_path($fileName);
 
-        if (!file_exists($sqlPath)) {
+        if (! file_exists($sqlPath)) {
             $this->error("File {$fileName} does not exist in root directory.");
+
             return Command::FAILURE;
         }
 
@@ -45,30 +48,30 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
         $buktiPemasanganRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksipemasangan');
         $biayaRows = $this->parseTableData($sql, 'biaya_tagihan');
 
-        $this->line("- pengguna: " . count($penggunaRows));
-        $this->line("- barang: " . count($barangRows));
-        $this->line("- merk_barang: " . count($merkBarangRows));
-        $this->line("- riwayatstatus_penggunabarang: " . count($riwayatBarangRows));
-        $this->line("- apikeuangan_buktitransaksilunas: " . count($buktiLunasRows));
-        $this->line("- apikeuangan_buktitransaksipemasangan: " . count($buktiPemasanganRows));
-        $this->line("- biaya_tagihan: " . count($biayaRows));
+        $this->line('- pengguna: '.count($penggunaRows));
+        $this->line('- barang: '.count($barangRows));
+        $this->line('- merk_barang: '.count($merkBarangRows));
+        $this->line('- riwayatstatus_penggunabarang: '.count($riwayatBarangRows));
+        $this->line('- apikeuangan_buktitransaksilunas: '.count($buktiLunasRows));
+        $this->line('- apikeuangan_buktitransaksipemasangan: '.count($buktiPemasanganRows));
+        $this->line('- biaya_tagihan: '.count($biayaRows));
 
         $penggunaMap = [];
         foreach ($penggunaRows as $row) {
-            if (!empty($row['IDPENGGUNA'])) {
+            if (! empty($row['IDPENGGUNA'])) {
                 $penggunaMap[$row['IDPENGGUNA']] = $row;
             }
         }
 
         $barangByCode = [];
         foreach ($barangRows as $row) {
-            if (!empty($row['KODEBARANG'])) {
+            if (! empty($row['KODEBARANG'])) {
                 $barangByCode[$row['KODEBARANG']] = $row;
             }
         }
         $merkBarangById = [];
         foreach ($merkBarangRows as $row) {
-            if (!empty($row['IDMERK'])) {
+            if (! empty($row['IDMERK'])) {
                 $merkBarangById[$row['IDMERK']] = $row;
             }
         }
@@ -102,7 +105,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
         $installationPaidAt = [];
         foreach ($buktiPemasanganRows as $row) {
             $invoiceCode = $row['IDPERMINTAAN'] ?? '';
-            if ($invoiceCode !== '' && !isset($installationPaidAt[$invoiceCode])) {
+            if ($invoiceCode !== '' && ! isset($installationPaidAt[$invoiceCode])) {
                 $installationPaidAt[$invoiceCode] = $row['TGLBAYAR'] ?? null;
             }
         }
@@ -124,21 +127,21 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
             // 1. Backfill device MAC/serial/brand note on existing technical details.
             foreach ($assetByRequest as $requestId => $asset) {
                 $detail = CustomerTechnicalDetail::where('old_request_id', $requestId)->first();
-                if (!$detail) {
+                if (! $detail) {
                     continue;
                 }
 
                 $changes = [];
-                if (empty($detail->router_mac) && !empty($asset['mac'])) {
+                if (empty($detail->router_mac) && ! empty($asset['mac'])) {
                     $changes['router_mac'] = $asset['mac'];
                 }
-                if (empty($detail->router_or_ont_serial) && !empty($asset['serial'])) {
+                if (empty($detail->router_or_ont_serial) && ! empty($asset['serial'])) {
                     $changes['router_or_ont_serial'] = $asset['serial'];
                 }
-                if (!empty($asset['brand_label']) && !str_contains((string) $detail->note, $asset['brand_label'])) {
-                    $assetNote = 'Perangkat: ' . $asset['brand_label'] . ' (dari data aset migrasi)';
+                if (! empty($asset['brand_label']) && ! str_contains((string) $detail->note, $asset['brand_label'])) {
+                    $assetNote = 'Perangkat: '.$asset['brand_label'].' (dari data aset migrasi)';
                     $changes['note'] = trim((string) $detail->note) !== ''
-                        ? $detail->note . ' | ' . $assetNote
+                        ? $detail->note.' | '.$assetNote
                         : $assetNote;
                 }
 
@@ -151,7 +154,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
             // 2. Backfill real payment method/receiver/note on existing payments.
             foreach ($lunasByTransaction as $transactionId => $lunas) {
                 $payment = Payment::where('old_transaction_id', $transactionId)->first();
-                if (!$payment) {
+                if (! $payment) {
                     continue;
                 }
 
@@ -180,7 +183,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
                     }
                 }
                 $noteIsPlaceholder = empty($payment->note) || $payment->note === 'Imported legacy payment';
-                if ($noteIsPlaceholder && !empty(trim((string) ($lunas['KET'] ?? '')))) {
+                if ($noteIsPlaceholder && ! empty(trim((string) ($lunas['KET'] ?? '')))) {
                     $changes['note'] = trim((string) $lunas['KET']);
                 }
 
@@ -201,12 +204,12 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
                 }
 
                 $cust = $row['IDPELANGGAN'] ?? '';
-                if (!str_starts_with($cust, 'PE')) {
+                if (! str_starts_with($cust, 'PE')) {
                     continue;
                 }
 
                 $invoice = Invoice::where('old_cost_id', $invoiceCode)->orWhere('old_invoice_id', $invoiceCode)->first();
-                if (!$invoice) {
+                if (! $invoice) {
                     continue;
                 }
 
@@ -219,22 +222,22 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
 
                 $payDate = now()->format('Y-m-d');
                 try {
-                    $payDate = \Carbon\Carbon::parse($paidAt)->format('Y-m-d');
+                    $payDate = Carbon::parse($paidAt)->format('Y-m-d');
                 } catch (\Exception $e) {
                 }
 
                 Payment::create([
-                    'payment_number' => 'PAY-' . uniqid(),
-                    'old_payment_id' => $invoiceCode . '-PASANG',
+                    'payment_number' => 'PAY-'.uniqid(),
+                    'old_payment_id' => $invoiceCode.'-PASANG',
                     'old_transaction_id' => $invoiceCode,
                     'invoice_id' => $invoice->id,
                     'customer_id' => $invoice->customer_id,
                     'pop_id' => $invoice->pop_id,
-                    'billing_period' => \Carbon\Carbon::parse($payDate)->format('Y-m'),
+                    'billing_period' => Carbon::parse($payDate)->format('Y-m'),
                     'amount' => $installationFee,
                     'payment_date' => $payDate,
                     'payment_method' => 'cash',
-                    'payment_status' => \App\Enums\PaymentStatus::VALID->value,
+                    'payment_status' => PaymentStatus::VALID->value,
                     'note' => 'Pembayaran biaya pasang (migrasi backfill)',
                 ]);
                 $installationInserted++;
@@ -249,7 +252,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
     private function parseTableData(string $sql, string $tableName): array
     {
         $insertMatches = [];
-        preg_match_all('/INSERT INTO `' . $tableName . '` \(([^\)]+)\) VALUES\s*(.*?);/s', $sql, $insertMatches);
+        preg_match_all('/INSERT INTO `'.$tableName.'` \(([^\)]+)\) VALUES\s*(.*?);/s', $sql, $insertMatches);
 
         $rows = [];
         foreach ($insertMatches[1] as $idx => $columnsList) {
@@ -295,20 +298,23 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
             if ($escape) {
                 $currentVal .= $char;
                 $escape = false;
+
                 continue;
             }
 
             if ($char === '\\') {
                 $escape = true;
+
                 continue;
             }
 
             if ($char === "'") {
-                $inString = !$inString;
+                $inString = ! $inString;
+
                 continue;
             }
 
-            if ($char === ',' && !$inString) {
+            if ($char === ',' && ! $inString) {
                 $values[] = $this->cleanParsedValue($currentVal);
                 $currentVal = '';
             } else {
@@ -317,6 +323,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
         }
 
         $values[] = $this->cleanParsedValue($currentVal);
+
         return $values;
     }
 
@@ -329,6 +336,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
         if (strtolower($val) === 'null') {
             return null;
         }
+
         return $val;
     }
 
@@ -350,6 +358,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
 
             if (isset($penggunaMap[$token])) {
                 $labels[] = $this->buildLegacyUserName($penggunaMap[$token]) ?: $token;
+
                 continue;
             }
 
@@ -363,7 +372,7 @@ class BackfillLegacyDeviceAndPaymentDataCommand extends Command
 
     private function buildLegacyUserName(array $row): string
     {
-        $name = trim((string) (($row['NAMADEPAN'] ?? '') . ' ' . ($row['NAMABELAKANG'] ?? '')));
+        $name = trim((string) (($row['NAMADEPAN'] ?? '').' '.($row['NAMABELAKANG'] ?? '')));
         $name = preg_replace('/\s+/', ' ', $name) ?: '';
 
         return $name !== '' ? $name : trim((string) ($row['IDPENGGUNA'] ?? ''));

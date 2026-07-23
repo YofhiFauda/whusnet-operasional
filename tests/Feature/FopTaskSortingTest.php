@@ -2,15 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FopTaskPriority;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
 use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class FopTaskSortingTest extends TestCase
@@ -18,17 +27,19 @@ class FopTaskSortingTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private Village $village;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $fopRole = Role::where('code', 'fop')->first();
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
@@ -57,13 +68,13 @@ class FopTaskSortingTest extends TestCase
         $seq++;
 
         return FopTask::create(array_merge([
-            'task_number' => 'TFOP-2026-SORT-' . str_pad((string) $seq, 4, '0', STR_PAD_LEFT),
+            'task_number' => 'TFOP-2026-SORT-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT),
             'task_date' => now(),
             'category' => 'MTN',
-            'tugas' => 'Task ' . $seq,
+            'tugas' => 'Task '.$seq,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
-            'issue' => 'Issue ' . $seq,
+            'issue' => 'Issue '.$seq,
             'status' => 'terjadwal',
             'priority' => 'low',
         ], $overrides));
@@ -251,7 +262,7 @@ class FopTaskSortingTest extends TestCase
      */
     public function test_auto_sync_does_not_duplicate_existing_active_survey_task(): void
     {
-        $customer = \App\Models\Customer::create([
+        $customer = Customer::create([
             'customer_code' => 'C00RQ000099',
             'full_name' => 'Pelanggan Antri Survey',
             'phone' => '081200000099',
@@ -262,8 +273,8 @@ class FopTaskSortingTest extends TestCase
         ]);
 
         $existingSurveyTask = $this->makeFopTask([
-            'category' => \App\Enums\TaskType::SURVEY->value,
-            'status' => \App\Enums\TaskStatus::DRAFT->value,
+            'category' => TaskType::SURVEY->value,
+            'status' => TaskStatus::DRAFT->value,
             'customer_id' => $customer->id,
         ]);
 
@@ -273,7 +284,7 @@ class FopTaskSortingTest extends TestCase
         $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
 
         $surveyTaskCount = FopTask::where('customer_id', $customer->id)
-            ->where('category', \App\Enums\TaskType::SURVEY->value)
+            ->where('category', TaskType::SURVEY->value)
             ->count();
 
         $this->assertEquals(1, $surveyTaskCount, 'Auto-sync gak boleh bikin FopTask survey duplikat buat customer yg udah punya task aktif.');
@@ -291,7 +302,7 @@ class FopTaskSortingTest extends TestCase
      */
     public function test_survey_task_priority_escalates_to_urgent_when_sla_overdue(): void
     {
-        $customer = \App\Models\Customer::create([
+        $customer = Customer::create([
             'customer_code' => 'C00RQ000098',
             'full_name' => 'Pelanggan SLA Lewat',
             'phone' => '081200000098',
@@ -302,13 +313,13 @@ class FopTaskSortingTest extends TestCase
         ]);
         // SLA survey defaultnya 24 jam (TaskType::SURVEY->defaultHandlingSlaHours()) —
         // paksa created_at 2 hari lalu biar udah lewat deadline.
-        \Illuminate\Support\Facades\DB::table('customers')
+        DB::table('customers')
             ->where('id', $customer->id)
             ->update(['created_at' => now()->subDays(2)]);
 
         $surveyTask = $this->makeFopTask([
-            'category' => \App\Enums\TaskType::SURVEY->value,
-            'status' => \App\Enums\TaskStatus::DRAFT->value,
+            'category' => TaskType::SURVEY->value,
+            'status' => TaskStatus::DRAFT->value,
             'priority' => 'low',
             'customer_id' => $customer->id,
         ]);
@@ -316,6 +327,6 @@ class FopTaskSortingTest extends TestCase
         $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
 
         $surveyTask->refresh();
-        $this->assertEquals(\App\Enums\FopTaskPriority::URGENT->value, $surveyTask->priority->value);
+        $this->assertEquals(FopTaskPriority::URGENT->value, $surveyTask->priority->value);
     }
 }

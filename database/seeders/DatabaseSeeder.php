@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Http\Controllers\Master\SlaTimelineController;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -27,10 +26,10 @@ class DatabaseSeeder extends Seeder
         $this->call(RolePermissionSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(WorkflowTransitionPermissionSeeder::class);
-        $this->call(TaskFeatureSeeder::class); 
-        $this->call(PackageSlaSettingSeeder::class); //UNTUK MENGATUR DURASI SLA TIAP PACKAGE
-        $this->call(SlaTimelineFeatureSeeder::class); //UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
-        
+        $this->call(TaskFeatureSeeder::class);
+        $this->call(PackageSlaSettingSeeder::class); // UNTUK MENGATUR DURASI SLA TIAP PACKAGE
+        $this->call(SlaTimelineFeatureSeeder::class); // UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
+
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);

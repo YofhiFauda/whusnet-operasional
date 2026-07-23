@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\City;
@@ -14,7 +15,14 @@ use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -28,21 +36,26 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private User $tech;
+
     private Customer $customer;
+
     private Pop $pop;
+
     private Village $village;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -75,7 +88,7 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -109,7 +122,7 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
     public function test_fop_submitting_with_technicians_and_task_date_immediately_schedules(): void
     {
-        $taskDate = now()->addDay()->format('Y-m-d') . ' 09:00:00';
+        $taskDate = now()->addDay()->format('Y-m-d').' 09:00:00';
 
         $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload([
             'technicians' => [$this->tech->id],
@@ -138,7 +151,7 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
         $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload([
             'type' => TaskType::CREQ->value,
             'technicians' => [$this->tech->id],
-            'task_date' => now()->format('Y-m-d') . ' 10:00:00',
+            'task_date' => now()->format('Y-m-d').' 10:00:00',
         ]));
 
         $response->assertRedirect(route('fop-tasks.index'));
@@ -155,7 +168,7 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
     {
         $response = $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->basePayload([
             'technicians' => [$this->tech->id],
-            'task_date' => now()->format('Y-m-d') . ' 09:00:00',
+            'task_date' => now()->format('Y-m-d').' 09:00:00',
         ]));
 
         $ticket = Ticket::first();
@@ -215,7 +228,7 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
     {
         $response = $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'O-REQ',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Perbaikan Office',
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -237,10 +250,10 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
      */
     public function test_fop_can_attach_evidence_when_creating_ticket_from_fop_tasks_page(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('local');
+        Storage::fake('local');
 
         $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload([
-            'attachments' => [\Illuminate\Http\UploadedFile::fake()->image('bukti.jpg')],
+            'attachments' => [UploadedFile::fake()->image('bukti.jpg')],
         ]));
 
         $response->assertRedirect(route('fop-tasks.index'));
@@ -250,6 +263,6 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         $this->assertNotNull($attachment);
         $this->assertSame('bukti.jpg', $attachment->original_name);
-        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($attachment->file_path);
+        Storage::disk('local')->assertExists($attachment->file_path);
     }
 }

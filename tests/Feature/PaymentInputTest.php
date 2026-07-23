@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -11,6 +12,8 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -37,12 +40,12 @@ class PaymentInputTest extends TestCase
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-1', 'PAY1', 'POP Payment 1');
         $finance->pops()->attach($pop->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $finance->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $pop->id,
         ]);
@@ -85,12 +88,12 @@ class PaymentInputTest extends TestCase
         $finance = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $pop = $this->createPop('POP-PAY-2', 'PAY2', 'POP Payment 2');
         $finance->pops()->attach($pop->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $finance->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $pop->id,
         ]);

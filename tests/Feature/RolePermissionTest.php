@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EffectiveAccessService;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -101,9 +104,9 @@ class RolePermissionTest extends TestCase
 
         // Attach and test again
         $csRole->permissions()->attach($permission->id);
-        
+
         // Clear relations cache or reload user role relation
-        app(\App\Services\EffectiveAccessService::class)->clearCache($csUser);
+        app(EffectiveAccessService::class)->clearCache($csUser);
         $csUser->load('role.permissions');
 
         $this->assertTrue($csUser->hasPermission('view_customers'));
@@ -122,8 +125,8 @@ class RolePermissionTest extends TestCase
     public function test_role_permission_seeder_maps_permissions_correctly(): void
     {
         // Seed Roles, Permissions, and their relationships
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);

@@ -34,7 +34,7 @@ class CustomerNetworkAssignmentController extends Controller
             'customer_cid' => $customer->cid,
             'pop_name' => $customer->pop->name ?? '-',
             'pop_code' => $customer->pop->pop_code ?? '',
-            'editable' => !in_array($customer->status, self::BLOCKED_STATUSES, true),
+            'editable' => ! in_array($customer->status, self::BLOCKED_STATUSES, true),
             'mini_pops' => $miniPops,
             'distributions' => $distributions,
             'current' => [
@@ -86,7 +86,7 @@ class CustomerNetworkAssignmentController extends Controller
                 ->where('parent_id', $customer->pop_id)
                 ->first();
 
-            if (!$miniPop) {
+            if (! $miniPop) {
                 return back()->with('error', 'Mini POP yang dipilih tidak valid untuk Cabang POP pelanggan ini.');
             }
         }
@@ -96,7 +96,7 @@ class CustomerNetworkAssignmentController extends Controller
                 ->where('pop_id', $miniPopId)
                 ->first();
 
-            if (!$distribution) {
+            if (! $distribution) {
                 return back()->with('error', 'Distribusi yang dipilih tidak sesuai dengan Mini POP yang dipilih.');
             }
         }

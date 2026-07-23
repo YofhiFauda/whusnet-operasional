@@ -35,8 +35,8 @@ class PopModelTest extends TestCase
         ]);
 
         $this->assertEquals('POP Pusat Jakarta', $pop->name);
-        $this->assertEquals(-6.1753924, (float)$pop->latitude);
-        $this->assertEquals(106.8271528, (float)$pop->longitude);
+        $this->assertEquals(-6.1753924, (float) $pop->latitude);
+        $this->assertEquals(106.8271528, (float) $pop->longitude);
     }
 
     public function test_pop_has_default_active_status(): void

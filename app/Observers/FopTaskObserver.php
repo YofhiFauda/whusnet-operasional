@@ -30,7 +30,7 @@ class FopTaskObserver
 {
     public function updated(FopTask $fopTask): void
     {
-        if (!$fopTask->wasChanged('status')) {
+        if (! $fopTask->wasChanged('status')) {
             return;
         }
 
@@ -40,18 +40,18 @@ class FopTaskObserver
 
         $ticket = Ticket::where('fop_task_id', $fopTask->id)->first();
 
-        if (!$ticket) {
+        if (! $ticket) {
             return;
         }
 
         $from = $fopTask->getOriginal('status');
 
         $ticket->histories()->create([
-            'action'      => TicketHistoryAction::DIBATALKAN,
+            'action' => TicketHistoryAction::DIBATALKAN,
             'from_status' => $from instanceof TaskStatus ? $from->value : $from,
-            'to_status'   => TaskStatus::DIBATALKAN->value,
-            'reason'      => $fopTask->cancel_reason,
-            'actor_id'    => auth()->id(),
+            'to_status' => TaskStatus::DIBATALKAN->value,
+            'reason' => $fopTask->cancel_reason,
+            'actor_id' => auth()->id(),
             'happened_at' => now(),
         ]);
     }

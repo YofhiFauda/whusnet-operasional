@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Enums\InvoiceStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
@@ -22,7 +22,7 @@ class DashboardController extends Controller
             return redirect()->route('fop.dashboard');
         }
 
-        if (!auth()->user()->hasPermission('dashboard.view')) {
+        if (! auth()->user()->hasPermission('dashboard.view')) {
             if (auth()->user()->hasPermission('task.view.own')) {
                 return redirect()->route('tasks.own');
             }
@@ -64,14 +64,18 @@ class DashboardController extends Controller
                 ->count(),
             'total_invoices_amount' => (float) (clone $periodInvoiceQuery)->sum('total_amount'),
             'total_payments_amount' => (float) (clone $periodPaymentQuery)
-                ->where('payment_status', \App\Enums\PaymentStatus::VALID->value)
+                ->where('payment_status', PaymentStatus::VALID->value)
                 ->sum('amount'),
             'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
-                ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
+                ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
                 ->sum('remaining_amount'),
             'due_invoices_count' => (clone $invoiceQuery)
-                ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
-                ->whereDate('due_date', '<=', now()->toDateString())
+                ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
+                // whereDate() membungkus kolom jadi DATE(due_date) dan mematikan
+                // index. endOfDay() wajib: sqlite menyimpan kolom date sebagai
+                // '2026-07-22 00:00:00', jadi `<= '2026-07-22'` membuang tagihan
+                // yang jatuh tempo hari ini.
+                ->where('due_date', '<=', now()->endOfDay())
                 ->count(),
         ];
 
@@ -84,8 +88,8 @@ class DashboardController extends Controller
 
         $dueInvoices = (clone $invoiceQuery)
             ->with(['customer', 'pop'])
-            ->whereNotIn('invoice_status', [\App\Enums\InvoiceStatus::LUNAS->value, \App\Enums\InvoiceStatus::BATAL->value])
-            ->whereDate('due_date', '<=', now()->toDateString())
+            ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
+            ->where('due_date', '<=', now()->endOfDay())
             ->orderBy('due_date')
             ->limit(10)
             ->get();
@@ -139,7 +143,7 @@ class DashboardController extends Controller
 
     private function normalizePeriod(mixed $period): ?string
     {
-        if (!is_string($period) || !preg_match('/^\d{4}-\d{2}$/', $period)) {
+        if (! is_string($period) || ! preg_match('/^\d{4}-\d{2}$/', $period)) {
             return null;
         }
 

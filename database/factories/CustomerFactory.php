@@ -7,7 +7,7 @@ use App\Models\Pop;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Customer>
+ * @extends Factory<Customer>
  */
 class CustomerFactory extends Factory
 {
@@ -20,7 +20,7 @@ class CustomerFactory extends Factory
     {
         return [
             'full_name' => $this->faker->name,
-            'customer_code' => 'REG' . $this->faker->unique()->numberBetween(100000, 999999),
+            'customer_code' => 'REG'.$this->faker->unique()->numberBetween(100000, 999999),
             'phone' => $this->faker->phoneNumber,
             'status' => 'aktif',
             'pop_id' => Pop::factory(),

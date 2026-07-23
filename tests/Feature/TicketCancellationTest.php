@@ -2,17 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketHistoryAction;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,20 +32,24 @@ class TicketCancellationTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private User $teknisiUser;
+
     private Customer $customer;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -71,7 +82,7 @@ class TicketCancellationTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -269,7 +280,7 @@ class TicketCancellationTest extends TestCase
 
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Task murni FOP',
             'village_id' => $village->id,
             'pop_id' => $this->pop->id,
@@ -279,7 +290,7 @@ class TicketCancellationTest extends TestCase
             'technicians' => [$this->teknisiUser->id],
         ])->assertRedirect();
 
-        $fopTask = \App\Models\FopTask::where('tugas', 'Task murni FOP')->firstOrFail();
+        $fopTask = FopTask::where('tugas', 'Task murni FOP')->firstOrFail();
 
         $this->actingAs($this->fopUser)
             ->putJson(route('fop-tasks.update', $fopTask), [

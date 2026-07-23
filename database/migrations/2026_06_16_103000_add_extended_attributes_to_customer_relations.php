@@ -77,9 +77,9 @@ return new class extends Migration
 
         Schema::table('customer_technical_details', function (Blueprint $table) {
             $table->dropColumn([
-                'passive_device', 'branch_number', 'pop_number', 'router_number', 
-                'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 
-                'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'
+                'passive_device', 'branch_number', 'pop_number', 'router_number',
+                'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time',
+                'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score',
             ]);
         });
 

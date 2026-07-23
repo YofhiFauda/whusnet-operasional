@@ -93,8 +93,8 @@ trait RecordsAuditLogs
     }
 
     /**
-     * @param array<string, mixed>|null $oldValues
-     * @param array<string, mixed>|null $newValues
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
      */
     protected function writeModelAuditLog(string $action, ?array $oldValues, ?array $newValues): void
     {

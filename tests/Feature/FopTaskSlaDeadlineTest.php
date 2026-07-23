@@ -5,16 +5,17 @@ namespace Tests\Feature;
 use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Models\City;
 use App\Models\Customer;
+use App\Models\District;
 use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Task;
-use App\Models\Village;
-use App\Models\City;
-use App\Models\District;
 use App\Models\User;
+use App\Models\Village;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -30,7 +31,9 @@ class FopTaskSlaDeadlineTest extends TestCase
     use RefreshDatabase;
 
     private Pop $pop;
+
     private Village $village;
+
     private User $user;
 
     protected function setUp(): void
@@ -68,7 +71,7 @@ class FopTaskSlaDeadlineTest extends TestCase
             'pop_id' => $this->pop->id,
             'status' => 'surveyed',
         ]);
-        \Illuminate\Support\Facades\DB::table('customers')
+        DB::table('customers')
             ->where('id', $customer->id)
             ->update(['updated_at' => $customerUpdatedAt]);
 

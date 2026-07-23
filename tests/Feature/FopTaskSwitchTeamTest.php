@@ -12,6 +12,10 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,21 +24,27 @@ class FopTaskSwitchTeamTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private Village $village;
+
     private Pop $pop;
+
     private User $abdul;
+
     private User $karim;
+
     private User $yanto;
+
     private User $wito;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $fopRole = Role::where('code', 'fop')->first();
         $teknisiRole = Role::where('code', 'teknisi')->first();
@@ -55,7 +65,7 @@ class FopTaskSwitchTeamTest extends TestCase
     {
         $response = $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => $taskDate ?? now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => $taskDate ?? now()->format('Y-m-d').' 08:00:00',
             'tugas' => $tugas,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -195,8 +205,8 @@ class FopTaskSwitchTeamTest extends TestCase
 
     public function test_switch_team_rejects_across_different_work_dates(): void
     {
-        $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id], now()->format('Y-m-d') . ' 08:00:00');
-        $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id], now()->addDay()->format('Y-m-d') . ' 08:00:00');
+        $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id], now()->format('Y-m-d').' 08:00:00');
+        $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id], now()->addDay()->format('Y-m-d').' 08:00:00');
 
         $response = $this->actingAs($this->fopUser)->postJson("/fop-tasks/{$taskA->id}/switch-team", [
             'to_team_id' => $taskE->team_id,

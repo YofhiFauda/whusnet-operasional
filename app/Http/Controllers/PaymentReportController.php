@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\Pop;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentReportController extends Controller
@@ -18,7 +19,7 @@ class PaymentReportController extends Controller
         $user = auth()->user();
 
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -31,7 +32,7 @@ class PaymentReportController extends Controller
 
         // POP yang bisa diakses user
         $popsQuery = Pop::query();
-        if (!$user->hasFullAccess()) {
+        if (! $user->hasFullAccess()) {
             $popsQuery->whereHas('users', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
@@ -41,7 +42,7 @@ class PaymentReportController extends Controller
 
         // Jika user memfilter POP tertentu, pastikan POP itu ada di dalam POP yang diizinkan untuknya
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 $popId = '';
             }
         }
@@ -64,11 +65,14 @@ class PaymentReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('payment_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(payment_date) dan mematikan
+            // index. Batas ditulis eksplisit startOfDay/endOfDay — lihat alasan
+            // lengkapnya di CustomerReportController::index().
+            $query->where('payment_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('payment_date', '<=', $endDate);
+            $query->where('payment_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
@@ -109,7 +113,7 @@ class PaymentReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -121,14 +125,14 @@ class PaymentReportController extends Controller
 
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user ini
         $allowedPopsQuery = Pop::query();
-        if (!$user->hasFullAccess()) {
+        if (! $user->hasFullAccess()) {
             $allowedPopsQuery->whereHas('users', function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             });
         }
         $allowedPopIds = $allowedPopsQuery->pluck('id')->toArray();
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 abort(403, 'Unauthorized action.');
             }
         }
@@ -150,28 +154,31 @@ class PaymentReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('payment_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(payment_date) dan mematikan
+            // index. Batas ditulis eksplisit startOfDay/endOfDay — lihat alasan
+            // lengkapnya di CustomerReportController::index().
+            $query->where('payment_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('payment_date', '<=', $endDate);
+            $query->where('payment_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
-        $payments = $query->orderByDesc('payment_date')
-            ->orderByDesc('id')
-            ->get();
+        // Query dieksekusi di dalam closure stream pakai `lazy()` — lihat alasan
+        // yang sama di InvoiceReportController::export().
+        $query->orderByDesc('payment_date')->orderByDesc('id');
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="laporan-pembayaran-' . now()->format('YmdHis') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="laporan-pembayaran-'.now()->format('YmdHis').'.csv"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
 
-        $callback = function () use ($payments) {
+        $callback = function () use ($query) {
             $file = fopen('php://output', 'w');
-            
+
             // Add UTF-8 BOM for proper Excel compatibility
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
@@ -190,7 +197,7 @@ class PaymentReportController extends Controller
                 'Catatan',
             ]);
 
-            foreach ($payments as $payment) {
+            foreach ($query->lazy(500) as $payment) {
                 fputcsv($file, [
                     $payment->payment_number,
                     $payment->invoice->invoice_number ?? '-',

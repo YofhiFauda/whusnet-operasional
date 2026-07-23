@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('to_status');   // VARCHAR murni
             $table->foreignId('changed_by')->nullable()->constrained('users')->nullOnDelete(); // Cegah hilangnya histori jika user resign/dihapus
             $table->text('note')->nullable();
-            
+
             // Log bersifat immutable (hanya waktu pembuatan yang dicatat)
             $table->timestamp('created_at')->useCurrent();
         });

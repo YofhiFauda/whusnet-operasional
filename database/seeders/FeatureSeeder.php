@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Feature;
 use App\Enums\FeatureType;
+use App\Models\Feature;
 use Illuminate\Database\Seeder;
 
 class FeatureSeeder extends Seeder

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -12,6 +13,7 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -105,10 +107,10 @@ class PaymentAuditLogTest extends TestCase
             'role_id' => $adminPusatRole->id,
             'status' => 'active',
         ]);
-        \App\Models\UserRoleScope::create([
+        UserRoleScope::create([
             'user_id' => $adminPusat->id,
             'role_id' => $adminPusatRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP,
+            'scope_type' => ScopeType::ALL_POP,
         ]);
 
         $pop = $this->createPop('POP-PAY-AUDIT-VIEW', 'PPV', 'POP Payment Audit View');

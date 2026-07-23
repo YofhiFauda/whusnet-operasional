@@ -10,13 +10,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Task extends Model
 {
-    use RecordsAuditLogs, HasPopScope;
+    use HasPopScope, RecordsAuditLogs;
 
     protected string $auditModule = 'Task Management';
-    protected array $auditEvents  = ['created', 'updated', 'deleted'];
+
+    protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     protected $fillable = [
         'task_number',
@@ -43,14 +45,14 @@ class Task extends Model
     ];
 
     protected $casts = [
-        'task_type'        => TaskType::class,
-        'status'           => TaskStatus::class,
-        'scheduled_at'     => 'datetime',
-        'started_at'       => 'datetime',
-        'completed_at'     => 'datetime',
-        'cancelled_at'     => 'datetime',
+        'task_type' => TaskType::class,
+        'status' => TaskStatus::class,
+        'scheduled_at' => 'datetime',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'conflict_override' => 'boolean',
-        'report_deferred'  => 'boolean',
+        'report_deferred' => 'boolean',
     ];
 
     // ─── Relasi ─────────────────────────────────────────────────
@@ -90,7 +92,7 @@ class Task extends Model
         return $this->hasMany(TaskEvidence::class);
     }
 
-    public function auditLogs(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function auditLogs(): MorphMany
     {
         return $this->morphMany(AuditLog::class, 'auditable')->orderBy('created_at', 'desc');
     }
@@ -128,7 +130,7 @@ class Task extends Model
      */
     public function actualDurationMinutes(): ?int
     {
-        if (!$this->started_at || !$this->completed_at) {
+        if (! $this->started_at || ! $this->completed_at) {
             return null;
         }
 
@@ -140,11 +142,12 @@ class Task extends Model
      */
     public function isOverSla(): bool
     {
-        if (!$this->sla_minutes || !$this->started_at) {
+        if (! $this->sla_minutes || ! $this->started_at) {
             return false;
         }
 
         $reference = $this->completed_at ?? now();
+
         return $this->started_at->addMinutes($this->sla_minutes)->lt($reference);
     }
 }

@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\InvoiceType;
 use App\Models\Concerns\RecordsAuditLogs;
+use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
-    use RecordsAuditLogs, \App\Traits\HasPopScope;
+    use HasPopScope, RecordsAuditLogs;
 
     protected string $auditModule = 'Tagihan';
 
@@ -49,8 +52,8 @@ class Invoice extends Model
     protected function casts(): array
     {
         return [
-            'invoice_type' => \App\Enums\InvoiceType::class,
-            'invoice_status' => \App\Enums\InvoiceStatus::class,
+            'invoice_type' => InvoiceType::class,
+            'invoice_status' => InvoiceStatus::class,
             'issue_date' => 'date',
             'due_date' => 'date',
             'subtotal' => 'decimal:2',
@@ -122,6 +125,4 @@ class Invoice extends Model
     {
         return $this->hasMany(Payment::class);
     }
-
-
 }

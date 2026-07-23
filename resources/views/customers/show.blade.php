@@ -1467,7 +1467,7 @@
             <div class="flex justify-end gap-2 pt-2 border-t border-border mt-4">
                 <button type="button" @click="$dispatch('close-modal', 'network-assignment')"
                         class="text-sm font-semibold px-4 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-text-secondary transition-colors duration-200 cursor-pointer">Batal</button>
-                <button type="submit" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
+                <button type="submit" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-sky-600 hover:bg-sky-700 shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
             </div>
         </form>
     </div>

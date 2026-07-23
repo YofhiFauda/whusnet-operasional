@@ -61,8 +61,7 @@ class InternetPackageSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $features
-     *
+     * @param  array<int, string>  $features
      * @return array<string, mixed>
      */
     private function home(
@@ -89,8 +88,7 @@ class InternetPackageSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $features
-     *
+     * @param  array<int, string>  $features
      * @return array<string, mixed>
      */
     private function businessBroadband(
@@ -115,8 +113,7 @@ class InternetPackageSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $features
-     *
+     * @param  array<int, string>  $features
      * @return array<string, mixed>
      */
     private function sme(
@@ -137,8 +134,7 @@ class InternetPackageSeeder extends Seeder
     }
 
     /**
-     * @param array<int, string> $features
-     *
+     * @param  array<int, string>  $features
      * @return array<string, mixed>
      */
     private function dedicated(
@@ -161,8 +157,7 @@ class InternetPackageSeeder extends Seeder
     }
 
     /**
-     * @param array<string, mixed> $overrides
-     *
+     * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
     private function package(

@@ -2,18 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
-use App\Models\Pop;
 use App\Models\Invoice;
-use App\Models\AuditLog;
-use App\Models\User;
+use App\Models\Pop;
 use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\SubscriptionStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,14 +36,14 @@ class InvoiceCreateTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\SubscriptionStatusSeeder::class);
-        $this->seed(\Database\Seeders\InternetPackageSeeder::class);
-        $this->seed(\Database\Seeders\PonorogoRegionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(SubscriptionStatusSeeder::class);
+        $this->seed(InternetPackageSeeder::class);
+        $this->seed(PonorogoRegionSeeder::class);
     }
 
     /**
@@ -159,7 +170,7 @@ class InvoiceCreateTest extends TestCase
 
         $package = InternetPackage::query()->firstOrFail();
         $customer1 = $this->createTestCustomer($pop, $package);
-        
+
         // Create customer2
         $customer2 = Customer::create([
             'customer_code' => 'WHUS-2026-0002',
@@ -319,19 +330,19 @@ class InvoiceCreateTest extends TestCase
 
         // Assign user to pop1 only
         $user->pops()->attach($pop1->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $pop1->id,
         ]);
 
         $package = InternetPackage::query()->firstOrFail();
         $customerInPop1 = $this->createTestCustomer($pop1, $package);
-        
+
         $customerInPop2 = Customer::create([
             'customer_code' => 'WHUS-2026-0003',
             'full_name' => 'Siti Santoso',

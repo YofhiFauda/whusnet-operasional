@@ -3,10 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\User;
-use App\Models\Role;
-use App\Models\InternetPackage;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

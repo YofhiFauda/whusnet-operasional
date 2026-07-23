@@ -2,18 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketBucket;
 use App\Models\City;
 use App\Models\Customer;
+use App\Models\CustomerDevice;
 use App\Models\District;
 use App\Models\FopTask;
+use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -25,20 +33,24 @@ class TicketingTest extends TestCase
     use RefreshDatabase;
 
     private User $helpdeskUser;
+
     private User $teknisiUser;
+
     private Customer $customer;
+
     private Pop $pop;
+
     private Village $village;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $helpdeskRole = Role::where('code', 'helpdesk')->first();
         $teknisiRole = Role::where('code', 'teknisi')->first();
@@ -81,7 +93,7 @@ class TicketingTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -507,7 +519,7 @@ class TicketingTest extends TestCase
 
     public function test_ticket_snapshots_full_customer_panel_at_creation(): void
     {
-        $package = \App\Models\InternetPackage::create([
+        $package = InternetPackage::create([
             'package_code' => 'GOLD-50',
             'name' => 'Paket Gold 50Mbps',
             'category' => 'Home',
@@ -525,7 +537,7 @@ class TicketingTest extends TestCase
             'longitude' => 111.4619,
         ]);
 
-        \App\Models\CustomerDevice::create([
+        CustomerDevice::create([
             'customer_id' => $this->customer->id,
             'device_type' => 'ONT',
             'brand' => 'Huawei',
@@ -550,7 +562,7 @@ class TicketingTest extends TestCase
     {
         $this->customer->update(['odp_code' => null]);
 
-        \App\Models\CustomerDevice::create([
+        CustomerDevice::create([
             'customer_id' => $this->customer->id,
             'device_type' => 'ONT',
             'odp' => 'ODP-FROM-DEVICE',

@@ -2,13 +2,11 @@
 
 use App\Helpers\FormatHelper;
 
-if (!function_exists('format_rupiah')) {
+if (! function_exists('format_rupiah')) {
     /**
      * Format number to Indonesian Rupiah.
      *
-     * @param float|int|string|null $amount
-     * @param bool $showDecimal
-     * @return string
+     * @param  float|int|string|null  $amount
      */
     function format_rupiah($amount, bool $showDecimal = false): string
     {
@@ -16,13 +14,11 @@ if (!function_exists('format_rupiah')) {
     }
 }
 
-if (!function_exists('format_tanggal')) {
+if (! function_exists('format_tanggal')) {
     /**
      * Format date to Indonesian Format.
      *
-     * @param string|\DateTime|Carbon\Carbon|null $date
-     * @param bool $withDay
-     * @return string
+     * @param  string|DateTime|Carbon\Carbon|null  $date
      */
     function format_tanggal($date, bool $withDay = false): string
     {
@@ -30,13 +26,11 @@ if (!function_exists('format_tanggal')) {
     }
 }
 
-if (!function_exists('format_jam')) {
+if (! function_exists('format_jam')) {
     /**
      * Format time to Indonesian Format (WIB).
      *
-     * @param string|\DateTime|Carbon\Carbon|null $time
-     * @param bool $withWib
-     * @return string
+     * @param  string|DateTime|Carbon\Carbon|null  $time
      */
     function format_jam($time, bool $withWib = true): string
     {
@@ -44,13 +38,11 @@ if (!function_exists('format_jam')) {
     }
 }
 
-if (!function_exists('format_datetime')) {
+if (! function_exists('format_datetime')) {
     /**
      * Format datetime to Indonesian Format.
      *
-     * @param string|\DateTime|Carbon\Carbon|null $datetime
-     * @param bool $withDay
-     * @return string
+     * @param  string|DateTime|Carbon\Carbon|null  $datetime
      */
     function format_datetime($datetime, bool $withDay = false): string
     {

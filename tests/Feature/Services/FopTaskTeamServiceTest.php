@@ -5,6 +5,7 @@ namespace Tests\Feature\Services;
 use App\Models\FopTask;
 use App\Models\FopTaskTeam;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
@@ -17,7 +18,9 @@ class FopTaskTeamServiceTest extends TestCase
     use RefreshDatabase;
 
     private FopTaskTeamService $service;
+
     private Carbon $date;
+
     private static int $counter = 0;
 
     protected function setUp(): void
@@ -33,10 +36,10 @@ class FopTaskTeamServiceTest extends TestCase
         self::$counter++;
 
         $task = FopTask::create(array_merge([
-            'task_number' => 'TFOP-TEST-' . str_pad((string) self::$counter, 4, '0', STR_PAD_LEFT),
+            'task_number' => 'TFOP-TEST-'.str_pad((string) self::$counter, 4, '0', STR_PAD_LEFT),
             'task_date' => $overrides['task_date'] ?? $this->date->copy()->setTime(8, 0),
             'category' => 'MTN',
-            'tugas' => 'Task ' . self::$counter,
+            'tugas' => 'Task '.self::$counter,
             'issue' => 'Issue',
             'status' => 'terjadwal',
             'priority' => 'Medium',
@@ -56,8 +59,8 @@ class FopTaskTeamServiceTest extends TestCase
         $fopTask = $this->makeTask($technicianIds, $overrides);
 
         $pop = Pop::create([
-            'code' => 'POP-' . self::$counter,
-            'name' => 'POP Test ' . self::$counter,
+            'code' => 'POP-'.self::$counter,
+            'name' => 'POP Test '.self::$counter,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -69,7 +72,7 @@ class FopTaskTeamServiceTest extends TestCase
         $execTask = app(TaskService::class)->create([
             'pop_id' => $pop->id,
             'task_type' => 'MTN',
-            'title' => 'FOP: ' . $fopTask->tugas,
+            'title' => 'FOP: '.$fopTask->tugas,
             'team_member_ids' => $technicianIds,
             'scheduled_at' => $fopTask->task_date,
             'conflict_override' => true,
@@ -418,7 +421,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team1 = FopTaskTeam::create([
             'name' => 'Team 1',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team1->members()->sync([$joko->id]);
         $taskX->team_id = $team1->id;
@@ -435,7 +438,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team2 = FopTaskTeam::create([
             'name' => 'Team 2',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team2->members()->sync([$tri->id]);
         $taskY->team_id = $team2->id;
@@ -480,7 +483,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team1 = FopTaskTeam::create([
             'name' => 'Team 1',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team1->members()->sync([$joko->id, $cagak->id]);
         $taskA->team_id = $team1->id;
@@ -491,7 +494,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team2 = FopTaskTeam::create([
             'name' => 'Team 2',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team2->members()->sync([$suci->id, $tri->id]);
         $taskB->team_id = $team2->id;
@@ -525,13 +528,13 @@ class FopTaskTeamServiceTest extends TestCase
 
         // Bikin Task C dulu (ID lebih kecil)
         $taskC = $this->makeTask([$cagak->id]);
-        
+
         // Task A ditugaskan Joko dan Cagak, masuk TIM 1
         $taskA = $this->makeTask([$joko->id, $cagak->id]);
         $team1 = FopTaskTeam::create([
             'name' => 'Team 1',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team1->members()->sync([$joko->id, $cagak->id]);
         $taskA->team_id = $team1->id;
@@ -546,7 +549,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team2 = FopTaskTeam::create([
             'name' => 'Team 2',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team2->members()->sync([$suci->id, $tri->id]);
         $taskB->team_id = $team2->id;
@@ -580,7 +583,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team1 = FopTaskTeam::create([
             'name' => 'Team 1',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team1->members()->sync([$joko->id, $cagak->id]);
         $taskA->team_id = $team1->id;
@@ -591,7 +594,7 @@ class FopTaskTeamServiceTest extends TestCase
         $team2 = FopTaskTeam::create([
             'name' => 'Team 2',
             'work_date' => $this->date->toDateString(),
-            'created_by' => 1
+            'created_by' => 1,
         ]);
         $team2->members()->sync([$suci->id, $tri->id]);
         $taskB->team_id = $team2->id;
@@ -602,7 +605,7 @@ class FopTaskTeamServiceTest extends TestCase
         $this->service->rebuildTeamsForDate($this->date);
 
         // Simulasi HTTP request ke assignToTeam untuk meletakkan Task C di TIM 2 (ID = $team2->id)
-        $role = \App\Models\Role::create(['name' => 'Owner', 'code' => 'owner']);
+        $role = Role::create(['name' => 'Owner', 'code' => 'owner']);
         $fopUser = User::factory()->create([
             'status' => 'active',
             'role_id' => $role->id,

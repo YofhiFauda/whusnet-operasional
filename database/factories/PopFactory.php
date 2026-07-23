@@ -6,7 +6,7 @@ use App\Models\Pop;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Pop>
+ * @extends Factory<Pop>
  */
 class PopFactory extends Factory
 {
@@ -24,7 +24,7 @@ class PopFactory extends Factory
             'pop_code' => $this->faker->unique()->bothify('??'),
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => $this->faker->city . ' POP',
+            'name' => $this->faker->city.' POP',
             'type' => 'cabang',
             'status' => 'active',
         ];

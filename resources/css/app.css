@@ -2,17 +2,19 @@
 
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
 :root {
-  /* Colors */
-  --color-primary: #4F46E5;
-  --color-primary-hover: #4338CA;
-  --color-primary-soft: #F5F3FF;
-  --color-primary-border: #C7D2FE;
+  /* Colors — Sky Blue (skybrand) sesuai Design.md */
+  --color-primary: #0284C7;         /* sky-600 */
+  --color-primary-hover: #0369A1;   /* sky-700 */
+  --color-primary-soft: #F0F9FF;    /* sky-50 */
+  --color-primary-border: #BAE6FD;  /* sky-200 */
 
   --color-background: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -101,17 +103,19 @@
 /* Dark Mode Token System */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: #090D16;
-    --color-surface: #111827;
-    --color-surface-muted: #1F2937;
-    --color-border: #1E293B;
-    --color-border-strong: #334155;
+    --color-background: #0F172A;      /* slate-900 */
+    --color-surface: #1E293B;         /* slate-800 */
+    --color-surface-muted: #334155;   /* slate-700 */
+    --color-border: #334155;          /* slate-700 */
+    --color-border-strong: #475569;   /* slate-600 */
     --color-text-main: #F8FAFC;
     --color-text-secondary: #CBD5E1;
     --color-text-muted: #94A3B8;
     --color-text-disabled: #475569;
-    --color-primary-soft: #1E1B4B;
-    --color-primary-border: #312E81;
+    --color-primary: #38BDF8;         /* sky-400 (dark) */
+    --color-primary-hover: #0284C7;   /* sky-600 (dark hover) */
+    --color-primary-soft: #0C4A6E;    /* sky-900 (dark soft) */
+    --color-primary-border: #0369A1;  /* sky-700 (dark border) */
     --color-success-bg: #064E3B;
     --color-success-border: #065F46;
     --color-warning-bg: #451A03;
@@ -124,17 +128,19 @@
 }
 
 .dark {
-  --color-background: #090D16;
-  --color-surface: #111827;
-  --color-surface-muted: #1F2937;
-  --color-border: #1E293B;
-  --color-border-strong: #334155;
+  --color-background: #0F172A;      /* slate-900 */
+  --color-surface: #1E293B;         /* slate-800 */
+  --color-surface-muted: #334155;   /* slate-700 */
+  --color-border: #334155;          /* slate-700 */
+  --color-border-strong: #475569;   /* slate-600 */
   --color-text-main: #F8FAFC;
   --color-text-secondary: #CBD5E1;
   --color-text-muted: #94A3B8;
   --color-text-disabled: #475569;
-  --color-primary-soft: #1E1B4B;
-  --color-primary-border: #312E81;
+  --color-primary: #38BDF8;         /* sky-400 (dark) */
+  --color-primary-hover: #0284C7;
+  --color-primary-soft: #0C4A6E;
+  --color-primary-border: #0369A1;
   --color-success-bg: #064E3B;
   --color-success-border: #065F46;
   --color-warning-bg: #451A03;
@@ -637,18 +643,152 @@ body {
 
 /* NProgress Customization */
 #nprogress .bar {
-  background: var(--color-sky-500, #0ea5e9) !important;
+  background: #0ea5e9 !important;
   height: 3px !important;
 }
 
 #nprogress .peg {
-  box-shadow: 0 0 10px var(--color-sky-500, #0ea5e9), 0 0 5px var(--color-sky-500, #0ea5e9) !important;
+  box-shadow: 0 0 10px #0ea5e9, 0 0 5px #0ea5e9 !important;
 }
 
 #nprogress .spinner-icon {
-  border-top-color: var(--color-sky-500, #0ea5e9) !important;
-  border-left-color: var(--color-sky-500, #0ea5e9) !important;
+  border-top-color: #0ea5e9 !important;
+  border-left-color: #0ea5e9 !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   WHUSNET Shell — Glass Topbar & Sidebar Light Mode
+   Sesuai Design.md §3.2 & §1.9
+───────────────────────────────────────────────────────────── */
+
+/* Glass header — topbar transparan dengan blur */
+.glass-header {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.dark .glass-header {
+  background: rgba(30, 41, 59, 0.85); /* slate-800 @ 85% */
+}
+
+/* Sidebar light mode */
+.sidebar-light {
+  background: #FFFFFF;
+  border-right: 1px solid rgba(226, 232, 240, 0.8);
+}
+.dark .sidebar-light {
+  background: #1E293B;
+  border-right-color: rgba(51, 65, 85, 1);
+}
+
+/* Sidebar nav item — default */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;          /* slate-600 */
+  transition: background 150ms, color 150ms;
+  text-decoration: none;
+}
+.sidebar-nav-item:hover {
+  background: rgba(241, 245, 249, 0.8); /* slate-100/80 */
+  color: #0F172A;
+}
+.dark .sidebar-nav-item {
+  color: #CBD5E1;
+}
+.dark .sidebar-nav-item:hover {
+  background: rgba(51, 65, 85, 0.6);
+  color: #F8FAFC;
+}
+
+/* Sidebar nav item — active (menu induk) */
+.sidebar-nav-item-active {
+  background: #F0F9FF;     /* sky-50 */
+  color: #0369A1;          /* sky-700 */
+  font-weight: 600;
+}
+.dark .sidebar-nav-item-active {
+  background: rgba(12, 74, 110, 0.3); /* sky-900/30 */
+  color: #7DD3FC;          /* sky-300 */
+}
+
+/* Sidebar sub-item — active (border kiri, lebih lembut dari induk) */
+.sidebar-subitem-active {
+  background: #F0F9FF;     /* sky-50 */
+  color: #0369A1;          /* sky-700 */
+  font-weight: 600;
+  border-left: 2px solid #0284C7; /* sky-600 */
+}
+.dark .sidebar-subitem-active {
+  background: rgba(12, 74, 110, 0.3);
+  color: #7DD3FC;
+  border-left-color: #38BDF8;
+}
+
+/* Summary strip flat bar — Design.md §1.6 */
+.summary-strip {
+  display: flex;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dark .summary-strip {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+.summary-col {
+  flex: 1;
+  padding: 12px 20px;
+  border-right: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dark .summary-col {
+  border-right-color: #334155;
+}
+.summary-col:last-child { border-right: none; }
+
+.summary-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748B;
+}
+.dark .summary-label { color: #94A3B8; }
+
+.summary-value {
+  font-family: var(--font-data);
+  font-size: 18px;
+  font-weight: 600;
+  color: #0F172A;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.dark .summary-value { color: #F8FAFC; }
+
+.summary-value.success { color: #10B981; }
+.dark .summary-value.success { color: #34D399; }
+.summary-value.warning { color: #F59E0B; }
+.dark .summary-value.warning { color: #FBBF24; }
+.summary-value.error   { color: #EF4444; }
+.dark .summary-value.error   { color: #F87171; }
+.summary-value.purple  { color: #7C3AED; }
+.dark .summary-value.purple  { color: #A78BFA; }
+
+.summary-sub {
+  font-size: 11px;
+  color: #64748B;
+}
+.dark .summary-sub { color: #94A3B8; }
 
 /* Custom Scrollbar System */
 

@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\Pop;
-use App\Services\CustomerValidationService;
+use App\Models\Village;
+use Carbon\Carbon;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,9 +18,13 @@ class CustomerValidationTest extends TestCase
     use RefreshDatabase;
 
     private Pop $defaultPop;
+
     private City $city;
+
     private District $district;
+
     private Village $village;
+
     private InternetPackage $package;
 
     protected function setUp(): void
@@ -124,7 +128,7 @@ class CustomerValidationTest extends TestCase
             'ppn' => 11,
             'total_monthly_bill' => $this->package->monthly_price * 1.11,
             'activation_date' => $customer->registration_date,
-            'due_date' => \Carbon\Carbon::parse($customer->registration_date)->addMonth(),
+            'due_date' => Carbon::parse($customer->registration_date)->addMonth(),
             'service_status' => 'calon_pelanggan',
             'billing_status' => 'pending',
         ]);
@@ -194,7 +198,7 @@ class CustomerValidationTest extends TestCase
             'ppn' => 11,
             'total_monthly_bill' => $this->package->monthly_price * 1.11,
             'activation_date' => $customer->registration_date,
-            'due_date' => \Carbon\Carbon::parse($customer->registration_date)->addMonth(),
+            'due_date' => Carbon::parse($customer->registration_date)->addMonth(),
             'service_status' => 'calon_pelanggan',
             'billing_status' => 'pending',
         ]);

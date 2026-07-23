@@ -3,15 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
-use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\District;
 use App\Models\FopTask;
+use App\Models\FopTaskTeam;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,21 +24,27 @@ class FopTaskSwitchTechnicianTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private Village $village;
+
     private Pop $pop;
+
     private User $abdul;
+
     private User $karim;
+
     private User $yanto;
+
     private User $wito;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $fopRole = Role::where('code', 'fop')->first();
         $teknisiRole = Role::where('code', 'teknisi')->first();
@@ -55,7 +65,7 @@ class FopTaskSwitchTechnicianTest extends TestCase
     {
         $response = $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => $taskDate ?? now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => $taskDate ?? now()->format('Y-m-d').' 08:00:00',
             'tugas' => $tugas,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -167,8 +177,8 @@ class FopTaskSwitchTechnicianTest extends TestCase
 
     public function test_switch_rejects_across_different_days(): void
     {
-        $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id], now()->format('Y-m-d') . ' 08:00:00');
-        $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id], now()->addDay()->format('Y-m-d') . ' 08:00:00');
+        $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id], now()->format('Y-m-d').' 08:00:00');
+        $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id], now()->addDay()->format('Y-m-d').' 08:00:00');
 
         $response = $this->actingAs($this->fopUser)->postJson('/fop-tasks/switch-technician', [
             'technician_id' => $this->abdul->id,
@@ -207,8 +217,8 @@ class FopTaskSwitchTechnicianTest extends TestCase
         $this->assertNotNull($taskA->team_id);
         $this->assertNotNull($taskE->team_id);
 
-        $team1 = \App\Models\FopTaskTeam::find($taskA->team_id);
-        $team2 = \App\Models\FopTaskTeam::find($taskE->team_id);
+        $team1 = FopTaskTeam::find($taskA->team_id);
+        $team2 = FopTaskTeam::find($taskE->team_id);
 
         $this->assertEqualsCanonicalizing([$this->karim->id], $team1->members->pluck('id')->all());
         $this->assertEqualsCanonicalizing([$this->yanto->id, $this->wito->id, $this->abdul->id], $team2->members->pluck('id')->all());

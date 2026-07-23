@@ -151,7 +151,7 @@
                                 </span>
                                 @endif
                                 @if($invoice->invoice_type)
-                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-indigo-50 text-indigo-700 border-indigo-100">
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-sky-50 text-sky-700 border-sky-100">
                                     {{ $invoice->invoice_type->label() }}
                                 </span>
                                 @endif

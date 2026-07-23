@@ -7,13 +7,18 @@ use App\Enums\TaskType;
 use App\Events\TaskCompleted;
 use App\Events\TaskScheduled;
 use App\Events\TaskStarted;
-use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskEvidence;
 use App\Models\User;
 use App\Services\TaskService;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -23,19 +28,21 @@ class TaskBroadcastingTest extends TestCase
     use RefreshDatabase;
 
     protected User $fopUser;
+
     protected User $technician;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -81,7 +88,7 @@ class TaskBroadcastingTest extends TestCase
 
         Event::assertDispatched(TaskStarted::class, function ($event) use ($task) {
             return $event->task->id === $task->id
-                && $event->broadcastOn()[0]->name === 'private-fop.' . $this->pop->id
+                && $event->broadcastOn()[0]->name === 'private-fop.'.$this->pop->id
                 && $event->broadcastWith()['status'] === TaskStatus::IN_PROGRESS->value;
         });
     }
@@ -115,7 +122,7 @@ class TaskBroadcastingTest extends TestCase
 
         Event::assertDispatched(TaskCompleted::class, function ($event) use ($task) {
             return $event->task->id === $task->id
-                && $event->broadcastOn()[0]->name === 'private-fop.' . $this->pop->id
+                && $event->broadcastOn()[0]->name === 'private-fop.'.$this->pop->id
                 && $event->broadcastWith()['status'] === TaskStatus::SELESAI->value;
         });
     }
@@ -136,9 +143,10 @@ class TaskBroadcastingTest extends TestCase
 
         Event::assertDispatched(TaskScheduled::class, function ($event) use ($task) {
             $channels = $event->broadcastOn();
+
             return $event->task->id === $task->id
                 && count($channels) === 1
-                && $channels[0]->name === 'private-teknisi.' . $this->technician->id;
+                && $channels[0]->name === 'private-teknisi.'.$this->technician->id;
         });
     }
 }

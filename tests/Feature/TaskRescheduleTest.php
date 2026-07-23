@@ -2,15 +2,25 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\FopTask;
 use App\Models\FopTaskStatusHistory;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
 
 class TaskRescheduleTest extends TestCase
@@ -18,19 +28,20 @@ class TaskRescheduleTest extends TestCase
     use RefreshDatabase;
 
     protected User $techUser;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -49,12 +60,12 @@ class TaskRescheduleTest extends TestCase
 
         $this->techUser->roleScopes()->create([
             'role_id' => $techRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
-        foreach (\App\Models\Permission::all() as $permission) {
+        foreach (Permission::all() as $permission) {
             if ($permission->code) {
-                \Illuminate\Support\Facades\Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
+                Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
             }
         }
     }

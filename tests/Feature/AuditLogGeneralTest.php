@@ -232,7 +232,7 @@ class AuditLogGeneralTest extends TestCase
     private function createCustomer(Pop $pop): Customer
     {
         $customer = Customer::create([
-            'customer_code' => 'C-AUDIT-' . $pop->pop_code,
+            'customer_code' => 'C-AUDIT-'.$pop->pop_code,
             'full_name' => 'Customer Audit',
             'phone' => '081234567890',
             'primary_phone' => '081234567890',

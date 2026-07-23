@@ -6,10 +6,13 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\Pop;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,17 +25,17 @@ class CustomerSurveyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
     }
 
     public function test_technician_can_fill_survey()
     {
         Storage::fake('public');
 
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $pop = Pop::create([
             'code' => 'SMN',
@@ -86,7 +89,7 @@ class CustomerSurveyTest extends TestCase
 
         $customer->refresh();
         $this->assertEquals('waiting_acc', $customer->status);
-        
+
         $survey = $customer->surveys()->first();
         $this->assertNotNull($survey->survey_photo);
         Storage::disk('public')->assertExists($survey->survey_photo);
@@ -103,7 +106,7 @@ class CustomerSurveyTest extends TestCase
     {
         Storage::fake('public');
 
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $pop = Pop::create([
             'code' => 'SMN3',
@@ -188,7 +191,7 @@ class CustomerSurveyTest extends TestCase
 
     public function test_unauthorized_user_cannot_fill_survey()
     {
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
 
         $pop = Pop::create([
             'code' => 'SMN2',

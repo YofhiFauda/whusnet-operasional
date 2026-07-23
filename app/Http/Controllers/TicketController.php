@@ -6,6 +6,7 @@ use App\Enums\FopTaskPriority;
 use App\Enums\TaskType;
 use App\Enums\TicketBucket;
 use App\Models\Customer;
+use App\Models\CustomerDevice;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Services\TicketService;
@@ -23,9 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class TicketController extends Controller
 {
-    public function __construct(private readonly TicketService $ticketService)
-    {
-    }
+    public function __construct(private readonly TicketService $ticketService) {}
 
     /**
      * Daftar tiket ala Gmail, per bucket submenu (Masuk / Diproses / Selesai /
@@ -172,7 +171,7 @@ class TicketController extends Controller
         // request yang di-craft manual — dua field ini DIABAIKAN diam-diam,
         // bukan ditolak 422/403, biar submit ticket normal tetap jalan.
         $assignment = [];
-        if (!empty($validated['technicians']) && auth()->user()->hasPermission('fop_tasks.create')) {
+        if (! empty($validated['technicians']) && auth()->user()->hasPermission('fop_tasks.create')) {
             $assignment = [
                 'technicians' => $validated['technicians'],
                 'task_date' => $validated['task_date'] ?? null,
@@ -205,7 +204,7 @@ class TicketController extends Controller
 
             $redirect = redirect()->route('fop-tasks.index')->with('success', $message);
 
-            if (!empty($result['conflicts'])) {
+            if (! empty($result['conflicts'])) {
                 $redirect = $redirect->with('fop_team_conflicts', $result['conflicts']);
             }
 
@@ -285,9 +284,9 @@ class TicketController extends Controller
         ];
     }
 
-    private function deviceSummary(?\App\Models\CustomerDevice $device): ?string
+    private function deviceSummary(?CustomerDevice $device): ?string
     {
-        if (!$device) {
+        if (! $device) {
             return null;
         }
 

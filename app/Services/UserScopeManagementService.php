@@ -11,11 +11,6 @@ class UserScopeManagementService
 {
     /**
      * Sync user role scope and pop targets, and record audit log if changed.
-     *
-     * @param User $user
-     * @param string $scopeType
-     * @param array $popIds
-     * @return void
      */
     public function syncUserRoleScope(User $user, string $scopeType, array $popIds): void
     {
@@ -28,23 +23,23 @@ class UserScopeManagementService
                 ['user_id' => $user->id, 'role_id' => $user->role_id],
                 ['scope_type' => $scopeType]
             );
-            
+
             UserRoleScope::where('user_id', $user->id)
                 ->where('role_id', '!=', $user->role_id)
                 ->delete();
 
             $roleScope->targets()->delete();
             if ($scopeType === 'selected_pop') {
-                $targets = collect($popIds)->map(fn($id) => ['pop_id' => $id]);
+                $targets = collect($popIds)->map(fn ($id) => ['pop_id' => $id]);
                 $roleScope->targets()->createMany($targets->all());
             }
-            
+
             // Update backward compatibility table user_pops
             $syncPops = $scopeType === 'selected_pop' ? $popIds : [];
             $user->pops()->sync($syncPops);
 
             // Clear access cache
-            app(\App\Services\EffectiveAccessService::class)->clearCache($user);
+            app(EffectiveAccessService::class)->clearCache($user);
 
             // Normalisasi array untuk komparasi (sorting string/int)
             sort($oldPopIds);
@@ -61,11 +56,11 @@ class UserScopeManagementService
                     'auditable_id' => $user->id,
                     'old_values' => [
                         'scope_type' => $oldScopeType,
-                        'pop_ids' => $oldPopIds
+                        'pop_ids' => $oldPopIds,
                     ],
                     'new_values' => [
                         'scope_type' => $scopeType,
-                        'pop_ids' => $popIds
+                        'pop_ids' => $popIds,
                     ],
                     'ip_address' => request()?->ip(),
                     'user_agent' => request()?->userAgent(),

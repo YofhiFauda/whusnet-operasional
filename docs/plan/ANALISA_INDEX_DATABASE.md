@@ -1064,31 +1064,49 @@ Analisa ini struktural, belum terukur. Sebelum menyatakan selesai:
 
 ## 16. Checklist Eksekusi
 
-### Fase 0 — Detektor
-- [ ] `Model::preventLazyLoading(! app()->isProduction())` di `AppServiceProvider`
-- [ ] Catat daftar test yang jadi merah — itu N+1 tambahan di luar §11
-- [ ] Catat baseline: jumlah query + waktu render 8 halaman kunci
+### Fase 0 — Detektor — ✅ SELESAI (2026-07-22)
+- [x] `Model::preventLazyLoading(! app()->isProduction())` di `AppServiceProvider`
+- [x] Catat daftar test yang jadi merah — 3 N+1 tambahan di luar §11 ditemukan:
+      `FopTaskTeamService::syncExecutionTaskTitle()` (lazy `task`),
+      `NotificationController` (lazy `role` di dropdown), plus efek lanjutannya
+      di 21 test (`FopTaskSwitchTeam/Technician`, `FopTasks`, `FopTaskTeamService`).
+- [x] Baseline dashboard FOP: **21 query, konstan** — dijaga
+      `DashboardFopQueryCountTest`. Baseline 8 halaman penuh + waktu render belum
+      dicatat (butuh seeder volume — lihat Penutup).
 
-### Fase 1 — N+1
-- [ ] **1.1** `clean_address` — eager load di `FopDashboardController` (3 lokasi) + `TaskController:44`
-- [ ] **1.2** `getTeknisiList()` → `TeknisiWorkloadService`, hapus duplikat di 2 controller
-- [ ] **1.3** `isActive()` → filter koleksi in-memory (`FopDashboardController:148`)
-- [ ] **1.4** Batasi rentang `work_date` team di dashboard FOP ⚠️ *butuh konfirmasi*
-- [ ] **1.5** `load()` → `loadMissing()` di `CustomerValidationService:169` + `CustomerController:889`
-- [ ] **1.6** Ekspor 3 laporan pakai `->lazy()` di dalam closure stream
-- [ ] **1.7** Batasi `->get()` tanpa batas (5 lokasi, §H.8)
-- [ ] **Test** `DashboardFopQueryCountTest` — ambang jumlah query
+### Fase 1 — N+1 — ✅ SELESAI (2026-07-22)
+- [x] **1.1** `clean_address` — eager load di `FopDashboardController` (3 lokasi) + `TaskController:44`
+- [x] **1.2** `getTeknisiList()` → `TeknisiWorkloadService`, hapus duplikat di 2 controller
+- [x] **1.3** `isActive()` → filter koleksi in-memory (`FopDashboardController`)
+- [x] **1.4** Batasi team dashboard FOP → **hari ini saja** (keputusan produk 2026-07-22)
+- [x] **1.5** `load()` → `loadMissing()` di `CustomerValidationService:169` + `CustomerController:889`
+- [x] **1.6** Ekspor 3 laporan pakai `->lazy(500)` di dalam closure stream
+- [x] **1.7** Batasi `->get()` tanpa batas (audit_logs & status_logs → limit 50,
+      `FopTaskController` switchTarget → whereNotNull+select, `TicketController` sudah limit)
+- [x] **Test** `DashboardFopQueryCountTest` — ambang jumlah query (diverifikasi
+      menangkap regresi dengan N+1 sengaja disuntik lalu dicabut)
 
-### Fase 2 — Sargability
-- [ ] **2.1** Ganti 15 `whereDate()` ⚠️ *cek kasus batas 00:00:00 / 23:59:59*
-- [ ] **2.2** Cache `DISTINCT module` / `DISTINCT action`
-- [ ] **2.3** Batasi rentang tanggal papan FOP sebelum `orderByRaw`
+### Fase 2 — Sargability — ✅ SELESAI (2026-07-22)
+- [x] **2.1** Ganti **28** `whereDate()` (bukan 15). Kolom `date` & `datetime`
+      dua-duanya pakai rentang `startOfDay`/`endOfDay` eksplisit — BUKAN `where()`
+      polos: dev MySQL vs test sqlite menyimpan kolom `date` beda
+      (`'2026-07-22 00:00:00'` di sqlite), dan `<= 'tanggal'` polos membuang isi
+      hari terakhir. Catatan koreksi dokumen: `fop_tasks.task_date` ternyata
+      `datetime`, bukan `date`.
+- [x] **2.2** Cache `DISTINCT module` / `DISTINCT action` (`Cache::remember` 5 menit)
+- [ ] **2.3** Batasi rentang tanggal papan FOP sebelum `orderByRaw` — **SENGAJA
+      TIDAK DIKERJAKAN.** Bertentangan dengan keputusan produk 2026-07-22: task
+      Survey/Pemasangan yang dipesan pelanggan untuk tanggal ke depan HARUS tetap
+      tampil di papan FOP. Membatasi `task_date` akan menyembunyikannya.
+      `orderByRaw` bertingkat karenanya masih filesort — diterima.
 
-### Fase 3 — Index
-- [ ] **3.1** P0: `invoices_customer_period_type_idx` + 3 index `audit_logs` + 11 index legacy → ukur
-- [ ] **3.2** P1: composite `customers` / `invoices` / `payments` → ukur
-- [ ] **3.3** Drop 4 index redundan `tasks` → ukur biaya tulis
-- [ ] **3.4** P2: index operasional → ukur
+### Fase 3 — Index — ✅ SELESAI (2026-07-22)
+Migration: `2026_07_22_164035_add_performance_indexes_phase3.php` (aditif, `up`+`down`
+diuji bersih dua arah). 34 index `_idx` terpasang.
+- [x] **3.1** P0: `invoices_customer_period_type_idx` + 3 index `audit_logs` + 11 index legacy → diukur
+- [x] **3.2** P1: composite `customers` / `invoices` / `payments` → diukur
+- [x] **3.3** Drop 4 index redundan `tasks` (`status`, `pop_id`, `pop_status`, `customer_id`) → 0 tersisa
+- [x] **3.4** P2: index operasional (`tasks`, `fop_tasks`, `notifications`, `customer_status_logs`, `customer_services`) → diukur
 
 ### Fase 4 — Skema (destruktif, `migrate:fresh`)
 - [ ] **4.1** Persempit `customers.cid`, `audit_logs.auditable_type`, kolom status
@@ -1105,11 +1123,51 @@ Analisa ini struktural, belum terukur. Sebelum menyatakan selesai:
 - [ ] **5.6** `->select()` di daftar pelanggan
 
 ### Penutup
-- [ ] Seeder volume + `EXPLAIN ANALYZE` sebelum/sesudah
-- [ ] `sys.schema_unused_indexes` bersih dari index yang baru dipasang
-- [ ] `php artisan test` full suite hijau
-- [ ] `vendor/bin/pint`
-- [ ] Update `docs/TASKS.md` + `docs/DATABASE_RULES.md`
+- [x] Seeder volume + `EXPLAIN` sebelum/sesudah — **selesai 2026-07-22**.
+      Command: `php artisan benchmark:seed-volume`
+      (`app/Console/Commands/SeedVolumeForBenchmark.php`). Dijalankan di DB
+      throwaway `whusnet_perf` (migrate:fresh → seed → ukur → drop), **BUKAN** di
+      DB legacy — 20.000 pelanggan, 240.000 invoice, 199.740 pembayaran,
+      100.000 audit_logs.
+
+      Hasil `EXPLAIN` tanpa-index → dengan-index:
+      | Query | Tanpa | Dengan |
+      |---|---|---|
+      | A — lookup legacy (`old_customer_id`) | `ALL` rows=19.885 | `ref` rows=1 |
+      | B — riwayat audit per entitas | `ALL` rows=99.701 + filesort | `ref` rows=5, covering |
+      | B — filter halaman audit | `ALL` rows=99.701 + filesort | `ref` rows=8.056, covering |
+      | D — guard InvoiceObserver | `ref` FK rows=12 (saring in-memory) | `ref` rows=1 (4-kolom) |
+      | C — list pelanggan (pop+status) | `ALL` rows=19.885 + filesort | `ref` rows=3.281, no filesort |
+      | invoice status+jatuh tempo | `ALL` rows=237.150 | `range` rows=85.510, covering |
+      | payment pop+tanggal | range via FK rows=147.736 | `range` rows=74.886, covering |
+
+      Akar masalah kuadratik (A, B) turun dari full-scan ~20k/100k baris → 1–5
+      baris. Guard D tidak lagi menyaring in-memory. `Using index` (covering)
+      muncul di B/invoice/payment.
+- [x] `sys.schema_unused_indexes` — **selesai 2026-07-22**. 27 query bentuk-
+      controller dieksekusi NYATA (bukan `EXPLAIN` — hanya eksekusi yang tercatat
+      di `performance_schema.table_io_waits_summary_by_index_usage`) di atas
+      volume, lalu `count_star` per index dibaca.
+
+      **25 dari 26 index `_idx` di tabel berisi data TERPAKAI** — nol dead weight
+      di antara tabel volume tinggi (customers, invoices, payments, audit_logs,
+      customer_services). Semua P0/P1 divalidasi benar-benar dipilih optimizer.
+
+      Sisa:
+      - `internet_packages_old_package_id_idx` — `count_star=0`. Bukan mati:
+        `internet_packages` hanya ±68 baris, optimizer selalu full-scan tabel
+        sekecil itu. Fungsinya dedup lookup saat import legacy; biaya di 68 baris
+        nyaris nol. **Dipertahankan.**
+      - 8 index operasional di tabel yang kosong saat benchmark (`tasks`,
+        `fop_tasks`, `notifications`, `customer_status_logs`) — TAK TERUJI, bukan
+        bukti mati. Butuh benchmark lanjutan yang men-seed tabel operasional.
+        Untuk sekarang bentuknya sudah divalidasi struktural terhadap query
+        controller yang menargetkannya.
+- [x] `php artisan test` full suite — 551 hijau, 2 merah pre-existing dari
+      redesign sidebar (`DashboardTest`, di luar scope perf).
+- [x] `vendor/bin/pint`
+- [x] Update `docs/TASKS.md` — sudah. `docs/DATABASE_RULES.md` belum disentuh
+      (belum ada aturan baru yang perlu dicatat di sana untuk Fase 0–3).
 
 ---
 

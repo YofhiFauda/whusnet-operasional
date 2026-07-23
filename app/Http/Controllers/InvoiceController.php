@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -97,19 +98,21 @@ class InvoiceController extends Controller
     public function lunas(Request $request): View
     {
         $request->merge(['status_group' => 'lunas']);
+
         return $this->index($request);
     }
 
     public function belumLunas(Request $request): View
     {
         $request->merge(['status_group' => 'belum_lunas']);
+
         return $this->index($request);
     }
 
     /**
      * Display a single invoice detail.
      */
-    public function show(Invoice $invoice): View|\Illuminate\Http\JsonResponse
+    public function show(Invoice $invoice): View|JsonResponse
     {
         abort_unless(
             Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
@@ -136,6 +139,7 @@ class InvoiceController extends Controller
             if ($invoice->customer) {
                 $invoice->customer->append('clean_address');
             }
+
             return response()->json($invoice);
         }
 

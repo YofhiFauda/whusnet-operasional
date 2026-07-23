@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\PermissionGeneratorService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RolePermissionSeeder extends Seeder
@@ -12,7 +14,7 @@ class RolePermissionSeeder extends Seeder
     public function run(): void
     {
         // Dynamically generate permissions first from config/rbac.php
-        app(\App\Services\PermissionGeneratorService::class)->generate();
+        app(PermissionGeneratorService::class)->generate();
 
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
@@ -42,7 +44,7 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
             ],
- 
+
             'admin' => [
                 'dashboard.view',
                 'pops.*',
@@ -69,7 +71,7 @@ class RolePermissionSeeder extends Seeder
                 'master_status_pelanggan.*',
                 'task.manage',
             ],
- 
+
             'noc' => [
                 'dashboard.view',
                 'pops.view',
@@ -103,7 +105,7 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
             ],
- 
+
             'helpdesk' => [
                 'dashboard.view',
                 'pops.view',
@@ -235,7 +237,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissionsByRole as $roleCode => $wantedPermissions) {
             $role = Role::where('code', $roleCode)->first();
-            if (!$role) {
+            if (! $role) {
                 continue;
             }
 
@@ -265,27 +267,27 @@ class RolePermissionSeeder extends Seeder
 
             // Remove sensitive permissions for pop_admin based on matrix
             if ($roleCode === 'pop_admin') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
-                    return !in_array($code, [
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
+                    return ! in_array($code, [
                         'customers.detail.devices.view_sensitive',
-                        'customers.detail.devices.update_sensitive'
+                        'customers.detail.devices.update_sensitive',
                     ]);
                 });
             }
 
             // Also for admin, matrix says no sensitive access, except if specified.
             if ($roleCode === 'admin') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
-                    return !in_array($code, [
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
+                    return ! in_array($code, [
                         'customers.detail.devices.view_sensitive',
-                        'customers.detail.devices.update_sensitive'
+                        'customers.detail.devices.update_sensitive',
                     ]);
                 });
             }
 
             // FOP tidak boleh ubah Tipe Task lewat wildcard fop_tasks.* — harus di-grant eksplisit.
             if ($roleCode === 'fop') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
                     return $code !== 'fop_tasks.update_sensitive';
                 });
             }
@@ -302,6 +304,6 @@ class RolePermissionSeeder extends Seeder
         // gak kepakai sampai cache lama expire sendiri (bisa nunggu 1 jam), bikin
         // developer bingung tiap abis reset/reseed DB (permission "keliatan" gak
         // berubah padahal DB udah bener).
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
     }
 }

@@ -10,7 +10,15 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Tests\TestCase;
 
 class TaskOwnCardPartialTest extends TestCase
@@ -29,17 +37,17 @@ class TaskOwnCardPartialTest extends TestCase
      */
     public function test_own_card_partial_shows_mulai_survey_button_for_scheduled_survey_task(): void
     {
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         foreach (Permission::all() as $permission) {
             if ($permission->code) {
-                \Illuminate\Support\Facades\Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
+                Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
             }
         }
 
@@ -63,7 +71,7 @@ class TaskOwnCardPartialTest extends TestCase
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'task_type' => TaskType::SURVEY->value,
-            'title' => 'Survey: ' . $customer->full_name,
+            'title' => 'Survey: '.$customer->full_name,
             'status' => TaskStatus::TERJADWAL->value,
             'scheduled_at' => now(),
             'sla_minutes' => 120,
@@ -80,17 +88,17 @@ class TaskOwnCardPartialTest extends TestCase
 
     public function test_own_card_partial_shows_mulai_pemasangan_button_for_scheduled_installation_task(): void
     {
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         foreach (Permission::all() as $permission) {
             if ($permission->code) {
-                \Illuminate\Support\Facades\Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
+                Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
             }
         }
 
@@ -114,7 +122,7 @@ class TaskOwnCardPartialTest extends TestCase
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'task_type' => TaskType::PEMASANGAN->value,
-            'title' => 'Pemasangan: ' . $customer->full_name,
+            'title' => 'Pemasangan: '.$customer->full_name,
             'status' => TaskStatus::TERJADWAL->value,
             'scheduled_at' => now(),
             'sla_minutes' => 240,

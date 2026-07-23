@@ -4,16 +4,20 @@ namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
+use App\Models\District;
 use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
-use App\Models\District;
-use App\Models\City;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,17 +26,19 @@ class FopTaskHistoryDetailPageTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $unauthorizedUser;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $fopRole = Role::where('code', 'fop')->first();
         $salesRole = Role::where('code', 'sales')->first();
@@ -67,7 +73,7 @@ class FopTaskHistoryDetailPageTest extends TestCase
             'customer_id' => $customer->id,
             'pop_id' => $this->pop->id,
             'task_type' => TaskType::SURVEY->value,
-            'title' => 'Survey: ' . $customer->full_name,
+            'title' => 'Survey: '.$customer->full_name,
             'status' => TaskStatus::TERJADWAL->value,
             'scheduled_at' => now(),
             'sla_minutes' => 120,
@@ -79,7 +85,7 @@ class FopTaskHistoryDetailPageTest extends TestCase
             'task_number' => 'TFOP-HIST-0001',
             'task_date' => now(),
             'category' => 'SURVEY',
-            'tugas' => 'Survey Pelanggan: ' . $customer->full_name,
+            'tugas' => 'Survey Pelanggan: '.$customer->full_name,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'customer_id' => $customer->id,

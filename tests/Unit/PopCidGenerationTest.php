@@ -2,15 +2,15 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
-use App\Models\Pop;
-use App\Models\Customer;
-use App\Models\Village;
 use App\Models\City;
-use App\Models\District;
-use App\Models\Distribution;
+use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\Distribution;
+use App\Models\District;
+use App\Models\Pop;
+use App\Models\Village;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class PopCidGenerationTest extends TestCase
 {
@@ -28,7 +28,7 @@ class PopCidGenerationTest extends TestCase
         $dist = Distribution::create([
             'pop_id' => $pop->id,
             'code' => 'X1A',
-            'name' => 'Dist Jetis 1'
+            'name' => 'Dist Jetis 1',
         ]);
 
         // customer_code menggunakan format baru: {cid_prefix}00{registration_prefix}{######}
@@ -39,7 +39,7 @@ class PopCidGenerationTest extends TestCase
             'phone' => '08123456789',
             'registration_date' => now(),
             'village_id' => $village->id,
-            'status' => 'registered'
+            'status' => 'registered',
         ]);
 
         CustomerTechnicalDetail::create([

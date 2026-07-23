@@ -1,7 +1,71 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
 Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1, BATCH 2 & BATCH 3)
-Current Task: MIGRASI-T003 — Duplikasi Tagihan & Pembayaran Hasil Migrasi (Done, DB sudah di-import ulang)
+Current Task: PERF-T001..T004 — Index, N+1 & Beban Database Fase 0–3 (Done), ADHOC-01 — Customer List Redesign & Theme (Done)
+
+### Ad-Hoc Improvements
+
+| Task | Deskripsi | Status |
+|---|---|---|
+| ADHOC-01 | Sesuaikan Kolom List Pelanggan & Dark Theme Toggle | Done |
+
+### PERF — Index, N+1 & Beban Database (`docs/plan/ANALISA_INDEX_DATABASE.md`)
+
+| Task | Fase | Status |
+|---|---|---|
+| PERF-T001 | Fase 0 — Detektor `preventLazyLoading` + baseline | Done |
+| PERF-T002 | Fase 1 — N+1 (1.1–1.7) + `DashboardFopQueryCountTest` | Done |
+| PERF-T003 | Fase 2 — Sargability (28 `whereDate()` + cache DISTINCT) | Done |
+| PERF-T004 | Fase 3 — 34 index P0/P1/P2 + hapus 4 index redundan `tasks` | Done |
+| PERF-T005 | Fase 4 — Bersihkan skema (destruktif, `migrate:fresh`) | **Belum** — di luar scope yang disetujui |
+| PERF-T006 | Fase 5 — Perbaikan struktural | **Belum** — di luar scope yang disetujui |
+
+**Baseline terukur (2026-07-22):**
+- Dashboard FOP: **21 query, konstan** — tidak lagi tumbuh mengikuti jumlah teknisi/task.
+  Dijaga `tests/Feature/DashboardFopQueryCountTest.php`.
+- Guard `InvoiceObserver::creating()`: full scan → `type=ref`, `rows=1`
+  (`invoices_customer_period_type_idx`). Ini akar masalah D, yang kuadratik.
+- Riwayat audit per entitas: full scan 9.701 baris → `rows=1`, covering index.
+- Lookup legacy saat import (`old_customer_id`): full scan → `rows=1`.
+
+**Verifikasi volume (§15) — SELESAI 2026-07-22:**
+Command `php artisan benchmark:seed-volume` dibuat
+(`app/Console/Commands/SeedVolumeForBenchmark.php`). Dijalankan di DB throwaway
+`whusnet_perf` (bukan DB legacy) dengan 20.000 pelanggan / 240.000 invoice /
+199.740 pembayaran / 100.000 audit_logs. Hasil `EXPLAIN` membuktikan akar
+masalah kuadratik pada skala nyata:
+- A (lookup legacy): full scan 19.885 baris → `rows=1`
+- B (riwayat audit): full scan 99.701 + filesort → `rows=5` covering
+- D (guard InvoiceObserver): saring 12 baris in-memory → `rows=1`
+- invoice status+due: full scan 237.150 → `range` covering
+Tabel lengkap di §16 Penutup `docs/plan/ANALISA_INDEX_DATABASE.md`. Perf DB
+sudah di-drop; DB legacy tetap utuh (1.957 pelanggan).
+
+**Verifikasi index terpakai (§15 poin 5) — SELESAI 2026-07-22:**
+27 query bentuk-controller dieksekusi nyata di atas volume, `count_star` per
+index dibaca dari `performance_schema`. **25/26 index `_idx` di tabel berisi
+data terpakai** — nol dead weight. `internet_packages_old_package_id_idx`
+tak terpilih (tabel ±68 baris, full-scan lebih murah — dipertahankan untuk dedup
+import). 8 index operasional (`tasks`/`fop_tasks`/`notifications`/
+`customer_status_logs`) belum teruji karena tabel kosong saat benchmark.
+
+**Catatan / Blocked:**
+- **Benchmark belum men-seed tabel operasional** (`tasks`, `fop_tasks`, dll),
+  jadi 8 index P2 di situ belum divalidasi lewat `performance_schema` — baru
+  divalidasi struktural. Perlu perpanjang `SeedVolumeForBenchmark` kalau mau
+  bukti runtime.
+- **Fase 2.3 (batasi rentang tanggal papan FOP) sengaja TIDAK dikerjakan.**
+  Bertentangan dengan keputusan produk 2026-07-22: task Survey/Pemasangan yang
+  dipesan pelanggan untuk tanggal ke depan HARUS tetap tampil di papan FOP.
+  Membatasi `task_date` akan menyembunyikannya. `orderByRaw` bertingkat di
+  `FopTaskController::index()` karenanya masih memaksa filesort.
+- **Aturan bisnis baru yang belum dikodekan** (muncul dari keputusan 1.4):
+  task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP
+  besok, dan SLA tidak berjalan untuk task terjadwal ke depan. Butuh task sendiri.
+- Migration index ditulis sebagai file tambahan
+  (`2026_07_22_164035_add_performance_indexes_phase3.php`), bukan diedit ke
+  migration `create_*` asalnya seperti saran §14 — supaya tidak mewajibkan
+  `migrate:fresh` atas data legacy hasil import.
 
 > **S8.10-T003 (FOP Notification Dashboard):** ⏸️ PAUSED — Siap dilanjutkan setelah BATCH 1 & BATCH 2 selesai
 > **Sprint 8.9 Tasks:** T001–T006 (Done)

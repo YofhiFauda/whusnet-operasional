@@ -14,17 +14,17 @@ class TaskTeamController extends Controller
     public function update(Request $request, Task $task)
     {
         $validated = $request->validate([
-            'old_user_id'  => 'required|exists:users,id',
-            'new_user_id'  => 'required|exists:users,id|different:old_user_id',
+            'old_user_id' => 'required|exists:users,id',
+            'new_user_id' => 'required|exists:users,id|different:old_user_id',
             'scheduled_at' => 'nullable|date|after:now',
         ]);
 
         try {
             DB::beginTransaction();
             $this->taskService->reassignTeam(
-                $task, 
-                $validated['old_user_id'], 
-                $validated['new_user_id'], 
+                $task,
+                $validated['old_user_id'],
+                $validated['new_user_id'],
                 auth()->id(),
                 $validated['scheduled_at'] ?? null
             );
@@ -33,7 +33,8 @@ class TaskTeamController extends Controller
             return back()->with('success', 'Teknisi berhasil diganti.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal mengganti teknisi: ' . $e->getMessage());
+
+            return back()->with('error', 'Gagal mengganti teknisi: '.$e->getMessage());
         }
     }
 }

@@ -17,7 +17,7 @@ class UserManagementTest extends TestCase
     {
         parent::setUp();
 
-        $compiledPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whusnet-test-views';
+        $compiledPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'whusnet-test-views';
         if (! is_dir($compiledPath)) {
             @mkdir($compiledPath, 0777, true);
         }

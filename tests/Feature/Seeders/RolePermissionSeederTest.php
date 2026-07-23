@@ -4,13 +4,12 @@ namespace Tests\Feature\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
-use Database\Seeders\FeatureSeeder;
 use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class RolePermissionSeederTest extends TestCase
@@ -20,7 +19,7 @@ class RolePermissionSeederTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Seed required prerequisites
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);
@@ -44,7 +43,7 @@ class RolePermissionSeederTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
 
         $teknisi = Role::where('code', 'teknisi')->firstOrFail();
-        
+
         $hasPaymentPermission = $teknisi->permissions()
             ->where('code', 'like', 'payments.%')
             ->exists();

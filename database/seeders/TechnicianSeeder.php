@@ -2,14 +2,14 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
-use App\Models\Role;
 use App\Models\Pop;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
-use Illuminate\Support\Facades\Hash;
 use Faker\Factory as Faker;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class TechnicianSeeder extends Seeder
 {
@@ -20,8 +20,9 @@ class TechnicianSeeder extends Seeder
     {
         $role = Role::where('code', 'teknisi')->first();
 
-        if (!$role) {
+        if (! $role) {
             $this->command->error('Role teknisi tidak ditemukan. Pastikan RoleSeeder sudah dijalankan.');
+
             return;
         }
 
@@ -33,7 +34,7 @@ class TechnicianSeeder extends Seeder
                 ['email' => "teknisi{$i}@whusnet.com"],
                 [
                     'name' => $faker->firstName,
-                    'phone' => '08' . $faker->randomNumber(8, true),
+                    'phone' => '08'.$faker->randomNumber(8, true),
                     'password' => Hash::make('password'),
                     'status' => 'active',
                     'role_id' => $role->id,
@@ -52,12 +53,12 @@ class TechnicianSeeder extends Seeder
                     'scope_type' => $scopeType,
                 ]
             );
-            
+
             if ($scopeType === 'selected_pop') {
-                 UserRoleScopeTarget::firstOrCreate([
-                     'user_role_scope_id' => $scope->id,
-                     'pop_id' => $pops->random()->id,
-                 ]);
+                UserRoleScopeTarget::firstOrCreate([
+                    'user_role_scope_id' => $scope->id,
+                    'pop_id' => $pops->random()->id,
+                ]);
             }
         }
 

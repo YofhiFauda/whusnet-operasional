@@ -3,6 +3,7 @@
 namespace Tests\Feature\Services;
 
 use App\Enums\ActionCode;
+use App\Enums\FeatureType;
 use App\Models\Action;
 use App\Models\Feature;
 use App\Models\Permission;
@@ -18,33 +19,33 @@ class PermissionGeneratorServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Clear tables to isolate the test from migrations seeding
         Permission::query()->delete();
         Feature::query()->delete();
         Action::query()->delete();
-        
+
         // Seed features and actions manually for test
         $feature = Feature::create([
             'code' => 'test_feature',
             'name' => 'Test Feature',
             'is_active' => true,
-            'type' => \App\Enums\FeatureType::ROOT,
-            'sort_order' => 1
+            'type' => FeatureType::ROOT,
+            'sort_order' => 1,
         ]);
 
         Action::create([
             'code' => ActionCode::VIEW->value,
             'name' => 'View',
-            'description' => 'View Data'
+            'description' => 'View Data',
         ]);
 
         Action::create([
             'code' => ActionCode::CREATE->value,
             'name' => 'Create',
-            'description' => 'Create Data'
+            'description' => 'Create Data',
         ]);
-        
+
         // Override config
         Config::set('rbac.allowed_actions', [
             'test_feature' => [
@@ -52,14 +53,14 @@ class PermissionGeneratorServiceTest extends TestCase
                 ActionCode::CREATE->value,
             ],
             'invalid_feature' => [
-                ActionCode::VIEW->value
-            ]
+                ActionCode::VIEW->value,
+            ],
         ]);
     }
 
     public function test_generate_permissions_successfully()
     {
-        $service = new PermissionGeneratorService();
+        $service = new PermissionGeneratorService;
         $summary = $service->generate();
 
         $this->assertEquals(1, $summary['total_features_processed']);
@@ -68,18 +69,18 @@ class PermissionGeneratorServiceTest extends TestCase
         $this->assertCount(1, $summary['errors']); // invalid_feature not found
 
         $this->assertDatabaseHas('permissions', [
-            'code' => 'test_feature.view'
+            'code' => 'test_feature.view',
         ]);
-        
+
         $this->assertDatabaseHas('permissions', [
-            'code' => 'test_feature.create'
+            'code' => 'test_feature.create',
         ]);
     }
 
     public function test_generator_is_idempotent()
     {
-        $service = new PermissionGeneratorService();
-        
+        $service = new PermissionGeneratorService;
+
         // First run
         $service->generate();
         $this->assertEquals(2, Permission::count());

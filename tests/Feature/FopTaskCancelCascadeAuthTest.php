@@ -12,6 +12,10 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,19 +28,23 @@ class FopTaskCancelCascadeAuthTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $adminUser;
+
     private User $tech;
+
     private Village $village;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = User::factory()->create(['role_id' => Role::where('code', 'fop')->first()->id]);
         $this->adminUser = User::factory()->create(['role_id' => Role::where('code', 'admin')->first()->id]);
@@ -58,7 +66,7 @@ class FopTaskCancelCascadeAuthTest extends TestCase
     {
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => $tugas,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,

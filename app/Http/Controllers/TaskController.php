@@ -40,17 +40,24 @@ class TaskController extends Controller
 
         $user = auth()->user();
         $today = Carbon::today();
+        $startOfToday = $today->copy()->startOfDay();
+        $endOfToday = $today->copy()->endOfDay();
 
-        $tasks = Task::with(['customer', 'pop', 'evidences', 'fop', 'teamMembers'])
+        // village/district/city untuk `clean_address` yang dirender per kartu
+        // (tasks/own.blade.php:133 & partials/own-card.blade.php:61).
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'pop', 'evidences', 'fop', 'teamMembers'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('status', '!=', TaskStatus::DIBATALKAN->value)
-            ->where(function ($q) use ($today) {
-                $q->whereDate('scheduled_at', $today)
+            // scheduled_at bertipe timestamp, jadi perbandingan tanggal ditulis
+            // sebagai rentang eksplisit. whereDate() membungkusnya jadi
+            // DATE(scheduled_at) sehingga index tanggal tidak pernah terpakai.
+            ->where(function ($q) use ($startOfToday, $endOfToday) {
+                $q->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
                     ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
                   // Overdue: terjadwal tapi scheduled_at udah lewat hari ini — jangan sampe ilang dari list
-                    ->orWhere(function ($q2) use ($today) {
+                    ->orWhere(function ($q2) use ($startOfToday) {
                         $q2->where('status', TaskStatus::TERJADWAL->value)
-                            ->whereDate('scheduled_at', '<', $today);
+                            ->where('scheduled_at', '<', $startOfToday);
                     });
             })
             ->orderBy('scheduled_at')
@@ -58,7 +65,7 @@ class TaskController extends Controller
 
         $upcomingTasks = Task::with(['customer', 'pop'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
-            ->whereDate('scheduled_at', '>', $today)
+            ->where('scheduled_at', '>', $endOfToday)
             ->whereIn('status', [TaskStatus::TERJADWAL->value])
             ->whereNotIn('id', $tasks->pluck('id'))
             ->orderBy('scheduled_at')

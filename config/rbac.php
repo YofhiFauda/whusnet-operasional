@@ -48,144 +48,144 @@ return [
 
     'allowed_actions' => [
         'dashboard' => [ActionCode::VIEW->value],
-        
+
         'master_wilayah' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
 
         'master_distribusi' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
 
         'master_status_pelanggan' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
 
         'pops' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'users' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'roles' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'packages' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'customers' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'customers.import' => [
-            ActionCode::VIEW->value, 
-            ActionCode::IMPORT->value
+            ActionCode::VIEW->value,
+            ActionCode::IMPORT->value,
         ],
-        
+
         'customers.detail' => [
-            ActionCode::VIEW->value
+            ActionCode::VIEW->value,
         ],
-        
+
         'customers.detail.identity' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
         ],
-        
+
         'customers.detail.address' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
         ],
-        
+
         'customers.detail.packages' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPDATE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPDATE->value,
         ],
-        
+
         'customers.detail.survey' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
             ActionCode::VALIDATE->value,
-            ActionCode::REJECT->value
+            ActionCode::REJECT->value,
         ],
-        
+
         'customers.detail.installation' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
             ActionCode::VALIDATE->value,
             ActionCode::ACTIVATE->value,
-            ActionCode::REJECT->value
+            ActionCode::REJECT->value,
         ],
-        
+
         'customers.detail.devices' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
             ActionCode::VIEW_SENSITIVE->value,
             ActionCode::UPDATE_SENSITIVE->value,
-            ActionCode::RETRIEVE->value
+            ActionCode::RETRIEVE->value,
         ],
-        
+
         'customers.detail.documents' => [
-            ActionCode::VIEW->value, 
-            ActionCode::UPLOAD->value, 
-            ActionCode::DOWNLOAD->value, 
-            ActionCode::DELETE->value
+            ActionCode::VIEW->value,
+            ActionCode::UPLOAD->value,
+            ActionCode::DOWNLOAD->value,
+            ActionCode::DELETE->value,
         ],
-        
+
         'invoices' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value, 
-            ActionCode::PRINT->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+            ActionCode::PRINT->value,
         ],
-        
+
         'payments' => [
-            ActionCode::VIEW->value, 
-            ActionCode::CREATE->value, 
-            ActionCode::UPDATE->value, 
-            ActionCode::DELETE->value, 
-            ActionCode::VALIDATE->value, 
-            ActionCode::APPROVE->value, 
-            ActionCode::REJECT->value
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+            ActionCode::VALIDATE->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
         ],
-        
+
         'reports' => [
-            ActionCode::VIEW->value, 
-            ActionCode::EXPORT->value, 
-            ActionCode::PRINT->value
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
+            ActionCode::PRINT->value,
         ],
-        
+
         'audit_logs' => [
-            ActionCode::VIEW->value, 
-            ActionCode::EXPORT->value
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
         ],
 
         'fop_tasks' => [
@@ -194,7 +194,7 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
             ActionCode::UPDATE_SENSITIVE->value,
-            ActionCode::CANCEL->value
+            ActionCode::CANCEL->value,
         ],
 
         'sla_timeline' => [

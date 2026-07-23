@@ -2,11 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use App\Models\UserRoleScope;
 
 class UserSeeder extends Seeder
 {
@@ -27,7 +29,7 @@ class UserSeeder extends Seeder
         );
 
         // (Opsional) Sinkronisasi permission '*' khusus untuk role Owner jika belum dijalankan oleh RolePermissionSeeder
-        $allPermissions = \App\Models\Permission::pluck('id')->toArray();
+        $allPermissions = Permission::pluck('id')->toArray();
         $roleOwner->permissions()->sync($allPermissions);
 
         // 2. Buat User Super Admin / Owner
@@ -73,12 +75,12 @@ class UserSeeder extends Seeder
         // Kosongkan target scope jika sebelumnya ada, karena all_pop tidak butuh target spesifik
         $userRoleScope = UserRoleScope::where('user_id', $superAdmin->id)->first();
         if ($userRoleScope) {
-            \App\Models\UserRoleScopeTarget::where('user_role_scope_id', $userRoleScope->id)->delete();
+            UserRoleScopeTarget::where('user_role_scope_id', $userRoleScope->id)->delete();
         }
 
         $userRoleScope2 = UserRoleScope::where('user_id', $owner->id)->first();
         if ($userRoleScope2) {
-            \App\Models\UserRoleScopeTarget::where('user_role_scope_id', $userRoleScope2->id)->delete();
+            UserRoleScopeTarget::where('user_role_scope_id', $userRoleScope2->id)->delete();
         }
 
         $this->command->info('✅ Super Admin (Aksesibilitas All) berhasil dibuat!');

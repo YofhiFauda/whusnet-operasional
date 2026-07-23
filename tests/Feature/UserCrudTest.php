@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Role;
 use App\Models\Pop;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +18,7 @@ class UserCrudTest extends TestCase
     {
         parent::setUp();
 
-        $compiledPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whusnet-test-views';
+        $compiledPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'whusnet-test-views';
         if (! is_dir($compiledPath)) {
             @mkdir($compiledPath, 0777, true);
         }

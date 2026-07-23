@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\City;
@@ -14,7 +15,13 @@ use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -29,20 +36,24 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private User $tech;
+
     private Customer $customer;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -70,7 +81,7 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -92,7 +103,7 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
      * Simulasi persis payload yang dikirim modal Edit: 'status' hidden input
      * = nilai lama (edit modal gak punya pilihan ubah status manual).
      */
-    private function assignTechnicianViaEditModal(FopTask $fopTask, array $technicianIds): \Illuminate\Testing\TestResponse
+    private function assignTechnicianViaEditModal(FopTask $fopTask, array $technicianIds): TestResponse
     {
         return $this->actingAs($this->fopUser)->putJson(route('fop-tasks.update', $fopTask), [
             'category' => $fopTask->category->value,
@@ -203,7 +214,7 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
             'task_number' => 'TFOP-TEST-0001',
             'task_date' => now(),
             'category' => 'SURVEY',
-            'tugas' => 'Survey Pelanggan: ' . $this->customer->full_name,
+            'tugas' => 'Survey Pelanggan: '.$this->customer->full_name,
             'village_id' => $village->id,
             'pop_id' => $this->pop->id,
             'customer_id' => $this->customer->id,

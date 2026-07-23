@@ -8,6 +8,12 @@ use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,17 +32,18 @@ class FopTaskVerificationOverlayTest extends TestCase
     use RefreshDatabase;
 
     protected Pop $pop;
-    protected \App\Models\User $adminUser;
+
+    protected User $adminUser;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -64,14 +71,14 @@ class FopTaskVerificationOverlayTest extends TestCase
             'pop_id' => $this->pop->id,
             'customer_id' => $customer?->id,
             'task_type' => $taskType->value,
-            'title' => $taskType->value . ' ' . $taskNumber,
+            'title' => $taskType->value.' '.$taskNumber,
             'status' => 'in_progress',
             'created_by' => $this->adminUser->id,
             'updated_by' => $this->adminUser->id,
         ]);
 
         $fopTask = FopTask::create([
-            'task_number' => 'TFOP-' . $taskNumber,
+            'task_number' => 'TFOP-'.$taskNumber,
             'category' => $taskType->value,
             'task_id' => $task->id,
             'tugas' => $task->title,

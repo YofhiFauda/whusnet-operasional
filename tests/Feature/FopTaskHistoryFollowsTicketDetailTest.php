@@ -2,16 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Enums\TaskType;
 use App\Models\City;
 use App\Models\Customer;
+use App\Models\Distribution;
 use App\Models\District;
 use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -28,19 +36,22 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $helpdeskUser;
+
     private Customer $customer;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\TicketFeatureSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(TicketFeatureSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -76,7 +87,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         return $user;
@@ -173,7 +184,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
     {
         $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => 'Task MTN Manual FOP',
             'village_id' => Village::first()->id,
             'pop_id' => $this->pop->id,
@@ -200,12 +211,12 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
      */
     public function test_non_ticket_category_never_shows_ticketing_section(): void
     {
-        $task = \App\Models\Task::create([
+        $task = Task::create([
             'task_number' => 'TASK-SRV-0001',
             'customer_id' => $this->customer->id,
             'pop_id' => $this->pop->id,
             'task_type' => TaskType::SURVEY->value,
-            'title' => 'Survey: ' . $this->customer->full_name,
+            'title' => 'Survey: '.$this->customer->full_name,
             'status' => 'terjadwal',
             'scheduled_at' => now(),
             'sla_minutes' => 120,
@@ -217,7 +228,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
             'task_number' => 'TFOP-SRV-0001',
             'task_date' => now(),
             'category' => 'SURVEY',
-            'tugas' => 'Survey Pelanggan: ' . $this->customer->full_name,
+            'tugas' => 'Survey Pelanggan: '.$this->customer->full_name,
             'village_id' => $this->customer->village_id,
             'pop_id' => $this->pop->id,
             'customer_id' => $this->customer->id,
@@ -244,7 +255,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
     {
         $this->customer->update([
             'cid' => 'C1X4CRQ000007',
-            'distribution_id' => \App\Models\Distribution::create([
+            'distribution_id' => Distribution::create([
                 'pop_id' => $this->pop->id,
                 'code' => 'C',
                 'description' => 'Distribusi C',
@@ -307,12 +318,12 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
      */
     public function test_non_ticket_task_still_shows_generic_issue_row(): void
     {
-        $task = \App\Models\Task::create([
+        $task = Task::create([
             'task_number' => 'TASK-SRV-ISSUE-0001',
             'customer_id' => $this->customer->id,
             'pop_id' => $this->pop->id,
             'task_type' => TaskType::SURVEY->value,
-            'title' => 'Survey: ' . $this->customer->full_name,
+            'title' => 'Survey: '.$this->customer->full_name,
             'status' => 'terjadwal',
             'scheduled_at' => now(),
             'sla_minutes' => 120,
@@ -324,7 +335,7 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
             'task_number' => 'TFOP-SRV-ISSUE-0001',
             'task_date' => now(),
             'category' => 'SURVEY',
-            'tugas' => 'Survey Pelanggan: ' . $this->customer->full_name,
+            'tugas' => 'Survey Pelanggan: '.$this->customer->full_name,
             'village_id' => $this->customer->village_id,
             'pop_id' => $this->pop->id,
             'customer_id' => $this->customer->id,

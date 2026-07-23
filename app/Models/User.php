@@ -3,14 +3,15 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserStatus;
 use App\Models\Concerns\RecordsAuditLogs;
+use App\Services\EffectiveAccessService;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\UserPop;
-use App\Models\UserRoleScope;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -41,7 +42,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'status' => \App\Enums\UserStatus::class,
+            'status' => UserStatus::class,
         ];
     }
 
@@ -69,11 +70,12 @@ class User extends Authenticatable
     public function hasRole(string|array $roles): bool
     {
         $roleCode = $this->role?->code;
-        if (!$roleCode) {
+        if (! $roleCode) {
             return false;
         }
 
         $rolesArray = is_array($roles) ? $roles : func_get_args();
+
         return in_array($roleCode, $rolesArray, true);
     }
 
@@ -82,7 +84,7 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        return app(\App\Services\EffectiveAccessService::class)->userCan($this, $permission);
+        return app(EffectiveAccessService::class)->userCan($this, $permission);
     }
 
     /**
@@ -104,7 +106,7 @@ class User extends Authenticatable
     /**
      * Get the POPs assigned to the user.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Pop, $this>
+     * @return BelongsToMany<Pop, $this>
      */
     public function pops()
     {

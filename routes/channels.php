@@ -7,12 +7,13 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 Broadcast::channel('fop.{pop_id}', function ($user, $popId) {
-    if (!$user->hasPermission('fop.dashboard')) {
+    if (! $user->hasPermission('fop.dashboard')) {
         return false;
     }
     if ($user->hasFullAccess()) {
         return true;
     }
+
     return $user->pops()->where('pops.id', $popId)->exists();
 });
 

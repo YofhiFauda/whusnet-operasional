@@ -11,6 +11,11 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use App\Notifications\AppNotification;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Tests\TestCase;
@@ -24,19 +29,23 @@ class FopTaskCancelTest extends TestCase
     use RefreshDatabase;
 
     private User $fopUser;
+
     private User $noPermUser;
+
     private User $tech;
+
     private Village $village;
+
     private Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         $fopRole = Role::where('code', 'fop')->first();
         $teknisiRole = Role::where('code', 'teknisi')->first();
@@ -56,7 +65,7 @@ class FopTaskCancelTest extends TestCase
     {
         $response = $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
             'category' => 'MTN',
-            'task_date' => now()->format('Y-m-d') . ' 08:00:00',
+            'task_date' => now()->format('Y-m-d').' 08:00:00',
             'tugas' => $tugas,
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -136,7 +145,7 @@ class FopTaskCancelTest extends TestCase
             ])
             ->assertOk();
 
-        NotificationFacade::assertSentTo($this->tech, \App\Notifications\AppNotification::class);
+        NotificationFacade::assertSentTo($this->tech, AppNotification::class);
     }
 
     public function test_cancelling_terjadwal_task_does_not_notify_technician(): void

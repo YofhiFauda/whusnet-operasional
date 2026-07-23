@@ -2,41 +2,55 @@
 
 @section('title', 'List Pelanggan - Whusnet Operasional')
 @section('page_title', 'List Pelanggan')
+@section('breadcrumb_parent', 'Pelanggan')
+@section('breadcrumb_parent_url', '/customers')
 
 @section('content')
 <style>
-    .toggle-checkbox:checked + .toggle-label .check-icon {
-        display: block;
-    }
-    .toggle-checkbox:checked + .toggle-label .x-icon {
-        display: none;
-    }
-    .toggle-checkbox:not(:checked) + .toggle-label .check-icon {
-        display: none;
-    }
-    .toggle-checkbox:not(:checked) + .toggle-label .x-icon {
-        display: block;
-    }
+    .toggle-checkbox:checked + .toggle-label .check-icon { display: block; }
+    .toggle-checkbox:checked + .toggle-label .x-icon { display: none; }
+    .toggle-checkbox:not(:checked) + .toggle-label .check-icon { display: none; }
+    .toggle-checkbox:not(:checked) + .toggle-label .x-icon { display: block; }
+
+    /*
+     * Kerapatan tabel. Default LONGGAR; "rapat" untuk melihat lebih banyak baris.
+     * Selektor ID supaya menang atas utility Tailwind tanpa !important.
+     */
+    #customerTable tbody td { padding-top: 14px; padding-bottom: 14px; }
+    html.density-compact #customerTable tbody td { padding-top: 8px; padding-bottom: 8px; }
+
+    /* Baris aktif navigasi keyboard — harus terlihat tanpa mengandalkan hover. */
+    #customerTable tbody tr.row-active { outline: 2px solid #0284c7; outline-offset: -2px; }
+    html.dark #customerTable tbody tr.row-active { outline-color: #38bdf8; }
 </style>
-<!-- Page Header (Naked Header - Design.md §1.7 & §6.1) -->
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+
+{{-- ────────────────────────────────────────────────────────────
+     LAYER 1 — PAGE HEADER (naked, tidak pernah ada card)
+     Design.md §1.7
+──────────────────────────────────────────────────────────── --}}
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
     <div>
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pelanggan</h1>
-        <p class="text-xs sm:text-sm text-slate-500 font-normal">Kelola data pelanggan, layanan aktif, status billing, dan dokumen.</p>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Data Pelanggan</h1>
+        <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola data pelanggan, status layanan internet, penagihan, dan verifikasi dokumen.</p>
     </div>
-    <div class="flex items-center gap-2 shrink-0">
+    <div class="flex items-center gap-2.5 flex-wrap shrink-0">
         @if(auth()->user()->hasPermission('customers.import.view'))
-        <a href="/customers/import" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2 px-3.5 rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
-            <svg class="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        <a href="/customers/import"
+           class="h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
+                  text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60
+                  text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer">
+            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m17 8-5-5-5 5"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12"/>
             </svg>
             <span>Import Pelanggan</span>
         </a>
         @endif
         @if(auth()->user()->hasPermission('customers.create'))
-        <a href="/customers/create" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 px-3.5 rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        <a href="/customers/create"
+           class="h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white
+                  text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14"/>
             </svg>
             <span>Tambah Pelanggan</span>
         </a>
@@ -44,124 +58,222 @@
     </div>
 </div>
 
-<!-- Filter & Search Bar (Naked Bar - Design.md §1.8 & §1.5) -->
-<div class="mb-5">
-    <form action="/customers" method="GET" class="flex flex-wrap items-center gap-3">
+{{-- ────────────────────────────────────────────────────────────
+     SUMMARY STRIP — flat bar, bukan 4 card terpisah
+     Design.md §1.6 & §1.5 (Type A halaman)
+──────────────────────────────────────────────────────────── --}}
+<div class="summary-strip mb-5 flex-col sm:flex-row">
+    <div class="summary-col">
+        <span class="summary-label">Total Pelanggan</span>
+        <span class="summary-value">{{ number_format($totalCustomers) }}</span>
+        <span class="summary-sub">Seluruh data terdaftar</span>
+    </div>
+    <div class="summary-col">
+        <span class="summary-label">Pelanggan Aktif</span>
+        <span class="summary-value success">{{ number_format($statusCounts['active'] ?? 0) }}</span>
+        <span class="summary-sub">Langganan berjalan</span>
+    </div>
+    <div class="summary-col">
+        <span class="summary-label">Pelanggan Isolir</span>
+        <span class="summary-value purple">{{ number_format($statusCounts['suspended'] ?? 0) }}</span>
+        <span class="summary-sub">Diblokir billing / admin</span>
+    </div>
+    <div class="summary-col">
+        <span class="summary-label">Lewat Tempo</span>
+        <span class="summary-value error">{{ number_format($overdueCount ?? 0) }}</span>
+        <span class="summary-sub">Tagihan belum terbayar</span>
+    </div>
+</div>
+
+{{-- ────────────────────────────────────────────────────────────
+     LAYER 2 — FILTER BAR (naked, tidak pernah dibungkus card)
+     Design.md §1.8 & §1.5
+──────────────────────────────────────────────────────────── --}}
+<div class="space-y-3 mb-5">
+
+    {{-- Status Tabs + Search Row --}}
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+
+        {{-- Status Tabs (pill group) --}}
+        <div class="flex items-center p-1 bg-slate-200/60 dark:bg-slate-900/60 rounded-lg w-fit text-xs font-semibold">
+            <a href="{{ request()->fullUrlWithQuery(['status' => '', 'status_group' => '']) }}"
+               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
+                      {{ $status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                <span>Semua</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
+                             {{ $status === '' && empty($statusGroup) ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $totalCustomers }}</span>
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['status' => 'active', 'status_group' => '']) }}"
+               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
+                      {{ $status === 'active' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                <span>Aktif</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
+                             {{ $status === 'active' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $statusCounts['active'] ?? 0 }}</span>
+            </a>
+            <a href="{{ request()->fullUrlWithQuery(['status' => 'suspended', 'status_group' => '']) }}"
+               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
+                      {{ $status === 'suspended' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                <span>Isolir</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
+                             {{ $status === 'suspended' ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $statusCounts['suspended'] ?? 0 }}</span>
+            </a>
+        </div>
+
+        {{-- Search Input (pill) — submit saat Enter, tanpa tombol terpisah (match template) --}}
+        <form action="/customers" method="GET" id="searchForm" class="relative flex-1 max-w-md">
+            @if($statusGroup !== '')
+                <input type="hidden" name="status_group" value="{{ $statusGroup }}">
+            @endif
+            @if($status !== '')
+                <input type="hidden" name="status" value="{{ $status }}">
+            @endif
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/>
+            </svg>
+            <input type="text" name="search" id="search" value="{{ $search }}"
+               placeholder="Cari nama, CID, No HP, Desa, atau ID..."
+               class="w-full pl-11 pr-4 h-[38px] rounded-full border border-slate-200 dark:border-slate-700
+                      bg-white dark:bg-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-100
+                      placeholder-slate-400 dark:placeholder-slate-500
+                      focus:outline-none focus:border-sky-600 dark:focus:border-sky-500
+                      focus:ring-2 focus:ring-sky-600/12 transition-all">
+        </form>
+    </div>
+
+    {{-- Dropdown Filters Row --}}
+    <form action="/customers" method="GET" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5" id="filterForm">
         @if($statusGroup !== '')
             <input type="hidden" name="status_group" value="{{ $statusGroup }}">
         @endif
         @if($status !== '')
             <input type="hidden" name="status" value="{{ $status }}">
         @endif
-        
-        <!-- Search Input (Pill Shape with Icon - Design.md §1.8) -->
-        <div class="relative flex-1 min-w-[240px] max-w-md">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        @if($search !== '')
+            <input type="hidden" name="search" value="{{ $search }}">
+        @endif
+
+        {{-- POP --}}
+        <select name="pop_id" id="pop_id" onchange="this.form.submit()"
+                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
+                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
+                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+            <option value="">Semua POP</option>
+            @foreach($pops as $pop)
+                <option value="{{ $pop->id }}" {{ $popId == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
+            @endforeach
+        </select>
+
+        {{-- Kecamatan --}}
+        <select name="district_id" id="district_id" onchange="this.form.submit()"
+                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
+                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
+                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+            <option value="">Semua Kecamatan</option>
+            @foreach($districts as $district)
+                <option value="{{ $district->id }}" {{ $districtId == $district->id ? 'selected' : '' }}>{{ $district->name }}</option>
+            @endforeach
+        </select>
+
+        {{-- Paket --}}
+        <select name="package_id" id="package_id" onchange="this.form.submit()"
+                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
+                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
+                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+            <option value="">Semua Paket</option>
+            @foreach($packages as $package)
+                <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
+            @endforeach
+        </select>
+
+        {{-- Kelengkapan --}}
+        <select name="completeness_status" id="completeness_status" onchange="this.form.submit()"
+                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
+                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
+                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+            <option value="">Semua Kelengkapan</option>
+            <option value="draft" {{ $completenessStatus === 'draft' ? 'selected' : '' }}>Draft</option>
+            <option value="perlu_dilengkapi" {{ $completenessStatus === 'perlu_dilengkapi' ? 'selected' : '' }}>Perlu Dilengkapi</option>
+            <option value="lengkap" {{ $completenessStatus === 'lengkap' ? 'selected' : '' }}>Lengkap</option>
+            <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
+        </select>
+
+        {{-- Reset + Submit --}}
+        <div class="col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
+            <a href="/customers{{ $statusGroup ? '?status_group='.$statusGroup : '' }}"
+               class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
+                      text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700
+                      text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
+                <svg class="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
                 </svg>
-            </div>
-            <input type="text" name="search" id="search" value="{{ $search }}" placeholder="Cari nama, CID, No. HP, atau ID Lama..." class="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-full bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 font-sans shadow-2xs">
-        </div>
-
-        <!-- POP Filter -->
-        <div class="min-w-[140px]">
-            <select name="pop_id" id="pop_id" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 font-sans shadow-2xs">
-                <option value="">Semua POP</option>
-                @foreach($pops as $pop)
-                    <option value="{{ $pop->id }}" {{ $popId == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Kecamatan Filter -->
-        <div class="min-w-[140px]">
-            <select name="district_id" id="district_id" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 font-sans shadow-2xs">
-                <option value="">Semua Kecamatan</option>
-                @foreach($districts as $district)
-                    <option value="{{ $district->id }}" {{ $districtId == $district->id ? 'selected' : '' }}>{{ $district->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Paket Layanan Filter -->
-        <div class="min-w-[150px]">
-            <select name="package_id" id="package_id" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 font-sans shadow-2xs">
-                <option value="">Semua Paket</option>
-                @foreach($packages as $package)
-                    <option value="{{ $package->id }}" {{ $packageId == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Status Kelengkapan Filter -->
-        <div class="min-w-[140px]">
-            <select name="completeness_status" id="completeness_status" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 font-sans shadow-2xs">
-                <option value="">Semua Kelengkapan</option>
-                <option value="draft" {{ $completenessStatus === 'draft' ? 'selected' : '' }}>Draft</option>
-                <option value="perlu_dilengkapi" {{ $completenessStatus === 'perlu_dilengkapi' ? 'selected' : '' }}>Perlu Dilengkapi</option>
-                <option value="lengkap" {{ $completenessStatus === 'lengkap' ? 'selected' : '' }}>Lengkap</option>
-                <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
-            </select>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex items-center gap-1.5 shrink-0">
-            <button type="submit" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2 px-3.5 rounded-lg transition-colors cursor-pointer shadow-2xs">
-                Cari
-            </button>
-            <a href="/customers" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3.5 rounded-lg transition-colors cursor-pointer text-center">
                 Reset
             </a>
         </div>
     </form>
-</div>
 
-<!-- Status Tabs Nav & Table Content -->
-<div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
-    @if(empty($statusGroup))
-    <!-- Status Tabs Nav -->
-    <div class="border-b border-slate-200 bg-slate-50 px-6 py-3 flex flex-wrap gap-2 items-center justify-between">
-        <div class="flex flex-wrap gap-1">
-            <a href="{{ request()->fullUrlWithQuery(['status' => '']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === '' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
-                Semua <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === '' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $totalCustomers }}</span>
-            </a>
-            <a href="{{ request()->fullUrlWithQuery(['status' => 'active']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === 'active' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
-                Active <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === 'active' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $statusCounts['active'] ?? 0 }}</span>
-            </a>
-            <a href="{{ request()->fullUrlWithQuery(['status' => 'suspended']) }}" class="px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors {{ $status === 'suspended' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-200/50' }}">
-                Suspend <span class="ml-1 px-1.5 py-0.25 rounded-full text-[10px] {{ $status === 'suspended' ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-500' }} data-text">{{ $statusCounts['suspended'] ?? 0 }}</span>
-            </a>
+    {{-- Baris utilitas: kerapatan tabel (match template) --}}
+    <div class="flex items-center justify-between gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+        <div class="flex items-center gap-1.5">
+            <span class="hidden sm:inline">Kerapatan</span>
+            <div class="flex items-center p-0.5 bg-slate-200/60 dark:bg-slate-900/60 rounded-lg font-semibold">
+                <button type="button" onclick="setDensity('comfortable')" id="density-comfortable" class="px-2.5 py-1 rounded-md transition-colors">Longgar</button>
+                <button type="button" onclick="setDensity('compact')" id="density-compact" class="px-2.5 py-1 rounded-md transition-colors">Rapat</button>
+            </div>
         </div>
     </div>
-    @else
-    <!-- Filter Group Header -->
-    <div class="border-b border-slate-200 bg-sky-50 px-6 py-3 flex flex-wrap gap-2 items-center justify-between">
-        <div class="flex items-center gap-2">
-            <span class="text-sm font-bold text-sky-800 uppercase tracking-wider">
-                @if($statusGroup === 'survey') Daftar Survey Pelanggan
-                @elseif($statusGroup === 'verification') Daftar Verifikasi Pelanggan
-                @elseif($statusGroup === 'failed') Daftar Pelanggan Gagal
-                @elseif($statusGroup === 'terminated') Daftar Pelanggan Putus
-                @endif
-            </span>
-        </div>
+</div>
+
+<!-- BULK ACTION BAR -->
+<div id="bulkBar" class="hidden items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-700 mb-4">
+    <div class="flex items-center gap-3 text-xs">
+        <span class="font-semibold text-sky-700 dark:text-sky-300">
+            <span id="bulkCount" class="font-mono">0</span> baris dipilih
+        </span>
+        <button type="button" onclick="clearSelection()" class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer">Batalkan</button>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap justify-end">
+        <button type="button" onclick="bulkCetak()" class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer">
+            <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/>
+            </svg>
+            <span>Cetak Tagihan</span>
+        </button>
+    </div>
+</div>
+
+{{-- ────────────────────────────────────────────────────────────
+     LAYER 3 — TABLE PANEL (1 card, card budget = 1)
+     Design.md §1.3 Type A
+──────────────────────────────────────────────────────────── --}}
+<div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+    @if(!empty($statusGroup))
+    {{-- Filter Group Header --}}
+    <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
+        <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            @if($statusGroup === 'survey') Daftar Survey Pelanggan
+            @elseif($statusGroup === 'verification') Daftar Verifikasi Pelanggan
+            @elseif($statusGroup === 'failed') Daftar Pelanggan Gagal
+            @elseif($statusGroup === 'terminated') Daftar Pelanggan Putus
+            @endif
+        </span>
+        <a href="/customers" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua</a>
     </div>
     @endif
 
-    <!-- Table Container -->
+    {{-- TABLE CONTAINER --}}
     <div class="overflow-x-auto">
         @if($statusGroup === 'failed')
-        <table class="w-full border-collapse text-left text-sm text-slate-700">
+        <table class="w-full border-collapse text-left">
             <thead>
-                <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
-                    <th class="px-6 py-3.5 w-12 text-center">NO</th>
-                    <th class="px-6 py-3.5">CID</th>
-                    <th class="px-6 py-3.5">NAMA</th>
-                    <th class="px-6 py-3.5">POP</th>
-                    <th class="px-6 py-3.5">ALASAN</th>
-                    <th class="px-6 py-3.5">TGL PEMUTUSAN</th>
-                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th scope="col" class="px-6 py-3.5 w-12 text-center">No</th>
+                    <th scope="col" class="px-6 py-3.5">CID</th>
+                    <th scope="col" class="px-6 py-3.5">Nama Pelanggan</th>
+                    <th scope="col" class="px-6 py-3.5">POP</th>
+                    <th scope="col" class="px-6 py-3.5">Alasan</th>
+                    <th scope="col" class="px-6 py-3.5">Tgl Pemutusan</th>
+                    <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -214,18 +326,18 @@
             </tbody>
         </table>
         @elseif($statusGroup === 'terminated')
-        <table class="w-full border-collapse text-left text-sm text-slate-700">
+        <table class="w-full border-collapse text-left">
             <thead>
-                <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
-                    <th class="px-6 py-3.5 w-12 text-center">NO</th>
-                    <th class="px-6 py-3.5">ID</th>
-                    <th class="px-6 py-3.5">NAMA</th>
-                    <th class="px-6 py-3.5">POP</th>
-                    <th class="px-6 py-3.5">KONTRAK</th>
-                    <th class="px-6 py-3.5">ALASAN PUTUS</th>
-                    <th class="px-6 py-3.5">TGL PEMUTUSAN</th>
-                    <th class="px-6 py-3.5 text-center">STATUS ALAT</th>
-                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th scope="col" class="px-6 py-3.5 w-12 text-center">No</th>
+                    <th scope="col" class="px-6 py-3.5">ID</th>
+                    <th scope="col" class="px-6 py-3.5">Nama Pelanggan</th>
+                    <th scope="col" class="px-6 py-3.5">POP</th>
+                    <th scope="col" class="px-6 py-3.5">Kontrak</th>
+                    <th scope="col" class="px-6 py-3.5">Alasan Putus</th>
+                    <th scope="col" class="px-6 py-3.5">Tgl Pemutusan</th>
+                    <th scope="col" class="px-6 py-3.5 text-center">Status Alat</th>
+                    <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -304,136 +416,170 @@
             </tbody>
         </table>
         @else
-        <table class="w-full border-collapse text-left text-sm text-slate-700">
+        <table class="w-full border-collapse text-left" id="customerTable">
             <thead>
-                <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-xs">
-                    <th class="px-6 py-3.5 w-12 text-center">NO</th>
-                    <th class="px-6 py-3.5">ID</th>
-                    <th class="px-6 py-3.5">NAMA</th>
-                    <th class="px-6 py-3.5">POP</th>
-                    <th class="px-6 py-3.5">DESA</th>
-                    <th class="px-6 py-3.5">PAKET</th>
-                    <th class="px-6 py-3.5">HP</th>
-                    <th class="px-6 py-3.5 text-center">KELENGKAPAN</th>
-                    <th class="px-6 py-3.5 text-center">STATUS</th>
-                    <th class="px-6 py-3.5 text-center">KONEKSI</th>
-                    <th class="px-6 py-3.5 text-right">ACTION</th>
+                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th scope="col" class="py-3.5 pl-4 pr-0 w-10">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"
+                               aria-label="Pilih semua baris di halaman ini"
+                               class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-600/40 cursor-pointer align-middle">
+                    </th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID PELANGGAN</th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">NAMA LENGKAP</th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">POP &middot; DESA</th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PAKET INTERNET</th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">NO. TELEPON</th>
+                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">JATUH TEMPO</th>
+                    <th scope="col" class="py-3.5 px-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">TAGIHAN</th>
+                    <th scope="col" class="py-3.5 px-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">BERKAS</th>
+                    <th scope="col" class="py-3.5 px-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">STATUS</th>
+                    <th scope="col" class="py-3.5 px-4 text-center w-16 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">AKSI</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
                 @forelse($customers as $customer)
                 @php
                     $isCustomer = $customer->status === 'active';
                     $isTerminated = $customer->status === 'terminated';
-                    // Gunakan accessor display_id dari Customer model
-                    // yang menghitung format ID berdasarkan status pelanggan
-                    // sesuai spesifikasi-pop-distribusi-cid.md
                     $displayId = $customer->display_id;
                     $completeness = $customer->dataCompleteness();
-                    $stages = $customer->workflowProgress();
                 @endphp
-                <tr class="hover:bg-slate-50/45 transition-colors">
-                    <!-- No -->
-                    <td class="px-6 py-3.5 text-center text-slate-400 data-text">
-                        {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
+                <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-900/20 transition-colors group">
+                    <!-- Checkbox -->
+                    <td class="pl-4 pr-0">
+                        <input type="checkbox" name="selected_customers[]" value="{{ $customer->id }}"
+                               onchange="toggleRow('{{ $customer->id }}', this.checked)"
+                               class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-600/40 cursor-pointer align-middle select-customer">
                     </td>
-                    <!-- ID (CID / REQ) -->
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
+                    <!-- ID Pelanggan -->
+                    <td class="py-3.5 px-4 font-mono font-semibold text-sky-600 dark:text-sky-400">
                         @if(auth()->user()->hasPermission('customers.detail.installation.validate'))
                         <button type="button" onclick="openNetworkAssignmentModal({{ $customer->id }})"
-                                class="text-primary hover:underline cursor-pointer" title="Atur Mini POP & Distribusi">
+                                class="text-sky-600 dark:text-sky-400 hover:underline cursor-pointer font-mono font-semibold text-left" title="Atur Mini POP & Distribusi">
                             {{ $displayId }}
                         </button>
                         @else
                         {{ $displayId }}
                         @endif
                     </td>
-                    <!-- Nama -->
-                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
-                        {{ $customer->full_name }}
+                    <!-- Nama Lengkap -->
+                    <td class="py-3.5 px-4">
+                        <span class="font-medium text-slate-900 dark:text-slate-50 group-hover:text-sky-700 dark:group-hover:text-sky-300 transition-colors">
+                            {{ $customer->full_name }}
+                        </span>
                     </td>
-                    <!-- POP -->
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
-                        {{ $customer->pop->name ?? '-' }}
+                    <!-- POP & Desa -->
+                    <td class="py-3.5 px-4 whitespace-nowrap">
+                        <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs">
+                            {{ $customer->pop->name ?? '-' }}
+                        </span>
+                        <span class="text-slate-500 dark:text-slate-400 ml-1.5 text-xs">
+                            {{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}
+                        </span>
                     </td>
-                    <!-- Desa -->
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
-                        {{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}
-                    </td>
-                    <!-- Paket -->
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-semibold text-xs">
+                    <!-- Paket Internet -->
+                    <td class="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300 text-xs">
                         {{ $customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-' }}
                     </td>
-                    <!-- HP -->
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
-                        {{ $customer->primary_phone ?? $customer->phone }}
+                    <!-- No. Telepon -->
+                    <td class="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300 text-xs">
+                        @if($customer->primary_phone || $customer->phone)
+                        <a href="https://wa.me/{{ $customer->primary_phone ?? $customer->phone }}" target="_blank" class="hover:text-emerald-600 flex items-center gap-1">
+                            <span class="text-emerald-500 text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 0 1 6.988 2.896 9.83 9.83 0 0 1 2.893 6.994c-.003 5.45-4.437 9.886-9.885 9.886m8.413-18.297A11.8 11.8 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.9 11.9 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.82 11.82 0 0 0-3.48-8.413"/></svg>
+                            </span>
+                            <span>{{ $customer->primary_phone ?? $customer->phone }}</span>
+                        </a>
+                        @else
+                        -
+                        @endif
                     </td>
-                    <!-- Kelengkapan (Progress & Lifecycle Stage Indicator) -->
-                    <td class="px-6 py-3.5 whitespace-nowrap">
-                        <div class="flex flex-col gap-1.5 justify-center items-center">
-                            <!-- Progress Bar & Percentage -->
-                            <div class="flex items-center gap-1.5">
-                                <div class="w-12 bg-slate-100 rounded-full h-1 overflow-hidden border border-slate-200/50">
-                                    <div class="h-full rounded-full transition-all duration-300 {{ count($completeness['missing_required']) > 0 ? 'bg-red-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-green-500') }}" style="width: {{ $completeness['percentage'] }}%"></div>
-                                </div>
-                                <span class="text-[9px] font-extrabold data-text {{ count($completeness['missing_required']) > 0 ? 'text-red-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-green-600') }}">
-                                    {{ $completeness['percentage'] }}%
-                                </span>
-                            </div>
-                            
-                            <!-- 5 Stage Dots -->
-                            <div class="flex items-center gap-1">
-                                @foreach($stages as $stageKey => $stage)
-                                    <span class="h-3.5 w-3.5 rounded-full flex items-center justify-center text-[7px] font-extrabold text-white font-mono {{ $stage['color'] }} cursor-help" title="{{ $stage['name'] }}: {{ ucfirst($stage['status']) }}">
-                                        {{ $stage['label'] }}
-                                    </span>
-                                @endforeach
-                            </div>
-                        </div>
+                    <!-- Jatuh Tempo -->
+                    <td class="py-3.5 px-4 font-mono text-xs">
+                        @if($customer->latestInvoice)
+                            @php
+                                $billState = 'belum';
+                                if ($customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS) {
+                                    $billState = 'lunas';
+                                } elseif ($customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast()) {
+                                    $billState = 'overdue';
+                                }
+                                $dueClass = $billState === 'overdue' ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-slate-600 dark:text-slate-300';
+                            @endphp
+                            <span class="{{ $dueClass }}">
+                                {{ \App\Support\IndonesianDate::date($customer->latestInvoice->due_date) }}
+                            </span>
+                        @else
+                            -
+                        @endif
                     </td>
-                    <!-- Status Layanan -->
-                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
+                    <!-- Tagihan -->
+                    <td class="py-3.5 px-4 text-right text-xs">
+                        @if($customer->latestInvoice)
+                            @php
+                                $billState = 'belum';
+                                if ($customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS) {
+                                    $billState = 'lunas';
+                                } elseif ($customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast()) {
+                                    $billState = 'overdue';
+                                }
+                                
+                                $amountClass = $billState === 'lunas'   ? 'text-emerald-600 dark:text-emerald-400'
+                                              : ($billState === 'overdue' ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                              : 'text-slate-900 dark:text-slate-50');
+                                
+                                $billNote = $billState === 'lunas'   ? '<span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Lunas</span>'
+                                           : ($billState === 'overdue' ? '<span class="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Lewat tempo</span>'
+                                           : '<span class="text-[10px] text-slate-400 dark:text-slate-500">Belum dibayar</span>');
+                            @endphp
+                            <span class="font-mono tabular-nums {{ $amountClass }}">
+                                Rp {{ number_format($customer->latestInvoice->total_amount, 0, ',', '.') }}
+                            </span>
+                            <br>
+                            {!! $billNote !!}
+                        @else
+                            -
+                        @endif
+                    </td>
+                    <!-- Berkas -->
+                    <td class="py-3.5 px-4 text-center font-mono font-semibold text-xs">
+                        @php
+                            $berkasClass = $completeness['percentage'] >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
+                        @endphp
+                        <span class="{{ $berkasClass }}">
+                            {{ $completeness['percentage'] }}%
+                        </span>
+                    </td>
+                    <!-- Status -->
+                    <td class="py-3.5 px-4 text-center">
                         @php
                             $statusLabel = $customer->subscriptionStatus->name ?? ucfirst($customer->status);
-                            $badgeClass = match($customer->status) {
-                                'active' => 'bg-green-50 text-green-700 border border-green-100',
-                                'suspended' => 'bg-amber-50 text-amber-700 border border-amber-100',
-                                'terminated', 'rejected' => 'bg-red-50 text-red-700 border border-red-100',
-                                'waiting_survey', 'surveyed' => 'bg-yellow-50 text-yellow-800 border border-yellow-100',
-                                'waiting_installation', 'installed' => 'bg-blue-50 text-blue-700 border border-blue-100',
-                                default => 'bg-slate-50 text-slate-700 border border-slate-100'
-                            };
+                            
+                            $isSuspended = $customer->status === 'suspended';
+                            $isTerminated = $customer->status === 'terminated';
+                            $isFailed = in_array($customer->status, ['failed', 'rejected', 'gagal']);
+                            
+                            if ($customer->status === 'active') {
+                                $statusBadgeClass = 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+                                $dotColor = 'bg-emerald-500';
+                            } elseif ($isSuspended) {
+                                $statusBadgeClass = 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+                                $dotColor = 'bg-amber-500';
+                            } elseif ($isTerminated || $isFailed) {
+                                $statusBadgeClass = 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
+                                $dotColor = 'bg-rose-500';
+                            } else {
+                                $statusBadgeClass = 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
+                                $dotColor = 'bg-slate-500';
+                            }
                         @endphp
-                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $statusBadgeClass }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }} mr-1.5"></span>
                             {{ $statusLabel }}
                         </span>
                     </td>
-                    <!-- Koneksi with Toggle On Off -->
-                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
-                        <div class="flex justify-center items-center">
-                            <label class="relative inline-flex items-center cursor-pointer select-none">
-                                <input type="checkbox" 
-                                       class="sr-only peer toggle-checkbox" 
-                                       {{ $customer->status === 'active' ? 'checked' : '' }}
-                                       onchange="toggleConnection('{{ $customer->id }}', '{{ $customer->full_name }}', this)">
-                                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-sky-500/25 peer-checked:bg-sky-600 transition-colors duration-200 relative toggle-label">
-                                    <!-- Knob -->
-                                    <div class="absolute top-[2px] left-[2px] w-5 h-5 bg-white rounded-full transition-transform duration-200 peer-checked:translate-x-5 flex items-center justify-center shadow-sm">
-                                        <!-- X Icon -->
-                                        <svg class="h-2.5 w-2.5 text-slate-400 x-icon transition-opacity duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                        <!-- Check Icon -->
-                                        <svg class="h-2.5 w-2.5 text-sky-600 check-icon transition-opacity duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </label>
-                        </div>
-                    </td>
-                    <!-- Action -->
-                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                    <!-- Aksi -->
+                    <td class="py-3.5 px-4 text-center">
                         <button type="button" 
                                 onclick="openActionsModal(this)"
                                 data-id="{{ $customer->id }}"
@@ -448,11 +594,11 @@
                                 data-pop="{{ $customer->pop->name ?? '-' }}"
                                 data-reg="{{ \App\Support\IndonesianDate::date($customer->registration_date) }}"
                                 data-package="{{ $customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-' }}"
-                                data-bandwidth="{{ $customer->internetPackage->speed_mbps ? $customer->internetPackage->speed_mbps . ' Mbps' : '-' }}"
+                                data-bandwidth="{{ $customer->internetPackage?->speed_mbps ? $customer->internetPackage->speed_mbps . ' Mbps' : '-' }}"
                                 data-price="{{ $customer->internetPackage ? 'Rp ' . number_format($customer->internetPackage->monthly_price, 0, ',', '.') : '-' }}"
                                 data-address="{{ $customer->address }}"
                                 data-landmark="{{ $customer->customerAddress->landmark ?? '-' }}"
-                                data-rt-rw="{{ ($customer->customerAddress->rt ? 'RT ' . $customer->customerAddress->rt : '') . ($customer->customerAddress->rw ? ' / RW ' . $customer->customerAddress->rw : '') ?: '-' }}"
+                                data-rt-rw="{{ ($customer->customerAddress?->rt ? 'RT ' . $customer->customerAddress->rt : '') . ($customer->customerAddress?->rw ? ' / RW ' . $customer->customerAddress->rw : '') ?: '-' }}"
                                 data-village="{{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}"
                                 data-district="{{ $customer->district->name ?? ($customer->customerAddress->district ?? '-') }}"
                                 data-city="{{ $customer->city->name ?? ($customer->customerAddress->city ?? 'Kab. Ponorogo') }}"
@@ -470,11 +616,10 @@
                                 data-router-brand="{{ $customer->customerDevice->router_brand ?? '-' }}"
                                 data-contract="{{ match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' } }}"
                                 data-distribution="{{ $customer->distribution->name ?? '-' }}"
-                                class="inline-flex items-center text-xs font-semibold text-sky-600 hover:text-sky-800 bg-sky-50/80 hover:bg-sky-100 transition-colors border border-sky-200 rounded-lg px-3 py-1.5 cursor-pointer shadow-2xs">
-                            <svg class="w-3.5 h-3.5 mr-1 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 hover:border-sky-300 dark:hover:border-sky-600 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 inline-flex items-center justify-center transition-colors shadow-sm cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sm">
+                                <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
                             </svg>
-                            <span>Action</span>
                         </button>
                     </td>
                 </tr>
@@ -490,19 +635,107 @@
         @endif
     </div>
 
-    <!-- Pagination Footer -->
-    @if($customers->hasPages())
-    <div class="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-        <div class="flex-1 flex justify-between sm:hidden">
-            {{ $customers->links('pagination::simple-tailwind') }}
-        </div>
-        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-                {{ $customers->links() }}
+    {{-- ────────────────────────────────────────────────────────────
+         PAGINATION FOOTER — match template redesign_list_pelanggan
+    ──────────────────────────────────────────────────────────── --}}
+    @php
+        $cur = $customers->currentPage();
+        $last = $customers->lastPage();
+        $winStart = max(1, $cur - 2);
+        $winEnd = min($last, $cur + 2);
+        $btnBase = 'px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-semibold transition-colors';
+        $btnDisabled = 'px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-600 text-xs font-semibold opacity-40 cursor-not-allowed';
+        $btnActive = 'px-3 py-1.5 rounded-lg bg-sky-600 text-white font-semibold text-xs font-mono';
+    @endphp
+    <div class="p-4 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+
+        {{-- Kiri: info + baris per halaman --}}
+        <div class="flex items-center gap-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+                @if($customers->total() > 0)
+                    Menampilkan
+                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-100">{{ number_format($customers->firstItem(), 0, ',', '.') }}&ndash;{{ number_format($customers->lastItem(), 0, ',', '.') }}</span>
+                    dari
+                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-100">{{ number_format($customers->total(), 0, ',', '.') }}</span>
+                    pelanggan
+                @else
+                    Tidak ada data
+                @endif
             </div>
+
+            {{-- Per-page select — submit GET, pertahankan filter aktif --}}
+            <form method="GET" action="/customers" class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                @foreach(request()->except(['per_page', 'page']) as $qk => $qv)
+                    @if(is_array($qv))
+                        @foreach($qv as $qvItem)
+                            <input type="hidden" name="{{ $qk }}[]" value="{{ $qvItem }}">
+                        @endforeach
+                    @else
+                        <input type="hidden" name="{{ $qk }}" value="{{ $qv }}">
+                    @endif
+                @endforeach
+                <span class="hidden sm:inline">Baris</span>
+                <select name="per_page" onchange="this.form.submit()"
+                        class="h-8 pl-2 pr-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+                    @foreach([10, 25, 50, 100] as $ppOption)
+                        <option value="{{ $ppOption }}" {{ (int) request('per_page', 10) === $ppOption ? 'selected' : '' }}>{{ $ppOption }}</option>
+                    @endforeach
+                </select>
+            </form>
         </div>
+
+        {{-- Kanan: tombol halaman --}}
+        @if($last > 1)
+        <div class="flex items-center gap-1.5">
+            {{-- Prev --}}
+            @if($customers->onFirstPage())
+                <span class="{{ $btnDisabled }} inline-flex items-center gap-1">
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg> Prev
+                </span>
+            @else
+                <a href="{{ $customers->previousPageUrl() }}" id="paginatePrev" class="{{ $btnBase }} inline-flex items-center gap-1">
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg> Prev
+                </a>
+            @endif
+
+            {{-- Halaman pertama + ellipsis --}}
+            @if($winStart > 1)
+                <a href="{{ $customers->url(1) }}" class="{{ $btnBase }} font-mono">1</a>
+                @if($winStart > 2)
+                    <span class="px-1 text-slate-400 dark:text-slate-500 text-xs">&hellip;</span>
+                @endif
+            @endif
+
+            {{-- Jendela halaman --}}
+            @for($n = $winStart; $n <= $winEnd; $n++)
+                @if($n === $cur)
+                    <span aria-current="page" class="{{ $btnActive }}">{{ $n }}</span>
+                @else
+                    <a href="{{ $customers->url($n) }}" class="{{ $btnBase }} font-mono">{{ $n }}</a>
+                @endif
+            @endfor
+
+            {{-- Ellipsis + halaman terakhir --}}
+            @if($winEnd < $last)
+                @if($winEnd < $last - 1)
+                    <span class="px-1 text-slate-400 dark:text-slate-500 text-xs">&hellip;</span>
+                @endif
+                <a href="{{ $customers->url($last) }}" class="{{ $btnBase }} font-mono">{{ $last }}</a>
+            @endif
+
+            {{-- Next --}}
+            @if($customers->hasMorePages())
+                <a href="{{ $customers->nextPageUrl() }}" id="paginateNext" class="{{ $btnBase }} inline-flex items-center gap-1">
+                    Next <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                </a>
+            @else
+                <span class="{{ $btnDisabled }} inline-flex items-center gap-1">
+                    Next <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+                </span>
+            @endif
+        </div>
+        @endif
     </div>
-    @endif
 </div>
 
 <!-- Customer Action & Quick Operational Hub Modal (Design.md Compliant) -->
@@ -1069,7 +1302,190 @@
 
 @section('scripts')
 <script>
+    /* ── Kerapatan tabel (match template) ── */
+    function setDensity(mode) {
+        document.documentElement.classList.toggle('density-compact', mode === 'compact');
+        localStorage.setItem('whusnet-density', mode);
+        syncDensityButtons();
+    }
+
+    function syncDensityButtons() {
+        const compact = document.documentElement.classList.contains('density-compact');
+        const on  = 'px-2.5 py-1 rounded-md transition-colors bg-white dark:bg-slate-700 text-sky-700 dark:text-sky-300 shadow-sm';
+        const off = 'px-2.5 py-1 rounded-md transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200';
+        const c = document.getElementById('density-compact');
+        const f = document.getElementById('density-comfortable');
+        if (c) c.className = compact ? on : off;
+        if (f) f.className = compact ? off : on;
+    }
+
+    (function () {
+        if (localStorage.getItem('whusnet-density') === 'compact') {
+            document.documentElement.classList.add('density-compact');
+        }
+        syncDensityButtons();
+    })();
+
+    /* ──────────────────────────────────────────────────────────────
+     * Navigasi keyboard tabel (match template).
+     * Operator memproses ratusan baris/hari — memaksa tangan bolak-balik
+     * ke mouse tiap baris menyumbang RSI. Pintasan bikin alur tanpa mouse.
+     * ────────────────────────────────────────────────────────────── */
+    (function () {
+        const table = document.getElementById('customerTable');
+        if (!table) return;
+
+        let activeRow = -1;
+        const rowEls = () => Array.from(table.querySelectorAll('tbody tr')).filter(tr => tr.querySelector('.select-customer'));
+
+        function setActiveRow(i) {
+            const rows = rowEls();
+            if (!rows.length) return;
+            activeRow = Math.min(Math.max(0, i), rows.length - 1);
+            rows.forEach(r => r.classList.remove('row-active'));
+            const el = rows[activeRow];
+            el.classList.add('row-active');
+            el.scrollIntoView({ block: 'nearest' });
+        }
+
+        function anyModalOpen() {
+            return !document.getElementById('actions-modal')?.classList.contains('hidden')
+                || !document.getElementById('shortcutsModal')?.classList.contains('hidden');
+        }
+
+        document.addEventListener('keydown', e => {
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
+                        || document.activeElement.isContentEditable;
+
+            // Esc — tutup modal aksi pelanggan bila sedang terbuka.
+            if (e.key === 'Escape') {
+                const actionsModal = document.getElementById('actions-modal');
+                if (actionsModal && !actionsModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closeActionsModal();
+                    return;
+                }
+            }
+
+            // Alt+N — tambah pelanggan, berlaku di mana saja (pakai link yang ada).
+            if (e.altKey && e.key.toLowerCase() === 'n') {
+                const addLink = document.querySelector('a[href="/customers/create"]');
+                if (addLink) { e.preventDefault(); window.location = addLink.href; }
+                return;
+            }
+
+            if (typing || anyModalOpen()) return;
+
+            const rows = rowEls();
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault(); setActiveRow(activeRow < 0 ? 0 : activeRow + 1); break;
+                case 'ArrowUp':
+                    e.preventDefault(); setActiveRow(activeRow < 0 ? 0 : activeRow - 1); break;
+                case 'Home':
+                    if (!rows.length) return; e.preventDefault(); setActiveRow(0); break;
+                case 'End':
+                    if (!rows.length) return; e.preventDefault(); setActiveRow(rows.length - 1); break;
+                case 'PageDown': {
+                    const next = document.getElementById('paginateNext');
+                    if (next && next.href) { e.preventDefault(); window.location = next.href; }
+                    break;
+                }
+                case 'PageUp': {
+                    const prev = document.getElementById('paginatePrev');
+                    if (prev && prev.href) { e.preventDefault(); window.location = prev.href; }
+                    break;
+                }
+                case ' ': {
+                    if (activeRow < 0) return;
+                    e.preventDefault();
+                    const cb = rows[activeRow].querySelector('.select-customer');
+                    if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+                    break;
+                }
+                case 'Enter': {
+                    if (activeRow < 0) return;
+                    e.preventDefault();
+                    const actionBtn = rows[activeRow].querySelector('button[onclick^="openActionsModal"]');
+                    if (actionBtn) actionBtn.click();
+                    break;
+                }
+            }
+        });
+    })();
+
     let selectedCustomerData = {};
+
+    const selected = new Set();
+    
+    function toggleRow(id, checked) {
+        if (checked) {
+            selected.add(id);
+        } else {
+            selected.delete(id);
+        }
+        syncSelectAll();
+        renderBulkBar();
+    }
+    
+    function toggleSelectAll(checked) {
+        document.querySelectorAll('.select-customer').forEach(cb => {
+            cb.checked = checked;
+            const id = cb.value;
+            if (checked) {
+                selected.add(id);
+            } else {
+                selected.delete(id);
+            }
+        });
+        renderBulkBar();
+    }
+    
+    function syncSelectAll() {
+        const selectAll = document.getElementById('selectAll');
+        if (!selectAll) return;
+        const cbs = document.querySelectorAll('.select-customer');
+        if (cbs.length === 0) return;
+        const n = Array.from(cbs).filter(cb => cb.checked).length;
+        selectAll.checked = n > 0 && n === cbs.length;
+        selectAll.indeterminate = n > 0 && n < cbs.length;
+    }
+    
+    function clearSelection() {
+        selected.clear();
+        document.querySelectorAll('.select-customer').forEach(cb => cb.checked = false);
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+        }
+        renderBulkBar();
+    }
+    
+    function renderBulkBar() {
+        const bar = document.getElementById('bulkBar');
+        if (!bar) return;
+        const countEl = document.getElementById('bulkCount');
+        if (countEl) countEl.innerText = selected.size;
+        
+        if (selected.size > 0) {
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+        } else {
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+        }
+    }
+    
+    function bulkCetak() {
+        if (selected.size === 0) return;
+        if (window.Toast) {
+            window.Toast.success('Cetak Massal', `Menyiapkan ${selected.size} PDF tagihan...`);
+        } else {
+            alert(`Menyiapkan ${selected.size} PDF tagihan...`);
+        }
+        clearSelection();
+    }
 
     function switchActionTab(tabName) {
         const tabs = ['finance', 'technical', 'field', 'profile'];
@@ -1574,7 +1990,7 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         <div class="flex justify-end gap-2 pt-2 border-t border-border mt-4">
             <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'network-assignment-list' }))"
                     class="text-sm font-semibold px-4 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-text-secondary transition-colors duration-200 cursor-pointer">Batal</button>
-            <button type="submit" id="na-submit-btn" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-primary hover:bg-primary-hover shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
+            <button type="submit" id="na-submit-btn" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-sky-600 hover:bg-sky-700 shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
         </div>
     </form>
 </x-ui.modal>

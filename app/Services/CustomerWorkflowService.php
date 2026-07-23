@@ -2,23 +2,26 @@
 
 namespace App\Services;
 
-use App\Models\Customer;
-use App\Models\AuditLog;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use InvalidArgumentException;
+use App\Jobs\SendCustomerActivationNotification;
+use App\Models\AuditLog;
+use App\Models\Customer;
+use App\Models\CustomerStatusLog;
+use App\Models\Task;
 use Exception;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 class CustomerWorkflowService
 {
     /**
      * Transition a customer to the next workflow status.
      *
-     * @param Customer $customer
-     * @param WorkflowTransition|string $nextStatus
-     * @param string|null $note
-     * @return bool
+     * @param  WorkflowTransition|string  $nextStatus
+     *
      * @throws Exception|InvalidArgumentException
      */
     public function transition(Customer $customer, $nextStatus, ?string $note = null): bool
@@ -56,50 +59,50 @@ class CustomerWorkflowService
                     'old_values' => ['status' => $currentStatusStr],
                     'new_values' => array_filter([
                         'status' => $nextStatus->value,
-                        'note' => $note
+                        'note' => $note,
                     ]),
                     'ip_address' => request() ? request()->ip() : null,
                     'user_agent' => request() ? request()->userAgent() : null,
                     'created_at' => now(),
                 ]);
 
-                \App\Models\CustomerStatusLog::create([
+                CustomerStatusLog::create([
                     'customer_id' => $customer->id,
                     'from_status' => $currentStatusStr,
-                    'to_status'   => $nextStatus->value,
-                    'changed_by'  => Auth::id(), // Akan mereturn null secara otomatis jika di-run dari scheduler/CLI (OK)
-                    'note'        => $note,
+                    'to_status' => $nextStatus->value,
+                    'changed_by' => Auth::id(), // Akan mereturn null secara otomatis jika di-run dari scheduler/CLI (OK)
+                    'note' => $note,
                 ]);
 
                 // Sentralisasi Tiket: Auto-create Task antrean Survey & Pemasangan
                 if (in_array($nextStatus->value, ['waiting_survey', 'waiting_installation'])) {
-                    $taskType = $nextStatus->value === 'waiting_survey' ? \App\Enums\TaskType::SURVEY->value : \App\Enums\TaskType::PEMASANGAN->value;
+                    $taskType = $nextStatus->value === 'waiting_survey' ? TaskType::SURVEY->value : TaskType::PEMASANGAN->value;
                     $titlePrefix = $nextStatus->value === 'waiting_survey' ? 'Survey Pelanggan: ' : 'Pemasangan Baru: ';
-                    $existingTask = \App\Models\Task::where('customer_id', $customer->id)
+                    $existingTask = Task::where('customer_id', $customer->id)
                         ->where('task_type', $taskType)
-                        ->whereIn('status', [\App\Enums\TaskStatus::PENDING->value, \App\Enums\TaskStatus::TERJADWAL->value, \App\Enums\TaskStatus::IN_PROGRESS->value])
+                        ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
                         ->exists();
 
                     if (! $existingTask) {
-                        $year  = date('Y');
-                        $count = \App\Models\Task::whereYear('created_at', $year)->count() + 1;
-                        \App\Models\Task::create([
+                        $year = date('Y');
+                        $count = Task::whereYear('created_at', $year)->count() + 1;
+                        Task::create([
                             'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                            'task_type'   => $taskType,
-                            'title'       => $titlePrefix . $customer->full_name,
+                            'task_type' => $taskType,
+                            'title' => $titlePrefix.$customer->full_name,
                             'description' => null,
-                            'pop_id'      => $customer->pop_id ?? 1,
+                            'pop_id' => $customer->pop_id ?? 1,
                             'customer_id' => $customer->id,
-                            'status'      => \App\Enums\TaskStatus::PENDING->value,
-                            'created_by'  => Auth::id() ?? 1,
-                            'updated_by'  => Auth::id() ?? 1,
+                            'status' => TaskStatus::PENDING->value,
+                            'created_by' => Auth::id() ?? 1,
+                            'updated_by' => Auth::id() ?? 1,
                         ]);
                     }
                 }
 
                 // S8.8-T005: Trigger notifikasi ke pelanggan setelah status Active
                 if ($nextStatus->value === 'active') {
-                    \App\Jobs\SendCustomerActivationNotification::dispatch($customer, Auth::id());
+                    SendCustomerActivationNotification::dispatch($customer, Auth::id());
                 }
             }
 

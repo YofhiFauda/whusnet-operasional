@@ -2,12 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,11 +29,11 @@ class CustomerDocumentTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
     }
 
     public function test_technician_can_upload_customer_document(): void
@@ -158,7 +166,7 @@ class CustomerDocumentTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -168,7 +176,7 @@ class CustomerDocumentTest extends TestCase
     {
         return Customer::create([
             'customer_code' => $code,
-            'full_name' => 'Customer Document ' . $code,
+            'full_name' => 'Customer Document '.$code,
             'phone' => '0812345678',
             'pop_id' => $pop->id,
             'status' => 'installed',
@@ -189,12 +197,12 @@ class CustomerDocumentTest extends TestCase
 
     private function grantPopScope(User $user, Pop $pop): void
     {
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $user->role_id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $pop->id,
         ]);

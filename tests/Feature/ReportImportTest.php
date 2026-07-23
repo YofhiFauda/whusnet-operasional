@@ -132,10 +132,10 @@ class ReportImportTest extends TestCase
         $response->assertDontSee('branch-b-upload.xlsx');
 
         // Detailed view check
-        $responseDetailA = $this->actingAs($userA)->get('/reports/imports/' . $batchA->id);
+        $responseDetailA = $this->actingAs($userA)->get('/reports/imports/'.$batchA->id);
         $responseDetailA->assertStatus(200);
 
-        $responseDetailB = $this->actingAs($userA)->get('/reports/imports/' . $batchB->id);
+        $responseDetailB = $this->actingAs($userA)->get('/reports/imports/'.$batchB->id);
         $responseDetailB->assertStatus(403);
     }
 
@@ -218,17 +218,17 @@ class ReportImportTest extends TestCase
         ]);
 
         // Test Detail Page
-        $response = $this->actingAs($owner)->get('/reports/imports/' . $batch->id);
+        $response = $this->actingAs($owner)->get('/reports/imports/'.$batch->id);
         $response->assertStatus(200);
         $response->assertSee('test-with-errors.xlsx');
         $response->assertSee('primary_phone');
         $response->assertSee('Nomor HP sudah terdaftar di database.');
 
         // Test Export CSV Page
-        $responseExport = $this->actingAs($owner)->get('/reports/imports/' . $batch->id . '/export');
+        $responseExport = $this->actingAs($owner)->get('/reports/imports/'.$batch->id.'/export');
         $responseExport->assertStatus(200);
         $responseExport->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        
+
         $content = $responseExport->streamedContent();
         $this->assertStringContainsString('test-with-errors.xlsx', $content);
         $this->assertStringContainsString('primary_phone', $content);

@@ -68,7 +68,7 @@ class CustomerController extends Controller
 
         $query = Customer::query()
             ->applyUserScope()
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice']);
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice']);
 
         // Search filter
         if ($search !== '') {
@@ -160,7 +160,15 @@ class CustomerController extends Controller
             $query->orderBy('customer_code', 'asc');
         }
 
-        $customers = $query->paginate(10)->withQueryString();
+        // Baris per halaman — staf yang memproses ratusan baris lebih butuh
+        // melihat banyak sekaligus. Whitelist supaya tidak bisa disetel ke nilai
+        // ekstrem lewat query string.
+        $perPage = (int) request('per_page', 10);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 10;
+        }
+
+        $customers = $query->paginate($perPage)->withQueryString();
 
         // Untuk grup "failed" (Pelanggan Gagal), ambil alasan & tanggal penolakan
         // dari AuditLog transisi terakhir ke status 'rejected' per customer.
@@ -224,6 +232,14 @@ class CustomerController extends Controller
         // Total is active + suspended customers
         $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
 
+        // Jumlah pelanggan aktif dengan invoice lewat tempo (untuk summary strip)
+        $overdueCount = Invoice::whereHas('customer', function ($q) {
+            $q->applyUserScope()->where('status', 'active');
+        })
+            ->where('invoice_status', '!=', 'lunas')
+            ->where('due_date', '<', now())
+            ->count();
+
         return view('customers.index', compact(
             'customers',
             'districts',
@@ -231,6 +247,7 @@ class CustomerController extends Controller
             'pops',
             'statusCounts',
             'totalCustomers',
+            'overdueCount',
             'subscriptionStatuses',
             'search',
             'status',
@@ -885,7 +902,9 @@ class CustomerController extends Controller
         // - REQ ID murni (RQ######): pending, survey, pemasangan, installed, terminated
         // - CID lengkap (D2X6CRQ######_DESA_NAMA): aktif + punya distribusi
         // - Format default (C00RQ######): aktif tanpa distribusi
-        $customer->load(['pop', 'distribution', 'miniPop']); // pastikan relasi dimuat untuk accessor
+        // loadMissing(): `pop` sudah termasuk di load() 17-relasi beberapa baris di
+        // atas, dan load() akan menembak DB lagi untuk relasi yang sudah dimuat.
+        $customer->loadMissing(['pop', 'distribution', 'miniPop']); // pastikan relasi dimuat untuk accessor
         $displayId = $customer->display_id;
         $displayIdLabel = $customer->display_id_label;
 
@@ -985,11 +1004,17 @@ class CustomerController extends Controller
                 }
             })
             ->orderBy('created_at', 'desc')
+            // audit_logs tidak pernah dipangkas — pelanggan berumur 3 tahun bisa
+            // menumpuk ratusan baris dan SEMUANYA dirender ke satu halaman detail.
+            // Dibatasi ke 50 terbaru; riwayat lengkap tetap bisa dilihat lewat
+            // halaman Riwayat tersendiri.
+            ->limit(50)
             ->get();
 
         $statusLogs = CustomerStatusLog::with('user.role')
             ->where('customer_id', $customer->id)
             ->orderBy('created_at', 'desc')
+            ->limit(50)
             ->get();
 
         // 2. Tasks & FopTasks untuk Riwayat Ticketing

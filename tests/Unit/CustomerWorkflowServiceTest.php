@@ -2,15 +2,15 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
-use App\Models\Customer;
-use App\Models\AuditLog;
 use App\Enums\WorkflowTransition;
+use App\Models\AuditLog;
+use App\Models\Customer;
+use App\Models\User;
 use App\Services\CustomerWorkflowService;
 use Exception;
-use InvalidArgumentException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
+use Tests\TestCase;
 
 class CustomerWorkflowServiceTest extends TestCase
 {
@@ -21,8 +21,8 @@ class CustomerWorkflowServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new CustomerWorkflowService();
-        $user = \App\Models\User::factory()->create();
+        $this->service = new CustomerWorkflowService;
+        $user = User::factory()->create();
         $this->actingAs($user);
     }
 
@@ -46,7 +46,7 @@ class CustomerWorkflowServiceTest extends TestCase
         $customer = $this->createCustomer('registered');
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("Cannot transition from registered to active.");
+        $this->expectExceptionMessage('Cannot transition from registered to active.');
 
         $this->service->transition($customer, WorkflowTransition::ACTIVE);
     }
@@ -56,22 +56,22 @@ class CustomerWorkflowServiceTest extends TestCase
         $customer = $this->createCustomer('registered');
 
         $this->expectException(InvalidArgumentException::class);
-        
+
         $this->service->transition($customer, 'invalid_status');
     }
-    
+
     public function test_transition_creates_audit_log()
     {
         $customer = $this->createCustomer('waiting_survey');
-        
+
         $this->service->transition($customer, WorkflowTransition::SURVEY_IN_PROGRESS, 'Starting survey');
-        
+
         $this->assertDatabaseHas('audit_logs', [
             'auditable_id' => $customer->id,
             'auditable_type' => Customer::class,
-            'action' => 'status_transition'
+            'action' => 'status_transition',
         ]);
-        
+
         $log = AuditLog::where('auditable_id', $customer->id)->where('action', 'status_transition')->first();
         $this->assertEquals('waiting_survey', $log->old_values['status']);
         $this->assertEquals('survey_in_progress', $log->new_values['status']);

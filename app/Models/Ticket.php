@@ -59,7 +59,7 @@ class Ticket extends Model
      */
     public function customerMapsUrl(): ?string
     {
-        if (!$this->customer_latitude || !$this->customer_longitude) {
+        if (! $this->customer_latitude || ! $this->customer_longitude) {
             return null;
         }
 
@@ -128,7 +128,7 @@ class Ticket extends Model
     {
         $status = $this->resolveStatus();
 
-        if (!$status) {
+        if (! $status) {
             return TicketBucket::DIBATALKAN;
         }
 
@@ -169,7 +169,7 @@ class Ticket extends Model
     {
         $status = $this->resolveStatus();
 
-        if (!$status) {
+        if (! $status) {
             return 'Terputus';
         }
 
@@ -180,7 +180,7 @@ class Ticket extends Model
     {
         $status = $this->resolveStatus();
 
-        if (!$status) {
+        if (! $status) {
             return 'bg-slate-100 text-slate-600 border-slate-200';
         }
 

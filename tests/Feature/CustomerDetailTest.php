@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use Database\Seeders\CustomerSeeder;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,7 +16,7 @@ class CustomerDetailTest extends TestCase
     {
         // 1. Seed database with master data and customer records
         $this->seed(DatabaseSeeder::class);
-        $this->seed(\Database\Seeders\CustomerSeeder::class);
+        $this->seed(CustomerSeeder::class);
         $this->loginAsAdmin();
 
         // 2. Retrieve first seeded customer with active status
@@ -44,7 +45,7 @@ class CustomerDetailTest extends TestCase
             'Tagihan',
             'Pembayaran',
             'Dokumen',
-            'Riwayat Perubahan'
+            'Riwayat Perubahan',
         ];
 
         foreach ($tabs as $tab) {

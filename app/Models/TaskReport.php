@@ -22,13 +22,13 @@ class TaskReport extends Model
     protected function casts(): array
     {
         return [
-            'started_at'              => 'datetime',
-            'pending_at'               => 'datetime',
-            'resumed_at'               => 'datetime',
-            'completed_at'             => 'datetime',
-            'total_duration_minutes'   => 'integer',
-            'sla_target_minutes'       => 'integer',
-            'sla_overrun_minutes'      => 'integer',
+            'started_at' => 'datetime',
+            'pending_at' => 'datetime',
+            'resumed_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'total_duration_minutes' => 'integer',
+            'sla_target_minutes' => 'integer',
+            'sla_overrun_minutes' => 'integer',
         ];
     }
 
@@ -46,7 +46,7 @@ class TaskReport extends Model
     {
         $minutes = $this->total_duration_minutes;
 
-        if (!$this->completed_at) {
+        if (! $this->completed_at) {
             $cycleStart = $this->resumed_at ?? $this->started_at;
             if ($cycleStart) {
                 $minutes += $cycleStart->diffInMinutes(now());

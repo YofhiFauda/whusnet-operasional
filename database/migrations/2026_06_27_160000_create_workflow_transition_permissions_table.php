@@ -23,9 +23,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
             $table->foreignId('workflow_transition_permission_id')
-                  ->constrained('workflow_transition_permissions')
-                  ->onDelete('cascade')
-                  ->name('fk_role_wf_trans_perm_id');
+                ->constrained('workflow_transition_permissions')
+                ->onDelete('cascade')
+                ->name('fk_role_wf_trans_perm_id');
             $table->timestamp('created_at')->useCurrent();
         });
     }

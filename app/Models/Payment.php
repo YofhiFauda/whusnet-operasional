@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use App\Enums\PaymentStatus;
+use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Payment extends Model
 {
-    use \App\Traits\HasPopScope;
+    use HasPopScope;
+
     protected $fillable = [
         'payment_number',
         'old_payment_id',
@@ -126,8 +128,6 @@ class Payment extends Model
         return $this->morphMany(AuditLog::class, 'auditable')->latest('created_at');
     }
 
-
-
     /**
      * @return array<string, mixed>
      */
@@ -155,8 +155,8 @@ class Payment extends Model
     }
 
     /**
-     * @param array<string, mixed>|null $oldValues
-     * @param array<string, mixed>|null $newValues
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
      */
     private function writeAuditLog(string $action, ?array $oldValues, ?array $newValues): void
     {

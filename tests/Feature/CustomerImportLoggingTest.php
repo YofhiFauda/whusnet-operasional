@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
-use App\Models\InternetPackage;
 use App\Models\ImportBatch;
-use App\Models\ImportError;
+use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +21,7 @@ class CustomerImportLoggingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(VerifyCsrfToken::class);
     }
 
     public function test_confirm_import_creates_batch_log_and_stores_errors(): void
@@ -76,7 +76,7 @@ class CustomerImportLoggingTest extends TestCase
                     'phone' => '087700000003',
                     'village_id' => $village->id,
                     'pop_id' => $pop->id,
-                ]
+                ],
             ],
             'packages' => [],
             'services' => [],
@@ -87,11 +87,11 @@ class CustomerImportLoggingTest extends TestCase
 
         $response = $this->post('/customers/import/confirm', [
             'sheets' => json_encode($sheets),
-            'file_name' => 'test-import.xlsx'
+            'file_name' => 'test-import.xlsx',
         ]);
 
         $response->assertRedirect('/customers');
-        
+
         // Assert ImportBatch created
         $this->assertDatabaseHas('import_batches', [
             'file_name' => 'test-import.xlsx',
@@ -124,7 +124,7 @@ class CustomerImportLoggingTest extends TestCase
         $customer = Customer::where('full_name', 'Valid Customer')->first();
         $this->assertNotNull($customer);
         $this->assertNotNull($customer->customer_code);
-        
+
         $this->assertDatabaseHas('customer_addresses', [
             'customer_id' => $customer->id,
             'village_id' => $village->id,

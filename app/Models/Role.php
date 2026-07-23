@@ -12,6 +12,7 @@ class Role extends Model
     use RecordsAuditLogs;
 
     protected string $auditModule = 'Role Management';
+
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     public function isFullAccessRole(): bool
@@ -38,6 +39,7 @@ class Role extends Model
     public function isProtected(): bool
     {
         $protected = config('rbac.protected_roles', ['owner']);
+
         return in_array($this->code, $protected, true);
     }
 
@@ -48,10 +50,8 @@ class Role extends Model
      * 1. Owner selalu bisa mengelola semua role.
      * 2. Role Owner hanya bisa dikelola oleh user Owner.
      * 3. Role lain: cek rbac.role_management_scope.
-     *
-     * @param \App\Models\User $user
      */
-    public function canBeManagedBy(\App\Models\User $user): bool
+    public function canBeManagedBy(User $user): bool
     {
         $userRoleCode = $user->role?->code;
 
@@ -77,10 +77,8 @@ class Role extends Model
      *
      * Owner dapat membuat role apa saja.
      * Role lain tidak dapat membuat role baru (create = Owner only).
-     *
-     * @param \App\Models\User $user
      */
-    public static function canBeCreatedBy(\App\Models\User $user): bool
+    public static function canBeCreatedBy(User $user): bool
     {
         return $user->role?->code === 'owner';
     }
@@ -124,6 +122,6 @@ class Role extends Model
             'id',
             'permission_name'
         )->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
-         ->whereColumn('permissions.code', 'workflow_transition_permissions.permission_name');
+            ->whereColumn('permissions.code', 'workflow_transition_permissions.permission_name');
     }
 }

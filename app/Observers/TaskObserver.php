@@ -26,13 +26,13 @@ class TaskObserver
     {
         $this->syncTaskReport($task);
 
-        if (!$task->wasChanged(['status', 'report_deferred', 'fop_review_status'])) {
+        if (! $task->wasChanged(['status', 'report_deferred', 'fop_review_status'])) {
             return;
         }
 
         $fopTask = FopTask::where('task_id', $task->id)->first();
 
-        if (!$fopTask) {
+        if (! $fopTask) {
             return;
         }
 
@@ -55,9 +55,9 @@ class TaskObserver
         FopTaskStatusHistory::create([
             'fop_task_id' => $fopTask->id,
             'from_status' => $fromStatus,
-            'to_status'   => $historyLabel,
-            'changed_by'  => auth()->id(),
-            'changed_at'  => now(),
+            'to_status' => $historyLabel,
+            'changed_by' => auth()->id(),
+            'changed_at' => now(),
         ]);
     }
 
@@ -73,14 +73,14 @@ class TaskObserver
      */
     private function syncTaskReport(Task $task): void
     {
-        if (!$task->wasChanged('status')) {
+        if (! $task->wasChanged('status')) {
             return;
         }
 
         if ($task->status === TaskStatus::IN_PROGRESS) {
             $report = TaskReport::firstOrNew(['task_id' => $task->id]);
 
-            if (!$report->exists) {
+            if (! $report->exists) {
                 $report->started_at = $task->started_at ?? now();
                 $report->sla_target_minutes = $task->sla_minutes;
             } else {
@@ -95,7 +95,7 @@ class TaskObserver
         if ($task->status === TaskStatus::PENDING) {
             $report = TaskReport::where('task_id', $task->id)->first();
 
-            if (!$report) {
+            if (! $report) {
                 return;
             }
 
@@ -109,7 +109,7 @@ class TaskObserver
         if ($task->status === TaskStatus::SELESAI) {
             $report = TaskReport::where('task_id', $task->id)->first();
 
-            if (!$report) {
+            if (! $report) {
                 return;
             }
 
@@ -159,7 +159,7 @@ class TaskObserver
 
         $historyLabel = match (true) {
             $task->status === TaskStatus::PENDING && $task->report_deferred => 'lapor_nanti',
-            $task->status === TaskStatus::PENDING && !$task->report_deferred => 'pending_fop',
+            $task->status === TaskStatus::PENDING && ! $task->report_deferred => 'pending_fop',
             $task->status === TaskStatus::SELESAI && $task->fop_review_status === 'approved' => 'selesai',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask && $task->fop_review_status === 'rejected' => 'selesai_ditolak_verifikasi',
             $task->status === TaskStatus::SELESAI && $isCustomerDecisionTask => 'selesai_menunggu_verifikasi',

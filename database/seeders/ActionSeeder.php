@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Action;
 use App\Enums\ActionCode;
+use App\Models\Action;
 use Illuminate\Database\Seeder;
 
 class ActionSeeder extends Seeder

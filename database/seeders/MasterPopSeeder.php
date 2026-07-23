@@ -59,7 +59,7 @@ class MasterPopSeeder extends Seeder
                         'code' => $distributionCode,
                     ],
                     [
-                        'description' => 'Distribusi Jetis ' . $code . ' ' . $distributionCode,
+                        'description' => 'Distribusi Jetis '.$code.' '.$distributionCode,
                     ]
                 );
             }
@@ -119,7 +119,7 @@ class MasterPopSeeder extends Seeder
                         'code' => $distributionCode,
                     ],
                     [
-                        'description' => 'Distribusi Siman ' . $code . ' ' . $distributionCode,
+                        'description' => 'Distribusi Siman '.$code.' '.$distributionCode,
                     ]
                 );
             }

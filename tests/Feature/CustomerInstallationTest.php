@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -18,9 +21,9 @@ class CustomerInstallationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
 
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
     }
 
     public function test_technician_can_fill_installation(): void
@@ -146,7 +149,7 @@ class CustomerInstallationTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -162,7 +165,7 @@ class CustomerInstallationTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP,
+            'scope_type' => ScopeType::ALL_POP,
         ]);
 
         return $user;

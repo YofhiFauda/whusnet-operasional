@@ -10,13 +10,13 @@ namespace App\Enums;
  */
 enum TicketHistoryAction: string
 {
-    case DIBUAT     = 'dibuat';
+    case DIBUAT = 'dibuat';
     case DIBATALKAN = 'dibatalkan';
 
     public function label(): string
     {
         return match ($this) {
-            self::DIBUAT     => 'Ticket dikirim',
+            self::DIBUAT => 'Ticket dikirim',
             self::DIBATALKAN => 'Ticket dibatalkan',
         };
     }
@@ -24,7 +24,7 @@ enum TicketHistoryAction: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::DIBUAT     => 'bg-sky-50 border-sky-200 text-sky-700',
+            self::DIBUAT => 'bg-sky-50 border-sky-200 text-sky-700',
             self::DIBATALKAN => 'bg-red-50 border-red-200 text-red-700',
         };
     }

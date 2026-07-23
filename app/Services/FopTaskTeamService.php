@@ -8,6 +8,7 @@ use App\Models\FopTask;
 use App\Models\FopTaskTeam;
 use App\Models\Task;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class FopTaskTeamService
@@ -33,7 +34,10 @@ class FopTaskTeamService
             $start = $date->copy()->startOfDay();
             $end = $date->copy()->endOfDay();
 
-            $tasks = FopTask::with('technicians:id,name')
+            // `task` ikut di-eager-load karena syncExecutionTaskTitle() di ujung
+            // method ini menyentuhnya untuk SETIAP task — tanpa ini satu query
+            // per task, dan rebuild dipanggil tiap kali jadwal berubah.
+            $tasks = FopTask::with(['technicians:id,name', 'task'])
                 ->whereBetween('task_date', [$start, $end])
                 ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
                 ->orderBy('id')
@@ -85,6 +89,7 @@ class FopTaskTeamService
 
                 if (count($ids) === 1) {
                     $soloTasks[] = $task;
+
                     continue;
                 }
 
@@ -141,7 +146,7 @@ class FopTaskTeamService
                 // teknisi yang tersisa bakal kelempar keluar dari teamnya sendiri dan
                 // teamnya ikut kehapus di step cleanup (lihat analisa-sync-execution-task.md).
                 $existingTeam = $existingTeamOf[$id] ?? null;
-                if ($existingTeam !== null && !isset($rootTeam[$root])) {
+                if ($existingTeam !== null && ! isset($rootTeam[$root])) {
                     $rootTeam[$root] = $existingTeam;
                 }
 
@@ -167,7 +172,7 @@ class FopTaskTeamService
                 $team = $teamId ? FopTaskTeam::find($teamId) : null;
                 $oldValues = $team ? $team->load('members:id,name')->toArray() : null;
 
-                if (!$team) {
+                if (! $team) {
                     $team = FopTaskTeam::create([
                         'name' => $this->nextTeamName($date),
                         'work_date' => $date->toDateString(),
@@ -216,14 +221,14 @@ class FopTaskTeamService
                 ->unique()
                 ->all();
 
-            FopTaskTeam::whereDate('work_date', $date->toDateString())
+            FopTaskTeam::whereBetween('work_date', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
                 ->get()
                 ->each(function (FopTaskTeam $team) use ($protectedTeamIds) {
                     if (in_array($team->id, $protectedTeamIds, true)) {
                         return;
                     }
 
-                    if (!$team->isActive()) {
+                    if (! $team->isActive()) {
                         $oldValues = $team->load('members:id,name')->toArray();
                         $team->members()->detach();
                         $team->delete();
@@ -237,8 +242,14 @@ class FopTaskTeamService
             // Sinkron nama team ke execution Task (`tasks.title`) buat semua task yang
             // ke-sentuh rebuild ini — biar teknisi di /tasks-saya & detail task gak lihat
             // nama team basi (lihat analisa-sync-execution-task.md bagian 6).
+            // Nama team dipungut SEKALI di sini, bukan lewat relasi `team` yang
+            // di-eager-load di awal method: `team_id` baru ditentukan di dalam
+            // method ini, jadi relasi yang dimuat sebelum mutasi pasti basi.
+            $teamNames = FopTaskTeam::whereIn('id', $tasks->pluck('team_id')->filter()->unique()->all())
+                ->pluck('name', 'id');
+
             foreach ($tasks as $task) {
-                $this->syncExecutionTaskTitle($task);
+                $this->syncExecutionTaskTitle($task, $teamNames);
             }
 
             return ['conflicts' => $conflicts];
@@ -253,19 +264,19 @@ class FopTaskTeamService
      * gak mancing notifikasi/reassignment/side-effect lain, dan gak recurse
      * balik manggil rebuildTeamsForDate() lewat TaskService::syncToFopTask().
      */
-    private function syncExecutionTaskTitle(FopTask $fopTask): void
+    private function syncExecutionTaskTitle(FopTask $fopTask, Collection $teamNames): void
     {
-        if (!$fopTask->task_id) {
+        if (! $fopTask->task_id) {
             return;
         }
 
-        $execTask = $fopTask->task ?: Task::find($fopTask->task_id);
-        if (!$execTask) {
+        $execTask = $fopTask->relationLoaded('task') ? $fopTask->task : Task::find($fopTask->task_id);
+        if (! $execTask) {
             return;
         }
 
-        $teamName = $fopTask->team_id ? $fopTask->team?->name : null;
-        $baseTitle = 'FOP: ' . $fopTask->tugas;
+        $teamName = $fopTask->team_id ? ($teamNames[$fopTask->team_id] ?? null) : null;
+        $baseTitle = 'FOP: '.$fopTask->tugas;
         $newTitle = $teamName ? "[{$teamName}] {$baseTitle}" : $baseTitle;
 
         if ($execTask->title !== $newTitle) {
@@ -281,7 +292,7 @@ class FopTaskTeamService
      */
     public function nextTeamName(Carbon $date): string
     {
-        $usedNumbers = FopTaskTeam::whereDate('work_date', $date->toDateString())
+        $usedNumbers = FopTaskTeam::whereBetween('work_date', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
             ->pluck('name')
             ->map(fn ($name) => (int) preg_replace('/[^0-9]/', '', $name))
             ->filter()
@@ -292,6 +303,6 @@ class FopTaskTeamService
             $n++;
         }
 
-        return 'Team ' . $n;
+        return 'Team '.$n;
     }
 }

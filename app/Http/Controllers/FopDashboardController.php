@@ -14,16 +14,17 @@ use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
+use App\Services\TeknisiWorkloadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class FopDashboardController extends Controller
 {
     public function __construct(
-        private readonly EffectiveAccessService $accessService
+        private readonly EffectiveAccessService $accessService,
+        private readonly TeknisiWorkloadService $teknisiWorkload
     ) {}
 
     /**
@@ -38,6 +39,8 @@ class FopDashboardController extends Controller
         $hasAllPopAccess = $this->accessService->hasAllPopAccess($user);
         $allowedPopIds = $this->accessService->getAllowedPopIds($user);
         $today = Carbon::today();
+        $startOfToday = $today->copy()->startOfDay();
+        $endOfToday = $today->copy()->endOfDay();
 
         // ── Antrean survey: pelanggan yang belum disurvey ───────────
         // Countdown Survey: (customers.created_at + 1 hari) - sekarang
@@ -93,7 +96,9 @@ class FopDashboardController extends Controller
 
         $todayTaskCounts = Task::applyUserScope($user)
             ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::SELESAI->value])
-            ->whereDate('scheduled_at', $today)
+            // scheduled_at bertipe timestamp — rentang eksplisit supaya index
+            // tanggal bisa dipakai (whereDate() membungkusnya jadi DATE(...)).
+            ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
             ->get(['status']);
 
         $stats = [
@@ -107,13 +112,17 @@ class FopDashboardController extends Controller
         ];
 
         // ── Teknisi di POP yang sama (static, real-time di T009) ────
-        $teknisiList = $this->getTeknisiList($hasAllPopAccess, $allowedPopIds, $today);
+        $teknisiList = $this->teknisiWorkload->summarize($hasAllPopAccess, $allowedPopIds, $today);
 
         // ── Tim Gabungan Aktif Hari Ini ──────────────────────────────
-        $activeTeams = Task::with(['customer', 'pop', 'teamMembers.user'])
+        // village/district/city ikut karena `clean_address` (dipakai di map di bawah)
+        // membaca ketiganya — tanpa eager load ini 3 query per task.
+        $activeTeams = Task::with(['customer.village', 'customer.district', 'customer.city', 'pop', 'teamMembers.user'])
             ->applyUserScope($user)
             ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-            ->whereDate('scheduled_at', $today)
+            // scheduled_at bertipe timestamp — rentang eksplisit supaya index
+            // tanggal bisa dipakai (whereDate() membungkusnya jadi DATE(...)).
+            ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
             ->has('teamMembers', '>', 1)
             ->orderBy('scheduled_at')
             ->get()
@@ -139,14 +148,39 @@ class FopDashboardController extends Controller
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
 
         // ── Team FOP Aktif — card per team, list task + footer avatar ────
+        // Dibatasi ke work_date hari ini. Sebelumnya SELURUH team yang pernah ada
+        // dimuat lengkap dengan anak-anaknya lalu difilter di PHP —
+        // FopTaskTeamService::rebuildTeamsForDate() membuat team baru tiap tanggal
+        // kerja, jadi setelah setahun operasi itu 300+ team per refresh dashboard.
+        // Keputusan produk (2026-07-22): papan FOP = hari ini saja. Task yang tidak
+        // selesai hari ini harus di-pending teknisi supaya terjadwal ulang, bukan
+        // dibiarkan menggantung di papan kemarin.
         $activeFopTeams = FopTaskTeam::with([
             'members',
             'fopTasks.technicians',
-            'fopTasks.customer',
+            'fopTasks.customer.village',
+            'fopTasks.customer.district',
+            'fopTasks.customer.city',
             'fopTasks.task',
         ])
+            // Rentang, bukan `where('work_date', $tanggal)`: MySQL menyimpan
+            // work_date sebagai DATE, tapi sqlite (dipakai test) tidak punya tipe
+            // DATE dan menyimpannya sebagai '2026-07-22 00:00:00'. Perbandingan
+            // sama-dengan jadi tidak cocok di sqlite. Bentuk rentang benar di
+            // kedua engine DAN tetap bisa memakai index.
+            ->whereBetween('work_date', [$startOfToday, $endOfToday])
             ->get()
-            ->filter->isActive()
+            // Filter koleksi yang SUDAH dimuat, bukan `->filter->isActive()`:
+            // isActive() memanggil relasi fopTasks() lewat query baru, jadi
+            // eager load di atas terbuang dan lahir 1 query per team.
+            // Pola ini menyalin FopTaskController:153-156 yang sudah benar.
+            ->filter(fn (FopTaskTeam $team) => $team->fopTasks->contains(
+                fn (FopTask $t) => ! in_array(
+                    $t->status->value,
+                    [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value],
+                    true
+                )
+            ))
             ->when(! $hasAllPopAccess, fn ($teams) => $teams->filter(
                 fn (FopTaskTeam $team) => $team->fopTasks->contains(
                     fn (FopTask $t) => in_array($t->pop_id, $allowedPopIds)
@@ -330,60 +364,6 @@ class FopDashboardController extends Controller
     }
 
     // ─── Private Helpers ─────────────────────────────────────────
-
-    private function getTeknisiList(bool $hasAllPopAccess, array $allowedPopIds, Carbon $today): Collection
-    {
-        $query = User::with(['roleScopes.targets'])
-            ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
-            ->orderBy('name');
-
-        if (! $hasAllPopAccess) {
-            $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
-        }
-
-        return $query->get()->map(function (User $teknisi) use ($today) {
-            // Task in progress aktif (terlepas dari tanggal, untuk status & lokasi)
-            $activeTask = Task::with('customer')
-                ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
-                ->where('status', TaskStatus::IN_PROGRESS->value)
-                ->latest('started_at')
-                ->first();
-
-            // Hitung task terjadwal hari ini + task terjadwal/in_progress overdue (sebelum hari ini)
-            $taskCount = Task::whereHas('teamMembers', fn ($q) => $q->where('user_id', $teknisi->id))
-                ->where(function ($q) use ($today) {
-                    $q->where(function ($q1) use ($today) {
-                        $q1->where('status', TaskStatus::TERJADWAL->value)
-                            ->whereDate('scheduled_at', $today);
-                    })
-                        ->orWhere(function ($q2) use ($today) {
-                            $q2->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-                                ->whereDate('scheduled_at', '<', $today);
-                        });
-                })
-                ->count();
-
-            // Tentukan status: aktif (jika ada task in progress), terjadwal (jika ada scheduled/overdue), standby (jika tidak ada)
-            $status = 'standby';
-            if ($activeTask) {
-                $status = 'aktif';
-            } elseif ($taskCount > 0) {
-                $status = 'terjadwal';
-            }
-
-            // Lokasi terakhir dari alamat customer pada task in progress
-            $location = $activeTask ? ($activeTask->customer?->clean_address ?? 'Tidak Diketahui') : '-';
-
-            return [
-                'id' => $teknisi->id,
-                'name' => $teknisi->name,
-                'initials' => $this->initials($teknisi->name),
-                'status' => $status,
-                'task_count' => $taskCount,
-                'location' => $location,
-            ];
-        });
-    }
 
     private function initials(string $name): string
     {

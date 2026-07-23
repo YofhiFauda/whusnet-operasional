@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
-use App\Models\City;
 use App\Models\District;
 use App\Models\Village;
-use App\Models\Pop;
+use Database\Seeders\CustomerSeeder;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,7 +20,7 @@ class CustomerAddressModelTest extends TestCase
     {
         // Seed standard tables (including region master)
         $this->seed(DatabaseSeeder::class);
-        $this->seed(\Database\Seeders\CustomerSeeder::class);
+        $this->seed(CustomerSeeder::class);
 
         // Retrieve seeded records
         $customer = Customer::firstOrFail();
@@ -77,7 +77,7 @@ class CustomerAddressModelTest extends TestCase
     public function test_customer_address_is_deleted_on_customer_cascade(): void
     {
         $this->seed(DatabaseSeeder::class);
-        $this->seed(\Database\Seeders\CustomerSeeder::class);
+        $this->seed(CustomerSeeder::class);
         $customer = Customer::firstOrFail();
 
         // Create Address

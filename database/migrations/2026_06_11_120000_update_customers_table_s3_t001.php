@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -13,31 +13,31 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            if (!Schema::hasColumn('customers', 'old_customer_id')) {
+            if (! Schema::hasColumn('customers', 'old_customer_id')) {
                 $table->string('old_customer_id', 50)->nullable()->after('customer_code');
             }
-            if (!Schema::hasColumn('customers', 'cid')) {
+            if (! Schema::hasColumn('customers', 'cid')) {
                 $table->string('cid', 50)->nullable()->after('old_customer_id');
             }
-            if (!Schema::hasColumn('customers', 'primary_phone')) {
+            if (! Schema::hasColumn('customers', 'primary_phone')) {
                 $table->string('primary_phone', 20)->nullable()->after('gender');
             }
-            if (!Schema::hasColumn('customers', 'alternative_phone')) {
+            if (! Schema::hasColumn('customers', 'alternative_phone')) {
                 $table->string('alternative_phone', 20)->nullable()->after('primary_phone');
             }
-            if (!Schema::hasColumn('customers', 'data_completeness_status')) {
+            if (! Schema::hasColumn('customers', 'data_completeness_status')) {
                 $table->string('data_completeness_status', 50)->default('draft')->after('registration_date');
             }
-            if (!Schema::hasColumn('customers', 'customer_status')) {
+            if (! Schema::hasColumn('customers', 'customer_status')) {
                 $table->string('customer_status', 50)->default('calon_pelanggan')->after('data_completeness_status');
             }
-            if (!Schema::hasColumn('customers', 'pop_id')) {
+            if (! Schema::hasColumn('customers', 'pop_id')) {
                 $table->foreignId('pop_id')->nullable()->after('customer_status')->constrained('pops')->nullOnDelete();
             }
-            if (!Schema::hasColumn('customers', 'created_by')) {
+            if (! Schema::hasColumn('customers', 'created_by')) {
                 $table->foreignId('created_by')->nullable()->after('updated_at')->constrained('users')->nullOnDelete();
             }
-            if (!Schema::hasColumn('customers', 'updated_by')) {
+            if (! Schema::hasColumn('customers', 'updated_by')) {
                 $table->foreignId('updated_by')->nullable()->after('created_by')->constrained('users')->nullOnDelete();
             }
         });

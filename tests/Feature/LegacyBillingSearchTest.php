@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerService;
+use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
-use App\Models\InternetPackage;
-use App\Models\CustomerService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -30,7 +30,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG001',
             'name' => 'Test Package',
@@ -96,7 +96,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG002',
             'name' => 'Test Package 2',
@@ -163,7 +163,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG003',
             'name' => 'Test Package 3',

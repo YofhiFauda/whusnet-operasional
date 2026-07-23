@@ -79,7 +79,7 @@ class CustomerService extends Model
      */
     public function activatedBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'activated_by_user_id');
+        return $this->belongsTo(User::class, 'activated_by_user_id');
     }
 
     /**

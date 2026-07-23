@@ -2,17 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
-use App\Models\InternetPackage;
-use App\Models\Pop;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\CustomerTechnicalDetail;
+use App\Models\Pop;
+use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Spatie\SimpleExcel\SimpleExcelWriter;
 use Tests\TestCase;
 
 class CustomerImportTest extends TestCase
@@ -57,7 +57,7 @@ class CustomerImportTest extends TestCase
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
-        
+
         $pop = Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
@@ -78,7 +78,7 @@ class CustomerImportTest extends TestCase
                     'upload_speed' => '10',
                     'package_type' => 'Broadband',
                     'category' => 'Home',
-                ]
+                ],
             ],
             'customers' => [
                 [
@@ -94,7 +94,7 @@ class CustomerImportTest extends TestCase
                     'pop_name' => 'POP Test',
                     'gender' => 'Laki-laki',
                     'identity_number' => '3502181010900001',
-                ]
+                ],
             ],
             'services' => [
                 [
@@ -104,7 +104,7 @@ class CustomerImportTest extends TestCase
                     'service_status' => 'aktif',
                     'activation_date' => '2026-01-01',
                     'due_date' => '2026-02-01',
-                ]
+                ],
             ],
             'technical_details' => [
                 [
@@ -121,7 +121,7 @@ class CustomerImportTest extends TestCase
                     'fiber_signal' => '-19',
                     'location_source' => 'POLE-01',
                     'note' => 'Migrasi lancar',
-                ]
+                ],
             ],
             'invoices' => [
                 [
@@ -132,7 +132,7 @@ class CustomerImportTest extends TestCase
                     'issue_date' => '2026-01-01',
                     'due_date' => '2026-01-10',
                     'status' => 'belum_dibayar',
-                ]
+                ],
             ],
             'payments' => [
                 [
@@ -141,20 +141,20 @@ class CustomerImportTest extends TestCase
                     'amount' => '166500',
                     'payment_date' => '2026-01-05',
                     'payment_method' => 'cash',
-                ]
+                ],
             ],
         ];
 
         $response = $this->postJson('/customers/import/validate', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
 
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
-        
+
         $data = $response->json();
         $this->assertArrayHasKey('sheets', $data);
-        
+
         $this->assertEquals('valid', $data['sheets']['packages']['rows'][0]['status_row']);
         $this->assertEquals('valid', $data['sheets']['customers']['rows'][0]['status_row']);
         $this->assertEquals('valid', $data['sheets']['services']['rows'][0]['status_row']);
@@ -174,7 +174,7 @@ class CustomerImportTest extends TestCase
                     'old_package_id' => '', // Error: wajib diisi
                     'name' => '', // Error: wajib diisi
                     'monthly_price' => 'abc', // Error: harus angka
-                ]
+                ],
             ],
             'customers' => [
                 [
@@ -186,7 +186,7 @@ class CustomerImportTest extends TestCase
                     'district' => 'Kecamatan Fiktif',
                     'city' => 'Kota Fiktif',
                     'pop_code' => 'NONEXISTENT', // Error: POP tidak ditemukan
-                ]
+                ],
             ],
             'services' => [
                 [
@@ -194,13 +194,13 @@ class CustomerImportTest extends TestCase
                     'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
                     'old_package_id' => 'PKG-NONEXISTENT', // Error: package tidak ditemukan
                     'service_status' => 'status_salah', // Error: status tidak valid
-                ]
+                ],
             ],
             'technical_details' => [
                 [
                     'old_report_id' => 'REP-LEGACY-2',
                     'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
-                ]
+                ],
             ],
             'invoices' => [
                 [
@@ -208,7 +208,7 @@ class CustomerImportTest extends TestCase
                     'old_customer_id' => 'CUST-NONEXISTENT', // Error: customer tidak ditemukan
                     'billing_period' => '2026/01', // Error: format YYYY-MM
                     'total_amount' => 'abc', // Error: harus angka
-                ]
+                ],
             ],
             'payments' => [
                 [
@@ -216,17 +216,17 @@ class CustomerImportTest extends TestCase
                     'old_invoice_id' => 'INV-NONEXISTENT', // Error: invoice tidak ditemukan
                     'amount' => 'abc', // Error: harus angka
                     'payment_date' => 'tanggal-salah', // Error: tidak valid
-                ]
+                ],
             ],
         ];
 
         $response = $this->postJson('/customers/import/validate', [
-            'sheets' => $sheets
+            'sheets' => $sheets,
         ]);
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $this->assertEquals('error', $data['sheets']['packages']['rows'][0]['status_row']);
         $this->assertContains('ID paket lama wajib diisi.', $data['sheets']['packages']['rows'][0]['errors']);
         $this->assertContains('Nama paket wajib diisi.', $data['sheets']['packages']['rows'][0]['errors']);
@@ -263,7 +263,7 @@ class CustomerImportTest extends TestCase
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
-        
+
         $pop = Pop::create([
             'code' => 'POP-TEST-2',
             'pop_code' => 'TS2',
@@ -285,7 +285,7 @@ class CustomerImportTest extends TestCase
                     'package_type' => 'Broadband',
                     'category' => 'Home',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'customers' => [
                 [
@@ -306,7 +306,7 @@ class CustomerImportTest extends TestCase
                     'gender' => 'Laki-laki',
                     'identity_number' => '3502181010900002',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'services' => [
                 [
@@ -317,7 +317,7 @@ class CustomerImportTest extends TestCase
                     'activation_date' => '2026-01-01',
                     'due_date' => '2026-02-01',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'technical_details' => [
                 [
@@ -335,7 +335,7 @@ class CustomerImportTest extends TestCase
                     'location_source' => 'POLE-05',
                     'note' => 'Pemasangan rapi',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'invoices' => [
                 [
@@ -347,7 +347,7 @@ class CustomerImportTest extends TestCase
                     'due_date' => '2026-01-10',
                     'status' => 'belum_dibayar',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'payments' => [
                 [
@@ -357,7 +357,7 @@ class CustomerImportTest extends TestCase
                     'payment_date' => '2026-01-05',
                     'payment_method' => 'cash',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
         ];
 
@@ -562,7 +562,7 @@ class CustomerImportTest extends TestCase
 
     public function test_validate_uploaded_xlsx_file_successfully(): void
     {
-        if (!class_exists(\ZipArchive::class)) {
+        if (! class_exists(\ZipArchive::class)) {
             $this->markTestSkipped('ZipArchive extension is required to write XLSX files');
         }
 
@@ -572,7 +572,7 @@ class CustomerImportTest extends TestCase
         $city = City::firstOrFail();
         $district = District::where('city_id', $city->id)->firstOrFail();
         $village = Village::where('district_id', $district->id)->firstOrFail();
-        
+
         $pop = Pop::create([
             'code' => 'POP-TEST-FILE',
             'pop_code' => 'TFL',
@@ -583,14 +583,14 @@ class CustomerImportTest extends TestCase
             'status' => 'active',
         ]);
 
-        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test-import-' . uniqid() . '.xlsx';
-        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($tempFile);
-        
+        $tempFile = sys_get_temp_dir().DIRECTORY_SEPARATOR.'test-import-'.uniqid().'.xlsx';
+        $writer = SimpleExcelWriter::create($tempFile);
+
         $writer->nameCurrentSheet('customers');
         $writer->addHeader(['old_customer_id', 'full_name', 'phone', 'primary_phone', 'full_address', 'village', 'district', 'city', 'pop_code', 'pop_name', 'gender', 'identity_number']);
         $writer->addRow([
-            'CUST-FILE-1', 'Budi Santoso', '081234567890', '081234567890', 'Jl. Pahlawan No. 10', 
-            $village->name, $district->name, $city->name, 'TFL', 'POP File Test', 'Laki-laki', '3502181010900001'
+            'CUST-FILE-1', 'Budi Santoso', '081234567890', '081234567890', 'Jl. Pahlawan No. 10',
+            $village->name, $district->name, $city->name, 'TFL', 'POP File Test', 'Laki-laki', '3502181010900001',
         ]);
 
         $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('packages');
@@ -615,7 +615,7 @@ class CustomerImportTest extends TestCase
 
         $writer->close();
 
-        $uploadedFile = new \Illuminate\Http\UploadedFile(
+        $uploadedFile = new UploadedFile(
             $tempFile,
             'template-import-pelanggan.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -624,12 +624,12 @@ class CustomerImportTest extends TestCase
         );
 
         $response = $this->post('/customers/import/validate', [
-            'file' => $uploadedFile
+            'file' => $uploadedFile,
         ]);
 
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
-        
+
         $data = $response->json();
         $this->assertEquals('valid', $data['sheets']['customers']['rows'][0]['status_row']);
         $this->assertEquals('valid', $data['sheets']['packages']['rows'][0]['status_row']);
@@ -641,23 +641,23 @@ class CustomerImportTest extends TestCase
 
     public function test_validate_uploaded_invalid_xlsx_file_fails_gracefully(): void
     {
-        if (!class_exists(\ZipArchive::class)) {
+        if (! class_exists(\ZipArchive::class)) {
             $this->markTestSkipped('ZipArchive extension is required to write XLSX files');
         }
 
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
 
-        $tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test-import-invalid-' . uniqid() . '.xlsx';
-        $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($tempFile);
-        
+        $tempFile = sys_get_temp_dir().DIRECTORY_SEPARATOR.'test-import-invalid-'.uniqid().'.xlsx';
+        $writer = SimpleExcelWriter::create($tempFile);
+
         // Only write customers sheet, missing packages, services, technical_details, invoices, payments
         $writer->nameCurrentSheet('customers');
         $writer->addHeader(['old_customer_id', 'full_name']);
         $writer->addRow(['CUST-FILE-INVALID', 'Budi']);
         $writer->close();
 
-        $uploadedFile = new \Illuminate\Http\UploadedFile(
+        $uploadedFile = new UploadedFile(
             $tempFile,
             'template-import-pelanggan.xlsx',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -666,7 +666,7 @@ class CustomerImportTest extends TestCase
         );
 
         $response = $this->post('/customers/import/validate', [
-            'file' => $uploadedFile
+            'file' => $uploadedFile,
         ]);
 
         $response->assertStatus(422);

@@ -10,6 +10,13 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskReport;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -19,19 +26,20 @@ class TaskReportSlaCalculationTest extends TestCase
     use RefreshDatabase;
 
     protected User $techUser;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',

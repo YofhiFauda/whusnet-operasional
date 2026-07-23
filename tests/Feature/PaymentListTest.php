@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -11,6 +12,8 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -69,12 +72,12 @@ class PaymentListTest extends TestCase
         $popA = $this->createPop('POP-PAY-CABANG-A', 'PCA', 'POP Payment Cabang A');
         $popB = $this->createPop('POP-PAY-CABANG-B', 'PCB', 'POP Payment Cabang B');
         $adminCabang->pops()->attach($popA->id);
-        $scope = \App\Models\UserRoleScope::create([
+        $scope = UserRoleScope::create([
             'user_id' => $adminCabang->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        \App\Models\UserRoleScopeTarget::create([
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $popA->id,
         ]);

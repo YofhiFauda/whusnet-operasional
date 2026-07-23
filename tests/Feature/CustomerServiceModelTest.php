@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
+use Database\Seeders\CustomerSeeder;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,7 +17,7 @@ class CustomerServiceModelTest extends TestCase
     public function test_customer_service_can_be_saved_with_relations_and_calculations(): void
     {
         $this->seed(DatabaseSeeder::class);
-        $this->seed(\Database\Seeders\CustomerSeeder::class);
+        $this->seed(CustomerSeeder::class);
 
         $customer = Customer::firstOrFail();
         $package = InternetPackage::firstOrFail();
@@ -33,8 +34,8 @@ class CustomerServiceModelTest extends TestCase
             'customer_id' => $customer->id,
             'internet_package_id' => $package->id,
             'package_name_snapshot' => $package->name,
-            'download_speed_snapshot' => $package->download_speed_mbps . ' Mbps',
-            'upload_speed_snapshot' => $package->upload_speed_mbps . ' Mbps',
+            'download_speed_snapshot' => $package->download_speed_mbps.' Mbps',
+            'upload_speed_snapshot' => $package->upload_speed_mbps.' Mbps',
             'monthly_price' => $monthlyPrice,
             'discount' => $discount,
             'ppn' => $ppnPercent,
@@ -74,7 +75,7 @@ class CustomerServiceModelTest extends TestCase
     public function test_customer_service_is_deleted_on_customer_cascade(): void
     {
         $this->seed(DatabaseSeeder::class);
-        $this->seed(\Database\Seeders\CustomerSeeder::class);
+        $this->seed(CustomerSeeder::class);
         $customer = Customer::firstOrFail();
         $package = InternetPackage::firstOrFail();
 

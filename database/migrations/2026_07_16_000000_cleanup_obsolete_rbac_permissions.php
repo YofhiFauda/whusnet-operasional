@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
 use App\Models\Permission;
+use Illuminate\Database\Migrations\Migration;
 
 /**
  * Cleanup tahap 2 dari migrasi RBAC S5 (lihat 2026_07_09_000000_migrate_rbac_permissions.php

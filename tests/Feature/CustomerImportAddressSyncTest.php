@@ -45,7 +45,7 @@ class CustomerImportAddressSyncTest extends TestCase
                     'full_address' => $fullAddress,
                     'pop_id' => $pop->id,
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'services' => [],
             'technical_details' => [],

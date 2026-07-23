@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\Feature;
+use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Support\Facades\DB;
 
@@ -10,10 +12,6 @@ class RoleManagementService
 {
     /**
      * Sync permissions to a role and record audit log.
-     *
-     * @param Role $role
-     * @param array $permissions
-     * @return void
      */
     public function syncPermissions(Role $role, array $permissions): void
     {
@@ -21,16 +19,16 @@ class RoleManagementService
         $sanitizedPermissions = array_values(array_unique(array_map('intval', $permissions)));
 
         // S6: Auto-grant parent view permissions bottom-up for any checked child permission
-        if (!empty($sanitizedPermissions)) {
-            $allPermissions = \App\Models\Permission::with('feature')->get();
+        if (! empty($sanitizedPermissions)) {
+            $allPermissions = Permission::with('feature')->get();
             $permissionsMap = $allPermissions->keyBy('id');
-            $allFeatures = \App\Models\Feature::all()->keyBy('id');
+            $allFeatures = Feature::all()->keyBy('id');
             $viewOverrides = config('rbac.view_permission_overrides', []);
 
             $addedIds = [];
             foreach ($sanitizedPermissions as $permId) {
                 $perm = $permissionsMap->get($permId);
-                if (!$perm || !$perm->feature) {
+                if (! $perm || ! $perm->feature) {
                     continue;
                 }
 
@@ -48,7 +46,7 @@ class RoleManagementService
                     $viewCode = $viewOverrides[$currentFeature->code] ?? "{$currentFeature->code}.view";
 
                     if ($viewCode !== $perm->code) {
-                        $viewPerm = $allPermissions->first(fn($p) => $p->code === $viewCode);
+                        $viewPerm = $allPermissions->first(fn ($p) => $p->code === $viewCode);
                         if ($viewPerm) {
                             $addedIds[] = $viewPerm->id;
                         }
@@ -59,7 +57,7 @@ class RoleManagementService
                         : null;
                 }
             }
-            if (!empty($addedIds)) {
+            if (! empty($addedIds)) {
                 $sanitizedPermissions = array_values(array_unique(array_merge($sanitizedPermissions, $addedIds)));
             }
         }
@@ -79,7 +77,7 @@ class RoleManagementService
 
             // Clear cache for all users with this role
             $users = $role->users()->get();
-            $effectiveAccessService = app(\App\Services\EffectiveAccessService::class);
+            $effectiveAccessService = app(EffectiveAccessService::class);
             foreach ($users as $user) {
                 $effectiveAccessService->clearCache($user);
             }

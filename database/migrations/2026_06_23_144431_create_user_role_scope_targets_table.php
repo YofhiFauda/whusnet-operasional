@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('user_role_scope_targets', function (Blueprint $table) {
             $table->foreignId('user_role_scope_id')->constrained('user_role_scopes')->cascadeOnDelete();
             $table->foreignId('pop_id')->constrained('pops')->cascadeOnDelete();
-            
+
             $table->primary(['user_role_scope_id', 'pop_id']);
         });
     }
