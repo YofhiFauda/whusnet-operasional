@@ -2120,14 +2120,14 @@ class CustomerController extends Controller
                     $customerCode = ! empty($row['customer_code']) ? $row['customer_code'] : ($pop?->generateRegistrationNumber() ?: $row['old_customer_id']);
 
                     // Backfill identitas person (rancangan-fase4-persons.md §3.2).
-                    // Key ke "{cabang}:{IDPENGGUNA}" — old_branch_id + old_customer_id
-                    // — BUKAN customer_code (yang bisa di-auto-generate saat bentrok
-                    // → non-deterministik antar import). firstOrCreate memastikan
-                    // import ulang memungut person yang SAMA, jadi kerja merge manual
-                    // di gel.2 tidak hangus tiap re-import. Kalau IDPENGGUNA kosong,
-                    // buat person baru berdiri sendiri (tanpa legacy_key).
+                    // Namespace = CABANG POP (unik per instalasi), BUKAN old_branch_id
+                    // yang bertabrakan lintas dump (jetis & sandya sama-sama IDCABANG=1).
+                    // Anchor = IDPENGGUNA (old_customer_id), BUKAN customer_code yang
+                    // bisa di-auto-generate saat bentrok → non-deterministik. firstOrCreate
+                    // memastikan import ulang memungut person yang SAMA, jadi kerja merge
+                    // manual gel.2 tidak hangus. IDPENGGUNA kosong → person berdiri sendiri.
                     $person = $this->resolveLegacyPerson(
-                        $row['old_branch_id'] ?? null,
+                        $pop,
                         $row['old_customer_id'] ?? null,
                     );
 
@@ -2793,20 +2793,48 @@ class CustomerController extends Controller
 
     /**
      * Resolve (atau buat) Person untuk baris legacy berdasar anchor stabil
-     * "{cabang}:{IDPENGGUNA}". Idempoten lintas import ulang — kunci utama
+     * "{cabang_pop_id}:{IDPENGGUNA}". Idempoten lintas import ulang — kunci utama
      * mekanisme persons (rancangan-fase4-persons.md §3.2). IDPENGGUNA kosong →
      * person baru tanpa legacy_key (tak bisa di-anchor, tapi tetap punya identitas).
+     *
+     * Namespace WAJIB memakai CABANG POP, BUKAN `old_branch_id` (IDCABANG legacy).
+     * Terbukti dua dump terpisah (jetis_db & sand_db) sama-sama memakai IDCABANG=1
+     * dan IDPENGGUNA mulai dari PE000001, jadi "1:PE000042" bertabrakan lintas
+     * cabang dan pelanggan Sandya nyantol ke person Jetis. Kelas bug yang sama
+     * dengan tabrakan customer_code lintas cabang. Cabang POP unik per instalasi.
      */
-    private function resolveLegacyPerson(?string $branchId, ?string $legacyCustomerId): Person
+    private function resolveLegacyPerson(?Pop $pop, ?string $legacyCustomerId): Person
     {
         $legacyCustomerId = trim((string) ($legacyCustomerId ?? ''));
         if ($legacyCustomerId === '') {
             return Person::create();
         }
 
-        $legacyKey = trim((string) ($branchId ?? '')).':'.$legacyCustomerId;
+        $branchNs = $this->resolveCabangPopId($pop) ?? 'nopop';
+        $legacyKey = $branchNs.':'.$legacyCustomerId;
 
         return Person::firstOrCreate(['legacy_key' => $legacyKey]);
+    }
+
+    /**
+     * Naik ke akar pohon POP (cabang) dari sebuah POP (bisa Mini POP). Sengaja
+     * TANPA cache: walk ini murah (pohon POP dangkal, PK lookup di tabel kecil).
+     * Cache keyed pop_id pernah dicoba tapi rapuh — instance controller bisa
+     * di-reuse lintas request/test sementara pop_id di-reuse setelah refresh DB,
+     * membuat cache menunjuk cabang yang salah. Recompute selalu benar.
+     */
+    private function resolveCabangPopId(?Pop $pop): ?int
+    {
+        if (! $pop) {
+            return null;
+        }
+
+        $node = $pop;
+        while ($node && $node->parent_id) {
+            $node = Pop::find($node->parent_id);
+        }
+
+        return $node?->id ?? $pop->id;
     }
 
     private function cleanLegacyValue(mixed $value): ?string
