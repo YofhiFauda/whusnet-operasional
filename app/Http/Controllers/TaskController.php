@@ -116,6 +116,7 @@ class TaskController extends Controller
             'fop',
             'teamMembers.user',
             'evidences.uploader',
+            'auditLogs.user',
         ]);
 
         $recentMaintenanceTasks = collect();

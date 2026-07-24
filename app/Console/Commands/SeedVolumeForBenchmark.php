@@ -186,7 +186,7 @@ class SeedVolumeForBenchmark extends Command
             $rows[] = [
                 'customer_code' => 'PERF'.str_pad((string) ($firstId + $i), 8, '0', STR_PAD_LEFT),
                 'full_name' => 'Pelanggan Benchmark '.($firstId + $i),
-                'phone' => '08'.random_int(1000000000, 9999999999),
+                'primary_phone' => '08'.random_int(1000000000, 9999999999),
                 'pop_id' => $popIds[array_rand($popIds)],
                 'status' => $statuses[array_rand($statuses)],
                 'data_completeness_status' => $completeness[array_rand($completeness)],

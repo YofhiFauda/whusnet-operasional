@@ -40,7 +40,6 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000001',
             'full_name' => 'Test Customer',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -107,7 +106,6 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000002',
             'full_name' => 'Test Customer 2',
-            'phone' => '081234567891',
             'primary_phone' => '081234567891',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -137,7 +135,6 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000003',
             'full_name' => 'Test Customer 3',
-            'phone' => '081234567892',
             'primary_phone' => '081234567892',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,

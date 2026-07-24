@@ -36,7 +36,7 @@ class PopCidGenerationTest extends TestCase
             'pop_id' => $pop->id,
             'customer_code' => 'C00RQ000001',
             'full_name' => 'DYAH PURBA',
-            'phone' => '08123456789',
+            'primary_phone' => '08123456789',
             'registration_date' => now(),
             'village_id' => $village->id,
             'status' => 'registered',

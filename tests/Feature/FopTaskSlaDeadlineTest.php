@@ -65,7 +65,7 @@ class FopTaskSlaDeadlineTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C00RQ000097',
             'full_name' => 'Pelanggan Sudah Survey',
-            'phone' => '081200000097',
+            'primary_phone' => '081200000097',
             'registration_date' => now(),
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,

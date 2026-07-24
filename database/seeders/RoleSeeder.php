@@ -59,7 +59,7 @@ class RoleSeeder extends Seeder
             [
                 'code' => 'admin',
                 'name' => 'Admin',
-                'description' => 'Admin Operasional (Akses Penuh)',
+                'description' => 'Admin Operasional',
                 'is_system' => true,
             ],
             [

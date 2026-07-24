@@ -291,7 +291,6 @@ class CustomerImportTest extends TestCase
                 [
                     'old_customer_id' => 'CUST-LEG2-1',
                     'full_name' => 'Andi Wijaya',
-                    'phone' => '087788990011',
                     'primary_phone' => '087788990011',
                     'full_address' => 'Jl. Gajah Mada No. 25',
                     'village_name' => $village->name,
@@ -381,10 +380,9 @@ class CustomerImportTest extends TestCase
         $this->assertDatabaseHas('customers', [
             'old_customer_id' => 'CUST-LEG2-1',
             'full_name' => 'Andi Wijaya',
-            'phone' => '087788990011',
+            'primary_phone' => '087788990011',
             'pop_id' => $pop->id,
             'status' => 'active',
-            'customer_status' => 'aktif',
         ]);
 
         $customer = Customer::where('old_customer_id', 'CUST-LEG2-1')->firstOrFail();
@@ -544,7 +542,10 @@ class CustomerImportTest extends TestCase
         $invoice = Invoice::where('old_cost_id', 'IN-TRX-1')->firstOrFail();
 
         $this->assertSame('active', $customer->status);
-        $this->assertSame('aktif', $customer->customer_status);
+        // service_status kini sumber kebenaran (customers.customer_status di-drop).
+        // Jalur import memakai vokab Inggris ('active'); mapping 'aktif' dulu cuma
+        // hidup di kolom zombie customer_status yang sekarang hilang.
+        $this->assertSame('active', $customer->customerService()->value('service_status'));
         $this->assertSame('sebagian', $invoice->invoice_status->value);
         $this->assertEquals(50000.00, (float) $invoice->paid_amount);
         $this->assertEquals(50000.00, (float) $invoice->remaining_amount);

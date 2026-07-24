@@ -39,13 +39,11 @@ class CustomerModelTest extends TestCase
             'full_name' => 'Ahmad Fauzi',
             'identity_number' => '3502181212900001',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'alternative_phone' => '089988776655',
             'email' => 'ahmad@example.com',
             'registration_date' => '2026-06-11',
             'data_completeness_status' => 'draft',
-            'customer_status' => 'calon_pelanggan',
             'pop_id' => $pop->id,
             'internet_package_id' => $package->id,
             'status' => 'registered', // Keep legacy status compatible
@@ -65,7 +63,6 @@ class CustomerModelTest extends TestCase
             'primary_phone' => '081234567890',
             'alternative_phone' => '089988776655',
             'data_completeness_status' => 'draft',
-            'customer_status' => 'calon_pelanggan',
             'pop_id' => $pop->id,
             'created_by' => $user->id,
             'updated_by' => $user->id,
@@ -83,7 +80,6 @@ class CustomerModelTest extends TestCase
 
         // Verify status fields
         $this->assertEquals('draft', $customer->data_completeness_status);
-        $this->assertEquals('calon_pelanggan', $customer->customer_status);
         $this->assertEquals('OLD-9992', $customer->old_customer_id);
         $this->assertEquals('CID-10029', $customer->cid);
     }

@@ -27,6 +27,7 @@ use App\Models\ImportError;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Person;
 use App\Models\Pop;
 use App\Models\PopSequence;
 use App\Models\SubscriptionStatus;
@@ -79,7 +80,6 @@ class CustomerController extends Controller
                     ->orWhere('old_request_id', 'like', "%{$search}%")
                     ->orWhere('cid', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('primary_phone', 'like', "%{$search}%")
                     ->orWhere('identity_number', 'like', "%{$search}%");
             });
@@ -412,7 +412,6 @@ class CustomerController extends Controller
     {
         $validated = $request->validated();
 
-        $validated['phone'] = $validated['primary_phone'];
         $validated['created_by'] = auth()->id();
         $validated['status'] = 'waiting_survey';
         $validated['updated_by'] = auth()->id();
@@ -428,7 +427,11 @@ class CustomerController extends Controller
             'installed' => 'menunggu_pemasangan',
             'registered' => 'calon_pelanggan',
         ];
-        $validated['customer_status'] = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
+        // Nilai turunan status buat customer_services.service_status. Dulu
+        // disimpan di kolom customers.customer_status (zombie — duplikat `status`
+        // yang gampang menyimpang). Sekarang variabel lokal, tak dipersist ke
+        // customers. Sumber kebenaran service_status = customer_services.
+        $serviceStatus = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
 
         $fotoKtp = $request->file('foto_ktp');
         unset($validated['foto_ktp']);
@@ -442,7 +445,13 @@ class CustomerController extends Controller
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $fotoKtp, $fotoRumah, $fotoKontrak) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoKtp, $fotoRumah, $fotoKontrak) {
+            // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
+            // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
+            // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
+            // "tiap customer punya person".
+            $validated['person_id'] = Person::create()->id;
+
             // 1. Create customer record
             $customer = Customer::create($validated);
 
@@ -525,8 +534,8 @@ class CustomerController extends Controller
                     'activation_date' => $activationDate,
                     'due_date' => $dueDate,
                     'billing_cycle' => 'monthly',
-                    'service_status' => $validated['customer_status'],
-                    'billing_status' => ($validated['status'] === 'active' || $validated['customer_status'] === 'aktif') ? 'active' : 'pending',
+                    'service_status' => $serviceStatus,
+                    'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
                 ]);
             }
 
@@ -663,7 +672,6 @@ class CustomerController extends Controller
             'status' => 'required|string|max:50',
         ]);
 
-        $validated['phone'] = $validated['primary_phone'];
         $validated['updated_by'] = auth()->id();
 
         $statusMapping = [
@@ -677,7 +685,8 @@ class CustomerController extends Controller
             'installed' => 'menunggu_pemasangan',
             'registered' => 'calon_pelanggan',
         ];
-        $validated['customer_status'] = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
+        // Lokal, tak dipersist ke customers (kolom customer_status di-drop).
+        $serviceStatus = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
 
         $originalFiles = Customer::query()
             ->whereKey($customer->getKey())
@@ -716,7 +725,7 @@ class CustomerController extends Controller
             $validated['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($request->file('foto_kontrak'), $customer, 'kontrak');
         }
 
-        DB::transaction(function () use ($customer, $validated) {
+        DB::transaction(function () use ($customer, $validated, $serviceStatus) {
             // 1. Update customer record
             $customer->update($validated);
 
@@ -814,8 +823,8 @@ class CustomerController extends Controller
                     'activation_date' => $activationDate,
                     'due_date' => $dueDate,
                     'billing_cycle' => 'monthly',
-                    'service_status' => $validated['customer_status'],
-                    'billing_status' => ($validated['status'] === 'active' || $validated['customer_status'] === 'aktif') ? 'active' : 'pending',
+                    'service_status' => $serviceStatus,
+                    'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
                 ]);
             } else {
                 $customer->customerService()->delete();
@@ -2110,7 +2119,20 @@ class CustomerController extends Controller
                     }
                     $customerCode = ! empty($row['customer_code']) ? $row['customer_code'] : ($pop?->generateRegistrationNumber() ?: $row['old_customer_id']);
 
+                    // Backfill identitas person (rancangan-fase4-persons.md §3.2).
+                    // Key ke "{cabang}:{IDPENGGUNA}" — old_branch_id + old_customer_id
+                    // — BUKAN customer_code (yang bisa di-auto-generate saat bentrok
+                    // → non-deterministik antar import). firstOrCreate memastikan
+                    // import ulang memungut person yang SAMA, jadi kerja merge manual
+                    // di gel.2 tidak hangus tiap re-import. Kalau IDPENGGUNA kosong,
+                    // buat person baru berdiri sendiri (tanpa legacy_key).
+                    $person = $this->resolveLegacyPerson(
+                        $row['old_branch_id'] ?? null,
+                        $row['old_customer_id'] ?? null,
+                    );
+
                     $customer = Customer::create([
+                        'person_id' => $person->id,
                         'customer_code' => $customerCode,
                         'old_customer_id' => $row['old_customer_id'],
                         'old_request_id' => $row['old_request_id'] ?? null,
@@ -2120,8 +2142,6 @@ class CustomerController extends Controller
                         'customer_type' => $row['customer_type'] ?? null,
                         'company_name' => $row['company_name'] ?? null,
                         'npwp' => $row['npwp'] ?? null,
-                        'old_account_status' => $row['old_account_status'] ?? null,
-                        'phone' => $this->cleanLegacyValue($row['phone'] ?? null) ?? '',
                         'primary_phone' => $this->cleanLegacyValue($row['primary_phone'] ?? $row['phone'] ?? null) ?? '',
                         'alternative_phone' => $row['alternative_phone'] ?? null,
                         'email' => $row['email'] ?? null,
@@ -2129,7 +2149,6 @@ class CustomerController extends Controller
                         'pop_id' => $pop?->id,
                         'distribution_id' => $distribution?->id,
                         'status' => 'registered', // Default, updated by service activation or mapping
-                        'customer_status' => 'calon_pelanggan',
                         'created_by' => auth()->id(),
                         'foto_ktp' => $row['foto_ktp'] ?? null,
                         'foto_rumah' => $row['foto_rumah'] ?? null,
@@ -2284,12 +2303,9 @@ class CustomerController extends Controller
                         ]);
                     }
 
-                    $custStatus = $this->mapServiceStatusToCustomerStatus($serviceStatus);
-
                     $updateData = [
                         'internet_package_id' => $packageId,
                         'status' => $serviceStatus,
-                        'customer_status' => $custStatus,
                     ];
 
                     // Generate CID if active or suspended
@@ -2775,6 +2791,24 @@ class CustomerController extends Controller
         return $streetAddress !== '' ? $streetAddress : '-';
     }
 
+    /**
+     * Resolve (atau buat) Person untuk baris legacy berdasar anchor stabil
+     * "{cabang}:{IDPENGGUNA}". Idempoten lintas import ulang — kunci utama
+     * mekanisme persons (rancangan-fase4-persons.md §3.2). IDPENGGUNA kosong →
+     * person baru tanpa legacy_key (tak bisa di-anchor, tapi tetap punya identitas).
+     */
+    private function resolveLegacyPerson(?string $branchId, ?string $legacyCustomerId): Person
+    {
+        $legacyCustomerId = trim((string) ($legacyCustomerId ?? ''));
+        if ($legacyCustomerId === '') {
+            return Person::create();
+        }
+
+        $legacyKey = trim((string) ($branchId ?? '')).':'.$legacyCustomerId;
+
+        return Person::firstOrCreate(['legacy_key' => $legacyKey]);
+    }
+
     private function cleanLegacyValue(mixed $value): ?string
     {
         if ($value === null) {
@@ -3087,7 +3121,6 @@ class CustomerController extends Controller
             $oldValues = [
                 'cid' => $customer->cid,
                 'status' => $customer->status,
-                'customer_status' => $customer->customer_status,
                 'data_completeness_status' => $customer->data_completeness_status,
                 'service_status' => $service->service_status,
                 'billing_status' => $service->billing_status,
@@ -3096,7 +3129,6 @@ class CustomerController extends Controller
             $customer->update([
                 'cid' => $cid,
                 'status' => 'active',
-                'customer_status' => 'aktif',
                 'data_completeness_status' => 'siap_billing',
             ]);
 
@@ -3111,7 +3143,6 @@ class CustomerController extends Controller
             $newValues = [
                 'cid' => $cid,
                 'status' => 'active',
-                'customer_status' => 'aktif',
                 'data_completeness_status' => 'siap_billing',
                 'service_status' => 'aktif',
                 'billing_status' => 'active',
@@ -3135,7 +3166,7 @@ class CustomerController extends Controller
                 $message = "🎉 <b>Pelanggan Aktif</b>\n";
                 $message .= "Pelanggan: {$customer->full_name}\n";
                 $message .= "CID: {$cid}\n";
-                $message .= "No. HP: {$customer->phone}\n";
+                $message .= "No. HP: {$customer->primary_phone}\n";
                 $message .= "POP: {$customer->pop->name}\n";
                 $message .= 'Telah berhasil diaktivasi dan masuk siklus penagihan.';
                 $telegram->sendMessage($message);
@@ -3149,23 +3180,6 @@ class CustomerController extends Controller
 
         return redirect()->route('customers.show', $customer->id)
             ->with('success', "Layanan pelanggan berhasil diaktifkan! CID: {$customer->cid}");
-    }
-
-    private function mapServiceStatusToCustomerStatus(string $status): string
-    {
-        $mapping = [
-            'active' => 'aktif',
-            'suspended' => 'isolir',
-            'terminated' => 'berhenti',
-            'rejected' => 'nonaktif',
-            'waiting_survey' => 'survey',
-            'surveyed' => 'survey',
-            'waiting_installation' => 'menunggu_pemasangan',
-            'installed' => 'menunggu_pemasangan',
-            'registered' => 'calon_pelanggan',
-        ];
-
-        return $mapping[$status] ?? 'calon_pelanggan';
     }
 
     /**

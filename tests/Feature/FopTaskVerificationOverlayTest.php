@@ -96,7 +96,7 @@ class FopTaskVerificationOverlayTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-PSB-001',
             'full_name' => 'Perlu Verifikasi Customer',
-            'phone' => '081200000010',
+            'primary_phone' => '081200000010',
             'status' => 'verification_admin',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',
@@ -132,7 +132,7 @@ class FopTaskVerificationOverlayTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-PSB-002',
             'full_name' => 'Riwayat Customer',
-            'phone' => '081200000011',
+            'primary_phone' => '081200000011',
             'status' => 'verification_admin',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',

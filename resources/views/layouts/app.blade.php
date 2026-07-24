@@ -234,7 +234,8 @@
                                 <svg class="h-5 w-5 shrink-0 {{ Request::is('tasks*') || Request::is('fop*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                                 </svg>
-                                <span class="sidebar-text">Task Management</span>
+                                {{-- <span class="sidebar-text">Task Management</span> --}}
+                                <span class="sidebar-text">Penjadwalan Teknis</span>
                             </div>
                             <svg id="chevron-tasks"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('tasks*') || Request::is('fop*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"

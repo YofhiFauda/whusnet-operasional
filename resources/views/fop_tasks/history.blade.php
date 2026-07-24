@@ -141,7 +141,7 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap font-ui">
                                 @if($task->team)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-100">
                                         {{ $task->team->name }}
                                     </span>
                                 @else

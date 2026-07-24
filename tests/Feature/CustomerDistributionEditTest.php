@@ -44,7 +44,6 @@ class CustomerDistributionEditTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000001',
             'full_name' => 'Budi Santoso',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -83,7 +82,6 @@ class CustomerDistributionEditTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
             'full_name' => 'Original Name',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,

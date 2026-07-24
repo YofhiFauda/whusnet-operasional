@@ -24,7 +24,7 @@ class CustomerSurveyController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.view'), 403);
 
-        $query = Customer::with(['village.district', 'latestSurvey.technician'])
+        $query = Customer::with(['pop', 'village.district', 'latestSurvey.technician'])
             ->where('status', 'waiting_survey')
             ->orWhere('status', 'survey_in_progress');
 
@@ -296,7 +296,7 @@ class CustomerSurveyController extends Controller
                     $telegram = app(TelegramBotService::class);
                     $message = "✅ <b>Survey Selesai</b>\n";
                     $message .= "Pelanggan: {$customer->full_name}\n";
-                    $message .= "No. HP: {$customer->phone}\n";
+                    $message .= "No. HP: {$customer->primary_phone}\n";
                     $message .= "Alamat: {$customer->address}\n";
                     $message .= 'Menunggu Verifikasi Admin untuk Pemasangan.';
                     $telegram->sendMessage($message);

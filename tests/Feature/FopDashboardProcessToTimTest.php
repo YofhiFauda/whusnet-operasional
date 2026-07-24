@@ -81,7 +81,7 @@ class FopDashboardProcessToTimTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-001',
             'full_name' => 'John Doe',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'waiting_acc',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',
@@ -170,7 +170,7 @@ class FopDashboardProcessToTimTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-001',
             'full_name' => 'John Doe',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'waiting_acc',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',

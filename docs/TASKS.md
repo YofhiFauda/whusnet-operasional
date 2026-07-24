@@ -1,13 +1,14 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
 Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1, BATCH 2 & BATCH 3)
-Current Task: PERF-T001..T004 — Index, N+1 & Beban Database Fase 0–3 (Done), ADHOC-01 — Customer List Redesign & Theme (Done)
+Current Task: S8.10-T003 (FOP Notification Dashboard)
 
 ### Ad-Hoc Improvements
 
 | Task | Deskripsi | Status |
 |---|---|---|
-| ADHOC-01 | Sesuaikan Kolom List Pelanggan & Dark Theme Toggle | Done |
+| ADHOC-01 | Desain Ulang List Pelanggan & Dark Theme Toggle | Done |
+| ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi Dark/Light Theme Support | Done |
 
 ### PERF — Index, N+1 & Beban Database (`docs/plan/ANALISA_INDEX_DATABASE.md`)
 

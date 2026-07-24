@@ -253,6 +253,57 @@ TERMASUK: §2 (semua pembersihan skema, drop `old_account_status` + `ip_address`
 TIDAK TERMASUK (gel.2): halaman merge, pencarian person saat registrasi,
 riwayat/alias CID, pindah laporan ke level person.
 
+### Progres implementasi gel.1 (per 2026-07-22)
+
+**SELESAI & test hijau (551 pass, 2 merah pre-existing sidebar redesign):**
+- `persons` + `customers.person_id` (migration + model `Person` dengan
+  `$table='persons'` — Eloquent memplural jadi "people"). Backfill di
+  `CustomerController` import (`resolveLegacyPerson` by legacy_key) + manual create
+  (person baru). **CATATAN:** backfill saat ini di `CustomerController::store/import`,
+  BUKAN di `MigrateLegacyDataCommand` seperti §3.2 tulis — karena pembuatan
+  customer legacy nyatanya lewat `CustomerController` import (sheet dari
+  MigrateLegacyDataCommand). Efeknya sama: idempoten by legacy_key.
+- Drop `customer_status` — migration `2026_07_23_101056_gel1_cleanup_customers_schema`
+  + arahkan ~15 titik ke `service_status` (variabel lokal `$serviceStatus`) +
+  hapus `mapServiceStatusToCustomerStatus()` + bersih seeder/factory/25 test.
+- Satukan `phone`→`primary_phone` **TUNTAS** — layer aplikasi (read/write/search
+  controller + factory + seeder + SeedVolumeForBenchmark) + **DROP FISIK kolom
+  `phone`** (migration `2026_07_23_101056`). ~80 penulisan `'phone' =>` di tests
+  diklasifikasi per-baris (Customer vs User vs sheet-import) lalu di-rename/drop:
+  Customer→`primary_phone`, User.phone & sheet-source dibiarkan. `alternative_phone`
+  tetap.
+
+- Drop `old_account_status` **SELESAI** (migration `2026_07_23_101056`) — cuma
+  jejak import, tak pernah dibaca. Sheet/template masih membawanya sebagai sumber.
+
+**DIBATALKAN — 5 field teknis DIPERTAHANKAN (keputusan final 2026-07-22):**
+- **`customers.ip_address` TIDAK di-drop.** Ternyata BUKAN zombie: ia 1 dari 5
+  field teknis inline (`ont_sn`/`ip_address`/`odp_code`/`olt_code`/`vlan_id`) yang
+  divalidasi (`:665-669`), ditulis (`:1757-1761`), dibaca (`:962/971`) bareng.
+  Data nyata: `ont_sn` 1661 baris terisi, `ip_address` 1669, `odp_code` 1663 —
+  **cache denormalized aktif, bukan duplikat berbahaya**. `olt_code`/`vlan_id` = 0
+  baris. `technical_details` punya ekuivalen dengan NAMA BEDA
+  (`router_or_ont_serial`/`odp_number`/`olt_*`/`vlan`), jadi konsolidasi = relokasi
+  1600+ baris + rename + rework form registrasi/edit + blade + import mapping =
+  perubahan model-data + UX level fitur. Asumsi §2.5 ("ip_address ringan/duplikat")
+  KELIRU. **Owner memutuskan: pertahankan semua 5 field inline apa adanya.**
+  Konsolidasi (kalau kelak perlu) = BACKLOG terpisah, bukan bagian Fase 4/gel.1.
+
+**SELESAI juga (2026-07-22):**
+- Persempit tipe `cid` 150→50, `status` 50→30 (default `registered` terjaga),
+  `auditable_type` 255→100 — via `->change()` di migration `2026_07_23_101056`.
+  Diverifikasi jalan bersih di MySQL fresh (whusnet_perf) + data nyata jauh di
+  bawah target (cid 13, status 24, auditable_type 34, nol truncation).
+- `clean_address` pilihan B — accessor hanya membaca relasi yang SUDAH dimuat
+  (`relationLoaded` guard) + prioritas string `customer_addresses`; tidak pernah
+  memicu query siluman, degradasi anggun bila pemanggil lupa eager-load.
+
+**BELUM (langkah kamu):**
+- `migrate:fresh` + import ulang legacy di Docker → verifikasi person 1:1.
+
+**gel.1 TUNTAS** kecuali ip_address (ditunda, lihat atas). Test 552 hijau, 2
+merah pre-existing (sidebar redesign, di luar scope).
+
 ---
 
 ## Rujukan

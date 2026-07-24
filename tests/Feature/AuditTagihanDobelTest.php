@@ -38,7 +38,6 @@ class AuditTagihanDobelTest extends TestCase
         $customer = Customer::factory()->create([
             'full_name' => $nama,
             'status' => 'active',
-            'customer_status' => 'aktif',
             'internet_package_id' => $package->id,
         ]);
 

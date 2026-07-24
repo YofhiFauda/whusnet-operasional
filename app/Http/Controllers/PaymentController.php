@@ -54,8 +54,7 @@ class PaymentController extends Controller
                             ->orWhere('customer_code', 'like', "%{$search}%")
                             ->orWhere('old_customer_id', 'like', "%{$search}%")
                             ->orWhere('cid', 'like', "%{$search}%")
-                            ->orWhere('primary_phone', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%");
+                            ->orWhere('primary_phone', 'like', "%{$search}%");
                     });
             });
         }

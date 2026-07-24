@@ -197,7 +197,7 @@ class TicketService
 
         $ticket->customer_name = $customer->full_name;
         $ticket->customer_address = $customer->address;
-        $ticket->customer_phone = $customer->primary_phone ?: $customer->phone;
+        $ticket->customer_phone = $customer->primary_phone;
         $ticket->customer_odp = $customer->odp_code ?: $device?->odp;
         $ticket->customer_package = $customer->internetPackage?->name;
         $ticket->customer_device = $this->deviceSummary($device);

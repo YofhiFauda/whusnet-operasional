@@ -23,6 +23,9 @@ use Illuminate\Support\Str;
 ])]
 class Person extends Model
 {
+    // Eloquent memplural "Person" jadi "people"; tabelnya `persons`.
+    protected $table = 'persons';
+
     protected static function booted(): void
     {
         // UUIDv7 (time-ordered) supaya punya lokalitas indeks di InnoDB.

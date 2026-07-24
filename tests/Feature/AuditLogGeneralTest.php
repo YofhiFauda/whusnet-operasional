@@ -234,11 +234,9 @@ class AuditLogGeneralTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-AUDIT-'.$pop->pop_code,
             'full_name' => 'Customer Audit',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'internet_package_id' => $this->package->id,

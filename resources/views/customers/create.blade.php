@@ -2,35 +2,28 @@
 
 @section('title', 'Tambah Pelanggan Baru - Whusnet Operasional')
 @section('page_title', 'Tambah Pelanggan Baru')
+@section('breadcrumb_parent', 'Pelanggan')
+@section('breadcrumb_parent_url', '/customers')
 
 @section('content')
-<!-- Breadcrumbs -->
-<div class="mb-6">
-    <nav class="flex text-xs font-semibold text-slate-400 uppercase tracking-wider gap-2">
-        <a href="/customers" class="hover:text-slate-700 transition-colors">Daftar Pelanggan</a>
-        <span>/</span>
-        <span class="text-slate-600">Registrasi Pelanggan Baru</span>
-    </nav>
-</div>
-
 <!-- Form Container -->
 <form action="/customers" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
     @csrf
 
     <!-- TOP PANEL: Progress Bar -->
-    <div class="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+    <div class="bg-surface border border-border rounded-lg p-6 shadow-sm">
         <div class="flex items-center justify-between mb-3">
             <div>
-                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Kelengkapan Formulir Registrasi</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Semua data akan divalidasi sebelum disimpan ke database</p>
+                <h3 class="text-sm font-bold text-text-main uppercase tracking-wider">Kelengkapan Formulir Registrasi</h3>
+                <p class="text-xs text-text-muted mt-0.5">Semua data akan divalidasi sebelum disimpan ke database</p>
             </div>
             <div class="text-right">
-                <span id="progress-percentage" class="text-sm font-extrabold text-sky-600 data-text">0%</span>
-                <span class="text-xs text-slate-400 block mt-0.5"><span id="filled-fields-count" class="data-text">0</span> dari <span class="data-text">25</span> field terisi</span>
+                <span id="progress-percentage" class="text-sm font-extrabold text-primary data-text">0%</span>
+                <span class="text-xs text-text-muted block mt-0.5"><span id="filled-fields-count" class="data-text">0</span> dari <span class="data-text">25</span> field terisi</span>
             </div>
         </div>
         <!-- Progress bar background -->
-        <div class="w-full bg-slate-100 rounded-full h-3.5 overflow-hidden border border-slate-200/50">
+        <div class="w-full bg-surface-muted rounded-full h-3.5 overflow-hidden border border-border">
             <div id="progress-bar-fill" class="bg-gradient-to-r from-sky-500 to-sky-600 h-full w-0 transition-all duration-500 ease-out"></div>
         </div>
     </div>
@@ -40,48 +33,48 @@
         
         <!-- LEFT COLUMN: Stepper & Completeness Checklist -->
         <div class="lg:col-span-1 flex flex-col gap-4">
-            <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-5">
-                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tahapan Formulir</h4>
+            <div class="bg-surface border border-border rounded-lg p-5 shadow-sm space-y-5">
+                <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Tahapan Formulir</h4>
                 
                 <div class="space-y-4">
                     <!-- Step 1 Trigger -->
-                    <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3.5 rounded-lg border border-sky-600 bg-sky-50/20 hover:bg-sky-50/40 transition-all group focus:outline-none">
+                    <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3.5 rounded-lg border border-primary bg-primary-soft/30 transition-all group focus:outline-none">
                         <div class="flex items-start gap-3">
                             <div class="mt-0.5 shrink-0" id="step-nav-icon-1">
                                 <!-- Will be inserted by JS -->
                             </div>
                             <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-slate-800">1. Data Diri & Wilayah</span>
+                                <span class="block text-xs font-bold text-text-main">1. Data Diri & Wilayah</span>
                                 <span id="step-nav-status-1" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-1" class="text-[9px] text-slate-400 block mt-1 leading-relaxed whitespace-pre-wrap"></span>
+                                <span id="step-nav-missing-1" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
                             </div>
                         </div>
                     </button>
 
                     <!-- Step 2 Trigger -->
-                    <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3.5 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-all group focus:outline-none">
+                    <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3.5 rounded-lg border border-border bg-surface hover:bg-surface-muted transition-all group focus:outline-none">
                         <div class="flex items-start gap-3">
                             <div class="mt-0.5 shrink-0" id="step-nav-icon-2">
                                 <!-- Will be inserted by JS -->
                             </div>
                             <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-slate-700 group-hover:text-slate-900">2. Dokumen Lampiran</span>
+                                <span class="block text-xs font-bold text-text-secondary group-hover:text-text-main">2. Dokumen Lampiran</span>
                                 <span id="step-nav-status-2" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-2" class="text-[9px] text-slate-400 block mt-1 leading-relaxed whitespace-pre-wrap"></span>
+                                <span id="step-nav-missing-2" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
                             </div>
                         </div>
                     </button>
 
                     <!-- Step 3 Trigger -->
-                    <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 transition-all group focus:outline-none">
+                    <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-lg border border-border bg-surface hover:bg-surface-muted transition-all group focus:outline-none">
                         <div class="flex items-start gap-3">
                             <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
                                 <!-- Will be inserted by JS -->
                             </div>
                             <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-slate-700 group-hover:text-slate-900">3. Layanan & Paket</span>
+                                <span class="block text-xs font-bold text-text-secondary group-hover:text-text-main">3. Layanan & Paket</span>
                                 <span id="step-nav-status-3" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-3" class="text-[9px] text-slate-400 block mt-1 leading-relaxed whitespace-pre-wrap"></span>
+                                <span id="step-nav-missing-3" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
                             </div>
                         </div>
                     </button>
@@ -92,7 +85,7 @@
         </div>
 
         <!-- RIGHT COLUMN: Wizard Steps Form Panels -->
-        <div class="lg:col-span-3 bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden min-h-[480px] flex flex-col justify-between">
+        <div class="lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm overflow-hidden min-h-[480px] flex flex-col justify-between">
             
             <!-- FORM BODY -->
             <div class="p-6 md:p-8 flex-1">
@@ -101,25 +94,25 @@
 
                 <!-- STEP 1 PANEL: Data Diri & Wilayah -->
                 <div id="step-panel-1" class="step-panel space-y-6">
-                    <div class="border-b border-slate-100 pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider">1. IDENTITAS PELANGGAN & ALAMAT</h4>
-                        <p class="text-xs text-slate-400 mt-1">Masukkan data diri lengkap dan wilayah instalasi pelanggan</p>
+                    <div class="border-b border-border pb-3 mb-6">
+                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">1. IDENTITAS PELANGGAN & ALAMAT</h4>
+                        <p class="text-xs text-text-muted mt-1">Masukkan data diri lengkap dan wilayah instalasi pelanggan</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-slate-500">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-text-secondary">
                         <div>
                             <label for="full_name" class="block mb-2 uppercase tracking-wide">NAMA LENGKAP <span class="text-red-500">*</span></label>
-                            <input type="text" name="full_name" id="full_name" value="{{ old('full_name') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: Budi Santoso">
+                            <input type="text" name="full_name" id="full_name" value="{{ old('full_name') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: Budi Santoso">
                         </div>
 
                         <div>
                             <label for="identity_number" class="block mb-2 uppercase tracking-wide">NOMOR IDENTITAS (NIK) <span class="text-red-500">*</span></label>
-                            <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 3502182039200001">
+                            <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 3502182039200001">
                         </div>
 
                         <div>
                             <label for="gender" class="block mb-2 uppercase tracking-wide">JENIS KELAMIN <span class="text-red-500">*</span></label>
-                            <select name="gender" id="gender" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="gender" id="gender" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Jenis Kelamin</option>
                                 <option value="Laki-laki" {{ old('gender') === 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
                                 <option value="Perempuan" {{ old('gender') === 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
@@ -128,32 +121,32 @@
 
                         <div>
                             <label for="primary_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP UTAMA <span class="text-red-500">*</span></label>
-                            <input type="text" name="primary_phone" id="primary_phone" value="{{ old('primary_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 082139xxxxxx">
+                            <input type="text" name="primary_phone" id="primary_phone" value="{{ old('primary_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 082139xxxxxx">
                         </div>
 
                         <div>
                             <label for="alternative_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP ALTERNATIF</label>
-                            <input type="text" name="alternative_phone" id="alternative_phone" value="{{ old('alternative_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 082139xxxxxx">
+                            <input type="text" name="alternative_phone" id="alternative_phone" value="{{ old('alternative_phone') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 082139xxxxxx">
                         </div>
 
                         <div>
                             <label for="npwp" class="block mb-2 uppercase tracking-wide">NPWP</label>
-                            <input type="text" name="npwp" id="npwp" value="{{ old('npwp') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 12.345.678.9-012.000">
+                            <input type="text" name="npwp" id="npwp" value="{{ old('npwp') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 12.345.678.9-012.000">
                         </div>
 
                         <div>
                             <label for="email" class="block mb-2 uppercase tracking-wide">ALAMAT EMAIL</label>
-                            <input type="email" name="email" id="email" value="{{ old('email') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: budi@gmail.com">
+                            <input type="email" name="email" id="email" value="{{ old('email') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: budi@gmail.com">
                         </div>
 
                         <div>
                             <label for="registration_date" class="block mb-2 uppercase tracking-wide">TANGGAL REGISTRASI <span class="text-red-500">*</span></label>
-                            <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', now()->format('Y-m-d')) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', now()->format('Y-m-d')) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                         </div>
 
                         <div>
                             <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP CABANG <span class="text-red-500">*</span></label>
-                            <select name="pop_id" id="pop_id" onchange="filterDistributionsByPop(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="pop_id" id="pop_id" onchange="filterDistributionsByPop(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih POP Cabang</option>
                                 @foreach($pops as $pop)
                                     <option value="{{ $pop->id }}" {{ old('pop_id') == $pop->id ? 'selected' : '' }}>{{ $pop->name }}</option>
@@ -165,13 +158,13 @@
 
                         <div class="md:col-span-2">
                             <label for="address" class="block mb-2 uppercase tracking-wide">ALAMAT INSTALASI LENGKAP <span class="text-red-500">*</span></label>
-                            <textarea name="address" id="address" rows="2" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Nama Jalan, RT/RW, nomor rumah, detail lainnya...">{{ old('address') }}</textarea>
+                            <textarea name="address" id="address" rows="2" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Nama Jalan, RT/RW, nomor rumah, detail lainnya...">{{ old('address') }}</textarea>
                         </div>
 
                         <!-- Region Selection -->
                         <div>
                             <label for="city_id" class="block mb-2 uppercase tracking-wide">KOTA <span class="text-red-500">*</span></label>
-                            <select name="city_id" id="city_id" onchange="loadDistricts(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="city_id" id="city_id" onchange="loadDistricts(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Kota</option>
                                 @foreach($cities as $city)
                                     <option value="{{ $city->id }}" {{ old('city_id', \App\Models\City::where('name', 'Ponorogo')->first()->id ?? '') == $city->id ? 'selected' : '' }}>{{ $city->name }}</option>
@@ -181,14 +174,14 @@
 
                         <div>
                             <label for="district_id" class="block mb-2 uppercase tracking-wide">KECAMATAN <span class="text-red-500">*</span></label>
-                            <select name="district_id" id="district_id" onchange="loadVillages(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="district_id" id="district_id" onchange="loadVillages(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Kecamatan (Pilih Kota Dulu)</option>
                             </select>
                         </div>
 
                         <div>
                             <label for="village_id" class="block mb-2 uppercase tracking-wide">DESA / KELURAHAN <span class="text-red-500">*</span></label>
-                            <select name="village_id" id="village_id" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="village_id" id="village_id" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Desa (Pilih Kecamatan Dulu)</option>
                                 <!-- Async Populated -->
                             </select>
@@ -197,11 +190,11 @@
                         <div class="grid grid-cols-2 gap-4 md:col-span-1">
                             <div>
                                 <label for="latitude" class="block mb-2 uppercase tracking-wide">LATITUDE</label>
-                                <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="-7.86940">
+                                <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="-7.86940">
                             </div>
                             <div>
                                 <label for="longitude" class="block mb-2 uppercase tracking-wide">LONGITUDE</label>
-                                <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="111.46210">
+                                <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="111.46210">
                             </div>
                         </div>
                     </div>
@@ -209,41 +202,41 @@
 
                 <!-- STEP 2 PANEL: Dokumen Lampiran -->
                 <div id="step-panel-2" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-slate-100 pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                        <p class="text-xs text-slate-400 mt-1">Upload lampiran dokumen pendukung pelanggan (opsional)</p>
+                    <div class="border-b border-border pb-3 mb-6">
+                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
+                        <p class="text-xs text-text-muted mt-1">Upload lampiran dokumen pendukung pelanggan (opsional)</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Foto KTP -->
-                        <div class="border border-slate-200 rounded-lg p-5 flex flex-col justify-between hover:border-sky-300 transition-colors shadow-sm relative">
+                        <div class="border border-border bg-surface rounded-lg p-5 flex flex-col justify-between hover:border-primary-border transition-colors shadow-sm relative">
                             <div id="default-placeholder-foto_ktp" class="text-center py-4">
-                                <svg class="mx-auto h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <svg class="mx-auto h-10 w-10 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
                                 </svg>
-                                <span class="block text-xs font-bold text-slate-700 mt-3">FOTO KTP <span class="text-red-500">*</span></span>
-                                <span class="block text-[10px] text-slate-400 mt-1">Format: JPG, PNG (Max 2MB)</span>
+                                <span class="block text-xs font-bold text-text-secondary mt-3">FOTO KTP <span class="text-red-500">*</span></span>
+                                <span class="block text-[10px] text-text-muted mt-1">Format: JPG, PNG (Max 2MB)</span>
                             </div>
 
                             <!-- Preview Container -->
                             <div id="preview-container-foto_ktp" class="hidden text-center py-2 flex flex-col items-center justify-center">
                                 <div class="relative inline-block">
-                                    <img id="preview-img-foto_ktp" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 shadow-sm" src="" alt="Preview Foto KTP">
-                                    <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
+                                    <img id="preview-img-foto_ktp" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="" alt="Preview Foto KTP">
+                                    <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-2 -right-2 bg-error hover:bg-error/90 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </button>
                                 </div>
-                                <span class="block text-xs font-bold text-slate-700 mt-2">PREVIEW FOTO KTP</span>
+                                <span class="block text-xs font-bold text-text-secondary mt-2">PREVIEW FOTO KTP</span>
                             </div>
 
                             <div class="mt-4">
                                 <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
-                                <label for="foto_ktp" class="block w-full text-center bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
+                                <label for="foto_ktp" class="block w-full text-center bg-surface-muted border border-border hover:bg-surface hover:border-border-strong text-text-secondary text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
                                     Pilih File
                                 </label>
-                                <span id="file-label-foto_ktp" class="block text-[10px] text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
+                                <span id="file-label-foto_ktp" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
                             </div>
                         </div>
                     </div>
@@ -251,15 +244,15 @@
 
                 <!-- STEP 3 PANEL: Layanan & Paket -->
                 <div id="step-panel-3" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-slate-100 pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider">3. LAYANAN & PAKET LAYANAN INTERNET</h4>
-                        <p class="text-xs text-slate-400 mt-1">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
+                    <div class="border-b border-border pb-3 mb-6">
+                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">3. LAYANAN & PAKET LAYANAN INTERNET</h4>
+                        <p class="text-xs text-text-muted mt-1">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-slate-500">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-text-secondary">
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="internet_package_id">PAKET INTERNET <span class="text-red-500">*</span></label>
-                            <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Paket Internet</option>
                                 @foreach($packages as $package)
                                     <option value="{{ $package->id }}" data-price="{{ $package->monthly_price }}" {{ old('internet_package_id') == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }} (Rp {{ number_format($package->monthly_price, 0, ',', '.') }}/bln)</option>
@@ -269,7 +262,7 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="jenis_kontrak">JENIS KONTRAK <span class="text-red-500">*</span></label>
-                            <select name="jenis_kontrak" id="jenis_kontrak" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25">
+                            <select name="jenis_kontrak" id="jenis_kontrak" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
                                 <option value="" disabled selected>Pilih Jenis Kontrak</option>
                                 <option value="sewa" {{ old('jenis_kontrak') === 'sewa' ? 'selected' : '' }}>Sewa</option>
                                 <option value="beli" {{ old('jenis_kontrak') === 'beli' ? 'selected' : '' }}>Beli</option>
@@ -278,12 +271,12 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="contract_period_months">MASA KONTRAK (BULAN) <span class="text-red-500">*</span></label>
-                            <input type="number" name="contract_period_months" id="contract_period_months" value="{{ old('contract_period_months', 12) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 12">
+                            <input type="number" name="contract_period_months" id="contract_period_months" value="{{ old('contract_period_months', 12) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 12">
                         </div>
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="discount_amount">DISKON PROMOSI (RP) <span class="text-red-500">*</span></label>
-                            <input type="number" name="discount_amount" id="discount_amount" value="{{ old('discount_amount', 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-slate-200 rounded-md bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25" placeholder="Contoh: 10000">
+                            <input type="number" name="discount_amount" id="discount_amount" value="{{ old('discount_amount', 0) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
                         </div>
                     </div>
                 </div>
@@ -293,15 +286,15 @@
             </div>
 
             <!-- BUTTONS NAVIGATION FOOTER -->
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div class="px-6 py-4 bg-surface-muted border-t border-border flex items-center justify-between">
                 <div>
-                    <button type="button" id="btn-prev" onclick="prevStep()" class="px-4 py-2 border border-slate-200 rounded-md bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
+                    <button type="button" id="btn-prev" onclick="prevStep()" class="px-4 py-2 border border-border rounded-md bg-surface text-text-secondary hover:bg-surface-muted transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
                         Sebelumnya
                     </button>
                 </div>
                 
                 <div class="flex gap-2">
-                    <a href="/customers" class="px-4 py-2 border border-slate-200 rounded-md bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs font-semibold cursor-pointer focus:outline-none">
+                    <a href="/customers" class="px-4 py-2 border border-border rounded-md bg-surface text-text-secondary hover:bg-surface-muted transition-colors text-xs font-semibold cursor-pointer focus:outline-none">
                         Batal
                     </a>
                     
@@ -570,10 +563,10 @@
         if (requiredMissing.length > 0) {
             // State: Belum Lengkap (Red Warning)
             statusSpan.textContent = 'Belum Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-red-600';
+            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-error';
             
             // Red warning icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-error-bg border border-error-border flex items-center justify-center text-error">
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -582,15 +575,15 @@
             missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
             
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-red-100 bg-red-50/10 hover:bg-red-50/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-error-border bg-error-bg/10 hover:bg-error-bg/20 transition-all group focus:outline-none";
             }
         } else if (optionalMissing.length > 0) {
             // State: Kekurangan Data (Amber Warning)
             statusSpan.textContent = 'Kekurangan Data';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-amber-600';
+            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-warning';
 
             // Amber alert icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-warning-bg border border-warning-border flex items-center justify-center text-warning">
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -599,15 +592,15 @@
             missingSpan.textContent = 'Kurang: ' + optionalMissing.join(', ');
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-amber-100 bg-amber-50/10 hover:bg-amber-50/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-warning-border bg-warning-bg/10 hover:bg-warning-bg/20 transition-all group focus:outline-none";
             }
         } else {
             // State: Lengkap (Green Check)
             statusSpan.textContent = 'Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-green-600';
+            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-success';
 
             // Green check icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-success flex items-center justify-center text-white">
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -616,13 +609,13 @@
             missingSpan.textContent = 'Semua data terisi';
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-green-200 bg-green-50/10 hover:bg-green-50/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-success-border bg-success-bg/10 hover:bg-success-bg/20 transition-all group focus:outline-none";
             }
         }
 
         // Highlight active step specifically
         if (currentActiveStep === step) {
-            navBtn.className = "w-full text-left p-3.5 rounded-lg border-2 border-sky-600 bg-sky-50/30 transition-all group focus:outline-none";
+            navBtn.className = "w-full text-left p-3.5 rounded-lg border-2 border-primary bg-primary-soft/30 transition-all group focus:outline-none";
         }
     }
 

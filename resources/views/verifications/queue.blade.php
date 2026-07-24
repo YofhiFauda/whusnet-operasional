@@ -2,6 +2,8 @@
 
 @section('title', 'Proses Verifikasi & Pemasangan - Whusnet Operasional')
 @section('page_title', 'Antrean Verifikasi & Pemasangan')
+@section('breadcrumb_parent', 'Pelanggan')
+@section('breadcrumb_parent_url', '/customers')
 
 @section('content')
 <div x-data="processToTimHandler()">
@@ -24,7 +26,7 @@
             <button type="submit" class="bg-primary hover:bg-primary/90 text-white text-sm font-medium py-2 px-6 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/25">
                 Cari
             </button>
-            <a href="{{ route('verifications.queue') }}" class="bg-surface-muted hover:bg-surface-muted text-text-main text-sm font-medium py-2 px-4 rounded-md transition-colors cursor-pointer text-center focus:outline-none">
+            <a href="{{ route('verifications.queue') }}" class="bg-surface-muted hover:bg-surface border border-border text-text-main text-sm font-medium py-2 px-4 rounded-md transition-colors cursor-pointer text-center focus:outline-none">
                 Reset
             </a>
         </div>
@@ -33,15 +35,15 @@
 
 <!-- Table Content -->
 <div class="bg-surface border border-border rounded-lg overflow-hidden">
-    <div class="border-b border-border bg-info/5 px-6 py-3 flex items-center justify-between">
-        <span class="text-sm font-bold text-info uppercase tracking-wider">Daftar Antrean</span>
+    <div class="border-b border-border bg-surface-muted/50 dark:bg-transparent px-6 py-3 flex items-center justify-between">
+        <span class="text-sm font-bold text-text-main uppercase tracking-wider">Daftar Antrean</span>
     </div>
 
     <!-- Table Container -->
     <div class="overflow-x-auto">
         <table class="w-full border-collapse text-left text-sm text-text-main">
             <thead>
-                <tr class="bg-surface-muted/50 border-b border-border text-text-muted font-semibold text-xs">
+                <tr class="bg-surface-muted/50 dark:bg-transparent border-b border-border text-text-muted font-semibold text-xs">
                     <th class="px-6 py-3.5 w-12 text-center">NO</th>
                     <th class="px-6 py-3.5">ID</th>
                     <th class="px-6 py-3.5">NAMA</th>
@@ -53,7 +55,7 @@
                     <th class="px-6 py-3.5 text-right">ACTION</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-border">
                 @forelse($customers as $customer)
                     @php
                     $installation = $customer->latestInstallation;
@@ -127,7 +129,7 @@
 
                             @if($customer->status === 'waiting_acc' || $customer->status === 'surveyed')
                                 @can('customers.detail.installation.validate')
-                                <a href="{{ route('customers.verification.admin', $customer) }}" class="bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
+                                <a href="{{ route('customers.verification.admin', $customer) }}" class="bg-warning hover:bg-warning/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     Detail & Review
                                 </a>
@@ -184,7 +186,7 @@
     </div>
     
     @if($customers->hasPages())
-        <div class="border-t border-border px-6 py-4 bg-surface-muted/50">
+        <div class="border-t border-border px-6 py-4 bg-surface-muted/50 dark:bg-transparent">
             {{ $customers->links() }}
         </div>
     @endif
@@ -195,9 +197,9 @@
 {{-- Modal Final Verify telah dipindahkan ke halaman verifications/admin.blade.php --}}
 
 <!-- Modal Reject -->
-<div id="rejectModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-text-main/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
-    <div class="bg-surface rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
-        <div class="flex justify-between items-center px-6 py-4 border-b border-border bg-error/5">
+<div id="rejectModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-black/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
+    <div class="bg-surface border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-border bg-error-bg/60">
             <h3 class="text-lg font-bold text-error">Batalkan / Gagal Pelanggan</h3>
             <button type="button" onclick="closeRejectModal()" class="text-text-muted hover:text-text-main transition-colors focus:outline-none rounded-md hover:bg-surface-muted p-1 cursor-pointer">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -213,7 +215,7 @@
                 </div>
             </div>
             
-            <div class="px-6 py-4 border-t border-border bg-surface-muted flex justify-end gap-3">
+            <div class="px-6 py-4 border-t border-border bg-surface-muted dark:bg-transparent flex justify-end gap-3">
                 <button type="button" onclick="closeRejectModal()" class="px-5 py-2 text-sm font-medium text-text-muted bg-surface border border-border rounded-md hover:bg-surface-muted transition-colors cursor-pointer">Tutup</button>
                 <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-error rounded-md hover:bg-error/90 transition-colors shadow-sm cursor-pointer">Batalkan / Gagal</button>
             </div>

@@ -357,7 +357,7 @@ class CustomerInstallationController extends Controller
                     $telegram = app(TelegramBotService::class);
                     $message = "🛠 <b>Pemasangan Selesai</b>\n";
                     $message .= "Pelanggan: {$customer->full_name}\n";
-                    $message .= "No. HP: {$customer->phone}\n";
+                    $message .= "No. HP: {$customer->primary_phone}\n";
                     $message .= "POP: {$customer->pop->name}\n";
                     $message .= 'Menunggu Verifikasi Admin untuk Aktivasi & Penagihan.';
                     $telegram->sendMessage($message);

@@ -53,11 +53,9 @@ class CustomerActivationTest extends TestCase
             'customer_code' => 'D00C000001',  // format baru: {cid_prefix}00{registration_prefix}{######}
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'installed',
-            'customer_status' => 'menunggu_pemasangan',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -149,7 +147,6 @@ class CustomerActivationTest extends TestCase
             'customer_code' => 'WHUS-2026-0001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'installed',
@@ -192,7 +189,8 @@ class CustomerActivationTest extends TestCase
 
         // Customer assertions
         $this->assertEquals('active', $customer->status);
-        $this->assertEquals('aktif', $customer->customer_status);
+        // service_status kini sumber kebenaran (customers.customer_status di-drop)
+        $this->assertEquals('aktif', $customer->customerService()->value('service_status'));
         $this->assertEquals('siap_billing', $customer->data_completeness_status);
         $this->assertNotNull($customer->cid);
         // CID format: {cid_prefix}{mini_pop_or_olt}{dist_code}{request_id}_{DESA}_{NAMA}

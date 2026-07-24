@@ -44,7 +44,6 @@ class BackfillActivationDateTest extends TestCase
 
         $customer = Customer::factory()->create([
             'status' => 'active',
-            'customer_status' => 'aktif',
             'internet_package_id' => $package->id,
             'registration_date' => '2026-06-01',
         ]);

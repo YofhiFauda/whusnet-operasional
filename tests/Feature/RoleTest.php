@@ -45,7 +45,7 @@ class RoleTest extends TestCase
         $this->assertEquals('Owner Perusahaan (Akses Penuh)', $owner->description);
 
         $admin = Role::where('name', 'Admin')->firstOrFail();
-        $this->assertEquals('Admin Operasional (Akses Penuh)', $admin->description);
+        $this->assertEquals('Admin Operasional', $admin->description);
 
         $cs = Role::where('name', 'Helpdesk')->firstOrFail();
         $this->assertEquals('Layanan Pelanggan dan Bantuan', $cs->description);

@@ -55,7 +55,7 @@
             <tbody class="block sm:table-row-group divide-y sm:divide-y-0 divide-border">
                 @forelse($customers as $customer)
                 @php
-                    $survey = $customer->latestSurvey()->first();
+                    $survey = $customer->latestSurvey;
                 @endphp
                 <tr class="hover:bg-surface-muted transition-colors flex flex-col sm:table-row p-4 sm:p-0 border-b sm:border-0 border-border">
                     <td class="hidden sm:table-cell px-6 py-3.5 text-center text-text-muted font-mono">{{ $loop->iteration }}</td>

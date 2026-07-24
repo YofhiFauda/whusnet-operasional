@@ -270,7 +270,7 @@ class TicketController extends Controller
             ),
             'nama' => $c->full_name,
             'alamat' => $c->address,
-            'no_hp' => $c->primary_phone ?: $c->phone,
+            'no_hp' => $c->primary_phone,
             'pop' => $c->pop?->name,
             'odp' => $c->odp_code ?: $device?->odp,
             'paket' => $c->internetPackage?->name,

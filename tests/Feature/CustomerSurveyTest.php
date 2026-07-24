@@ -55,7 +55,7 @@ class CustomerSurveyTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-001',
             'full_name' => 'Test Customer',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'survey_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -126,7 +126,7 @@ class CustomerSurveyTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-003',
             'full_name' => 'Test Customer Duplicate Task',
-            'phone' => '0812345680',
+            'primary_phone' => '0812345680',
             'status' => 'survey_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -211,7 +211,7 @@ class CustomerSurveyTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-002',
             'full_name' => 'Test Customer 2',
-            'phone' => '0812345679',
+            'primary_phone' => '0812345679',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
@@ -226,5 +226,41 @@ class CustomerSurveyTest extends TestCase
             ->post(route('customers.survey.store', $customer->id), $surveyData);
 
         $response->assertStatus(403);
+    }
+
+    public function test_authorized_user_can_view_survey_queue()
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $pop = Pop::create([
+            'code' => 'SMN4',
+            'pop_code' => 'SMN4',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko 4',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $technician = User::factory()->create();
+        $teknisiRole = Role::where('name', 'Teknisi')->first();
+        $technician->role_id = $teknisiRole->id;
+        $technician->save();
+
+        Customer::create([
+            'customer_code' => 'TEST-004',
+            'full_name' => 'Test Customer 4',
+            'primary_phone' => '0812345681',
+            'status' => 'waiting_survey',
+            'pop_id' => $pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+
+        $response = $this->actingAs($technician)
+            ->get(route('surveys.queue'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Test Customer 4');
     }
 }

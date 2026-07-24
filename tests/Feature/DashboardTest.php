@@ -106,7 +106,7 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
 
         // Owner has all permissions, so should see everything
-        $response->assertSee('PELANGGAN');
+        $response->assertSee('Pelanggan');
         $response->assertSee('List Pelanggan');
         $response->assertSee('Registrasi Pelanggan');
         $response->assertSee('Import Pelanggan');
@@ -129,7 +129,7 @@ class DashboardTest extends TestCase
         $response = $this->actingAs($user)->get('/');
         $response->assertStatus(200);
 
-        $response->assertSee('PELANGGAN');
+        $response->assertSee('Pelanggan');
         $response->assertSee('List Pelanggan');
         $response->assertSee('Registrasi Pelanggan');
         $response->assertDontSee('Import Pelanggan'); // No permission
@@ -162,7 +162,7 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
 
         // Should not see Pelanggan or Master Data dropdowns at all
-        $response->assertDontSee('PELANGGAN');
+        $response->assertDontSee("toggleSubmenu('submenu-pelanggan'");
         $response->assertDontSee('Master Data');
 
         // Quick Actions should show empty state message
@@ -218,12 +218,10 @@ class DashboardTest extends TestCase
         Customer::create([
             'full_name' => 'Customer POP A',
             'customer_code' => 'C-SDA-000001',
-            'phone' => '081122334455',
             'primary_phone' => '081122334455',
             'gender' => 'Laki-laki',
             'pop_id' => $popA->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -232,12 +230,10 @@ class DashboardTest extends TestCase
         Customer::create([
             'full_name' => 'Customer POP B',
             'customer_code' => 'C-SBY-000001',
-            'phone' => '089988776655',
             'primary_phone' => '089988776655',
             'gender' => 'Laki-laki',
             'pop_id' => $popB->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -287,12 +283,10 @@ class DashboardTest extends TestCase
         Customer::create([
             'full_name' => 'Customer Kediri',
             'customer_code' => 'C-KDR-000001',
-            'phone' => '081122334455',
             'primary_phone' => '081122334455',
             'gender' => 'Laki-laki',
             'pop_id' => $popA->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -301,12 +295,10 @@ class DashboardTest extends TestCase
         Customer::create([
             'full_name' => 'Customer Malang',
             'customer_code' => 'C-MLG-000001',
-            'phone' => '089988776655',
             'primary_phone' => '089988776655',
             'gender' => 'Laki-laki',
             'pop_id' => $popB->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -342,12 +334,10 @@ class DashboardTest extends TestCase
         $customer = Customer::create([
             'full_name' => 'Customer Period Test',
             'customer_code' => 'C-JMR-000001',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'gender' => 'Laki-laki',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);

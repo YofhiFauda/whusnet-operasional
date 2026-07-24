@@ -154,10 +154,10 @@
                                     </a>
                                     <span class="font-mono text-xs text-text-muted ml-1">{{ $task->customer->display_id }}</span>
                                 </div>
-                                @if($task->customer->phone)
+                                @if($task->customer->primary_phone)
                                 <div class="flex items-center gap-1.5 mt-1 text-[11px]">
-                                    <span class="text-text-muted font-mono">{{ $task->customer->phone }}</span>
-                                    <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $task->customer->phone)) }}" target="_blank"
+                                    <span class="text-text-muted font-mono">{{ $task->customer->primary_phone }}</span>
+                                    <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $task->customer->primary_phone)) }}" target="_blank"
                                        class="text-emerald-600 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer">
                                         <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.768-.001 1.298.409 2.522 1.189 3.518l-.756 2.766 2.831-.744a5.748 5.748 0 002.504.588h.002c3.18 0 5.767-2.586 5.768-5.766 0-1.541-.6-2.99-1.691-4.08-1.091-1.09-2.539-1.69-4.079-1.648zm0 10.153a4.398 4.398 0 01-2.241-.614l-.16-.095-1.666.438.444-1.624-.105-.167a4.394 4.394 0 01-.67-2.326c.001-2.426 1.975-4.4 4.402-4.4 1.177 0 2.283.458 3.115 1.29a4.382 4.382 0 011.29 3.117c-.001 2.426-1.975 4.4-4.409 4.4z"/></svg>
                                         WhatsApp

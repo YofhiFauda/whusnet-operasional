@@ -21,7 +21,7 @@ class CustomerFactory extends Factory
         return [
             'full_name' => $this->faker->name,
             'customer_code' => 'REG'.$this->faker->unique()->numberBetween(100000, 999999),
-            'phone' => $this->faker->phoneNumber,
+            'primary_phone' => $this->faker->phoneNumber,
             'status' => 'aktif',
             'pop_id' => Pop::factory(),
             'registration_date' => now(),

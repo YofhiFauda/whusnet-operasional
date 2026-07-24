@@ -1,7 +1,18 @@
 @extends('layouts.app')
 
-@section('title', 'List Pelanggan - Whusnet Operasional')
-@section('page_title', 'List Pelanggan')
+@php
+    $statusGroup = request()->query('status_group', '');
+    $pageTitle = match ($statusGroup) {
+        'failed' => 'Pelanggan Gagal',
+        'terminated' => 'Pelanggan Putus',
+        'survey' => 'Survey Pelanggan',
+        'verification' => 'Verifikasi Pelanggan',
+        default => 'List Pelanggan',
+    };
+@endphp
+
+@section('title', $pageTitle . ' - Whusnet Operasional')
+@section('page_title', $pageTitle)
 @section('breadcrumb_parent', 'Pelanggan')
 @section('breadcrumb_parent_url', '/customers')
 
@@ -30,7 +41,7 @@
 ──────────────────────────────────────────────────────────── --}}
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
     <div>
-        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Data Pelanggan</h1>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{{ $pageTitle }}</h1>
         <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola data pelanggan, status layanan internet, penagihan, dan verifikasi dokumen.</p>
     </div>
     <div class="flex items-center gap-2.5 flex-wrap shrink-0">
@@ -276,22 +287,22 @@
                     <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
                 @forelse($customers as $customer)
-                <tr class="hover:bg-slate-50/45 transition-colors">
-                    <td class="px-6 py-3.5 text-center text-slate-400 data-text">
+                <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/20 transition-colors">
+                    <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">
                         {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
                         {{ $customer->display_id }}
                     </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
+                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900 dark:text-slate-50">
                         {{ $customer->full_name }}
                     </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
                         {{ $customer->pop->name ?? '-' }}
                     </td>
-                    <td class="px-6 py-3.5 max-w-xs text-slate-700">
+                    <td class="px-6 py-3.5 max-w-xs text-slate-700 dark:text-slate-300">
                         {{ $customer->reject_reason ?? '-' }}
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap data-text">
@@ -300,7 +311,7 @@
                     <td class="px-6 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{{ route('customers.show', $customer->id) }}"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 transition-colors border border-sky-200 hover:bg-sky-50 rounded px-2.5 py-1 cursor-pointer">
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
                                 Detail
                             </a>
                             @if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject)
@@ -308,7 +319,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengembalikan {{ $customer->full_name }} ke proses sebelum ditolak?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 hover:bg-amber-50 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 transition-colors border border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded px-2.5 py-1 cursor-pointer">
                                     Kembalikan
                                 </button>
                             </form>
@@ -318,7 +329,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
                         Tidak ada data pelanggan gagal.
                     </td>
                 </tr>
@@ -340,7 +351,7 @@
                     <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
                 @forelse($customers as $customer)
                 @php
                     $contractType = match($customer->customerService->contract_type ?? null) {
@@ -350,37 +361,37 @@
                     };
                     $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
                 @endphp
-                <tr class="hover:bg-slate-50/45 transition-colors">
-                    <td class="px-6 py-3.5 text-center text-slate-400 data-text">
+                <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/20 transition-colors">
+                    <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">
                         {{ ($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration }}
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
                         {{ $customer->display_id }}
                     </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900">
+                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900 dark:text-slate-50">
                         {{ $customer->full_name }}
                     </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
                         {{ $customer->pop->name ?? '-' }}
                     </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 font-medium">
+                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
                         {{ $contractType }}
                     </td>
-                    <td class="px-6 py-3.5 max-w-xs text-slate-700">
+                    <td class="px-6 py-3.5 max-w-xs text-slate-700 dark:text-slate-300">
                         {{ $customer->termination_reason ?? '-' }}
                     </td>
                     <td class="px-6 py-3.5 whitespace-nowrap data-text">
                         {{ $customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-' }}
                     </td>
                     <td class="px-6 py-3.5 text-center whitespace-nowrap">
-                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100' }}">
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $isDeviceRetrieved ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/50' : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50' }}">
                             {{ $isDeviceRetrieved ? 'Sudah di Ambil' : 'Belum di Ambil' }}
                         </span>
                     </td>
                     <td class="px-6 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{{ route('customers.show', $customer->id) }}"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 transition-colors border border-sky-200 hover:bg-sky-50 rounded px-2.5 py-1 cursor-pointer">
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
                                 Detail
                             </a>
                             @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
@@ -388,7 +399,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors border border-slate-200 hover:bg-slate-50 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 transition-colors border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded px-2.5 py-1 cursor-pointer">
                                     Ambil Alat
                                 </button>
                             </form>
@@ -398,7 +409,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 transition-colors border border-emerald-200 hover:bg-emerald-50 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded px-2.5 py-1 cursor-pointer">
                                     Langganan Lagi
                                 </button>
                             </form>
@@ -408,7 +419,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-6 py-8 text-center text-slate-400">
+                    <td colspan="9" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
                         Tidak ada data pelanggan putus langganan.
                     </td>
                 </tr>

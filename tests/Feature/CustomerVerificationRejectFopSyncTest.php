@@ -92,7 +92,7 @@ class CustomerVerificationRejectFopSyncTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-SURV-001',
             'full_name' => 'Survey Reject Customer',
-            'phone' => '081200000001',
+            'primary_phone' => '081200000001',
             'status' => 'surveyed',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',
@@ -132,7 +132,7 @@ class CustomerVerificationRejectFopSyncTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-INST-001',
             'full_name' => 'Install Reject Customer',
-            'phone' => '081200000002',
+            'primary_phone' => '081200000002',
             'status' => 'verification_admin',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',

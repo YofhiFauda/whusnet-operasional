@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
 @section('title', 'FOP Dashboard')
+@section('page_title', 'FOP Dashboard')
+@section('breadcrumb_parent', 'Dashboard')
+@section('breadcrumb_parent_url', '/')
 
 @section('content')
 <div x-data="fopDashboardHandler()" class="flex flex-col gap-6 px-6 py-6 max-w-screen-2xl mx-auto font-sans text-text-main">
@@ -8,14 +11,6 @@
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
     <div class="page-header flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between mb-2">
         <div class="page-header-left">
-            <!-- Breadcrumbs -->
-            <nav class="flex items-center gap-1.5 text-xs text-text-muted mb-1 font-sans">
-                <a href="/" class="hover:text-text-main transition-colors duration-150 cursor-pointer">Dashboard</a>
-                <svg class="h-3 w-3 text-text-disabled shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-                <span class="text-text-muted font-medium">FOP Dashboard</span>
-            </nav>
             <div class="flex items-center gap-2">
                 <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -356,7 +351,7 @@
                 </div>
 
                 <div class="p-5 space-y-4 font-sans">
-                    <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 text-slate-800 p-3 rounded-lg border border-primary-border">
+                    <p class="text-xs text-text-secondary leading-relaxed bg-primary-soft/50 p-3 rounded-lg border border-primary-border">
                         Pindahkan task <span class="font-bold text-text-main font-mono" x-text="switchTeamModal.tugas"></span> dari 
                         <span class="font-bold text-text-main" x-text="switchTeamModal.fromTeamName"></span> ke 
                         <span class="font-bold text-text-main" x-text="switchTeamModal.toTeamName"></span>.

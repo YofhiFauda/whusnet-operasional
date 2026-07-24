@@ -265,7 +265,7 @@ class FopTaskSortingTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C00RQ000099',
             'full_name' => 'Pelanggan Antri Survey',
-            'phone' => '081200000099',
+            'primary_phone' => '081200000099',
             'registration_date' => now(),
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
@@ -305,7 +305,7 @@ class FopTaskSortingTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C00RQ000098',
             'full_name' => 'Pelanggan SLA Lewat',
-            'phone' => '081200000098',
+            'primary_phone' => '081200000098',
             'registration_date' => now()->subDays(2),
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,

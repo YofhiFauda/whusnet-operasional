@@ -52,7 +52,6 @@ class CustomerImportLoggingTest extends TestCase
                     'status_row' => 'valid',
                     'old_customer_id' => 'CUST-LEG-1',
                     'full_name' => 'Valid Customer',
-                    'phone' => '087700000001',
                     'primary_phone' => '087700000001',
                     'village_id' => $village->id,
                     'district_id' => $district->id,
@@ -73,7 +72,7 @@ class CustomerImportLoggingTest extends TestCase
                     'status_row' => 'valid',
                     'old_customer_id' => 'CUST-LEG-3',
                     'full_name' => '', // missing name
-                    'phone' => '087700000003',
+                    'primary_phone' => '087700000003',
                     'village_id' => $village->id,
                     'pop_id' => $pop->id,
                 ],
@@ -116,7 +115,7 @@ class CustomerImportLoggingTest extends TestCase
         // Assert records created in master tables
         $this->assertDatabaseHas('customers', [
             'full_name' => 'Valid Customer',
-            'phone' => '087700000001',
+            'primary_phone' => '087700000001',
             'old_customer_id' => 'CUST-LEG-1',
             'pop_id' => $pop->id,
         ]);
@@ -132,7 +131,7 @@ class CustomerImportLoggingTest extends TestCase
 
         $this->assertDatabaseHas('customers', [
             'full_name' => 'CUST-LEG-3',
-            'phone' => '087700000003',
+            'primary_phone' => '087700000003',
             'old_customer_id' => 'CUST-LEG-3',
             'data_completeness_status' => 'perlu_dilengkapi',
         ]);

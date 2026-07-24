@@ -250,7 +250,6 @@ class CustomerVerificationController extends Controller
             $oldValues = [
                 'cid' => $customer->cid,
                 'status' => $customer->status,
-                'customer_status' => $customer->customer_status,
                 'data_completeness_status' => $customer->data_completeness_status,
                 'service_status' => $service->service_status,
                 'billing_status' => $service->billing_status,
@@ -260,7 +259,6 @@ class CustomerVerificationController extends Controller
             $customer->update([
                 'cid' => $cid,
                 'status' => 'active',
-                'customer_status' => 'aktif',
                 'data_completeness_status' => 'siap_billing',
             ]);
 
@@ -294,7 +292,6 @@ class CustomerVerificationController extends Controller
             $newValues = [
                 'cid' => $cid,
                 'status' => 'active',
-                'customer_status' => 'aktif',
                 'data_completeness_status' => 'siap_billing',
                 'service_status' => 'aktif',
                 'billing_status' => 'active',

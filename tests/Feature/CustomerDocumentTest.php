@@ -177,7 +177,7 @@ class CustomerDocumentTest extends TestCase
         return Customer::create([
             'customer_code' => $code,
             'full_name' => 'Customer Document '.$code,
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'pop_id' => $pop->id,
             'status' => 'installed',
             'data_completeness_status' => 'draft',

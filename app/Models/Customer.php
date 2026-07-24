@@ -25,14 +25,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_type',
     'company_name',
     'npwp',
-    'old_account_status',
     'email',
-    'phone',
     'primary_phone',
     'alternative_phone',
     'registration_date',
     'data_completeness_status',
-    'customer_status',
     'pop_id',
     'distribution_id',
     'mini_pop_id',
@@ -395,9 +392,26 @@ class Customer extends Model
     {
         $address = $this->address ?? '';
 
-        $village = $this->village?->name;
-        $district = $this->district?->name;
-        $city = $this->city?->name;
+        // Pilihan B (rancangan §2.6): accessor TIDAK boleh memicu query tersembunyi.
+        // Dulu membaca $this->village/district/city langsung — kalau relasinya tak
+        // di-eager-load, itu 3 query per pemanggilan, dan accessor terlihat seperti
+        // properti biasa di Blade sehingga jebakan ini menyebar diam-diam.
+        //
+        // Sekarang hanya membaca relasi yang SUDAH dimuat. Di bawah
+        // preventLazyLoading (dev/test) ini tidak pernah melempar; di produksi
+        // tidak pernah jadi query siluman. Kalau pemanggil lupa eager-load, alamat
+        // mentah dikembalikan apa adanya — degradasi anggun, bukan N+1 senyap.
+        // customer_addresses menyimpan village/district/city sebagai STRING; itu
+        // dipakai sebagai sumber utama bila relasinya dimuat, relasi id→name jadi
+        // cadangan.
+        $addr = $this->relationLoaded('customerAddress') ? $this->customerAddress : null;
+
+        $village = ($addr?->village)
+            ?: ($this->relationLoaded('village') ? $this->village?->name : null);
+        $district = ($addr?->district)
+            ?: ($this->relationLoaded('district') ? $this->district?->name : null);
+        $city = ($addr?->city)
+            ?: ($this->relationLoaded('city') ? $this->city?->name : null);
 
         $parts = array_map('trim', explode(',', $address));
 

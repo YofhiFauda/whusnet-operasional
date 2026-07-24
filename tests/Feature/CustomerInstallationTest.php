@@ -36,7 +36,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-001',
             'full_name' => 'Test Installation Customer',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'installation_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -95,7 +95,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-002',
             'full_name' => 'Visible Installation Customer',
-            'phone' => '0812345679',
+            'primary_phone' => '0812345679',
             'status' => 'waiting_installation',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -127,7 +127,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-003',
             'full_name' => 'Unauthorized Installation Customer',
-            'phone' => '0812345680',
+            'primary_phone' => '0812345680',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
