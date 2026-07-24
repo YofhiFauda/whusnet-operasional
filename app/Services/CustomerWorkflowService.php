@@ -47,6 +47,16 @@ class CustomerWorkflowService
 
         return DB::transaction(function () use ($customer, $currentStatusStr, $nextStatus, $note) {
             $customer->status = $nextStatus->value;
+
+            // Fase 5.1 — stempel tanggal reject/terminate ke kolom nyata, supaya
+            // daftar pelanggan tab Gagal/Putus bisa ORDER BY kolom biasa (bukan
+            // subquery JSON berkorelasi ke audit_logs yang O(N²)).
+            if ($nextStatus->value === 'rejected') {
+                $customer->rejected_at = now();
+            } elseif ($nextStatus->value === 'terminated') {
+                $customer->terminated_at = now();
+            }
+
             $saved = $customer->save();
 
             if ($saved) {

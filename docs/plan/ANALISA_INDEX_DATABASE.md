@@ -1109,13 +1109,21 @@ diuji bersih dua arah). 34 index `_idx` terpasang.
 - [x] **3.4** P2: index operasional (`tasks`, `fop_tasks`, `notifications`, `customer_status_logs`, `customer_services`) → diukur
 
 ### Fase 4 — Skema (destruktif, `migrate:fresh`)
-- [ ] **4.1** Persempit `customers.cid`, `audit_logs.auditable_type`, kolom status
-- [ ] **4.2** Drop kolom zombie ⚠️ *butuh konfirmasi kolom mana*
-- [ ] **4.3** Satukan `phone` / `primary_phone`
-- [ ] **4.4** `clean_address` pilihan B — accessor lepas dari relasi
+- [x] **4.1** Persempit `customers.cid`, `audit_logs.auditable_type`, kolom status
+- [x] **4.2** Drop kolom zombie ⚠️ *butuh konfirmasi kolom mana*
+- [x] **4.3** Satukan `phone` / `primary_phone`
+- [x] **4.4** `clean_address` pilihan B — accessor lepas dari relasi
 
 ### Fase 5 — Struktural
-- [ ] **5.1** Kolom `rejected_at` / `terminated_at` + backfill
+- [x] **5.1** Kolom `rejected_at` / `terminated_at` + backfill — **SELESAI 2026-07-24**.
+      Migration `2026_07_24_135019` (2 kolom + index `(status, rejected_at)` &
+      `(status, terminated_at)`). Diisi di `CustomerWorkflowService::transition`
+      (reject), `CustomerTerminationController` (terminate), jalur import legacy,
+      + command `customers:backfill-status-timestamps` (data lama, idempoten).
+      ORDER BY tab Gagal/Putus ganti dari subquery JSON berkorelasi → kolom.
+      EXPLAIN MySQL: `type=ref`, `customers_status_rejected_idx`, covering, tanpa
+      filesort (dulu O(pelanggan × audit_logs)). Test
+      `CustomerListStatusTimestampOrderingTest`.
 - [ ] **5.2** Generated column `notification_type`, `data` → tipe `json`
 - [ ] **5.3** Pencarian pelanggan: prefix-`LIKE` + FULLTEXT ⚠️ *butuh konfirmasi*
 - [ ] **5.4** Endpoint pencarian wilayah `?q=` + limit

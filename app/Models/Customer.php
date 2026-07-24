@@ -34,6 +34,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'distribution_id',
     'mini_pop_id',
     'status',
+    'rejected_at',
+    'terminated_at',
     'address',
     'latitude',
     'longitude',
@@ -77,6 +79,8 @@ class Customer extends Model
     {
         return [
             'registration_date' => 'date',
+            'rejected_at' => 'datetime',
+            'terminated_at' => 'datetime',
             'gender' => Gender::class,
         ];
     }

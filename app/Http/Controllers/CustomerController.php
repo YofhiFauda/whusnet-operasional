@@ -133,29 +133,14 @@ class CustomerController extends Controller
         }
 
         if ($statusGroup === 'failed') {
-            // Urut berdasarkan tanggal ditolak (dari AuditLog transisi 'rejected'
-            // terakhir per customer), bukan customer_code — subquery karena
-            // rejected_at bukan kolom asli, dihitung dari AuditLog.
-            $query->orderBy(
-                AuditLog::selectRaw('MAX(created_at)')
-                    ->whereColumn('auditable_id', 'customers.id')
-                    ->where('auditable_type', Customer::class)
-                    ->where('module', 'Customer Workflow')
-                    ->where('action', 'status_transition')
-                    ->whereJsonContains('new_values->status', 'rejected'),
-                'desc'
-            );
+            // Fase 5.1 — urut pakai kolom nyata rejected_at. Versi lama memakai
+            // subquery JSON berkorelasi ke audit_logs di ORDER BY (dieksekusi
+            // sekali per baris pelanggan, scan+parse JSON) — O(pelanggan ×
+            // audit_logs), timeout begitu audit membesar. Kolom diisi di
+            // CustomerWorkflowService, import, dan command backfill.
+            $query->orderByDesc('rejected_at');
         } elseif ($statusGroup === 'terminated') {
-            // Urut berdasarkan tanggal putus (dari AuditLog terminate terakhir
-            // per customer) — sama pola kayak grup 'failed' di atas.
-            $query->orderBy(
-                AuditLog::selectRaw('MAX(created_at)')
-                    ->whereColumn('auditable_id', 'customers.id')
-                    ->where('auditable_type', Customer::class)
-                    ->where('module', 'customers')
-                    ->where('action', 'terminate'),
-                'desc'
-            );
+            $query->orderByDesc('terminated_at');
         } else {
             $query->orderBy('customer_code', 'asc');
         }
@@ -2332,6 +2317,11 @@ class CustomerController extends Controller
                     $legacyReason = trim((string) ($row['reason'] ?? '')) ?: 'Data migrasi dari sistem lama (alasan tidak tercatat).';
 
                     if ($serviceStatus === 'rejected') {
+                        // Fase 5.1 — stempel tanggal reject ke kolom nyata pakai
+                        // tanggal legacy, supaya ORDER BY tab Gagal langsung benar
+                        // tanpa harus jalankan command backfill setelah import.
+                        $customer->updateQuietly(['rejected_at' => $legacyChangedAt]);
+
                         AuditLog::create([
                             'user_id' => $batch->uploaded_by,
                             'module' => 'Customer Workflow',
@@ -2345,6 +2335,8 @@ class CustomerController extends Controller
                             'created_at' => $legacyChangedAt,
                         ]);
                     } elseif ($serviceStatus === 'terminated') {
+                        $customer->updateQuietly(['terminated_at' => $legacyChangedAt]);
+
                         AuditLog::create([
                             'user_id' => $batch->uploaded_by,
                             'module' => 'customers',

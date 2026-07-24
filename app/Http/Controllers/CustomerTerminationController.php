@@ -19,9 +19,11 @@ class CustomerTerminationController extends Controller
         ]);
 
         DB::transaction(function () use ($customer, $request) {
-            // Update customer status
+            // Update customer status. terminated_at (Fase 5.1) diisi supaya tab
+            // "Putus Langganan" bisa ORDER BY kolom, bukan subquery JSON audit.
             $customer->update([
                 'status' => 'terminated',
+                'terminated_at' => now(),
             ]);
 
             // Update service status if it exists
