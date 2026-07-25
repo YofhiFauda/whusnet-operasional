@@ -38,6 +38,9 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\UserController;
 use App\Models\City;
 use App\Models\District;
+use App\Models\Pop;
+use App\Models\Village;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -406,4 +409,85 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/cities/{city}/districts', function (City $city) {
         return response()->json($city->districts()->orderBy('name')->get());
     });
+
+    // Fase 5.4 — endpoint pencarian wilayah (?q= + limit) untuk typeahead,
+    // menggantikan pemuatan SELURUH baris ke <select> yang meledak saat wilayah
+    // bertambah. Hasil selalu dibatasi 20 baris; opsional disaring per induk
+    // (city_id / district_id). LIKE '%q%' aman karena tabel wilayah kecil dan
+    // hasil dibatasi limit.
+    Route::get('/api/wilayah/cities', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+
+        return City::query()
+            ->when($q !== '', fn ($b) => $b->where('name', 'like', "%{$q}%"))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+    })->name('wilayah.cities.search');
+
+    Route::get('/api/wilayah/districts', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+
+        return District::query()
+            ->when($request->filled('city_id'), fn ($b) => $b->where('city_id', $request->integer('city_id')))
+            ->when($q !== '', fn ($b) => $b->where('name', 'like', "%{$q}%"))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name', 'city_id']);
+    })->name('wilayah.districts.search');
+
+    Route::get('/api/wilayah/villages', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+        // district_id bisa array (multi kecamatan terpilih) atau tunggal.
+        $districtIds = array_values(array_filter(
+            (array) $request->query('district_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
+
+        return Village::query()
+            ->when($districtIds !== [], fn ($b) => $b->whereIn('district_id', $districtIds))
+            ->when($q !== '', fn ($b) => $b->where('name', 'like', "%{$q}%"))
+            ->with('district:id,name')
+            ->orderBy('name')
+            ->limit(30)
+            // Sertakan nama kecamatan untuk disambiguasi desa senama lintas kecamatan.
+            ->get(['id', 'name', 'district_id'])
+            ->map(fn ($v) => ['id' => $v->id, 'name' => $v->name, 'district_id' => $v->district_id, 'district' => $v->district?->name]);
+    })->name('wilayah.villages.search');
+
+    // Fase 5.4b — endpoint pencarian POP untuk filter dropdown (Cabang + Mini POP).
+    // WAJIB lewat forUser() supaya HANYA POP dalam scope user yang muncul
+    // (mencegah kebocoran lintas cabang di dropdown, sejalan Fase 5.5).
+    Route::get('/api/pop/cabang', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+
+        return Pop::forUser()
+            ->where('type', 'cabang')
+            ->when($q !== '', fn ($b) => $b->where(fn ($w) => $w->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%")))
+            ->orderBy('name')
+            ->limit(30)
+            ->get(['id', 'name', 'code']);
+    })->name('pop.cabang.search');
+
+    Route::get('/api/pop/mini', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+        // Mini POP = anak dari cabang terpilih (cascade). pop_id[] = cabang terpilih.
+        $cabangIds = array_values(array_filter(
+            (array) $request->query('pop_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
+
+        if ($cabangIds === []) {
+            return [];
+        }
+
+        return Pop::forUser()
+            ->whereIn('parent_id', $cabangIds)
+            ->when($q !== '', fn ($b) => $b->where(fn ($w) => $w->where('name', 'like', "%{$q}%")->orWhere('code', 'like', "%{$q}%")))
+            ->with('parent:id,name')
+            ->orderBy('name')
+            ->limit(30)
+            ->get(['id', 'name', 'code', 'parent_id'])
+            ->map(fn ($m) => ['id' => $m->id, 'name' => $m->name, 'code' => $m->code, 'parent_id' => $m->parent_id, 'parent' => $m->parent?->name]);
+    })->name('pop.mini.search');
 });

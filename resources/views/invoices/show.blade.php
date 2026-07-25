@@ -46,7 +46,7 @@
             </div>
             <div class="flex items-center gap-2">
                 @if($invoice->invoice_type)
-                <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-indigo-50 text-indigo-700 border-indigo-100">
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-sky-50 text-sky-700 border-sky-100">
                     {{ $invoice->invoice_type->label() }}
                 </span>
                 @endif

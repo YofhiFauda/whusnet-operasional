@@ -62,26 +62,72 @@ class CustomerController extends Controller
         $statusGroup = trim((string) $request->query('status_group', ''));
         // Default to empty string '' (Semua active & suspend) if not specified
         $status = $request->query('status', '');
-        $districtId = $request->query('district_id', '');
+        // Fase 5.4 — filter wilayah multi-pilih (dropdown Kecamatan + Desa).
+        // Terima district_id[]/village_id[] (array) maupun tunggal (kompat lama).
+        $districtIds = array_values(array_filter(
+            (array) $request->query('district_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
+        $villageIds = array_values(array_filter(
+            (array) $request->query('village_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
         $packageId = $request->query('package_id', '');
-        $popId = $request->query('pop_id', '');
+        // Fase 5.4b — filter POP multi (dropdown Cabang + Mini POP).
+        // pop_id[] = cabang (customers.pop_id), mini_pop_id[] = Mini POP (OLT).
+        $popIds = array_values(array_filter(
+            (array) $request->query('pop_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
+        $miniPopIds = array_values(array_filter(
+            (array) $request->query('mini_pop_id', []),
+            fn ($v) => $v !== '' && $v !== null
+        ));
         $completenessStatus = $request->query('completeness_status', '');
 
+        // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
+        // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
+        // (teknis: ont_sn/ip_address/odp/olt/vlan; foto ktp/rumah/kontrak; npwp/
+        // company; lat/long; kontrak/diskon/pajak; sales/agent/referral). Select
+        // hanya yang dirender + accessor (display_id butuh cid/customer_code/
+        // distribution_id/status + relasi) + FK untuk eager load. FK WAJIB ikut,
+        // kalau tidak relasi belongsTo-nya gagal dimuat.
         $query = Customer::query()
             ->applyUserScope()
+            ->select([
+                'id', 'person_id',
+                'customer_code', 'old_customer_id', 'old_request_id', 'cid',
+                'full_name', 'primary_phone', 'email', 'identity_number', 'gender',
+                'status', 'data_completeness_status', 'registration_date',
+                'rejected_at', 'terminated_at', 'address',
+                'pop_id', 'distribution_id', 'mini_pop_id',
+                'city_id', 'district_id', 'village_id', 'internet_package_id',
+                'created_at', 'updated_at',
+            ])
             ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice']);
 
-        // Search filter
+        // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
+        // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
+        //  - ada '@'  → email (identifier, prefix)
+        //  - ada digit → kode/HP/NIK/CID → PREFIX 'x%' (sargable, pakai index)
+        //  - selainnya → nama → substring '%x%' (nama memang butuh potongan tengah,
+        //                cuma 1 kolom, jauh lebih murah dari 8-kolom OR)
+        // Konsekuensi UX yang disengaja: query nama tidak lagi mencocokkan kode,
+        // dan sebaliknya — orang mencari BY nama ATAU BY kode, bukan campur.
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('full_name', 'like', "%{$search}%")
-                    ->orWhere('customer_code', 'like', "%{$search}%")
-                    ->orWhere('old_customer_id', 'like', "%{$search}%")
-                    ->orWhere('old_request_id', 'like', "%{$search}%")
-                    ->orWhere('cid', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('primary_phone', 'like', "%{$search}%")
-                    ->orWhere('identity_number', 'like', "%{$search}%");
+                if (str_contains($search, '@')) {
+                    $q->where('email', 'like', "{$search}%");
+                } elseif (preg_match('/\d/', $search)) {
+                    $q->where('customer_code', 'like', "{$search}%")
+                        ->orWhere('cid', 'like', "{$search}%")
+                        ->orWhere('old_customer_id', 'like', "{$search}%")
+                        ->orWhere('old_request_id', 'like', "{$search}%")
+                        ->orWhere('primary_phone', 'like', "{$search}%")
+                        ->orWhere('identity_number', 'like', "{$search}%");
+                } else {
+                    $q->where('full_name', 'like', "%{$search}%");
+                }
             });
         }
 
@@ -112,9 +158,14 @@ class CustomerController extends Controller
             $query->whereIn('status', ['active', 'suspended']);
         }
 
-        // District filter
-        if ($districtId !== '') {
-            $query->where('district_id', $districtId);
+        // District filter (multi)
+        if (! empty($districtIds)) {
+            $query->whereIn('district_id', $districtIds);
+        }
+
+        // Village filter (multi)
+        if (! empty($villageIds)) {
+            $query->whereIn('village_id', $villageIds);
         }
 
         // Service package filter
@@ -122,9 +173,14 @@ class CustomerController extends Controller
             $query->where('internet_package_id', $packageId);
         }
 
-        // POP filter
-        if ($popId !== '') {
-            $query->where('pop_id', $popId);
+        // POP filter (Cabang multi)
+        if (! empty($popIds)) {
+            $query->whereIn('pop_id', $popIds);
+        }
+
+        // Mini POP filter (multi)
+        if (! empty($miniPopIds)) {
+            $query->whereIn('mini_pop_id', $miniPopIds);
         }
 
         // Completeness status filter
@@ -199,10 +255,25 @@ class CustomerController extends Controller
             }
         }
 
-        // Data for filter selects
-        $districts = District::orderBy('name')->get();
+        // Data for filter selects. Fase 5.4 — kecamatan pakai combobox typeahead
+        // (/api/wilayah/districts), jadi TIDAK memuat seluruh district. Cuma
+        // resolve label kecamatan yang SEDANG terpilih untuk chip awal.
+        $selectedDistricts = empty($districtIds)
+            ? collect()
+            : District::whereIn('id', $districtIds)->orderBy('name')->get(['id', 'name']);
+        $selectedVillages = empty($villageIds)
+            ? collect()
+            : Village::whereIn('id', $villageIds)->with('district:id,name')->orderBy('name')->get(['id', 'name', 'district_id']);
         $packages = InternetPackage::orderBy('name')->get();
-        $pops = Pop::forUser()->orderBy('name')->get();
+        // Fase 5.4b — POP pakai dropdown filter (Cabang + Mini POP) via endpoint
+        // /api/pop/*, jadi TIDAK memuat seluruh POP. Resolve label yang terpilih
+        // saja untuk chip awal (tetap lewat forUser → aman scope).
+        $selectedCabang = empty($popIds)
+            ? collect()
+            : Pop::forUser()->whereIn('id', $popIds)->orderBy('name')->get(['id', 'name']);
+        $selectedMini = empty($miniPopIds)
+            ? collect()
+            : Pop::forUser()->whereIn('id', $miniPopIds)->with('parent:id,name')->orderBy('name')->get(['id', 'name', 'parent_id']);
         $subscriptionStatuses = SubscriptionStatus::query()
             ->where('is_active', true)
             ->orderBy('workflow_order')
@@ -227,9 +298,11 @@ class CustomerController extends Controller
 
         return view('customers.index', compact(
             'customers',
-            'districts',
+            'selectedDistricts',
+            'selectedVillages',
+            'selectedCabang',
+            'selectedMini',
             'packages',
-            'pops',
             'statusCounts',
             'totalCustomers',
             'overdueCount',
@@ -237,9 +310,11 @@ class CustomerController extends Controller
             'search',
             'status',
             'statusGroup',
-            'districtId',
+            'districtIds',
+            'villageIds',
             'packageId',
-            'popId',
+            'popIds',
+            'miniPopIds',
             'completenessStatus'
         ));
     }
@@ -382,12 +457,16 @@ class CustomerController extends Controller
      */
     public function create()
     {
-        $districts = District::orderBy('name')->get();
+        // Fase 5.4 — $districts TIDAK dimuat: form create memakai cascade async
+        // (city → /api/cities/{city}/districts → /api/districts/{d}/villages),
+        // jadi memuat SELURUH district di sini sia-sia (dead weight yang meledak
+        // saat wilayah bertambah). $cities dipertahankan — top-level, kecil,
+        // memang dirender.
         $packages = InternetPackage::orderBy('name')->get();
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
 
-        return view('customers.create', compact('districts', 'packages', 'cities', 'pops'));
+        return view('customers.create', compact('packages', 'cities', 'pops'));
     }
 
     /**
@@ -600,13 +679,13 @@ class CustomerController extends Controller
             $customer = Customer::findOrFail(request()->route('customer'));
         }
 
-        $districts = District::orderBy('name')->get();
+        // Fase 5.4 — $districts dead weight (form edit pakai cascade async). Buang.
         $packages = InternetPackage::orderBy('name')->get();
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
         $distributions = Distribution::orderBy('code')->get();
 
-        return view('customers.edit', compact('customer', 'districts', 'packages', 'cities', 'pops', 'distributions'));
+        return view('customers.edit', compact('customer', 'packages', 'cities', 'pops', 'distributions'));
     }
 
     /**

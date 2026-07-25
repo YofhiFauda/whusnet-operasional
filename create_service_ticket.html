@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50 dark:bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="2zUXWRAcu3l22LELvad2exIpa6YMJ0lVg5ivg61Q">
+    <title>Create Service Ticket - WHUSNET</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface: 'var(--bg-surface)',
+                        background: 'var(--bg-background)',
+                        border: 'var(--border-color)',
+                        'text-main': 'var(--text-main)',
+                        'text-secondary': 'var(--text-secondary)',
+                        'text-muted': 'var(--text-muted)',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-surface: #ffffff;
+            --bg-background: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+        }
+
+        html.dark {
+            --bg-surface: #1e293b;
+            --bg-background: #0f172a;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+        }
+
+        [x-cloak] { display: none !important; }
+
+        /* Custom Scrollbar Styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        /* Glassmorphism Header */
+        .glass-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        html.dark .glass-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Sidebar Collapsed State */
+        aside.collapsed {
+            width: 4.5rem !important;
+        }
+        aside.collapsed .sidebar-text,
+        aside.collapsed .sidebar-footer-info,
+        aside.collapsed .chevron-icon,
+        aside.collapsed .submenu-container {
+            display: none !important;
+        }
+        aside.collapsed .sidebar-nav-item {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+    </style>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Theme Initialization Script -->
+    <script>
+        (function () {
+            const saved = localStorage.getItem('whusnet-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (!saved && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+
+<div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="sidebar" class="bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700/80 fixed inset-y-0 left-0 z-40 w-64 flex flex-col justify-between transition-all duration-300 md:static md:translate-x-0 -translate-x-full">
+        
+        <!-- Sidebar Header / Logo -->
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-base tracking-wider shrink-0 shadow-md shadow-sky-600/20">
+                    W
+                </div>
+                <span class="font-bold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight sidebar-text">WHUSNET</span>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 rounded-lg">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Sidebar Navigation Menu -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
+
+            <!-- OPERASIONAL SECTION -->
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Operasional</p>
+                <div class="space-y-1">
+                    <a href="#" title="Dashboard" class="sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                        </svg>
+                        <span class="sidebar-text">Dashboard</span>
+                    </a>
+
+                    <!-- Submenu Pelanggan -->
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                                <span class="sidebar-text">Pelanggan</span>
+                            </div>
+                            <svg id="chevron-pelanggan" class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div id="submenu-pelanggan" class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs hidden">
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Registrasi Pelanggan</a>
+                            <a href="#" class="flex items-center justify-between py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">
+                                <span>Antrean Survey</span>
+                                <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">1</span>
+                            </a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">List Pelanggan</a>
+                        </div>
+                    </div>
+
+                    <!-- Submenu Tagihan -->
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M14 8H8"></path><path d="M16 12H8"></path><path d="M13 16H8"></path>
+                                </svg>
+                                <span class="sidebar-text">Tagihan</span>
+                            </div>
+                            <svg id="chevron-tagihan" class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div id="submenu-tagihan" class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs hidden">
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Tagihan Belum Lunas</a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Tagihan Lunas</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JARINGAN & LAPANGAN SECTION -->
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
+                <div class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"></path><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path>
+                        </svg>
+                        <span class="sidebar-text">Penjadwalan Teknis</span>
+                    </a>
+
+                    <!-- Submenu Ticketing (Active) -->
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 11h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M21 11h-3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 11a9 9 0 1 1 18 0"></path><path stroke-linecap="round" stroke-linejoin="round" d="M21 16v2a4 4 0 0 1-4 4h-5"></path>
+                                </svg>
+                                <span class="sidebar-text">Ticketing</span>
+                            </div>
+                            <svg id="chevron-ticketing" class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 rotate-180 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div id="submenu-ticketing" class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs">
+                            <a href="#" class="block py-2 px-3 rounded-md font-semibold text-sky-600 dark:text-sky-400 bg-sky-100/60 dark:bg-sky-900/50">New Ticket</a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket Masuk</a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket di Proses</a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket Selesai</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LAPORAN & MASTER -->
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Master &amp; Pengaturan</p>
+                <div class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M3 5V19A9 3 0 0 0 21 19V5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 12A9 3 0 0 0 21 12"></path>
+                        </svg>
+                        <span class="sidebar-text">Master Data</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="15" r="3"></circle><circle cx="9" cy="7" r="4"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M10 15H6a4 4 0 0 0-4 4v2"></path>
+                        </svg>
+                        <span class="sidebar-text">Pengguna &amp; RBAC</span>
+                    </a>
+                </div>
+            </div>
+
+        </nav>
+
+        <!-- Sidebar Footer Profile -->
+        <div class="p-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="relative shrink-0">
+                        <div class="w-9 h-9 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center border border-sky-200 dark:border-sky-700">
+                            SU
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                    </div>
+                    <div class="truncate sidebar-footer-info">
+                        <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">Super Admin (Owner)</p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate">superadmin@whusnet.com</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Sidebar Backdrop Mobile -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 z-30 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm hidden md:hidden"></div>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <!-- HEADER TOPBAR -->
+        <header class="glass-header sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-700 px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+
+            <!-- Left: Mobile Toggle & Breadcrumb -->
+            <div class="flex items-center gap-2 min-w-0">
+                <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M4 6h16M4 18h16"></path>
+                    </svg>
+                </button>
+
+                <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 min-w-0">
+                    <button onclick="toggleDesktopSidebar()" class="hidden md:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 transition-colors" title="Toggle Sidebar">
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+                            <path d="M9 3v18"></path>
+                        </svg>
+                    </button>
+
+                    <a href="#" class="hidden sm:flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0">
+                        <span>Home</span>
+                    </a>
+
+                    <svg class="hidden sm:block h-3 w-3 text-slate-300 dark:text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"></path>
+                    </svg>
+                    <span aria-current="page" class="font-semibold text-sky-600 dark:text-sky-400 truncate">Create Service Ticket</span>
+                </nav>
+            </div>
+
+            <!-- Middle: Global Search -->
+            <div class="hidden md:block flex-1 max-w-sm lg:max-w-md">
+                <div class="relative">
+                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"></path>
+                    </svg>
+                    <input type="search" id="globalSearch" placeholder="Cari pelanggan, CID, invoice, tiket, IP…" class="w-full h-9 pl-10 pr-16 rounded-full border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-sky-600 dark:focus:border-sky-500 focus:ring-2 focus:ring-sky-600/12 transition-all">
+                    <kbd class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-slate-50 dark:bg-slate-900">/</kbd>
+                </div>
+            </div>
+
+            <!-- Right: Controls & Profile -->
+            <div class="flex items-center gap-1 sm:gap-2">
+                <button onclick="toggleTheme()" id="themeToggle" aria-label="Ganti tema" class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
+                    <svg id="themeIconMoon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"></path>
+                    </svg>
+                    <svg id="themeIconSun" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="4"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                    </svg>
+                </button>
+
+                <button onclick="openHelp()" aria-label="Bantuan" title="Bantuan (?)" class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"></path>
+                    </svg>
+                </button>
+
+                <div class="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                <div class="flex items-center gap-2 py-1 pl-1 pr-2 rounded-lg">
+                    <span class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 font-bold text-[11px] flex items-center justify-center">
+                        SU
+                    </span>
+                    <span class="hidden lg:flex flex-col items-start leading-tight">
+                        <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Super Admin (Owner)</span>
+                        <span class="text-[10px] text-slate-400 dark:text-slate-500">Online • FOP Sync</span>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN PAGE CONTENT (SPLIT VIEW - FRAME 130) -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900">
+            <div x-data="ticketPage()" @keydown.window="handleShortcut($event)" class="max-w-[1700px] mx-auto">
+
+                <!-- Toast Notification -->
+                <div x-show="toast.show" x-transition x-cloak
+                     class="fixed top-20 right-6 z-50 max-w-sm rounded-lg shadow-lg border px-4 py-3 flex items-start gap-2.5"
+                     :class="toast.type === 'error' ? 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'"
+                     style="display: none;">
+                    <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path x-show="toast.type !== 'error'" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path x-show="toast.type === 'error'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span class="text-xs font-semibold" x-text="toast.message"></span>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
+
+                    <!-- LEFT COLUMN: CREATE SERVICE TICKET FORM (Col 7 / Col 8) -->
+                    <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+
+                        <!-- Top Bar / Breadcrumb & Status -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-xs text-text-muted">
+                                <a href="#" class="hover:text-sky-600 transition-colors flex items-center gap-1">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                    Ticketing
+                                </a>
+                                <span>/</span>
+                                <span class="text-text-main font-semibold">Create New Ticket</span>
+                            </div>
+
+                            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Draft Mode
+                            </div>
+                        </div>
+
+                        <!-- Ticket Form Container Card -->
+                        <div class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden transition-all">
+                            
+                            <!-- Form Header -->
+                            <div class="px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
+                                <div>
+                                    <h1 class="text-lg font-bold text-text-main tracking-tight flex items-center gap-2">
+                                        <svg class="h-5 w-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
+                                        </svg>
+                                        Create Service Ticket
+                                    </h1>
+                                    <p class="text-[11px] text-text-muted font-medium uppercase tracking-wider mt-0.5">
+                                        Internal Operations Entry &amp; FOP Sync
+                                    </p>
+                                </div>
+                                
+                                <a href="#" class="text-xs text-text-muted hover:text-text-main transition-colors flex items-center gap-1">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    Tutup
+                                </a>
+                            </div>
+
+                            <!-- Form Body -->
+                            <form @submit.prevent="submitForm()" class="divide-y divide-border">
+                                
+                                <!-- SECTION 01: CLASSIFICATION -->
+                                <div class="p-6 space-y-4">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
+                                        <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 01: CLASSIFICATION</h2>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="space-y-1.5">
+                                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                Ticket Type <span class="text-rose-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <select name="type" x-model="ticketType" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
+                                                    <option value="" disabled selected>-- SELECT CLASSIFICATION --</option>
+                                                    <option value="MTN">MTN — Maintenance</option>
+                                                    <option value="C-REQ">C-REQ — Customer Request</option>
+                                                </select>
+                                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+
+                                        <div class="space-y-1.5">
+                                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                Prioritas <span class="text-rose-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <select name="priority" x-model="priority" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                                                    <option value="low">Low</option>
+                                                    <option value="Medium">Medium</option>
+                                                    <option value="High">High</option>
+                                                    <option value="Urgent">Urgent</option>
+                                                </select>
+                                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SECTION 02: CUSTOMER IDENTITY -->
+                                <div class="p-6 bg-slate-50/30 dark:bg-slate-900/20 space-y-4">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
+                                        <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 02: CUSTOMER IDENTITY</h2>
+                                    </div>
+
+                                    <div class="space-y-1.5 relative">
+                                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                            Search Customer Data <span class="text-rose-500">*</span>
+                                        </label>
+
+                                        <div class="relative flex items-center">
+                                            <svg class="h-4 w-4 absolute left-3 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+
+                                            <input type="text" x-ref="searchInput" x-model="cidQuery" @input="searchCustomer()" :disabled="selected !== null" placeholder="ENTER CID OR NAME..." class="w-full text-sm font-mono tracking-wide rounded-lg border border-border bg-surface pl-9 pr-10 py-2.5 text-text-main placeholder:text-text-muted placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-text-muted transition-all">
+
+                                            <button type="button" x-show="selected" @click="clearSelection()" class="absolute right-3 text-xs font-bold text-sky-600 hover:text-sky-700 underline cursor-pointer" style="display: none;">
+                                                Ganti
+                                            </button>
+
+                                            <button type="button" x-show="cidQuery && !selected" @click="cidQuery = ''; results = []" class="absolute right-3 text-text-muted hover:text-text-main" style="display: none;">
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+
+                                        <!-- Results Dropdown -->
+                                        <div x-show="results.length > 0 && !selected" class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y divide-border">
+                                            <template x-for="r in results" :key="r.id">
+                                                <div @click="pick(r)" class="p-3 hover:bg-sky-50 dark:hover:bg-slate-800 cursor-pointer transition-colors flex items-center justify-between">
+                                                    <div>
+                                                        <span class="text-xs font-bold text-text-main block" x-text="r.nama"></span>
+                                                        <span class="text-[11px] text-text-muted font-mono" x-text="'CID: ' + r.cid + ' • ' + r.pop"></span>
+                                                    </div>
+                                                    <span class="text-xs font-semibold text-sky-600 dark:text-sky-400" x-text="r.paket"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <p x-show="searching" class="text-xs text-sky-600 animate-pulse mt-1 flex items-center gap-1" style="display: none;">
+                                            <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            Mencari data pelanggan di database...
+                                        </p>
+                                    </div>
+
+                                    <!-- Duplicate Ticket Warning -->
+                                    <div x-show="selected && duplicateTickets.length > 0" x-cloak class="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800" style="display: none;">
+                                        <svg class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                            Pelanggan ini masih punya <span x-text="duplicateTickets.length"></span> tiket open:
+                                            <template x-for="d in duplicateTickets" :key="d.id">
+                                                <span class="font-mono" x-text="d.code + ' (' + d.status + ')  '"></span>
+                                            </template>
+                                        </p>
+                                    </div>
+
+                                    <!-- Customer Details Grid -->
+                                    <div class="border border-border rounded-lg overflow-hidden bg-border shadow-xs">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border">
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Customer Name</span>
+                                                <div class="text-sm font-semibold text-text-main truncate" x-text="selected?.nama || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">CID Number</span>
+                                                <div class="text-sm font-bold font-mono text-sky-600 dark:text-sky-400 truncate" x-text="selected?.cid || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Phone / HP</span>
+                                                <div class="text-sm font-mono text-text-main truncate" x-text="selected?.no_hp || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Active Package</span>
+                                                <div class="flex items-center gap-1.5">
+                                                    <div class="text-sm font-medium text-text-main truncate" x-text="selected?.paket || '—'">—</div>
+                                                    <span x-show="selected" class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300" style="display:none;">Active</span>
+                                                </div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1 md:col-span-2">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Site Address</span>
+                                                <div class="text-xs text-text-main line-clamp-2" x-text="selected?.alamat || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">POP / Cabang</span>
+                                                <div class="text-xs font-semibold text-text-main" x-text="selected?.pop || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">ODP Port</span>
+                                                <div class="text-xs font-mono font-medium text-text-main" x-text="selected?.odp || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1 md:col-span-2">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Perangkat Pelanggan (ONT/Router)</span>
+                                                <div class="text-xs font-mono text-text-main" x-text="selected?.perangkat || '—'">—</div>
+                                            </div>
+                                            <div class="bg-surface p-3 space-y-1 md:col-span-2">
+                                                <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">GPS Coordinates</span>
+                                                <div class="text-xs font-mono text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                                                    <svg class="h-3.5 w-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    </svg>
+                                                    <span x-text="selected?.gps || '—'">—</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SECTION 03: COMPLAINT & NOTES -->
+                                <div class="p-6 space-y-4">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
+                                        <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 03: COMPLAINT &amp; NOTES</h2>
+                                    </div>
+
+                                    <div class="space-y-4">
+                                        <div class="space-y-1.5">
+                                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                Kategori Issue <span class="text-rose-500">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <select name="issue_category_id" x-model="issueCategoryId" @change="onIssueCategoryChange()" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                                                    <option value="" disabled selected>-- PILIH KATEGORI ISSUE --</option>
+                                                    <template x-for="c in issueCategories" :key="c.id">
+                                                        <option :value="c.id" x-text="c.name"></option>
+                                                    </template>
+                                                    <option value="lainnya">Lainnya (isi manual)</option>
+                                                </select>
+                                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                            <p class="text-[10px] text-text-muted">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
+                                        </div>
+
+                                        <div class="space-y-1.5">
+                                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                Detail Keluhan (Customer Complaint) <span class="text-rose-500">*</span>
+                                            </label>
+                                            <textarea name="detail_keluhan" x-model="detailKeluhan" rows="4" required maxlength="2000" placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..." class="w-full text-sm rounded-lg border border-border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"></textarea>
+                                        </div>
+
+                                        <button type="button" @click="showExtra = !showExtra" class="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">
+                                            <svg class="h-3.5 w-3.5 transition-transform" :class="showExtra ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"></path>
+                                            </svg>
+                                            <span x-text="showExtra ? 'Sembunyikan Detail Tambahan' : 'Tampilkan Detail Tambahan (Catatan Teknis & Lampiran, Opsional)'"></span>
+                                        </button>
+
+                                        <div x-show="showExtra" x-cloak x-transition class="space-y-4" style="display: none;">
+                                            <div class="space-y-1.5">
+                                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                    Catatan Teknis
+                                                </label>
+                                                <textarea name="catatan_teknis" rows="3" maxlength="2000" placeholder="NOC assessment, ping results, optical power checks (-dBm), redaman OPM, atau petunjuk awal untuk teknisi FOP..." class="w-full font-mono text-xs rounded-lg border border-border bg-slate-900/5 dark:bg-slate-900/40 p-3 text-text-main italic placeholder:text-text-muted placeholder:not-italic focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"></textarea>
+                                            </div>
+
+                                            <div class="space-y-1.5 pt-2">
+                                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                                    Lampiran (Evidence / OPM Screenshot)
+                                                </label>
+                                                <div class="flex items-center justify-center w-full">
+                                                    <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-border border-dashed rounded-lg cursor-pointer bg-slate-50/50 dark:bg-slate-900/20 hover:bg-sky-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <div class="flex flex-col items-center justify-center pt-3 pb-3">
+                                                            <svg class="w-6 h-6 mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                                            </svg>
+                                                            <p class="text-xs text-text-secondary font-medium"><span class="font-bold text-sky-600">Klik untuk upload file</span> atau drag &amp; drop</p>
+                                                            <p class="text-[10px] text-text-muted mt-0.5">Maks. 5 file, tiap file maks. 5 MB (JPG, PNG, WEBP, PDF)</p>
+                                                        </div>
+                                                        <input type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Footer Info & Actions -->
+                                <div class="p-6 bg-slate-50/50 dark:bg-slate-900/40 border-t border-border">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        <div class="flex items-start gap-3 p-3.5 bg-surface border border-amber-200 dark:border-amber-900/50 rounded-lg shadow-xs">
+                                            <svg class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                            </svg>
+                                            <div>
+                                                <div class="text-[11px] font-bold text-text-main uppercase tracking-wider">SLA Protocol Standard</div>
+                                                <p class="text-xs text-text-muted font-mono leading-relaxed mt-0.5">
+                                                    MTN: 4h Response / 24h Resolution. Pastikan catatan teknis mencantumkan indikator redaman OPM jika terjadi kerusakan jaringan fisik.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex items-start gap-3 p-3.5 bg-surface border border-sky-200 dark:border-sky-900/50 rounded-lg shadow-xs">
+                                            <svg class="h-5 w-5 text-sky-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                            </svg>
+                                            <div>
+                                                <div class="text-[11px] font-bold text-text-main uppercase tracking-wider">Audit &amp; Security Compliance</div>
+                                                <p class="text-xs text-text-muted font-mono leading-relaxed mt-0.5">
+                                                    Seluruh pembuatan dan perubahan ticket ini akan dicatat secara otomatis under session UID: <span class="font-bold text-text-main">SUPER ADMIN (OWNER)</span>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-between pt-2">
+                                        <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main transition-colors">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                            DISCARD <span class="opacity-60 normal-case font-normal">(Esc)</span>
+                                        </button>
+
+                                        <div class="flex items-center gap-3">
+                                            <button type="submit" :disabled="!selected" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-md shadow-sky-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <span>CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: LIST TASK TICKETING PANEL (FRAME 130 SPLIT VIEW) -->
+                    <div class="lg:col-span-5 xl:col-span-4 space-y-4">
+                        <div class="bg-surface border border-border rounded-xl shadow-sm p-5 sticky top-20 flex flex-col min-h-[calc(100vh-120px)]">
+                            
+                            <!-- Header & Filter Bar -->
+                            <div class="pb-4 border-b border-border space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <h2 class="text-base font-bold text-text-main tracking-tight">List Task Ticketing</h2>
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" x-text="tasks.length + ' Active'">5 Active</span>
+                                    </div>
+                                    <button @click="refreshTasks()" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                                        <span>Refresh</span>
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <!-- Filter Tabs -->
+                                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted">
+                                    <button @click="taskFilter = 'all'" :class="taskFilter === 'all' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Semua</button>
+                                    <button @click="taskFilter = 'open'" :class="taskFilter === 'open' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Open</button>
+                                    <button @click="taskFilter = 'fop'" :class="taskFilter === 'fop' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">FOP Assigned</button>
+                                </div>
+                            </div>
+
+                            <!-- Task List Cards -->
+                            <div class="flex-1 overflow-y-auto py-4 space-y-3 pr-1 custom-scrollbar">
+                                <template x-for="task in filteredTasks" :key="task.id">
+                                    <div class="p-3.5 rounded-lg border border-border bg-slate-50/50 dark:bg-slate-900/40 hover:border-sky-500/50 transition-all space-y-2.5">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs font-bold font-mono text-sky-600 dark:text-sky-400" x-text="task.code"></span>
+                                                    <span class="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase"
+                                                        :class="{
+                                                            'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300': task.priority === 'Urgent',
+                                                            'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': task.priority === 'High',
+                                                            'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300': task.priority === 'Medium' || task.priority === 'Low'
+                                                        }"
+                                                        x-text="task.priority">
+                                                    </span>
+                                                </div>
+                                                <h4 class="text-xs font-bold text-text-main mt-0.5" x-text="task.title"></h4>
+                                            </div>
+                                            <span class="text-[10px] text-text-muted shrink-0 font-mono" x-text="task.time"></span>
+                                        </div>
+
+                                        <p class="text-xs text-text-muted line-clamp-2" x-text="task.desc"></p>
+
+                                        <div class="flex items-center justify-between pt-1 border-t border-border/60 text-[11px]">
+                                            <span class="font-medium text-text-secondary">CID: <span class="font-mono text-text-main" x-text="task.cid"></span></span>
+                                            <span class="font-semibold flex items-center gap-1"
+                                                :class="{
+                                                    'text-amber-600 dark:text-amber-400': task.status === 'Diproses FOP',
+                                                    'text-sky-600 dark:text-sky-400': task.status === 'Ticket Masuk',
+                                                    'text-emerald-600 dark:text-emerald-400': task.status === 'Penjadwalan FOP',
+                                                    'text-slate-500': task.status === 'Pending Customer'
+                                                }">
+                                                <span class="w-1.5 h-1.5 rounded-full"
+                                                    :class="{
+                                                        'bg-amber-500': task.status === 'Diproses FOP',
+                                                        'bg-sky-500': task.status === 'Ticket Masuk',
+                                                        'bg-emerald-500': task.status === 'Penjadwalan FOP',
+                                                        'bg-slate-400': task.status === 'Pending Customer'
+                                                    }">
+                                                </span>
+                                                <span x-text="task.status"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Footer Link -->
+                            <div class="pt-3 border-t border-border text-center">
+                                <a href="#" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline inline-flex items-center gap-1">
+                                    <span>Lihat Semua Task Ticketing</span>
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                                    </svg>
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    /* ── Sidebar & Theme Toggles ── */
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const isHidden = sidebar.classList.contains('-translate-x-full');
+        if (isHidden) {
+            sidebar.classList.remove('-translate-x-full');
+            backdrop && backdrop.classList.remove('hidden');
+        } else {
+            sidebar.classList.add('-translate-x-full');
+            backdrop && backdrop.classList.add('hidden');
+        }
+    }
+
+    function toggleDesktopSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+    }
+
+    function toggleSubmenu(menuId, chevronId) {
+        const menu = document.getElementById(menuId);
+        const chevron = document.getElementById(chevronId);
+        if (menu) {
+            menu.classList.toggle('hidden');
+            chevron && chevron.classList.toggle('rotate-180');
+        }
+    }
+
+    function toggleTheme() {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        localStorage.setItem('whusnet-theme', isDark ? 'dark' : 'light');
+        syncThemeIcon(isDark);
+    }
+
+    function syncThemeIcon(isDark) {
+        const moon = document.getElementById('themeIconMoon');
+        const sun = document.getElementById('themeIconSun');
+        if (moon) moon.classList.toggle('hidden', isDark);
+        if (sun) sun.classList.toggle('hidden', !isDark);
+    }
+
+    /* Initialize Theme Icons */
+    document.addEventListener('DOMContentLoaded', () => {
+        syncThemeIcon(document.documentElement.classList.contains('dark'));
+    });
+
+    /* ── Alpine.js Page Logic ── */
+    function ticketPage() {
+        return {
+            // Form state
+            cidQuery: '',
+            results: [],
+            selected: null,
+            searching: false,
+            taskFilter: 'all',
+            ticketType: '',
+            priority: 'Medium',
+            issueCategoryId: '',
+            detailKeluhan: '',
+            showExtra: false,
+            toast: { show: false, type: 'success', message: '' },
+            nextTicketSeq: 893,
+
+            // Mock Master Issue Category — CONTOH, ganti dari Master Data sungguhan (Task 1 rancangan)
+            issueCategories: [
+                { id: 1, name: 'Lemot', default_priority: 'low' },
+                { id: 2, name: 'LOS', default_priority: 'Medium' },
+                { id: 3, name: 'Backbone CUT', default_priority: 'High' },
+                { id: 4, name: 'ODP LOS', default_priority: 'High' },
+            ],
+
+            // Mock Customer Database for Quick Lookup
+            mockCustomers: [
+                { id: 1, cid: '20240911002', nama: 'Budi Santoso', no_hp: '081234567890', paket: 'FTTH 50 Mbps', pop: 'POP Bandar Lampung', odp: 'ODP-BDR-04 / Port 3', alamat: 'Jl. Merdeka No. 45, Kecamatan Enggal, Bandar Lampung', perangkat: 'Huawei HG8245H5 (SN: HWTC123456)', gps: '-5.4292, 105.2611' },
+                { id: 2, cid: '20240815041', nama: 'Siti Rahmawati', no_hp: '085712348899', paket: 'FTTH 100 Mbps', pop: 'POP Tanjung Karang', odp: 'ODP-TJK-02 / Port 1', alamat: 'Komplek Permata Biru Blok B12, Sukarame', perangkat: 'ZTE F660 (SN: ZTEG987654)', gps: '-5.3971, 105.2833' },
+                { id: 3, cid: '20231201088', nama: 'Ahmad Dahlan', no_hp: '081399887766', paket: 'SOHO Dedicated 20 Mbps', pop: 'POP Kedaton', odp: 'ODP-KDT-08 / Port 5', alamat: 'Jl. ZA Pagar Alam No. 102, Kedaton', perangkat: 'MikroTik RB951Ui + Fiber ONT', gps: '-5.3789, 105.2512' }
+            ],
+
+            // Task List Data — di halaman nyata ini dari initial server payload + realtime Reverb (rancangan bagian E)
+            tasks: [
+                { id: 1, code: '#TK-2026-0892', priority: 'Urgent', title: 'Indihome Fiber Cut — Restorasi Kabel', desc: 'Pelanggan melaporkan indikator LOS merah secara tiba-tiba di ODP-BDR-04 Port 3.', time: '10m ago', cid: '20240911002', status: 'Diproses FOP', category: 'fop' },
+                { id: 2, code: '#TK-2026-0890', priority: 'High', title: 'Sinyal Redaman Tinggi (-29dBm)', desc: 'Koneksi sering terputus (unstable connection). Perlu patching ulang di ODP.', time: '42m ago', cid: '20240815041', status: 'Ticket Masuk', category: 'open' },
+                { id: 3, code: '#TK-2026-0885', priority: 'Medium', title: 'Permintaan Relokasi Perangkat Router', desc: 'Pelanggan meminta pemindahan titik router dari Lantai 1 ke Lantai 2.', time: '2h ago', cid: '20231201088', status: 'Penjadwalan FOP', category: 'fop' },
+                { id: 4, code: '#TK-2026-0881', priority: 'Low', title: 'Ganti Password WiFi & SSID', desc: 'Bantuan remote setting konfigurasi Router Huawei HG8245H5.', time: '4h ago', cid: '20240110012', status: 'Pending Customer', category: 'open' },
+            ],
+
+            get filteredTasks() {
+                if (this.taskFilter === 'all') return this.tasks;
+                if (this.taskFilter === 'open') return this.tasks.filter(t => t.category === 'open');
+                if (this.taskFilter === 'fop') return this.tasks.filter(t => t.category === 'fop');
+                return this.tasks;
+            },
+
+            // Tiket open milik customer terpilih — bukan Selesai/Dibatalkan (poin 5: mudah solving)
+            get duplicateTickets() {
+                if (!this.selected) return [];
+                return this.tasks.filter(t => t.cid === this.selected.cid && t.status !== 'Selesai' && t.status !== 'Dibatalkan');
+            },
+
+            searchCustomer() {
+                const q = this.cidQuery.trim().toLowerCase();
+                if (q.length < 2) {
+                    this.results = [];
+                    return;
+                }
+                this.searching = true;
+                setTimeout(() => {
+                    this.results = this.mockCustomers.filter(c =>
+                        c.cid.toLowerCase().includes(q) || c.nama.toLowerCase().includes(q)
+                    );
+                    this.searching = false;
+                }, 200);
+            },
+
+            pick(customer) {
+                this.selected = customer;
+                this.cidQuery = `${customer.nama} (${customer.cid})`;
+                this.results = [];
+            },
+
+            clearSelection() {
+                this.selected = null;
+                this.cidQuery = '';
+                this.results = [];
+            },
+
+            // Kategori issue auto-fill prioritas — user tetap bisa override manual (poin 1: speed)
+            onIssueCategoryChange() {
+                if (this.issueCategoryId === 'lainnya' || this.issueCategoryId === '') return;
+                const cat = this.issueCategories.find(c => c.id == this.issueCategoryId);
+                if (cat) this.priority = cat.default_priority;
+            },
+
+            showToast(message, type = 'success') {
+                this.toast = { show: true, type, message };
+                setTimeout(() => { this.toast.show = false; }, 3000);
+            },
+
+            // Reset total form (DISCARD) — beda dari clearSelection() yang cuma lepas customer
+            resetForm() {
+                this.clearSelection();
+                this.ticketType = '';
+                this.priority = 'Medium';
+                this.issueCategoryId = '';
+                this.detailKeluhan = '';
+                this.showExtra = false;
+                this.$nextTick(() => this.$refs.searchInput?.focus());
+            },
+
+            refreshTasks() {
+                this.showToast('Daftar task ticketing diperbarui.');
+            },
+
+            // Ctrl+Enter submit, Esc discard — poin 3: speed buat power user input beruntun
+            handleShortcut(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    if (this.selected) this.submitForm();
+                    return;
+                }
+                if (e.key === 'Escape') {
+                    this.resetForm();
+                }
+            },
+
+            submitForm() {
+                if (!this.selected) return;
+
+                const code = '#TK-2026-' + (this.nextTicketSeq++);
+                const catName = this.issueCategoryId && this.issueCategoryId !== 'lainnya'
+                    ? this.issueCategories.find(c => c.id == this.issueCategoryId)?.name
+                    : null;
+
+                // Simulasi broadcast realtime (rancangan bagian E) — di halaman nyata ini datang dari
+                // Echo.private('tickets.{pop_id}').listen('TicketQueueUpdated', ...), bukan push lokal.
+                this.tasks.unshift({
+                    id: Date.now(),
+                    code,
+                    priority: this.priority,
+                    title: catName || this.detailKeluhan.slice(0, 60),
+                    desc: this.detailKeluhan,
+                    time: 'baru saja',
+                    cid: this.selected.cid,
+                    status: 'Ticket Masuk',
+                    category: 'open',
+                });
+
+                this.showToast(`${code} dibuat & disinkronkan ke FOP.`);
+                this.resetForm();
+            }
+        };
+    }
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\RecordsAuditLogs;
+use App\Services\EffectiveAccessService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -125,13 +126,23 @@ class Pop extends Model
             return $query->whereRaw('1 = 0'); // return empty if no user
         }
 
-        if (in_array($user->role?->name, ['Owner', 'Admin', 'Admin Pusat'], true)) {
-            return $query; // return all
+        // Fase 5.5 — pakai EffectiveAccessService, BUKAN pivot user_pops via
+        // whereHas('users'). Dua bug di versi lama:
+        //  1. Jalur user_pops TIDAK paham pop_tree — user ber-scope pop_tree bisa
+        //     lihat daftar POP yang salah di dropdown (kebocoran lintas cabang).
+        //  2. Cek akses penuh memakai role NAME ('Owner'/'Admin'/'Admin Pusat')
+        //     padahal seluruh repo pakai role CODE, dan 'Admin Pusat' tidak ada
+        //     di RoleSeeder → cek itu praktis mati.
+        // getAllowedPopIds() sudah resolve pop_tree DAN di-cache Redis;
+        // hasAllPopAccess() menangani deny-by-default (scope kosong ≠ akses penuh).
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($user)) {
+            return $query; // akses semua POP — tanpa filter
         }
 
-        return $query->whereHas('users', function ($q) use ($user) {
-            $q->where('user_id', $user->id);
-        });
+        // Scope kosong → whereIn('id', []) → tidak ada POP (deny-by-default).
+        return $query->whereIn($this->getTable().'.id', $access->getAllowedPopIds($user));
     }
 
     /**

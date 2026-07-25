@@ -24,6 +24,8 @@ Fitur pada kategori ini dikerjakan oleh **banyak user sekaligus dalam satu waktu
 | 2 | **Kasir & Loket Pembayaran (Payment Desk)** | Kasir / Finance, Admin POP | `PaymentReceived`<br>`InvoiceStatusUpdated` | • Saat kasir mengonfirmasi pembayaran tagihan, status invoice langsung berubah jadi `PAID` di seluruh layar cabang/pusat.<br>• Mencegah ganda cetak kwitansi atau klaim bayar ulang oleh kasir lain. |
 | 3 | **Antrean & Escalation Tiket Pengaduan (Helpdesk)** | Helpdesk, NOC, Admin POP | `TicketCreated`<br>`TicketAssigned`<br>`TicketStatusChanged` | • Tiket gangguan baru dari pelanggan langsung *pop-up* / masuk ke antrean Helpdesk secara *live*.<br>• Mencegah 2 petugas Helpdesk mengambil tiket penanganan yang sama (*overlapping*). |
 | 4 | **Live Progress Import Pelanggan (Bulk Import CSV/Excel)** | Admin Pusat, Admin POP | `ImportProgressUpdated`<br>`ImportBatchCompleted` | • Menampilkan *Progress Bar* secara *live* (misal: *140/500 baris sukses*) beserta log error tanpa membuat halaman *freeze* atau minta di-reload. |
+| 10 | **Antrean Verifikasi Admin** (`verifications/queue.blade.php`) | Admin POP, Admin Pusat | `CustomerVerificationStatusChanged` | • Sama kelas risiko dengan antrean tiket (#3): 2 admin bisa verifikasi pelanggan yang sama bersamaan tanpa realtime. Item yang sudah diproses harus hilang/berubah status di layar admin lain secara instan. |
+| 11 | **Konfirmasi Pembayaran di List Invoice** (`invoices/index.blade.php:279`) | Kasir, Admin POP | `PaymentReceived`<br>`InvoiceStatusUpdated` | • Saat ini konfirmasi bayar memicu `window.location.reload()` — full page reload. Harus pakai event yang sama dengan Kasir (#2), update baris invoice di state Alpine, cegah klaim bayar ganda tanpa reload. |
 
 ---
 
@@ -35,6 +37,8 @@ Fitur yang mempermudah interaksi harian antar divisi agar alur kerja berjalan ce
 | 5 | **Quick Action & Quick View Modal Pelanggan** | Helpdesk, NOC, Finance, CS | `CustomerUpdated`<br>`CustomerDeviceStatusChanged` | • Pengguna dapat mengubah paket, menguji perangkat, atau memperbarui data dari modal samping/pop-up; baris di tabel utama pelanggan langsung ter-update di background. |
 | 6 | **Proses Aktivasi & Perubahan Status Layanan** | NOC, Admin POP, CS | `CustomerStatusActivated`<br>`CustomerSuspended` | • Ketika status pelanggan diubah dari *Perlu Dilengkapi* → *Lengkap* → *Siap Billing* / *Aktif*, perubahan badge status langsung terfleksi di seluruh modul billing & FOP. |
 | 7 | **Notifikasi Center & Alert Bar (Top Nav Notification)** | Seluruh Role | `UserNotificationSent`<br>`SystemAlertBroadcast` | • Indikator lonceng notifikasi di navbar menyala instan saat ada tugas baru atau alert sistem tanpa mengganggu form yang sedang diisi pengguna. |
+| 12 | **Tombol Refresh Manual "Status Teknisi"** (`fop/dashboard.blade.php:481`) | FOP | `TechnicianStatusChanged` | • UI FOP dashboard sekarang punya tombol reload eksplisit untuk lihat status teknisi terbaru — bukti langsung butuh realtime. Ganti tombol dengan listener status teknisi (online/task progress), hapus tombolnya. |
+| 13 | **Reassign Tim FOP Task** (`fop_tasks/index.blade.php:673`) | FOP | `TaskTeamAssigned` | • Setelah pindah tim, halaman full reload (`setTimeout(reload, 1000)`). Broadcast event, update baris task di state Alpine langsung tanpa reload. |
 
 ---
 

@@ -41,7 +41,7 @@
         <form action="{{ route('customers.installation.cancel', $customer) }}" method="POST">
             @csrf
             <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan <span class="text-error">*</span></label>
-            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Pelanggan menolak pemasangan, lokasi tidak sesuai, dll."></textarea>
+            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4 bg-surface text-text-main" placeholder="Contoh: Pelanggan menolak pemasangan, lokasi tidak sesuai, dll."></textarea>
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('cancel-installation-modal').classList.add('hidden')" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
                 <button type="submit" class="text-xs px-3 py-1.5 rounded-md font-semibold text-white" style="background:var(--color-error);">Ya, Batalkan Pemasangan</button>
@@ -252,14 +252,14 @@
                     <div>
                         <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-2">Foto Hasil Speedtest</span>
                         @if($tech->speedtest_photo)
-                            <div class="border border-border rounded overflow-hidden shadow-sm max-h-24 bg-white relative group">
+                            <div class="border border-border rounded overflow-hidden shadow-sm max-h-24 bg-surface relative group">
                                 <img src="{{ asset('storage/' . $tech->speedtest_photo) }}" alt="Foto Speedtest" class="w-full object-cover max-h-24">
                                 <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                    <a href="{{ asset('storage/' . $tech->speedtest_photo) }}" target="_blank" class="text-[9px] bg-white text-text-main font-bold px-2 py-1 rounded shadow">LIHAT FULL</a>
+                                    <a href="{{ asset('storage/' . $tech->speedtest_photo) }}" target="_blank" class="text-[9px] bg-surface text-text-main font-bold px-2 py-1 rounded shadow">LIHAT FULL</a>
                                 </div>
                             </div>
                         @else
-                            <div class="h-20 bg-white border border-dashed border-border rounded flex flex-col items-center justify-center text-text-muted">
+                            <div class="h-20 bg-surface-muted/30 border border-dashed border-border rounded flex flex-col items-center justify-center text-text-muted">
                                 <svg class="h-6 w-6 opacity-40 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
@@ -283,7 +283,7 @@
     $latestInst = $customer->installations()->latest()->first();
 @endphp
 <div id="installation-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-lg shadow-xl border border-border w-full max-w-2xl overflow-hidden transform transition-all">
+    <div class="bg-surface rounded-lg shadow-xl border border-border w-full max-w-2xl overflow-hidden transform transition-all">
         <div class="px-5 py-4 border-b border-border flex items-center justify-between">
             <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Input Data Pemasangan</h3>
             <button onclick="closeInstallationModal()" class="text-text-muted hover:text-text-muted focus:outline-none cursor-pointer">
@@ -320,49 +320,49 @@
                 <div>
                     <label for="scheduled_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Jadwal</label>
                     <input type="date" name="scheduled_date" id="scheduled_date" value="{{ $latestInst && $latestInst->scheduled_date ? $latestInst->scheduled_date->format('Y-m-d') : date('Y-m-d') }}" required
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="scheduled_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Jam Jadwal</label>
                     <input type="time" name="scheduled_time" id="scheduled_time" value="{{ $latestInst && $latestInst->scheduled_time ? substr($latestInst->scheduled_time, 0, 5) : '09:00' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="start_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Mulai Pemasangan</label>
                     <input type="time" name="start_time" id="start_time" value="{{ $latestInst && $latestInst->start_time ? substr($latestInst->start_time, 0, 5) : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="end_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Selesai Pemasangan</label>
                     <input type="time" name="end_time" id="end_time" value="{{ $latestInst && $latestInst->end_time ? substr($latestInst->end_time, 0, 5) : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="finished_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Selesai (Aktual)</label>
                     <input type="date" name="finished_date" id="finished_date" value="{{ $latestInst && $latestInst->finished_date ? $latestInst->finished_date->format('Y-m-d') : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="fop_id_inst" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">ID FOP / Penugasan</label>
                     <input type="text" name="fop_id" id="fop_id_inst" placeholder="FOP-2026-..." value="{{ $latestInst ? $latestInst->fop_id : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="assigned_at_inst" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Waktu Penugasan Pemasangan</label>
                     <input type="datetime-local" name="assigned_at" id="assigned_at_inst" value="{{ $latestInst && $latestInst->assigned_at ? $latestInst->assigned_at->format('Y-m-d\TH:i') : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="installation_technician_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Teknisi 1 (Utama)</label>
                     <select name="technician_id" id="installation_technician_id" required
-                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                            class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                         <option value="{{ auth()->id() }}" {{ $latestInst && $latestInst->technician_id == auth()->id() ? 'selected' : '' }}>{{ auth()->user()->name }} (Saya)</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers->where('id', '!=', auth()->id()) as $u)
@@ -375,7 +375,7 @@
                 <div>
                     <label for="technician_2_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Teknisi 2</label>
                     <select name="technician_2_id" id="technician_2_id"
-                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                            class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                         <option value="">— Tidak ada —</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers as $u)
@@ -388,7 +388,7 @@
                 <div>
                     <label for="technician_3_id" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Teknisi 3</label>
                     <select name="technician_3_id" id="technician_3_id"
-                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                            class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                         <option value="">— Tidak ada —</option>
                         @if(isset($activeUsers))
                             @foreach($activeUsers as $u)
@@ -401,24 +401,24 @@
                 <div class="md:col-span-2">
                     <label for="technicians" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Nama Tim Teknisi (Opsional)</label>
                     <input type="text" name="technicians" id="technicians" placeholder="Contoh: Tim Pemasangan - Budi, Andi" value="{{ $latestInst ? $latestInst->technicians : '' }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                 </div>
 
                 <div class="md:col-span-2">
                     <label for="installation_note" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Catatan Pemasangan</label>
                     <textarea name="installation_note" id="installation_note" rows="3" placeholder="Tuliskan catatan pemasangan pelanggan..."
-                              class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">{{ $latestInst ? $latestInst->installation_note : '' }}</textarea>
+                              class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">{{ $latestInst ? $latestInst->installation_note : '' }}</textarea>
                 </div>
 
                 <div class="md:col-span-2">
                     <label for="installation_photo" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Foto Pemasangan</label>
                     <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                     <p class="text-[9px] text-text-muted mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-surface-muted border-t border-border flex justify-end gap-2 text-xs">
-                <button type="button" onclick="closeInstallationModal()" class="px-3 py-1.5 border border-border text-text-main bg-white hover:bg-surface-muted font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                <button type="button" onclick="closeInstallationModal()" class="px-3 py-1.5 border border-border text-text-secondary bg-surface hover:bg-surface-muted font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
                     Batal
                 </button>
                 <button type="submit" class="btn-primary px-3 py-1.5 font-semibold shadow-sm">
@@ -431,7 +431,7 @@
 
 <!-- Modal Input Laporan Uji (Speedtest) -->
 <div id="test-report-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-lg shadow-xl border border-border w-full max-w-2xl overflow-hidden transform transition-all">
+    <div class="bg-surface rounded-lg shadow-xl border border-border w-full max-w-2xl overflow-hidden transform transition-all">
         <div class="px-5 py-4 border-b border-border flex items-center justify-between">
             <h3 class="text-xs font-bold text-text-main uppercase tracking-wider">Laporan Hasil Pengujian Layanan (Speedtest)</h3>
             <button onclick="closeTestReportModal()" class="text-text-muted hover:text-text-muted focus:outline-none cursor-pointer">
@@ -446,49 +446,49 @@
                 <div>
                     <label for="test_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Tanggal Uji</label>
                     <input type="date" name="test_date" id="test_date" value="{{ date('Y-m-d') }}" required
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="test_time" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Jam Uji</label>
                     <input type="time" name="test_time" id="test_time" value="{{ date('H:i') }}"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="test_download" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Speed Download (Mbps)</label>
                     <input type="number" step="0.01" name="test_download" id="test_download" required
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="test_upload" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Speed Upload (Mbps)</label>
                     <input type="number" step="0.01" name="test_upload" id="test_upload" required
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="latency_ms" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Latency (Ping ms)</label>
                     <input type="number" step="0.1" name="latency_ms" id="latency_ms"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="jitter_ms" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Jitter (ms)</label>
                     <input type="number" step="0.1" name="jitter_ms" id="jitter_ms"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="packet_loss_percent" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Packet Loss (%)</label>
                     <input type="number" step="0.01" name="packet_loss_percent" id="packet_loss_percent"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="quality_score" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Skor Kualitas (1-5)</label>
                     <select name="quality_score" id="quality_score"
-                            class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                            class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                         <option value="5">⭐⭐⭐⭐⭐ (Sangat Bagus)</option>
                         <option value="4">⭐⭐⭐⭐ (Bagus)</option>
                         <option value="3" selected>⭐⭐⭐ (Cukup)</option>
@@ -500,24 +500,24 @@
                 <div>
                     <label for="initial_attenuation" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Redaman Awal (dBm)</label>
                     <input type="text" name="initial_attenuation" id="initial_attenuation" placeholder="-19.50"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div>
                     <label for="actual_attenuation" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Redaman Aktual (dBm)</label>
                     <input type="text" name="actual_attenuation" id="actual_attenuation" placeholder="-21.20"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs font-mono text-text-main">
                 </div>
 
                 <div class="md:col-span-2">
                     <label for="speedtest_photo" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Foto Hasil Speedtest</label>
                     <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*" capture="environment"
-                           class="w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs">
+                           class="w-full px-3 py-2 bg-surface border border-border rounded-md shadow-sm focus:ring-primary/25 focus:border-primary text-xs text-text-main">
                     <p class="text-[9px] text-text-muted mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-surface-muted border-t border-border flex justify-end gap-2 text-xs">
-                <button type="button" onclick="closeTestReportModal()" class="px-3 py-1.5 border border-border text-text-main bg-white hover:bg-surface-muted font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
+                <button type="button" onclick="closeTestReportModal()" class="px-3 py-1.5 border border-border text-text-secondary bg-surface hover:bg-surface-muted font-semibold rounded-md shadow-sm transition-colors cursor-pointer">
                     Batal
                 </button>
                 <button type="submit" class="btn-primary px-3 py-1.5 font-semibold shadow-sm">

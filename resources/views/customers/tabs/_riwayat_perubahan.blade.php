@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header Summary -->
-    <div class="border border-slate-200 rounded-xl p-5 bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="border border-border rounded-xl p-5 bg-gradient-to-r from-surface-muted/30 via-surface to-surface-muted/30 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">
@@ -8,9 +8,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <h3 class="text-sm font-bold text-slate-800">List Riwayat Perbaruan Data Pelanggan</h3>
+                <h3 class="text-sm font-bold text-text-main">List Riwayat Perbaruan Data Pelanggan</h3>
             </div>
-            <p class="text-xs text-slate-500 mt-1.5">
+            <p class="text-xs text-text-muted mt-1.5">
                 Setiap perubahan data (seperti update paket internet, informasi kontak, alamat, atau perangkat) dicatat secara terperinci mencakup nilai sebelum dan sesudah, pelaku pembaruan, serta waktu kejadian.
             </p>
         </div>
@@ -20,15 +20,15 @@
         @endphp
 
         @if($activationDate)
-        <div class="bg-sky-50/80 border border-sky-200 rounded-lg px-3.5 py-2.5 text-right shrink-0">
+        <div class="bg-sky-50/10 border border-sky-500/20 rounded-lg px-3.5 py-2.5 text-right shrink-0">
             <span class="block text-[10px] font-bold text-sky-500 uppercase tracking-wider">Tanggal Aktivasi Layanan</span>
-            <span class="text-xs font-bold text-sky-950">{{ \App\Support\IndonesianDate::date($activationDate) }}</span>
-            <span class="block text-[10px] text-sky-600 mt-0.5 font-medium">Perubahan setelah tanggal ini berstatus Pasca Aktivasi</span>
+            <span class="text-xs font-bold text-sky-400">{{ \App\Support\IndonesianDate::date($activationDate) }}</span>
+            <span class="block text-[10px] text-sky-500 mt-0.5 font-medium">Perubahan setelah tanggal ini berstatus Pasca Aktivasi</span>
         </div>
         @elseif($customer->status === 'active')
-        <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2.5 text-right shrink-0">
-            <span class="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Status Layanan</span>
-            <span class="text-xs font-bold text-emerald-950">Aktif Beroperasi</span>
+        <div class="bg-emerald-50/10 border border-emerald-500/20 rounded-lg px-3.5 py-2.5 text-right shrink-0">
+            <span class="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Status Layanan</span>
+            <span class="text-xs font-bold text-emerald-500">Aktif Beroperasi</span>
         </div>
         @endif
     </div>
@@ -155,18 +155,18 @@
             $hasStatus = count(array_intersect($changedKeys, $statusKeys)) > 0;
 
             if ($hasPackage) {
-                return ['label' => 'Perbaruan Paket Layanan & Biaya', 'icon' => '📦', 'badge_class' => 'bg-sky-100 text-sky-800 border-sky-200'];
+                return ['label' => 'Perbaruan Paket Layanan & Biaya', 'icon' => '📦', 'badge_class' => 'bg-sky-50/10 text-sky-500 border-sky-500/20'];
             }
             if ($hasTech) {
-                return ['label' => 'Perbaruan Perangkat & Teknis Jaringan', 'icon' => '🔧', 'badge_class' => 'bg-teal-100 text-teal-800 border-teal-200'];
+                return ['label' => 'Perbaruan Perangkat & Teknis Jaringan', 'icon' => '🔧', 'badge_class' => 'bg-teal-50/10 text-teal-500 border-teal-500/20'];
             }
             if ($hasContact || $hasAddress) {
-                return ['label' => 'Perbaruan Profil & Alamat Pelanggan', 'icon' => '👤', 'badge_class' => 'bg-blue-100 text-blue-800 border-blue-200'];
+                return ['label' => 'Perbaruan Profil & Alamat Pelanggan', 'icon' => '👤', 'badge_class' => 'bg-blue-50/10 text-blue-500 border-blue-500/20'];
             }
             if ($hasStatus) {
-                return ['label' => 'Perbaruan Status Pelanggan', 'icon' => '🔄', 'badge_class' => 'bg-emerald-100 text-emerald-800 border-emerald-200'];
+                return ['label' => 'Perbaruan Status Pelanggan', 'icon' => '🔄', 'badge_class' => 'bg-emerald-50/10 text-emerald-500 border-emerald-500/20'];
             }
-            return ['label' => 'Perbaruan Data Pelanggan', 'icon' => '📝', 'badge_class' => 'bg-purple-100 text-purple-800 border-purple-200'];
+            return ['label' => 'Perbaruan Data Pelanggan', 'icon' => '📝', 'badge_class' => 'bg-purple-50/10 text-purple-500 border-purple-500/20'];
         };
 
         // Group updates by (timestamp_minute + user_id) so simultaneous edits merge cleanly
@@ -278,18 +278,18 @@
     @endphp
 
     @if(empty($groupedUpdates))
-        <div class="py-12 text-center text-slate-400 border border-slate-200 rounded-xl bg-slate-50/50">
-            <svg class="mx-auto h-12 w-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="py-12 text-center text-text-muted border border-border rounded-xl bg-surface-muted/20">
+            <svg class="mx-auto h-12 w-12 text-border mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h4 class="text-sm font-semibold text-slate-700">Belum Ada Perbaruan Data</h4>
-            <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            <h4 class="text-sm font-semibold text-text-main">Belum Ada Perbaruan Data</h4>
+            <p class="text-xs text-text-muted mt-1 max-w-md mx-auto">
                 Sejak pelanggan ini didaftarkan, belum ada aktivitas perubahan data (seperti penggantian paket, update alamat, atau ganti perangkat) yang tercatat oleh sistem.
             </p>
         </div>
     @else
         <!-- Timeline List Perbaruan Data -->
-        <div class="relative pl-6 border-l-2 border-sky-200 space-y-6 ml-2 my-4">
+        <div class="relative pl-6 border-l-2 border-primary/20 space-y-6 ml-2 my-4">
             @foreach($groupedUpdates as $group)
                 @php
                     $changedKeysList = array_map(fn($item) => $item['key'], $group['changes']);
@@ -298,14 +298,14 @@
 
                 <div class="relative group">
                     <!-- Timeline Bullet Indicator -->
-                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-sm {{ $group['is_post_activation'] ? 'bg-sky-600 text-white' : 'bg-slate-500 text-white' }}">
+                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-surface flex items-center justify-center shadow-sm {{ $group['is_post_activation'] ? 'bg-sky-600 text-white' : 'bg-slate-500 text-white' }}">
                         <span class="text-xs leading-none">{{ $categoryInfo['icon'] }}</span>
                     </div>
 
                     <!-- Card List Item -->
-                    <div class="border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-slate-300">
+                    <div class="border border-border rounded-xl bg-surface shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-border/80">
                         <!-- Card Header Bar -->
-                        <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <div class="px-5 py-3.5 bg-surface-muted/50 border-b border-border flex flex-wrap items-center justify-between gap-3">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold border {{ $categoryInfo['badge_class'] }}">
                                     {{ $categoryInfo['icon'] }} {{ $categoryInfo['label'] }}
@@ -314,16 +314,16 @@
 
                             <div class="flex items-center gap-2 text-xs">
                                 @if($group['is_post_activation'])
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50/10 text-sky-500 border border-sky-500/20">
                                         Pasca Aktivasi
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-surface-muted text-text-muted border border-border">
                                         Pra Aktivasi
                                     </span>
                                 @endif
 
-                                <span class="font-bold text-slate-700">
+                                <span class="font-bold text-text-main">
                                     {{ $group['created_at'] ? \Carbon\Carbon::parse($group['created_at'])->translatedFormat('d M Y, H:i') . ' WIB' : '-' }}
                                 </span>
                             </div>
@@ -331,39 +331,39 @@
 
                         <!-- Card Body: User Info & Table of Changed Fields -->
                         <div class="p-5">
-                            <div class="flex items-center justify-between gap-2 mb-3.5 pb-3 border-b border-slate-100 text-xs">
+                            <div class="flex items-center justify-between gap-2 mb-3.5 pb-3 border-b border-border text-xs">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-slate-500">Diperbarui Oleh:</span>
-                                    <span class="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                    <span class="text-text-muted">Diperbarui Oleh:</span>
+                                    <span class="font-bold text-text-main bg-surface-muted px-2 py-0.5 rounded border border-border">
                                         {{ $group['user_name'] }}
                                     </span>
-                                    <span class="text-slate-500 font-medium">({{ $group['user_role'] }})</span>
+                                    <span class="text-text-muted font-medium">({{ $group['user_role'] }})</span>
                                 </div>
-                                <span class="text-[11px] text-slate-400 font-mono">
+                                <span class="text-[11px] text-text-muted font-mono">
                                     Total {{ count($group['changes']) }} atribut diubah
                                 </span>
                             </div>
 
                             <!-- List of Changes Table -->
-                            <div class="border border-slate-200 rounded-lg overflow-hidden">
+                            <div class="border border-border rounded-lg overflow-hidden">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr class="bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                                        <tr class="bg-surface-muted/80 border-b border-border text-[11px] font-bold text-text-muted">
                                             <th class="py-2.5 px-4 w-1/3">Data / Atribut yang Diperbarui</th>
-                                            <th class="py-2.5 px-4 w-1/3 text-rose-700 bg-rose-50/40">Data Sebelum Perubahan</th>
-                                            <th class="py-2.5 px-4 w-1/3 text-emerald-700 bg-emerald-50/40">Data Sesudah Perubahan</th>
+                                            <th class="py-2.5 px-4 w-1/3 text-error bg-error-bg/10">Data Sebelum Perubahan</th>
+                                            <th class="py-2.5 px-4 w-1/3 text-success bg-success-bg/10">Data Sesudah Perubahan</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-slate-100">
+                                    <tbody class="divide-y divide-border">
                                         @foreach($group['changes'] as $change)
-                                            <tr class="hover:bg-slate-50/75 transition-colors">
-                                                <td class="py-3 px-4 font-bold text-slate-800 bg-slate-50/30">
+                                            <tr class="hover:bg-surface-muted/50 transition-colors">
+                                                <td class="py-3 px-4 font-bold text-text-main bg-surface-muted/20">
                                                     {{ $change['label'] }}
                                                 </td>
-                                                <td class="py-3 px-4 text-rose-900 bg-rose-50/25 font-medium break-words">
+                                                <td class="py-3 px-4 text-error bg-error-bg/5 font-medium break-words">
                                                     {{ $change['old'] }}
                                                 </td>
-                                                <td class="py-3 px-4 text-emerald-950 bg-emerald-50/35 font-bold break-words">
+                                                <td class="py-3 px-4 text-success bg-success-bg/5 font-bold break-words">
                                                     {{ $change['new'] }}
                                                 </td>
                                             </tr>
@@ -380,17 +380,17 @@
 
     <!-- Initial Creation Milestone -->
     @if($creationLog)
-        <div class="mt-8 border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/75 flex items-center justify-between text-xs text-slate-600">
+        <div class="mt-8 border border-dashed border-border rounded-xl p-4 bg-surface-muted/30 flex items-center justify-between text-xs text-text-secondary">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                     ✨
                 </div>
                 <div>
-                    <span class="font-bold text-slate-800">Registrasi & Pembuatan Data Awal Pelanggan</span>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Didaftarkan ke dalam sistem oleh <strong class="text-slate-700">{{ $creationLog['user_name'] }}</strong> ({{ $creationLog['user_role'] }})</p>
+                    <span class="font-bold text-text-main">Registrasi & Pembuatan Data Awal Pelanggan</span>
+                    <p class="text-[11px] text-text-muted mt-0.5">Didaftarkan ke dalam sistem oleh <strong class="text-text-secondary">{{ $creationLog['user_name'] }}</strong> ({{ $creationLog['user_role'] }})</p>
                 </div>
             </div>
-            <div class="text-right font-mono text-[11px] text-slate-500 font-semibold">
+            <div class="text-right font-mono text-[11px] text-text-muted font-semibold">
                 {{ $creationLog['created_at'] ? \Carbon\Carbon::parse($creationLog['created_at'])->translatedFormat('d M Y, H:i') . ' WIB' : '-' }}
             </div>
         </div>

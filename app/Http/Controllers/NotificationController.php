@@ -58,7 +58,9 @@ class NotificationController extends Controller
         }
 
         if ($request->filled('type')) {
-            $query->where('data->type', $request->type);
+            // Fase 5.2 — kolom nyata ter-index, bukan where('data->type') yang
+            // full-scan + parse JSON per baris di atas kolom TEXT.
+            $query->where('notification_type', $request->type);
         }
 
         if ($request->filled('user_id')) {

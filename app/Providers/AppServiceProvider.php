@@ -15,6 +15,7 @@ use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -58,6 +59,19 @@ class AppServiceProvider extends ServiceProvider
 
         // Task 9 — sync status Task eksekusi teknisi ke FopTask (status realtime).
         Task::observe(TaskObserver::class);
+
+        // Fase 5.2 — isi kolom nyata notifications.notification_type dari data['type']
+        // saat notifikasi dibuat, dari SEMUA jalur (Notification::send, dsb),
+        // supaya filter halaman notifikasi jadi lookup ter-index, bukan
+        // where('data->type') yang full-scan + parse JSON per baris. Notifikasi
+        // immutable setelah dibuat, jadi nilai ini tak pernah drift.
+        DatabaseNotification::creating(function ($notification) {
+            $data = $notification->data;
+            if (is_string($data)) {
+                $data = json_decode($data, true) ?: [];
+            }
+            $notification->notification_type = is_array($data) ? ($data['type'] ?? null) : null;
+        });
 
         // Ticketing — tulis riwayat sisi Ticket saat Task FOP-nya dibatalkan,
         // dari jalur cancel mana pun.

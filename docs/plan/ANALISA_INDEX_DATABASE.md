@@ -1124,11 +1124,63 @@ diuji bersih dua arah). 34 index `_idx` terpasang.
       EXPLAIN MySQL: `type=ref`, `customers_status_rejected_idx`, covering, tanpa
       filesort (dulu O(pelanggan × audit_logs)). Test
       `CustomerListStatusTimestampOrderingTest`.
-- [ ] **5.2** Generated column `notification_type`, `data` → tipe `json`
-- [ ] **5.3** Pencarian pelanggan: prefix-`LIKE` + FULLTEXT ⚠️ *butuh konfirmasi*
-- [ ] **5.4** Endpoint pencarian wilayah `?q=` + limit
-- [ ] **5.5** `Pop::forUser()` → `EffectiveAccessService` ⚠️ *potensi bug scope, butuh konfirmasi*
-- [ ] **5.6** `->select()` di daftar pelanggan
+- [x] **5.2** `notification_type` + index — **SELESAI 2026-07-24**. MENYIMPANG
+      dari "generated STORED column": sqlite (test) tak izinkan ADD COLUMN
+      generated STORED (hanya VIRTUAL), MySQL perlu STORED → skema beda antar-env.
+      Pakai kolom NYATA diisi via `DatabaseNotification::creating` (AppServiceProvider)
+      + command `notifications:backfill-type` (data lama). Portabel, indexable,
+      nol drift (notif immutable). NotificationController filter `data->type` →
+      `notification_type`. `data` TETAP `text` — tak perlu di-json-kan karena
+      sudah tidak di-query lewat path JSON. EXPLAIN: `type=ref`,
+      `notifications_notification_type_idx`. Test `NotificationTypeColumnTest`.
+- [x] **5.3** Pencarian pelanggan — **SELESAI 2026-07-24**. Keputusan produk:
+      **prefix untuk kode/nomor + substring untuk nama** (BUKAN FULLTEXT — hindari
+      cross-DB MySQL-only & perubahan perilaku word-based). Routing per bentuk
+      input di `CustomerController::index`: ada `@`→email prefix; ada digit→kode/
+      HP/NIK/CID `LIKE 'x%'` (sargable); selainnya→`full_name LIKE '%x%'`.
+      Migration `2026_07_24_145737` tambah index `customer_code`/`cid`/
+      `primary_phone`/`identity_number` (old_* sudah di Fase 3). **Perubahan
+      perilaku disetujui:** potongan TENGAH kode tak lagi cocok (prefix), query
+      berdigit tak mencocokkan nama. EXPLAIN: prefix pakai index. Test
+      `CustomerSearchPrefixRoutingTest`.
+- [x] **5.4** Endpoint pencarian wilayah `?q=` + limit — **SEBAGIAN SELESAI 2026-07-24**.
+      Dibuat 3 endpoint typeahead `GET /api/wilayah/{cities,districts,villages}?q=`
+      (limit 20, saring per induk city_id/district_id). Buang 2 full-load REDUNDAN
+      (`create()`/`edit()` `$districts` — form pakai cascade async, tak pernah
+      dirender). Test `WilayahSearchEndpointTest`.
+      **Wiring frontend — komponen dropdown wilayah (final).** Iterasi: typeahead
+      inline gagal → combobox chips → (permintaan owner, contoh screenshot filter
+      cabang) jadi **komponen `x-ui.wilayah-filter`** — pill dropdown gaya app,
+      2 TAB **Kecamatan + Desa**, tiap tab search dinamis ke endpoint +
+      checkbox-list multi-select, tombol Terapkan (batch submit). Controller MULTI
+      `district_id[]` + `village_id[]` → `whereIn` (kompat tunggal); `$districts`
+      full-load DIBUANG (ganti `$selectedDistricts`/`$selectedVillages` = resolve
+      label terpilih). Reuse token desain `pop-tree-picker`. Test
+      `CustomerListMultiDistrictFilterTest` (district+village whereIn + single
+      compat + render). Catatan bug: teks "@once" di komentar JS ke-parse Blade
+      jadi directive — hindari. **MASIH MENUNGGU VERIFIKASI VISUAL owner.**
+      **SISA lain:** filter village `fop_tasks` (`$villages` dipakai filter DAN
+      modal x-model). Import `resolveRegionFromAddress` (2706) = matching alamat,
+      terpisah.
+- [x] **5.5** `Pop::forUser()` → `EffectiveAccessService` — **SELESAI 2026-07-24**.
+      Ganti jalur `whereHas('users')` (pivot user_pops, buta pop_tree) → 
+      `hasAllPopAccess()` + `whereIn('id', getAllowedPopIds())` (paham pop_tree,
+      cached, deny-by-default). Sekaligus buang cek role-NAME
+      `['Owner','Admin','Admin Pusat']` yang salah (repo pakai role CODE; 'Admin
+      Pusat' tak ada di RoleSeeder). Test `PopForUserScopeTreeTest`.
+      **PERUBAHAN PERILAKU:** user role `admin` TANPA scope ALL_POP kini
+      ter-scope (dulu lolos via cek role-name). Owner/atasan tetap penuh
+      (hardcoded), owner/superAdmin seeded ALL_POP. Pastikan admin nasional
+      diberi scope ALL_POP eksplisit bila memang perlu lihat semua cabang.
+- [x] **5.6** `->select()` di daftar pelanggan — **SELESAI 2026-07-24**.
+      `CustomerController::index` tarik 26 kolom (yang dirender + accessor
+      display_id + FK eager load), buang ~21 kolom lebar/tak-dipakai di list
+      (teknis ont_sn/ip/odp/olt/vlan, foto ktp/rumah/kontrak, npwp/company,
+      lat/long, kontrak/diskon/pajak, sales/agent/referral). Sekalian bersihkan
+      sisa `$customer->phone` mati (kolom sudah di-drop gel.1) di index.blade.
+      Catatan: `preventAccessingMissingAttributes` TIDAK aktif, jadi kolom yang
+      lupa di-select jadi null diam-diam — daftar select diverifikasi cermat
+      terhadap semua akses blade + accessor; suite hijau.
 
 ### Penutup
 - [x] Seeder volume + `EXPLAIN` sebelum/sesudah — **selesai 2026-07-22**.

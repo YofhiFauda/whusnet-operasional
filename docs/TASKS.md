@@ -8,7 +8,7 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | Task | Deskripsi | Status |
 |---|---|---|
 | ADHOC-01 | Desain Ulang List Pelanggan & Dark Theme Toggle | Done |
-| ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi Dark/Light Theme Support | Done |
+| ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi, Detail Pelanggan & Sub-Tabs Dark/Light Theme Support | Done |
 
 ### PERF — Index, N+1 & Beban Database (`docs/plan/ANALISA_INDEX_DATABASE.md`)
 
