@@ -113,7 +113,7 @@ class TicketCidDisplayTest extends TestCase
 
         $ticket = $this->createTicketFor($customer);
 
-        $response = $this->actingAs($this->helpdeskUser)->get(route('tickets.bucket', 'masuk'));
+        $response = $this->actingAs($this->helpdeskUser)->get(route('tickets.create'));
 
         $response->assertOk();
         $response->assertSee('C1X4CRQ000007');
@@ -143,7 +143,7 @@ class TicketCidDisplayTest extends TestCase
         $ticket = $this->createTicketFor($customer);
 
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'masuk'))
+            ->get(route('tickets.create'))
             ->assertOk()
             ->assertSee('C00RQ000009');
     }

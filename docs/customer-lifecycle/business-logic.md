@@ -148,6 +148,74 @@ Kalau salah satu gak kepenuhi (termasuk pelanggan migrasi yang di sistem lama JU
 - Update `CustomerInstallation.installation_status` balik ke `in_progress` (supaya teknisi bisa submit ulang laporan) + prepend catatan revisi ke `installation_note`.
 - Auto-revert Task Pemasangan terkait: status Task balik ke `in_progress`, `fop_review_status=rejected`.
 
+## 8. Teknisi Fieldwork Page — Data Teknis Terpisah dari Detail Pelanggan (2026-07-28)
+
+### Latar Belakang (RBAC Split)
+
+Sebelumnya, teknisi akses data Perangkat & Pemasangan lewat halaman `/customers/{id}` (Detail Pelanggan), yang sama dengan tab-tab lain (identitas/alamat/paket/billing/dokumen/riwayat). Masalah: permission gate semua tab itu dengan `customers.view`/`customers.detail.view` — kalau teknisi dikasih akses, dia bisa lihat data identitas/billing/dokumen yang seharusnya hanya admin/noc/fop lihat.
+
+**Solusi (2026-07-28):** Halaman baru `/customers/{id}/perangkat-pemasangan` khusus teknisi fieldwork.
+
+### Halaman Fieldwork (`CustomerFieldworkController`)
+
+**Route & Guard:**
+```php
+Route::middleware('permission:customers.detail.devices.view|customers.detail.installation.view')->group(function () {
+    Route::get('/customers/{customer}/perangkat-pemasangan', [CustomerFieldworkController::class, 'show'])->name('customers.fieldwork');
+});
+```
+
+**Controller:**
+```php
+class CustomerFieldworkController extends Controller {
+    public function show(Customer $customer) {
+        // Load HANYA 3 relasi yang needed buat device & installation tab
+        $customer->load(['customerDevice', 'customerTechnicalDetail', 'installations.technician']);
+        return view('customers.fieldwork', compact('customer'));
+    }
+}
+```
+
+**View (`customers/fieldwork.blade.php`):**
+- Render tab `_installation` + `_device` (reuse partial dari halaman Detail)
+- Modal form "Isi Perangkat" + "Isi Pemasangan" (sama persis)
+- **TANPA** tab lain (identitas/alamat/paket/billing/dokumen/riwayat)
+
+### Permission Vs Route
+
+| Halaman | Permission | Teknisi Akses? | Data Dimuat |
+|---------|------------|------|------|
+| `/customers` (List) | `customers.view` | ✗ BLOK | - |
+| `/customers/{id}` (Detail) | `customers.detail.view` | ✗ BLOK | 17 relasi |
+| `/customers/{id}/perangkat-pemasangan` (Fieldwork) | `customers.detail.devices.view` OR `customers.detail.installation.view` | ✓ BOLEH | 3 relasi |
+
+**Teknisi permission set:**
+- ✓ `customers.detail.devices.*` (view, create, update, view_sensitive, update_sensitive)
+- ✓ `customers.detail.installation.*` (view, update, validate, activate, reject)
+- ✗ `customers.view` — tidak ada
+- ✗ `customers.detail.view` — tidak ada
+
+Dengan set ini, teknisi:
+- Can access fieldwork page (permission middleware OR logic lolos)
+- Cannot access List Data / List Putus / List Gagal / Detail Pelanggan (routes return 403)
+- Cannot see sidebar items untuk list/detail pages (Blade `@can()` gate blok render)
+
+### Backward Compat & Testing
+
+**Old links:** Kalau ada dokumentasi/cheatsheet yang refer `/customers/{id}` buat teknisi lihat device — UPDATE ke `/customers/{id}/perangkat-pemasangan`. Tests updated:
+
+- `CustomerDeviceTest::test_device_data_is_visible_on_customer_detail()` → use `route('customers.fieldwork', $customer->id)`
+- `CustomerDeviceSensitiveFieldTest::test_teknisi_can_see_and_update_sensitive_fields()` → use fieldwork route
+- `CustomerInstallationTest::test_installation_data_is_visible_on_customer_detail()` → use fieldwork route
+
+Modal form submission (POST `/customers/{id}/device` dan `/customers/{id}/installation`) **tetap sama** — teknisi post dari fieldwork page, action handler tidak berubah.
+
+### Design Rationale
+
+Fieldwork page load minimal relasi (`customerDevice`, `customerTechnicalDetail`, `installations`) — tidak perlu `customers.full_load()` yang 17 relasi. Spesialisasi ini juga force teknisi ke "field-only" mode semantik: harusnya HANYA isi teknis, bukan edit identitas/billing/dokumen/riwayat.
+
+Jika di futur ada kebutuhan teknisi lihat identitas/alamat *saat di lokasi* (misalnya verifikasi data di rumah), bisa expand fieldwork page dengan select query, bukan give `customers.detail.view` permission yang buka semua tab.
+
 ## 8. Terminasi Layanan (`CustomerTerminationController`)
 
 - Endpoint tunggal `__invoke()` — set `customer.status=terminated`, `customer_service.service_status=berhenti`.

@@ -24,9 +24,28 @@ class CustomerSurveyController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.view'), 403);
 
+        // orWhere() dibungkus closure — sebelumnya orWhere() nempel di level
+        // top query, jadi filter search() di bawah kena presedensi SQL
+        // "AND lebih erat dari OR" (jadi search cuma efektif buat cabang
+        // survey_in_progress, bukan waiting_survey). Sekalian jadi tempat aman
+        // buat nambah scope teknisi di bawah tanpa kena bug presedensi yang sama.
         $query = Customer::with(['pop', 'village.district', 'latestSurvey.technician'])
-            ->where('status', 'waiting_survey')
-            ->orWhere('status', 'survey_in_progress');
+            ->where(function ($q) {
+                $q->where('status', 'waiting_survey')->orWhere('status', 'survey_in_progress');
+            });
+
+        // Teknisi cuma boleh liat pelanggan yang Task Survey-nya PERNAH
+        // dijadwalkan buat dirinya (jadi anggota tim) — bukan seluruh antrean.
+        // NOC/FOP/Admin/Owner (hasFullAccess) tetap liat semua buat supervisi.
+        // Sengaja dicek pakai role, bukan permission kayak task.view.own/all —
+        // customers.detail.survey belum punya split permission serupa (lihat
+        // config/rbac.php), dan bikin split baru buat 1 kasus ini overkill.
+        if (! auth()->user()->hasFullAccess() && auth()->user()->hasRole('teknisi')) {
+            $query->whereHas('tasks', function ($q) {
+                $q->where('task_type', TaskType::SURVEY->value)
+                    ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', auth()->id()));
+            });
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -64,11 +83,21 @@ class CustomerSurveyController extends Controller
             ->latest('id')
             ->first();
 
-        if ($task) {
-            abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
-        }
+        // WAJIB — sebelumnya cuma dicek kalau $task ketemu (`if ($task) {...}`),
+        // jadi teknisi mana pun yang punya permission generik
+        // customers.detail.survey.update bisa mulai survey pelanggan MANA PUN
+        // tanpa pernah dijadwalkan FOP (bug RBAC — null Task paling sering
+        // kejadian justru karena Task-nya masih Draft, BELUM dijadwalkan, bukan
+        // berarti "gak perlu dicek"). hasFullAccess() tetap boleh override
+        // buat intervensi manual Owner/Admin.
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda belum dijadwalkan untuk survey pelanggan ini — tunggu penjadwalan dari FOP sebelum memulai survey.'
+        );
 
-        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [];
+        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [auth()->id()];
         if (! in_array(auth()->id(), $memberIds)) {
             $memberIds[] = auth()->id();
         }
@@ -164,6 +193,24 @@ class CustomerSurveyController extends Controller
             return redirect()->route('surveys.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan survey.');
         }
 
+        // Guard assignment sama kayak start() — permission generik
+        // customers.detail.survey.update gak cukup, wajib jadi anggota tim
+        // Task yang lagi jalan. Berlaku buat SEMUA non-full-access, termasuk
+        // NOC (keputusan eksplisit: no exemption, biar konsisten sama
+        // start()/store() — supervisi/koreksi data tetap lewat hasFullAccess).
+        $task = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::SURVEY->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk survey pelanggan ini.'
+        );
+
         $survey = $customer->latestSurvey()->first();
         if (! $survey) {
             return redirect()->route('surveys.queue')->with('error', 'Data waktu mulai survey tidak ditemukan.');
@@ -184,6 +231,22 @@ class CustomerSurveyController extends Controller
                 || auth()->user()->hasPermission('customers.detail.survey.validate'),
             403,
             'Data survey pelanggan ini sudah melewati tahap survey dan tidak dapat diubah oleh role Anda.'
+        );
+
+        // Guard assignment sama kayak start()/report() — SEMUA non-full-access
+        // wajib jadi anggota tim Task yang lagi jalan, termasuk NOC (gak ada
+        // pengecualian, keputusan eksplisit biar konsisten satu alur).
+        $assignmentTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::SURVEY->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($assignmentTask && $assignmentTask->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk survey pelanggan ini.'
         );
 
         $validated = $request->validate([

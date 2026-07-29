@@ -24,7 +24,7 @@ class PopController extends Controller
 
         $allItems = Pop::query()
             ->forUser()
-            ->with('parent')
+            ->with(['parent', 'children'])
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")

@@ -219,6 +219,7 @@
                             <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket Masuk</a>
                             <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket di Proses</a>
                             <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket Selesai</a>
+                            <a href="#" class="block py-2 px-3 rounded-md text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 transition-colors">Ticket Dibatalkan</a>
                         </div>
                     </div>
                 </div>
@@ -233,6 +234,17 @@
                             <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path stroke-linecap="round" stroke-linejoin="round" d="M3 5V19A9 3 0 0 0 21 19V5"></path><path stroke-linecap="round" stroke-linejoin="round" d="M3 12A9 3 0 0 0 21 12"></path>
                         </svg>
                         <span class="sidebar-text">Master Data</span>
+                    </a>
+
+                    <!--
+                        RBAC rancangan bagian B (RANCANGAN_MASTER_ISSUE_TICKETING.md):
+                        di Blade nyata, entri ini @if(auth()->user()->hasPermission('ticket_issue_categories.view'))
+                        feature_code: ticket_issue_categories — sementara cuma owner (wildcard *) yang lolos,
+                        role lain ditambah manual lewat UI RBAC nanti, bukan hardcode seeder.
+                    -->
+                    <a href="#" class="flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                        <span>Master Issue/Kategori Keluhan</span>
+                        <span class="ml-auto text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Owner</span>
                     </a>
                     <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
                         <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -372,7 +384,7 @@
                                     Ticketing
                                 </a>
                                 <span>/</span>
-                                <span class="text-text-main font-semibold">Create New Ticket</span>
+                                <span class="text-text-main font-semibold">Worksheet Helpdesk — New Ticket</span>
                             </div>
 
                             <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
@@ -394,7 +406,7 @@
                                         Create Service Ticket
                                     </h1>
                                     <p class="text-[11px] text-text-muted font-medium uppercase tracking-wider mt-0.5">
-                                        Internal Operations Entry &amp; FOP Sync
+                                        Worksheet Helpdesk — Pengganti Pencatatan Manual Excel
                                     </p>
                                 </div>
                                 
@@ -406,9 +418,33 @@
                                 </a>
                             </div>
 
-                            <!-- Form Body -->
+                            <!--
+                                Submit mode — rancangan bagian D (RANCANGAN_MASTER_ISSUE_TICKETING.md):
+                                di Blade nyata form ini @submit.prevent="submitForm()" fetch() POST JSON
+                                (Accept: application/json) ke /tickets, BUKAN native form POST — biar user
+                                tetap di halaman worksheet ini setelah simpan tanpa melanggar tujuan PRG
+                                (gak ada history-entry POST yang bisa di-refresh & resubmit).
+                                  - 201 → toast sukses, resetForm(), realtime push ke panel kanan (lewat
+                                    Echo listener terpisah, LIHAT bagian E, bukan optimistic push manual)
+                                  - 422 → errors ke state `errors{}`, render inline per field, form TIDAK
+                                    direset (lihat simulasi errors di bawah)
+                                  - 500 → toast error, form TIDAK direset
+                                TicketController@store bercabang wantsJson(): non-JS fallback tetap PRG
+                                normal redirect ke tickets.show (docs/PRG_REDIRECT_CONVENTION.md tetap
+                                dipatuhi di jalur itu).
+                            -->
                             <form @submit.prevent="submitForm()" class="divide-y divide-border">
-                                
+
+                                <!-- Error Summary (simulasi respons 422 — rancangan bagian D) -->
+                                <div x-show="Object.keys(errors).length > 0" x-cloak class="p-4 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-200 dark:border-rose-800" style="display: none;">
+                                    <p class="text-xs font-bold text-rose-700 dark:text-rose-300 mb-1">Validasi gagal — periksa kembali field bertanda merah:</p>
+                                    <ul class="text-xs text-rose-600 dark:text-rose-400 list-disc list-inside">
+                                        <template x-for="(msg, field) in errors" :key="field">
+                                            <li x-text="msg"></li>
+                                        </template>
+                                    </ul>
+                                </div>
+
                                 <!-- SECTION 01: CLASSIFICATION -->
                                 <div class="p-6 space-y-4">
                                     <div class="flex items-center gap-2 mb-1">
@@ -511,7 +547,7 @@
                                         <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
                                             Pelanggan ini masih punya <span x-text="duplicateTickets.length"></span> tiket open:
                                             <template x-for="d in duplicateTickets" :key="d.id">
-                                                <span class="font-mono" x-text="d.code + ' (' + d.status + ')  '"></span>
+                                                <span class="font-mono" x-text="d.code + ' (' + bucketLabel(d.bucket) + ')  '"></span>
                                             </template>
                                         </p>
                                     </div>
@@ -593,13 +629,18 @@
                                                 </svg>
                                             </div>
                                             <p class="text-[10px] text-text-muted">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
+                                            <p x-show="selectedCategorySlaSource" x-cloak class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400" style="display:none;">
+                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4m0-4h.01"></path></svg>
+                                                SLA kategori ini: <span x-text="selectedCategorySlaSource === 'paket' ? 'sesuai Paket Internet pelanggan' : 'sesuai Prioritas di atas'"></span>
+                                            </p>
                                         </div>
 
                                         <div class="space-y-1.5">
                                             <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
                                                 Detail Keluhan (Customer Complaint) <span class="text-rose-500">*</span>
                                             </label>
-                                            <textarea name="detail_keluhan" x-model="detailKeluhan" rows="4" required maxlength="2000" placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..." class="w-full text-sm rounded-lg border border-border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"></textarea>
+                                            <textarea name="detail_keluhan" x-model="detailKeluhan" @input="delete errors.detail_keluhan" rows="4" required maxlength="2000" placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..." :class="errors.detail_keluhan ? 'border-rose-400 focus:ring-rose-500/30 focus:border-rose-500' : 'border-border focus:ring-sky-500/30 focus:border-sky-500'" class="w-full text-sm rounded-lg border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all"></textarea>
+                                            <p x-show="errors.detail_keluhan" x-cloak class="text-[11px] font-semibold text-rose-600 dark:text-rose-400" x-text="errors.detail_keluhan" style="display:none;"></p>
                                         </div>
 
                                         <button type="button" @click="showExtra = !showExtra" class="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">
@@ -675,10 +716,19 @@
                                         </button>
 
                                         <div class="flex items-center gap-3">
-                                            <button type="submit" :disabled="!selected" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-md shadow-sky-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                                <span>CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <!-- Dev-only: simulasi respons 422 (hapus tombol ini saat wire ke backend asli) -->
+                                            <label class="hidden md:flex items-center gap-1.5 text-[10px] text-text-muted cursor-pointer select-none">
+                                                <input type="checkbox" x-model="debugSimulate422" class="rounded border-border">
+                                                Simulasikan Error 422
+                                            </label>
+                                            <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-md shadow-sky-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <span x-show="!submitting">CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
+                                                <span x-show="submitting" style="display:none;">MENYIMPAN...</span>
+                                                <svg x-show="!submitting" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                                </svg>
+                                                <svg x-show="submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none;">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                 </svg>
                                             </button>
                                         </div>
@@ -688,10 +738,19 @@
                         </div>
                     </div>
 
-                    <!-- RIGHT COLUMN: LIST TASK TICKETING PANEL (FRAME 130 SPLIT VIEW) -->
+                    <!--
+                        RIGHT COLUMN: LIST TASK TICKETING PANEL — rancangan bagian E.
+                        Bucket & label di sini WAJIB sama persis dengan App\Enums\TicketBucket
+                        (masuk/diproses/selesai/dibatalkan — 4 case, saling lepas, WAJIB nutupin
+                        semua TaskStatus, dijaga TicketingTest). Jangan bikin status bebas lagi
+                        kayak "Diproses FOP"/"Pending Customer" — itu bukan bucket asli.
+                        Initial load: data di-pass server-side saat halaman pertama dimuat.
+                        Item baru: masuk lewat Echo listener (LIHAT mockRealtimeBroadcast di script),
+                        bukan fetch ulang tiap kali.
+                    -->
                     <div class="lg:col-span-5 xl:col-span-4 space-y-4">
                         <div class="bg-surface border border-border rounded-xl shadow-sm p-5 sticky top-20 flex flex-col min-h-[calc(100vh-120px)]">
-                            
+
                             <!-- Header & Filter Bar -->
                             <div class="pb-4 border-b border-border space-y-3">
                                 <div class="flex items-center justify-between">
@@ -707,12 +766,13 @@
                                     </button>
                                 </div>
 
-                                <!-- Filter Tabs -->
+                                <!-- Filter Tabs — value = TicketBucket->value asli, bukan label bebas -->
                                 <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted">
                                     <button @click="taskFilter = 'all'" :class="taskFilter === 'all' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Semua</button>
-                                    <button @click="taskFilter = 'open'" :class="taskFilter === 'open' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Open</button>
-                                    <button @click="taskFilter = 'fop'" :class="taskFilter === 'fop' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">FOP Assigned</button>
+                                    <button @click="taskFilter = 'masuk'" :class="taskFilter === 'masuk' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Masuk</button>
+                                    <button @click="taskFilter = 'diproses'" :class="taskFilter === 'diproses' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Diproses</button>
                                 </div>
+                                <p class="text-[10px] text-text-muted">Selesai &amp; Dibatalkan gak masuk antrean kerja — lihat lewat "Semua Task Ticketing".</p>
                             </div>
 
                             <!-- Task List Cards -->
@@ -743,20 +803,20 @@
                                             <span class="font-medium text-text-secondary">CID: <span class="font-mono text-text-main" x-text="task.cid"></span></span>
                                             <span class="font-semibold flex items-center gap-1"
                                                 :class="{
-                                                    'text-amber-600 dark:text-amber-400': task.status === 'Diproses FOP',
-                                                    'text-sky-600 dark:text-sky-400': task.status === 'Ticket Masuk',
-                                                    'text-emerald-600 dark:text-emerald-400': task.status === 'Penjadwalan FOP',
-                                                    'text-slate-500': task.status === 'Pending Customer'
+                                                    'text-amber-600 dark:text-amber-400': task.bucket === 'diproses',
+                                                    'text-sky-600 dark:text-sky-400': task.bucket === 'masuk',
+                                                    'text-emerald-600 dark:text-emerald-400': task.bucket === 'selesai',
+                                                    'text-slate-500 dark:text-slate-400': task.bucket === 'dibatalkan'
                                                 }">
                                                 <span class="w-1.5 h-1.5 rounded-full"
                                                     :class="{
-                                                        'bg-amber-500': task.status === 'Diproses FOP',
-                                                        'bg-sky-500': task.status === 'Ticket Masuk',
-                                                        'bg-emerald-500': task.status === 'Penjadwalan FOP',
-                                                        'bg-slate-400': task.status === 'Pending Customer'
+                                                        'bg-amber-500': task.bucket === 'diproses',
+                                                        'bg-sky-500': task.bucket === 'masuk',
+                                                        'bg-emerald-500': task.bucket === 'selesai',
+                                                        'bg-slate-400': task.bucket === 'dibatalkan'
                                                     }">
                                                 </span>
-                                                <span x-text="task.status"></span>
+                                                <span x-text="bucketLabel(task.bucket)"></span>
                                             </span>
                                         </div>
                                     </div>
@@ -845,14 +905,21 @@
             detailKeluhan: '',
             showExtra: false,
             toast: { show: false, type: 'success', message: '' },
+            errors: {},
+            submitting: false,
             nextTicketSeq: 893,
+            debugSimulate422: false, // toggle dev-only lewat tombol "Simulasikan Error 422" di footer
 
             // Mock Master Issue Category — CONTOH, ganti dari Master Data sungguhan (Task 1 rancangan)
+            // sla_source: 'paket' → SLA ambil dari PackageSlaSetting pelanggan; 'prioritas' → SLA
+            // tetap ikut level Prioritas di form ini. Contoh "Lemot" pakai 'paket' krn keluhan
+            // kecepatan biasanya terikat kontrak paket, sisanya 'prioritas' (gangguan jaringan
+            // umum). Ini cuma CONTOH — kombinasi asli ditentukan pas isi Master Data sungguhan.
             issueCategories: [
-                { id: 1, name: 'Lemot', default_priority: 'low' },
-                { id: 2, name: 'LOS', default_priority: 'Medium' },
-                { id: 3, name: 'Backbone CUT', default_priority: 'High' },
-                { id: 4, name: 'ODP LOS', default_priority: 'High' },
+                { id: 1, name: 'Lemot', default_priority: 'low', sla_source: 'paket' },
+                { id: 2, name: 'LOS', default_priority: 'Medium', sla_source: 'prioritas' },
+                { id: 3, name: 'Backbone CUT', default_priority: 'High', sla_source: 'prioritas' },
+                { id: 4, name: 'ODP LOS', default_priority: 'High', sla_source: 'prioritas' },
             ],
 
             // Mock Customer Database for Quick Lookup
@@ -862,25 +929,37 @@
                 { id: 3, cid: '20231201088', nama: 'Ahmad Dahlan', no_hp: '081399887766', paket: 'SOHO Dedicated 20 Mbps', pop: 'POP Kedaton', odp: 'ODP-KDT-08 / Port 5', alamat: 'Jl. ZA Pagar Alam No. 102, Kedaton', perangkat: 'MikroTik RB951Ui + Fiber ONT', gps: '-5.3789, 105.2512' }
             ],
 
-            // Task List Data — di halaman nyata ini dari initial server payload + realtime Reverb (rancangan bagian E)
+            // Task List Data — bucket harus persis App\Enums\TicketBucket (masuk/diproses/selesai/dibatalkan).
+            // Di halaman nyata ini dari initial server payload + realtime Reverb (rancangan bagian E).
             tasks: [
-                { id: 1, code: '#TK-2026-0892', priority: 'Urgent', title: 'Indihome Fiber Cut — Restorasi Kabel', desc: 'Pelanggan melaporkan indikator LOS merah secara tiba-tiba di ODP-BDR-04 Port 3.', time: '10m ago', cid: '20240911002', status: 'Diproses FOP', category: 'fop' },
-                { id: 2, code: '#TK-2026-0890', priority: 'High', title: 'Sinyal Redaman Tinggi (-29dBm)', desc: 'Koneksi sering terputus (unstable connection). Perlu patching ulang di ODP.', time: '42m ago', cid: '20240815041', status: 'Ticket Masuk', category: 'open' },
-                { id: 3, code: '#TK-2026-0885', priority: 'Medium', title: 'Permintaan Relokasi Perangkat Router', desc: 'Pelanggan meminta pemindahan titik router dari Lantai 1 ke Lantai 2.', time: '2h ago', cid: '20231201088', status: 'Penjadwalan FOP', category: 'fop' },
-                { id: 4, code: '#TK-2026-0881', priority: 'Low', title: 'Ganti Password WiFi & SSID', desc: 'Bantuan remote setting konfigurasi Router Huawei HG8245H5.', time: '4h ago', cid: '20240110012', status: 'Pending Customer', category: 'open' },
+                { id: 1, code: '#TKT-2026-0892', priority: 'Urgent', title: 'Indihome Fiber Cut — Restorasi Kabel', desc: 'Pelanggan melaporkan indikator LOS merah secara tiba-tiba di ODP-BDR-04 Port 3.', time: '10m ago', cid: '20240911002', bucket: 'diproses' },
+                { id: 2, code: '#TKT-2026-0890', priority: 'High', title: 'Sinyal Redaman Tinggi (-29dBm)', desc: 'Koneksi sering terputus (unstable connection). Perlu patching ulang di ODP.', time: '42m ago', cid: '20240815041', bucket: 'masuk' },
+                { id: 3, code: '#TKT-2026-0885', priority: 'Medium', title: 'Permintaan Relokasi Perangkat Router', desc: 'Pelanggan meminta pemindahan titik router dari Lantai 1 ke Lantai 2.', time: '2h ago', cid: '20231201088', bucket: 'diproses' },
+                { id: 4, code: '#TKT-2026-0881', priority: 'Low', title: 'Ganti Password WiFi & SSID', desc: 'Bantuan remote setting konfigurasi Router Huawei HG8245H5.', time: '4h ago', cid: '20240110012', bucket: 'selesai' },
             ],
+
+            // SLA basis kategori terpilih — sesuai RANCANGAN_WORKSHEET_TICKETING.MD ("bisa
+            // menggunakan SLA berdasarkan paket atau menggunakan Prioritas"). null kalau "Lainnya"
+            // atau belum pilih, karena manual entry gak punya SLA master buat dirujuk.
+            get selectedCategorySlaSource() {
+                if (!this.issueCategoryId || this.issueCategoryId === 'lainnya') return null;
+                return this.issueCategories.find(c => c.id == this.issueCategoryId)?.sla_source || null;
+            },
+
+            // Label persis App\Enums\TicketBucket::label() — jangan bikin teks bebas di template.
+            bucketLabel(bucket) {
+                return { masuk: 'Ticket Masuk', diproses: 'Ticket di Proses', selesai: 'Ticket Selesai', dibatalkan: 'Ticket Dibatalkan' }[bucket] || bucket;
+            },
 
             get filteredTasks() {
                 if (this.taskFilter === 'all') return this.tasks;
-                if (this.taskFilter === 'open') return this.tasks.filter(t => t.category === 'open');
-                if (this.taskFilter === 'fop') return this.tasks.filter(t => t.category === 'fop');
-                return this.tasks;
+                return this.tasks.filter(t => t.bucket === this.taskFilter);
             },
 
-            // Tiket open milik customer terpilih — bukan Selesai/Dibatalkan (poin 5: mudah solving)
+            // Tiket open milik customer terpilih — bucket masuk/diproses (poin 5: mudah solving)
             get duplicateTickets() {
                 if (!this.selected) return [];
-                return this.tasks.filter(t => t.cid === this.selected.cid && t.status !== 'Selesai' && t.status !== 'Dibatalkan');
+                return this.tasks.filter(t => t.cid === this.selected.cid && (t.bucket === 'masuk' || t.bucket === 'diproses'));
             },
 
             searchCustomer() {
@@ -930,6 +1009,7 @@
                 this.issueCategoryId = '';
                 this.detailKeluhan = '';
                 this.showExtra = false;
+                this.errors = {};
                 this.$nextTick(() => this.$refs.searchInput?.focus());
             },
 
@@ -941,7 +1021,7 @@
             handleShortcut(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     e.preventDefault();
-                    if (this.selected) this.submitForm();
+                    if (this.selected && !this.submitting) this.submitForm();
                     return;
                 }
                 if (e.key === 'Escape') {
@@ -949,30 +1029,98 @@
                 }
             },
 
-            submitForm() {
-                if (!this.selected) return;
+            /**
+             * Mock fetch() POST /tickets, Accept: application/json — rancangan bagian D.
+             * Di Blade nyata ganti isi fungsi ini dengan:
+             *   const res = await fetch('/tickets', {
+             *       method: 'POST',
+             *       headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken, ... },
+             *       body: formData,
+             *   });
+             *   if (res.status === 422) throw { status: 422, errors: (await res.json()).errors };
+             *   if (!res.ok) throw { status: res.status };
+             *   return res.json();
+             */
+            mockApiCreateTicket(payload) {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        if (this.debugSimulate422) {
+                            reject({ status: 422, errors: { detail_keluhan: 'Detail keluhan wajib diisi minimal 10 karakter.' } });
+                            return;
+                        }
+                        resolve({
+                            ticket: {
+                                ticket_number: 'TKT-2026-' + String(this.nextTicketSeq++).padStart(4, '0'),
+                                fop_task_number: 'TFOP-2026-' + String(this.nextTicketSeq).padStart(4, '0'),
+                            },
+                        });
+                    }, 250);
+                });
+            },
 
-                const code = '#TK-2026-' + (this.nextTicketSeq++);
+            /**
+             * Simulasi broadcast realtime (rancangan bagian E). Di Blade nyata, panel kanan TIDAK
+             * di-push langsung dari respons submit — melainkan dengar broadcast server:
+             *   Echo.private('tickets.' + popId)
+             *       .listen('TicketQueueUpdated', (card) => this.tasks.unshift(card));
+             * Event TicketQueueUpdated didispatch dari TicketService::create() setelah commit,
+             * payload TIDAK menyalin catatan_teknis (satu sumber kebenaran, sama prinsip sync
+             * Ticket↔FopTask di CLAUDE.md).
+             */
+            mockRealtimeBroadcast(ticketNumber, customer) {
+                // Nilai form (priority/kategori/keluhan/customer) ditangkap di closure SEBELUM
+                // resetForm() jalan — resetForm() bersih-bersih state form segera setelah dipanggil
+                // di submitForm(), padahal broadcast ini baru "sampai" 400ms kemudian.
                 const catName = this.issueCategoryId && this.issueCategoryId !== 'lainnya'
                     ? this.issueCategories.find(c => c.id == this.issueCategoryId)?.name
                     : null;
+                const title = catName || this.detailKeluhan.slice(0, 60);
+                const desc = this.detailKeluhan;
+                const priority = this.priority;
+                setTimeout(() => {
+                    this.tasks.unshift({
+                        id: Date.now(),
+                        code: '#' + ticketNumber,
+                        priority,
+                        title,
+                        desc,
+                        time: 'baru saja',
+                        cid: customer.cid,
+                        bucket: 'masuk', // tiket baru selalu FopTask status DRAFT → bucket MASUK
+                    });
+                }, 400);
+            },
 
-                // Simulasi broadcast realtime (rancangan bagian E) — di halaman nyata ini datang dari
-                // Echo.private('tickets.{pop_id}').listen('TicketQueueUpdated', ...), bukan push lokal.
-                this.tasks.unshift({
-                    id: Date.now(),
-                    code,
+            async submitForm() {
+                if (!this.selected || this.submitting) return;
+                this.submitting = true;
+                this.errors = {};
+
+                const payload = {
+                    type: this.ticketType,
                     priority: this.priority,
-                    title: catName || this.detailKeluhan.slice(0, 60),
-                    desc: this.detailKeluhan,
-                    time: 'baru saja',
-                    cid: this.selected.cid,
-                    status: 'Ticket Masuk',
-                    category: 'open',
-                });
+                    customer_id: this.selected.id,
+                    issue_category_id: this.issueCategoryId !== 'lainnya' ? this.issueCategoryId : null,
+                    detail_keluhan: this.detailKeluhan,
+                };
+                const capturedCustomer = this.selected;
 
-                this.showToast(`${code} dibuat & disinkronkan ke FOP.`);
-                this.resetForm();
+                try {
+                    const res = await this.mockApiCreateTicket(payload);
+                    this.showToast(`${res.ticket.ticket_number} dibuat & disinkronkan ke FOP.`);
+                    this.mockRealtimeBroadcast(res.ticket.ticket_number, capturedCustomer);
+                    this.resetForm();
+                } catch (err) {
+                    if (err.status === 422) {
+                        this.errors = err.errors;
+                        this.showToast('Validasi gagal, periksa kembali form.', 'error');
+                    } else {
+                        this.showToast('Gagal membuat tiket, coba lagi.', 'error');
+                    }
+                    // Form TIDAK direset di jalur error (rancangan bagian D)
+                } finally {
+                    this.submitting = false;
+                }
             }
         };
     }

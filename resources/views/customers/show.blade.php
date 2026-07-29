@@ -191,17 +191,31 @@
         <!-- Tabs Buttons Nav -->
         <div class="border-b border-border bg-surface rounded-t-lg overflow-x-auto flex shadow-sm scrollbar-none">
             <button onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-primary text-primary focus:outline-none cursor-pointer whitespace-nowrap">Ringkasan</button>
+            @if(auth()->user()->hasPermission('customers.detail.identity.view'))
             <button onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Identitas</button>
+            @endif
+            @if(auth()->user()->hasPermission('customers.detail.address.view'))
             <button onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Alamat</button>
+            @endif
             <button onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">POP/Cabang</button>
+            @if(auth()->user()->hasPermission('customers.detail.survey.view'))
             <button onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Survey</button>
+            @endif
+            @if(auth()->user()->hasPermission('customers.detail.installation.view'))
             <button onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Pemasangan</button>
+            @endif
+            @if(auth()->user()->hasPermission('customers.detail.devices.view'))
             <button onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Perangkat</button>
+            @endif
+            @if(auth()->user()->hasPermission('customers.detail.packages.view'))
             <button onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Paket & Layanan</button>
+            @endif
             <button onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Billing</button>
             <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Tagihan</button>
             <button onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Pembayaran</button>
+            @if(auth()->user()->hasPermission('customers.detail.documents.view'))
             <button onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Dokumen</button>
+            @endif
             <button onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Riwayat Ticketing</button>
             <button onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-4 py-3 text-xs font-bold border-b-2 border-transparent text-text-muted hover:text-text-main focus:outline-none cursor-pointer whitespace-nowrap">Riwayat Perubahan</button>
             @if($customer->customerTechnicalDetail)
@@ -348,6 +362,7 @@
             </div>
 
             <!-- Tab 2: Identitas -->
+            @if(auth()->user()->hasPermission('customers.detail.identity.view'))
             <div id="tab-content-identitas" class="tab-content hidden space-y-6">
                 <div class="border border-border rounded-lg overflow-hidden">
                     <div class="px-5 py-3.5 bg-surface-muted/50 border-b border-border">
@@ -405,8 +420,10 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Tab 3: Alamat -->
+            @if(auth()->user()->hasPermission('customers.detail.address.view'))
             <div id="tab-content-alamat" class="tab-content hidden space-y-6">
                 <div class="border border-border rounded-lg overflow-hidden">
                     <div class="px-5 py-3.5 bg-surface-muted/50 border-b border-border">
@@ -444,6 +461,7 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Tab 4: POP/Cabang -->
             <div id="tab-content-pop" class="tab-content hidden space-y-6">
@@ -498,20 +516,27 @@
             </div>
 
             <!-- Tab: Survey -->
+            @if(auth()->user()->hasPermission('customers.detail.survey.view'))
             <div id="tab-content-survey" class="tab-content hidden space-y-6">
                 @include('customers.tabs._survey')
             </div>
+            @endif
 
             <!-- Tab: Pemasangan -->
+            @if(auth()->user()->hasPermission('customers.detail.installation.view'))
             <div id="tab-content-pemasangan" class="tab-content hidden space-y-6">
                 @include('customers.tabs._installation')
             </div>
+            @endif
 
+            @if(auth()->user()->hasPermission('customers.detail.devices.view'))
             <div id="tab-content-perangkat" class="tab-content hidden space-y-6">
                 @include('customers.tabs._device')
             </div>
+            @endif
 
             <!-- Tab 5: Paket & Layanan -->
+            @if(auth()->user()->hasPermission('customers.detail.packages.view'))
             <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6">
                 <div class="border border-border rounded-lg overflow-hidden">
                     <div class="px-5 py-3.5 bg-surface-muted/50 border-b border-border">
@@ -582,6 +607,7 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Tab 6: Billing -->
             <div id="tab-content-billing" class="tab-content hidden space-y-6">

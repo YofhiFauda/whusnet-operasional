@@ -158,7 +158,7 @@
                                 <div class="flex items-center gap-1.5 mt-1 text-[11px]">
                                     <span class="text-text-muted font-mono">{{ $task->customer->primary_phone }}</span>
                                     <a href="https://wa.me/{{ preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $task->customer->primary_phone)) }}" target="_blank"
-                                       class="text-emerald-600 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer">
+                                       class="text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer">
                                         <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.768-.001 1.298.409 2.522 1.189 3.518l-.756 2.766 2.831-.744a5.748 5.748 0 002.504.588h.002c3.18 0 5.767-2.586 5.768-5.766 0-1.541-.6-2.99-1.691-4.08-1.091-1.09-2.539-1.69-4.079-1.648zm0 10.153a4.398 4.398 0 01-2.241-.614l-.16-.095-1.666.438.444-1.624-.105-.167a4.394 4.394 0 01-.67-2.326c.001-2.426 1.975-4.4 4.402-4.4 1.177 0 2.283.458 3.115 1.29a4.382 4.382 0 011.29 3.117c-.001 2.426-1.975 4.4-4.409 4.4z"/></svg>
                                         WhatsApp
                                     </a>
@@ -172,8 +172,8 @@
 
                         @if($task->description)
                         <div class="flex flex-col sm:flex-row sm:items-start py-2 border-b border-border gap-1 sm:gap-4">
-                            <span class="text-text-muted sm:w-36 shrink-0 font-bold text-amber-700 font-ui">Issue / Keluhan</span>
-                            <span class="text-text-main font-semibold leading-relaxed bg-amber-50/60 border border-amber-200/60 rounded px-2 py-1 flex-1 font-ui">{{ $task->description }}</span>
+                            <span class="text-text-muted sm:w-36 shrink-0 font-bold text-amber-700 dark:text-amber-400 font-ui">Issue / Keluhan</span>
+                            <span class="text-text-main font-semibold leading-relaxed bg-amber-50/60 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-800/30 rounded px-2 py-1 flex-1 font-ui">{{ $task->description }}</span>
                         </div>
                         @endif
 
@@ -494,7 +494,7 @@
             </div>{{-- /left-column --}}
             
             {{-- Right Column: Waktu Pengerjaan, Tim Teknisi, Audit Log --}}
-            <div class="md:col-span-5 p-4 sm:p-5 space-y-4 bg-slate-50/50">
+            <div class="md:col-span-5 p-4 sm:p-5 space-y-4 bg-slate-50/50 dark:bg-slate-800/50">
                 
                 {{-- ══ Waktu Pengerjaan ══════════════════════════════ --}}
                 @if($task->status->value === 'selesai' && $task->started_at && $task->completed_at)
@@ -625,7 +625,7 @@
     <div class="flex flex-wrap items-center justify-end gap-2.5 pt-1.5 font-ui">
         @can('statusReschedule', $task)
         <button type="button" x-data @click="$dispatch('open-modal', 'reschedule-task-{{ $task->id }}')"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded border bg-white transition-colors hover:bg-warning/5 cursor-pointer"
+                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded border bg-white dark:bg-slate-800 transition-colors hover:bg-warning/5 cursor-pointer"
                 style="border-color:var(--color-warning-border); color:var(--color-warning)">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -733,7 +733,7 @@
             @if($task->status->value === 'pending')
                 @can('fopReject', $task)
                 <button x-data @click="$dispatch('open-modal', 'fop-reject-task-pending')"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white transition-colors hover:bg-error/5 cursor-pointer font-ui"
+                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white dark:bg-slate-800 transition-colors hover:bg-error/5 cursor-pointer font-ui"
                         style="border-color:var(--color-error-border); color:var(--color-error)">
                     Reject Task
                 </button>
@@ -743,7 +743,7 @@
             @if($task->status->value === 'terjadwal')
                 @can('fopPending', $task)
                 <button x-data @click="$dispatch('open-modal', 'fop-pending-task')"
-                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white transition-colors hover:bg-warning/5 cursor-pointer font-ui"
+                        class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white dark:bg-slate-800 transition-colors hover:bg-warning/5 cursor-pointer font-ui"
                         style="border-color:var(--color-warning-border); color:var(--color-warning)">
                     Set Pending
                 </button>
@@ -779,7 +779,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button x-data @click="$dispatch('open-modal', 'reject-task')"
-                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white transition-colors cursor-pointer font-ui"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border bg-white dark:bg-slate-800 transition-colors cursor-pointer font-ui"
                     style="border-color:var(--color-error-border); color:var(--color-error)">
                 Reject
             </button>

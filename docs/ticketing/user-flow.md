@@ -1,64 +1,179 @@
 # User Flow — Modul Ticketing
 
-## 1. Helpdesk/NOC/Sales — Submit Tiket Baru
+Lima halaman, tiga aktor. Peta cepat:
 
-1. Buka sidebar **TICKETING** → **New Ticket** (`/tickets/new`).
+| Halaman | Route | Siapa yang kerja di sini |
+|---|---|---|
+| New Ticket | `/tickets/new` | Helpdesk & NOC (worksheet bersama) |
+| Worksheet NOC | `/noc/worksheet` | NOC |
+| Dashboard NOC | `/noc/dashboard` | NOC (+ atasan, monitoring) |
+| Ticket Selesai | `/tickets/selesai` | semua pemegang `tickets.*` |
+| Ticket Dibatalkan | `/tickets/dibatalkan` | semua pemegang `tickets.*` |
+
+---
+
+## 1. Helpdesk/NOC — Submit Tiket Baru
+
+1. Sidebar **Ticketing** → **New Ticket** (`/tickets/new`).
 2. Pilih **Tipe Ticket** (MTN atau C-REQ) dan **Prioritas**.
-3. Ketik CID atau nama pelanggan di kolom **CID / Pelanggan** → hasil pencarian muncul (debounce 300ms, lewat `/api/tickets/lookup-customer`).
-4. Klik salah satu hasil → panel **Data Pelanggan** otomatis terisi 8 field: Nama, Alamat, No. HP, POP/Cabang, ODP, Paket, Perangkat Pelanggan, Koordinat (link Google Maps kalau ada).
-5. Isi **Detail Keluhan** (wajib) dan **Catatan Teknis** (opsional).
-6. Opsional: lampirkan bukti foto/PDF (maks 5 file, 5 MB/file).
-7. Klik **CREATE TICKET** → redirect ke halaman detail tiket (`/tickets/{id}`), pesan sukses menyebutkan nomor tiket dan nomor Task FOP yang otomatis dibuat.
-8. Tiket masuk ke bucket **Ticket Masuk** (status `draft`, belum ada teknisi) — menunggu FOP assign.
+3. Pilih **Kategori Issue** dari Master Issue (opsional — boleh "Lainnya (isi manual)"). Prioritas otomatis terisi dari `default_priority` kategori itu.
+4. Ketik CID atau nama pelanggan di kolom **CID / Pelanggan** → hasil pencarian muncul (debounce 300ms, lewat `/api/tickets/lookup-customer`).
+5. Klik salah satu hasil → panel **Data Pelanggan** otomatis terisi: Nama, Alamat, No. HP, POP/Cabang, ODP, Paket, Perangkat, Koordinat (link Google Maps kalau ada).
+   - Kalau pelanggan itu masih punya tiket aktif, muncul **peringatan kuning duplikat** (dicek server-side lewat `/api/tickets/duplicates`, jadi tiket lama yang sudah tergeser dari cap 30 panel tetap terdeteksi).
+6. Isi **Detail Keluhan** (wajib) dan **Catatan Teknis** (opsional).
+7. Opsional: lampirkan bukti foto/PDF (maks 5 file, 5 MB/file).
+8. Klik **CREATE TICKET** (atau `Ctrl+Enter`) → **tetap di halaman ini**, form auto-reset, tiket langsung muncul di panel kanan.
+9. Tiket masuk ke tab **Ticket** di panel List Task Ticketing — **belum ada Task FOP**, masih di tangan Helpdesk.
 
-## 2. FOP — Assign Teknisi ke Tiket yang Masuk
+> **Beda dari perilaku lama:** dulu setiap submit langsung membuat Task FOP. Sekarang tidak — Task FOP baru dibuat kalau tiketnya benar-benar dikirim ke FOP.
 
-1. Buka `/fop-tasks` — tiket dari Ticketing muncul di tabel dengan kategori MTN/C-REQ, status Draft.
-2. Klik tombol **Edit** pada baris tiket itu.
-3. Modal terbuka dalam **mode Ticketing** (otomatis terdeteksi karena tiket ini punya `ticket` terkait): panel CID/data pelanggan tampil **read-only**, Detail Keluhan/Catatan Teknis tampil sebagai teks (gak bisa diedit di sini — edit beneran lewat Ticketing).
-4. Pilih **Tanggal & Waktu** dan **Pilih Teknisi**.
-5. Simpan → `FopTask.status` otomatis naik dari `draft` ke `terjadwal`, `Task` eksekusi teknisi otomatis dibuat, tiket pindah dari bucket **Ticket Masuk** ke **Ticket di Proses**.
+## 2. Panel "List Task Ticketing" — 3 Tab
 
-## 3. FOP — Bikin Tiket MTN/C-REQ Langsung dari Task FOP
+Panel di kanan halaman New Ticket, memantau tiket yang sedang berjalan. Filternya per **siapa yang lagi pegang**, bukan per tahap pengerjaan:
 
-1. Buka `/fop-tasks` → klik **Tambah Task FOP**.
-2. Pilih **Tipe Task** = MTN atau C-REQ → form otomatis berubah ke mode Ticketing (field POP/Desa/Tugas/Issue generik disembunyikan).
-3. Cari & pilih pelanggan lewat CID — panel data pelanggan otomatis terisi, sama persis `/tickets/new`.
-4. Isi Detail Keluhan, Catatan Teknis (opsional), Lampiran (opsional).
-5. Pilih **Tanggal & Waktu** dan **Prioritas** (selalu wajib).
-6. **Pilih Teknisi** — opsional di sini:
-   - **Dikosongin** → tiket dibuat sebagai Draft, masuk bucket "Ticket Masuk", sama kayak submit helpdesk.
-   - **Diisi** → `FopTask` langsung `Terjadwal`, `Task` eksekusi langsung dibuat, gak mampir Draft.
-7. Simpan → redirect balik ke `/fop-tasks` (bukan ke halaman detail tiket), pesan sukses menyesuaikan (disebut "langsung dijadwalkan" atau "masuk ke Ticket Masuk").
+| Tab | Isi | Tombol aksi yang muncul |
+|---|---|---|
+| **Ticket** | Tiket yang masih di tangan pembuat, belum dikirim ke mana pun | Selesai, Ke NOC, Ke FOP |
+| **Assign NOC** | Sudah dikirim ke NOC — badge menunjukkan **Pending NOC** atau **OnCheck NOC** | Selesai, Ke FOP, Kembalikan (selama masih Pending) |
+| **Assign FOP** | Sudah dikirim ke FOP — pantau status Task FOP-nya | — (read-only, kendali ada di modul FOP) |
 
-## 4. Membatalkan Tiket
+Panel auto-refresh lewat Reverb saat ada perubahan dari user lain. Tombol **Refresh** manual jadi cadangan kalau Reverb tidak aktif. Kalau tiket aktif lebih dari 30, muncul indikator "+N tiket aktif lainnya".
 
-1. Pembatalan **cuma bisa dari halaman Task FOP** (`/fop-tasks`) — modul Ticketing sendiri sengaja gak punya tombol/endpoint cancel.
-2. Butuh permission `fop_tasks.cancel` (role owner/admin/fop secara default).
-3. Klik tombol **Cancel** pada baris tiket → isi alasan pembatalan (wajib) → konfirmasi.
-4. `FopTask.status` jadi `dibatalkan`, `Task` eksekusi ikut dibatalkan (kalau udah ada & masih aktif), dan **dua riwayat** ditulis sekaligus: satu di "Histori Status" Task FOP, satu di "Riwayat Ticketing".
-5. Tiket pindah ke bucket **Ticket Dibatalkan**.
+### Skenario A — Helpdesk selesaikan sendiri
 
-## 5. Melihat Detail Tiket
+1. Di tab **Ticket**, klik **Selesai** pada baris tiket.
+2. Dialog konfirmasi muncul dengan kolom **"Apa yang sudah dikerjakan?"** (opsional) — isi kalau mau tercatat di riwayat.
+3. Klik **Ya, Selesaikan** → baris hilang dari panel, tiket pindah ke halaman **Ticket Selesai**.
+
+### Skenario B — Helpdesk kirim ke NOC
+
+1. Klik **Ke NOC** → isi catatan buat NOC (opsional) → konfirmasi.
+2. Tiket pindah ke tab **Assign NOC**, statusnya **Pending NOC**.
+3. **Helpdesk masih bisa bertindak** di jendela ini — Selesai, Ke FOP, atau Batalkan tetap bisa selama NOC belum klik Oncheck.
+
+### Skenario C — Helpdesk kirim langsung ke FOP
+
+1. Klik **Ke FOP** → isi catatan (opsional) → konfirmasi.
+2. Task FOP baru (`TFOP-…`) otomatis dibuat berstatus Draft, tanpa teknisi.
+3. Tiket pindah ke tab **Assign FOP**. Sejak titik ini **semua aksi Ticketing tertutup** — kendali sepenuhnya di modul FOP.
+
+---
+
+## 3. NOC — Worksheet NOC
+
+Sidebar **Ticketing** → **Worksheet NOC** (`/noc/worksheet`). Satu halaman, dua tab.
+
+### Tab "Ticket Masuk" — tiket Pending NOC
+
+Tiket yang dikirim Helpdesk tapi **belum** di-Oncheck. Tombol yang tersedia:
+
+| Tombol | Efek |
+|---|---|
+| **Oncheck NOC** | NOC resmi ambil alih. Tiket pindah ke tab Ticket Diproses; Helpdesk kehilangan akses |
+| **Assign FOP** | Lempar ke FOP tanpa perlu Oncheck dulu (mis. jelas butuh teknisi lapangan) |
+| **Kembalikan** | Balikin ke Helpdesk (salah kirim/bukan ranah NOC) |
+| **Batalkan** | Batalkan tiket (alasan **wajib**) |
+
+**Tombol "Selesai" sengaja TIDAK ada di tab ini** — NOC wajib Oncheck dulu sebelum boleh menyelesaikan. Kalau dipaksa lewat request manual, server menolak dengan pesan *"NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket ini."*
+
+### Tab "Ticket Diproses" — tiket yang sudah di-Oncheck
+
+Tombol berubah jadi: **Selesai**, **Assign FOP**, **Kembalikan**, **Batalkan**.
+
+Alur NOC lengkap:
+
+1. Buka tab **Ticket Masuk** → klik **Oncheck NOC** pada tiket yang mau dikerjakan.
+2. Kerjakan perbaikan (konfigurasi/routing/dll).
+3. Buka tab **Ticket Diproses** → klik **Selesai** → isi **"Apa yang sudah dikerjakan?"** → konfirmasi.
+4. Kalau ternyata butuh lapangan: klik **Assign FOP** → Task FOP dibuat, tiket keluar dari worksheet NOC.
+
+> Tab yang tidak dimiliki izinnya tidak ditampilkan sama sekali. Kalau user cuma punya akses satu tab, membuka `/noc/worksheet` otomatis mengarahkan ke tab itu.
+
+---
+
+## 4. NOC — Dashboard NOC
+
+Sidebar **Ticketing** → **Dashboard NOC** (`/noc/dashboard`). Isinya:
+
+| Bagian | Isi |
+|---|---|
+| **Stat counter** | Pending NOC, OnCheck NOC, Selesai hari ini, Dibatalkan hari ini |
+| **Tiket Aktif NOC** | Tiket `handler=NOC` yang masih berjalan, diurut **paling lama menunggu di atas** + indikator umur — untuk melihat mana yang keteteran |
+| **Aktivitas Terbaru** | 20 kejadian terakhir dari `ticket_histories` (siapa mengerjakan apa) |
+| **Statistik per Issue** | 10 kategori keluhan terbanyak |
+| **Statistik per Daerah** | 10 kecamatan dengan komplain terbanyak |
+
+Semua di-scope POP user. Auto-refresh lewat Reverb; ada tombol **Refresh** manual.
+
+---
+
+## 5. Membatalkan Tiket
+
+Dua pintu, tergantung tiket sudah sampai FOP atau belum.
+
+### Pra-FOP (masih di Helpdesk/NOC)
+
+1. Klik **Batalkan** dari panel worksheet, Worksheet NOC, atau halaman detail tiket.
+2. Isi **Alasan pembatalan** — **wajib**, dialog menolak submit kalau kosong.
+3. Konfirmasi → tiket pindah ke halaman **Ticket Dibatalkan**, satu baris riwayat tercatat.
+
+Butuh permission `tickets.cancel` dan harus jadi pemegang tiket saat itu.
+
+### Pasca-FOP (sudah `handler=FOP`)
+
+1. Pembatalan **hanya dari** halaman Task FOP (`/fop-tasks`) — tombol Batalkan di sisi Ticketing sudah tidak muncul, dan endpoint-nya menolak.
+2. Butuh permission `fop_tasks.cancel` (owner/admin/fop).
+3. Isi alasan (wajib) → konfirmasi.
+4. `FopTask.status` jadi `dibatalkan`, `Task` eksekusi ikut dibatalkan kalau ada, dan **dua riwayat** ditulis sekaligus (Histori Status Task FOP + Riwayat Ticketing).
+
+---
+
+## 6. Melihat Detail Tiket
 
 **Dari sisi Ticketing** (`/tickets/{id}`):
-- Header: nomor tiket, tipe, status, prioritas, nama pelanggan, POP, **Assigned by** (pengirim), **Created** (waktu submit).
-- Info box link ke Task FOP terkait (kalau masih ada).
-- Panel snapshot data pelanggan (8 field, versi saat tiket dibuat).
-- Detail Keluhan & Catatan Teknis (versi utuh).
-- Dua kolom riwayat berdampingan: Riwayat Ticketing & Riwayat Task FOP.
-- Lampiran (kalau ada) — tombol Unduh per file.
 
-**Dari sisi Task FOP** (`/fop-tasks/history/{id}`, cuma buat category MTN/C-REQ yang nyambung ke tiket):
-- Section "Detail Ticket" di atas "Durasi & SLA Pengerjaan" — isinya sama persis panel di atas (CID, data pelanggan, keluhan, catatan teknis, lampiran, Assigned by/Created).
-- Section "Riwayat Ticketing" berdampingan dengan "Histori Status" (riwayat FOP) yang udah ada.
+- Header: nomor tiket, tipe, status (mis. *Pending NOC*, *OnCheck NOC*, *Selesai (NOC)*), prioritas, nama pelanggan, POP, **Assigned by**, **Created**.
+- Panel **Aksi Tiket** — tombol yang muncul mengikuti state & role (lihat flowchart.md § 7). Semua tombol membuka dialog konfirmasi + kolom alasan.
+- Info box link ke Task FOP terkait (kalau ada).
+- Panel snapshot data pelanggan (kondisi saat tiket dibuat).
+- Detail Keluhan & Catatan Teknis versi utuh.
+- Dua kolom riwayat berdampingan: **Riwayat Ticketing** & **Riwayat Task FOP**.
+- Lampiran — tombol Unduh per file (disk privat, dicek permission + POP scope).
+
+**Dari sisi Task FOP** (`/fop-tasks/history/{id}`, khusus MTN/C-REQ yang nyambung ke tiket):
+
+- Section "Detail Ticket": CID, data pelanggan, keluhan, catatan teknis, lampiran, Assigned by/Created.
+- Section "Riwayat Ticketing" berdampingan dengan "Histori Status".
 - Link "Buka di Ticketing →" balik ke `/tickets/{id}`.
-- FopTask kategori lain (SURVEY, PSB, O-REQ, dll) atau MTN/C-REQ yang dibuat manual (bukan dari Ticketing) **gak** menampilkan section ini sama sekali.
+- Kategori lain (SURVEY, PSB, O-REQ, dll) atau MTN/C-REQ yang dibuat manual **tidak** menampilkan section ini.
 
-## 6. Filter & Pencarian Daftar Tiket
+---
 
-Di `/tickets/{bucket}`:
+## 7. Filter & Pencarian (Halaman Arsip)
+
+Di `/tickets/selesai` dan `/tickets/dibatalkan`:
+
 - **Cari**: nomor tiket, CID, nama pelanggan, atau isi keluhan.
 - **Filter Tipe**: MTN atau C-REQ.
-- **Ticket Saya**: cuma tampilkan tiket yang dikirim user login sendiri.
-- Tab bucket (Masuk/Diproses/Selesai/Dibatalkan) di atas list, masing-masing dengan badge jumlah.
+- **Ticket Saya**: hanya tiket yang dikirim user login sendiri.
+- Tab navigasi antar dua halaman arsip di atas list (hanya yang user punya izinnya).
+
+---
+
+## 8. FOP — Bikin Tiket MTN/C-REQ Langsung dari Task FOP
+
+1. Buka `/fop-tasks` → klik **Tambah Task FOP**.
+2. Pilih **Tipe Task** = MTN atau C-REQ → form berubah ke mode Ticketing.
+3. Cari & pilih pelanggan lewat CID — panel data pelanggan terisi otomatis.
+4. Isi Detail Keluhan, Catatan Teknis, Lampiran (opsional).
+5. Pilih **Tanggal & Waktu** dan **Prioritas**.
+6. **Pilih Teknisi** — opsional:
+   - **Dikosongkan** → Task FOP dibuat sebagai Draft.
+   - **Diisi** → Task FOP langsung Terjadwal, `Task` eksekusi langsung dibuat.
+7. Simpan → redirect balik ke `/fop-tasks`.
+
+Tiket dari jalur ini langsung `handler=FOP` — tidak pernah mampir ke antrean Helpdesk/NOC.
+
+---
+
+**Last updated:** 2026-07-28

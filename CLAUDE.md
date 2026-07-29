@@ -54,7 +54,7 @@ php artisan horizon
 ### Service
 | Service | Tanggung jawab |
 |---|---|
-| `TicketService` | `create()` tiket → snapshot pelanggan → lampiran → **buat FopTask** → assign teknisi |
+| `TicketService` | Semua transisi status tiket: `create()` (snapshot pelanggan + lampiran, **tanpa** bikin FopTask) → `close()`/`cancel()`/`escalateToNoc()`/`onCheckNoc()`/`escalateToFop()`/`returnToHelpdesk()`. FopTask cuma kebentuk di `escalateToFop()` atau submit dari halaman Task FOP |
 | `TaskService` | task teknisi: `create/update/start/complete/setPending/cancel/reassignTeam/detectConflicts` + sync balik ke FopTask |
 | `FopTaskTeamService` | `rebuildTeamsForDate()` — tim harian FOP, dipanggil tiap jadwal berubah |
 | `CustomerWorkflowService` | transisi status pelanggan (`WorkflowTransition`) |
@@ -68,37 +68,54 @@ php artisan horizon
 ### Enum — jangan bikin string baru
 - `TaskStatus`: `draft`, `terjadwal`, `in_progress`, `selesai`, `dibatalkan`, `pending`
 - `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `C-REQ`, `O-REQ`, `INFR REQ`. `SURVEY`/`PSB`/`DEAC` = `autoOnlyValues()` — gak bisa dipilih manual, `DEAC` cuma lewat tombol "Ambil Alat" di List Putus Langganan. `RELOKASI` dihapus permanen dari sistem.
-- `TicketBucket`: `masuk`, `diproses`, `selesai`, `dibatalkan`
+- `TicketHandler`: `helpdesk`, `noc`, `fop` — siapa yang lagi pegang tiket. Beku permanen begitu `fop`.
+- `TicketHandlingStatus`: `open`, `closed`, `cancelled` — status internal tiket, cuma bermakna selama `handler` ≠ `fop`.
+- `TicketHistoryAction`: `dibuat`, `dieskalasi`, `dicek_noc`, `diselesaikan`, `dikembalikan`, `dibatalkan`
+- `TicketBucket`: `masuk`, `diproses`, `selesai`, `dibatalkan` — **klasifikasi, bukan route** (route `/tickets/{bucket}` sudah dihapus).
   → **Tiap `TaskStatus` baru wajib dipetakan ke bucket.** Ada test yang sengaja gagal kalau lupa.
 - `InvoiceStatus`: `belum_dibayar`, `sebagian`, `lunas`, `batal`
 - `WorkflowTransition` (14 state): `registered` → `waiting_survey` → `survey_in_progress` → `surveyed` → `waiting_acc` → `waiting_installation` → `installation_in_progress` → `installed` → `verification_admin` → `active`; cabang `revision_installation`, `rejected`, `suspended`, `terminated`
-- Lain: `ScopeType`, `InvoiceType`, `PaymentStatus`, `FopTaskPriority`, `NotificationType`, `TicketHistoryAction`, `DocumentType`, `FeatureType`, `ActionCode`, `Gender`, `UserStatus`
+- Lain: `ScopeType`, `InvoiceType`, `PaymentStatus`, `FopTaskPriority`, `NotificationType`, `DocumentType`, `FeatureType`, `ActionCode`, `Gender`, `UserStatus`
 
 ## Sinkronisasi Ticket ↔ FopTask ↔ Task
 
 Bagian paling rawan di repo ini. Tiga entitas, tiga nomor, sinkron dua arah.
 
 ```
-Ticket (TKT-YYYY-NNNN)
-  └─ TicketService::create()
-       └─ syncToFopTask()  →  FopTask (TFOP-YYYY-NNNN, status DRAFT)
-                                 ├─ ticket.fop_task_id  → FopTask
-                                 └─ fop_task.task_id    → Task (TASK-YYYY-NNNN)
-                                       └─ TaskService::syncToFopTask()
-                                            sync teknisi + task_date balik ke FopTask
-                                            lalu FopTaskTeamService::rebuildTeamsForDate()
-                                            untuk tanggal lama DAN tanggal baru
+Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
+  handler=HELPDESK, status=OPEN
+       │
+       ├─ close()/cancel()  → selesai/batal TANPA pernah nyentuh FOP
+       │
+       ├─ escalateToNoc()   → handler=NOC, noc_checked_at=NULL ("Pending NOC",
+       │                       Helpdesk MASIH boleh act)
+       │      └─ onCheckNoc() → noc_checked_at terisi, Helpdesk lepas kendali
+       │
+       └─ escalateToFop()   → SATU-SATUNYA titik FopTask kebentuk
+             └─ syncToFopTask() → FopTask (TFOP-YYYY-NNNN, status DRAFT)
+                                    ├─ ticket.fop_task_id → FopTask
+                                    ├─ ticket.handler = FOP  (TERMINAL)
+                                    └─ fop_task.task_id → Task (TASK-YYYY-NNNN)
+                                          └─ TaskService::syncToFopTask()
+                                               sync teknisi + task_date balik ke FopTask
+                                               lalu FopTaskTeamService::rebuildTeamsForDate()
+                                               untuk tanggal lama DAN tanggal baru
 ```
 
 Aturan:
 
-1. **`TFOP-` digenerate di dua tempat** — `TicketService::generateFopTaskNumber()` dan `FopTaskController::generateTaskNumber()`. Format wajib identik, keduanya nulis ke deret yang sama.
-2. **`fop_task.tugas` = `"{display_id}_{full_name}"`** (mis. `C1X4ARQ000631_Masudah Yuni Fitri`) — identitas pelanggan konsisten seluruh sistem, bukan label tipe tiket generik.
-3. **`fop_task.notes` cuma pointer pendek** (`"Ticket TKT-… — dikirim oleh …"`). Jangan salin `catatan_teknis` ke sini — itu bikin dua sumber kebenaran yang gampang menyimpang.
-4. **Riwayat pembatalan: satu aksi, dua riwayat, satu penulis per sisi.**
+1. **Tiket PUNYA kolom status sendiri** — `handler` (`TicketHandler`) + `status` (`TicketHandlingStatus`) + `noc_checked_at`. Selama `handler` ≠ FOP, status tiket **tidak** diturunkan dari FopTask. Jangan balik lagi ke asumsi lama "tiket gak punya status".
+2. **`handler=FOP` itu terminal buat sisi Ticketing** — `assertTicketStillOpen()` nolak semua aksi Ticketing begitu sampai sini. Pembatalan pasca-FOP wajib lewat `/fop-tasks`.
+3. **Window "Pending NOC"** — `Ticket::holderRoles()` adalah SATU-SATUNYA sumber "siapa yang boleh act": handler=NOC + `noc_checked_at` NULL ⇒ `['helpdesk','noc']`; setelah di-Oncheck ⇒ `['noc']`. Dipakai bareng `TicketService::assertActorOwnsTicket()` (otorisasi asli) dan `Ticket::actionFlagsFor()` (gerbang tombol). Jangan duplikasi logic ini di tempat ketiga.
+4. **`TFOP-` digenerate di dua tempat** — `TicketService::generateFopTaskNumber()` dan `FopTaskController::generateTaskNumber()`. Format wajib identik, keduanya nulis ke deret yang sama.
+5. **`fop_task.tugas` = `"{display_id}_{full_name}"`** (mis. `C1X4ARQ000631_Masudah Yuni Fitri`) — identitas pelanggan konsisten seluruh sistem, bukan label tipe tiket generik.
+6. **`fop_task.notes` cuma pointer pendek** (`"Ticket TKT-… — dikirim oleh …"`). Jangan salin `catatan_teknis` ke sini — itu bikin dua sumber kebenaran yang gampang menyimpang.
+7. **Riwayat pembatalan: satu aksi, dua riwayat, satu penulis per sisi.**
    - Sisi Ticket (`ticket_histories`) → **hanya** `FopTaskObserver`.
    - Sisi FOP (`fop_task_status_history`) → jalur `/tasks` ditulis `TaskObserver`; jalur `/fop-tasks` ditulis `FopTaskController::update()` (karena `TaskObserver` early-return begitu FopTask sudah `dibatalkan`).
    - **Jangan pindah-pindah penulisnya** — langsung jadi riwayat dobel.
+   - Pembatalan **pra-FOP** (`TicketService::cancel()`) cuma nulis `ticket_histories` — belum ada FopTask buat dicatat sisi lainnya. Prinsip "dua riwayat" cuma berlaku pasca-FOP.
+8. **Tiap halaman Ticketing punya permission sendiri** — `tickets.selesai.view`, `tickets.dibatalkan.view`, `noc_worksheet.masuk.view`, `noc_worksheet.diproses.view`, `noc_dashboard.view`. Jangan tambah halaman baru yang numpang `tickets.view` generik.
 
 Sebelum menyentuh alur ini, baca `docs/ticketing/business-logic.md` dan `docs/fop-task/analisa-sync-execution-task.md`.
 

@@ -6,7 +6,7 @@ Siklus hidup pelanggan dari registrasi sampai aktif/berhenti: **Registrasi → S
 
 | Dokumen | Isi |
 |---------|-----|
-| [business-logic.md](business-logic.md) | State machine, aturan transisi, guard tiap tahap, integrasi dengan Task/FopTask/Invoice |
+| [business-logic.md](business-logic.md) | State machine, aturan transisi, guard tiap tahap, integrasi dengan Task/FopTask/Invoice, §8 teknisi fieldwork page (2026-07-28) |
 | [flowchart.md](flowchart.md) | Alur registrasi→survey→verifikasi→pemasangan→aktivasi, alur reject/revisi/terminasi |
 | [user-flow.md](user-flow.md) | Langkah Sales/FOP/Teknisi/Admin di tiap tahap |
 | [database-schema.md](database-schema.md) | Tabel `customers`, `customer_surveys`, `customer_installations`, `customer_services`, dll |
@@ -51,6 +51,7 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 | Controller Pemasangan | `app/Http/Controllers/CustomerInstallationController.php` |
 | Controller Terminasi | `app/Http/Controllers/CustomerTerminationController.php` |
 | Controller Device/Dokumen | `app/Http/Controllers/CustomerDeviceController.php`, `CustomerDocumentController.php` |
+| **Controller Fieldwork (NEW 2026-07-28)** | **`app/Http/Controllers/CustomerFieldworkController.php`** — teknisi view/edit perangkat & pemasangan via `/customers/{id}/perangkat-pemasangan` (blok akses Detail Pelanggan umum) |
 | Registrasi | `app/Http/Controllers/CustomerController.php@store` |
 | Validasi input | `app/Http/Requests/CustomerRegistrationRequest.php`, `app/Services/CustomerValidationService.php` |
 | Event | `app/Events/SurveyStarted.php`, `SurveyCompleted.php`, `InstallationStarted.php`, `InstallationCompleted.php` |
@@ -60,8 +61,8 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 
 - [docs/fop-task](../fop-task/README.md) — tiap transisi ke `waiting_survey`/`waiting_installation` auto-bikin `Task` (via `CustomerWorkflowService`), yang lalu muncul di antrean FOP.
 - [docs/billing-pembayaran](../billing-pembayaran/README.md) — Verifikasi Admin (`finalVerify`) generate `Invoice` tipe `awal` sekaligus mengaktifkan `CustomerService`.
-- [docs/rbac](../rbac/README.md) — semua guard tahap di atas pakai permission granular `customers.detail.*`.
+- [docs/rbac](../rbac/README.md) — semua guard tahap di atas pakai permission granular `customers.detail.*`. Lihat juga [docs/rbac/customer-permission-hierarchy.md](../rbac/customer-permission-hierarchy.md) untuk detail segregasi 4 permission independen (List/Putus/Gagal/Detail) + fieldwork page (2026-07-28).
 
 ---
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-28 — added fieldwork page for technician device/installation data (separate from Detail Pelanggan per RBAC segregation)

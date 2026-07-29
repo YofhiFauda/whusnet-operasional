@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\TicketHandler;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
@@ -161,8 +162,10 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
     /**
      * Helpdesk gak punya fop_tasks.create — walau dia craft request dengan
      * technicians[] & origin=fop_tasks (misal lewat devtools), dua-duanya
-     * WAJIB diabaikan diam-diam. Ticket tetap dibuat normal (Draft), gak
-     * ke-assign, dan redirect tetap ke tickets.show (bukan fop-tasks.index).
+     * WAJIB diabaikan diam-diam. Ticket tetap dibuat normal (di tangan
+     * Helpdesk, BELUM ada FopTask sama sekali — FopTask cuma kebentuk kalau
+     * eksplisit dieskalasi), dan redirect tetap ke tickets.show (bukan
+     * fop-tasks.index).
      */
     public function test_helpdesk_cannot_self_assign_technicians_via_crafted_request(): void
     {
@@ -175,10 +178,8 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         $response->assertRedirect(route('tickets.show', $ticket));
 
-        $fopTask = $ticket->fopTask->refresh();
-        $this->assertSame(TaskStatus::DRAFT, $fopTask->status);
-        $this->assertNull($fopTask->task_id);
-        $this->assertCount(0, $fopTask->technicians);
+        $this->assertSame(TicketHandler::HELPDESK, $ticket->handler);
+        $this->assertNull($ticket->fopTask);
     }
 
     /**
@@ -191,11 +192,14 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         $ticket = Ticket::first();
         $response->assertRedirect(route('tickets.show', $ticket));
+        $this->assertNull($ticket->fopTask);
     }
 
     /**
      * Regresi: submit TANPA origin (dari /tickets/new biasa) tetap jalan
-     * persis seperti sebelumnya, gak kena pengaruh perubahan ini.
+     * persis seperti sebelumnya, gak kena pengaruh perubahan ini — beda dari
+     * dua test di atas, ini emang WAJIB gak pernah bikin FopTask (bukan cuma
+     * gara-gara origin/technicians diabaikan).
      */
     public function test_normal_ticketing_submission_without_origin_is_unaffected(): void
     {
@@ -206,7 +210,8 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         $ticket = Ticket::first();
         $response->assertRedirect(route('tickets.show', $ticket));
-        $this->assertSame(TaskStatus::DRAFT, $ticket->fopTask->status);
+        $this->assertSame(TicketHandler::HELPDESK, $ticket->handler);
+        $this->assertNull($ticket->fopTask);
     }
 
     /**

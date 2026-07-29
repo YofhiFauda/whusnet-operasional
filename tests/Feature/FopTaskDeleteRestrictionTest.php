@@ -147,6 +147,13 @@ class FopTaskDeleteRestrictionTest extends TestCase
 
         $ticket = Ticket::first();
 
+        // FopTask gak lagi auto-dibuat pas submit — eskalasi eksplisit ke FOP.
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        $ticket->refresh();
+
         $this->actingAs($this->fopUser)
             ->delete(route('fop-tasks.destroy', $ticket->fop_task_id))
             ->assertStatus(422);
@@ -231,6 +238,13 @@ class FopTaskDeleteRestrictionTest extends TestCase
         ])->assertRedirect();
 
         $ticket = Ticket::first();
+
+        // FopTask gak lagi auto-dibuat pas submit — eskalasi eksplisit ke FOP.
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        $ticket->refresh();
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
 

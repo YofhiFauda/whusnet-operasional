@@ -1,176 +1,348 @@
 # Flowchart — Modul Ticketing
 
-## 1. Alur Submit Tiket → Auto-Sync FopTask
+## 1. State Machine Tiket
+
+```
+                          POST /tickets
+                               │
+                               ▼
+                   ┌──────────────────────┐
+                   │  handler = HELPDESK  │
+                   │  status  = OPEN      │  ← tab "Ticket" di List Task Ticketing
+                   └──────────────────────┘
+                     │        │         │
+        ┌────────────┘        │         └──────────────┐
+        │ close()             │ escalateToNoc()        │ escalateToFop()
+        ▼                     ▼                        │
+  ┌───────────┐   ┌──────────────────────────┐         │
+  │  CLOSED   │   │ handler = NOC            │         │
+  └───────────┘   │ status  = OPEN           │         │
+        ▲         │ noc_checked_at = NULL    │         │
+        │         │ ── PENDING NOC ──        │         │
+        │         │ Helpdesk & NOC bisa act  │         │
+        │         └──────────────────────────┘         │
+        │            │       │        │                │
+        │            │       │        └────────────────┤ escalateToFop()
+        │            │       │ returnToHelpdesk()      │
+        │            │       └──────► balik ke HELPDESK│
+        │            │                (noc_checked_at  │
+        │            │                 di-reset NULL)  │
+        │            │ onCheckNoc()  [cuma role noc]   │
+        │            ▼                                  │
+        │  ┌──────────────────────────┐                │
+        │  │ handler = NOC            │                │
+        │  │ noc_checked_at = <ts>    │                │
+        │  │ ── ONCHECK NOC ──        │                │
+        │  │ CUMA NOC yang bisa act   │                │
+        │  └──────────────────────────┘                │
+        │            │       │        │                │
+        └────────────┘       │        └────────────────┤ escalateToFop()
+             close()         │ returnToHelpdesk()      │
+                             └──────► balik ke HELPDESK│
+                                                        ▼
+                                        ┌──────────────────────────────┐
+                                        │ handler = FOP  (TERMINAL)    │
+                                        │ FopTask DRAFT kebentuk       │
+                                        │ status tiket ikut FopTask    │
+                                        │ Semua aksi Ticketing DITOLAK │
+                                        └──────────────────────────────┘
+
+  cancel() bisa dari state HELPDESK / PENDING NOC / ONCHECK NOC → CANCELLED
+  (alasan WAJIB). Setelah handler=FOP, pembatalan pindah ke /fop-tasks.
+```
+
+## 2. Alur Submit Tiket
 
 ```
 POST /tickets (TicketController::store())
 │
-├─ Validasi: type ∈ {MTN, C-REQ}, customer_id, detail_keluhan, priority
+├─ Validasi: type ∈ {MTN, C-REQ}, customer_id, detail_keluhan, priority,
+│            issue_category_id (nullable), attachments (maks 5 × 5MB)
 │
-├─ Cek permission fop_tasks.create + technicians[] terisi?
-│     │
+├─ origin=fop_tasks DAN punya permission fop_tasks.create?
+│     YES → $fopOrigin = true
+│     NO  → $fopOrigin = false (field origin diabaikan diam-diam)
+│
+├─ technicians[] terisi DAN punya permission fop_tasks.create?
 │     YES → $assignment = ['technicians' => [...], 'task_date' => ...]
-│     NO  → $assignment = [] (diabaikan diam-diam, walau field-nya ada di payload)
+│     NO  → $assignment = [] (diabaikan diam-diam, walau ada di payload)
 │
 ▼
-TicketService::create($data, $actor, $attachments, $assignment)
+TicketService::create($data, $actor, $attachments, $assignment, $fopOrigin)
 │
 ├─ 1. Resolve Customer (applyUserScope + with pop_id/status/distribution_id)
 │      └─ pop_id null? → ValidationException "belum punya POP/Cabang"
 │
-├─ 2. Simpan Ticket (snapshotCustomer(): 8 kolom customer_* dibekukan)
+├─ 2. Simpan Ticket
+│      ├─ snapshotCustomer(): 8 kolom customer_* dibekukan
+│      ├─ handler = HELPDESK
+│      └─ status  = OPEN
 │
-├─ 3. syncToFopTask($ticket, $customer, $actor, $assignment['task_date'])
-│      └─ FopTask baru, status = DRAFT, category = ticket->type,
-│         issue = detail_keluhan (dipotong 255), notes = composeFopNotes()
-│
-├─ 4. $assignment['technicians'] terisi?
+├─ 3. $fopOrigin?
 │      │
-│      YES → assignTechnicians():
-│      │      ├─ sync teknisi ke FopTask
-│      │      ├─ FopTask.status = TERJADWAL
-│      │      ├─ TaskService::create() → Task eksekusi
-│      │      └─ FopTaskTeamService::rebuildTeamsForDate() → conflicts[]
+│      YES → syncToFopTask() → FopTask DRAFT
+│      │     ├─ ticket.fop_task_id = FopTask.id
+│      │     ├─ ticket.handler = FOP
+│      │     └─ $assignment['technicians'] terisi?
+│      │           YES → assignTechnicians():
+│      │                 ├─ sync teknisi, FopTask.status = TERJADWAL
+│      │                 ├─ TaskService::create() → Task eksekusi
+│      │                 └─ FopTaskTeamService::rebuildTeamsForDate()
+│      │           NO  → FopTask tetap DRAFT
 │      │
-│      NO  → FopTask tetap DRAFT, task_id null
+│      NO  → TIDAK ADA FopTask. Tiket berhenti di tangan Helpdesk.
+│            (beda dari perilaku lama yang selalu auto-sync)
 │
-├─ 5. Simpan attachments (disk 'local', privat)
+├─ 4. Simpan attachments (disk 'local', privat)
 │
-├─ 6. TicketHistory::create(action=DIBUAT, to_status=FopTask.status saat ini)
+├─ 5. TicketHistory::create(action=DIBUAT, to_status=handler saat ini)
 │
-└─ 7. Return ['ticket' => Ticket, 'conflicts' => array]
+└─ 6. Return → broadcast TicketQueueUpdated (SETELAH commit, toOthers())
        │
        ▼
-   Controller redirect:
-   - $assignment kosong & origin≠fop_tasks → tickets.show
-   - origin=fop_tasks (permission fop_tasks.create) → fop-tasks.index
+   Controller:
+   - wantsJson (worksheet)  → 201 + worksheetCardPayload
+   - origin=fop_tasks       → redirect fop-tasks.index
+   - selain itu             → redirect tickets.show
 ```
 
-## 2. Resolusi Bucket Ticketing
+## 3. Guard Aksi Tiket (berlaku untuk semua aksi)
 
 ```
-Ticket::scopeInBucket($bucket)
+POST /tickets/{id}/{aksi}
 │
-├─ whereHas('fopTask', status IN bucket->statusValues())
+├─ Middleware permission (tickets.update, atau tickets.cancel buat Batalkan)
+│      NO → 403
 │
-└─ bucket == DIBATALKAN? → OR whereNull('fop_task_id')  [tiket "Terputus"]
-
-┌─────────────┬───────────────────────────────────┐
-│   Bucket    │        Status FopTask              │
-├─────────────┼───────────────────────────────────┤
-│ Masuk       │ draft                               │
-│ Diproses    │ terjadwal, in_progress, pending      │
-│ Selesai     │ selesai                              │
-│ Dibatalkan  │ dibatalkan  + orphan (fop_task_id ∅)│
-└─────────────┴───────────────────────────────────┘
-```
-
-## 3. Transisi Draft → Terjadwal (Assign Teknisi Belakangan)
-
-```
-FOP buka modal Edit di /fop-tasks untuk FopTask Draft
+├─ authorizeTicketScope() — tiket ada dalam POP scope user?
+│      NO → 403
 │
-PUT /fop-tasks/{id}  (FopTaskController::update())
+▼
+TicketService::<aksi>()  — DB::transaction
 │
-├─ $originalStatus ditangkap SEBELUM field apa pun diubah
+├─ lockForUpdate()   ← WAJIB duluan; dua request bareng antre di sini,
+│                       bukan dua-duanya lolos guard sebelum commit (TOCTOU)
 │
-├─ ... update field lain (category/task_date/priority/dll) ...
-│
-├─ Blok technicians (jika $request->has('technicians')):
-│    ├─ sync teknisi
-│    ├─ $originalStatus === 'draft' && FopTask.status masih 'draft'
-│    │  && teknisi baru TIDAK kosong?
-│    │      │
-│    │      YES → FopTask.status = TERJADWAL
-│    │             + FopTaskStatusHistory::create(draft → terjadwal)
-│    │      NO  → status gak berubah (mis. sudah terjadwal, atau
-│    │             teknisi dikosongin lagi)
-│    │
-│    └─ (!empty(teknisi) || udah ada task_id) → buat/update Task eksekusi
-│
-└─ Ticket::scopeInBucket() otomatis baca status baru di request GET berikutnya
-   → tiket pindah dari "Ticket Masuk" ke "Ticket di Proses"
-```
-
-## 4. RBAC Decision Tree — Pembatalan
-
-```
-User klik Cancel di /fop-tasks
-│
-PUT /fop-tasks/{id}  status=dibatalkan
-│
-├─ category ∈ {SURVEY, PSB}?
-│      YES → 422 "harus lewat halaman Pelanggan" (SEMUA role, termasuk owner)
-│
-├─ hasPermission('fop_tasks.cancel')?
-│      NO  → 403
-│
-├─ FopTask.status berubah ke DIBATALKAN
-│      └─ FopTaskStatusHistory::create(from=$originalStatus, to=dibatalkan)
-│         [ditulis DI SINI karena TaskObserver punya guard early-return
-│          begitu FopTask sudah 'dibatalkan' — lihat business-logic.md §9]
-│
-├─ FopTask punya task_id & Task masih aktif?
+├─ assertActorOwnsTicket()
 │      │
-│      YES → TaskPolicy::cancelViaFopTask($linkedTask)
-│             │
-│             ├─ Task.task_type ∈ {SURVEY, PSB}? → 403 (invarian, cek
-│             │    terhadap TASK, bukan FopTask.category — cegah tiket
-│             │    MTN jadi jalan pintas cancel Task SURVEY)
-│             │
-│             ├─ hasPermission('fop_tasks.cancel')?  (BUKAN task.cancel!)
-│             │    NO → 403
-│             │
-│             └─ YES → TaskService::cancel($linkedTask, ...)
+│      ├─ full-access (owner/admin)? → lolos
+│      │
+│      └─ role aktor ∈ Ticket::holderRoles()?
+│            handler=HELPDESK            → ['helpdesk']
+│            handler=NOC, belum di-check → ['helpdesk','noc']   ← window pending
+│            handler=NOC, sudah di-check → ['noc']
+│            handler=FOP                 → []  (gak ada yang lolos)
+│                  NO → ValidationException "bukan di tangan Anda"
 │
-└─ FopTaskObserver::updated() terpicu (FopTask.status → dibatalkan)
-       │
-       └─ Ticket terkait ada? → TicketHistory::create(action=DIBATALKAN,
-          from_status, to_status, reason=cancel_reason, actor)
+├─ assertTicketStillOpen()
+│      handler=FOP        → tolak "udah di FOP, lihat Task FOP"
+│      status=CLOSED      → tolak "udah selesai"
+│      status=CANCELLED   → tolak "udah dibatalkan"
+│
+├─ [guard khusus per aksi — lihat § 4]
+│
+├─ Update kolom + TicketHistory::create(...)
+│
+└─ (setelah commit) broadcast TicketQueueUpdated
 ```
 
-## 5. Jalur Cancel dari `/tasks` (Cascade Naik)
+## 4. Guard Khusus per Aksi
+
+```
+close()
+└─ assertNocCheckedBeforeClose()
+     aktor role 'noc' (bukan full-access) DAN handler=NOC DAN
+     noc_checked_at NULL?
+        YES → tolak "NOC wajib Oncheck dulu sebelum bisa Selesaikan"
+        NO  → lanjut
+   [Helpdesk TIDAK kena guard ini — dia boleh close kapan pun
+    selama masih pegang tiket, termasuk di window pending]
+
+escalateToNoc()
+└─ handler harus HELPDESK
+     (NOC gak bisa kirim ke NOC lagi)
+
+onCheckNoc()
+├─ handler harus NOC
+├─ aktor harus role 'noc' atau full-access
+│    [sengaja BUKAN assertActorOwnsTicket() — guard itu di window
+│     pending juga meloloskan 'helpdesk', padahal Oncheck khusus NOC]
+└─ noc_checked_at harus masih NULL (idempotent guard)
+
+escalateToFop()
+└─ (tanpa guard handler tambahan — boleh dari Helpdesk maupun NOC)
+
+returnToHelpdesk()
+└─ handler harus NOC
+
+cancel()
+└─ reason WAJIB (validasi di controller: required|string|max:1000)
+```
+
+## 5. Resolusi Bucket (Dua Rezim)
+
+```
+Ticket::scopeInBucket($bucket) / Ticket::bucket()
+│
+├─ handler = FOP ?
+│    │
+│    YES ├─ fopTask ada?  → cocokkan fopTask.status ke bucket->statuses()
+│        └─ fopTask NULL? → bucket DIBATALKAN (orphan / "Terputus")
+│
+└─ handler = HELPDESK / NOC (rezim internal)
+     ├─ status = CLOSED     → SELESAI
+     ├─ status = CANCELLED  → DIBATALKAN
+     ├─ handler = HELPDESK  → MASUK
+     └─ handler = NOC       → DIPROSES
+
+┌─────────────┬──────────────────────────────┬────────────────────────────┐
+│   Bucket    │  handler=FOP (FopTask.status)│  Internal (helpdesk/noc)   │
+├─────────────┼──────────────────────────────┼────────────────────────────┤
+│ Masuk       │ draft                        │ handler=HELPDESK & OPEN    │
+│ Diproses    │ terjadwal, in_progress,      │ handler=NOC & OPEN         │
+│             │ pending                      │                            │
+│ Selesai     │ selesai                      │ status=CLOSED              │
+│ Dibatalkan  │ dibatalkan + orphan          │ status=CANCELLED           │
+└─────────────┴──────────────────────────────┴────────────────────────────┘
+```
+
+## 6. Peta Halaman & Filter
+
+```
+/tickets/new  — New Ticket (Worksheet Helpdesk & NOC)
+│
+├─ [kiri]  Form submit tiket
+└─ [kanan] Panel "List Task Ticketing" — filter per HANDLER, bukan bucket
+             ├─ Tab "Ticket"      → handler = helpdesk
+             ├─ Tab "Assign NOC"  → handler = noc  (Pending / OnCheck)
+             └─ Tab "Assign FOP"  → handler = fop  (pantau status FopTask)
+           Sumber: scopeActiveForWorksheet() — exclude Selesai & Dibatalkan
+           di AKAR query, bukan disaring client-side. Cap 30 terbaru.
+
+/noc/worksheet — entry point sidebar
+│
+└─ redirect ke tab pertama yang user punya permission-nya
+     ├─ punya noc_worksheet.masuk.view    → /noc/worksheet/masuk
+     ├─ else punya ...diproses.view       → /noc/worksheet/diproses
+     └─ gak punya dua-duanya              → 403
+
+/noc/worksheet/masuk     → handler=noc & status=open & noc_checked_at IS NULL
+/noc/worksheet/diproses  → handler=noc & status=open & noc_checked_at NOT NULL
+
+/tickets/selesai         → scopeInBucket(SELESAI)
+/tickets/dibatalkan      → scopeInBucket(DIBATALKAN)
+   (dua-duanya lewat TicketArchiveController, controller & view sendiri-sendiri)
+
+/noc/dashboard  — stat counter, list aktif+aging, feed aktivitas,
+                  statistik per Issue, statistik per Daerah
+```
+
+## 7. Tombol yang Muncul per State
+
+`Ticket::actionFlagsFor($user)` — **satu-satunya** sumber gerbang tampilan. Otorisasi asli tetap di `TicketService`.
+
+```
+$isHolder = full-access ATAU role ∈ holderRoles()
+$canAct   = handler ≠ FOP  DAN  status = OPEN
+            DAN punya tickets.update  DAN $isHolder
+
+can_close            = $canAct  DAN BUKAN (pending NOC & aktor role noc)
+can_escalate_noc     = $canAct  DAN handler = HELPDESK
+can_escalate_fop     = $canAct
+can_return_to_helpdesk = $canAct DAN handler = NOC
+can_cancel           = $canAct  DAN punya tickets.cancel
+can_oncheck_noc      = isPendingNoc() DAN punya tickets.update
+                       DAN (full-access ATAU role noc)
+```
+
+Hasilnya per state:
+
+| State | Helpdesk lihat | NOC lihat |
+|---|---|---|
+| handler=HELPDESK | Selesai, Ke NOC, Ke FOP, Batalkan | — (bukan pemegang) |
+| Pending NOC | Selesai, Ke FOP, Kembalikan*, Batalkan | **Oncheck NOC**, Ke FOP, Kembalikan, Batalkan (Selesai **tidak** muncul) |
+| OnCheck NOC | — (kehilangan akses) | Selesai, Ke FOP, Kembalikan, Batalkan |
+| handler=FOP | — | — |
+
+\* `can_return_to_helpdesk` hanya syarat `handler=NOC`, jadi secara teknis muncul juga buat Helpdesk di window pending; tanpa efek berarti karena tiket memang balik ke dia sendiri.
+
+## 8. RBAC Decision Tree — Pembatalan
+
+```
+                    Tiket mau dibatalkan
+                            │
+              ┌─────────────┴──────────────┐
+        handler = helpdesk/noc        handler = fop
+              │                             │
+              ▼                             ▼
+   POST /tickets/{id}/cancel      PUT /fop-tasks/{id} status=dibatalkan
+              │                             │
+   ├─ permission tickets.cancel?  ├─ category ∈ {SURVEY, PSB}?
+   │     NO → 403                 │     YES → 422 (semua role, termasuk owner)
+   │                              │
+   ├─ authorizeTicketScope()      ├─ permission fop_tasks.cancel?
+   │     NO → 403                 │     NO → 403
+   │                              │
+   ├─ reason kosong?              ├─ FopTask.status = DIBATALKAN
+   │     YES → 422                │    + FopTaskStatusHistory (ditulis DI SINI,
+   │                              │      di luar guard TaskObserver)
+   ├─ assertActorOwnsTicket()     │
+   ├─ assertTicketStillOpen()     ├─ punya task_id & Task masih aktif?
+   │                              │    YES → TaskPolicy::cancelViaFopTask()
+   ▼                              │          ├─ Task.task_type ∈ {SURVEY,PSB}? → 403
+   status = CANCELLED             │          │   (dicek terhadap TASK, bukan
+   + TicketHistory(dibatalkan)    │          │    FopTask.category — cegah tiket MTN
+   [1 riwayat]                    │          │    jadi jalan pintas cancel SURVEY)
+                                  │          └─ permission fop_tasks.cancel?
+                                  │              (BUKAN task.cancel!) NO → 403
+                                  │
+                                  └─ FopTaskObserver::updated() terpicu
+                                       └─ TicketHistory(dibatalkan, reason)
+                                     [2 riwayat: FOP + Ticket]
+```
+
+## 9. Jalur Cancel dari `/tasks` (Cascade Naik)
 
 ```
 Task dibatalkan langsung dari /tasks (TaskService::cancel())
 │
 ├─ TaskObserver::updated() terpicu
-│      │
-│      ├─ FopTask terkait status SUDAH 'dibatalkan'? → early return
+│      ├─ FopTask terkait SUDAH 'dibatalkan'? → early return
 │      │   (guard proteksi override manual — TIDAK berlaku di sini karena
-│      │    FopTask BELUM dibatalkan saat Task ini yang duluan dibatalkan)
-│      │
-│      └─ Sync FopTask.status = dibatalkan (copy dari Task.status)
-│         + FopTaskStatusHistory::create() [jalur normal TaskObserver,
-│           TIDAK kena guard karena FopTask baru berubah SEKARANG]
+│      │    FopTask BELUM dibatalkan saat Task yang duluan dibatalkan)
+│      └─ Sync FopTask.status = dibatalkan + FopTaskStatusHistory
 │
-└─ FopTaskObserver::updated() terpicu (FopTask.status → dibatalkan)
-       └─ Ticket terkait → TicketHistory::create(action=DIBATALKAN)
+└─ FopTaskObserver::updated() terpicu
+       └─ Ticket terkait → TicketHistory(action=DIBATALKAN)
 ```
 
-## 6. Bug CID Mentah — Root Cause Visual
+## 10. Auto-Refresh Realtime
 
 ```
-GET /tickets/masuk
+TicketService::<aksi>()  — DB::transaction { ... } COMMIT
 │
-TicketController::index()
-│
-├─ Ticket::with(['customer:id,full_name,cid,customer_code', ...])
-│                            ↑
-│              pop_id TIDAK ikut ke-select!
-│
-▼
-Blade: $ticket->customer->display_id
-│
-Customer::getDisplayIdAttribute()
-│
-├─ $pop = $this->pop;   ← relasi butuh pop_id, tapi kolomnya gak ke-load
-├─ if (!$pop) return $this->customer_code;   ← SELALU masuk sini
-│
-▼
-Hasil: "RQ000007" (bare) — padahal customers.cid = "C1X4CRQ000007"
+└─ broadcast(new TicketQueueUpdated($popId))->toOthers()
+   [SETELAH commit, bukan di dalam closure — gak boleh nembak kalau rollback]
+        │
+        ▼
+   Channel private tickets.{popId}
+   [otorisasi: EffectiveAccessService::hasAllPopAccess()/getAllowedPopIds()
+    — jalur POP-scope yang BENAR, bukan $user->pops() legacy]
+        │
+        ├─ Panel List Task Ticketing (/tickets/new)
+        │    └─ refreshWorksheet() → GET /api/tickets/worksheet-tasks
+        │       → replace array `tasks` (+ worksheetTotalCount)
+        │
+        └─ Dashboard NOC (/noc/dashboard)
+             └─ refetch window.location.href → DOMParser
+                → innerHTML-swap per container
+                  (stat-cards / active-tickets / activity-feed /
+                   issue-stats / region-stats)
 
-FIX: select tambah pop_id, status, distribution_id
-     + eager-load customer.pop:id,name,cid_prefix
-     → resolveDisplayId() jalan normal, balikin CID lengkap
+Kalau Reverb gak jalan (BROADCAST_CONNECTION ≠ reverb): sistem tetap normal,
+auto-refresh diam-diam mati, fallback ke tombol "Refresh" manual.
 ```
+
+---
+
+**Last updated:** 2026-07-28

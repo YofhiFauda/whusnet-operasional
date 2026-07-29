@@ -79,8 +79,10 @@ class RestoredFailedCustomerStaysVisibleTest extends TestCase
         $verificationList->assertStatus(200);
         $verificationList->assertSee($customer->full_name);
 
-        // Dan tidak lagi nyangkut di daftar Gagal.
-        $failedList = $this->get('/customers?status_group=failed');
+        // Dan tidak lagi nyangkut di daftar Gagal (route + permission sendiri
+        // sekarang — lihat CustomerFailedController).
+        $failedList = $this->get(route('customers.failed'));
+        $failedList->assertStatus(200);
         $failedList->assertDontSee($customer->full_name);
     }
 

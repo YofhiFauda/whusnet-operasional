@@ -35,11 +35,21 @@ class CustomerInstallationController extends Controller
             ->latest('id')
             ->first();
 
-        if ($task) {
-            abort_unless($task->teamMembers->pluck('user_id')->contains(auth()->id()), 403);
-        }
+        // WAJIB — sebelumnya cuma dicek kalau $task ketemu (`if ($task) {...}`),
+        // jadi teknisi mana pun yang punya permission generik
+        // customers.detail.installation.update bisa mulai pemasangan pelanggan
+        // MANA PUN tanpa pernah dijadwalkan FOP (bug RBAC — null Task paling
+        // sering kejadian justru karena Task-nya masih Draft, BELUM
+        // dijadwalkan, bukan berarti "gak perlu dicek"). hasFullAccess() tetap
+        // boleh override buat intervensi manual Owner/Admin.
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda belum dijadwalkan untuk pemasangan pelanggan ini — tunggu penjadwalan dari FOP sebelum memulai pemasangan.'
+        );
 
-        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [];
+        $memberIds = $task ? $task->teamMembers()->pluck('user_id')->toArray() : [auth()->id()];
         if (! in_array(auth()->id(), $memberIds)) {
             $memberIds[] = auth()->id();
         }
@@ -139,6 +149,23 @@ class CustomerInstallationController extends Controller
             return redirect()->route('verifications.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan pemasangan.');
         }
 
+        // Guard assignment sama kayak start() — permission generik
+        // customers.detail.installation.update gak cukup, wajib jadi anggota
+        // tim Task yang lagi jalan. Berlaku buat SEMUA non-full-access,
+        // termasuk NOC (keputusan eksplisit: no exemption).
+        $task = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($task && $task->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
+        );
+
         $installation = $customer->installations()->latest()->first();
         if (! $installation || ! $installation->started_at) {
             return redirect()->route('verifications.queue')->with('error', 'Anda harus menekan tombol "Start Proses" terlebih dahulu untuk memulai waktu pemasangan.');
@@ -161,6 +188,22 @@ class CustomerInstallationController extends Controller
                 || auth()->user()->hasPermission('customers.detail.installation.validate'),
             403,
             'Data pemasangan pelanggan ini sudah melewati tahap pemasangan dan tidak dapat diubah oleh role Anda.'
+        );
+
+        // Guard assignment sama kayak start()/report() — SEMUA non-full-access
+        // wajib jadi anggota tim Task yang lagi jalan, termasuk NOC (gak ada
+        // pengecualian, keputusan eksplisit biar konsisten satu alur).
+        $assignmentTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($assignmentTask && $assignmentTask->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
         );
 
         $validated = $request->validate([

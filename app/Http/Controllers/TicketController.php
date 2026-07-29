@@ -4,120 +4,163 @@ namespace App\Http\Controllers;
 
 use App\Enums\FopTaskPriority;
 use App\Enums\TaskType;
-use App\Enums\TicketBucket;
+use App\Enums\TicketHandler;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketAttachment;
+use App\Models\TicketIssueCategory;
 use App\Services\TicketService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Ticketing — tiket internal PERUSAHAAN (helpdesk/NOC/sales/admin/dll),
- * berbeda dari FopTask yang internal FOP. Tiap tiket yang masuk otomatis
- * memunculkan FopTask baru (status Draft) di halaman Task FOP —
- * lihat TicketService::create().
+ * berbeda dari FopTask yang internal FOP. Tiket lahir di tangan Helpdesk —
+ * FopTask BARU kebentuk kalau eksplisit dieskalasi ke FOP (lihat
+ * TicketService::escalateToFop()), atau kalau FOP sendiri yang submit
+ * langsung dari halaman Task FOP (lihat TicketService::create()).
  */
 class TicketController extends Controller
 {
     public function __construct(private readonly TicketService $ticketService) {}
 
     /**
-     * Daftar tiket ala Gmail, per bucket submenu (Masuk / Diproses / Selesai /
-     * Dibatalkan). Bucket-nya nentuin status FopTask mana yang ditarik —
-     * lihat TicketBucket.
+     * Cap tampilan panel worksheet — bukan cap TOTAL tiket aktif. Kalau lebih
+     * dari ini, worksheetTotalActiveCount() bakal beda dari count(initialTasks)
+     * dan Blade nampilin indikator "+N lainnya" (Gap #4).
      */
-    public function index(Request $request, string $bucket = TicketBucket::MASUK->value)
-    {
-        abort_unless(auth()->user()->hasPermission('tickets.view'), 403);
-
-        $activeBucket = TicketBucket::tryFrom($bucket) ?? TicketBucket::MASUK;
-
-        $query = Ticket::query()
-            ->applyUserScope()
-            ->inBucket($activeBucket)
-            ->with([
-                // pop_id/status/distribution_id WAJIB ikut ke-select — dipakai
-                // Customer::getDisplayIdAttribute() buat nebak format CID lengkap
-                // (Pop::resolveDisplayId()). Tanpa kolom-kolom ini, $customer->pop
-                // selalu null (FK-nya gak ke-load) dan display_id diam-diam jatuh
-                // ke customer_code mentah (mis. "RQ000007" tanpa prefix POP/
-                // distribusi), padahal customers.cid udah nyimpen CID lengkap
-                // yang benar (mis. "C1X4CRQ000007").
-                'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id',
-                'customer.pop:id,name,cid_prefix',
-                'creator:id,name',
-                'pop:id,name',
-                'fopTask:id,task_number,status',
-            ])
-            ->withCount('attachments');
-
-        if ($search = $request->query('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('ticket_number', 'like', "%{$search}%")
-                    ->orWhere('detail_keluhan', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($c) use ($search) {
-                        $c->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('cid', 'like', "%{$search}%")
-                            ->orWhere('customer_code', 'like', "%{$search}%");
-                    });
-            });
-        }
-
-        if ($type = $request->query('type')) {
-            $query->where('type', $type);
-        }
-
-        // "Ticket Saya" — riwayat tiket yang dikirim user login sendiri.
-        if ($request->boolean('mine')) {
-            $query->where('created_by', auth()->id());
-        }
-
-        $tickets = $query->latest('created_at')->paginate(20)->withQueryString();
-
-        return view('tickets.index', [
-            'tickets' => $tickets,
-            'activeBucket' => $activeBucket,
-            'bucketCounts' => $this->bucketCounts(),
-            'typeOptions' => TaskType::ticketOptions(),
-        ]);
-    }
+    private const WORKSHEET_DISPLAY_LIMIT = 30;
 
     /**
-     * Halaman form ticket baru.
+     * Halaman form ticket baru — "Worksheet Helpdesk", pengganti pencatatan
+     * manual Excel (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD). Dropdown
+     * kategori dari Master Issue + panel kanan "List Task Ticketing" diisi
+     * data awal server-side, auto-refresh lewat broadcast Reverb
+     * (App\Events\TicketQueueUpdated, lihat worksheetJson()).
      */
     public function create()
     {
         abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
 
+        $issueCategories = TicketIssueCategory::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name', 'default_priority', 'sla_source'])
+            ->map(fn (TicketIssueCategory $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'default_priority' => $c->default_priority->value,
+                'sla_source' => $c->sla_source,
+            ])
+            ->values()
+            ->all();
+
         return view('tickets.create', [
             'typeOptions' => TaskType::ticketOptions(),
             'priorityOptions' => FopTaskPriority::cases(),
+            'issueCategories' => $issueCategories,
+            'initialTasks' => $this->worksheetTasks(),
+            'worksheetTotalCount' => $this->worksheetTotalActiveCount(),
+            'allowedPopIds' => Pop::forUser(auth()->user())->pluck('id'),
         ]);
     }
 
     /**
-     * Jumlah tiket per bucket buat badge di header — dihitung sekali, sekali
-     * query per bucket, dalam scope POP user yang sama kayak list-nya.
-     *
-     * @return array<string, int>
+     * Endpoint refresh panel worksheet — dipanggil Alpine pas nerima broadcast
+     * TicketQueueUpdated (Gap #3) atau klik tombol Refresh manual. Bentuk
+     * respons SAMA PERSIS field-nya sama initialTasks (server-side) biar
+     * Alpine tinggal replace array `tasks`, gak ada "lompat" bentuk.
      */
-    private function bucketCounts(): array
+    public function worksheetJson(): JsonResponse
     {
-        $counts = [];
+        abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
 
-        foreach (TicketBucket::cases() as $bucket) {
-            $counts[$bucket->value] = Ticket::query()
-                ->applyUserScope()
-                ->inBucket($bucket)
-                ->count();
-        }
+        return response()->json([
+            'tasks' => $this->worksheetTasks(),
+            'total' => $this->worksheetTotalActiveCount(),
+        ]);
+    }
 
-        return $counts;
+    /**
+     * Snapshot tiket terbaru (scope POP user) buat initial load panel kanan
+     * worksheet. Bentuknya sengaja sama persis field-nya sama card yang
+     * di-prepend submitForm() di Alpine — biar item hasil submit gak "lompat"
+     * bentuk begitu nanti disusul broadcast asli.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function worksheetTasks(): array
+    {
+        return Ticket::query()
+            ->applyUserScope()
+            ->activeForWorksheet()
+            ->with([
+                'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id',
+                'customer.pop:id,name,cid_prefix',
+                'issueCategory:id,name',
+                'fopTask:id,task_number,status',
+                'creator:id,name',
+                'histories.actor:id,name',
+            ])
+            ->latest('created_at')
+            ->limit(self::WORKSHEET_DISPLAY_LIMIT)
+            ->get()
+            ->map(fn (Ticket $ticket) => $this->worksheetCardPayload($ticket))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Total tiket aktif (scope POP user) — dibandingkan sama count(worksheetTasks())
+     * buat nentuin apakah perlu nampilin indikator "+N lainnya, lihat semua"
+     * (Gap #4: cap 30 sebelumnya diem-diem nyembunyiin tiket tanpa indikator).
+     */
+    private function worksheetTotalActiveCount(): int
+    {
+        return Ticket::query()
+            ->applyUserScope()
+            ->activeForWorksheet()
+            ->count();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function worksheetCardPayload(Ticket $ticket): array
+    {
+        $customer = $ticket->customer;
+
+        return [
+            'id' => $ticket->id,
+            'code' => $ticket->ticket_number,
+            'priority' => $ticket->priority->value,
+            'title' => $ticket->issueCategory?->name ?? Str::limit($ticket->detail_keluhan, 60),
+            'desc' => $ticket->detail_keluhan,
+            'time' => $ticket->created_at->diffForHumans(),
+            'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code) ?: '—',
+            'customer_name' => $customer?->full_name ?? $ticket->customer_name ?? '—',
+            'customer_phone' => $customer?->primary_phone ?? $ticket->customer_phone ?? '—',
+            'issue_category' => $ticket->issueCategory?->name,
+            'bucket' => $ticket->bucket()->value,
+            'handler' => $ticket->handler->value,
+            'actions' => $ticket->actionFlagsFor(auth()->user()),
+            // Atribusi "siapa ngapain" — Ticket::closedBy()/escalatedToNocBy()/
+            // escalatedToFopBy() (dari ticket_histories, tanpa query baru,
+            // relasi 'histories.actor' udah eager-loaded pemanggil).
+            'created_by' => $ticket->creator?->name,
+            'closed_by' => $ticket->closedBy()?->name,
+            'escalated_noc_by' => $ticket->escalatedToNocBy()?->name,
+            'escalated_fop_by' => $ticket->escalatedToFopBy()?->name,
+            'returned_to_helpdesk_by' => $ticket->returnedToHelpdeskBy()?->name,
+        ];
     }
 
     public function show(Ticket $ticket)
@@ -147,6 +190,10 @@ class TicketController extends Controller
         $validated = $request->validate([
             'type' => ['required', 'string', Rule::in(TaskType::ticketValues())],
             'customer_id' => ['required', 'exists:customers,id'],
+            // Nullable — dropdown boleh "Lainnya (isi manual)", detail_keluhan
+            // tetap satu-satunya sumber klasifikasi buat kasus itu (rancangan
+            // bagian C RANCANGAN_MASTER_ISSUE_TICKETING.md).
+            'issue_category_id' => ['nullable', 'integer', 'exists:ticket_issue_categories,id'],
             'detail_keluhan' => ['required', 'string', 'max:2000'],
             'catatan_teknis' => ['nullable', 'string', 'max:2000'],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
@@ -165,6 +212,15 @@ class TicketController extends Controller
             'attachments.*.mimes' => 'Lampiran harus berupa gambar (jpg/png/webp) atau PDF.',
         ]);
 
+        // Submit langsung dari halaman Task FOP — satu-satunya jalur non-FOP-
+        // origin di mana FopTask masih boleh kebentuk di titik create() ini
+        // juga (lihat TicketService docblock). Origin cuma dihonor buat aktor
+        // yang emang berwenang bikin Task FOP — gak ada insentif nyata buat
+        // spoofing (cuma ngubah tujuan redirect, bukan buka akses baru), tapi
+        // tetap dikunci permission yang sama biar konsisten satu aturan.
+        $fromFopTasksPage = $request->input('origin') === 'fop_tasks'
+            && auth()->user()->hasPermission('fop_tasks.create');
+
         // Penugasan teknisi langsung cuma dihonor buat aktor yang emang
         // berwenang bikin/assign Task FOP (fop_tasks.create). Kalau bukan —
         // helpdesk/sales/dll yang submit dari /tickets/new biasa, atau
@@ -182,20 +238,23 @@ class TicketController extends Controller
             $validated,
             auth()->user(),
             $request->file('attachments', []),
-            $assignment
+            $assignment,
+            $fromFopTasksPage
         );
 
         $ticket = $result['ticket'];
 
-        // Submit dari halaman Task FOP — balikin ke situ juga (bukan
-        // tickets.show), gak peduli teknisi diisi atau dikosongin (biar masuk
-        // Ticket Masuk dulu). Origin cuma dihonor buat aktor yang emang
-        // berwenang bikin Task FOP, sama kayak gate assignment di atas —
-        // gak ada insentif nyata buat spoofing (cuma ngubah tujuan redirect,
-        // bukan buka akses baru), tapi tetap dikunci permission yang sama
-        // biar konsisten satu aturan.
-        $fromFopTasksPage = $request->input('origin') === 'fop_tasks'
-            && auth()->user()->hasPermission('fop_tasks.create');
+        // Worksheet Helpdesk (rancangan bagian D) submit via fetch() JSON —
+        // stay-on-page, BUKAN PRG redirect. Fallback non-JS (mis. form FOP di
+        // /fop-tasks yang submit native POST) tetap lewat jalur di bawah,
+        // gak kena cabang ini sama sekali karena gak kirim Accept: application/json.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ticket' => $this->worksheetCardPayload($ticket->fresh([
+                    'customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor',
+                ])) + ['fop_task_number' => $ticket->fopTask?->task_number],
+            ], 201);
+        }
 
         if ($fromFopTasksPage) {
             $message = $ticket->fopTask->task_id
@@ -213,7 +272,180 @@ class TicketController extends Controller
 
         return redirect()
             ->route('tickets.show', $ticket)
-            ->with('success', "Ticket {$ticket->ticket_number} terkirim. Task FOP {$ticket->fopTask?->task_number} otomatis dibuat.");
+            ->with('success', "Ticket {$ticket->ticket_number} terkirim ke Helpdesk. Selesaikan sendiri atau kirim ke NOC/FOP dari halaman detail.");
+    }
+
+    /**
+     * Helpdesk/NOC selesaikan tiket sendiri — Skenario A worksheet (Helpdesk),
+     * juga dipakai NOC pas berhasil perbaiki tanpa lapangan.
+     */
+    public function close(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.update'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $this->ticketService->close($ticket, auth()->user(), $validated['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return $this->respondToTicketActionError($request, $e);
+        }
+
+        $message = "Ticket {$ticket->ticket_number} berhasil diselesaikan.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+            ]);
+        }
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    /**
+     * Helpdesk kirim ke NOC (Skenario B), atau Helpdesk/NOC kirim ke FOP
+     * (Skenario C worksheet + skenario NOC gagal perbaiki).
+     */
+    public function escalate(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.update'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'target' => ['required', 'string', Rule::in(['noc', 'fop'])],
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            if ($validated['target'] === TicketHandler::FOP->value) {
+                $fopTask = $this->ticketService->escalateToFop($ticket, auth()->user(), $validated['reason'] ?? null);
+                $message = "Ticket {$ticket->ticket_number} dikirim ke FOP, Task FOP {$fopTask->task_number} dibuat.";
+            } else {
+                $this->ticketService->escalateToNoc($ticket, auth()->user(), $validated['reason'] ?? null);
+                $message = "Ticket {$ticket->ticket_number} dikirim ke NOC.";
+            }
+        } catch (ValidationException $e) {
+            return $this->respondToTicketActionError($request, $e);
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+            ]);
+        }
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    /**
+     * NOC resmi ambil alih tiket yang lagi "pending" (baru dikirim Helpdesk,
+     * belum di-check) — sebelum ini Helpdesk masih pegang kendali penuh
+     * (lihat Ticket::holderRoles()/isPendingNoc()).
+     */
+    public function onCheckNoc(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.update'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $this->ticketService->onCheckNoc($ticket, auth()->user(), $validated['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return $this->respondToTicketActionError($request, $e);
+        }
+
+        $message = "Ticket {$ticket->ticket_number} di-check NOC.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+            ]);
+        }
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    /**
+     * NOC kembaliin tiket ke Helpdesk — Gap #7 (docs/plan/analisa-efektivitas-worksheet-ticketing.md),
+     * jalur pemulihan kalau NOC salah pencet/salah terima tiket sebelumnya.
+     */
+    public function returnToHelpdesk(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.update'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $this->ticketService->returnToHelpdesk($ticket, auth()->user(), $validated['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return $this->respondToTicketActionError($request, $e);
+        }
+
+        $message = "Ticket {$ticket->ticket_number} dikembalikan ke Helpdesk.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+            ]);
+        }
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    /**
+     * Helpdesk/NOC batalkan tiket yang masih ditangani sendiri (belum pernah
+     * ke FOP). Reason wajib diisi — beda dari close() yang opsional, karena
+     * membatalkan keluhan pelanggan tanpa alasan riskan buat audit. Tiket
+     * yang udah `handler=FOP` TETAP dibatalkan lewat modul FOP (/fop-tasks),
+     * ditolak di sini oleh TicketService::assertTicketStillOpen().
+     */
+    public function cancel(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.cancel'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $this->ticketService->cancel($ticket, auth()->user(), $validated['reason']);
+        } catch (ValidationException $e) {
+            return $this->respondToTicketActionError($request, $e);
+        }
+
+        $message = "Ticket {$ticket->ticket_number} dibatalkan.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $message,
+                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
+            ]);
+        }
+
+        return redirect()->route('tickets.show', $ticket)->with('success', $message);
+    }
+
+    private function respondToTicketActionError(Request $request, ValidationException $e): RedirectResponse|JsonResponse
+    {
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+        }
+
+        return back()->withErrors($e->errors());
     }
 
     public function download(TicketAttachment $attachment): StreamedResponse
@@ -251,6 +483,40 @@ class TicketController extends Controller
             ->get();
 
         return response()->json($customers->map(fn (Customer $c) => $this->customerPayload($c)));
+    }
+
+    /**
+     * Tiket open (bucket Masuk/Diproses) milik satu customer — server-side,
+     * TANPA kena cap panel worksheet. Gap #5 (docs/plan/analisa-efektivitas-worksheet-ticketing.md)
+     * — sebelumnya deteksi duplikat cuma nyisir array `tasks` Alpine yang
+     * kena cap 30, jadi tiket lama yang udah kegeser dari cap gak kedeteksi.
+     * activeForWorksheet() PERSIS sama cakupannya sama bucket Masuk+Diproses
+     * gabungan (lihat Ticket::scopeActiveForWorksheet() docblock).
+     */
+    public function duplicates(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
+
+        $customerId = $request->query('customer_id');
+
+        if (! $customerId) {
+            return response()->json([]);
+        }
+
+        $tickets = Ticket::query()
+            ->applyUserScope()
+            ->where('customer_id', $customerId)
+            ->activeForWorksheet()
+            ->with('fopTask:id,status')
+            ->get()
+            ->map(fn (Ticket $ticket) => [
+                'id' => $ticket->id,
+                'code' => $ticket->ticket_number,
+                'bucket' => $ticket->bucket()->value,
+            ])
+            ->values();
+
+        return response()->json($tickets);
     }
 
     /**

@@ -5,7 +5,10 @@ namespace App\Services;
 use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\TicketHandler;
+use App\Enums\TicketHandlingStatus;
 use App\Enums\TicketHistoryAction;
+use App\Events\TicketQueueUpdated;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
@@ -18,31 +21,33 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * TicketService — pembuatan tiket internal perusahaan + auto-sync ke FopTask.
+ * TicketService — pembuatan tiket internal perusahaan + mekanisme
+ * Close/Escalate (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD).
  *
- * Dua jalur masuk, satu logic:
- *  1. User non-FOP (helpdesk/NOC/sales/admin) submit lewat /tickets/new →
- *     FopTask kebentuk Draft, BELUM ada teknisi/Task eksekusi. FOP assign
- *     teknisi belakangan lewat /fop-tasks.
- *  2. FOP sendiri submit MTN/C-REQ langsung dari halaman Task FOP, sekaligus
- *     pilih teknisi & jadwal di form yang sama ($assignment terisi) → FopTask
- *     langsung Terjadwal + Task eksekusi langsung dibuat, gak perlu mampir
- *     Draft dulu — FOP kan yang paling berwenang nentuin penugasan.
- *     Otorisasi assignment ini WAJIB dicek oleh caller (TicketController)
- *     SEBELUM manggil create(), bukan di sini — lihat authorizeAssignment()
- *     kalau butuh reuse pengecekan yang sama.
+ * FopTask TIDAK LAGI auto-dibuat begitu tiket disubmit (beda dari versi lama
+ * Sprint 8.3). Tiket lahir di tangan Helpdesk (`handler` = HELPDESK), dan
+ * FopTask baru kebentuk kalau:
+ *  1. Helpdesk/NOC eksplisit escalateToFop() — FopTask Draft, BELUM ada
+ *     teknisi/Task eksekusi. FOP assign teknisi belakangan lewat /fop-tasks.
+ *  2. FOP sendiri submit MTN/C-REQ langsung dari halaman Task FOP ($fopOrigin
+ *     true) — FopTask langsung dibuat di titik create() ini juga, sekaligus
+ *     pilih teknisi & jadwal di form yang sama ($assignment terisi) kalau
+ *     ada → FopTask langsung Terjadwal + Task eksekusi langsung dibuat, gak
+ *     perlu mampir Draft dulu. Otorisasi $fopOrigin/$assignment WAJIB dicek
+ *     caller (TicketController) SEBELUM manggil create(), bukan di sini.
  */
 class TicketService
 {
     /**
      * @param  array  $data  Data tervalidasi dari TicketController::store()
      * @param  UploadedFile[]  $attachments
-     * @param  array{technicians?: int[], task_date?: string|null}  $assignment  Cuma dihonor kalau non-empty
+     * @param  array{technicians?: int[], task_date?: string|null}  $assignment  Cuma dihonor kalau $fopOrigin true
+     * @param  bool  $fopOrigin  Submit langsung dari halaman Task FOP — lihat docblock kelas
      * @return array{ticket: Ticket, conflicts: array}
      */
-    public function create(array $data, User $actor, array $attachments = [], array $assignment = []): array
+    public function create(array $data, User $actor, array $attachments = [], array $assignment = [], bool $fopOrigin = false): array
     {
-        return DB::transaction(function () use ($data, $actor, $attachments, $assignment) {
+        $result = DB::transaction(function () use ($data, $actor, $attachments, $assignment, $fopOrigin) {
             /** @var Customer $customer */
             $customer = Customer::query()
                 ->applyUserScope($actor)
@@ -69,20 +74,27 @@ class TicketService
             $ticket->customer_id = $customer->id;
             $ticket->pop_id = $customer->pop_id;
             $this->snapshotCustomer($ticket, $customer);
+            $ticket->issue_category_id = $data['issue_category_id'] ?? null;
             $ticket->detail_keluhan = $data['detail_keluhan'];
             $ticket->catatan_teknis = $data['catatan_teknis'] ?? null;
             $ticket->priority = $data['priority'];
             $ticket->created_by = $actor->id;
-            $ticket->save();
-
-            $fopTask = $this->syncToFopTask($ticket, $customer, $actor, $assignment['task_date'] ?? null);
-
-            $ticket->fop_task_id = $fopTask->id;
+            $ticket->handler = TicketHandler::HELPDESK;
+            $ticket->status = TicketHandlingStatus::OPEN;
             $ticket->save();
 
             $conflicts = [];
-            if (! empty($assignment['technicians'])) {
-                $conflicts = $this->assignTechnicians($fopTask, $ticket, $assignment['technicians'], $actor);
+
+            if ($fopOrigin) {
+                $fopTask = $this->syncToFopTask($ticket, $customer, $actor, $assignment['task_date'] ?? null);
+
+                $ticket->fop_task_id = $fopTask->id;
+                $ticket->handler = TicketHandler::FOP;
+                $ticket->save();
+
+                if (! empty($assignment['technicians'])) {
+                    $conflicts = $this->assignTechnicians($fopTask, $ticket, $assignment['technicians'], $actor);
+                }
             }
 
             foreach ($attachments as $file) {
@@ -91,7 +103,7 @@ class TicketService
 
             $ticket->histories()->create([
                 'action' => TicketHistoryAction::DIBUAT,
-                'to_status' => $fopTask->status->value,
+                'to_status' => $ticket->handler->value,
                 'actor_id' => $actor->id,
                 'happened_at' => now(),
             ]);
@@ -101,10 +113,349 @@ class TicketService
             }
 
             return [
-                'ticket' => $ticket->load(['customer', 'creator', 'fopTask.technicians', 'attachments']),
+                'ticket' => $ticket->load(['customer', 'creator', 'fopTask.technicians', 'attachments', 'issueCategory']),
                 'conflicts' => $conflicts,
             ];
         });
+
+        // Dispatch SETELAH transaksi commit (bukan di dalam closure) — broadcast
+        // gak boleh nembak kalau transaksinya rollback. toOthers() biar tab
+        // sendiri yang barusan aksi gak refetch dobel (udah di-patch lokal).
+        broadcast(new TicketQueueUpdated($result['ticket']->pop_id))->toOthers();
+
+        return $result;
+    }
+
+    /**
+     * Helpdesk/NOC selesaikan tiket sendiri, gak pernah nyampe FOP sama
+     * sekali (Skenario A worksheet: Helpdesk bisa selesaikan konfigurasi
+     * sendiri; juga dipakai NOC pas berhasil perbaiki tanpa lapangan).
+     */
+    public function close(Ticket $ticket, User $actor, ?string $reason = null): Ticket
+    {
+        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
+            // lockForUpdate() — dua request nyaris bareng (double-klik, atau
+            // Helpdesk Close pas NOC Escalate di detik yang sama) WAJIB
+            // antre di sini, bukan dua-duanya lolos guard di bawah sebelum
+            // salah satu commit (TOCTOU). Baris kedua yang nunggu bakal baca
+            // state TERBARU begitu lock lepas, jadi ketahan assertTicketStillOpen().
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertActorOwnsTicket($ticket, $actor);
+            $this->assertTicketStillOpen($ticket);
+            $this->assertNocCheckedBeforeClose($ticket, $actor);
+
+            $fromHandler = $ticket->handler->value;
+            $ticket->status = TicketHandlingStatus::CLOSED;
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DISELESAIKAN,
+                'from_status' => $fromHandler,
+                'to_status' => $fromHandler,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $ticket->fresh();
+        });
+
+        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        return $ticket;
+    }
+
+    /**
+     * Helpdesk/NOC batalkan tiket sendiri, gak pernah nyampe FOP sama sekali —
+     * kembaran close() tapi berakhir di bucket Dibatalkan, bukan Selesai.
+     * Reason WAJIB (dicek di controller) — beda dari close() yang opsional,
+     * karena membatalkan keluhan pelanggan tanpa alasan riskan buat audit.
+     * Pembatalan tiket yang udah `handler=FOP` TETAP lewat modul FOP
+     * (/fop-tasks, lihat FopTaskObserver) — bukan di sini, ditolak lewat
+     * assertTicketStillOpen() sama seperti close/escalate/return.
+     */
+    public function cancel(Ticket $ticket, User $actor, ?string $reason): Ticket
+    {
+        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
+            // lockForUpdate() — lihat penjelasan di close().
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertActorOwnsTicket($ticket, $actor);
+            $this->assertTicketStillOpen($ticket);
+
+            $fromHandler = $ticket->handler->value;
+            $ticket->status = TicketHandlingStatus::CANCELLED;
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DIBATALKAN,
+                'from_status' => $fromHandler,
+                'to_status' => $fromHandler,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $ticket->fresh();
+        });
+
+        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        return $ticket;
+    }
+
+    /**
+     * Helpdesk kirim tiket ke NOC (Skenario B worksheet) — belum ke FOP,
+     * cuma pindah tangan penanganan internal.
+     */
+    public function escalateToNoc(Ticket $ticket, User $actor, ?string $reason = null): Ticket
+    {
+        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
+            // lockForUpdate() — lihat penjelasan di close().
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertActorOwnsTicket($ticket, $actor);
+            $this->assertTicketStillOpen($ticket);
+
+            if ($ticket->handler !== TicketHandler::HELPDESK) {
+                throw ValidationException::withMessages([
+                    'target' => 'Cuma tiket yang masih di tangan Helpdesk yang bisa dikirim ke NOC.',
+                ]);
+            }
+
+            $fromHandler = $ticket->handler->value;
+            $ticket->handler = TicketHandler::NOC;
+            // Window "pending NOC" mulai dari sini — null berarti NOC belum
+            // resmi ambil alih (lihat onCheckNoc()), Helpdesk MASIH boleh
+            // act (assertActorOwnsTicket() izinin dua-duanya selama null).
+            $ticket->noc_checked_at = null;
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DIESKALASI,
+                'from_status' => $fromHandler,
+                'to_status' => TicketHandler::NOC->value,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $ticket->fresh();
+        });
+
+        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        return $ticket;
+    }
+
+    /**
+     * NOC resmi ambil alih tiket yang lagi "pending" (baru dikirim Helpdesk,
+     * belum di-check). Sebelum ini, Helpdesk MASIH pegang kendali penuh
+     * (assertActorOwnsTicket() izinin helpdesk & noc dua-duanya). Begitu
+     * di-check, Helpdesk kehilangan akses — cuma NOC yang bisa lanjut.
+     *
+     * Guard beda dari close()/escalate() lain: BUKAN assertActorOwnsTicket()
+     * biasa (yang di window pending justru izinin helpdesk JUGA) — aksi ini
+     * spesifik cuma buat NOC, gak peduli window pending atau enggak.
+     */
+    public function onCheckNoc(Ticket $ticket, User $actor, ?string $reason = null): Ticket
+    {
+        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertTicketStillOpen($ticket);
+
+            if ($ticket->handler !== TicketHandler::NOC) {
+                throw ValidationException::withMessages([
+                    'target' => 'Cuma tiket yang lagi di tangan NOC yang bisa di-check.',
+                ]);
+            }
+
+            if (! $actor->hasFullAccess() && ! $actor->hasRole('noc')) {
+                throw ValidationException::withMessages([
+                    'target' => 'Cuma NOC yang bisa Oncheck tiket ini.',
+                ]);
+            }
+
+            if ($ticket->noc_checked_at !== null) {
+                throw ValidationException::withMessages([
+                    'target' => 'Tiket ini udah di-check NOC.',
+                ]);
+            }
+
+            $ticket->noc_checked_at = now();
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DICEK_NOC,
+                'from_status' => TicketHandler::NOC->value,
+                'to_status' => TicketHandler::NOC->value,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $ticket->fresh();
+        });
+
+        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        return $ticket;
+    }
+
+    /**
+     * Helpdesk (Skenario C) atau NOC kirim tiket ke FOP — titik SATU-SATUNYA
+     * di mana FopTask kebentuk buat tiket yang gak lewat halaman Task FOP.
+     * Selalu Draft-unassigned, sama kayak perilaku auto-sync lama — FOP yang
+     * nentuin penjadwalan teknisi belakangan lewat /fop-tasks.
+     */
+    public function escalateToFop(Ticket $ticket, User $actor, ?string $reason = null): FopTask
+    {
+        $fopTask = DB::transaction(function () use ($ticket, $actor, $reason) {
+            // lockForUpdate() — lihat penjelasan di close().
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertActorOwnsTicket($ticket, $actor);
+            $this->assertTicketStillOpen($ticket);
+
+            /** @var Customer $customer */
+            $customer = Customer::query()->with('pop')->findOrFail($ticket->customer_id);
+
+            $fromHandler = $ticket->handler->value;
+            $fopTask = $this->syncToFopTask($ticket, $customer, $actor);
+
+            $ticket->fop_task_id = $fopTask->id;
+            $ticket->handler = TicketHandler::FOP;
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DIESKALASI,
+                'from_status' => $fromHandler,
+                'to_status' => TicketHandler::FOP->value,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $fopTask;
+        });
+
+        broadcast(new TicketQueueUpdated($fopTask->pop_id))->toOthers();
+
+        return $fopTask;
+    }
+
+    /**
+     * NOC kembaliin tiket ke Helpdesk — jalur pemulihan salah kirim (Gap #7,
+     * docs/plan/analisa-efektivitas-worksheet-ticketing.md). Cuma NOC yang
+     * bisa "turun" — Helpdesk gak punya ke mana pun buat dikembaliin (dia
+     * asal-usulnya), dan FOP terminal buat sisi Ticketing (lihat
+     * assertTicketStillOpen()).
+     */
+    public function returnToHelpdesk(Ticket $ticket, User $actor, ?string $reason = null): Ticket
+    {
+        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
+            // lockForUpdate() — lihat penjelasan di close().
+            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
+
+            $this->assertActorOwnsTicket($ticket, $actor);
+            $this->assertTicketStillOpen($ticket);
+
+            if ($ticket->handler !== TicketHandler::NOC) {
+                throw ValidationException::withMessages([
+                    'target' => 'Cuma tiket yang lagi di tangan NOC yang bisa dikembalikan ke Helpdesk.',
+                ]);
+            }
+
+            $fromHandler = $ticket->handler->value;
+            $ticket->handler = TicketHandler::HELPDESK;
+            // Reset — kalau dikirim ulang ke NOC belakangan, window pending
+            // harus fresh lagi, bukan mewarisi status checked yang lama.
+            $ticket->noc_checked_at = null;
+            $ticket->save();
+
+            $ticket->histories()->create([
+                'action' => TicketHistoryAction::DIKEMBALIKAN,
+                'from_status' => $fromHandler,
+                'to_status' => TicketHandler::HELPDESK->value,
+                'reason' => $reason,
+                'actor_id' => $actor->id,
+                'happened_at' => now(),
+            ]);
+
+            return $ticket->fresh();
+        });
+
+        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        return $ticket;
+    }
+
+    /**
+     * Cuma pihak yang lagi pegang tiket yang boleh close/escalate — Helpdesk
+     * gak boleh utak-atik tiket yang udah dilempar ke NOC, begitu juga
+     * sebaliknya. Full-access (owner/admin) dibebaskan dari batasan ini.
+     *
+     * Pengecualian window "pending NOC": begitu Helpdesk kirim ke NOC tapi
+     * NOC BELUM Oncheck (`noc_checked_at` null), Helpdesk MASIH boleh act —
+     * dua role (`helpdesk` + `noc`) sama-sama valid di window ini. Begitu
+     * NOC Oncheck, cuma `noc` yang lolos (lihat holderRoles()).
+     */
+    private function assertActorOwnsTicket(Ticket $ticket, User $actor): void
+    {
+        if ($actor->hasFullAccess()) {
+            return;
+        }
+
+        $expectedRoles = $ticket->holderRoles();
+
+        if (empty($expectedRoles) || ! collect($expectedRoles)->contains(fn ($role) => $actor->hasRole($role))) {
+            throw ValidationException::withMessages([
+                'target' => 'Tiket ini bukan di tangan Anda — cuma pihak yang lagi menangani yang bisa selesaikan/kirim tiket ini.',
+            ]);
+        }
+    }
+
+    /**
+     * NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket — gak boleh
+     * langsung Close dari tab "Ticket Masuk" (pending, belum di-check).
+     * Cuma berlaku buat role `noc` non-full-access; Helpdesk yang close
+     * tiketnya sendiri (baik masih di dia, atau masih window pending-NOC)
+     * gak kena guard ini.
+     */
+    private function assertNocCheckedBeforeClose(Ticket $ticket, User $actor): void
+    {
+        if ($actor->hasFullAccess() || ! $actor->hasRole('noc')) {
+            return;
+        }
+
+        if ($ticket->handler === TicketHandler::NOC && $ticket->noc_checked_at === null) {
+            throw ValidationException::withMessages([
+                'target' => 'NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket ini.',
+            ]);
+        }
+    }
+
+    private function assertTicketStillOpen(Ticket $ticket): void
+    {
+        if ($ticket->handler === TicketHandler::FOP) {
+            throw ValidationException::withMessages([
+                'target' => 'Tiket ini udah di FOP — Close/Escalate Ticketing gak berlaku lagi, lihat Task FOP.',
+            ]);
+        }
+
+        if ($ticket->status === TicketHandlingStatus::CLOSED) {
+            throw ValidationException::withMessages([
+                'target' => 'Tiket ini udah selesai.',
+            ]);
+        }
+
+        if ($ticket->status === TicketHandlingStatus::CANCELLED) {
+            throw ValidationException::withMessages([
+                'target' => 'Tiket ini udah dibatalkan.',
+            ]);
+        }
     }
 
     /**

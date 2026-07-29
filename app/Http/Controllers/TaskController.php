@@ -45,7 +45,7 @@ class TaskController extends Controller
 
         // village/district/city untuk `clean_address` yang dirender per kartu
         // (tasks/own.blade.php:133 & partials/own-card.blade.php:61).
-        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'pop', 'evidences', 'fop', 'teamMembers'])
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'evidences', 'fop', 'teamMembers'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('status', '!=', TaskStatus::DIBATALKAN->value)
             // scheduled_at bertipe timestamp, jadi perbandingan tanggal ditulis
@@ -63,7 +63,7 @@ class TaskController extends Controller
             ->orderBy('scheduled_at')
             ->get();
 
-        $upcomingTasks = Task::with(['customer', 'pop'])
+        $upcomingTasks = Task::with(['customer.customerAddress', 'pop'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('scheduled_at', '>', $endOfToday)
             ->whereIn('status', [TaskStatus::TERJADWAL->value])
@@ -91,7 +91,7 @@ class TaskController extends Controller
 
         abort_if(! $isMember, 403, 'Anda bukan anggota task ini.');
 
-        $task->load(['customer', 'pop', 'evidences', 'teamMembers']);
+        $task->load(['customer.customerAddress', 'pop', 'evidences', 'teamMembers']);
 
         return view('tasks.partials.own-card', compact('task'));
     }

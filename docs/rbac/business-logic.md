@@ -86,7 +86,63 @@ Urutan match, berhenti di match pertama:
 
 Selain permission fitur biasa, ada lapis khusus buat transisi status workflow pelanggan/task (`workflow_transition_permissions`: `from_status` → `to_status` → `permission_name`, di-assign ke Role lewat `role_workflow_transition`). Dipakai buat kontrol siapa yang boleh trigger transisi status tertentu (e.g. FOP approve survey → verifikasi lapangan) — independen dari CRUD permission biasa, karena satu Role bisa punya akses CRUD fitur tapi belum tentu berhak approve transisi status kritikal.
 
-## 8. Audit
+## 8. Hierarki Permission Pelanggan — Independent Feature Gating
+
+### Konteks Permasalahan (2026-07-28)
+
+Sebelumnya, semua akses customer-related di-gate oleh **satu** permission `customers.view` yang bundel:
+- List Data Pelanggan biasa (`/customers`)
+- List Pelanggan Putus (`/customers?status_group=terminated`)
+- List Pelanggan Gagal (`/customers?status_group=failed`)
+- Detail Pelanggan (`/customers/{id}`)
+- Queue tab Perangkat & Pemasangan (teknisi fieldwork, `/customers/{id}/perangkat-pemasangan` — halaman BARU)
+
+**Masalah:** hardcoded seeder + query-param filtering (`status_group`) → permission gak bisa di-toggle independen lewat Role Matrix UI. Misal: "Cabut akses `customers.view` dari teknisi (gak boleh liat List/Detail)" → secara tidak sengaja cabut Queue Perangkat & Pemasangan juga (teknisi genuinely butuh buat fieldwork).
+
+### Solusi: 4 Permission Independen (2026-07-28)
+
+| Permission | Halaman | Route | Pemegang utama |
+|------------|---------|-------|-----------------|
+| `customers.view` | List Data Pelanggan (Aktif/Isolir/Semua) | `/customers` | Admin, NOC, Helpdesk, FOP, Sales, POP Admin — **BUKAN Teknisi** |
+| `customers.detail.view` | Detail Pelanggan (tab Identitas/Alamat/Paket/Billing/Dokumen/Riwayat) | `/customers/{id}` | Admin, NOC, FOP, POP Admin, Atasan — **BUKAN Teknisi** |
+| `customers.terminated.view` | List Pelanggan Putus | `/customers/terminated` | Admin, NOC, FOP, POP Admin, Atasan (same scope as `customers.view`) |
+| `customers.failed.view` | List Pelanggan Gagal | `/customers/failed` | Admin, NOC, FOP, POP Admin, Atasan (same scope as `customers.view`) |
+
+**Teknisi akses fieldwork via permission berbeda** — lihat tabel berikutnya.
+
+### Permission Fieldwork — Tab Perangkat & Pemasangan
+
+Halaman **baru** `/customers/{id}/perangkat-pemasangan` (controller `CustomerFieldworkController`, view `customers.fieldwork`) — reuse tab `_device` & `_installation` dari halaman Detail, tapi tanpa perlu `customers.detail.view`. Permission:
+
+- Route: `permission:customers.detail.devices.view|customers.detail.installation.view` (middleware `OR` logic)
+- Teknisi sudah punya `customers.detail.devices.*` + `customers.detail.installation.*` → otomatis bisa akses halaman fieldwork tanpa perlu `customers.detail.view`
+- Detail Pelanggan (`customers.detail.view`) **sengaja diblok** buat Teknisi — mereka gak boleh liat data identitas/billing/dokumen pelanggan, cuma data perangkat & pemasangan
+
+**Kenapa split:** teknisi lapangan genuine butuh isi data teknis Perangkat & Pemasangan di halaman, tapi permission-nya bukan "Detail Pelanggan" umum — itu kewenangan admin/noc/fop saja. Fieldwork page `customers.fieldwork` load **3 relasi doang** (`customerDevice`, `customerTechnicalDetail`, `installations.technician`) vs customers.show yang load 17 relasi (`city`, `district`, `village`, `packages`, `services`, `pop`, `creator`, dll) — lebih ringan, scope terbatas, sesuai kebutuhan teknisi.
+
+### Alur Nambah Permission Customer Baru
+
+Misal nambah permission `customers.detail.sensitive_info.view` (buat admin lihat data sensitif pelanggan):
+
+1. **Pastikan Feature/Action ada di DB** — cek `database/seeders/FeatureSeeder.php` (Feature parent `customers` sudah ada, no-op), `ActionSeeder.php` (Action `VIEW` sudah ada, no-op).
+2. Atau **create Sub-Feature baru** kalau fitur itu belum ada — contoh: sub-feature `customers.detail.sensitive_info` under parent `customers`, daftarkan di `FeatureSeeder::run()`.
+3. **Daftarkan action ke config** — `config/rbac.php`:
+   ```php
+   'allowed_actions' => [
+       // ... existing ...
+       'customers.detail.sensitive_info' => [ActionCode::VIEW->value],
+   ],
+   'permission_name_overrides' => [
+       'customers.detail.sensitive_info.view' => 'Lihat Data Sensitif Pelanggan',
+   ],
+   ```
+4. **Generate permission** — `php artisan rbac:generate-permissions`.
+5. **Assign ke role** — (optional di seeder, atau assign manual di UI Matrix), contoh add ke `admin`/`noc`/`pop_admin` di `RolePermissionSeeder::permissionsByRole['admin']`.
+6. **Guard di controller/route/view** — `Route::middleware('permission:customers.detail.sensitive_info.view')`, `abort_unless(...hasPermission(...))`, `@if(auth()->user()->hasPermission(...))`.
+
+Setiap feature customer kini permission-nya **independent** — gak perlu hardcode redirect/filter di seeder level, bukan bundel satu string generik.
+
+## 9. Audit
 
 Semua perubahan RBAC diaudit:
 - `Role`, `Permission`, `Feature`, `Action` — trait `RecordsAuditLogs`, event `created`/`updated`/`deleted`.

@@ -7,7 +7,21 @@
 | `2026_07_23_000001_create_tickets_table.php` | Tabel `tickets` — kolom inti |
 | `2026_07_23_000002_create_ticket_attachments_table.php` | Tabel `ticket_attachments` |
 | `2026_07_23_000003_create_ticket_histories_table.php` | Tabel `ticket_histories` |
-| `2026_07_24_000001_add_customer_snapshot_to_tickets_table.php` | Tambah 8 kolom snapshot pelanggan ke `tickets` |
+| `2026_07_24_000001_add_customer_snapshot_to_tickets_table.php` | 8 kolom snapshot pelanggan |
+| `2026_07_25_000001_create_ticket_issue_categories_table.php` | Master kategori keluhan |
+| `2026_07_25_000002_add_issue_category_id_to_tickets_table.php` | FK ke master kategori |
+| `2026_07_25_000003_add_handler_and_status_to_tickets_table.php` | **`handler` + `status`** — tiket mulai punya status sendiri |
+| `2026_07_28_000001_add_noc_checked_at_to_tickets_table.php` | **`noc_checked_at`** — penanda NOC sudah Oncheck |
+
+### Catatan migrasi `2026_07_25_000003`
+
+Kolom ditambahkan sebagai `string` biasa dengan default dari PHP enum (`->default(TicketHandler::HELPDESK->value)`), **bukan** native DB enum — biar penambahan nilai baru gak butuh `ALTER TABLE`.
+
+Migrasi ini melakukan backfill `DB::table('tickets')->update(['handler' => FOP])`: semua tiket yang sudah ada dibuat sebelum perubahan ini **pasti** punya `FopTask` (dulu auto-sync), jadi menandainya sebagai `FOP` menjaga tampilan riwayat lama tetap benar.
+
+### Catatan migrasi `2026_07_28_000001`
+
+`noc_checked_at` nullable **tanpa backfill**. Tiket lama ber-`handler=noc` otomatis terbaca "Pending NOC", yang justru membuat guard lebih longgar untuk data lama (Helpdesk masih bisa bantu) — bukan lebih ketat, jadi aman.
 
 ## Tabel `tickets`
 
@@ -16,26 +30,56 @@
 | `id` | bigint PK | |
 | `ticket_number` | string, unique | Format `TKT-{tahun}-{urut4digit}`, mis. `TKT-2026-0001` |
 | `type` | string(20) | `MTN` atau `C-REQ` — `Rule::in(TaskType::ticketValues())` |
+| `issue_category_id` | FK → `ticket_issue_categories`, nullable | Master kategori; nullable karena boleh "Lainnya (isi manual)" |
 | `customer_id` | FK → `customers` | `restrictOnDelete` |
-| `pop_id` | FK → `pops` | `restrictOnDelete` — snapshot POP pelanggan saat tiket dibuat, dipakai `HasPopScope` |
-| `customer_name` | string, nullable | Snapshot — nama pelanggan saat tiket dibuat |
-| `customer_address` | text, nullable | Snapshot — alamat |
-| `customer_phone` | string, nullable | Snapshot — `primary_phone` fallback `phone` |
+| `pop_id` | FK → `pops` | `restrictOnDelete` — dipakai `HasPopScope` |
+| `customer_name` | string, nullable | Snapshot |
+| `customer_address` | text, nullable | Snapshot |
+| `customer_phone` | string, nullable | Snapshot |
 | `customer_odp` | string, nullable | Snapshot — `odp_code` fallback `customer_devices.odp` |
-| `customer_package` | string, nullable | Snapshot — nama paket internet |
-| `customer_device` | string, nullable | Snapshot — ringkasan brand+model+device_type (non-sensitif, SN/MAC/PPPoE sengaja gak ikut) |
+| `customer_package` | string, nullable | Snapshot |
+| `customer_device` | string, nullable | Snapshot brand+model+device_type (non-sensitif; SN/MAC/PPPoE sengaja gak ikut) |
 | `customer_latitude` | decimal(10,7), nullable | Snapshot koordinat |
 | `customer_longitude` | decimal(10,7), nullable | Snapshot koordinat |
-| `detail_keluhan` | text | Wajib diisi |
+| `detail_keluhan` | text | Wajib |
 | `catatan_teknis` | text, nullable | Opsional |
 | `priority` | string(20) | `FopTaskPriority` (`low`/`Medium`/`High`/`Urgent`) |
+| **`handler`** | string(20), default `helpdesk` | `TicketHandler` — siapa yang lagi pegang. Beku permanen begitu jadi `fop` |
+| **`status`** | string(20), default `open` | `TicketHandlingStatus` — `open`/`closed`/`cancelled`. Cuma bermakna selama `handler` ≠ `fop` |
+| **`noc_checked_at`** | timestamp, nullable | NULL = NOC belum Oncheck (window "Pending NOC"); terisi = NOC sudah ambil alih |
 | `created_by` | FK → `users` | `restrictOnDelete` — "Assigned by" |
 | `fop_task_id` | FK → `fop_tasks`, nullable | `nullOnDelete` — kalau FOP hapus `FopTask`, tiket TETAP ada (jadi "Terputus") |
 | `created_at`, `updated_at` | timestamp | |
 
 **Index:** `[pop_id, created_at]`, `created_by`, `type`.
 
-**Kolom yang SENGAJA gak ada:** `status` (selalu derived dari `fopTask.status`, lihat business-logic.md §5) dan `cid` (selalu dibaca live dari `customer.display_id`, bukan snapshot — lihat business-logic.md §4).
+**Kolom yang SENGAJA gak ada:** `cid` — selalu dibaca live dari `customer.display_id`, bukan snapshot (lihat business-logic.md § 5).
+
+> **Perubahan penting vs versi dokumen sebelumnya:** dokumen lama menyatakan kolom `status` "SENGAJA gak ada" karena status selalu diturunkan dari `fopTask.status`. Itu **sudah tidak berlaku** sejak `2026_07_25_000003`. Alasannya di business-logic.md § 2.
+
+### Kombinasi kolom status yang valid
+
+| `handler` | `status` | `noc_checked_at` | Arti |
+|---|---|---|---|
+| `helpdesk` | `open` | NULL | Ditangani Helpdesk |
+| `noc` | `open` | NULL | Pending NOC (Helpdesk & NOC dua-duanya boleh act) |
+| `noc` | `open` | terisi | OnCheck NOC (cuma NOC) |
+| `helpdesk`/`noc` | `closed` | apa saja | Selesai internal |
+| `helpdesk`/`noc` | `cancelled` | apa saja | Dibatalkan pra-FOP |
+| `fop` | diabaikan | diabaikan | Status ikut `fopTask.status` |
+
+`handler=fop` + `fop_task_id` NULL = orphan ("Terputus") — FopTask-nya dihapus FOP. Dibedakan dari tiket yang belum pernah dieskalasi lewat kolom `handler`, **bukan** cuma cek NULL di `fop_task_id`.
+
+## Tabel `ticket_issue_categories`
+
+| Kolom | Tipe | Keterangan |
+|---|---|---|
+| `id` | bigint PK | |
+| `name` | string | Nama kategori (mis. "LOS", "Lemot", "Backbone CUT") |
+| `default_priority` | string(20) | `FopTaskPriority` — auto-isi prioritas saat kategori dipilih |
+| `sla_source` | string, nullable | Sumber SLA (paket vs prioritas) |
+| `is_active` | boolean | Soft-toggle; kategori lama gak dihapus keras biar tiket lama gak kehilangan jejak |
+| `created_at`, `updated_at` | timestamp | |
 
 ## Tabel `ticket_attachments`
 
@@ -44,7 +88,7 @@
 | `id` | bigint PK | |
 | `ticket_id` | FK → `tickets` | `cascadeOnDelete` |
 | `file_path` | string | Path di disk `local` (privat, bukan `public`) |
-| `original_name` | string | Nama file asli buat ditampilkan/download |
+| `original_name` | string | Nama file asli |
 | `mime_type` | string(100), nullable | |
 | `size` | unsignedBigInteger, nullable | Bytes |
 | `uploaded_by` | FK → `users` | `restrictOnDelete` |
@@ -56,47 +100,79 @@
 |---|---|---|
 | `id` | bigint PK | |
 | `ticket_id` | FK → `tickets` | `cascadeOnDelete` |
-| `action` | string(30) | `TicketHistoryAction`: `dibuat` atau `dibatalkan` |
-| `from_status` | string(30), nullable | Status `FopTask` sebelum aksi |
-| `to_status` | string(30), nullable | Status `FopTask` sesudah aksi |
-| `reason` | text, nullable | Alasan (diisi kalau action=dibatalkan) |
-| `actor_id` | FK → `users`, nullable | `nullOnDelete` — null kalau aksi dipicu proses sistem |
+| `action` | string(30) | `TicketHistoryAction` — lihat tabel di bawah |
+| `from_status` | string(30), nullable | Nilai `handler` sebelum aksi (pra-FOP) / status FopTask (pasca-FOP) |
+| `to_status` | string(30), nullable | Nilai `handler` sesudah aksi |
+| `reason` | text, nullable | Alasan/catatan. **Wajib** untuk `dibatalkan` pra-FOP, opsional untuk aksi lain |
+| `actor_id` | FK → `users`, nullable | `nullOnDelete` — null kalau dipicu proses sistem |
 | `happened_at` | timestamp | |
 | `created_at`, `updated_at` | timestamp | |
 
 **Index:** `[ticket_id, happened_at]`.
 
-Kembaran `fop_task_status_history` — satu pembatalan nulis ke dua tabel ini sekaligus (lihat business-logic.md §9).
+### Nilai `action` (`TicketHistoryAction`)
+
+| Nilai | Ditulis oleh | Kapan |
+|---|---|---|
+| `dibuat` | `TicketService::create()` | Tiket disubmit |
+| `dieskalasi` | `escalateToNoc()` / `escalateToFop()` | Kirim ke NOC atau FOP (`to_status` membedakan) |
+| `dicek_noc` | `onCheckNoc()` | NOC klik "Oncheck NOC" |
+| `diselesaikan` | `close()` | Selesai internal |
+| `dikembalikan` | `returnToHelpdesk()` | NOC balikin ke Helpdesk |
+| `dibatalkan` | `cancel()` (pra-FOP) **atau** `FopTaskObserver` (pasca-FOP) | Pembatalan |
+
+Kembaran `fop_task_status_history` — satu pembatalan **pasca-FOP** menulis ke dua tabel sekaligus (business-logic.md § 11).
 
 ## Relasi Model
 
 ```
 Ticket
-├─ belongsTo Customer         (customer_id)
-├─ belongsTo Pop               (pop_id)
-├─ belongsTo User as creator   (created_by)
-├─ belongsTo FopTask           (fop_task_id)
+├─ belongsTo Customer              (customer_id)
+├─ belongsTo Pop                   (pop_id)
+├─ belongsTo TicketIssueCategory   (issue_category_id)
+├─ belongsTo User as creator       (created_by)
+├─ belongsTo FopTask               (fop_task_id)
 ├─ hasMany TicketAttachment
 └─ hasMany TicketHistory
 
 FopTask
-└─ hasOne Ticket               (fop_task_id) — kembaran Ticket::fopTask()
+└─ hasOne Ticket                   (fop_task_id) — kembaran Ticket::fopTask()
 
 TicketAttachment
 ├─ belongsTo Ticket
-└─ belongsTo User as uploader  (uploaded_by)
+└─ belongsTo User as uploader      (uploaded_by)
 
 TicketHistory
 ├─ belongsTo Ticket
-└─ belongsTo User as actor     (actor_id)
+└─ belongsTo User as actor         (actor_id)
 ```
+
+## Cast & Helper di `Ticket`
+
+```php
+'handler'        => TicketHandler::class,
+'status'         => TicketHandlingStatus::class,
+'noc_checked_at' => 'datetime',
+```
+
+| Helper | Kembalian |
+|---|---|
+| `isPendingNoc()` | `handler=NOC` & `status=OPEN` & `noc_checked_at` NULL |
+| `isOnCheckNoc()` | `handler=NOC` & `status=OPEN` & `noc_checked_at` terisi |
+| `holderRoles()` | Role yang sah bertindak sekarang — dipakai Service (otorisasi) & `actionFlagsFor()` (UI) |
+| `bucket()` / `scopeInBucket()` | Klasifikasi bucket, dua rezim (internal vs FopTask) |
+| `checkedBy()` | User yang Oncheck NOC (dari `ticket_histories`, butuh `histories.actor` eager-loaded) |
 
 ## Kolom yang Butuh Diperhatikan Saat Eager-Load
 
-`Customer::getDisplayIdAttribute()` (dipakai buat tampilkan CID di mana pun ticket/customer ditampilkan) butuh 3 kolom Customer yang **gampang kelewat kalau eager-load dibatasi**:
+`Customer::getDisplayIdAttribute()` butuh 3 kolom Customer yang **gampang kelewat kalau eager-load dibatasi**:
 
 - `pop_id` — buat resolve relasi `pop()`
-- `status` — buat cek `bareStatuses` (terminated/failed/dll)
-- `distribution_id` — buat cek udah masuk distribusi atau belum
+- `status` — buat cek `bareStatuses`
+- `distribution_id` — buat cek sudah masuk distribusi atau belum
 
-Kalau salah satu gak ke-select saat eager-load dengan kolom dibatasi (`'customer:id,...'`), `display_id` diam-diam jatuh ke fallback yang salah (lihat business-logic.md §7 & flowchart.md §6). Tempat yang WAJIB include 3 kolom ini: `TicketController::index()`, `FopTaskController::index()` (buat modal Edit).
+Tanpa salah satunya, `display_id` diam-diam jatuh ke fallback yang salah (business-logic.md § 10). Tempat yang WAJIB menyertakan ketiganya: `TicketArchiveController`, `NocWorksheetController`, `TicketController::worksheetTasks()`, `FopTaskController::index()`.
+
+---
+
+**Last updated:** 2026-07-28

@@ -2,27 +2,77 @@
 
 ## 1. Tipe Tiket yang Berlaku
 
-Cuma 2 dari 8 nilai `TaskType` yang boleh masuk lewat Ticketing:
+Cuma 2 dari nilai `TaskType` yang boleh masuk lewat Ticketing:
 
 ```php
 // App\Enums\TaskType::ticketValues()
 [self::MAINTENANCE->value, self::CREQ->value]  // ['MTN', 'C-REQ']
 ```
 
-Tipe lain (SURVEY, PSB, O-REQ, RELOKASI, DEAC, INFR) tetap dibuat langsung dari `/fop-tasks` (FopTaskController::store()) atau auto-sync Registrasi Pelanggan — gak pernah lewat Ticketing. `TicketController::store()` menolak tipe di luar 2 itu dengan pesan validasi `"Tipe ticket hanya boleh MTN atau C-REQ."`.
+Tipe lain (SURVEY, PSB, O-REQ, DEAC, INFR REQ) tetap dibuat langsung dari `/fop-tasks` atau auto-sync Registrasi Pelanggan — gak pernah lewat Ticketing. `TicketController::store()` menolak tipe di luar 2 itu dengan pesan `"Tipe ticket hanya boleh MTN atau C-REQ."`.
 
-## 2. Dua Jalur Masuk, Satu Logic
+## 2. Dua Rezim Status
 
-`TicketService::create()` melayani dua aktor lewat satu jalur logic, dibedakan lewat parameter `$assignment`:
+Tiket punya kolom status **sendiri** selama masih ditangani internal, dan baru numpang `FopTask` setelah dieskalasi ke FOP. Tiga kolom yang berperan:
+
+| Kolom | Enum/Tipe | Arti |
+|---|---|---|
+| `handler` | `TicketHandler` (`helpdesk`/`noc`/`fop`) | Siapa yang lagi pegang tiket |
+| `status` | `TicketHandlingStatus` (`open`/`closed`/`cancelled`) | Status internal — **cuma bermakna selama `handler` ≠ FOP** |
+| `noc_checked_at` | timestamp nullable | Penanda NOC sudah resmi ambil alih (lihat § 3) |
+
+State yang mungkin:
+
+| `handler` | `status` | `noc_checked_at` | Label | Siapa yang boleh bertindak |
+|---|---|---|---|---|
+| `helpdesk` | `open` | — | Ditangani Helpdesk | `helpdesk` |
+| `noc` | `open` | NULL | **Pending NOC** | `helpdesk` **DAN** `noc` |
+| `noc` | `open` | terisi | **OnCheck NOC** | `noc` saja |
+| `helpdesk`/`noc` | `closed` | — | Selesai (…) | tidak ada (final) |
+| `helpdesk`/`noc` | `cancelled` | — | Dibatalkan (…) | tidak ada (final) |
+| `fop` | (diabaikan) | (diabaikan) | turunan `FopTask.status` | tidak ada di sisi Ticketing |
+
+**Kenapa tiket sekarang punya status sendiri.** Desain awal (`docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD`) menganggap setiap tiket pasti berujung ke lapangan, jadi status tiket cukup diturunkan dari `FopTask`. Kenyataannya mayoritas keluhan (lemot, konfigurasi, routing) selesai dari meja Helpdesk/NOC tanpa teknisi sama sekali. Memaksa `FopTask` kebentuk cuma buat nampung status bikin papan FOP penuh tugas palsu. Sejak migrasi `2026_07_25_000003`, tiket berdiri sendiri sampai benar-benar butuh lapangan.
+
+**Kenapa `handler` gak dilebur jadi satu enum status.** Dua sumbu ini ortogonal: `handler` = *siapa*, `status` = *sudah kelar atau belum*. Dilebur jadi satu enum bakal meledak jadi 3×3 kombinasi (`helpdesk_open`, `noc_closed`, …) yang harus dijaga manual setiap ada aktor baru.
+
+**`handler=FOP` itu beku permanen.** Dipakai juga buat membedakan dua kasus `fop_task_id` NULL yang artinya beda: tiket yang **belum pernah** dieskalasi (`handler` masih helpdesk/noc) vs tiket yang **sudah pernah** tapi FopTask-nya dihapus FOP (orphan/"Terputus").
+
+## 3. Window "Pending NOC" & Aksi Oncheck NOC
+
+Begitu Helpdesk klik "Ke NOC" (`escalateToNoc()`), `handler` langsung jadi `noc` **tapi** `noc_checked_at` masih NULL. Di jendela ini Helpdesk **belum kehilangan akses** — dia masih boleh Selesaikan, Assign FOP, atau Batalkan tiketnya. NOC melihat tiket ini di tab **Ticket Masuk**.
+
+NOC klik **"Oncheck NOC"** (`onCheckNoc()`) → `noc_checked_at` terisi, tiket pindah ke tab **Ticket Diproses**, dan mulai titik ini **cuma NOC** yang boleh bertindak.
+
+```php
+// Ticket::holderRoles() — SATU-SATUNYA sumber; dipakai
+// TicketService::assertActorOwnsTicket() (otorisasi asli) DAN
+// Ticket::actionFlagsFor() (gerbang tampilan tombol).
+match ($this->handler) {
+    TicketHandler::HELPDESK => ['helpdesk'],
+    TicketHandler::NOC      => $this->noc_checked_at === null
+                                 ? ['helpdesk', 'noc']   // window pending
+                                 : ['noc'],              // sudah di-Oncheck
+    TicketHandler::FOP      => [],                       // terminal
+};
+```
+
+**Kenapa ada jendela ini sama sekali.** Kalau Helpdesk langsung kehilangan akses begitu klik "Ke NOC", tiket menggantung tanpa pemilik selama NOC belum sempat membuka worksheet-nya — pelanggan nelpon lagi, Helpdesk gak bisa apa-apa. Sebaliknya kalau Helpdesk memegang kendali selamanya, dua orang bisa Close/Assign FOP di objek yang sama nyaris bersamaan (`FopTask` dobel, riwayat konflik). Titik serah-terima yang eksplisit menutup dua-duanya.
+
+**Guard tambahan: NOC wajib Oncheck sebelum boleh Selesaikan.** `assertNocCheckedBeforeClose()` menolak `close()` dari role `noc` selama `noc_checked_at` masih NULL — kalau enggak, "Oncheck NOC" cuma jadi tombol hiasan yang bisa dilewati. Aksi lain (Assign FOP, Kembalikan, Batalkan) **tidak** kena guard ini: NOC memang boleh langsung melempar/menolak tiket dari tab Ticket Masuk tanpa harus mengklaimnya dulu.
+
+**`returnToHelpdesk()` me-reset `noc_checked_at` ke NULL** — kalau tiket dikirim ulang ke NOC belakangan, jendela pending mulai fresh lagi.
+
+## 4. Dua Jalur Masuk, Satu Logic
+
+`TicketService::create()` melayani dua aktor lewat satu jalur, dibedakan parameter `$fopOrigin` + `$assignment`:
 
 | Jalur | Siapa | Endpoint | Hasil |
 |---|---|---|---|
-| Submit biasa | Helpdesk/NOC/Sales/Admin/POP Admin, dari `/tickets/new` | `POST /tickets` tanpa `technicians[]` | `FopTask` Draft, `task_id` null, teknisi kosong — masuk bucket "Ticket Masuk" |
-| Submit + assign langsung | FOP, dari modal "Tambah Task FOP" (`/fop-tasks`) | `POST /tickets` dengan `technicians[]` + `origin=fop_tasks` | `FopTask` langsung Terjadwal, `Task` eksekusi langsung dibuat |
+| Submit worksheet | Helpdesk/NOC/Sales/Admin/POP Admin, dari `/tickets/new` | `POST /tickets` | `handler=HELPDESK`, `status=OPEN`, **tanpa FopTask** |
+| Submit + assign langsung | FOP, dari modal "Tambah Task FOP" (`/fop-tasks`) | `POST /tickets` + `origin=fop_tasks` | `handler=FOP` langsung, `FopTask` kebentuk; kalau `technicians[]` terisi → langsung Terjadwal + `Task` eksekusi |
 
-**Kenapa satu endpoint, bukan dua:** FOP kan yang paling berwenang assign teknisi — aneh kalau dipaksa dua langkah (submit dulu, assign belakangan) padahal dia bisa langsung tentuin di form yang sama. Membatalkan tiket **memang seharusnya** ikut membatalkan pekerjaannya juga; kalau enggak, Task-nya jadi yatim dan tetap kelihatan aktif di `/tasks-saya`.
-
-**Kenapa aman dari self-assign:** field `technicians[]` dan `task_date` yang dikirim dari form Ticketing (`/tickets/new`, tanpa field ini sama sekali di HTML-nya) TIDAK dihonor gitu aja kalau ada di payload — `TicketController::store()` cuma memprosesnya kalau aktor punya permission `fop_tasks.create`:
+**Kenapa aman dari self-assign:** field `technicians[]`/`task_date` cuma diproses kalau aktor punya `fop_tasks.create`:
 
 ```php
 $assignment = [];
@@ -31,133 +81,167 @@ if (!empty($validated['technicians']) && auth()->user()->hasPermission('fop_task
 }
 ```
 
-Helpdesk yang nge-craft request manual (lewat devtools) dengan `technicians[]` terisi TETAP diabaikan diam-diam (bukan ditolak 422/403) — tiket tetap kebentuk normal sebagai Draft. Redirect tujuan (`origin=fop_tasks` → balik ke `/fop-tasks`, bukan `/tickets/{id}`) dikunci permission yang sama.
+Helpdesk yang nge-craft request manual lewat devtools TETAP diabaikan diam-diam (bukan 422/403) — tiket tetap kebentuk normal di tangan Helpdesk.
 
-## 3. FopTask Draft — Kenapa Bukan Lewat FopTaskController::store()
+## 5. Snapshot Data Pelanggan
 
-`TicketService::syncToFopTask()` sengaja gak manggil `FopTaskController::store()` — controller itu mewajibkan minimal 1 teknisi dan langsung bikin `Task` eksekusi, sedangkan tiket dari perusahaan masuk sebagai antrean mentah yang penugasannya jadi keputusan FOP (kecuali FOP sendiri yang submit sambil assign, lihat § 2).
+8 kolom pelanggan di `tickets` (`customer_name`, `customer_address`, `customer_phone`, `customer_odp`, `customer_package`, `customer_device`, `customer_latitude`, `customer_longitude`) diisi **sekali** saat tiket dibuat (`TicketService::snapshotCustomer()`), **BUKAN** dibaca live.
 
-## 4. Snapshot Data Pelanggan
+**Kenapa dibekukan:** tiket adalah catatan keluhan pada satu titik waktu. Kalau dibaca live, riwayat tiket lama "berubah" begitu pelanggan pindah alamat atau ganti paket — padahal bukan itu yang terjadi saat keluhan dilaporkan.
 
-8 kolom pelanggan di `tickets` (`customer_name`, `customer_address`, `customer_phone`, `customer_odp`, `customer_package`, `customer_device`, `customer_latitude`, `customer_longitude`) diisi **sekali** saat tiket dibuat (`TicketService::snapshotCustomer()`), **BUKAN** dibaca live dari relasi `customer()`.
+**Pengecualian — POP tidak di-snapshot sebagai teks:** `tickets.pop_id` tetap FK ke master data; ID-nya sendiri sudah cukup jadi jangkar historis.
 
-**Kenapa dibekukan:** ticket adalah catatan keluhan pada satu titik waktu. Kalau field-field ini cuma dibaca live, riwayat ticket lama bisa "berubah" begitu pelanggan pindah alamat, ganti paket, atau nomor HP-nya diupdate — padahal itu bukan yang terjadi saat keluhan dilaporkan.
+**Pengecualian — CID juga tidak di-snapshot:** CID itu identitas permanen yang terikat ke `customer_id`, bukan data yang berubah-ubah. Selalu dibaca live via `$ticket->customer->display_id`. Lihat § 10 untuk bug yang pernah terjadi di sini.
 
-**Pengecualian: POP TIDAK ikut di-snapshot sebagai teks.** `tickets.pop_id` tetap FK ke master data — ID-nya sendiri sudah cukup jadi jangkar historis, beda dari string/angka bebas seperti alamat atau koordinat.
+**Urutan resolusi ODP:** `customers.odp_code` diprioritaskan, fallback ke `customer_devices.odp` — urutan ini diduplikasi identik di `TicketService::snapshotCustomer()` dan `TicketController::customerPayload()`, sengaja gak saling manggil biar independen.
 
-**Pengecualian lain: CID juga TIDAK di-snapshot.** CID (`customers.cid`/`display_id`) itu identitas permanen yang terikat ke `customer_id` (FK), bukan data yang berubah-ubah seperti alamat — jadi selalu dibaca live via `$ticket->customer->display_id` di halaman detail/list. Lihat § 7 buat bug yang pernah terjadi di sini.
+## 6. Aksi & Guard
 
-**Urutan resolusi ODP:** `customers.odp_code` (kolom denormalisasi) diprioritaskan, fallback ke `customer_devices.odp` kalau kosong — urutan ini diduplikasi identik di `TicketService::snapshotCustomer()` dan `TicketController::customerPayload()` (live-preview form), sengaja gak saling manggil biar independen.
+Semua aksi lewat `TicketService`, semuanya dibuka dengan `lockForUpdate()` di dalam transaksi **sebelum** guard dicek — dua request nyaris bersamaan wajib antre, bukan dua-duanya lolos sebelum salah satu commit (TOCTOU).
 
-## 5. Status Tiket = Derivasi, Bukan Kolom
+| Aksi | Method | Guard tambahan | Efek |
+|---|---|---|---|
+| Selesai | `close()` | `assertNocCheckedBeforeClose()` | `status=CLOSED` |
+| Ke NOC | `escalateToNoc()` | wajib `handler=HELPDESK` | `handler=NOC`, `noc_checked_at=NULL` |
+| Oncheck NOC | `onCheckNoc()` | wajib `handler=NOC`, aktor role `noc`/full-access, belum pernah di-check | `noc_checked_at=now()` |
+| Ke FOP | `escalateToFop()` | — (boleh dari Helpdesk maupun NOC) | `handler=FOP`, `FopTask` DRAFT kebentuk |
+| Kembalikan | `returnToHelpdesk()` | wajib `handler=NOC` | `handler=HELPDESK`, `noc_checked_at=NULL` |
+| Batalkan | `cancel()` | `reason` **wajib** (validasi controller) | `status=CANCELLED` |
 
-```php
-// Ticket::resolveStatus()
-public function resolveStatus(): ?TaskStatus
-{
-    return $this->fopTask?->status;
-}
-```
+Dua guard yang berlaku ke hampir semua aksi:
 
-Dinamai `resolveStatus()`, **BUKAN** `status()` — Eloquent nebak method zero-argument bernama sama kayak attribute access itu relasi. Kalau ada kode nulis `$ticket->status` (properti, bukan manggil method), Eloquent nyoba resolve sebagai relasi, dapet balik `TaskStatus` (bukan `Relation`), lempar `LogicException`. Ini pernah beneran kejadian (500 di `/tickets/masuk`) — lihat § 8.
+- **`assertActorOwnsTicket()`** — aktor harus punya salah satu role dari `holderRoles()` (§ 3). Full-access (owner/admin) dibebaskan.
+- **`assertTicketStillOpen()`** — tolak kalau `handler=FOP` ("udah di FOP, lihat Task FOP"), `status=CLOSED`, atau `status=CANCELLED`.
 
-`fopTask` null (FopTask udah dihapus FOP lewat `nullOnDelete`) → `statusLabel()` balikin `"Terputus"`, bukan crash.
+**`onCheckNoc()` sengaja TIDAK pakai `assertActorOwnsTicket()`** — di window pending guard itu mengizinkan `helpdesk` juga, padahal Oncheck spesifik cuma buat NOC. Jadi dia mengecek role secara langsung.
 
-## 6. Bucket Submenu (`TicketBucket`)
+**Kenapa `reason` wajib khusus Batalkan:** membatalkan keluhan pelanggan itu keputusan yang menutup jalur, beda dari menyelesaikan (yang hasilnya terbukti dari kondisi layanan). Tanpa alasan tertulis, audit gak punya apa-apa buat ditelusuri.
 
-| Bucket | Status `FopTask` yang masuk |
-|---|---|
-| Ticket Masuk | `draft` |
-| Ticket di Proses | `terjadwal`, `in_progress`, `pending` (termasuk "Lapor Nanti" — itu `pending` + `Task.report_deferred`, bukan status terpisah) |
-| Ticket Selesai | `selesai` |
-| Ticket Dibatalkan | `dibatalkan`, **plus** tiket "Terputus" (`fop_task_id` null) |
+## 7. Pembatalan: Dua Pintu, Dua Wewenang
 
-Empat bucket ini **wajib saling lepas dan menutupi seluruh `TaskStatus`** — dijaga test `test_buckets_cover_every_task_status_exactly_once()`. Kalau nambah case baru di `TaskStatus` dan lupa dipetakan, test itu gagal duluan sebelum tiketnya diam-diam hilang dari semua submenu.
+| | Tiket **pra-FOP** (`handler` helpdesk/noc) | Tiket **pasca-FOP** (`handler=fop`) |
+|---|---|---|
+| Endpoint | `POST /tickets/{id}/cancel` | `PUT /fop-tasks/{id}` status=dibatalkan |
+| Permission | `tickets.cancel` | `fop_tasks.cancel` |
+| Riwayat | 1 baris (`ticket_histories`) | 2 baris (`ticket_histories` + `fop_task_status_history`) |
+| Siapa | pihak yang lagi pegang tiket | FOP/admin/owner |
 
-Filter dijalankan lewat `Ticket::scopeInBucket()` — query langsung ke kolom `fop_tasks.status`, bukan cache/computed column, jadi begitu status berubah, tiket otomatis pindah bucket di request berikutnya.
+Endpoint Ticketing **menolak** tiket yang sudah di FOP (`assertTicketStillOpen()`), dan sebaliknya `/fop-tasks` gak bisa menyentuh tiket yang belum punya `FopTask`. Dua pintu ini gak tumpang tindih.
 
-## 7. Bug: CID Tampil Mentah di List (Fixed)
+> Sebelumnya modul Ticketing sama sekali gak punya endpoint cancel — satu-satunya jalur adalah `/fop-tasks`. Akibatnya tiket yang masih di meja Helpdesk **tidak bisa dibatalkan sama sekali** (salah input, pelanggan batal komplain) tanpa mengeskalasinya dulu ke FOP hanya untuk dibatalkan di sana. `tickets.cancel` menutup lubang itu.
 
-**Gejala:** daftar tiket nampilin `RQ000007` (nomor registrasi mentah) padahal `customers.cid` udah nyimpen CID lengkap (`C1X4CRQ000007`).
-
-**Akar masalah:** `TicketController::index()` eager-load customer dengan kolom dibatasi (`'customer:id,full_name,cid,customer_code'`) — TANPA `pop_id`. `Customer::getDisplayIdAttribute()` butuh akses `$this->pop` (relasi) buat nentuin format; tanpa `pop_id` ke-select, relasi itu selalu `null`, dan accessor diam-diam jatuh ke fallback paling awal (`if (!$pop) return $this->customer_code;`) — skip semua aturan CID (lihat [docs/master/pop/business-logic.md](../master/pop/business-logic.md) buat aturan lengkap format CID).
-
-**Fix:** tambah `pop_id`, `status`, `distribution_id` ke select, plus eager-load `customer.pop:id,name,cid_prefix`. Bug yang sama dicegah di `FopTaskController::index()` (modal Edit) dan `history_detail.blade.php` (Detail Task, cuma 1 row jadi lazy-load langsung, gak perlu eager-load tambahan) dengan pola yang sama.
-
-## 8. RBAC Pembatalan — 3 Lapis, Bukan Satu
-
-Sistem punya **dua objek berbeda** yang bisa dibatalkan, dua permission terpisah, dan satu policy penyambung:
+### RBAC pembatalan pasca-FOP — 3 lapis
 
 | | `fop_tasks.cancel` | `task.cancel` | `TaskPolicy::cancelViaFopTask()` |
 |---|---|---|---|
-| Batalin | `FopTask` (tiket) | `Task` (eksekusi teknisi) langsung dari `/tasks` | `Task` sebagai **efek ikutan** cascade dari `/fop-tasks` |
-| Role default | owner, admin, fop | owner, fop (**admin TIDAK punya!**) | Otoritasnya = `fop_tasks.cancel`, BUKAN `task.cancel` |
+| Batalin | `FopTask` (tiket) | `Task` langsung dari `/tasks` | `Task` sebagai efek cascade dari `/fop-tasks` |
+| Role default | owner, admin, fop | owner, fop (**admin TIDAK punya**) | Otoritasnya = `fop_tasks.cancel`, BUKAN `task.cancel` |
 
-**Kenapa cascade pakai `fop_tasks.cancel`, bukan `task.cancel`:** role `admin` di DB punya `fop_tasks.*` tapi **gak punya** `task.cancel`. Kalau cascade dipaksa lewat `task.cancel`, admin kehilangan kemampuan membatalkan tiket yang selama ini dia punya. Dua permission ini menjaga dua pintu berbeda ke objek berbeda, bukan kelalaian desain.
+**Kenapa cascade pakai `fop_tasks.cancel`:** role `admin` punya `fop_tasks.*` tapi gak punya `task.cancel`. Kalau cascade dipaksa lewat `task.cancel`, admin kehilangan kemampuan membatalkan tiket yang selama ini dia punya.
 
-**Invarian yang tetap dijaga:** `cancelViaFopTask()` memeriksa `task_type` milik **Task yang beneran dibatalkan** (bukan `FopTask.category`) — kalau dua kolom itu menyimpang, tiket MTN gak bisa jadi jalan pintas buat membatalkan Task SURVEY/PSB. `TaskPolicy::before()` sengaja ngecualiin `cancelViaFopTask` dari bypass wildcard owner (`*`), biar invarian ini berlaku ke SEMUA role termasuk owner.
+**Invarian:** `cancelViaFopTask()` memeriksa `task_type` milik **Task yang beneran dibatalkan** (bukan `FopTask.category`) — kalau dua kolom itu menyimpang, tiket MTN gak bisa jadi jalan pintas membatalkan Task SURVEY/PSB. `TaskPolicy::before()` sengaja mengecualikan method ini dari bypass wildcard owner.
 
-Modul Ticketing sendiri **sengaja gak punya endpoint cancel** — `POST /tickets/{id}/cancel` selalu 404. Satu-satunya pintu pembatalan tiket adalah Task FOP.
+## 8. Bucket & Halaman
 
-## 9. Dua History per Pembatalan
+`TicketBucket` masih ada sebagai **klasifikasi**, tapi sudah **bukan lagi route**. Dipakai `Ticket::bucket()`/`scopeInBucket()` buat aksen visual, badge, dan query halaman arsip.
 
-Satu aksi cancel menghasilkan **DUA** baris riwayat, ditulis oleh dua tempat berbeda tergantung jalur:
+| Bucket | Kondisi `handler=FOP` (dari `FopTask.status`) | Kondisi internal (`handler` helpdesk/noc) |
+|---|---|---|
+| Masuk | `draft` | `handler=HELPDESK` & `status=OPEN` |
+| Diproses | `terjadwal`, `in_progress`, `pending` | `handler=NOC` & `status=OPEN` |
+| Selesai | `selesai` | `status=CLOSED` |
+| Dibatalkan | `dibatalkan` + orphan (`handler=FOP` & `fop_task_id` NULL) | `status=CANCELLED` |
+
+Empat bucket ini wajib saling lepas dan menutupi seluruh `TaskStatus` — dijaga `test_buckets_cover_every_task_status_exactly_once()`.
+
+**Pemetaan bucket → halaman** (sejak restrukturisasi 2026-07-28):
+
+| Bucket | Dulu | Sekarang |
+|---|---|---|
+| Masuk | `/tickets/masuk` | Tab **Ticket** di panel List Task Ticketing (handler=helpdesk) + tab **Ticket Masuk** Worksheet NOC (pending NOC) |
+| Diproses | `/tickets/diproses` | Tab **Assign NOC**/**Assign FOP** di panel + tab **Ticket Diproses** Worksheet NOC |
+| Selesai | `/tickets/selesai` (bucket) | Halaman sendiri, controller + permission sendiri |
+| Dibatalkan | `/tickets/dibatalkan` (bucket) | idem |
+
+Panel **List Task Ticketing** di `/tickets/new` memfilter per **`handler`**, bukan per bucket — tab Ticket / Assign NOC / Assign FOP menjawab "tiket ini lagi di tangan siapa", pertanyaan yang beda dari "sudah sampai tahap mana pengerjaannya".
+
+## 9. Halaman Punya Permission Masing-masing
+
+Sebelumnya semua daftar tiket numpang satu route `/tickets/{bucket}` dengan `tickets.view`, jadi memberi akses "lihat arsip" otomatis memberi akses "lihat antrean kerja NOC" — gak bisa dipisah di Role Matrix. Sekarang tiap halaman punya feature sendiri (pola sama `customers.terminated`/`customers.failed`):
+
+```
+tickets              (root)   → view, create, update, cancel
+  ├─ tickets.selesai          → view
+  └─ tickets.dibatalkan       → view
+noc_worksheet        (root)   → view          (penanda modul, buat dependency chaining)
+  ├─ noc_worksheet.masuk      → view
+  └─ noc_worksheet.diproses   → view
+noc_dashboard        (root)   → view
+```
+
+Semuanya ditanam `TicketFeatureSeeder`, permission-nya digenerate `PermissionGeneratorService` dari `config/rbac.php`. Label kontekstual per permission diatur di `permission_name_overrides` biar di Role Matrix kelihatan nama halamannya, bukan cuma "Lihat".
+
+Tab yang user gak punya izinnya **tidak dirender sama sekali** (bukan cuma ditolak saat diklik) — `NocWorksheetController::worksheetTabs()` dan `TicketArchiveController::archiveTabs()` menyaring per permission.
+
+## 10. Bug: CID Tampil Mentah di List (Fixed)
+
+**Gejala:** daftar tiket menampilkan `RQ000007` padahal `customers.cid` menyimpan `C1X4CRQ000007`.
+
+**Akar masalah:** eager-load customer dengan kolom dibatasi TANPA `pop_id`. `Customer::getDisplayIdAttribute()` butuh relasi `$this->pop`; tanpa `pop_id` ke-select relasi itu selalu `null` dan accessor diam-diam jatuh ke fallback paling awal (`if (!$pop) return $this->customer_code;`).
+
+**Fix:** select wajib menyertakan `pop_id`, `status`, `distribution_id` + eager-load `customer.pop:id,name,cid_prefix`. Berlaku di `TicketArchiveController`, `NocWorksheetController`, `TicketController::worksheetTasks()`, dan `FopTaskController::index()`.
+
+## 11. Dua History per Pembatalan Pasca-FOP
 
 | Jalur cancel | History FOP (`fop_task_status_history`) | History Ticket (`ticket_histories`) |
 |---|---|---|
 | `/fop-tasks` (FOP batalin) | `FopTaskController::update()` | `FopTaskObserver` |
-| `/tasks` (Task dibatalin, cascade naik) | `TaskObserver` (guard lolos karena `FopTask` belum `dibatalkan`) | `FopTaskObserver` |
+| `/tasks` (Task dibatalin, cascade naik) | `TaskObserver` | `FopTaskObserver` |
+| `/tickets/{id}/cancel` (pra-FOP) | — (belum ada FopTask) | `TicketService::cancel()` |
 
-`FopTaskObserver` jadi **satu-satunya** penulis sisi Ticket — dua jalur ketutup tanpa nulis dobel (dijaga test `test_assigned_ticket_cancellation_does_not_duplicate_histories`).
+`FopTaskObserver` adalah **satu-satunya** penulis sisi Ticket untuk pembatalan pasca-FOP — dua jalur tertutup tanpa nulis dobel (dijaga `test_assigned_ticket_cancellation_does_not_duplicate_histories`).
 
-**Bug lama yang ditutup di sini:** `TaskObserver` (penulis normal `fop_task_status_history`) punya guard early-return begitu `FopTask` udah berstatus `dibatalkan` (biar cancel manual gak ke-overwrite sync otomatis) — efek sampingnya, cancel dari `/fop-tasks` (yang set status duluan sebelum cascade jalan) gak pernah nulis history FOP sama sekali. Fix: `FopTaskController::update()` nulis `FopTaskStatusHistory` sendiri persis di titik itu, di luar jangkauan guard `TaskObserver`.
+**Bug lama yang ditutup:** `TaskObserver` punya guard early-return begitu `FopTask` sudah `dibatalkan`; efek sampingnya cancel dari `/fop-tasks` gak pernah nulis history FOP. Fix: `FopTaskController::update()` nulis `FopTaskStatusHistory` sendiri persis di titik itu, di luar jangkauan guard.
 
-## 10. Bug: FopTask Draft Gak Naik Status Meski Udah Di-assign (Fixed)
+**Prinsip "satu aksi dua riwayat" hanya berlaku pasca-FOP.** Aksi pra-FOP (close/escalate/oncheck/return/cancel) cuma nulis `ticket_histories` — belum ada FopTask buat dicatat sisi lainnya.
 
-**Gejala:** FOP assign teknisi ke tiket Draft lewat modal Edit tabel `/fop-tasks` — `Task` eksekusi kebuat, teknisi ke-assign beneran, tapi `fop_tasks.status` nyangkut `draft` selamanya. Tiket macet di bucket "Ticket Masuk" walau udah beneran dijadwalkan.
+## 12. Dialog Konfirmasi & Input Alasan
 
-**Akar masalah:** modal Edit ngirim field `status` sebagai hidden input berisi nilai LAMA (`draft`) — form itu emang sengaja gak punya pilihan ubah status manual (`"Status realtime — otomatis mengikuti status Task teknisi, gak bisa diedit manual di sini"`). Blok assign-teknisi di `FopTaskController::update()` bikin `Task` + sync teknisi, tapi gak pernah ikut naikin `FopTask.status`.
+Semua aksi tiket di **semua** halaman lewat satu helper `window.confirmTicketAction()` (`tickets/partials/action-dialog.blade.php`), yang numpang `window.Dialog` global (`components/dialog.blade.php`).
 
-**Fix:** tangkap `$originalStatus` di awal `update()` (sebelum field apa pun diubah). Begitu teknisi baru di-assign (bukan dikosongin) ke `FopTask` yang masih `draft`, status ikut naik ke `terjadwal` + nulis `FopTaskStatusHistory`. Generik — berlaku juga buat `FopTask` Draft non-Ticketing (mis. hasil auto-sync SURVEY yang belum di-assign).
+**Kenapa bukan `confirm()` native:** `confirm()` cuma bisa Ya/Tidak — gak bisa menampung textarea alasan. Padahal `reason` itu yang mengisi `ticket_histories.reason`; selama panel worksheet masih pakai `confirm()`, kolom itu **selalu kosong** dari sana meski backend-nya sudah siap menerima.
 
-## 11. Edit Modal Ikut Ticketing (Sinkronisasi Penuh)
+**Kenapa bukan modal sendiri per halaman:** sempat begitu — tiga file punya markup modal yang hampir identik, dan halaman detail punya versi Alpine keempat. Empat implementasi untuk satu perilaku artinya empat tempat yang harus diperbaiki setiap ada perubahan.
 
-Sebelumnya, `isTicketMode` di modal "Tambah Task FOP" cuma aktif pas **create** — buka modal Edit buat MTN/C-REQ yang udah nyambung ke tiket balik ke form generik (field "Penugasan/Pelanggan" bisa dicari-ulang ke pelanggan LAIN, lepas dari ticket aslinya).
+Catatan teknis: `Dialog.show()` men-*disable* tombol konfirmasi begitu diklik (proteksi double-submit). Kalau validasi alasan gagal, tombol itu harus dihidupkan lagi lewat `e.currentTarget` — kalau tidak, dialognya buntu dan user gak bisa submit ulang setelah mengisi alasan.
 
-**Fix:**
-- `FopTaskController::index()` eager-load `ticket` + `ticket.customer` (dengan `pop_id`/`status`/`distribution_id` — kolom yang sama dari § 7) + `display_id` di-append manual (`$fopTask->ticket?->customer?->append('display_id')`) karena itu accessor, bukan kolom, jadi gak otomatis ikut ke-`json_encode()`.
-- `isTicketMode` di Alpine sekarang juga `true` pas edit kalau `FopTask` punya `ticket` terkait.
-- Panel CID/data pelanggan jadi **read-only** (tombol "Ganti" disembunyikan), Detail Keluhan/Catatan Teknis ditampilkan sebagai teks read-only (bukan textarea) — edit beneran cuma lewat Ticketing, biar gak ada dua sumber kebenaran yang bisa menyimpang.
-- Tipe Task ikut dikunci (`disabled` + hidden input fallback) kalau ada ticket terkait — mencegah kategori diubah manual sampai desync dari `Ticket.type`.
-- POP/Cabang & Desa **otomatis kebaca** dari `fopTask.pop_id`/`village_id` (udah bener sejak `syncToFopTask()`) — field-nya cuma disembunyikan visual (`x-show`), tetap ke-submit gak berubah lewat form yang sama.
+Halaman detail memakai POST native (form dirakit on-the-fly, diberi class `no-confirm` agar tidak kena listener `submit` global yang akan memunculkan dialog konfirmasi kedua); halaman list memakai `fetch()` JSON agar baris hilang in-place tanpa navigasi.
 
-## 12. Detail Task Mengikuti Detail Ticketing
+## 13. Auto-Refresh Realtime
 
-`history_detail.blade.php` nampilin section "Detail Ticket" khusus buat `FopTask` category MTN/C-REQ yang punya `ticket` terkait (`$isTicketOriginType && $ticket`). Isinya harus paritas data (bukan visual) sama `/tickets/{id}`: CID, data pelanggan snapshot, Detail Keluhan & Catatan Teknis versi utuh (bukan `$fopTask->issue` yang kepotong 255 karakter), lampiran, **dan** "Assigned by"/"Created" (siapa & kapan tiket dikirim) — dua elemen terakhir sempat ketinggalan, ditambahkan belakangan.
+`TicketQueueUpdated` di-broadcast **setelah** `DB::transaction()` commit (bukan di dalam closure — gak boleh nembak kalau rollback), dengan `toOthers()` supaya tab aktor sendiri gak refetch dobel.
 
-Section "Riwayat Ticketing" (dari `ticket->histories`) tampil berdampingan dengan "Histori Status" (`fopTask->statusHistories`) yang udah ada — dua riwayat independen sesuai § 9, bukan digabung jadi satu.
+Channel `tickets.{popId}` diotorisasi lewat `EffectiveAccessService::hasAllPopAccess()`/`getAllowedPopIds()` — jalur POP-scope yang benar, **bukan** `$user->pops()` legacy yang dipakai channel `fop.{pop_id}` lama.
 
-Section "Laporan" (laporan teknisi: kendala teknis, alat dipakai, foto) **gak diubah** — itu laporan teknisi tentang apa yang dia kerjakan, beda konsep dari keluhan pelanggan yang datang dari Ticketing. Keduanya tampil berdampingan buat MTN yang asalnya dari tiket.
+Listener me-*refetch* sendiri lewat endpoint yang sudah lolos scope & permission user, bukan mempercayai payload broadcast mentah. Panel worksheet menarik `/api/tickets/worksheet-tasks`; Dashboard NOC me-refetch halamannya sendiri lalu menukar `innerHTML` per container.
 
-Issue/Gangguan (`detail_keluhan`) dan Catatan Teknis (`catatan_teknis`) juga dipisah jadi 2 blok utuh sendiri (bukan berbagi 1 baris grid) — masing-masing sumbernya beda dan gak boleh ketuker: Issue/Gangguan itu keluhan **pelanggan** (wajib diisi), Catatan Teknis itu asesmen **teknis** NOC (opsional). Baris "Issue"/"Catatan" generik di panel Info Task (dari `$fopTask->issue`/`notes`) disembunyikan khusus buat tipe ticket-origin — dua versi konten yang beda (satu kepotong 255 char, satu utuh) gak boleh tampil bersamaan.
+## 14. Format `tugas`: `{CID}_{Nama}`
 
-`composeFopNotes()` (isi `fop_tasks.notes`) SENGAJA cuma pointer pendek (`"Ticket TKT-xxx — dikirim oleh yyy."`), **BUKAN** nyalin ulang `catatan_teknis` ke dalamnya — itu kesalahan desain awal yang bikin dua sumber kebenaran (notes vs ticket.catatan_teknis) bisa menyimpang begitu salah satu diedit belakangan.
+`FopTask.tugas` untuk SURVEY, PSB, MTN, dan C-REQ memakai format `"{customer->display_id}_{customer->full_name}"`, mis. `C1X4ARQ000631_Masudah Yuni Fitri` — bukan label generik. Konsisten dengan identitas pelanggan di seluruh sistem.
 
-## 13. Format `tugas`: `{CID}_{Nama}`
+`composeFopNotes()` (isi `fop_tasks.notes`) SENGAJA cuma pointer pendek (`"Ticket TKT-xxx — dikirim oleh yyy."`), **BUKAN** menyalin ulang `catatan_teknis` — menyalin bikin dua sumber kebenaran yang menyimpang begitu salah satu diedit.
 
-`FopTask.tugas` buat SURVEY, PSB, MTN, dan C-REQ semuanya pakai format `"{customer->display_id}_{customer->full_name}"`, mis. `C1X4ARQ000631_Masudah Yuni Fitri` — bukan label generik ("Survey Pelanggan: ...", "Maintenance: ..."). Konsisten sama identitas pelanggan yang dipakai di seluruh sistem (lihat [docs/master/pop/business-logic.md](../master/pop/business-logic.md)).
+## 15. Restriksi Hapus Task FOP
 
-Diterapkan di 3 tempat: `TicketService::syncToFopTask()` (MTN/C-REQ dari Ticketing) dan `FopTaskController::autoSyncAndCalculatePriority()` (SURVEY & PSB auto-sync). Ketiganya butuh `Customer::pop` ke-eager-load — tanpa itu, `display_id` jatuh ke fallback yang salah (lihat §7).
-
-## 14. Restriksi Hapus Task FOP
-
-`FopTaskController::destroy()` menolak (422) dua kategori:
+`FopTaskController::destroy()` menolak (422):
 
 | Kategori | Kenapa ditolak |
 |---|---|
-| SURVEY, PSB | `destroy()` beneran mentransisikan customer ke status `rejected` sebagai efek samping — konsekuensi bisnis nyata, harus disengaja lewat halaman Pelanggan, bukan tombol Hapus di tabel Task FOP |
-| MTN, C-REQ **yang punya `ticket` terkait** | Riwayat pengirim (`ticket_histories`) harus tetap ke-trace — hapus `FopTask` gak boleh bikin jejak Ticketing jadi yatim tanpa cara ditelusuri |
+| SURVEY, PSB | `destroy()` mentransisikan customer ke `rejected` sebagai efek samping — konsekuensi bisnis nyata, harus disengaja lewat halaman Pelanggan |
+| MTN, C-REQ **yang punya `ticket` terkait** | Riwayat pengirim harus tetap bisa ditelusuri — hapus `FopTask` gak boleh bikin jejak Ticketing jadi yatim |
 
-**MTN/C-REQ yang dibuat MANUAL langsung di `/fop-tasks`** (gak punya `ticket`, `$fopTask->ticket` null) **tetap boleh dihapus** — toleransi buat kasus salah input data. Kategori lain (O-REQ, RELOKASI, DEAC, INFR) gak kena restriksi ini sama sekali.
+MTN/C-REQ yang dibuat manual langsung di `/fop-tasks` (tanpa `ticket`) tetap boleh dihapus.
 
-UI (`fop_tasks/index.blade.php`) menghitung `$canDeleteTask` per baris dan menyembunyikan form Hapus (diganti ikon disabled + tooltip alasan) buat baris yang gak boleh — tapi ini cuma lapisan tampilan, gerbang sebenarnya tetap di `destroy()` server-side.
+---
+
+**Last updated:** 2026-07-28

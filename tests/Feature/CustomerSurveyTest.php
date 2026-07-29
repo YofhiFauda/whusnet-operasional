@@ -62,6 +62,22 @@ class CustomerSurveyTest extends TestCase
             'registration_date' => now(),
         ]);
 
+        // Guard assignment di store() (fix RBAC Issue 3 — semua non-full-access
+        // wajib jadi anggota tim Task yang lagi jalan, gak cukup cuma modal
+        // permission generik customers.detail.survey.update).
+        $task = Task::create([
+            'task_number' => 'TASK-TEST-001',
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'task_type' => TaskType::SURVEY->value,
+            'title' => 'Survey Test Customer 1',
+            'status' => TaskStatus::IN_PROGRESS->value,
+            'started_at' => now(),
+            'created_by' => $technician->id,
+            'updated_by' => $technician->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
+
         $surveyData = [
             'survey_status' => 'completed',
             'survey_date' => now()->format('Y-m-d'),
@@ -247,7 +263,7 @@ class CustomerSurveyTest extends TestCase
         $technician->role_id = $teknisiRole->id;
         $technician->save();
 
-        Customer::create([
+        $customer = Customer::create([
             'customer_code' => 'TEST-004',
             'full_name' => 'Test Customer 4',
             'primary_phone' => '0812345681',
@@ -256,6 +272,23 @@ class CustomerSurveyTest extends TestCase
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
         ]);
+
+        // Teknisi cuma liat pelanggan yang Task Survey-nya dijadwalkan buat
+        // dirinya (lihat tests/Feature/SurveyInstallationQueueScopeTest.php —
+        // fix RBAC: sebelumnya antrean nampilin SEMUA pelanggan ke teknisi
+        // mana pun, gak peduli assignment).
+        $task = Task::create([
+            'task_number' => 'TASK-TEST-004',
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'task_type' => TaskType::SURVEY->value,
+            'title' => 'Survey Test Customer 4',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now()->subHour(),
+            'created_by' => $technician->id,
+            'updated_by' => $technician->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
 
         $response = $this->actingAs($technician)
             ->get(route('surveys.queue'));

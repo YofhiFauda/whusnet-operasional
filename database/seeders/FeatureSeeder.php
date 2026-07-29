@@ -103,6 +103,28 @@ class FeatureSeeder extends Seeder
                 'type' => FeatureType::ROOT,
                 'sort_order' => 15,
             ],
+            // Root sendiri, sengaja dipisah dari 'customers' — sebelumnya nested
+            // sebagai mini-feature anak 'customers.detail', jadi JS dependency
+            // chaining di matrix.blade.php (checkbox anak auto-nyentang parent)
+            // bikin role Teknisi yang cuma dikasih akses Survey/Pemasangan otomatis
+            // ikut kebawa dapet customers.view + customers.detail.view (bisa lihat
+            // List & Detail Pelanggan penuh lintas status). Kode permission
+            // ('customers.detail.survey.view' dst) TIDAK berubah — kode permission
+            // = feature.code + action.code, independen dari parent_id
+            // (lihat PermissionGeneratorService::generate()), jadi route/controller/
+            // config/rbac.php tidak perlu disentuh.
+            [
+                'code' => 'customers.detail.survey',
+                'name' => 'Survey Pelanggan',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 17,
+            ],
+            [
+                'code' => 'customers.detail.installation',
+                'name' => 'Pemasangan Pelanggan',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 18,
+            ],
         ];
 
         $rootFeatureIds = [];
@@ -135,6 +157,20 @@ class FeatureSeeder extends Seeder
                 'name' => 'Detail Pelanggan',
                 'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 2,
+            ],
+            [
+                'parent_code' => 'customers',
+                'code' => 'customers.terminated',
+                'name' => 'List Pelanggan Putus',
+                'type' => FeatureType::SUB_FEATURE,
+                'sort_order' => 3,
+            ],
+            [
+                'parent_code' => 'customers',
+                'code' => 'customers.failed',
+                'name' => 'List Pelanggan Gagal',
+                'type' => FeatureType::SUB_FEATURE,
+                'sort_order' => 4,
             ],
         ];
 
@@ -179,31 +215,17 @@ class FeatureSeeder extends Seeder
             ],
             [
                 'parent_code' => 'customers.detail',
-                'code' => 'customers.detail.survey',
-                'name' => 'Survey Pelanggan',
-                'type' => FeatureType::MINI_FEATURE,
-                'sort_order' => 4,
-            ],
-            [
-                'parent_code' => 'customers.detail',
-                'code' => 'customers.detail.installation',
-                'name' => 'Pemasangan Pelanggan',
-                'type' => FeatureType::MINI_FEATURE,
-                'sort_order' => 5,
-            ],
-            [
-                'parent_code' => 'customers.detail',
                 'code' => 'customers.detail.devices',
                 'name' => 'Perangkat Pelanggan',
                 'type' => FeatureType::MINI_FEATURE,
-                'sort_order' => 6,
+                'sort_order' => 4,
             ],
             [
                 'parent_code' => 'customers.detail',
                 'code' => 'customers.detail.documents',
                 'name' => 'Dokumen Pelanggan',
                 'type' => FeatureType::MINI_FEATURE,
-                'sort_order' => 7,
+                'sort_order' => 5,
             ],
         ];
 

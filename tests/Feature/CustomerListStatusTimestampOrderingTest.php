@@ -128,7 +128,8 @@ class CustomerListStatusTimestampOrderingTest extends TestCase
             'full_name' => 'Reject Baru', 'pop_id' => $pop->id,
         ]);
 
-        $response = $this->actingAs($admin)->get('/customers?status_group=failed');
+        // Route + permission sendiri sekarang — lihat CustomerFailedController.
+        $response = $this->actingAs($admin)->get(route('customers.failed'));
         $response->assertStatus(200);
 
         // Yang paling baru ditolak muncul lebih dulu di halaman.

@@ -103,6 +103,13 @@ return [
             ActionCode::CREATE->value,
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
+            // Terminasi langganan — sebelumnya numpang di customers.update
+            // (CustomerTerminationController gak punya guard permission sama
+            // sekali), jadi role mana pun yang bisa edit field pelanggan biasa
+            // (Helpdesk/Sales) otomatis bisa putus langganan juga. Aksi
+            // destruktif/service-impacting, wajib permission sendiri — pola
+            // sama kayak customers.detail.devices.retrieve.
+            ActionCode::DEACTIVATE->value,
         ],
 
         'customers.import' => [
@@ -111,6 +118,19 @@ return [
         ],
 
         'customers.detail' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // List Pelanggan Putus & List Pelanggan Gagal — sebelumnya numpang
+        // customers.view yang sama persis dengan List Data Pelanggan biasa
+        // (cuma beda query param status_group), jadi gak bisa di-toggle
+        // independen lewat Role Matrix. Sekarang masing-masing halaman
+        // (route + controller sendiri) punya permission sendiri.
+        'customers.terminated' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'customers.failed' => [
             ActionCode::VIEW->value,
         ],
 
@@ -205,6 +225,57 @@ return [
         'tickets' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
+            // Close/Escalate/Return (Ticket::close()/escalateToNoc()/escalateToFop()/
+            // returnToHelpdesk()) — satu permission generik buat aksi-aksi itu,
+            // otorisasi per-handler (siapa lagi pegang tiket) dicek di
+            // TicketService, bukan di sini.
+            ActionCode::UPDATE->value,
+            // Batalkan tiket pra-FOP (Ticket::cancel()) — permission terpisah
+            // dari UPDATE biar bisa diatur independen lewat matrix role (mis.
+            // NOC boleh close/escalate tapi gak boleh batalkan).
+            ActionCode::CANCEL->value,
+        ],
+
+        // Arsip Ticket Selesai & Dibatalkan — dulu numpang `tickets.view` lewat
+        // route bucket generik `/tickets/{bucket}`, jadi gak bisa di-toggle
+        // per-halaman di Role Matrix. Sekarang masing-masing halaman (route +
+        // controller sendiri) punya permission sendiri, pola sama persis
+        // customers.terminated/customers.failed di atas.
+        'tickets.selesai' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'tickets.dibatalkan' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Worksheet NOC & Dashboard NOC — feature terpisah dari 'tickets'
+        // (bukan cuma aksi atas tiket, tapi AKSES HALAMAN KERJA) biar RBAC-nya
+        // bisa diatur independen. Dua tab Worksheet NOC juga halaman sendiri.
+        'noc_worksheet' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'noc_worksheet.masuk' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'noc_worksheet.diproses' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'noc_dashboard' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // DELETE digenerate tapi TIDAK dipasang ke route CRUD — kategori
+        // di-toggle is_active, bukan dihapus keras (pola sama dengan packages),
+        // biar kategori yang sudah dipakai tiket lama gak kehilangan jejak.
+        'ticket_issue_categories' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
         ],
     ],
 
@@ -252,5 +323,22 @@ return [
         'customers.detail.devices.update_sensitive' => 'Ubah Data Sensitif Perangkat',
         'customers.detail.devices.view_sensitive' => 'Lihat Data Sensitif Perangkat',
         'customers.detail.devices.retrieve' => 'Ambil Alat Pelanggan Putus Langganan',
+        'customers.detail.view' => 'Lihat Detail Pelanggan',
+        'customers.terminated.view' => 'Lihat List Pelanggan Putus',
+        'customers.failed.view' => 'Lihat List Pelanggan Gagal',
+
+        // Modul Ticketing — tiap halaman punya permission sendiri, jadi
+        // labelnya harus nyebut NAMA HALAMAN-nya biar di Role Matrix kelihatan
+        // jelas mana yang lagi di-toggle (bukan cuma "Lihat"/"Buat" generik).
+        'tickets.create' => 'Buka Halaman New Ticket (Worksheet)',
+        'tickets.view' => 'Lihat Ticket & Detailnya',
+        'tickets.update' => 'Aksi Ticket (Selesai/Assign NOC/Assign FOP/Oncheck/Kembalikan)',
+        'tickets.cancel' => 'Batalkan Ticket (pra-FOP)',
+        'tickets.selesai.view' => 'Lihat Halaman Ticket Selesai',
+        'tickets.dibatalkan.view' => 'Lihat Halaman Ticket Dibatalkan',
+        'noc_worksheet.view' => 'Akses Modul Worksheet NOC',
+        'noc_worksheet.masuk.view' => 'Lihat Tab Ticket Masuk (Worksheet NOC)',
+        'noc_worksheet.diproses.view' => 'Lihat Tab Ticket Diproses (Worksheet NOC)',
+        'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
     ],
 ];

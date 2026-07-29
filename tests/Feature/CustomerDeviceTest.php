@@ -145,8 +145,11 @@ class CustomerDeviceTest extends TestCase
             'technical_note' => 'Router pelanggan sudah dikonfigurasi manual.',
         ]);
 
+        // Teknisi gak punya customers.detail.view (Detail Pelanggan diblok),
+        // tab Perangkat diakses lewat halaman terpisah customers.fieldwork —
+        // lihat CustomerFieldworkController.
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
         $response->assertSee('Data Perangkat Pelanggan');
@@ -228,8 +231,10 @@ class CustomerDeviceTest extends TestCase
             'note' => 'Purnama Ayu Lestari Putri',
         ]);
 
+        // Teknisi gak punya customers.detail.view — lihat catatan di
+        // test_device_data_is_visible_on_customer_detail().
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
         $response->assertSee('Data Perangkat Migrasi');

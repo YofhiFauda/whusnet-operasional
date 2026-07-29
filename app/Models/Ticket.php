@@ -6,6 +6,9 @@ use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketBucket;
+use App\Enums\TicketHandler;
+use App\Enums\TicketHandlingStatus;
+use App\Enums\TicketHistoryAction;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,13 +19,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Ticket — tiket internal PERUSAHAAN (helpdesk/NOC/sales/admin), beda dari
  * FopTask yang internal FOP. Tiket adalah *permintaan*; FopTask adalah
- * *penugasan* hasil auto-sync dari permintaan itu (lihat TicketService::create()).
+ * *penugasan* — TAPI BEDA dari versi lama modul ini, FopTask sekarang TIDAK
+ * lagi auto-dibuat saat tiket disubmit. Tiket mulai di tangan Helpdesk
+ * (`handler` = HELPDESK), dan cuma nyampe FOP (FopTask kebentuk) kalau
+ * eksplisit dieskalasi — lihat TicketService::create()/escalateToFop().
  *
  * Cuma berlaku buat tipe MTN & C-REQ — lihat TaskType::ticketValues().
  */
 #[Fillable([
     'ticket_number',
     'type',
+    'issue_category_id',
     'customer_id',
     'pop_id',
     'customer_name',
@@ -38,6 +45,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'priority',
     'created_by',
     'fop_task_id',
+    'handler',
+    'status',
+    'noc_checked_at',
 ])]
 class Ticket extends Model
 {
@@ -50,6 +60,9 @@ class Ticket extends Model
             'priority' => FopTaskPriority::class,
             'customer_latitude' => 'decimal:7',
             'customer_longitude' => 'decimal:7',
+            'handler' => TicketHandler::class,
+            'status' => TicketHandlingStatus::class,
+            'noc_checked_at' => 'datetime',
         ];
     }
 
@@ -74,6 +87,11 @@ class Ticket extends Model
     public function pop(): BelongsTo
     {
         return $this->belongsTo(Pop::class);
+    }
+
+    public function issueCategory(): BelongsTo
+    {
+        return $this->belongsTo(TicketIssueCategory::class, 'issue_category_id');
     }
 
     /**
@@ -104,17 +122,79 @@ class Ticket extends Model
     }
 
     /**
-     * Saring tiket per bucket submenu Ticketing. Status-nya nempel di FopTask
-     * hasil sync, jadi filternya lewat relasi — bukan kolom di tabel ini.
+     * Saring tiket per bucket submenu Ticketing. Dua rezim, tergantung `handler`:
+     *  - handler=FOP  → turunan FopTask.status (existing, sama kayak sebelumnya).
+     *  - handler=HELPDESK/NOC → belum pernah ke FOP, turunan `status`/`handler`
+     *    kolom sendiri (lihat bucket()).
+     *
+     * `handler=FOP` + `fop_task_id` null = FopTask-nya udah dihapus FOP
+     * (orphan/"Terputus", nullOnDelete) — beda dari tiket yang MEMANG belum
+     * pernah dieskalasi, makanya pembeda dua kasus null itu pakai `handler`,
+     * BUKAN `fop_task_id` doang.
      */
     public function scopeInBucket(Builder $query, TicketBucket $bucket): Builder
     {
         return $query->where(function (Builder $q) use ($bucket) {
-            $q->whereHas('fopTask', fn (Builder $f) => $f->whereIn('status', $bucket->statusValues()));
+            $q->where(function (Builder $fopQ) use ($bucket) {
+                $fopQ->where('handler', TicketHandler::FOP->value)
+                    ->whereHas('fopTask', fn (Builder $f) => $f->whereIn('status', $bucket->statusValues()));
+            });
 
             if ($bucket->includesOrphans()) {
-                $q->orWhereNull('fop_task_id');
+                $q->orWhere(function (Builder $orphanQ) {
+                    $orphanQ->where('handler', TicketHandler::FOP->value)->whereNull('fop_task_id');
+                });
             }
+
+            if ($bucket === TicketBucket::SELESAI) {
+                $q->orWhere(function (Builder $internalQ) {
+                    $internalQ->whereIn('handler', [TicketHandler::HELPDESK->value, TicketHandler::NOC->value])
+                        ->where('status', TicketHandlingStatus::CLOSED->value);
+                });
+            }
+
+            if ($bucket === TicketBucket::DIBATALKAN) {
+                $q->orWhere(function (Builder $internalQ) {
+                    $internalQ->whereIn('handler', [TicketHandler::HELPDESK->value, TicketHandler::NOC->value])
+                        ->where('status', TicketHandlingStatus::CANCELLED->value);
+                });
+            }
+
+            if ($bucket === TicketBucket::MASUK) {
+                $q->orWhere(function (Builder $internalQ) {
+                    $internalQ->where('handler', TicketHandler::HELPDESK->value)
+                        ->where('status', TicketHandlingStatus::OPEN->value);
+                });
+            }
+
+            if ($bucket === TicketBucket::DIPROSES) {
+                $q->orWhere(function (Builder $internalQ) {
+                    $internalQ->where('handler', TicketHandler::NOC->value)
+                        ->where('status', TicketHandlingStatus::OPEN->value);
+                });
+            }
+        });
+    }
+
+    /**
+     * Tiket yang masih "aktif" buat panel worksheet (List Task Ticketing) —
+     * exclude Selesai & Dibatalkan dari akar query, BUKAN cuma disaring tab
+     * client-side. Helpdesk/NOC fokus cuma ke kerjaan yang masih jalan;
+     * tiket yang udah kelar cari lewat /tickets/selesai atau /tickets/dibatalkan.
+     */
+    public function scopeActiveForWorksheet(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->where(function (Builder $internal) {
+                $internal->whereIn('handler', [TicketHandler::HELPDESK->value, TicketHandler::NOC->value])
+                    ->where('status', TicketHandlingStatus::OPEN->value);
+            })->orWhere(function (Builder $fop) {
+                $fop->where('handler', TicketHandler::FOP->value)
+                    ->whereHas('fopTask', fn (Builder $f) => $f->whereNotIn('status', [
+                        TaskStatus::SELESAI->value,
+                        TaskStatus::DIBATALKAN->value,
+                    ]));
+            });
         });
     }
 
@@ -126,64 +206,230 @@ class Ticket extends Model
      */
     public function bucket(): TicketBucket
     {
-        $status = $this->resolveStatus();
+        if ($this->handler === TicketHandler::FOP) {
+            $status = $this->fopTask?->status;
 
-        if (! $status) {
+            if (! $status) {
+                return TicketBucket::DIBATALKAN;
+            }
+
+            foreach (TicketBucket::cases() as $bucket) {
+                if (in_array($status, $bucket->statuses(), true)) {
+                    return $bucket;
+                }
+            }
+
             return TicketBucket::DIBATALKAN;
         }
 
-        foreach (TicketBucket::cases() as $bucket) {
-            if (in_array($status, $bucket->statuses(), true)) {
-                return $bucket;
-            }
+        if ($this->status === TicketHandlingStatus::CLOSED) {
+            return TicketBucket::SELESAI;
         }
 
-        return TicketBucket::DIBATALKAN;
+        if ($this->status === TicketHandlingStatus::CANCELLED) {
+            return TicketBucket::DIBATALKAN;
+        }
+
+        return $this->handler === TicketHandler::NOC ? TicketBucket::DIPROSES : TicketBucket::MASUK;
     }
 
     /**
-     * Status tiket TIDAK disimpan sebagai kolom — selalu diturunkan dari
-     * FopTask hasil sync, biar gak ada dua sumber kebenaran yang bisa
-     * melenceng (kasus yang sama kayak unifikasi FopTaskStatus → TaskStatus
-     * di migration 2026_07_20_000001).
+     * Window "pending NOC" — Helpdesk kirim ke NOC tapi NOC BELUM Oncheck.
+     * Selama ini Helpdesk MASIH pegang kendali penuh (lihat holderRoles()).
+     */
+    public function isPendingNoc(): bool
+    {
+        return $this->handler === TicketHandler::NOC
+            && $this->status === TicketHandlingStatus::OPEN
+            && $this->noc_checked_at === null;
+    }
+
+    /**
+     * NOC udah resmi Oncheck — cuma NOC yang bisa lanjut act dari sini,
+     * Helpdesk kehilangan akses (lihat holderRoles()).
+     */
+    public function isOnCheckNoc(): bool
+    {
+        return $this->handler === TicketHandler::NOC
+            && $this->status === TicketHandlingStatus::OPEN
+            && $this->noc_checked_at !== null;
+    }
+
+    /**
+     * Role yang sah bertindak atas tiket ini SEKARANG — satu-satunya sumber
+     * dipakai TicketService::assertActorOwnsTicket() (real authz) DAN
+     * actionFlagsFor() (UI gate), biar dua-duanya konsisten.
      *
-     * SENGAJA dinamai `resolveStatus()`, BUKAN `status()`. Eloquent nebak
-     * method zero-argument bernama sama kayak attribute access itu relasi —
-     * begitu ada kode yang nulis `$ticket->status` (properti, wajar banget
-     * ditulis padahal method-nya `status()`), Eloquent manggil `status()`,
-     * dapet balik `TaskStatus` (bukan instance Relation), lalu lempar
-     * `LogicException: Ticket::status must return a relationship instance.`
-     * Ini pernah beneran kejadian (500 di /tickets/masuk) waktu blade nulis
-     * `$ticket->status->value` — lihat index.blade.php.
+     * @return string[]
+     */
+    public function holderRoles(): array
+    {
+        return match ($this->handler) {
+            TicketHandler::HELPDESK => ['helpdesk'],
+            TicketHandler::NOC => $this->noc_checked_at === null
+                ? ['helpdesk', 'noc']
+                : ['noc'],
+            TicketHandler::FOP => [],
+        };
+    }
+
+    /**
+     * Status FopTask kalau tiket udah nyampe FOP (`handler` = FOP). null
+     * kalau belum pernah ke FOP SAMA SEKALI, ATAU udah tapi FopTask-nya
+     * kehapus (orphan) — dua kasus itu dibedain lewat `handler`, bukan cuma
+     * cek null di sini (lihat statusLabel()/bucket()).
+     *
+     * SENGAJA dinamai `resolveStatus()`, BUKAN `status()` — `status` udah
+     * jadi nama kolom (`TicketHandlingStatus`), method zero-argument bernama
+     * sama bakal ketiban logika relasi Eloquent kalau suatu saat konflik.
+     * Riwayat masalah yang sama pernah beneran kejadian (500 di /tickets/masuk).
      */
     public function resolveStatus(): ?TaskStatus
     {
-        return $this->fopTask?->status;
+        return $this->handler === TicketHandler::FOP ? $this->fopTask?->status : null;
     }
 
     /**
-     * Label status buat UI. null fopTask = FopTask-nya udah dihapus FOP
-     * (fop_task_id ke-null lewat nullOnDelete), tiketnya sendiri tetap ada.
+     * Label status buat UI — dua rezim sama kayak bucket()/scopeInBucket().
      */
     public function statusLabel(): string
     {
-        $status = $this->resolveStatus();
+        if ($this->handler === TicketHandler::FOP) {
+            $status = $this->resolveStatus();
 
-        if (! $status) {
-            return 'Terputus';
+            return $status ? $status->displayLabel() : 'Terputus';
         }
 
-        return $status->displayLabel();
+        if ($this->status === TicketHandlingStatus::CLOSED) {
+            return 'Selesai ('.$this->handler->label().')';
+        }
+
+        if ($this->status === TicketHandlingStatus::CANCELLED) {
+            return 'Dibatalkan ('.$this->handler->label().')';
+        }
+
+        if ($this->isPendingNoc()) {
+            return 'Pending NOC';
+        }
+
+        if ($this->isOnCheckNoc()) {
+            return 'OnCheck NOC';
+        }
+
+        return 'Ditangani '.$this->handler->label();
     }
 
     public function statusBadgeClasses(): string
     {
-        $status = $this->resolveStatus();
+        if ($this->handler === TicketHandler::FOP) {
+            $status = $this->resolveStatus();
 
-        if (! $status) {
-            return 'bg-slate-100 text-slate-600 border-slate-200';
+            return $status ? $status->displayBadgeClasses() : 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
         }
 
-        return $status->displayBadgeClasses();
+        if ($this->status === TicketHandlingStatus::CLOSED) {
+            return 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400';
+        }
+
+        if ($this->status === TicketHandlingStatus::CANCELLED) {
+            return 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400';
+        }
+
+        if ($this->isOnCheckNoc()) {
+            return 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300';
+        }
+
+        return $this->handler === TicketHandler::NOC
+            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400'
+            : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/50 text-sky-700 dark:text-sky-400';
+    }
+
+    /**
+     * Atribusi "siapa ngapain" — dibuat siapa (creator(), udah ada), diselesaikan
+     * siapa, dikirim ke NOC siapa, dikirim ke FOP siapa. Diturunkan dari
+     * `histories` yang UDAH eager-loaded (orderByDesc happened_at bawaan
+     * relasi), BUKAN query baru — pemanggil WAJIB eager-load 'histories.actor'
+     * dulu, sama kayak aturan bucket()/fopTask di atas.
+     */
+    public function closedBy(): ?User
+    {
+        return $this->histories->firstWhere('action', TicketHistoryAction::DISELESAIKAN)?->actor;
+    }
+
+    /**
+     * Siapa yang Oncheck NOC (resmi ambil alih dari window pending). Null
+     * kalau belum pernah di-check sama sekali.
+     */
+    public function checkedBy(): ?User
+    {
+        return $this->histories->firstWhere('action', TicketHistoryAction::DICEK_NOC)?->actor;
+    }
+
+    public function escalatedToNocBy(): ?User
+    {
+        return $this->histories
+            ->first(fn (TicketHistory $h) => $h->action === TicketHistoryAction::DIESKALASI && $h->to_status === TicketHandler::NOC->value)
+            ?->actor;
+    }
+
+    public function escalatedToFopBy(): ?User
+    {
+        return $this->histories
+            ->first(fn (TicketHistory $h) => $h->action === TicketHistoryAction::DIESKALASI && $h->to_status === TicketHandler::FOP->value)
+            ?->actor;
+    }
+
+    /**
+     * Siapa yang ngembaliin tiket ke Helpdesk (Gap #7 — jalur pemulihan salah
+     * kirim, docs/plan/analisa-efektivitas-worksheet-ticketing.md). Cuma
+     * relevan kalau tiket PERNAH balik dari NOC ke Helpdesk lagi.
+     */
+    public function returnedToHelpdeskBy(): ?User
+    {
+        return $this->histories->firstWhere('action', TicketHistoryAction::DIKEMBALIKAN)?->actor;
+    }
+
+    /**
+     * Flag tombol Selesaikan Sendiri/Kirim ke NOC/Kirim ke FOP/Kembalikan ke
+     * Helpdesk — SATU-SATUNYA sumber buat UI (worksheet panel, index bucket,
+     * halaman detail). Cuma gerbang tampilan; otorisasi sungguhan tetap di
+     * TicketService::assertActorOwnsTicket()/assertTicketStillOpen().
+     *
+     * can_return_to_helpdesk cuma buat NOC — Helpdesk gak punya "turun"
+     * lagi (dia asal-usulnya), dan FOP udah terminal buat sisi Ticketing
+     * (assertTicketStillOpen() nolak semua aksi begitu handler=FOP, gak ada
+     * "kembali dari FOP" lewat Ticketing — pembatalan FOP tetap lewat
+     * /fop-tasks, lihat CLAUDE.md § Sinkronisasi Ticket ↔ FopTask).
+     *
+     * @return array{can_close: bool, can_escalate_noc: bool, can_escalate_fop: bool, can_return_to_helpdesk: bool, can_cancel: bool, can_oncheck_noc: bool}
+     */
+    public function actionFlagsFor(User $user): array
+    {
+        $isHolder = $user->hasFullAccess()
+            || collect($this->holderRoles())->contains(fn ($role) => $user->hasRole($role));
+
+        $canAct = $this->handler !== TicketHandler::FOP
+            && $this->status === TicketHandlingStatus::OPEN
+            && $user->hasPermission('tickets.update')
+            && $isHolder;
+
+        // NOC wajib Oncheck dulu sebelum Selesaikan (lihat
+        // TicketService::assertNocCheckedBeforeClose()) — kalau actor NOC
+        // (bukan full-access) dan tiket masih pending, sembunyiin Selesai.
+        $canClose = $canAct && ! (
+            $this->isPendingNoc() && ! $user->hasFullAccess() && $user->hasRole('noc')
+        );
+
+        return [
+            'can_close' => $canClose,
+            'can_escalate_noc' => $canAct && $this->handler === TicketHandler::HELPDESK,
+            'can_escalate_fop' => $canAct,
+            'can_return_to_helpdesk' => $canAct && $this->handler === TicketHandler::NOC,
+            'can_cancel' => $canAct && $user->hasPermission('tickets.cancel'),
+            'can_oncheck_noc' => $this->isPendingNoc()
+                && $this->status === TicketHandlingStatus::OPEN
+                && $user->hasPermission('tickets.update')
+                && ($user->hasFullAccess() || $user->hasRole('noc')),
+        ];
     }
 }

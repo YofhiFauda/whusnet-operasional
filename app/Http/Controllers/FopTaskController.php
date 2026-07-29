@@ -1105,6 +1105,10 @@ class FopTaskController extends Controller
             'ticket.creator:id,name',
             'ticket.attachments.uploader:id,name',
             'ticket.histories.actor:id,name',
+            // Kategori Issue (Master Issue) — belum ditampilkan sama sekali
+            // di Detail Task, padahal udah ada field-nya sejak Master Issue
+            // ditambah (docs/plan/RANCANGAN_MASTER_ISSUE_TICKETING.md).
+            'ticket.issueCategory:id,name',
         ]);
 
         $survey = null;

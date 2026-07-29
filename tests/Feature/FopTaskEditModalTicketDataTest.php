@@ -110,6 +110,12 @@ class FopTaskEditModalTicketDataTest extends TestCase
 
         $ticket = Ticket::first();
 
+        // FopTask gak lagi auto-dibuat pas submit — eskalasi eksplisit ke FOP
+        // biar tetap muncul di /fop-tasks (subjek test ini).
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
 
         $response->assertOk();

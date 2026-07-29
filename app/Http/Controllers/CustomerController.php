@@ -55,11 +55,39 @@ class CustomerController extends Controller
 {
     /**
      * Display a listing of the customers with search and filters.
+     *
+     * List Pelanggan Putus & List Pelanggan Gagal PUNYA route + permission
+     * sendiri sekarang (CustomerTerminatedController / CustomerFailedController)
+     * — kalau ada link/bookmark lama yang masih pakai
+     * /customers?status_group=terminated|failed, redirect ke route barunya
+     * biar permission-nya bener-bener kecek di sana, bukan numpang
+     * customers.view di sini.
      */
     public function index(Request $request)
     {
-        $search = trim((string) $request->query('search', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
+        if ($statusGroup === 'terminated') {
+            return redirect()->route('customers.terminated');
+        }
+        if ($statusGroup === 'failed') {
+            return redirect()->route('customers.failed');
+        }
+
+        return $this->renderCustomerList($request);
+    }
+
+    /**
+     * Query builder + view render bersama buat List Data Pelanggan biasa,
+     * List Pelanggan Putus, dan List Pelanggan Gagal — cuma beda filter
+     * status. Dipanggil dari index() di sini, dan dari
+     * CustomerTerminatedController / CustomerFailedController (extend class
+     * ini) dengan $forcedStatusGroup di-set biar gak bisa "dipaksa ganti
+     * grup" lewat query string di route yang salah permission-nya.
+     */
+    protected function renderCustomerList(Request $request, ?string $forcedStatusGroup = null)
+    {
+        $search = trim((string) $request->query('search', ''));
+        $statusGroup = $forcedStatusGroup ?? trim((string) $request->query('status_group', ''));
         // Default to empty string '' (Semua active & suspend) if not specified
         $status = $request->query('status', '');
         // Fase 5.4 — filter wilayah multi-pilih (dropdown Kecamatan + Desa).
@@ -1531,7 +1559,7 @@ class CustomerController extends Controller
                 }
                 $seenPhones[$phoneKey] = true;
 
-                if (Customer::where('phone', $primaryPhone)->orWhere('primary_phone', $primaryPhone)->exists()) {
+                if (Customer::where('primary_phone', $primaryPhone)->exists()) {
                     $warnings[] = 'Nomor HP sudah terdaftar di database; duplikasi dicegah berdasarkan ID pelanggan lama.';
                 }
             } else {

@@ -135,10 +135,10 @@
                          :class="[
                             'flex items-center justify-between text-[11px] rounded-lg px-2.5 py-2 border transition-all duration-150 shadow-xs',
                             dragging && dragging.fopTaskId === {{ $t['fop_task_id'] }}
-                                ? 'opacity-40 border-dashed bg-slate-100 border-slate-300'
+                                ? 'opacity-40 border-dashed bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'
                                 : ({{ $t['draggable'] ? 'true' : 'false' }}
-                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-750 border-border hover:border-primary/30'
-                                    : 'cursor-not-allowed bg-slate-50 border-slate-200 opacity-60')
+                                    ? 'cursor-grab hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-700/50 dark:hover:bg-slate-700 dark:hover:bg-slate-700/50 dark:hover:bg-slate-750 border-border hover:border-primary/30'
+                                    : 'cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60')
                          ]">
                         <div class="flex items-center gap-2 truncate flex-1 mr-1">
                             @if($t['draggable'])
@@ -177,7 +177,7 @@
                         </span>
                         @endforeach
                         @if($team['members']->count() > 4)
-                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-sm">
+                        <span class="h-6 w-6 rounded-full bg-slate-200 text-slate-700 dark:text-slate-300 border-2 border-surface flex items-center justify-center text-[9px] font-bold font-sans shadow-sm">
                             +{{ $team['members']->count() - 4 }}
                         </span>
                         @endif
@@ -414,7 +414,7 @@
     <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Antrean Survey</p>
-            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-xs">Batas respon 1×24 jam sejak pendaftaran</span>
+            <span class="text-xs text-text-muted font-medium font-sans bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded shadow-xs">Batas respon 1×24 jam sejak pendaftaran</span>
         </div>
         <div id="antrian-survey-container" class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
             @if($surveyQueue->count() > 0)
@@ -520,7 +520,7 @@
                                         <span>Terjadwal</span>
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 text-text-muted font-sans">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full border border-border bg-slate-50 dark:bg-slate-800/50 text-text-muted font-sans">
                                         <span>Standby</span>
                                     </span>
                                 @endif

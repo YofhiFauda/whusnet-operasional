@@ -49,12 +49,12 @@ class AuditLogController extends Controller
         $modules = Cache::remember(
             'audit_logs.distinct_modules',
             now()->addMinutes(5),
-            fn () => AuditLog::query()->select('module')->distinct()->orderBy('module')->pluck('module')
+            fn () => AuditLog::query()->select('module')->distinct()->orderBy('module')->pluck('module')->toArray()
         );
         $actions = Cache::remember(
             'audit_logs.distinct_actions',
             now()->addMinutes(5),
-            fn () => AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action')
+            fn () => AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action')->toArray()
         );
 
         return view('audit-logs.index', compact('auditLogs', 'modules', 'actions', 'module', 'action', 'search'));

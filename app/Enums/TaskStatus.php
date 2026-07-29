@@ -41,12 +41,12 @@ enum TaskStatus: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::DRAFT => 'bg-gray-100 text-gray-700',
-            self::TERJADWAL => 'bg-blue-100 text-blue-700',
-            self::IN_PROGRESS => 'bg-amber-100 text-amber-700',
-            self::SELESAI => 'bg-green-100 text-green-700',
-            self::DIBATALKAN => 'bg-red-100 text-red-700 line-through',
-            self::PENDING => 'bg-yellow-100 text-yellow-700',
+            self::DRAFT => 'bg-gray-100 dark:bg-slate-700/50 text-gray-700 dark:text-slate-300',
+            self::TERJADWAL => 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400',
+            self::IN_PROGRESS => 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
+            self::SELESAI => 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
+            self::DIBATALKAN => 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 line-through',
+            self::PENDING => 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400',
         };
     }
 
@@ -59,16 +59,16 @@ enum TaskStatus: string
     public function displayBadgeClasses(bool $reportDeferred = false): string
     {
         if ($this === self::PENDING && $reportDeferred) {
-            return 'border-violet-200 text-violet-700 bg-violet-50';
+            return 'border-violet-200 dark:border-violet-800/50 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20';
         }
 
         return match ($this) {
-            self::DRAFT => 'border-slate-200 text-slate-600 bg-slate-50',
-            self::TERJADWAL => 'border-blue-200 text-blue-700 bg-blue-50',
-            self::IN_PROGRESS => 'border-amber-200 text-amber-700 bg-amber-50',
-            self::SELESAI => 'border-green-200 text-green-700 bg-green-50',
-            self::DIBATALKAN => 'border-red-200 text-red-700 bg-red-50',
-            self::PENDING => 'border-yellow-200 text-yellow-700 bg-yellow-50',
+            self::DRAFT => 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50',
+            self::TERJADWAL => 'border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
+            self::IN_PROGRESS => 'border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
+            self::SELESAI => 'border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
+            self::DIBATALKAN => 'border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
+            self::PENDING => 'border-yellow-200 dark:border-yellow-800/50 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
         };
     }
 

@@ -75,8 +75,10 @@ flowchart TD
 | Pelanggan | Kembalikan dari Gagal (`restoreFromFailed`) | `customers.show` | Detail |
 | Pelanggan | Aktivasi manual (`activate`) | `customers.show` | Detail |
 | Pelanggan | Import massal | `customers.index` | List (sengaja) |
-| Ticketing | Buat tiket (`store`) | `tickets.show` | Detail |
-| Ticketing | Ubah tiket (`update`) | `tickets.show` | Detail |
+| Ticketing | Buat tiket dari Worksheet (`store`, AJAX) | — stay-on-page | Pengecualian (sengaja) |
+| Ticketing | Buat tiket dari halaman Task FOP (`store`, `origin=fop_tasks`) | `fop-tasks.index` | Board (sengaja) |
+| Ticketing | Aksi tiket dari halaman **detail** (close/escalate/oncheck-noc/return/cancel) | `tickets.show` | Detail |
+| Ticketing | Aksi tiket dari **list/worksheet** (AJAX) | — baris hilang in-place | Pengecualian (sengaja) |
 | Task Teknisi | Ubah task (`update`) | `tasks.show` | Detail |
 | Task Teknisi | Batalkan task (`cancel`) | `fop.dashboard` | Board (sengaja) |
 | FOP Task | Assign team / switch teknisi | `fop-tasks.index` | Board (sengaja — tak ada detail) |
@@ -85,6 +87,18 @@ flowchart TD
 > Kolom **"sengaja"** = pengecualian sadar dari aturan #2, sesuai aturan #3/#4. FOP Task **tidak
 > punya** halaman detail (hanya index + edit modal + history); papan `fop-tasks.index` adalah surface
 > kerjanya.
+>
+> **Ticketing punya dua mode**, tergantung dari mana aksinya dipicu — dan ini bukan
+> inkonsistensi:
+> - **Dari halaman detail** (`tickets/show`): POST native → redirect ke `tickets.show`. PRG normal.
+> - **Dari worksheet/list**: `fetch()` JSON, controller bercabang di `$request->wantsJson()`.
+>   Tidak ada navigasi sama sekali — baris tiket dihapus in-place, form submit auto-reset dan
+>   fokus balik ke kolom pencarian. Redirect di sini justru **melanggar tujuan** halamannya:
+>   Helpdesk/NOC memproses banyak tiket beruntun dari satu layar, ke-bounce ke halaman detail
+>   tiap satu klik bikin mereka harus navigasi balik terus-terusan.
+>
+> Prinsip PRG tetap terjaga di dua-duanya: tidak ada entry `POST` di history browser yang
+> bisa di-refresh dan resubmit.
 
 ---
 

@@ -51,6 +51,17 @@ class CustomerVerificationController extends Controller
             },
         ])->whereIn('status', $statuses);
 
+        // Teknisi cuma boleh liat pelanggan yang Task Pemasangan-nya PERNAH
+        // dijadwalkan buat dirinya — bukan seluruh antrean verifikasi/pemasangan.
+        // NOC/FOP/Admin/Owner (hasFullAccess) tetap liat semua buat supervisi.
+        // Lihat catatan sama di CustomerSurveyController::index().
+        if (! auth()->user()->hasFullAccess() && auth()->user()->hasRole('teknisi')) {
+            $query->whereHas('tasks', function ($q) {
+                $q->where('task_type', TaskType::PEMASANGAN->value)
+                    ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', auth()->id()));
+            });
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -86,6 +97,24 @@ class CustomerVerificationController extends Controller
             || $user->hasPermission('customers.view')
             || $user->hasPermission('*');
         abort_unless($hasPermission, 403);
+
+        // Guard assignment — halaman ini diakses LANGSUNG lewat URL
+        // /verifications/{customer}/admin, gak lewat query index() yang udah
+        // di-scope (lihat SurveyInstallationQueueScopeTest). Tanpa guard di
+        // sini, teknisi yang gak punya customers.view tetep bisa nebak/ketik
+        // ID pelanggan siapa pun dan buka detail Verifikasi & Pemasangan-nya,
+        // nembus batasan "cuma liat yang dijadwalkan buat dirinya" (keluhan
+        // #1). Dicek ke task SURVEY *atau* PEMASANGAN karena halaman ini
+        // dipakai buat pelanggan di berbagai tahap (waiting_acc s/d
+        // verification_admin) — task yang relevan beda-beda tergantung tahap.
+        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+            $isAssigned = Task::where('customer_id', $customer->id)
+                ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
+                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))
+                ->exists();
+
+            abort_unless($isAssigned, 403, 'Anda bukan anggota tim yang ditugaskan untuk pelanggan ini.');
+        }
 
         $customer->loadMissing([
             'customerDevice',

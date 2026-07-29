@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\TicketBucket;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
@@ -96,7 +97,15 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
             'priority' => 'High',
         ])->assertRedirect();
 
-        return Ticket::first();
+        $ticket = Ticket::first();
+
+        // FopTask gak lagi auto-dibuat pas submit — dieskalasi eksplisit ke
+        // FOP biar tetap ada FopTask Draft buat di-assign (subjek test ini).
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        return $ticket->fresh();
     }
 
     /**
@@ -137,24 +146,20 @@ class FopTaskDraftAutoScheduleOnAssignTest extends TestCase
     /**
      * Inti keluhan user: Ticket yang tadinya nyangkut di bucket "Ticket Masuk"
      * sekarang otomatis pindah ke "Ticket di Proses" begitu teknisinya di-assign.
+     *
+     * Bucket Masuk/Diproses gak lagi punya halaman list sendiri (dipecah jadi
+     * Worksheet NOC yang cuma buat tiket handler=NOC), jadi klasifikasinya
+     * dites lewat Ticket::bucket() langsung — sumber yang sama dipakai UI.
      */
     public function test_ticket_moves_from_masuk_to_diproses_bucket_after_assignment(): void
     {
         $ticket = $this->createDraftTicket();
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'masuk'))
-            ->assertSee($ticket->ticket_number);
+        $this->assertSame(TicketBucket::MASUK, $ticket->fresh()->load('fopTask')->bucket());
 
         $this->assignTechnicianViaEditModal($ticket->fopTask, [$this->tech->id])->assertOk();
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'diproses'))
-            ->assertSee($ticket->ticket_number);
-
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'masuk'))
-            ->assertDontSee($ticket->ticket_number);
+        $this->assertSame(TicketBucket::DIPROSES, $ticket->fresh()->load('fopTask')->bucket());
     }
 
     public function test_status_transition_is_recorded_in_fop_task_history(): void

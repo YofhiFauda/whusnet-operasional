@@ -16,7 +16,7 @@
     {{-- Top Navigation & Breadcrumb --}}
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 text-xs text-text-muted">
-            <a href="{{ route('tickets.bucket', 'masuk') }}" class="hover:text-sky-600 transition-colors flex items-center gap-1">
+            <a href="{{ route('tickets.create') }}" class="hover:text-sky-600 transition-colors flex items-center gap-1">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
@@ -28,7 +28,7 @@
             <span class="font-mono font-bold text-sky-600 dark:text-sky-400">{{ $ticket->ticket_number }}</span>
         </div>
 
-        <a href="{{ route('tickets.bucket', 'masuk') }}"
+        <a href="{{ route('tickets.create') }}"
            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-xs font-semibold text-text-secondary hover:text-text-main transition-colors shadow-xs">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -125,6 +125,83 @@
             @endif
         </div>
     </div>
+
+    {{--
+        Aksi Tiket — Close/Escalate (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD).
+        Cuma tampil kalau tiket belum nyampe FOP, masih terbuka, DAN aktor
+        emang lagi megang tiket ini (role-nya cocok sama $ticket->handler) —
+        pengecekan role di sini cuma buat UI, otorisasi sungguhan tetap di
+        TicketService (lihat assertActorOwnsTicket()).
+    --}}
+    @php
+        // Ticket::actionFlagsFor() — SATU-SATUNYA sumber logic ini (dipakai
+        // juga di worksheet panel & index bucket), jangan duplikasi ulang di sini.
+        $ticketActions = $ticket->actionFlagsFor(auth()->user());
+    @endphp
+
+    @if($ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'] || $ticketActions['can_oncheck_noc'])
+    <div class="bg-surface border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="w-1 h-4 bg-amber-500 rounded-full"></span>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">Aksi Tiket — Ditangani {{ $ticket->handler->label() }}</h2>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            @if($ticketActions['can_oncheck_noc'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.oncheck-noc', $ticket) }}', null, 'Oncheck NOC', 'Catatan (opsional)', false, 'Ambil alih tiket ini?')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors cursor-pointer">
+                Oncheck NOC
+            </button>
+            @endif
+
+            @if($ticketActions['can_close'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.close', $ticket) }}', null, 'Selesaikan Tiket', 'Apa yang sudah dikerjakan? (opsional)', false, 'Tandai tiket ini selesai?')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer">
+                Selesaikan Sendiri
+            </button>
+            @endif
+
+            @if($ticketActions['can_escalate_noc'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.escalate', $ticket) }}', 'noc', 'Kirim Tiket ke NOC', 'Catatan buat NOC (opsional)', false, 'Kirim tiket ini ke NOC?')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors cursor-pointer">
+                Kirim ke NOC
+            </button>
+            @endif
+
+            @if($ticketActions['can_escalate_fop'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.escalate', $ticket) }}', 'fop', 'Kirim Tiket ke FOP', 'Catatan buat FOP (opsional)', false, 'Kirim tiket ini ke FOP? Task FOP baru akan dibuat.')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 text-white text-xs font-bold hover:bg-sky-700 transition-colors cursor-pointer">
+                Kirim ke FOP
+            </button>
+            @endif
+
+            {{--
+                Gap #7 (docs/plan/analisa-efektivitas-worksheet-ticketing.md) —
+                jalur pemulihan kalau NOC salah terima/salah pencet. Cuma NOC
+                yang bisa "turun" balik ke Helpdesk (lihat Ticket::actionFlagsFor()).
+            --}}
+            @if($ticketActions['can_return_to_helpdesk'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.return-to-helpdesk', $ticket) }}', null, 'Kembalikan ke Helpdesk', 'Alasan dikembalikan (opsional)', false, 'Kembalikan tiket ini ke Helpdesk?')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-600 text-white text-xs font-bold hover:bg-slate-700 transition-colors cursor-pointer">
+                Kembalikan ke Helpdesk
+            </button>
+            @endif
+
+            @if($ticketActions['can_cancel'])
+            <button type="button"
+                onclick="confirmTicketDetailAction('{{ route('tickets.cancel', $ticket) }}', null, 'Batalkan Tiket', 'Alasan pembatalan (wajib diisi)', true, 'Batalkan tiket ini? Tindakan ini gak bisa dibatalin balik.')"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer">
+                Batalkan
+            </button>
+            @endif
+        </div>
+
+    </div>
+    @endif
 
     {{-- Technical Customer Snapshot Grid (Data Pelanggan Saat Ticket Dibuat) --}}
     <div class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs">
@@ -342,7 +419,7 @@
                     </div>
 
                     <a href="{{ route('tickets.attachments.download', $attachment) }}"
-                       class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded bg-slate-100 hover:bg-sky-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 text-xs font-bold transition-colors">
+                       class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded bg-slate-100 hover:bg-sky-100 dark:hover:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 text-xs font-bold transition-colors">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
@@ -353,6 +430,60 @@
         </ul>
     </div>
     @endif
+
+    {{--
+        Konfirmasi + input alasan buat panel "Aksi Tiket" di atas — numpang
+        window.Dialog global, sama kayak worksheet & halaman arsip.
+    --}}
+    @include('tickets.partials.action-dialog')
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    /**
+     * Panel "Aksi Tiket" di halaman detail — beda dari worksheet/arsip yang
+     * fetch() JSON in-place: di sini sengaja POST native biar tetap PRG
+     * (redirect balik ke halaman detail dengan state terbaru, lihat
+     * docs/PRG_REDIRECT_CONVENTION.md). Form-nya dirakit on the fly, jadi gak
+     * perlu markup form tersembunyi per tombol.
+     */
+    function confirmTicketDetailAction(url, target, title, label, required, confirmText) {
+        window.confirmTicketAction({
+            title,
+            message: confirmText,
+            label,
+            required,
+            confirmText: required ? 'Ya, Batalkan' : 'Ya, Lanjutkan',
+            confirmType: required ? 'danger' : 'primary',
+            icon: required ? 'error' : 'warning',
+            onConfirm: (reason) => {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = url;
+                // Skip global submit-listener di layouts/app.blade.php —
+                // konfirmasinya udah lewat dialog di atas, jangan dobel.
+                form.classList.add('no-confirm');
+
+                const field = (name, value) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = value;
+                    form.appendChild(input);
+                };
+
+                field('_token', document.querySelector('meta[name="csrf-token"]').content);
+                field('reason', reason);
+                if (target) {
+                    field('target', target);
+                }
+
+                document.body.appendChild(form);
+                form.submit();
+            },
+        });
+    }
+</script>
+@endpush
 

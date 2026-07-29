@@ -281,21 +281,6 @@ services:
     networks:
       - app_network
 
-  ngrok:
-    image: ngrok/ngrok:alpine
-    container_name: whusnet-ngrok
-    restart: unless-stopped
-    command: ["http", "nginx:80"]
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-    ports:
-      - "4040:4040"
-    depends_on:
-      nginx:
-        condition: service_started
-    networks:
-      - app_network
-
 networks:
   app_network:
     driver: bridge

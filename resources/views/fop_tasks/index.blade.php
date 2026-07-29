@@ -10,12 +10,12 @@
     {{-- ══ Page Header ══ --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight font-ui">Task FOP</h1>
-            <p class="text-sm text-slate-500 mt-1 font-ui">Kelola penugasan, status, dan prioritas task FOP yang sedang berjalan.</p>
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight font-ui">Task FOP</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 font-ui">Kelola penugasan, status, dan prioritas task FOP yang sedang berjalan.</p>
         </div>
         <div class="flex items-center gap-2">
             <button x-show="teamConflictModal.conflicts.length > 0" @click="teamConflictModal.open = true"
-                    class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui"
+                    class="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 text-sm font-medium px-4 py-2 rounded transition-colors shadow-sm font-ui"
                     style="display: none;">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
@@ -36,12 +36,12 @@
     <form method="GET" action="{{ route('fop-tasks.index') }}" class="flex flex-col gap-3 pb-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Pencarian</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Task..." class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 font-ui bg-white">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Pencarian</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Task..." class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 dark:text-slate-500 font-ui bg-white dark:bg-slate-800">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Kategori</label>
-                <select name="category" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Kategori</label>
+                <select name="category" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
                     <option value="">Semua</option>
                     @foreach($categories as $key => $val)
                         <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $key }}</option>
@@ -49,8 +49,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Status</label>
-                <select name="status" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Status</label>
+                <select name="status" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
                     <option value="">Semua (Aktif)</option>
                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
                     <option value="terjadwal" {{ request('status') === 'terjadwal' ? 'selected' : '' }}>Terjadwal</option>
@@ -59,8 +59,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Prioritas</label>
-                <select name="priority" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Prioritas</label>
+                <select name="priority" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
                     <option value="">Semua</option>
                     <option value="low" {{ request('priority') === 'low' ? 'selected' : '' }}>Low</option>
                     <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>Medium</option>
@@ -69,8 +69,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Area</label>
-                <select name="village_id" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Area</label>
+                <select name="village_id" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
                     <option value="">Semua</option>
                     @foreach($villages as $v)
                         <option value="{{ $v->id }}" {{ request('village_id') == $v->id ? 'selected' : '' }}>{{ $v->name }}</option>
@@ -78,8 +78,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 font-ui">Team</label>
-                <select name="team_id" class="w-full text-sm border border-slate-300 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white font-ui">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5 font-ui">Team</label>
+                <select name="team_id" class="w-full text-sm border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-800 font-ui">
                     <option value="">Semua</option>
                     @foreach($teams as $t)
                         <option value="{{ $t['id'] }}" {{ request('team_id') == $t['id'] ? 'selected' : '' }}>{{ $t['name'] }} ({{ $t['work_date'] }})</option>
@@ -88,22 +88,22 @@
             </div>
         </div>
         <div class="flex items-center justify-between mt-1">
-            <span class="text-sm text-slate-500 font-ui">Menampilkan <span class="font-semibold text-slate-700 font-data">{{ $fopTasks->count() }}</span> dari <span class="font-semibold text-slate-700 font-data">{{ $fopTasks->total() }}</span> data</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400 font-ui">Menampilkan <span class="font-semibold text-slate-700 dark:text-slate-300 font-data">{{ $fopTasks->count() }}</span> dari <span class="font-semibold text-slate-700 dark:text-slate-300 font-data">{{ $fopTasks->total() }}</span> data</span>
             <div class="flex items-center gap-3">
                 @if(request()->anyFilled(['search', 'category', 'status', 'priority', 'village_id', 'team_id']))
-                    <a href="{{ route('fop-tasks.index') }}" class="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors font-ui">Reset</a>
+                    <a href="{{ route('fop-tasks.index') }}" class="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors font-ui">Reset</a>
                 @endif
-                <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-sm font-medium px-4 py-1.5 rounded transition-colors font-ui">Filter</button>
+                <button type="submit" class="bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600 text-sm font-medium px-4 py-1.5 rounded transition-colors font-ui">Filter</button>
             </div>
         </div>
     </form>
 
     {{-- ══ Table Panel (Single Card Container) ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                    <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                         <th class="px-3 py-2">Kategori</th>
                         <th class="px-3 py-2">Tanggal</th>
                         <th class="px-3 py-2">Tugas</th>
@@ -116,36 +116,36 @@
                         <th class="px-3 py-2 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 text-[11px] text-slate-700">
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px] text-slate-700 dark:text-slate-300">
                     @forelse($fopTasks as $task)
-                        <tr class="hover:bg-slate-50 transition-colors align-top">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 transition-colors align-top">
                             <td class="px-3 py-2 whitespace-nowrap">
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 bg-white text-slate-600' }}">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                                     {{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}
                                 </span>
                             </td>
-                            <td class="px-3 py-2 whitespace-nowrap text-slate-600">
+                            <td class="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-400">
                                 {{ $task->task_date ? $task->task_date->format('d/m/Y H:i') : '—' }}
                                 @if($task->client_request_date)
                                     <br>
                                     @if($task->client_request_date->lte(\Illuminate\Support\Carbon::today()))
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-50 text-red-700 border border-red-100 mt-0.5">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30 mt-0.5">
                                             JADWAL HARI INI
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 text-slate-600 border border-slate-200 mt-0.5">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 mt-0.5">
                                             Terjadwal — {{ $task->client_request_date->format('d/m/Y') }}
                                         </span>
                                     @endif
                                 @endif
                             </td>
                             <td class="px-3 py-2 min-w-[200px] whitespace-normal leading-tight">
-                                <span class="font-medium text-slate-800">{{ $task->tugas }}</span>
+                                <span class="font-medium text-slate-800 dark:text-slate-200">{{ $task->tugas }}</span>
                             </td>
-                            <td class="px-3 py-2 whitespace-normal leading-tight text-slate-600 min-w-[120px]">
+                            <td class="px-3 py-2 whitespace-normal leading-tight text-slate-600 dark:text-slate-400 min-w-[120px]">
                                 {{ $task->village?->name ?? '—' }}
                             </td>
-                            <td class="px-3 py-2 min-w-[150px] whitespace-normal leading-tight text-red-600">
+                            <td class="px-3 py-2 min-w-[150px] whitespace-normal leading-tight text-red-600 dark:text-red-400">
                                 {{ $task->issue ?? '—' }}
                             </td>
                             <td class="px-3 py-2">
@@ -166,13 +166,13 @@
                                             {{ \Illuminate\Support\Str::limit($firstName, 12) }}
                                         </button>
                                     @empty
-                                        <span class="text-slate-400 text-[10px] italic">Unassigned</span>
+                                        <span class="text-slate-400 dark:text-slate-500 text-[10px] italic">Unassigned</span>
                                     @endforelse
                                     
                                     @if($hiddenTechsCount > 0)
                                         <div class="relative" x-data="{ openHidden: false }">
                                             <button type="button" @click="openHidden = !openHidden"
-                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors">
+                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors">
                                                 +{{ $hiddenTechsCount }}
                                             </button>
                                             <div x-show="openHidden" @click.away="openHidden = false"
@@ -192,7 +192,7 @@
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 @if($task->team)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-100">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-800/30">
                                         {{ $task->team->name }}
                                     </span>
                                 @elseif($task->technicians->count() === 1)
@@ -214,7 +214,7 @@
                                     @if(count($candidates) >= 2)
                                         <button type="button"
                                                 @click="triggerConflictModal({{ $task->id }}, '{{ $task->task_number }}', {{ json_encode($candidates) }})"
-                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-100 hover:bg-red-100 transition-colors"
+                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30 hover:bg-red-100 transition-colors"
                                                 title="Klik untuk memilih team">
                                             ⚠️ Konflik Roster
                                         </button>
@@ -237,7 +237,7 @@
                                         : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
                                     $statusClasses = $task->task
                                         ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
-                                        : ($statusValue === 'draft' ? 'border-slate-200 text-slate-600 bg-slate-50' : $task->status->displayBadgeClasses());
+                                        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
 
                                     // SRV/PSB gak boleh dihapus SAMA SEKALI (efek samping: customer
                                     // otomatis jadi Gagal — kelola lewat halaman Pelanggan). MTN/C-REQ
@@ -261,7 +261,7 @@
                                             @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
                                                 <button type="button"
                                                         @click="openCancelModal({{ $task->id }}, '{{ $task->task_number }}')"
-                                                        class="text-[10px] text-red-600 underline decoration-dotted text-left cursor-pointer">
+                                                        class="text-[10px] text-red-600 dark:text-red-400 underline decoration-dotted text-left cursor-pointer">
                                                     Cancel
                                                 </button>
                                             @endif
@@ -276,10 +276,10 @@
                                             x-model="currentPriority"
                                             class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200"
                                             :class="{
-                                                'border-slate-200 text-slate-700 bg-slate-50': currentPriority === 'low',
+                                                'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50': currentPriority === 'low',
                                                 'border-yellow-300 text-yellow-800 bg-yellow-50': currentPriority === 'Medium',
                                                 'border-orange-300 text-orange-800 bg-orange-50': currentPriority === 'High',
-                                                'border-red-300 text-red-700 bg-red-50 font-bold': currentPriority === 'Urgent'
+                                                'border-red-300 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 font-bold': currentPriority === 'Urgent'
                                             }">
                                         <option value="low">Low</option>
                                         <option value="Medium">Medium</option>
@@ -298,7 +298,7 @@
                             <td class="px-3 py-2 whitespace-nowrap text-right">
                                 <div class="flex items-center justify-end gap-1.5">
                                     <a href="{{ route('fop-tasks.history.show', $task->id) }}"
-                                       class="text-slate-400 hover:text-slate-700 transition-colors bg-slate-100 hover:bg-slate-200 p-1.5 rounded"
+                                       class="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 dark:hover:text-slate-300 dark:hover:text-slate-200 dark:hover:text-slate-300 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 p-1.5 rounded"
                                        title="Detail Task">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -306,7 +306,7 @@
                                         </svg>
                                     </a>
                                     <button @click="openEditModal({{ json_encode($task) }}, {{ json_encode($task->technicians->pluck('id')) }})"
-                                            class="text-slate-400 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 p-1.5 rounded"
+                                            class="text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 p-1.5 rounded"
                                             title="Edit">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -316,7 +316,7 @@
                                     <form action="{{ route('fop-tasks.destroy', $task->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus Task FOP ini?" class="inline-block">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-slate-400 hover:text-red-600 transition-colors bg-slate-100 hover:bg-red-50 p-1.5 rounded" title="Hapus">
+                                        <button type="submit" class="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded" title="Hapus">
                                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
@@ -324,7 +324,7 @@
                                     </form>
                                     @elseif($task->ticket)
                                     <button type="button" disabled
-                                            class="text-slate-300 bg-slate-50 p-1.5 rounded cursor-not-allowed"
+                                            class="text-slate-300 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded cursor-not-allowed"
                                             title="Task dari Ticketing gak bisa dihapus — batalkan lewat Cancel kalau salah input.">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -338,12 +338,12 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-3 py-10 text-center text-slate-500">
+                            <td colspan="10" class="px-3 py-10 text-center text-slate-500 dark:text-slate-400">
                                 <svg class="w-8 h-8 mx-auto mb-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
                                 <p class="text-[11px] font-medium">Tidak ada data task FOP.</p>
-                                <p class="text-[10px] mt-1 text-slate-400">Silakan buat task baru atau ubah filter pencarian.</p>
+                                <p class="text-[10px] mt-1 text-slate-400 dark:text-slate-500">Silakan buat task baru atau ubah filter pencarian.</p>
                             </td>
                         </tr>
                     @endforelse
@@ -605,11 +605,11 @@
                                         <span class="inline-flex items-center px-2.5 py-1.5 rounded text-xs font-medium border w-fit"
                                               :class="{
                                                   'border-blue-200 text-blue-700 bg-blue-50': modal.data.status === 'terjadwal',
-                                                  'border-amber-200 text-amber-700 bg-amber-50': modal.data.status === 'in_progress',
+                                                  'border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20': modal.data.status === 'in_progress',
                                                   'border-yellow-200 text-yellow-700 bg-yellow-50': modal.data.status === 'pending',
                                                   'border-green-200 text-green-700 bg-green-50': modal.data.status === 'selesai',
-                                                  'border-red-200 text-red-700 bg-red-50': modal.data.status === 'dibatalkan',
-                                                  'border-slate-200 text-slate-600 bg-slate-50': modal.data.status === 'draft',
+                                                  'border-red-200 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20': modal.data.status === 'dibatalkan',
+                                                  'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50': modal.data.status === 'draft',
                                               }"
                                               x-text="modal.data.status"></span>
                                         <p class="text-[10px] text-text-muted mt-1">Status realtime — otomatis mengikuti status Task teknisi, gak bisa diedit manual di sini. Pakai tombol "Cancel" di tabel buat cancel tiket.</p>
@@ -783,7 +783,7 @@
                                         <span class="text-xs font-semibold text-text-main group-hover:text-primary transition-colors" x-text="t.name"></span>
                                         <div class="flex items-center gap-1.5 mt-1">
                                             <template x-for="m in t.members" :key="m.id">
-                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-sky-50 text-sky-700 border border-sky-100" x-text="m.name"></span>
+                                                <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-800/30" x-text="m.name"></span>
                                             </template>
                                         </div>
                                     </div>
@@ -1240,7 +1240,12 @@
                     this.ticketSelectedCustomer = this.ticketPanelFrom(task.ticket);
                     this.ticketCidQuery = this.ticketSelectedCustomer.label;
                 } else {
-                    this.clearTicketCustomer();
+                    // clearTicketCustomer() gak dipakai di sini karena dia juga nge-reset
+                    // modal.data.customer_id = '' — pas edit task non-ticket, itu bikin
+                    // customer_id ke-nol-in padahal task-nya udah punya pelanggan, trus
+                    // ke-anggep "diubah" sama guard lock Survey/Pemasangan di controller.
+                    this.ticketSelectedCustomer = null;
+                    this.ticketCidQuery = '';
                 }
                 this.ticketCustomerResults = [];
                 this.modal.techs = Array.isArray(assignedTechs) ? assignedTechs : [];

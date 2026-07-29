@@ -12,11 +12,15 @@ use Tests\TestCase;
  * Regresi: pencarian/filter di dalam daftar "Pelanggan Gagal"/"Putus" tidak boleh
  * melempar balik ke List Pelanggan (default active+suspended).
  *
- * Form filter di customers/index.blade.php submit GET ke /customers tapi dulu tidak
- * membawa `status_group` (maupun `status`), jadi begitu "Cari" ditekan dari grup
- * terminated/failed, controller kehilangan konteks grup dan jatuh ke tampilan
+ * Form filter di customers/index.blade.php submit GET ke url()->current() tapi dulu
+ * tidak membawa `status_group` (maupun `status`), jadi begitu "Cari" ditekan dari
+ * grup terminated/failed, controller kehilangan konteks grup dan jatuh ke tampilan
  * default — pencarian di grup itu jadi mustahil. Fix menambahkan hidden input yang
  * mempertahankan konteks.
+ *
+ * List Pelanggan Putus kini punya route + permission sendiri
+ * (customers.terminated / customers.terminated.view) — lihat
+ * CustomerTerminatedController.
  */
 class CustomerListFilterKeepsStatusGroupTest extends TestCase
 {
@@ -36,7 +40,10 @@ class CustomerListFilterKeepsStatusGroupTest extends TestCase
         $this->loginAsAdmin();
         $this->seedPop();
 
-        $response = $this->get('/customers?status_group=terminated');
+        // List Pelanggan Putus sekarang route sendiri (customers.terminated) —
+        // /customers?status_group=terminated di-redirect ke sini oleh
+        // CustomerController::index() (lihat catatan di controllernya).
+        $response = $this->get(route('customers.terminated'));
 
         $response->assertStatus(200);
         // Form harus membawa status_group terminated agar submit tetap di grup ini.
@@ -63,7 +70,7 @@ class CustomerListFilterKeepsStatusGroupTest extends TestCase
         // Cari "Zulkarnain" DI DALAM grup terminated — hanya yang terminated muncul,
         // pelanggan aktif dengan nama mirip tidak boleh ikut (bukti tidak jatuh ke
         // tampilan default).
-        $response = $this->get('/customers?status_group=terminated&search=Zulkarnain');
+        $response = $this->get(route('customers.terminated', ['search' => 'Zulkarnain']));
 
         $response->assertStatus(200);
         $response->assertSee($putus->full_name);

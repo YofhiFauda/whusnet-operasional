@@ -10,11 +10,25 @@ use Illuminate\Database\Seeder;
 /**
  * TicketFeatureSeeder
  *
- * Menanamkan root Feature 'tickets' (Ticketing internal perusahaan).
- * Permission-nya (tickets.view, tickets.create) digenerate otomatis oleh
- * PermissionGeneratorService dari config/rbac.php. Assignment ke role diatur
- * di RolePermissionSeeder (source of truth permission per role), jalankan
- * RolePermissionSeeder lagi setelah seeder ini biar ke-sync.
+ * Menanamkan seluruh Feature modul Ticketing internal perusahaan:
+ *
+ *   tickets                  (root) — Ticketing (buat/lihat/aksi tiket)
+ *     ├─ tickets.selesai            — halaman arsip Ticket Selesai
+ *     └─ tickets.dibatalkan         — halaman arsip Ticket Dibatalkan
+ *   noc_worksheet            (root) — Worksheet NOC
+ *     ├─ noc_worksheet.masuk        — halaman Ticket Masuk (pending, belum di-Oncheck)
+ *     └─ noc_worksheet.diproses     — halaman Ticket Diproses (udah di-Oncheck)
+ *   noc_dashboard            (root) — Dashboard NOC
+ *
+ * Tiap halaman punya feature (=permission) SENDIRI — dulu semuanya numpang
+ * `tickets.view` lewat route bucket generik `/tickets/{bucket}`, jadi gak bisa
+ * di-toggle per-halaman di Role Matrix. Pola sama persis customers.terminated/
+ * customers.failed (lihat FeatureSeeder).
+ *
+ * Permission-nya digenerate otomatis oleh PermissionGeneratorService dari
+ * config/rbac.php. Assignment ke role diatur di RolePermissionSeeder (source of
+ * truth permission per role), jalankan RolePermissionSeeder lagi setelah seeder
+ * ini biar ke-sync.
  *
  * Idempotent — aman dijalankan ulang.
  * Jalankan: php artisan db:seed --class=TicketFeatureSeeder
@@ -23,19 +37,48 @@ class TicketFeatureSeeder extends Seeder
 {
     public function run(): void
     {
-        Feature::updateOrCreate(
-            ['code' => 'tickets'],
-            [
-                'name' => 'Ticketing',
-                'type' => FeatureType::ROOT,
-                'sort_order' => 8,
-                'is_active' => true,
-                'parent_id' => null,
-            ]
-        );
+        $roots = [
+            ['code' => 'tickets', 'name' => 'Ticketing', 'sort_order' => 8],
+            ['code' => 'noc_worksheet', 'name' => 'Worksheet NOC', 'sort_order' => 9],
+            ['code' => 'noc_dashboard', 'name' => 'Dashboard NOC', 'sort_order' => 10],
+        ];
+
+        $rootIds = [];
+        foreach ($roots as $root) {
+            $rootIds[$root['code']] = Feature::updateOrCreate(
+                ['code' => $root['code']],
+                [
+                    'name' => $root['name'],
+                    'type' => FeatureType::ROOT,
+                    'sort_order' => $root['sort_order'],
+                    'is_active' => true,
+                    'parent_id' => null,
+                ]
+            )->id;
+        }
+
+        $subFeatures = [
+            ['parent' => 'tickets', 'code' => 'tickets.selesai', 'name' => 'Ticket Selesai', 'sort_order' => 1],
+            ['parent' => 'tickets', 'code' => 'tickets.dibatalkan', 'name' => 'Ticket Dibatalkan', 'sort_order' => 2],
+            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.masuk', 'name' => 'Ticket Masuk (NOC)', 'sort_order' => 1],
+            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.diproses', 'name' => 'Ticket Diproses (NOC)', 'sort_order' => 2],
+        ];
+
+        foreach ($subFeatures as $sf) {
+            Feature::updateOrCreate(
+                ['code' => $sf['code']],
+                [
+                    'name' => $sf['name'],
+                    'type' => FeatureType::SUB_FEATURE,
+                    'sort_order' => $sf['sort_order'],
+                    'is_active' => true,
+                    'parent_id' => $rootIds[$sf['parent']],
+                ]
+            );
+        }
 
         app(PermissionGeneratorService::class)->generate();
 
-        $this->command->info('TicketFeatureSeeder: feature tickets + permission digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
+        $this->command?->info('TicketFeatureSeeder: feature Ticketing + Worksheet/Dashboard NOC + permission digenerate. Jalankan RolePermissionSeeder biar ke-assign ke role.');
     }
 }

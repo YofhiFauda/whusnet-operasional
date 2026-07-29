@@ -13,6 +13,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\Ticket;
+use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Models\Village;
 use Database\Seeders\ActionSeeder;
@@ -103,7 +104,15 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
             'priority' => 'High',
         ], $overrides))->assertRedirect();
 
-        return Ticket::latest('id')->firstOrFail();
+        $ticket = Ticket::latest('id')->firstOrFail();
+
+        // FopTask gak lagi auto-dibuat pas submit — eskalasi eksplisit ke FOP
+        // biar riwayat Task FOP (subjek test ini) tetap ada buat diuji.
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        return $ticket->fresh();
     }
 
     public function test_mtn_ticket_detail_shows_full_customer_snapshot_and_complaint(): void
@@ -125,6 +134,31 @@ class FopTaskHistoryFollowsTicketDetailTest extends TestCase
         // kepotong yang disimpan di $fopTask->issue.
         $response->assertSee('sudah dicoba restart modem berkali-kali');
         $response->assertSee('Redaman -28 dBm, indikasi kabel FO putus di tiang dekat rumah.');
+    }
+
+    /**
+     * Kategori Issue (Master Issue) belum pernah tampil di Detail Task FOP
+     * sama sekali sebelum ini — cuma ada di /tickets. Sekarang WAJIB ikut,
+     * plus Tipe & Prioritas yang juga sebelumnya gak muncul di halaman ini.
+     */
+    public function test_detail_task_shows_issue_category_type_and_priority(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'Backbone CUT',
+            'default_priority' => 'High',
+            'sla_source' => 'prioritas',
+            'is_active' => true,
+        ]);
+
+        $ticket = $this->submitTicket(['issue_category_id' => $category->id]);
+
+        $response = $this->actingAs($this->fopUser)
+            ->get(route('fop-tasks.history.show', $ticket->fop_task_id));
+
+        $response->assertOk();
+        $response->assertSee('Backbone CUT');
+        $response->assertSee($ticket->type->value);
+        $response->assertSee('Prioritas: '.$ticket->priority->value);
     }
 
     public function test_creq_ticket_detail_also_follows_ticketing(): void

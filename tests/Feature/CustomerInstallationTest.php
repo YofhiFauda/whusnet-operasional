@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +52,22 @@ class CustomerInstallationTest extends TestCase
             'scheduled_time' => '09:00',
             'technician_id' => $technician->id,
         ]);
+
+        // Guard assignment di store() (fix RBAC Issue 3 — semua non-full-access
+        // wajib jadi anggota tim Task yang lagi jalan, gak cukup cuma modal
+        // permission generik customers.detail.installation.update).
+        $task = Task::create([
+            'task_number' => 'TASK-TEST-INST-001',
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'task_type' => TaskType::PEMASANGAN->value,
+            'title' => 'Pemasangan Test Installation Customer',
+            'status' => TaskStatus::IN_PROGRESS->value,
+            'started_at' => now(),
+            'created_by' => $technician->id,
+            'updated_by' => $technician->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
 
         $installationData = [
             'installation_status' => 'completed',
@@ -110,8 +129,11 @@ class CustomerInstallationTest extends TestCase
             'installation_note' => 'Jadwal pemasangan siang.',
         ]);
 
+        // Teknisi gak punya customers.detail.view (Detail Pelanggan diblok),
+        // tab Pemasangan diakses lewat halaman terpisah customers.fieldwork
+        // (lihat CustomerFieldworkController).
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
         $response->assertSee('Data Pemasangan Pelanggan');

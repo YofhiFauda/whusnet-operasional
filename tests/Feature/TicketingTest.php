@@ -6,6 +6,8 @@ use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketBucket;
+use App\Enums\TicketHandler;
+use App\Enums\TicketHandlingStatus;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
@@ -15,6 +17,7 @@ use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
+use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Models\Village;
 use Database\Seeders\ActionSeeder;
@@ -110,27 +113,42 @@ class TicketingTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * FopTask sekarang gak lagi auto-dibuat pas tiket disubmit — baru
+     * kebentuk begitu Helpdesk/NOC eksplisit "Kirim ke FOP" (lihat
+     * TicketService::escalateToFop()). Test lama yang butuh FopTask buat
+     * ngetes status/bucket turunannya wajib eskalasi dulu lewat helper ini.
+     */
+    private function escalateTicketToFop(Ticket $ticket): Ticket
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        return $ticket->fresh()->load('fopTask');
+    }
+
     public function test_guests_cannot_access_ticketing(): void
     {
-        $this->get(route('tickets.index'))->assertRedirect('/login');
+        $this->get(route('tickets.selesai'))->assertRedirect('/login');
     }
 
     public function test_role_without_permission_cannot_access_ticketing(): void
     {
         $this->actingAs($this->teknisiUser)
-            ->get(route('tickets.index'))
+            ->get(route('tickets.selesai'))
             ->assertForbidden();
     }
 
     public function test_authorized_user_can_view_ticketing_index(): void
     {
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.index'))
+            ->get(route('tickets.selesai'))
             ->assertOk()
-            ->assertSee('Ticketing');
+            ->assertSee('Ticket Selesai');
     }
 
-    public function test_submitting_ticket_auto_creates_synced_fop_task(): void
+    public function test_new_ticket_is_not_auto_synced_to_fop(): void
     {
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.store'), $this->validPayload())
@@ -144,10 +162,26 @@ class TicketingTest extends TestCase
         $this->assertSame($this->pop->id, $ticket->pop_id);
         $this->assertStringStartsWith('TKT-', $ticket->ticket_number);
 
-        // Inti fitur: satu tiket = satu FopTask kembar di halaman Task FOP.
+        // Inti perubahan: lahir di tangan Helpdesk, BELUM ada FopTask kembar.
+        $this->assertSame(TicketHandler::HELPDESK, $ticket->handler);
+        $this->assertSame(TicketHandlingStatus::OPEN, $ticket->status);
+        $this->assertNull($ticket->fop_task_id);
+        $this->assertNull($ticket->fopTask);
+    }
+
+    public function test_escalating_ticket_to_fop_creates_synced_fop_task(): void
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload())
+            ->assertRedirect();
+
+        $ticket = $this->escalateTicketToFop(Ticket::first());
+
+        // Inti fitur: satu tiket dieskalasi = satu FopTask kembar di halaman Task FOP.
         $fopTask = $ticket->fopTask;
 
-        $this->assertNotNull($fopTask, 'Ticket harus otomatis membuat FopTask.');
+        $this->assertNotNull($fopTask, 'Escalate ke FOP harus membuat FopTask.');
+        $this->assertSame(TicketHandler::FOP, $ticket->handler);
         $this->assertStringStartsWith('TFOP-', $fopTask->task_number);
         $this->assertSame(TaskType::MAINTENANCE, $fopTask->category);
         $this->assertSame($this->customer->id, $fopTask->customer_id);
@@ -174,7 +208,7 @@ class TicketingTest extends TestCase
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
 
         $this->assertStringContainsString($ticket->ticket_number, $ticket->fopTask->notes);
         $this->assertStringContainsString($this->helpdeskUser->name, $ticket->fopTask->notes);
@@ -191,7 +225,7 @@ class TicketingTest extends TestCase
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $expectedCid = $this->customer->fresh()->display_id;
 
         $this->assertSame("{$expectedCid}_{$this->customer->full_name}", $ticket->fopTask->tugas);
@@ -301,7 +335,7 @@ class TicketingTest extends TestCase
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->delete();
 
         $ticket->refresh()->load('fopTask');
@@ -314,10 +348,30 @@ class TicketingTest extends TestCase
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->update(['status' => TaskStatus::SELESAI]);
 
         $this->assertSame('Selesai', $ticket->refresh()->load('fopTask')->statusLabel());
+    }
+
+    /**
+     * Sebelum eskalasi, status turunan bukan lagi dari FopTask — masih di
+     * tangan Helpdesk/NOC.
+     */
+    public function test_ticket_status_label_reflects_internal_handler_before_escalation(): void
+    {
+        $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
+        $ticket = Ticket::first();
+
+        $this->assertSame('Ditangani Helpdesk', $ticket->statusLabel());
+
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->assertRedirect();
+
+        // Window "pending NOC" — belum di-check, bukan "Ditangani NOC" lagi
+        // (lihat TicketOnCheckNocTest buat mekanisme Oncheck NOC).
+        $this->assertSame('Pending NOC', $ticket->refresh()->statusLabel());
     }
 
     public function test_attachments_are_stored_privately_and_downloadable(): void
@@ -385,22 +439,29 @@ class TicketingTest extends TestCase
         }
     }
 
+    /**
+     * Bucket Masuk gak lagi punya halaman list sendiri (Masuk & Diproses
+     * pindah jadi tab Worksheet NOC — dan itu cuma buat tiket handler=NOC).
+     * Tiket baru handler=Helpdesk kelihatannya di panel "List Task Ticketing"
+     * tab Ticket, jadi yang dites di sini: klasifikasi bucket-nya benar DAN
+     * dia gak bocor ke halaman arsip.
+     */
     public function test_new_ticket_lands_in_ticket_masuk_bucket(): void
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
         $ticket = Ticket::first();
 
-        $this->assertSame(TaskStatus::DRAFT, $ticket->fopTask->status);
+        $this->assertNull($ticket->fopTask);
+        $this->assertSame(TicketBucket::MASUK, $ticket->bucket());
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'masuk'))
-            ->assertOk()
-            ->assertSee($ticket->ticket_number);
+        // Flash 'success' dari store() nyebut nomor tiket — kalau gak dibuang,
+        // dia ke-render di GET berikutnya dan bikin assertDontSee() salah alarm.
+        $this->flushSession();
 
-        foreach (['diproses', 'selesai', 'dibatalkan'] as $otherBucket) {
+        foreach (['tickets.selesai', 'tickets.dibatalkan'] as $archiveRoute) {
             $this->actingAs($this->helpdeskUser)
-                ->get(route('tickets.bucket', $otherBucket))
+                ->get(route($archiveRoute))
                 ->assertOk()
                 ->assertDontSee($ticket->ticket_number);
         }
@@ -411,18 +472,21 @@ class TicketingTest extends TestCase
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->update(['status' => $status]);
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'diproses'))
-            ->assertOk()
-            ->assertSee($ticket->ticket_number);
+        $this->assertSame(TicketBucket::DIPROSES, $ticket->fresh()->load('fopTask')->bucket());
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'masuk'))
-            ->assertOk()
-            ->assertDontSee($ticket->ticket_number);
+        // Lihat catatan flushSession() di test bucket Masuk di atas.
+        $this->flushSession();
+
+        // Belum kelar — gak boleh nongol di arsip mana pun.
+        foreach (['tickets.selesai', 'tickets.dibatalkan'] as $archiveRoute) {
+            $this->actingAs($this->helpdeskUser)
+                ->get(route($archiveRoute))
+                ->assertOk()
+                ->assertDontSee($ticket->ticket_number);
+        }
     }
 
     public static function diprosesStatusProvider(): array
@@ -438,41 +502,64 @@ class TicketingTest extends TestCase
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->update(['status' => TaskStatus::SELESAI]);
 
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'selesai'))
+            ->get(route('tickets.selesai'))
             ->assertOk()
             ->assertSee($ticket->ticket_number);
+    }
+
+    /**
+     * Bucket Selesai juga dicapai lewat jalur internal (tanpa FOP sama
+     * sekali) — Skenario A worksheet, Helpdesk selesaikan sendiri.
+     */
+    public function test_internally_closed_ticket_moves_to_selesai_bucket(): void
+    {
+        $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
+        $ticket = Ticket::first();
+
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.close', $ticket), ['reason' => 'Sudah dibantu reset ONT.'])
+            ->assertRedirect();
+
+        $this->actingAs($this->helpdeskUser)
+            ->get(route('tickets.selesai'))
+            ->assertOk()
+            ->assertSee($ticket->ticket_number);
+
+        $this->assertNull($ticket->fresh()->fopTask);
     }
 
     public function test_cancelled_ticket_moves_to_dibatalkan_bucket(): void
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->update(['status' => TaskStatus::DIBATALKAN]);
 
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'dibatalkan'))
+            ->get(route('tickets.dibatalkan'))
             ->assertOk()
             ->assertSee($ticket->ticket_number);
     }
 
     /**
      * Tiket Terputus gak punya status buat dicocokin — tanpa penampung, dia
-     * ilang dari keempat submenu.
+     * ilang dari keempat submenu. Cuma berlaku buat tiket yang UDAH pernah
+     * ke FOP (handler=fop) terus FopTask-nya kehapus — beda dari tiket yang
+     * memang belum pernah dieskalasi sama sekali.
      */
     public function test_orphaned_ticket_appears_in_dibatalkan_bucket(): void
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
 
-        $ticket = Ticket::first();
+        $ticket = $this->escalateTicketToFop(Ticket::first());
         $ticket->fopTask->delete();
 
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'dibatalkan'))
+            ->get(route('tickets.dibatalkan'))
             ->assertOk()
             ->assertSee($ticket->ticket_number);
     }
@@ -497,19 +584,115 @@ class TicketingTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * Worksheet Helpdesk (docs/plan/RANCANGAN_MASTER_ISSUE_TICKETING.md Task 2)
+     * — dropdown kategori dari Master Issue aktif, panel kanan List Task
+     * Ticketing keisi snapshot tiket yang udah ada.
+     */
+    public function test_new_ticket_page_shows_active_issue_categories_and_worksheet_panel(): void
+    {
+        TicketIssueCategory::create([
+            'name' => 'Backbone CUT',
+            'default_priority' => 'High',
+            'sla_source' => 'prioritas',
+            'is_active' => true,
+        ]);
+
+        TicketIssueCategory::create([
+            'name' => 'Kategori Nonaktif',
+            'default_priority' => 'low',
+            'sla_source' => 'prioritas',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload());
+
+        $response = $this->actingAs($this->helpdeskUser)->get(route('tickets.create'));
+
+        $response->assertOk()
+            ->assertSee('List Task Ticketing')
+            ->assertSee('Backbone CUT')
+            ->assertDontSee('Kategori Nonaktif');
+
+        // Tiket yang udah dibuat sebelumnya nampil di panel kanan (initial load server-side).
+        $response->assertSee(Ticket::first()->ticket_number);
+    }
+
+    /**
+     * Submit mode AJAX (rancangan bagian D) — fetch() JSON, stay-on-page,
+     * BUKAN PRG redirect. TicketController@store bercabang wantsJson().
+     */
+    public function test_ajax_submit_returns_json_and_stays_on_page(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'LOS',
+            'default_priority' => 'Medium',
+            'sla_source' => 'prioritas',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($this->helpdeskUser)
+            ->postJson(route('tickets.store'), $this->validPayload([
+                'issue_category_id' => $category->id,
+            ]));
+
+        $response->assertCreated();
+        $response->assertJsonPath('ticket.title', 'LOS');
+        $response->assertJsonPath('ticket.bucket', 'masuk');
+        $response->assertJsonStructure(['ticket' => ['id', 'code', 'priority', 'title', 'desc', 'time', 'cid', 'bucket', 'fop_task_number']]);
+
+        $ticket = Ticket::first();
+        $this->assertSame($category->id, $ticket->issue_category_id);
+    }
+
+    /**
+     * 422 dari AJAX submit harus tetap JSON (bukan redirect balik ke form
+     * dengan session errors) — form worksheet nangkep field errors lewat body.
+     */
+    public function test_ajax_submit_returns_json_validation_errors(): void
+    {
+        $response = $this->actingAs($this->helpdeskUser)
+            ->postJson(route('tickets.store'), $this->validPayload(['detail_keluhan' => '']));
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['detail_keluhan']);
+    }
+
+    /**
+     * "Lainnya (isi manual)" — issue_category_id null tetap valid, detail_keluhan
+     * satu-satunya sumber klasifikasi (rancangan bagian C).
+     */
+    public function test_ticket_without_issue_category_is_still_valid(): void
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload())
+            ->assertRedirect();
+
+        $this->assertNull(Ticket::first()->issue_category_id);
+    }
+
     public function test_index_can_filter_to_own_tickets(): void
     {
         $otherHelpdesk = $this->makeHelpdesk();
 
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
+        $mine = Ticket::latest('id')->first();
+
         $this->actingAs($otherHelpdesk)->post(route('tickets.store'), $this->validPayload([
             'detail_keluhan' => 'Keluhan dari user lain.',
         ]));
+        $theirs = Ticket::latest('id')->first();
 
         $this->assertSame(2, Ticket::count());
 
+        // Filter "Ticket Saya" hidup di halaman arsip — dua tiket ditutup dulu
+        // biar masuk ke sana (bucket Masuk gak punya halaman list lagi).
+        $this->actingAs($this->helpdeskUser)->postJson(route('tickets.close', $mine))->assertOk();
+        $this->actingAs($otherHelpdesk)->postJson(route('tickets.close', $theirs))->assertOk();
+
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.index', ['mine' => 1]))
+            ->get(route('tickets.selesai', ['mine' => 1]))
             ->assertOk()
             ->assertSee('Internet mati total sejak pagi.')
             ->assertDontSee('Keluhan dari user lain.');

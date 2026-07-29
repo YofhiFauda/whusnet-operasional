@@ -6,7 +6,7 @@
 <div class="px-4 py-6 max-w-5xl mx-auto space-y-5">
 
     {{-- ══ Breadcrumb ══ --}}
-    <nav class="flex items-center gap-1.5 text-xs text-slate-500 font-ui">
+    <nav class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-ui">
         <a href="{{ route('fop-tasks.history') }}" class="hover:text-blue-600 transition-colors">Riwayat Task FOP</a>
         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -18,14 +18,14 @@
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
             <div class="flex items-center gap-2 flex-wrap mb-1.5">
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui {{ $fopTask->category instanceof \App\Enums\TaskType ? $fopTask->category->badgeClasses() : 'border-slate-200 bg-white text-slate-600' }}">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border font-ui {{ $fopTask->category instanceof \App\Enums\TaskType ? $fopTask->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                     {{ $fopTask->category instanceof \App\Enums\TaskType ? $fopTask->category->value : $fopTask->category }}
                 </span>
                 @php
                     $statusBadge = match ($fopTask->status->value) {
                         'selesai' => 'bg-green-50 text-green-700 border-green-200',
-                        'dibatalkan' => 'bg-red-50 text-red-700 border-red-200',
-                        default => 'bg-slate-50 text-slate-600 border-slate-200',
+                        'dibatalkan' => 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200',
+                        default => 'bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
                     };
                     $statusLabel = $fopTask->task
                         ? $fopTask->task->status->displayLabel($fopTask->task->report_deferred)
@@ -35,8 +35,8 @@
                     {{ $statusLabel }}
                 </span>
             </div>
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight font-ui">{{ $fopTask->tugas }}</h1>
-            <p class="text-xs text-slate-500 mt-0.5 font-ui font-mono">{{ $fopTask->task_number }}</p>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight font-ui">{{ $fopTask->tugas }}</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-ui font-mono">{{ $fopTask->task_number }}</p>
         </div>
     </div>
 
@@ -52,26 +52,26 @@
     @endphp
 
     {{-- ══ Info Task ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Info Task</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Info Task</h2>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 text-[11px] font-ui">
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Tanggal</p>
-                <p class="font-medium text-slate-800 font-data">{{ $fopTask->task_date?->format('d/m/Y H:i') ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Tanggal</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $fopTask->task_date?->format('d/m/Y H:i') ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Area</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->village?->name ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Area</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->village?->name ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">POP / Cabang</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->pop?->name ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">POP / Cabang</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->pop?->name ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Prioritas</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->priority->value }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Prioritas</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->priority->value }}</p>
             </div>
             {{-- Issue generik ($fopTask->issue, kepotong 255 char) cuma relevan
                  buat tipe NON-Ticketing. MTN/C-REQ dari Ticketing nampilin versi
@@ -80,20 +80,20 @@
                  dari konten yang sama. --}}
             @unless($showTicketDetail)
             <div class="col-span-2">
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Issue</p>
-                <p class="font-medium text-red-600">{{ $fopTask->issue ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Issue</p>
+                <p class="font-medium text-red-600 dark:text-red-400">{{ $fopTask->issue ?? '—' }}</p>
             </div>
             @endunless
             @if($fopTask->status->value === 'dibatalkan')
             <div class="col-span-2">
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alasan Cancel</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->cancel_reason ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alasan Cancel</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->cancel_reason ?? '—' }}</p>
             </div>
             @endif
             @if($fopTask->notes && !$showTicketDetail)
             <div class="col-span-2 sm:col-span-4">
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Catatan</p>
-                <p class="font-medium text-slate-800">{{ $fopTask->notes }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Catatan</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->notes }}</p>
             </div>
             @endif
         </div>
@@ -104,9 +104,9 @@
          Ticketing tampilkan dari snapshot Ticket di bawah. Gak dipakai buat
          tipe ticket-origin karena datanya udah ada di blok "Detail Ticket". ══ --}}
     @unless($showTicketDetail)
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Detail Registrasi</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Detail Registrasi</h2>
         </div>
 
         @if($fopTask->customer)
@@ -115,122 +115,145 @@
         {{-- Teknisi & Team ditonjolkan di sini (dipindah dari Info Task),
              setara posisi "Assigned by" di blok Detail Ticket. --}}
         <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 pt-3 text-[11px] font-ui">
-            <p><span class="text-slate-400">Teknisi:</span> <span class="font-medium text-slate-800">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
-            <p><span class="text-slate-400">Team:</span> <span class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Teknisi:</span> <span class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Team:</span> <span class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->team?->name ?? '—' }}</span></p>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 text-[11px] font-ui">
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
                 <p class="font-medium text-blue-700 font-data">{{ $regCustomer->display_id ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
-                <p class="font-medium text-slate-800">{{ $regCustomer->full_name ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $regCustomer->full_name ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
-                <p class="font-medium text-slate-800 font-data">{{ $regCustomer->primary_phone ?: ($regCustomer->phone ?: '—') }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $regCustomer->primary_phone ?: ($regCustomer->phone ?: '—') }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
-                <p class="font-medium text-slate-800 font-data">{{ $regCustomer->customerTechnicalDetail?->odp_number ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $regCustomer->customerTechnicalDetail?->odp_number ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
-                <p class="font-medium text-slate-800">{{ $regCustomer->internetPackage ? $regCustomer->internetPackage->package_code . ' - ' . $regCustomer->internetPackage->name : '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $regCustomer->internetPackage ? $regCustomer->internetPackage->package_code . ' - ' . $regCustomer->internetPackage->name : '—' }}</p>
             </div>
             <div class="col-span-2">
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
-                <p class="font-medium text-slate-800">{{ $regCustomer->address ?: ($regCustomer->customerAddress?->village ?: '—') }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $regCustomer->address ?: ($regCustomer->customerAddress?->village ?: '—') }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
-                <p class="font-medium text-slate-800">
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">
                     {{ $regCustomer->customerDevice ? trim(($regCustomer->customerDevice->device_type ?? '') . ' ' . ($regCustomer->customerDevice->brand ?? '') . ' ' . ($regCustomer->customerDevice->model ?? '')) ?: '—' : '—' }}
                 </p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
                 @if($regCustomer->latitude && $regCustomer->longitude)
                     <a href="https://www.google.com/maps/search/?api=1&query={{ $regCustomer->latitude }},{{ $regCustomer->longitude }}" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline font-data">
                         {{ $regCustomer->latitude }}, {{ $regCustomer->longitude }}
                     </a>
                 @else
-                    <p class="font-medium text-slate-800">—</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">—</p>
                 @endif
             </div>
         </div>
         @else
         <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-[11px] font-ui">
-            <p><span class="text-slate-400">Teknisi:</span> <span class="font-medium text-slate-800">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
-            <p><span class="text-slate-400">Team:</span> <span class="font-medium text-slate-800">{{ $fopTask->team?->name ?? '—' }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Teknisi:</span> <span class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->technicians->pluck('name')->implode(', ') ?: '—' }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Team:</span> <span class="font-medium text-slate-800 dark:text-slate-200">{{ $fopTask->team?->name ?? '—' }}</span></p>
         </div>
-        <p class="px-4 pb-4 text-[11px] text-slate-400 italic font-ui">Task ini tidak terhubung ke pelanggan tertentu.</p>
+        <p class="px-4 pb-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Task ini tidak terhubung ke pelanggan tertentu.</p>
         @endif
     </div>
     @endunless
 
     @if($showTicketDetail)
     {{-- ══ Detail dari Ticketing (mengikuti /tickets/{ticket}) ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Detail Ticket</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Detail Ticket</h2>
             <a href="{{ route('tickets.show', $ticket) }}" class="text-[11px] font-medium text-blue-600 hover:underline font-ui">
                 {{ $ticket->ticket_number }} — Buka di Ticketing →
             </a>
         </div>
 
+        {{-- Klasifikasi — Kategori Issue (Master Issue) belum pernah muncul di
+             halaman ini sama sekali (baru ditambah bareng modul Master Issue),
+             disamping Tipe & Prioritas yang udah ada tapi juga belum tampil
+             di Detail Task, cuma di /tickets. --}}
+        <div class="flex flex-wrap items-center gap-2 px-4 pt-3 text-[11px] font-ui">
+            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border {{ $ticket->type->badgeClasses() }}">
+                {{ $ticket->type->value }}
+            </span>
+            @if($ticket->issueCategory)
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded border border-sky-200 dark:border-sky-900 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/50">
+                    {{ $ticket->issueCategory->name }}
+                </span>
+            @endif
+            @if($ticket->priority)
+                <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                    Prioritas: {{ $ticket->priority->value }}
+                </span>
+            @endif
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded border {{ $ticket->statusBadgeClasses() }}">
+                {{ $ticket->statusLabel() }}
+            </span>
+        </div>
+
         {{-- Assign by & Created at — sebelumnya gak ada sama sekali di halaman
              Detail Task, padahal ini yang pertama dilihat di /tickets/{ticket}. --}}
         <div class="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 pt-3 text-[11px] font-ui">
-            <p><span class="text-slate-400">Assigned by:</span> <span class="font-medium text-slate-800">{{ $ticket->creator->name ?? '—' }}</span></p>
-            <p><span class="text-slate-400">Created:</span> <span class="font-medium text-slate-800 font-data">{{ \App\Support\IndonesianDate::dateTime($ticket->created_at) }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Assigned by:</span> <span class="font-medium text-slate-800 dark:text-slate-200">{{ $ticket->creator->name ?? '—' }}</span></p>
+            <p><span class="text-slate-400 dark:text-slate-500">Created:</span> <span class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ \App\Support\IndonesianDate::dateTime($ticket->created_at) }}</span></p>
         </div>
 
         {{-- Data Pelanggan — snapshot saat ticket dibuat, sama kayak panel di /tickets --}}
         <div class="px-4 pt-3">
-            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-ui mb-2">Data Pelanggan (saat ticket dibuat)</p>
+            <p class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider font-ui mb-2">Data Pelanggan (saat ticket dibuat)</p>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-4 pb-4 text-[11px] font-ui">
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">CID</p>
                 <p class="font-medium text-blue-700 font-data">
                     {{ $ticket->customer?->display_id ?: ($ticket->customer?->cid ?: ($ticket->customer?->customer_code ?: '—')) }}
                 </p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
-                <p class="font-medium text-slate-800">{{ $ticket->customer_name ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Nama</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $ticket->customer_name ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
-                <p class="font-medium text-slate-800 font-data">{{ $ticket->customer_phone ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">No. HP</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $ticket->customer_phone ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
-                <p class="font-medium text-slate-800 font-data">{{ $ticket->customer_odp ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $ticket->customer_odp ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
-                <p class="font-medium text-slate-800">{{ $ticket->customer_package ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Paket</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $ticket->customer_package ?: '—' }}</p>
             </div>
             <div class="col-span-2">
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
-                <p class="font-medium text-slate-800">{{ $ticket->customer_address ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alamat</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $ticket->customer_address ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
-                <p class="font-medium text-slate-800">{{ $ticket->customer_device ?: '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Perangkat Pelanggan</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200">{{ $ticket->customer_device ?: '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Koordinat</p>
                 @if($ticket->customerMapsUrl())
                     <a href="{{ $ticket->customerMapsUrl() }}" target="_blank" rel="noopener" class="font-medium text-blue-600 hover:underline font-data">
                         {{ $ticket->customer_latitude }}, {{ $ticket->customer_longitude }}
                     </a>
                 @else
-                    <p class="font-medium text-slate-800">—</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">—</p>
                 @endif
             </div>
         </div>
@@ -241,24 +264,24 @@
              (keluhan PELANGGAN, wajib diisi), Catatan Teknis dari
              $ticket->catatan_teknis (asesmen TEKNIS awal NOC, opsional).
              Versi utuh — BUKAN $fopTask->issue yang kepotong 255 karakter. --}}
-        <div class="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
-            <div class="border border-amber-200 bg-amber-50/60 rounded overflow-hidden">
-                <p class="px-3 py-1.5 text-[10px] font-semibold text-amber-700 uppercase tracking-wider font-ui border-b border-amber-200 bg-amber-50">
+        <div class="px-4 pb-4 border-t border-slate-100 dark:border-slate-700/50 pt-3 space-y-3">
+            <div class="border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 rounded overflow-hidden">
+                <p class="px-3 py-1.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider font-ui border-b border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20">
                     Issue / Gangguan
                 </p>
-                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 whitespace-pre-line font-ui">{{ $ticket->detail_keluhan }}</p>
+                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line font-ui">{{ $ticket->detail_keluhan }}</p>
             </div>
-            <div class="border border-slate-200 bg-slate-50/60 rounded overflow-hidden">
-                <p class="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider font-ui border-b border-slate-200 bg-slate-100">
+            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/60 rounded overflow-hidden">
+                <p class="px-3 py-1.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-ui border-b border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700/50">
                     Catatan Teknis
                 </p>
-                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 whitespace-pre-line font-ui">{{ $ticket->catatan_teknis ?: '— Belum ada catatan teknis.' }}</p>
+                <p class="px-3 py-2.5 text-[11px] font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line font-ui">{{ $ticket->catatan_teknis ?: '— Belum ada catatan teknis.' }}</p>
             </div>
         </div>
 
         @if($ticket->attachments->isNotEmpty())
-        <div class="px-4 pb-4 border-t border-slate-100 pt-3">
-            <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-1.5 font-ui">Lampiran ({{ $ticket->attachments->count() }})</p>
+        <div class="px-4 pb-4 border-t border-slate-100 dark:border-slate-700/50 pt-3">
+            <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1.5 font-ui">Lampiran ({{ $ticket->attachments->count() }})</p>
             <div class="flex flex-wrap gap-3">
                 @foreach($ticket->attachments as $attachment)
                     <a href="{{ route('tickets.attachments.download', $attachment) }}"
@@ -275,21 +298,21 @@
     </div>
 
     {{-- ══ Riwayat Ticketing (dari sisi pengirim, kembaran Histori Status di bawah) ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Riwayat Ticketing</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Riwayat Ticketing</h2>
         </div>
         @if($ticket->histories->isNotEmpty())
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-slate-100 dark:divide-slate-700/50">
             @foreach($ticket->histories as $ticketHistory)
             <div class="px-4 py-2.5 flex items-center justify-between gap-3 text-[11px] font-ui">
                 <div class="flex items-center gap-2">
-                    <span class="font-medium text-slate-800">{{ $ticketHistory->action->label() }}</span>
+                    <span class="font-medium text-slate-800 dark:text-slate-200">{{ $ticketHistory->action->label() }}</span>
                     @if($ticketHistory->reason)
-                    <span class="text-slate-400">— {{ $ticketHistory->reason }}</span>
+                    <span class="text-slate-400 dark:text-slate-500">— {{ $ticketHistory->reason }}</span>
                     @endif
                 </div>
-                <div class="flex items-center gap-3 text-slate-500 font-data">
+                <div class="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-data">
                     <span>{{ $ticketHistory->actor?->name ?? 'Sistem' }}</span>
                     <span>{{ $ticketHistory->happened_at->format('d/m/Y H:i') }}</span>
                 </div>
@@ -297,83 +320,83 @@
             @endforeach
         </div>
         @else
-        <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada riwayat ticketing.</p>
+        <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada riwayat ticketing.</p>
         @endif
     </div>
     @endif
 
     {{-- ══ Durasi & SLA Pengerjaan ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Durasi & SLA Pengerjaan</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Durasi & SLA Pengerjaan</h2>
         </div>
         @php $report = $fopTask->task?->report; @endphp
         @if($report)
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 text-[11px] font-ui">
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Mulai</p>
-                <p class="font-medium text-slate-800 font-data">{{ $report->started_at?->format('d/m/Y H:i') ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Mulai</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $report->started_at?->format('d/m/Y H:i') ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Pending Terakhir</p>
-                <p class="font-medium text-slate-800 font-data">{{ $report->pending_at?->format('d/m/Y H:i') ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Pending Terakhir</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $report->pending_at?->format('d/m/Y H:i') ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Resume Terakhir</p>
-                <p class="font-medium text-slate-800 font-data">{{ $report->resumed_at?->format('d/m/Y H:i') ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Resume Terakhir</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $report->resumed_at?->format('d/m/Y H:i') ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Selesai</p>
-                <p class="font-medium text-slate-800 font-data">{{ $report->completed_at?->format('d/m/Y H:i') ?? '—' }}</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Selesai</p>
+                <p class="font-medium text-slate-800 dark:text-slate-200 font-data">{{ $report->completed_at?->format('d/m/Y H:i') ?? '—' }}</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Durasi Aktual</p>
-                <p class="font-semibold text-slate-800 font-data">{{ $report->accumulatedDurationMinutes() }} menit</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Durasi Aktual</p>
+                <p class="font-semibold text-slate-800 dark:text-slate-200 font-data">{{ $report->accumulatedDurationMinutes() }} menit</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Target SLA</p>
-                <p class="font-semibold text-slate-800 font-data">{{ $report->sla_target_minutes ?? '—' }} menit</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Target SLA</p>
+                <p class="font-semibold text-slate-800 dark:text-slate-200 font-data">{{ $report->sla_target_minutes ?? '—' }} menit</p>
             </div>
             <div>
-                <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Status SLA</p>
+                <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Status SLA</p>
                 @if($report->sla_status === 'on_time')
                     <p class="font-semibold text-green-700">Tepat Waktu</p>
                 @elseif($report->sla_status === 'over')
-                    <p class="font-semibold text-red-600">Lewat SLA ({{ $report->sla_overrun_minutes }} mnt)</p>
+                    <p class="font-semibold text-red-600 dark:text-red-400">Lewat SLA ({{ $report->sla_overrun_minutes }} mnt)</p>
                 @else
-                    <p class="font-medium text-slate-400">—</p>
+                    <p class="font-medium text-slate-400 dark:text-slate-500">—</p>
                 @endif
             </div>
         </div>
         @else
-        <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada data siklus pengerjaan (teknisi belum pernah klik Mulai).</p>
+        <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada data siklus pengerjaan (teknisi belum pernah klik Mulai).</p>
         @endif
     </div>
 
     {{-- ══ Laporan ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Laporan</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Laporan</h2>
         </div>
 
         @if($fopTask->category === \App\Enums\TaskType::SURVEY)
             @if($survey)
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2">
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
-                    <p class="font-medium text-slate-800">{{ $survey->required_tools ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $survey->required_tools ?? '—' }}</p>
                 </div>
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Estimasi Kabel</p>
-                    <p class="font-medium text-slate-800">{{ $survey->cable_estimation_meter ? $survey->cable_estimation_meter . ' meter' : '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Estimasi Kabel</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $survey->cable_estimation_meter ? $survey->cable_estimation_meter . ' meter' : '—' }}</p>
                 </div>
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP Terdekat</p>
-                    <p class="font-medium text-slate-800">{{ $survey->nearest_odp ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">ODP Terdekat</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $survey->nearest_odp ?? '—' }}</p>
                 </div>
                 <div class="col-span-2">
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Catatan Survey</p>
-                    <p class="font-medium text-slate-800 whitespace-pre-line">{{ $survey->survey_note ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Catatan Survey</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line">{{ $survey->survey_note ?? '—' }}</p>
                 </div>
                 @if($survey->survey_photo || $survey->house_photo)
                 <div class="col-span-2 flex gap-3 flex-wrap">
@@ -387,30 +410,30 @@
                 @endif
             </div>
             @else
-            <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada laporan survey.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan survey.</p>
             @endif
         @elseif($fopTask->category === \App\Enums\TaskType::PEMASANGAN)
             @if($installation || $technicalDetail)
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
-                    <p class="font-medium text-slate-800">{{ $technicalDetail?->odp_number ?? '—' }} / Port {{ $technicalDetail?->odp_port ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">ODP</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $technicalDetail?->odp_number ?? '—' }} / Port {{ $technicalDetail?->odp_port ?? '—' }}</p>
                 </div>
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Redaman</p>
-                    <p class="font-medium text-slate-800">{{ $technicalDetail?->actual_attenuation ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Redaman</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $technicalDetail?->actual_attenuation ?? '—' }}</p>
                 </div>
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Speedtest</p>
-                    <p class="font-medium text-slate-800 font-data">↓{{ $technicalDetail?->test_download ?? '—' }} / ↑{{ $technicalDetail?->test_upload ?? '—' }} Mbps</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Speedtest</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 font-data">↓{{ $technicalDetail?->test_download ?? '—' }} / ↑{{ $technicalDetail?->test_upload ?? '—' }} Mbps</p>
                 </div>
                 <div>
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Kualitas Sinyal</p>
-                    <p class="font-medium text-slate-800">Jitter {{ $technicalDetail?->jitter_ms ?? '—' }}ms, Loss {{ $technicalDetail?->packet_loss_percent ?? '—' }}%</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kualitas Sinyal</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">Jitter {{ $technicalDetail?->jitter_ms ?? '—' }}ms, Loss {{ $technicalDetail?->packet_loss_percent ?? '—' }}%</p>
                 </div>
                 <div class="col-span-2">
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Catatan Pemasangan</p>
-                    <p class="font-medium text-slate-800 whitespace-pre-line">{{ $installation?->installation_note ?? '—' }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Catatan Pemasangan</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line">{{ $installation?->installation_note ?? '—' }}</p>
                 </div>
                 @if($installation?->installation_photo || $installation?->signature_photo || $installation?->contract_photo)
                 <div class="col-span-2 flex gap-3 flex-wrap">
@@ -427,17 +450,17 @@
                 @endif
             </div>
             @else
-            <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada laporan pemasangan.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan pemasangan.</p>
             @endif
         @elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE)
             @if($maintenance)
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2">
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
-                    <p class="font-medium text-slate-800 whitespace-pre-line">{{ $maintenance->kendala_teknis }}</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line">{{ $maintenance->kendala_teknis }}</p>
                 </div>
                 <div class="col-span-2">
-                    <p class="text-slate-400 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
                         @foreach(['kabel' => 'Kabel', 'modem' => 'Modem', 'patchcord' => 'Patchcord', 'sleeve' => 'Sleeve', 'lainnya' => 'Lainnya'] as $field => $label)
                             @if($maintenance->{$field})
@@ -458,29 +481,29 @@
                 @endif
             </div>
             @else
-            <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada laporan maintenance.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada laporan maintenance.</p>
             @endif
         @else
-            <p class="p-4 text-[11px] text-slate-400 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>
+            <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Tipe task ini tidak punya laporan lapangan terstruktur.</p>
         @endif
     </div>
 
     {{-- ══ Histori Status ══ --}}
-    <div class="bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
-        <div class="px-4 py-2.5 border-b border-slate-200 bg-slate-50">
-            <h2 class="text-xs font-semibold text-slate-700 uppercase tracking-wider font-ui">Histori Status</h2>
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-sm overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <h2 class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-ui">Histori Status</h2>
         </div>
         @if($fopTask->statusHistories->isNotEmpty())
-        <div class="divide-y divide-slate-100">
+        <div class="divide-y divide-slate-100 dark:divide-slate-700/50">
             @foreach($fopTask->statusHistories as $history)
             <div class="px-4 py-2.5 flex items-center justify-between gap-3 text-[11px] font-ui">
                 <div class="flex items-center gap-2">
-                    <span class="font-medium text-slate-800">{{ $history->label() }}</span>
+                    <span class="font-medium text-slate-800 dark:text-slate-200">{{ $history->label() }}</span>
                     @if($history->from_status)
-                    <span class="text-slate-400">dari {{ $history->from_status }}</span>
+                    <span class="text-slate-400 dark:text-slate-500">dari {{ $history->from_status }}</span>
                     @endif
                 </div>
-                <div class="flex items-center gap-3 text-slate-500 font-data">
+                <div class="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-data">
                     <span>{{ $history->changedByUser?->name ?? 'Sistem' }}</span>
                     <span>{{ $history->changed_at->format('d/m/Y H:i') }}</span>
                 </div>
@@ -488,7 +511,7 @@
             @endforeach
         </div>
         @else
-        <p class="p-4 text-[11px] text-slate-400 italic font-ui">Belum ada histori transisi status.</p>
+        <p class="p-4 text-[11px] text-slate-400 dark:text-slate-500 italic font-ui">Belum ada histori transisi status.</p>
         @endif
     </div>
 </div>

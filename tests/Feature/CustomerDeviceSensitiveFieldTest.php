@@ -159,8 +159,10 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
     {
         $teknisi = $this->createUserWithRole($this->teknisiRole);
 
-        // Can see
-        $response = $this->actingAs($teknisi)->get('/customers/'.$this->customer->id);
+        // Can see — teknisi gak punya customers.detail.view (Detail Pelanggan
+        // diblok), tab Perangkat diakses lewat halaman terpisah
+        // customers.fieldwork (lihat CustomerFieldworkController).
+        $response = $this->actingAs($teknisi)->get(route('customers.fieldwork', $this->customer->id));
         $response->assertStatus(200);
         $response->assertSee('secret_pppoe');
         $response->assertSee('secret_wifi');

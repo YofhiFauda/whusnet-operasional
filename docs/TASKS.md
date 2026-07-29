@@ -9,6 +9,39 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 |---|---|---|
 | ADHOC-01 | Desain Ulang List Pelanggan & Dark Theme Toggle | Done |
 | ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi, Detail Pelanggan & Sub-Tabs Dark/Light Theme Support | Done |
+| ADHOC-03 | Restrukturisasi Modul Ticketing (lihat detail di bawah) | Done — 2026-07-28 |
+
+#### ADHOC-03 — Restrukturisasi Modul Ticketing (2026-07-28)
+
+Menyesuaikan modul Ticketing ke alur kerja Helpdesk/NOC yang sebenarnya. Dokumentasi
+lengkap sudah disinkronkan di `docs/ticketing/`.
+
+| # | Perubahan | Kenapa |
+|---|---|---|
+| 1 | Window **"Pending NOC"** + aksi **Oncheck NOC** (kolom `noc_checked_at`) | Dulu Helpdesk langsung kehilangan akses begitu kirim ke NOC — tiket menggantung tanpa pemilik selama NOC belum buka worksheet. Sekarang dua-duanya boleh act sampai NOC resmi ambil alih |
+| 2 | **Batalkan tiket pra-FOP** (`tickets.cancel`, alasan wajib) | Tiket yang masih di meja Helpdesk sebelumnya gak bisa dibatalkan sama sekali tanpa dieskalasi ke FOP dulu hanya untuk dibatalkan di sana |
+| 3 | Panel **List Task Ticketing** → 3 tab: Ticket / Assign NOC / Assign FOP (filter per `handler`) | Tab lama (Semua/Masuk/Diproses) menjawab "sudah sampai tahap mana", bukan "lagi di tangan siapa" — yang justru dibutuhkan pengirim tiket |
+| 4 | Halaman baru **Worksheet NOC** (`/noc/worksheet`, 1 halaman 2 tab) | NOC sebelumnya numpang halaman bucket yang sama dengan semua role |
+| 5 | Halaman baru **Dashboard NOC** (`/noc/dashboard`) | Stat counter, tiket aktif + aging, feed aktivitas, statistik Issue & Daerah |
+| 6 | **Ticket Selesai / Dibatalkan** jadi halaman sendiri (controller + view + permission masing-masing) | Route bucket generik `/tickets/{bucket}` bikin semuanya numpang `tickets.view` — gak bisa di-toggle per-halaman di Role Matrix |
+| 7 | RBAC per-halaman: `tickets.selesai.view`, `tickets.dibatalkan.view`, `noc_worksheet.masuk.view`, `noc_worksheet.diproses.view`, `noc_dashboard.view`, `tickets.cancel` | idem #6 |
+| 8 | **Dialog konfirmasi terpusat** `window.confirmTicketAction()` | Sebelumnya 4 implementasi berbeda (confirm() native + 3 modal hand-rolled). `confirm()` native gak bisa nampung alasan, jadi `ticket_histories.reason` selalu kosong dari panel worksheet |
+
+**Route yang dihapus:** `tickets.index` (`/tickets`) dan `tickets.bucket` (`/tickets/{bucket}`).
+
+**Migrasi:** `2026_07_28_000001_add_noc_checked_at_to_tickets_table.php`.
+
+**Seeder:** `TicketFeatureSeeder` sekarang menanam seluruh Feature modul (tickets +
+sub-feature arsip + noc_worksheet + noc_dashboard). Setelah pull, jalankan:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+**Test baru:** `TicketOnCheckNocTest`, `TicketPreFopCancelTest`, `TicketingRbacTest`,
+`NocWorksheetTest`, `NocDashboardTest`.
+
+**Test lama yang assertion-nya sengaja diubah** (perilaku memang berubah, bukan regresi):
+`TicketCloseEscalateTest` (lockout Helpdesk sekarang setelah Oncheck, bukan saat escalate),
+`TicketingTest` (label status `Pending NOC`, bucket Masuk/Diproses gak punya halaman list lagi),
+`TicketCancellationTest` (endpoint cancel Ticketing sekarang ada, tapi menolak tiket pasca-FOP).
 
 ### PERF — Index, N+1 & Beban Database (`docs/plan/ANALISA_INDEX_DATABASE.md`)
 

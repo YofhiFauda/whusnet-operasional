@@ -27,6 +27,9 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.survey.view',
                 'customers.detail.installation.view',
                 'customers.detail.devices.view',
@@ -40,6 +43,9 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.export', // assuming audit_logs has export
                 'fop_tasks.view',
                 'tickets.view', // Atasan cuma memantau — gak ikut ngirim tiket
+                'tickets.selesai.view',
+                'tickets.dibatalkan.view',
+                'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -56,8 +62,11 @@ class RolePermissionSeeder extends Seeder
                 'customers.create',
                 'customers.update',
                 'customers.delete',
+                'customers.deactivate', // Terminasi langganan — permission baru, terpisah dari customers.update
+                'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
+                'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
-                'customers.detail.*', // Access to all detail sections
+                'customers.detail.*', // Access to all detail sections (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.*', // Ex: view, create, update, delete, cancel, print
                 'payments.*', // Ex: view, create, update, validate, reject, print
                 'reports.*',
@@ -65,6 +74,8 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.export',
                 'fop_tasks.*',
                 'tickets.*',
+                'noc_worksheet.*',
+                'noc_dashboard.*',
                 'task.lookup', // dipakai modal /fop-tasks (autocomplete pelanggan + cek konflik)
                 'master_wilayah.*',
                 'master_distribusi.*',
@@ -78,6 +89,9 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -101,6 +115,8 @@ class RolePermissionSeeder extends Seeder
                 'invoices.print',
                 'payments.print', // Based on matrix
                 'tickets.*',
+                'noc_worksheet.*',
+                'noc_dashboard.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -112,6 +128,9 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.create',
                 'customers.update',
                 'customers.detail.identity.view',
@@ -143,6 +162,9 @@ class RolePermissionSeeder extends Seeder
             'fop' => [
                 'dashboard.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -169,7 +191,15 @@ class RolePermissionSeeder extends Seeder
 
             'teknisi' => [
                 'dashboard.view',
-                'customers.view',
+                // customers.view / customers.detail.view / customers.terminated.view /
+                // customers.failed.view SENGAJA gak dikasih — teknisi cuma
+                // boleh kerjain Survey/Pemasangan (queue + form lapor lewat
+                // permission .survey.*/.installation.* di bawah), TAPI gak
+                // boleh buka List Data Pelanggan, List Pelanggan Putus, List
+                // Pelanggan Gagal, atau Detail Pelanggan (4 permission
+                // terpisah sejak refactor — lihat routes/web.php,
+                // CustomerController/CustomerTerminatedController/
+                // CustomerFailedController).
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -190,6 +220,9 @@ class RolePermissionSeeder extends Seeder
             'sales' => [
                 'dashboard.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.create',
                 'customers.update',
                 'customers.detail.identity.view',
@@ -212,8 +245,11 @@ class RolePermissionSeeder extends Seeder
                 'customers.view',
                 'customers.create',
                 'customers.update',
+                'customers.deactivate', // Terminasi langganan dalam scope POP-nya
+                'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
+                'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
-                'customers.detail.*', // Except sensitive devices, we will subtract below
+                'customers.detail.*', // Except sensitive devices, we will subtract below (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.view',
                 'invoices.create',
                 'invoices.print',

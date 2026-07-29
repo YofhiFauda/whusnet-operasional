@@ -82,13 +82,13 @@ enum TaskType: string
     public function cardClasses(): string
     {
         return match ($this) {
-            self::SURVEY => 'bg-blue-100 border-blue-300 text-blue-800',
-            self::PEMASANGAN => 'bg-green-100 border-green-300 text-green-800',
-            self::MAINTENANCE => 'bg-orange-100 border-orange-300 text-orange-800',
-            self::AMBIL_MODEM => 'bg-pink-100 border-pink-300 text-pink-800',
-            self::CREQ => 'bg-teal-100 border-teal-300 text-teal-800',
-            self::OREQ => 'bg-gray-100 border-gray-300 text-gray-800',
-            self::INFR => 'bg-red-100 border-red-300 text-red-800',
+            self::SURVEY => 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-800/70 text-blue-800 dark:text-blue-300',
+            self::PEMASANGAN => 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-800/70 text-green-800 dark:text-green-300',
+            self::MAINTENANCE => 'bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-800/70 text-orange-800 dark:text-orange-300',
+            self::AMBIL_MODEM => 'bg-pink-100 dark:bg-pink-900/40 border-pink-300 dark:border-pink-800/70 text-pink-800 dark:text-pink-300',
+            self::CREQ => 'bg-teal-100 dark:bg-teal-900/40 border-teal-300 dark:border-teal-800/70 text-teal-800 dark:text-teal-300',
+            self::OREQ => 'bg-gray-100 dark:bg-slate-700/50 border-gray-300 dark:border-slate-600 text-gray-800 dark:text-slate-200',
+            self::INFR => 'bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-800/70 text-red-800',
         };
     }
 
@@ -98,13 +98,13 @@ enum TaskType: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::SURVEY => 'bg-blue-50 border-blue-200 text-blue-700',
-            self::PEMASANGAN => 'bg-green-50 border-green-200 text-green-700',
-            self::MAINTENANCE => 'bg-orange-50 border-orange-200 text-orange-700',
-            self::AMBIL_MODEM => 'bg-pink-50 border-pink-200 text-pink-700',
-            self::CREQ => 'bg-teal-50 border-teal-200 text-teal-700',
-            self::OREQ => 'bg-gray-50 border-gray-200 text-gray-700',
-            self::INFR => 'bg-red-50 border-red-200 text-red-700',
+            self::SURVEY => 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400',
+            self::PEMASANGAN => 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800/50 text-green-700 dark:text-green-400',
+            self::MAINTENANCE => 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/50 text-orange-700 dark:text-orange-400',
+            self::AMBIL_MODEM => 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800/50 text-pink-700 dark:text-pink-400',
+            self::CREQ => 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800/50 text-teal-700 dark:text-teal-400',
+            self::OREQ => 'bg-gray-50 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300',
+            self::INFR => 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400',
         };
     }
 

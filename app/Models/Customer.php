@@ -457,37 +457,37 @@ class Customer extends Model
         $status = strtolower($this->status);
 
         $stages = [
-            'registrasi' => ['label' => 'R', 'name' => 'Registrasi', 'status' => 'completed', 'color' => 'bg-green-500'],
-            'survey' => ['label' => 'S', 'name' => 'Survey', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'pemasangan' => ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'uji' => ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'aktivasi' => ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
+            'registrasi' => ['label' => 'R', 'name' => 'Registrasi', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600'],
+            'survey' => ['label' => 'S', 'name' => 'Survey', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'pemasangan' => ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'uji' => ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'aktivasi' => ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
         ];
 
         $completedStatuses = ['active', 'suspended', 'terminated'];
 
         // Survey
         if (in_array($status, ['surveyed', 'waiting_installation', 'installed', ...$completedStatuses])) {
-            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
+            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'waiting_survey') {
-            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
 
         // Pemasangan (Instalasi) & Uji Layanan
         if (in_array($status, ['installed', ...$completedStatuses])) {
-            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
-            $stages['uji'] = ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
+            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
+            $stages['uji'] = ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'waiting_installation') {
-            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
 
         // Aktivasi
         if (in_array($status, ['active', 'suspended'])) {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'completed', 'color' => $status === 'suspended' ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'completed', 'color' => $status === 'suspended' ? 'bg-amber-500 dark:bg-amber-600 text-white' : 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'terminated') {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'terminated', 'color' => 'bg-red-500 text-white'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'terminated', 'color' => 'bg-red-500 dark:bg-red-600 text-white'];
         } elseif ($status === 'installed') {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
 
         return $stages;

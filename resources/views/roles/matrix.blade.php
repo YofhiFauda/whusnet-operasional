@@ -24,6 +24,8 @@ $descriptions = [
     'audit_logs' => 'Catatan kronologis aktivitas krusial yang dilakukan staf di sistem untuk audit keamanan.',
     'fop_tasks' => 'Layer 1 (Tiket FOP) — Pembuatan tiket awal, penentuan tipe pekerjaan (SURVEY/PSB/MTN), prioritas, dan tim pelaksana. Begitu teknisi di-assign, tiket auto-lanjut ke <span class="font-medium text-text-secondary">"Eksekusi Task"</span> di bawah.',
     'tasks' => 'Layer 2 (Eksekusi Task) — Kelanjutan otomatis dari Tiket FOP setelah teknisi di-assign untuk pengerjaan & pelaporan checklist lapangan. Bukan modul terpisah — jangan samakan dengan hak akses Tiket FOP.',
+    'customers.detail.survey' => 'Hasil survey kelayakan, foto lokasi, status kelayakan, dan catatan surveyor. Sengaja dipisah dari "Pelanggan" — role yang cuma butuh isi laporan survey (mis. Teknisi) gak perlu dikasih akses List/Detail Pelanggan penuh.',
+    'customers.detail.installation' => 'Instalasi perangkat di rumah pelanggan, status pengerjaan, dan validasi aktivasi. Sengaja dipisah dari "Pelanggan" — role yang cuma butuh isi laporan pemasangan (mis. Teknisi) gak perlu dikasih akses List/Detail Pelanggan penuh.',
 
     // Sub features
     'customers.import' => 'Modul import massal data pelanggan lama via file Excel / CSV.',
@@ -33,8 +35,6 @@ $descriptions = [
     'customers.detail.identity' => 'Data personal pelanggan, kontak, NIK, dan berkas identitas.',
     'customers.detail.address' => 'Data koordinat GPS, alamat, kelurahan, kecamatan, dan kota/kabupaten.',
     'customers.detail.packages' => 'Paket layanan internet terhubung dan harga custom pelanggan. Status aktivasi layanan diatur lewat "Pemasangan Pelanggan", bukan di sini.',
-    'customers.detail.survey' => 'Hasil survey kelayakan, foto lokasi, status kelayakan, dan catatan surveyor.',
-    'customers.detail.installation' => 'Instalasi perangkat di rumah pelanggan, status pengerjaan, dan validasi aktivasi.',
     'customers.detail.devices' => 'Data teknis modem, SN perangkat, port OLT, password PPPoE, dan nama/password WiFi.',
     'customers.detail.documents' => 'Dokumen pendukung seperti KTP, foto rumah, form registrasi fisik, dsb.',
 ];

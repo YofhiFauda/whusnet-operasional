@@ -1,15 +1,17 @@
 <?php
 
-use App\Enums\TicketBucket;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
+use App\Http\Controllers\CustomerFailedController;
+use App\Http\Controllers\CustomerFieldworkController;
 use App\Http\Controllers\CustomerInstallationController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\CustomerSurveyController;
+use App\Http\Controllers\CustomerTerminatedController;
 use App\Http\Controllers\CustomerTerminationController;
 use App\Http\Controllers\CustomerTestReportController;
 use App\Http\Controllers\CustomerVerificationController;
@@ -25,6 +27,9 @@ use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
+use App\Http\Controllers\Master\TicketIssueCategoryController;
+use App\Http\Controllers\NocDashboardController;
+use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReportController;
@@ -35,6 +40,8 @@ use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskTeamController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketDibatalkanController;
+use App\Http\Controllers\TicketSelesaiController;
 use App\Http\Controllers\UserController;
 use App\Models\City;
 use App\Models\District;
@@ -90,6 +97,20 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     });
 
+    // List Pelanggan Putus & List Pelanggan Gagal — permission SENDIRI,
+    // terpisah dari customers.view (List Data Pelanggan biasa). Sebelumnya
+    // dua-duanya numpang customers.view lewat query param status_group di
+    // customers.index — gak bisa di-toggle independen lewat Role Matrix
+    // (mis. cabut akses teknisi ke List tapi Putus/Gagal ikut ke-cabut juga
+    // meski gak diminta, atau sebaliknya).
+    Route::middleware('permission:customers.terminated.view')->group(function () {
+        Route::get('/customers/terminated', [CustomerTerminatedController::class, 'index'])->name('customers.terminated');
+    });
+
+    Route::middleware('permission:customers.failed.view')->group(function () {
+        Route::get('/customers/failed', [CustomerFailedController::class, 'index'])->name('customers.failed');
+    });
+
     Route::middleware('permission:customers.create')->group(function () {
         Route::get('/customers/create', [CustomerController::class, 'create'])->name('customers.create');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
@@ -109,6 +130,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+    });
+
+    // Terminasi langganan — permission SENDIRI (customers.deactivate), BUKAN
+    // numpang customers.update lagi. Sebelumnya Helpdesk/Sales (yang cuma
+    // butuh edit field pelanggan biasa) ikut kebawa bisa putus langganan.
+    Route::middleware('permission:customers.deactivate')->group(function () {
         Route::post('/customers/{customer}/terminate', [CustomerTerminationController::class, '__invoke'])->name('customers.terminate');
     });
 
@@ -118,6 +145,18 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:customers.detail.installation.activate')->group(function () {
         Route::post('/customers/{customer}/activate', [CustomerController::class, 'activate'])->name('customers.activate');
+    });
+
+    // Perangkat & Pemasangan — halaman TERPISAH dari Detail Pelanggan
+    // (customers.show, digerbangin customers.detail.view). Teknisi sengaja
+    // DIBLOK dari customers.detail.view (gak boleh buka Detail Pelanggan
+    // umum: identitas/alamat/paket/billing/dokumen), TAPI tetap genuinely
+    // butuh liat/isi data Perangkat & Pemasangan buat kerja lapangan — makanya
+    // dipecah jadi route sendiri, digerbangin permission tab yang memang udah
+    // dipunyai teknisi (customers.detail.devices.view /
+    // customers.detail.installation.view), bukan numpang customers.detail.view.
+    Route::middleware('permission:customers.detail.devices.view|customers.detail.installation.view')->group(function () {
+        Route::get('/customers/{customer}/perangkat-pemasangan', [CustomerFieldworkController::class, 'show'])->name('customers.fieldwork');
     });
 
     Route::middleware('permission:invoices.create')->group(function () {
@@ -146,7 +185,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/invoices/bulk-pay', [PaymentController::class, 'bulkStore'])->name('invoices.payments.bulk-store');
     });
 
-    Route::middleware('permission:customers.view')->group(function () {
+    // Detail Pelanggan — permission SENDIRI (customers.detail.view), terpisah
+    // dari customers.view (List). Sebelumnya satu permission yang sama
+    // ngegerbangin List DAN Detail, jadi gak bisa kasih akses List doang
+    // tanpa Detail atau sebaliknya.
+    Route::middleware('permission:customers.detail.view')->group(function () {
         Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
         Route::get('/customers/{customer}/payment-info', [CustomerController::class, 'paymentInfo'])->name('customers.payment-info');
     });
@@ -195,6 +238,23 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:master_status_pelanggan.view')->group(function () {
         Route::get('/master/status-langganan', [SubscriptionStatusController::class, 'index'])->name('master.status-langganan.index');
+    });
+
+    // Master Issue/Kategori Keluhan - Static Routes First
+    Route::middleware('permission:ticket_issue_categories.create|ticket_issue_categories.update')->group(function () {
+        Route::get('/master/issue-categories/create', [TicketIssueCategoryController::class, 'create'])->name('master.ticket-issue-categories.create');
+        Route::post('/master/issue-categories', [TicketIssueCategoryController::class, 'store'])->name('master.ticket-issue-categories.store');
+    });
+
+    Route::middleware('permission:ticket_issue_categories.view')->group(function () {
+        Route::get('/master/issue-categories', [TicketIssueCategoryController::class, 'index'])->name('master.ticket-issue-categories.index');
+    });
+
+    // Master Issue/Kategori Keluhan - Dynamic Routes Last
+    Route::middleware('permission:ticket_issue_categories.create|ticket_issue_categories.update')->group(function () {
+        Route::get('/master/issue-categories/{category}/edit', [TicketIssueCategoryController::class, 'edit'])->name('master.ticket-issue-categories.edit');
+        Route::put('/master/issue-categories/{category}', [TicketIssueCategoryController::class, 'update'])->name('master.ticket-issue-categories.update');
+        Route::post('/master/issue-categories/{category}/toggle', [TicketIssueCategoryController::class, 'toggleStatus'])->name('master.ticket-issue-categories.toggle');
     });
 
     // Paket Internet Management - Static Routes First
@@ -386,20 +446,71 @@ Route::middleware('auth')->group(function () {
         Route::get('/tickets/new', [TicketController::class, 'create'])->name('tickets.create');
         Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
         Route::get('/api/tickets/lookup-customer', [TicketController::class, 'lookupCustomer'])->name('tickets.lookup-customer');
+        Route::get('/api/tickets/worksheet-tasks', [TicketController::class, 'worksheetJson'])->name('tickets.worksheet-tasks');
+        // Gap #5 — dupe-check server-side per customer_id, gak kena cap panel.
+        Route::get('/api/tickets/duplicates', [TicketController::class, 'duplicates'])->name('tickets.duplicates');
     });
-    Route::middleware('permission:tickets.view')->group(function () {
-        Route::get('/tickets', [TicketController::class, 'index'])->name('tickets.index');
-        Route::get('/ticket-attachments/{attachment}', [TicketController::class, 'download'])->name('tickets.attachments.download');
+    // Halaman arsip — masing-masing route + permission SENDIRI (bukan param
+    // {bucket} generik lagi) biar bisa di-toggle independen di Role Matrix.
+    // Bucket Masuk & Diproses pindah jadi halaman Worksheet NOC di bawah.
+    // Didaftarkan SEBELUM /tickets/{ticket} biar gak ketelan route dinamis.
+    Route::middleware('permission:tickets.selesai.view')->group(function () {
+        Route::get('/tickets/selesai', [TicketSelesaiController::class, 'index'])->name('tickets.selesai');
+    });
+    Route::middleware('permission:tickets.dibatalkan.view')->group(function () {
+        Route::get('/tickets/dibatalkan', [TicketDibatalkanController::class, 'index'])->name('tickets.dibatalkan');
+    });
 
-        // Submenu bucket (masuk|diproses|selesai|dibatalkan). Dibatasi whereIn
-        // biar gak bentrok sama route detail di bawahnya yang cuma nerima angka.
-        Route::get('/tickets/{bucket}', [TicketController::class, 'index'])
-            ->whereIn('bucket', TicketBucket::values())
-            ->name('tickets.bucket');
+    Route::middleware('permission:tickets.view')->group(function () {
+        Route::get('/ticket-attachments/{attachment}', [TicketController::class, 'download'])->name('tickets.attachments.download');
 
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
             ->whereNumber('ticket')
             ->name('tickets.show');
+    });
+
+    // Close/Escalate (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD) — otorisasi
+    // "cuma pihak yang lagi pegang tiket" dicek di TicketService, bukan di sini.
+    Route::middleware('permission:tickets.update')->group(function () {
+        Route::post('/tickets/{ticket}/close', [TicketController::class, 'close'])
+            ->whereNumber('ticket')
+            ->name('tickets.close');
+        Route::post('/tickets/{ticket}/escalate', [TicketController::class, 'escalate'])
+            ->whereNumber('ticket')
+            ->name('tickets.escalate');
+        // Gap #7 — NOC kembaliin tiket ke Helpdesk (jalur pemulihan salah kirim).
+        Route::post('/tickets/{ticket}/return-to-helpdesk', [TicketController::class, 'returnToHelpdesk'])
+            ->whereNumber('ticket')
+            ->name('tickets.return-to-helpdesk');
+        // NOC resmi ambil alih tiket pending (lihat Ticket::isPendingNoc()).
+        Route::post('/tickets/{ticket}/oncheck-noc', [TicketController::class, 'onCheckNoc'])
+            ->whereNumber('ticket')
+            ->name('tickets.oncheck-noc');
+    });
+
+    // Batalkan tiket pra-FOP — permission terpisah dari tickets.update biar
+    // bisa diatur independen lewat matrix role.
+    Route::middleware('permission:tickets.cancel')->group(function () {
+        Route::post('/tickets/{ticket}/cancel', [TicketController::class, 'cancel'])
+            ->whereNumber('ticket')
+            ->name('tickets.cancel');
+    });
+
+    // ── Worksheet NOC & Dashboard NOC — halaman kerja NOC sendiri, terpisah
+    // dari Ticketing generik di atas biar RBAC-nya bisa diatur independen.
+    // Worksheet NOC = SATU halaman, dua tab di dalamnya. Tiap tab tetap punya
+    // route + permission sendiri (biar bisa di-toggle granular di Role Matrix),
+    // tapi entry point-nya satu: /noc/worksheet → tab pertama yang boleh dibuka.
+    Route::get('/noc/worksheet', [NocWorksheetController::class, 'index'])->name('noc.worksheet');
+
+    Route::middleware('permission:noc_worksheet.masuk.view')->group(function () {
+        Route::get('/noc/worksheet/masuk', [NocWorksheetController::class, 'masuk'])->name('noc.worksheet.masuk');
+    });
+    Route::middleware('permission:noc_worksheet.diproses.view')->group(function () {
+        Route::get('/noc/worksheet/diproses', [NocWorksheetController::class, 'diproses'])->name('noc.worksheet.diproses');
+    });
+    Route::middleware('permission:noc_dashboard.view')->group(function () {
+        Route::get('/noc/dashboard', [NocDashboardController::class, 'index'])->name('noc.dashboard');
     });
 
     // Location APIs (used in forms)

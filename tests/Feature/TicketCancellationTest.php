@@ -88,6 +88,11 @@ class TicketCancellationTest extends TestCase
         return $user;
     }
 
+    /**
+     * FopTask gak lagi auto-dibuat pas ticket disubmit — modul ini nge-test
+     * pembatalan Task FOP, jadi tiap tiket WAJIB dieskalasi ke FOP dulu biar
+     * ada FopTask buat dibatalin (lihat TicketService::escalateToFop()).
+     */
     private function submitTicket(): Ticket
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), [
@@ -98,7 +103,13 @@ class TicketCancellationTest extends TestCase
             'priority' => 'High',
         ])->assertRedirect();
 
-        return Ticket::latest('id')->firstOrFail();
+        $ticket = Ticket::latest('id')->firstOrFail();
+
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertRedirect();
+
+        return $ticket->fresh();
     }
 
     private function cancel(User $actor, Ticket $ticket, string $reason = 'Pelanggan sudah normal sendiri')
@@ -122,7 +133,7 @@ class TicketCancellationTest extends TestCase
         $this->cancel($this->helpdeskUser, $ticket)->assertForbidden();
 
         $this->assertNotSame(TaskStatus::DIBATALKAN, $ticket->fopTask->refresh()->status);
-        $this->assertDatabaseCount('ticket_histories', 1); // cuma 'dibuat'
+        $this->assertDatabaseCount('ticket_histories', 2); // dibuat + dieskalasi ke FOP
     }
 
     public function test_teknisi_cannot_cancel_ticket(): void
@@ -159,16 +170,21 @@ class TicketCancellationTest extends TestCase
     }
 
     /**
-     * Modul Ticketing sengaja gak nyediain endpoint cancel sendiri — satu-satunya
-     * pintu pembatalan adalah Task FOP.
+     * Modul Ticketing punya endpoint cancel sendiri (TicketService::cancel()),
+     * TAPI cuma buat tiket yang belum pernah ke FOP (handler Helpdesk/NOC).
+     * Begitu tiket udah `handler=FOP` (kayak submitTicket() di sini), jalur
+     * itu ditutup — pembatalan wajib lewat Task FOP (lihat cancel() helper
+     * di atas / TicketService::assertTicketStillOpen()).
      */
-    public function test_ticketing_module_exposes_no_cancel_endpoint(): void
+    public function test_ticketing_cancel_endpoint_rejects_ticket_already_at_fop(): void
     {
         $ticket = $this->submitTicket();
 
         $this->actingAs($this->fopUser)
-            ->post("/tickets/{$ticket->id}/cancel", ['cancel_reason' => 'x'])
-            ->assertNotFound();
+            ->post(route('tickets.cancel', $ticket), ['reason' => 'x'])
+            ->assertSessionHasErrors('target');
+
+        $this->assertNotSame(TaskStatus::DIBATALKAN, $ticket->fopTask->refresh()->status);
     }
 
     // ── Dua riwayat ─────────────────────────────────────────────
@@ -191,7 +207,7 @@ class TicketCancellationTest extends TestCase
 
         // 2. Riwayat sisi Ticketing
         $ticketHistories = $ticket->histories()->get();
-        $this->assertCount(2, $ticketHistories); // dibuat + dibatalkan
+        $this->assertCount(3, $ticketHistories); // dibuat + dieskalasi + dibatalkan
 
         $cancelEntry = $ticketHistories->firstWhere('action', TicketHistoryAction::DIBATALKAN);
         $this->assertNotNull($cancelEntry);
@@ -205,11 +221,14 @@ class TicketCancellationTest extends TestCase
     {
         $ticket = $this->submitTicket();
 
-        $entry = $ticket->histories()->first();
+        // histories() orderByDesc — ambil eksplisit yang DIBUAT, bukan first()
+        // mentah (yang sekarang balikin 'dieskalasi', entry terbaru dari
+        // submitTicket() ikut ngeskalasi ke FOP).
+        $entry = $ticket->histories()->where('action', TicketHistoryAction::DIBUAT)->firstOrFail();
 
         $this->assertSame(TicketHistoryAction::DIBUAT, $entry->action);
         $this->assertSame($this->helpdeskUser->id, $entry->actor_id);
-        $this->assertSame(TaskStatus::DRAFT->value, $entry->to_status);
+        $this->assertSame('helpdesk', $entry->to_status);
     }
 
     /**
@@ -265,7 +284,7 @@ class TicketCancellationTest extends TestCase
         $this->cancel($this->fopUser, $ticket)->assertOk();
 
         $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.bucket', 'dibatalkan'))
+            ->get(route('tickets.dibatalkan'))
             ->assertOk()
             ->assertSee($ticket->ticket_number);
     }

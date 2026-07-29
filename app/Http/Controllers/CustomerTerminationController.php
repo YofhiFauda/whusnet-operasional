@@ -14,6 +14,13 @@ class CustomerTerminationController extends Controller
      */
     public function __invoke(Request $request, Customer $customer)
     {
+        // Sebelumnya gak ada guard permission sama sekali di sini — cuma
+        // numpang middleware `customers.update` di routes/web.php, jadi role
+        // mana pun yang bisa edit field pelanggan biasa (Helpdesk/Sales) juga
+        // otomatis bisa putus langganan. Aksi destruktif/service-impacting,
+        // wajib permission sendiri (customers.deactivate).
+        abort_unless(auth()->user()->hasPermission('customers.deactivate'), 403);
+
         $request->validate([
             'reason' => 'required|string|max:500',
         ]);

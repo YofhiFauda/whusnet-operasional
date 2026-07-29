@@ -1,7 +1,11 @@
 @extends('layouts.app')
 
 @php
-    $statusGroup = request()->query('status_group', '');
+    // $statusGroup dikirim controller (bisa dari query string DI /customers,
+    // atau di-paksa 'terminated'/'failed' oleh CustomerTerminatedController/
+    // CustomerFailedController yang URL-nya /customers/terminated|failed —
+    // gak ada query string status_group di URL itu). JANGAN dibaca ulang
+    // dari request()->query() di sini, bakal nimpa nilai forced-nya jadi ''.
     $pageTitle = match ($statusGroup) {
         'failed' => 'Pelanggan Gagal',
         'terminated' => 'Pelanggan Putus',
@@ -105,23 +109,34 @@
     {{-- Status Tabs + Search Row --}}
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
 
-        {{-- Status Tabs (pill group) --}}
+        {{--
+            Status Tabs cuma relevan buat List Data Pelanggan biasa (Aktif/
+            Isolir/Semua) — Putus & Gagal punya arti status yang beda sama
+            sekali. Sebelumnya pill ini pakai fullUrlWithQuery() yang
+            mempertahankan PATH saat ini; begitu List Putus/Gagal dapet route
+            sendiri (/customers/terminated, /customers/failed), klik pill di
+            sini bakal nyangkut di path yang sama (dipaksa statusGroup-nya
+            oleh controller) tapi query status=active ikut nempel — hasil
+            query jadi campur aduk (nampilin pelanggan aktif tapi masih
+            dilabeli "Daftar Pelanggan Putus"). Makanya diarahkan eksplisit ke
+            route('customers.index') — always balik ke List biasa.
+        --}}
         <div class="flex items-center p-1 bg-slate-200/60 dark:bg-slate-900/60 rounded-lg w-fit text-xs font-semibold">
-            <a href="{{ request()->fullUrlWithQuery(['status' => '', 'status_group' => '']) }}"
+            <a href="{{ route('customers.index') }}"
                class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
                       {{ $status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
                 <span>Semua</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
                              {{ $status === '' && empty($statusGroup) ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $totalCustomers }}</span>
             </a>
-            <a href="{{ request()->fullUrlWithQuery(['status' => 'active', 'status_group' => '']) }}"
+            <a href="{{ route('customers.index', ['status' => 'active']) }}"
                class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
                       {{ $status === 'active' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
                 <span>Aktif</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
                              {{ $status === 'active' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">{{ $statusCounts['active'] ?? 0 }}</span>
             </a>
-            <a href="{{ request()->fullUrlWithQuery(['status' => 'suspended', 'status_group' => '']) }}"
+            <a href="{{ route('customers.index', ['status' => 'suspended']) }}"
                class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
                       {{ $status === 'suspended' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50' }}">
                 <span>Isolir</span>
@@ -131,7 +146,13 @@
         </div>
 
         {{-- Search Input (pill) — submit saat Enter, tanpa tombol terpisah (match template) --}}
-        <form action="/customers" method="GET" id="searchForm" class="relative flex-1 max-w-md">
+        {{-- action pakai url()->current(), BUKAN hardcode /customers — halaman
+             ini dirender juga dari /customers/terminated & /customers/failed
+             (CustomerTerminatedController/CustomerFailedController), submit
+             harus balik ke route yang sama biar permission-nya tetep kecek
+             lewat route dedicated-nya, bukan mantul ke /customers lalu
+             ke-redirect (query filter lain bisa ke-drop di jalan). --}}
+        <form action="{{ url()->current() }}" method="GET" id="searchForm" class="relative flex-1 max-w-md">
             @if($statusGroup !== '')
                 <input type="hidden" name="status_group" value="{{ $statusGroup }}">
             @endif
@@ -152,7 +173,7 @@
     </div>
 
     {{-- Dropdown Filters Row --}}
-    <form action="/customers" method="GET" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5" id="filterForm">
+    <form action="{{ url()->current() }}" method="GET" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5" id="filterForm">
         @if($statusGroup !== '')
             <input type="hidden" name="status_group" value="{{ $statusGroup }}">
         @endif
@@ -194,7 +215,7 @@
 
         {{-- Reset + Submit --}}
         <div class="col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
-            <a href="/customers{{ $statusGroup ? '?status_group='.$statusGroup : '' }}"
+            <a href="{{ url()->current() }}"
                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
                       text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700
                       text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
@@ -252,7 +273,7 @@
             @elseif($statusGroup === 'terminated') Daftar Pelanggan Putus
             @endif
         </span>
-        <a href="/customers" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua</a>
+        <a href="{{ route('customers.index') }}" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua</a>
     </div>
     @endif
 
@@ -295,7 +316,7 @@
                     <td class="px-6 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{{ route('customers.show', $customer->id) }}"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:hover:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
                                 Detail
                             </a>
                             @if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject)
@@ -303,7 +324,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengembalikan {{ $customer->full_name }} ke proses sebelum ditolak?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 transition-colors border border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 dark:hover:text-amber-400 dark:hover:text-amber-300 transition-colors border border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded px-2.5 py-1 cursor-pointer">
                                     Kembalikan
                                 </button>
                             </form>
@@ -375,7 +396,7 @@
                     <td class="px-6 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
                             <a href="{{ route('customers.show', $customer->id) }}"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
+                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:hover:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
                                 Detail
                             </a>
                             @if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
@@ -383,7 +404,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk {{ $customer->full_name }}?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 transition-colors border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 dark:hover:text-slate-300 dark:hover:text-slate-100 transition-colors border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded px-2.5 py-1 cursor-pointer">
                                     Ambil Alat
                                 </button>
                             </form>
@@ -393,7 +414,7 @@
                                   onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan {{ $customer->full_name }}?', this);">
                                 @csrf
                                 <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded px-2.5 py-1 cursor-pointer">
+                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-400 dark:hover:text-emerald-300 transition-colors border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded px-2.5 py-1 cursor-pointer">
                                     Langganan Lagi
                                 </button>
                             </form>
@@ -1200,7 +1221,14 @@
 
             <!-- Right Group: Termination & Close Buttons -->
             <div class="flex flex-wrap items-center gap-2">
-                @if(auth()->user()->hasPermission('customers.delete'))
+                {{--
+                    Sebelumnya gate tombol ini `customers.delete`, padahal route
+                    `customers.terminate` cuma dikunci `customers.update` — dua
+                    permission beda yang gak nyambung sama sekali. Sekarang
+                    dua-duanya `customers.deactivate` (permission baru khusus
+                    terminasi), konsisten front-end & back-end.
+                --}}
+                @if(auth()->user()->hasPermission('customers.deactivate'))
                 <button onclick="triggerTerminate()" type="button" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                     <span>Putus Langganan</span>

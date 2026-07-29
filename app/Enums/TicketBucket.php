@@ -79,10 +79,10 @@ enum TicketBucket: string
     public function badgeClasses(): string
     {
         return match ($this) {
-            self::MASUK => 'bg-sky-50 border-sky-200 text-sky-700',
-            self::DIPROSES => 'bg-amber-50 border-amber-200 text-amber-700',
-            self::SELESAI => 'bg-emerald-50 border-emerald-200 text-emerald-700',
-            self::DIBATALKAN => 'bg-slate-50 border-slate-200 text-slate-600',
+            self::MASUK => 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/50 text-sky-700 dark:text-sky-400',
+            self::DIPROSES => 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400',
+            self::SELESAI => 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400',
+            self::DIBATALKAN => 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400',
         };
     }
 
