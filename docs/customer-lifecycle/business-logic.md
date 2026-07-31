@@ -57,6 +57,23 @@
 - **Kalau `survey_status = failed` (✅ ditambahkan 2026-07-08 — sebelumnya gap, lihat [bug.md](bug.md)):** `survey_note` jadi **wajib** (alasan tidak layak pasang, ditombolkan lewat tombol "Tidak Layak Pasang" terpisah di UI — bukan dropdown, biar teknisi gak salah pencet). Task Survey terkait di-**cancel** (`TaskService::cancel()`, status `DIBATALKAN` + `cancel_reason`), customer di-**transition ke `rejected`** (state final, sama mekanisme dengan reject di tahap verifikasi — lihat §7). Tiket Pemasangan otomatis **tidak akan pernah terbentuk** karena workflow tidak pernah sampai `waiting_acc`.
 - Kalau `survey_status = pending` (laporan draf/belum final) → data tersimpan, status customer/task tidak berubah, technician bisa submit ulang nanti.
 
+#### Tanggal Request Pemasangan (`requested_installation_date`, 2026-07-31)
+
+Field **opsional** di Step 4 form Lapor Survey. Diisi hanya kalau pelanggan minta dipasang di tanggal tertentu; kosong = "secepatnya".
+
+- Validasi `nullable|date|after_or_equal:today` — tanggal lampau ditolak, karena kalau lolos task-nya lahir langsung dalam kondisi TERLAMBAT di papan FOP.
+- **`customer_surveys.requested_installation_date` adalah satu-satunya sumber kebenaran.** `fop_tasks.client_request_date` untuk kategori PSB cuma nilai turunan yang di-refresh tiap auto-sync papan FOP — lihat [docs/fop-task/business-logic.md](../fop-task/README.md) & `FopTaskController::autoSyncAndCalculatePriority()`.
+- Efeknya di papan FOP: selama tanggalnya belum tiba, task tenggelam ke dasar papan, prioritas dipaksa `LOW`, dan **tidak dihitung SLA-nya**. Begitu tanggalnya tiba, deadline = akhir hari tanggal itu dan countdown berjalan; lewat tengah malam → timer negatif (`−18:25:02`).
+
+#### Estimasi Kebutuhan Alat (`task_materials`, kind `estimasi`, 2026-07-31)
+
+Daftar material terstruktur (baris berulang: barang, tipe, jumlah, satuan, catatan) menggantikan peran `required_tools` sebagai pencatat material.
+
+- `required_tools` **tidak dihapus** (ada data survey lama) — turun peran jadi "Alat Khusus / Kendala Peralatan": peralatan kerja non-habis-pakai (tangga, bor). Material habis pakai masuk `task_materials`.
+- `cable_estimation_meter` tetap dipakai dan **otomatis diturunkan** jadi satu baris `kabel_dropcore` (qty = nilai itu, unit meter) — teknisi tidak diminta mengisi angka yang sama dua kali. Kalau teknisi sudah menambah baris dropcore manual, baris otomatis tidak dibuat (cegah dobel).
+- Baris menempel di **FopTask kategori SURVEY** milik pelanggan. Kalau FopTask-nya belum terbentuk, baris material dilewat dan laporan survey tetap tersimpan — menggagalkan seluruh laporan cuma karena anchor belum ada lebih merugikan daripada kehilangan daftar estimasi.
+- Barang dipilih dari **Master Barang** (`items`). Barang di luar master dicatat lewat pilihan "Lainnya" (`item_id` null) supaya teknisi tidak terhambat di lapangan.
+
 ### Batalkan Survey — sebelum/selagi dikerjakan (`cancel()`)
 
 **Beda dari §"Lapor Survey" `survey_status=failed` di atas** — itu jalur "teknisi UDAH di lokasi, submit laporan gagal survey". Method `cancel()` ini buat kasus SEBELUM laporan ada sama sekali: **belum ditugaskan** (`waiting_survey`, belum ada teknisi/Task jalan) ATAU **udah ditugaskan tapi gak jadi/dibatalkan** (`waiting_survey` juga — status customer TETAP `waiting_survey` walau Task Survey-nya udah `terjadwal`/teknisi udah di-assign, sampai teknisi beneran pencet "Mulai Survey") ATAU **lagi dikerjakan tapi dibatalkan di tengah jalan** (`survey_in_progress`, belum submit laporan).
@@ -87,10 +104,26 @@
 - **Validasi kondisional ketat saat `installation_status = completed`:** foto pemasangan, foto kontrak, foto TTD pelanggan, DAN foto speedtest **wajib ada** (baik dari upload baru atau yang udah tersimpan sebelumnya) — kalau salah satu kosong, submit ditolak dengan pesan spesifik per field.
 - Data teknis disimpan **dobel** ke 2 tabel: `CustomerTechnicalDetail` (sumber utama, field lengkap: ODP/OLT/VLAN/speedtest/attenuation) dan `CustomerDevice` (legacy, subset field device/PPPoE/WiFi) — keduanya di-`updateOrCreate` dalam transaksi yang sama.
 - **Speed conformity** dihitung otomatis: `(test_download / paket.download_speed_mbps) * 100` — dipakai buat verifikasi hasil instalasi sesuai spek paket yang dijual.
+- **Perangkat Pasif Terpakai wajib minimal 1 baris saat `completed`** (2026-07-31) — lihat sub-bagian di bawah.
 - Efek per `installation_status`:
   - `completed` → complete Task Pemasangan, transition 2x berturutan: `installed` lalu langsung `verification_admin` (skip berhenti di `installed`), broadcast `InstallationCompleted`, notifikasi Telegram.
   - `failed` → transition balik ke `waiting_installation` ("Instalasi gagal/butuh revisi. Menunggu penjadwalan ulang").
   - lainnya (progress belum selesai) → data tersimpan, status customer/task tidak berubah.
+
+#### Perangkat Pasif Terpakai (`task_materials`, kind `terpakai`, 2026-07-31)
+
+**Beda tegas dari Estimasi Kebutuhan Alat di §4.** Estimasi = perkiraan surveyor. Perangkat Pasif = material yang **benar-benar dipakai** saat pemasangan. Selisih keduanya adalah nilai bisnis utamanya, dan nanti jadi input langsung modul Inventory.
+
+- Form Step 5 diisi awal (**prefill**) dari baris `estimasi` milik pelanggan; kalau laporan pernah disimpan/direvisi, baris `terpakai` yang tersimpan yang menang. Teknisi mengubah jumlah ke realita, boleh tambah/hapus baris. Tanpa prefill, seksi ini cenderung dikosongkan dan perbandingannya jadi tak berguna.
+- **Wajib minimal satu baris valid kalau `installation_status = completed`** (qty > 0 dan barang terisi). Kalau `failed`/revisi, tidak wajib — mengikuti pola field lain di form ini.
+- Baris menempel di **FopTask kategori PEMASANGAN**; sama seperti estimasi, kalau anchor belum ada baris dilewat tanpa menggagalkan laporan.
+- **Tidak menggantikan `customer_technical_details.passive_device*`.** Dua-duanya tetap ada dan tidak digabung:
+  | | `task_materials` (kind `terpakai`) | `customer_technical_details.passive_device*` |
+  |---|---|---|
+  | Makna | konsumsi material saat pekerjaan (biaya) | aset terpasang permanen di sisi pelanggan |
+  | Bentuk | banyak baris + qty + satuan | 4 kolom flat, 1 baris |
+  | Diisi | teknisi, saat Laporan Pemasangan | admin, lewat tab Perangkat |
+- Perbandingan **Estimasi vs Terpakai + selisih** tampil di halaman Verifikasi Admin (`verifications/admin.blade.php`). Di situlah admin menilai apakah estimasi survey meleset atau pemakaian tidak wajar — sengaja tanpa ambang otomatis, itu keputusan manusia.
 
 ### Batalkan Pemasangan — sebelum/selagi dikerjakan (`cancel()`, **baru 2026-07-21**)
 

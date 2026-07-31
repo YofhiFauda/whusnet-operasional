@@ -249,13 +249,27 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // History Ticketing — halaman arsip SEMUA tiket (semua handler & status,
+        // termasuk yang masih jalan), pengganti sheet Excel Helpdesk lama.
+        // Permission sendiri, BUKAN numpang tickets.view: isinya lintas-bucket
+        // dan bisa diekspor, jadi harus bisa dimatikan per-role tanpa mencabut
+        // akses tiket sehari-hari (docs/plan/analisa-halaman-history-ticketing.md §6).
+        'tickets.history' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
+        ],
+
         // Worksheet NOC & Dashboard NOC — feature terpisah dari 'tickets'
         // (bukan cuma aksi atas tiket, tapi AKSES HALAMAN KERJA) biar RBAC-nya
-        // bisa diatur independen. Dua tab Worksheet NOC juga halaman sendiri.
+        // bisa diatur independen. Worksheet NOC sekarang SATU halaman tanpa
+        // tab (ADHOC-06), jadi `noc_worksheet.view` yang jadi gerbangnya.
         'noc_worksheet' => [
             ActionCode::VIEW->value,
         ],
 
+        // Dua permission tab lama DIPENSIUNKAN (ADHOC-06) — sengaja tetap
+        // digenerate biar role yang terlanjur punya gak error waktu resolusi
+        // permission, tapi sudah tidak menggerbangi route mana pun.
         'noc_worksheet.masuk' => [
             ActionCode::VIEW->value,
         ],
@@ -336,9 +350,11 @@ return [
         'tickets.cancel' => 'Batalkan Ticket (pra-FOP)',
         'tickets.selesai.view' => 'Lihat Halaman Ticket Selesai',
         'tickets.dibatalkan.view' => 'Lihat Halaman Ticket Dibatalkan',
+        'tickets.history.view' => 'Lihat Halaman History Ticketing (semua tiket)',
+        'tickets.history.export' => 'Ekspor History Ticketing ke Excel',
         'noc_worksheet.view' => 'Akses Modul Worksheet NOC',
-        'noc_worksheet.masuk.view' => 'Lihat Tab Ticket Masuk (Worksheet NOC)',
-        'noc_worksheet.diproses.view' => 'Lihat Tab Ticket Diproses (Worksheet NOC)',
+        'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
+        'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
     ],
 ];

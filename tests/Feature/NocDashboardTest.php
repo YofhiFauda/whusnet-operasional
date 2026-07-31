@@ -10,6 +10,7 @@ use App\Models\District;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
+use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Models\Village;
 use Database\Seeders\ActionSeeder;
@@ -22,8 +23,7 @@ use Tests\TestCase;
 
 /**
  * Dashboard NOC (`/noc/dashboard`) — stat counter, list aktif+aging, feed
- * aktivitas, statistik issue & daerah. Smoke test tiap section muncul +
- * permission gate, bukan uji nilai statistik detail.
+ * aktivitas, statistik issue & daerah, serta trend matrix daerah x issue.
  */
 class NocDashboardTest extends TestCase
 {
@@ -114,7 +114,7 @@ class NocDashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee($ticket->ticket_number);
-        $response->assertSee('Pending NOC');
+        $response->assertSee('Diproses NOC');
     }
 
     public function test_dashboard_renders_all_sections(): void
@@ -124,7 +124,80 @@ class NocDashboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('Tiket Aktif NOC');
         $response->assertSee('Aktivitas Terbaru');
-        $response->assertSee('Statistik per Issue');
-        $response->assertSee('Statistik per Daerah');
+        $response->assertSee('Statistik Tiket per Kategori Issue');
+        $response->assertSee('Statistik Tiket per Daerah');
+        $response->assertSee('Tren Matriks: Daerah dengan Issue Terbanyak');
+    }
+
+    public function test_dashboard_filters_by_preset_and_pop(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'Kabel Putus',
+            'default_type' => TaskType::MAINTENANCE->value,
+            'default_priority' => 'High',
+            'is_active' => true,
+        ]);
+
+        $ticket1 = Ticket::create([
+            'ticket_number' => 'TK-TEST-001',
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'issue_category_id' => $category->id,
+            'detail_keluhan' => 'Kabel FO Putus',
+            'priority' => 'High',
+            'handler' => 'noc',
+            'status' => 'open',
+            'created_by' => $this->helpdeskUser->id,
+            'created_at' => now()->subDays(2),
+        ]);
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard', [
+            'date_preset' => '7_days',
+            'pop_id' => $this->pop->id,
+        ]));
+
+        $response->assertOk();
+        $stats = $response->viewData('stats');
+        $this->assertEquals(1, $stats['total_ticket']);
+        $this->assertEquals(1, $stats['diproses_noc']);
+    }
+
+    public function test_active_tickets_are_sorted_by_aging_oldest_first(): void
+    {
+        $olderTicket = Ticket::create([
+            'ticket_number' => 'TK-OLD',
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'detail_keluhan' => 'Keluhan Lama',
+            'priority' => 'High',
+            'handler' => 'noc',
+            'status' => 'open',
+            'created_by' => $this->helpdeskUser->id,
+            'created_at' => now()->subHours(10),
+        ]);
+
+        $newerTicket = Ticket::create([
+            'ticket_number' => 'TK-NEW',
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'detail_keluhan' => 'Keluhan Baru',
+            'priority' => 'High',
+            'handler' => 'noc',
+            'status' => 'open',
+            'created_by' => $this->helpdeskUser->id,
+            'created_at' => now()->subHours(1),
+        ]);
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+
+        $response->assertOk();
+        $activeTickets = $response->viewData('activeTickets');
+
+        $this->assertGreaterThanOrEqual(2, $activeTickets->count());
+        $firstTicket = $activeTickets->first();
+        $this->assertEquals($olderTicket->id, $firstTicket->id);
     }
 }

@@ -174,12 +174,6 @@ class TicketCloseEscalateTest extends TestCase
             ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
             ->assertRedirect();
 
-        // NOC wajib Oncheck dulu sebelum bisa Selesaikan (window pending —
-        // lihat TicketOnCheckNocTest untuk guard ini secara detail).
-        $this->actingAs($this->nocUser)
-            ->post(route('tickets.oncheck-noc', $ticket))
-            ->assertRedirect();
-
         $this->actingAs($this->nocUser)
             ->post(route('tickets.close', $ticket), ['reason' => 'Berhasil dikonfigurasi ulang dari sisi NOC.'])
             ->assertRedirect();
@@ -235,18 +229,18 @@ class TicketCloseEscalateTest extends TestCase
     }
 
     /**
-     * Window "pending NOC" — Helpdesk kirim ke NOC tapi NOC BELUM Oncheck.
-     * Helpdesk MASIH boleh act (close/escalate) selama window ini.
+     * Tiket di tangan NOC dipegang BERSAMA Helpdesk + NOC (ADHOC-06) —
+     * Helpdesk yang mengirim tetap boleh menyelesaikan tiketnya sendiri.
+     * Dulu ini cuma berlaku selama window "Pending NOC"; window itu dihapus,
+     * kepemilikan bersamanya dipertahankan permanen.
      */
-    public function test_helpdesk_can_still_act_during_pending_noc_window(): void
+    public function test_helpdesk_can_still_act_after_ticket_assigned_to_noc(): void
     {
         $ticket = $this->submitTicket($this->helpdeskUser);
 
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
             ->assertRedirect();
-
-        $this->assertTrue($ticket->fresh()->isPendingNoc());
 
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.close', $ticket), ['reason' => 'Ternyata bisa dibenerin sendiri.'])
@@ -256,22 +250,17 @@ class TicketCloseEscalateTest extends TestCase
     }
 
     /**
-     * Begitu NOC klik Oncheck NOC, Helpdesk kehilangan akses — tiket resmi
-     * pindah tangan ke NOC.
+     * Batas kepemilikan yang TETAP berlaku: FOP terminal buat sisi Ticketing.
+     * Begitu tiket dikirim ke FOP, Helpdesk maupun NOC kehilangan semua aksi
+     * Ticketing (pembatalan pasca-FOP wajib lewat /fop-tasks).
      */
-    public function test_helpdesk_cannot_act_after_noc_has_checked(): void
+    public function test_helpdesk_cannot_act_after_ticket_sent_to_fop(): void
     {
         $ticket = $this->submitTicket($this->helpdeskUser);
 
         $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
             ->assertRedirect();
-
-        $this->actingAs($this->nocUser)
-            ->post(route('tickets.oncheck-noc', $ticket))
-            ->assertRedirect();
-
-        $this->assertTrue($ticket->fresh()->isOnCheckNoc());
 
         $this->actingAs($this->helpdeskUser)
             ->post(route('tickets.close', $ticket))
@@ -428,14 +417,13 @@ class TicketCloseEscalateTest extends TestCase
             ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
             ->assertRedirect();
 
-        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet.masuk'));
+        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet'));
 
         $response->assertOk();
         $response->assertSee($ticket->ticket_number);
-        // Tiket masih pending (belum di-Oncheck) — NOC lihat tombol Oncheck
-        // NOC & Assign FOP, TAPI BELUM Selesai (wajib Oncheck dulu, lihat
-        // test_helpdesk_cannot_act_after_noc_has_checked).
-        $response->assertSee(route('tickets.oncheck-noc', $ticket), false);
+        // Tiket langsung diproses NOC begitu diassign (ADHOC-06) — NOC
+        // langsung lihat tombol Selesai & Assign FOP, gak ada langkah Oncheck.
+        $response->assertSee(route('tickets.close', $ticket), false);
         $response->assertSee(route('tickets.escalate', $ticket), false);
         $response->assertSee($this->helpdeskUser->name);
     }
@@ -455,10 +443,15 @@ class TicketCloseEscalateTest extends TestCase
             ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
             ->assertRedirect();
 
-        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet.masuk'));
+        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet'));
 
         $response->assertOk();
-        $response->assertSee('confirmTicketRowAction(this', false);
+        // Aksi sekarang dipicu dari drawer detail (ADHOC-09/ADHOC-10): drawer
+        // men-dispatch 'ticket-drawer-action', halaman ini yang konfirmasi lalu
+        // POST JSON lewat performTicketAction(). Yang dijaga test ini tetap sama:
+        // JANGAN <form method="POST">.
+        $response->assertSee('ticket-drawer-action', false);
+        $response->assertSee('performTicketAction(', false);
         $response->assertDontSee('action="'.route('tickets.close', $ticket).'"', false);
         $response->assertDontSee('action="'.route('tickets.escalate', $ticket).'"', false);
     }

@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'pop_id',
     'customer_name',
     'customer_address',
+    'customer_village',
     'customer_phone',
     'customer_odp',
     'customer_package',
@@ -47,7 +48,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'fop_task_id',
     'handler',
     'status',
-    'noc_checked_at',
+    'resolved_at',
 ])]
 class Ticket extends Model
 {
@@ -62,8 +63,65 @@ class Ticket extends Model
             'customer_longitude' => 'decimal:7',
             'handler' => TicketHandler::class,
             'status' => TicketHandlingStatus::class,
-            'noc_checked_at' => 'datetime',
+            'resolved_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Tiket "Terputus" — pernah dieskalasi ke FOP tapi FopTask-nya udah dihapus
+     * FOP (`fop_task_id` nullOnDelete). Beda dari tiket yang MEMANG belum pernah
+     * ke FOP, makanya pembedanya `handler`, bukan cuma cek null `fop_task_id`.
+     *
+     * bucket() menjatuhkan kasus ini ke `dibatalkan` (biar submenu arsip tetap
+     * nemu), TAPI di halaman History dia wajib dilabeli sendiri — kalau ikut
+     * kehitung pembatalan, angka "berapa tiket dibatalkan" jadi salah.
+     */
+    public function isOrphan(): bool
+    {
+        return $this->handler === TicketHandler::FOP && $this->fop_task_id === null;
+    }
+
+    /**
+     * Lama tiket berada di meja Ticketing, dalam menit — `resolved_at` −
+     * `created_at`.
+     *
+     * `resolved_at` = kapan tiket LEPAS dari Ticketing, dan itu punya dua arti
+     * tergantung jalurnya (lihat docs/plan/analisa-halaman-history-ticketing.md §4.1):
+     *   - ditutup Helpdesk/NOC → beneran selesai
+     *   - diserahkan ke FOP    → waktu penyerahan; progres lapangan setelahnya
+     *                            TIDAK mengubah nilai ini
+     *
+     * null (BUKAN 0) kalau belum ada titik lepas itu — mis. tiket masih
+     * dikerjakan, atau dibatalkan (dibatalkan bukan diselesaikan). Nol dan
+     * "tidak ada" dua hal berbeda waktu dirata-rata di halaman History.
+     */
+    public function resolutionMinutes(): ?int
+    {
+        if (! $this->resolved_at) {
+            return null;
+        }
+
+        return (int) $this->created_at->diffInMinutes($this->resolved_at);
+    }
+
+    /**
+     * Durasi format H:MM:SS — meniru kolom SOLVING TIME di sheet lama yang
+     * digantikan halaman History (docs/plan/analisa-halaman-history-ticketing.md §5).
+     *
+     * Dihitung dari DETIK, bukan dari resolutionMinutes(): tiket yang ditangani
+     * di bawah satu menit (sering, mis. Helpdesk langsung selesaikan atau
+     * langsung lempar ke FOP) tampil "0:00:00" kalau dibulatkan ke menit —
+     * kelihatan seperti data rusak.
+     */
+    public function solvingTimeLabel(): ?string
+    {
+        if (! $this->resolved_at) {
+            return null;
+        }
+
+        $seconds = (int) $this->created_at->diffInSeconds($this->resolved_at);
+
+        return sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
     }
 
     /**
@@ -234,31 +292,16 @@ class Ticket extends Model
     }
 
     /**
-     * Window "pending NOC" — Helpdesk kirim ke NOC tapi NOC BELUM Oncheck.
-     * Selama ini Helpdesk MASIH pegang kendali penuh (lihat holderRoles()).
-     */
-    public function isPendingNoc(): bool
-    {
-        return $this->handler === TicketHandler::NOC
-            && $this->status === TicketHandlingStatus::OPEN
-            && $this->noc_checked_at === null;
-    }
-
-    /**
-     * NOC udah resmi Oncheck — cuma NOC yang bisa lanjut act dari sini,
-     * Helpdesk kehilangan akses (lihat holderRoles()).
-     */
-    public function isOnCheckNoc(): bool
-    {
-        return $this->handler === TicketHandler::NOC
-            && $this->status === TicketHandlingStatus::OPEN
-            && $this->noc_checked_at !== null;
-    }
-
-    /**
      * Role yang sah bertindak atas tiket ini SEKARANG — satu-satunya sumber
      * dipakai TicketService::assertActorOwnsTicket() (real authz) DAN
      * actionFlagsFor() (UI gate), biar dua-duanya konsisten.
+     *
+     * Tiket di tangan NOC dipegang BERSAMA `helpdesk` + `noc` (ADHOC-06,
+     * 2026-07-29). Dulu kepemilikan itu bergantung window "Pending NOC"
+     * (`noc_checked_at` null = berdua, terisi = NOC saja); window itu dihapus
+     * bareng aksi Oncheck NOC, dan kepemilikan bersamanya dipertahankan
+     * permanen — Helpdesk yang mengirim tiket tetap boleh menutup/membatalkan
+     * tiketnya sendiri walau NOC sedang memprosesnya.
      *
      * @return string[]
      */
@@ -266,9 +309,7 @@ class Ticket extends Model
     {
         return match ($this->handler) {
             TicketHandler::HELPDESK => ['helpdesk'],
-            TicketHandler::NOC => $this->noc_checked_at === null
-                ? ['helpdesk', 'noc']
-                : ['noc'],
+            TicketHandler::NOC => ['helpdesk', 'noc'],
             TicketHandler::FOP => [],
         };
     }
@@ -308,12 +349,10 @@ class Ticket extends Model
             return 'Dibatalkan ('.$this->handler->label().')';
         }
 
-        if ($this->isPendingNoc()) {
-            return 'Pending NOC';
-        }
-
-        if ($this->isOnCheckNoc()) {
-            return 'OnCheck NOC';
+        // Label "Pending NOC" & "OnCheck NOC" dihapus (ADHOC-06) — tiket yang
+        // dikirim ke NOC langsung "Diproses NOC", gak ada state antara.
+        if ($this->handler === TicketHandler::NOC) {
+            return 'Diproses NOC';
         }
 
         return 'Ditangani '.$this->handler->label();
@@ -335,10 +374,6 @@ class Ticket extends Model
             return 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400';
         }
 
-        if ($this->isOnCheckNoc()) {
-            return 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300';
-        }
-
         return $this->handler === TicketHandler::NOC
             ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400'
             : 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/50 text-sky-700 dark:text-sky-400';
@@ -357,12 +392,24 @@ class Ticket extends Model
     }
 
     /**
-     * Siapa yang Oncheck NOC (resmi ambil alih dari window pending). Null
-     * kalau belum pernah di-check sama sekali.
+     * Siapa yang dulu meng-Oncheck tiket ini, buat tiket LAMA saja. Aksi
+     * Oncheck NOC sudah dihapus (ADHOC-06, 2026-07-29) sehingga baris riwayat
+     * `dicek_noc` tidak pernah lahir lagi — method ini dipertahankan supaya
+     * riwayat tiket lama tetap terbaca utuh, bukan buat alur baru.
      */
     public function checkedBy(): ?User
     {
         return $this->histories->firstWhere('action', TicketHistoryAction::DICEK_NOC)?->actor;
+    }
+
+    /**
+     * Siapa yang membatalkan tiket. Sisi Ticketing (`TicketService::cancel()`)
+     * dan sisi FOP (`FopTaskObserver`) sama-sama menulis action `dibatalkan`,
+     * jadi satu pencarian ini menutup dua jalur.
+     */
+    public function cancelledBy(): ?User
+    {
+        return $this->histories->firstWhere('action', TicketHistoryAction::DIBATALKAN)?->actor;
     }
 
     public function escalatedToNocBy(): ?User
@@ -401,7 +448,7 @@ class Ticket extends Model
      * "kembali dari FOP" lewat Ticketing — pembatalan FOP tetap lewat
      * /fop-tasks, lihat CLAUDE.md § Sinkronisasi Ticket ↔ FopTask).
      *
-     * @return array{can_close: bool, can_escalate_noc: bool, can_escalate_fop: bool, can_return_to_helpdesk: bool, can_cancel: bool, can_oncheck_noc: bool}
+     * @return array{can_close: bool, can_escalate_noc: bool, can_escalate_fop: bool, can_return_to_helpdesk: bool, can_cancel: bool}
      */
     public function actionFlagsFor(User $user): array
     {
@@ -413,23 +460,16 @@ class Ticket extends Model
             && $user->hasPermission('tickets.update')
             && $isHolder;
 
-        // NOC wajib Oncheck dulu sebelum Selesaikan (lihat
-        // TicketService::assertNocCheckedBeforeClose()) — kalau actor NOC
-        // (bukan full-access) dan tiket masih pending, sembunyiin Selesai.
-        $canClose = $canAct && ! (
-            $this->isPendingNoc() && ! $user->hasFullAccess() && $user->hasRole('noc')
-        );
-
+        // `can_oncheck_noc` dihapus bareng aksi Oncheck NOC (ADHOC-06) —
+        // tiket yang dikirim ke NOC langsung berstatus diproses, gak ada lagi
+        // langkah "terima dulu". Jangan dihidupkan lagi tanpa mengembalikan
+        // window Pending NOC utuh (kolom + guard + label + halaman).
         return [
-            'can_close' => $canClose,
+            'can_close' => $canAct,
             'can_escalate_noc' => $canAct && $this->handler === TicketHandler::HELPDESK,
             'can_escalate_fop' => $canAct,
             'can_return_to_helpdesk' => $canAct && $this->handler === TicketHandler::NOC,
             'can_cancel' => $canAct && $user->hasPermission('tickets.cancel'),
-            'can_oncheck_noc' => $this->isPendingNoc()
-                && $this->status === TicketHandlingStatus::OPEN
-                && $user->hasPermission('tickets.update')
-                && ($user->hasFullAccess() || $user->hasRole('noc')),
         ];
     }
 }

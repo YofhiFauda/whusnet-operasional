@@ -23,6 +23,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
+use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\SlaTimelineController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskTeamController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketDibatalkanController;
+use App\Http\Controllers\TicketHistoryController;
 use App\Http\Controllers\TicketSelesaiController;
 use App\Http\Controllers\UserController;
 use App\Models\City;
@@ -257,6 +259,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/master/issue-categories/{category}/toggle', [TicketIssueCategoryController::class, 'toggleStatus'])->name('master.ticket-issue-categories.toggle');
     });
 
+    // Master Barang/Material - Static Routes First
+    Route::middleware('permission:items.create|items.update')->group(function () {
+        Route::get('/master/items/create', [ItemController::class, 'create'])->name('master.items.create');
+        Route::post('/master/items', [ItemController::class, 'store'])->name('master.items.store');
+    });
+
+    Route::middleware('permission:items.view')->group(function () {
+        Route::get('/master/items', [ItemController::class, 'index'])->name('master.items.index');
+    });
+
+    // Master Barang/Material - Dynamic Routes Last
+    Route::middleware('permission:items.create|items.update')->group(function () {
+        Route::get('/master/items/{item}/edit', [ItemController::class, 'edit'])->name('master.items.edit');
+        Route::put('/master/items/{item}', [ItemController::class, 'update'])->name('master.items.update');
+        Route::post('/master/items/{item}/toggle', [ItemController::class, 'toggleStatus'])->name('master.items.toggle');
+    });
+
     // Paket Internet Management - Static Routes First
     Route::middleware('permission:packages.create|packages.update')->group(function () {
         Route::get('/master/paket/create', [InternetPackageController::class, 'create'])->name('master.paket.create');
@@ -460,9 +479,25 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:tickets.dibatalkan.view')->group(function () {
         Route::get('/tickets/dibatalkan', [TicketDibatalkanController::class, 'index'])->name('tickets.dibatalkan');
     });
+    // History Ticketing — arsip SEMUA tiket (semua handler & status, termasuk
+    // yang masih jalan + tiket "Terputus"). Superset dua halaman arsip di atas,
+    // tapi permission-nya sendiri: isinya lintas-bucket dan bisa diekspor.
+    // Tetap di atas /tickets/{ticket} — route dinamis di bawah bakal menelannya.
+    Route::middleware('permission:tickets.history.view')->group(function () {
+        Route::get('/tickets/history', [TicketHistoryController::class, 'index'])->name('tickets.history');
+    });
+    Route::middleware('permission:tickets.history.export')->group(function () {
+        Route::get('/tickets/history/export', [TicketHistoryController::class, 'export'])->name('tickets.history.export');
+    });
 
     Route::middleware('permission:tickets.view')->group(function () {
         Route::get('/ticket-attachments/{attachment}', [TicketController::class, 'download'])->name('tickets.attachments.download');
+
+        // Detail buat drawer kanan di Worksheet Helpdesk & Worksheet NOC —
+        // prefix /api/ biar gak ketelan /tickets/{ticket} di bawahnya.
+        Route::get('/api/tickets/{ticket}/detail', [TicketController::class, 'detailJson'])
+            ->whereNumber('ticket')
+            ->name('tickets.detail-json');
 
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
             ->whereNumber('ticket')
@@ -482,10 +517,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/tickets/{ticket}/return-to-helpdesk', [TicketController::class, 'returnToHelpdesk'])
             ->whereNumber('ticket')
             ->name('tickets.return-to-helpdesk');
-        // NOC resmi ambil alih tiket pending (lihat Ticket::isPendingNoc()).
-        Route::post('/tickets/{ticket}/oncheck-noc', [TicketController::class, 'onCheckNoc'])
-            ->whereNumber('ticket')
-            ->name('tickets.oncheck-noc');
+        // Route `tickets.oncheck-noc` DIHAPUS (ADHOC-06) — tiket yang dikirim
+        // ke NOC langsung diproses, gak ada langkah "terima dulu".
     });
 
     // Batalkan tiket pra-FOP — permission terpisah dari tickets.update biar
@@ -498,17 +531,14 @@ Route::middleware('auth')->group(function () {
 
     // ── Worksheet NOC & Dashboard NOC — halaman kerja NOC sendiri, terpisah
     // dari Ticketing generik di atas biar RBAC-nya bisa diatur independen.
-    // Worksheet NOC = SATU halaman, dua tab di dalamnya. Tiap tab tetap punya
-    // route + permission sendiri (biar bisa di-toggle granular di Role Matrix),
-    // tapi entry point-nya satu: /noc/worksheet → tab pertama yang boleh dibuka.
-    Route::get('/noc/worksheet', [NocWorksheetController::class, 'index'])->name('noc.worksheet');
-
-    Route::middleware('permission:noc_worksheet.masuk.view')->group(function () {
-        Route::get('/noc/worksheet/masuk', [NocWorksheetController::class, 'masuk'])->name('noc.worksheet.masuk');
+    // Worksheet NOC sekarang SATU halaman tanpa tab (ADHOC-06) — dua route tab
+    // lama (/noc/worksheet/masuk & /diproses) dihapus, link lamanya diarahkan
+    // balik ke halaman utama biar bookmark user gak jadi 404.
+    Route::middleware('permission:noc_worksheet.view')->group(function () {
+        Route::get('/noc/worksheet', [NocWorksheetController::class, 'index'])->name('noc.worksheet');
     });
-    Route::middleware('permission:noc_worksheet.diproses.view')->group(function () {
-        Route::get('/noc/worksheet/diproses', [NocWorksheetController::class, 'diproses'])->name('noc.worksheet.diproses');
-    });
+    Route::redirect('/noc/worksheet/masuk', '/noc/worksheet');
+    Route::redirect('/noc/worksheet/diproses', '/noc/worksheet');
     Route::middleware('permission:noc_dashboard.view')->group(function () {
         Route::get('/noc/dashboard', [NocDashboardController::class, 'index'])->name('noc.dashboard');
     });

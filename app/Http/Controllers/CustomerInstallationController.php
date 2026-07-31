@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\MaterialKind;
+use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -9,9 +11,11 @@ use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\Item;
 use App\Models\Task;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
+use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
@@ -173,7 +177,32 @@ class CustomerInstallationController extends Controller
 
         $customer->loadMissing(['customerDevice', 'customerTechnicalDetail', 'latestSurvey', 'internetPackage']);
 
-        return view('installations.report', compact('customer', 'installation'));
+        $materialService = app(TaskMaterialService::class);
+        $items = Item::active()->orderBy('name')->get();
+
+        // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
+        // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
+        // Tanpa prefill teknisi cenderung mengosongkan seksi ini, dan
+        // perbandingan estimasi-vs-realisasi jadi tak ada gunanya.
+        $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
+        $existingUsage = $installFopTask
+            ? $installFopTask->materials()->terpakai()->orderBy('id')->get()
+            : collect();
+
+        $sourceRows = $existingUsage->isNotEmpty()
+            ? $existingUsage
+            : $materialService->estimatesForCustomer($customer);
+
+        $materialRows = $sourceRows->map(fn ($row) => [
+            'item_id' => $row->item_id,
+            'item_name' => $row->item_name,
+            'item_type' => $row->item_type->value,
+            'qty' => (float) $row->qty,
+            'unit' => $row->unit,
+            'note' => $row->note,
+        ])->all();
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'materialRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -247,6 +276,16 @@ class CustomerInstallationController extends Controller
             // Timer fields (dari countdown JS di form)
             'started_at' => 'nullable|date',
             'completed_at' => 'nullable|date',
+
+            // Perangkat pasif yang benar-benar terpakai — daftar baris, bukan
+            // teks bebas. Baris kosong dibuang di TaskMaterialService.
+            'materials' => 'nullable|array',
+            'materials.*.item_id' => 'nullable|integer|exists:items,id',
+            'materials.*.item_name' => 'nullable|string|max:150',
+            'materials.*.item_type' => 'nullable|string|in:'.implode(',', MaterialType::values()),
+            'materials.*.qty' => 'nullable|numeric|min:0',
+            'materials.*.unit' => 'nullable|string|max:20',
+            'materials.*.note' => 'nullable|string|max:255',
         ]);
 
         $installation = $customer->installations()->latest()->first();
@@ -272,6 +311,20 @@ class CustomerInstallationController extends Controller
             $existingSpeedtest = $techDetail ? $techDetail->speedtest_photo : null;
             if (! $existingSpeedtest && ! $request->hasFile('speedtest_photo')) {
                 return redirect()->back()->withInput()->withErrors(['speedtest_photo' => 'Foto hasil speedtest wajib diunggah saat status selesai.']);
+            }
+
+            // Pemasangan selesai tanpa satupun material tercatat hampir pasti
+            // laporan yang belum diisi, bukan pemasangan tanpa material.
+            // Dicek di sini (bukan di rules) supaya baris qty 0 / nama kosong
+            // ikut terhitung tidak valid — aturan yang sama dipakai
+            // TaskMaterialService waktu menyimpan.
+            $hasMaterial = collect($validated['materials'] ?? [])->contains(
+                fn ($row) => (float) ($row['qty'] ?? 0) > 0
+                    && (! empty($row['item_id']) || trim((string) ($row['item_name'] ?? '')) !== '')
+            );
+
+            if (! $hasMaterial) {
+                return redirect()->back()->withInput()->withErrors(['materials' => 'Perangkat pasif terpakai wajib diisi minimal satu baris saat status selesai.']);
             }
         }
 
@@ -358,6 +411,22 @@ class CustomerInstallationController extends Controller
                     'speedtest_photo' => $speedtestPhoto,
                 ]
             );
+
+            // Perangkat pasif terpakai — menempel di FopTask PEMASANGAN.
+            // Ini KONSUMSI material, beda dari customer_technical_details.passive_device*
+            // yang mencatat aset terpasang permanen di sisi pelanggan. Dua-duanya
+            // tetap ada dan tidak digabung.
+            $materialService = app(TaskMaterialService::class);
+            $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
+
+            if ($installFopTask) {
+                $materialService->sync(
+                    $installFopTask,
+                    MaterialKind::TERPAKAI,
+                    $validated['materials'] ?? [],
+                    auth()->id()
+                );
+            }
 
             // Also keep backward compatibility for CustomerDevice for now
             $customer->customerDevice()->updateOrCreate(

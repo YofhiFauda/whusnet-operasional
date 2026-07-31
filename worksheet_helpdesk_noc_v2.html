@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHUSNET - Worksheet Helpdesk NOC v2 (Rapid Entry)</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        whus: {
+                            bg: '#0a0f1d',
+                            card: '#111827',
+                            sidebar: '#0d1322',
+                            border: '#1f293d',
+                            borderLight: '#2d3748',
+                            accent: '#2563eb',
+                            hover: '#1e293b',
+                            textMuted: '#94a3b8',
+                            textDark: '#cbd5e1',
+                            excelHeader: '#162238'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0a0f1d; color: #f1f5f9; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0d1322; }
+        ::-webkit-scrollbar-thumb { background: #233044; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        .excel-table { border-collapse: separate; border-spacing: 0; }
+        .excel-table th {
+            background-color: #162238;
+            border-right: 1px solid #233044;
+            border-bottom: 2px solid #233044;
+            user-select: none;
+        }
+        .excel-table td { border-right: 1px solid #1f293d; border-bottom: 1px solid #1f293d; position: relative; }
+        .excel-row-num {
+            background-color: #111827; color: #64748b; text-align: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            border-right: 1px solid #233044; user-select: none;
+        }
+        /* Sel yang boleh diedit langsung — beda visual dari sel terkunci */
+        [contenteditable="true"]:focus {
+            outline: 2px solid #2563eb; outline-offset: -2px; background-color: #0f1c33;
+        }
+        td.cell-locked { background-color: #0c111f; color: #64748b; cursor: not-allowed; }
+
+        .drawer-open { transform: translateX(0) !important; }
+        .backdrop-open { opacity: 1 !important; pointer-events: auto !important; }
+
+        kbd {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            background: #1e293b; border: 1px solid #334155; border-bottom-width: 2px;
+            border-radius: 4px; padding: 1px 5px; color: #94a3b8;
+        }
+        .sug-active { background-color: #1e293b !important; border-left: 2px solid #3b82f6; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col text-sm text-slate-200">
+
+    <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+    <header class="h-14 bg-whus-sidebar border-b border-whus-border flex items-center justify-between px-4 z-30 shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-600/30">
+                    <i class="fa-solid fa-wifi text-sm"></i>
+                </div>
+                <span class="font-bold text-lg tracking-wider text-white">WHUSNET</span>
+            </div>
+
+            <div class="hidden md:flex items-center space-x-2 text-xs text-slate-400 pl-4 border-l border-whus-border">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span class="text-blue-400 font-medium">Worksheet Helpdesk</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span id="breadcrumbMode" class="text-slate-200 font-semibold">Form Cepat</span>
+            </div>
+        </div>
+
+        <!-- Counter produktivitas sesi — pengganti "sudah sampai baris berapa" di Excel -->
+        <div class="hidden lg:flex items-center gap-3">
+            <div class="px-3 py-1 rounded-lg bg-emerald-900/30 border border-emerald-700/40 text-[11px] font-semibold text-emerald-300 flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-[10px]"></i>
+                <span>Sesi ini: <span id="sessionCounter" class="font-mono font-bold">0</span> tiket</span>
+            </div>
+            <div id="draftIndicator" class="px-3 py-1 rounded-lg bg-slate-800 border border-whus-border text-[11px] text-slate-400 flex items-center gap-2">
+                <i class="fa-regular fa-floppy-disk text-[10px]"></i>
+                <span>Draft tersimpan</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button onclick="openShortcutHelp()" class="w-8 h-8 rounded-lg bg-[#131b2e] border border-whus-border text-slate-400 hover:text-white flex items-center justify-center transition-colors" title="Pintasan Keyboard (?)">
+                <i class="fa-solid fa-keyboard text-xs"></i>
+            </button>
+            <div class="flex items-center space-x-2 pl-2 border-l border-whus-border">
+                <div class="w-8 h-8 rounded-lg bg-blue-900/60 border border-blue-500/30 text-blue-300 font-bold flex items-center justify-center text-xs">SU</div>
+                <div class="hidden lg:block text-left">
+                    <p class="text-xs font-semibold leading-tight text-slate-200">Super Admin (Owner)</p>
+                    <p class="text-[10px] text-slate-400">POP: Semua Cabang</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+
+        <aside class="w-52 bg-whus-sidebar border-r border-whus-border flex flex-col shrink-0 z-20">
+            <div class="p-3 overflow-y-auto flex-1 space-y-5">
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-3">Operasional</span>
+                    <nav class="mt-2 space-y-1">
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-chart-pie w-5 text-slate-500"></i><span>Dashboard</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-users w-5 text-slate-500"></i><span>Pelanggan</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-receipt w-5 text-slate-500"></i><span>Tagihan</span>
+                        </a>
+                    </nav>
+                </div>
+
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-3">Jaringan & Lapangan</span>
+                    <nav class="mt-2 space-y-1">
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-calendar-days w-5 text-slate-500"></i><span>Penjadwalan</span>
+                        </a>
+                        <div class="space-y-1">
+                            <button class="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-blue-400 bg-blue-950/40 border border-blue-800/40 rounded-lg">
+                                <div class="flex items-center"><i class="fa-solid fa-headset w-5 text-blue-400"></i><span>Ticketing</span></div>
+                                <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                            </button>
+                            <div class="pl-6 space-y-1 py-1">
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-blue-400 font-semibold bg-blue-500/10 rounded-md border-l-2 border-blue-500">Worksheet Helpdesk</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Worksheet NOC</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Dashboard NOC</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Ticket Selesai</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Ticket Dibatalkan</a>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="p-3 border-t border-whus-border">
+                <div class="p-2.5 rounded-xl bg-[#131b2e] border border-whus-border flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-xs">SU</div>
+                        <div class="overflow-hidden">
+                            <p class="text-xs font-semibold text-slate-200 truncate">Super Admin</p>
+                            <p class="text-[10px] text-slate-400 truncate">Helpdesk</p>
+                        </div>
+                    </div>
+                    <button class="text-slate-500 hover:text-rose-400"><i class="fa-solid fa-right-from-bracket text-xs"></i></button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden relative">
+
+            <!-- ============ MODE SWITCHER ============ -->
+            <div class="bg-[#111827] border-b border-whus-border px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-1 bg-[#0d1322] p-1 rounded-lg border border-whus-border">
+                    <button onclick="switchMode('form')" id="modeBtnForm"
+                        class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-bolt text-[10px]"></i><span>Form Cepat</span><kbd class="ml-1">Alt+1</kbd>
+                    </button>
+                    <button onclick="switchMode('grid')" id="modeBtnGrid"
+                        class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-table-cells text-[10px]"></i><span>Grid Excel</span><kbd class="ml-1">Alt+2</kbd>
+                    </button>
+                    <button onclick="switchMode('batch')" id="modeBtnBatch"
+                        class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-layer-group text-[10px]"></i><span>Batch Insiden</span><kbd class="ml-1">Alt+3</kbd>
+                    </button>
+                    <button onclick="switchMode('paste')" id="modeBtnPaste"
+                        class="px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all">
+                        <i class="fa-solid fa-paste text-[10px]"></i><span>Tempel Excel</span><kbd class="ml-1">Alt+4</kbd>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span class="hidden xl:inline">Semua mode menulis ke satu antrean tiket yang sama.</span>
+                    <button onclick="exportToCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium flex items-center gap-1">
+                        <i class="fa-solid fa-download text-[10px]"></i><span>Export CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- MODE 1: FORM CEPAT (Rapid Entry)                             -->
+            <!-- ============================================================ -->
+            <div id="viewForm" class="flex-1 flex overflow-hidden">
+
+                <div class="flex-1 overflow-y-auto p-4 md:p-5 space-y-4">
+
+                    <!-- Panel Mode Beruntun -->
+                    <div class="bg-gradient-to-r from-blue-950/50 to-whus-card border border-blue-800/40 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-start gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                                <i class="fa-solid fa-file-circle-plus"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-sm font-bold text-white tracking-wide">Create Service Ticket</h1>
+                                <p class="text-[11px] text-slate-400 mt-0.5">
+                                    Ketik <kbd>/</kbd> cari pelanggan &bull; <kbd>↑</kbd><kbd>↓</kbd> pilih &bull; <kbd>Enter</kbd> ambil &bull; <kbd>Ctrl</kbd>+<kbd>Enter</kbd> simpan
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Kunci klasifikasi: klasifikasi TIDAK ikut ter-reset setelah submit -->
+                        <label class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[#0e1424] border border-whus-border cursor-pointer hover:border-blue-600/50 transition-colors">
+                            <input type="checkbox" id="lockClassification" onchange="onLockToggle()" class="w-4 h-4 accent-blue-600">
+                            <div class="leading-tight">
+                                <span class="block text-[11px] font-bold text-slate-200">Kunci Klasifikasi</span>
+                                <span class="block text-[10px] text-slate-500">Tipe, prioritas & kategori bertahan setelah simpan</span>
+                            </div>
+                            <i id="lockIcon" class="fa-solid fa-lock-open text-slate-500 text-xs"></i>
+                        </label>
+                    </div>
+
+                    <form id="rapidForm" onsubmit="handleRapidSubmit(event)" class="space-y-4">
+
+                        <!-- SECTION 01: KLASIFIKASI -->
+                        <div class="bg-whus-card border border-whus-border rounded-xl p-4 relative overflow-hidden">
+                            <div id="lockStripe" class="absolute top-0 left-0 w-1 h-full bg-blue-500 transition-colors"></div>
+                            <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-400 mb-3 flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                01 &mdash; Klasifikasi
+                                <span id="lockBadge" class="hidden px-2 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30">TERKUNCI</span>
+                            </h2>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div class="md:col-span-2">
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">KATEGORI ISSUE <span class="text-rose-500">*</span></label>
+                                    <select id="fIssue" required onchange="onIssueCategoryChange()"
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                        <option value="">-- Pilih Kategori Issue --</option>
+                                    </select>
+                                    <p class="text-[10px] text-slate-500 mt-1">
+                                        Kategori mengisi otomatis <b>Tipe Tiket</b>, <b>Prioritas</b>, dan <b>template keluhan</b>.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">PRIORITAS <span class="text-rose-500">*</span></label>
+                                    <select id="fPriority" required
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                        <option value="High">High &mdash; Kritis / Putus Massal</option>
+                                        <option value="Medium" selected>Medium &mdash; Standar</option>
+                                        <option value="Low">Low &mdash; Informational</option>
+                                    </select>
+                                    <p class="text-[10px] text-slate-500 mt-1">
+                                        Tipe otomatis: <span id="fTypeAuto" class="font-mono text-slate-400">—</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECTION 02: PELANGGAN -->
+                        <div class="bg-whus-card border border-whus-border rounded-xl p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                    02 &mdash; Identitas Pelanggan
+                                </h2>
+
+                                <!-- Tiket tanpa pelanggan: backbone / infra / walk-in / prospek -->
+                                <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                                    <input type="checkbox" id="noCustomerMode" onchange="onNoCustomerToggle()" class="w-3.5 h-3.5 accent-amber-500">
+                                    <span>Tanpa pelanggan (infra / walk-in)</span>
+                                </label>
+                            </div>
+
+                            <!-- Blok pencarian pelanggan -->
+                            <div id="customerSearchBlock">
+                                <div class="relative mb-3">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                                    <input type="text" id="custSearch" autocomplete="off"
+                                        placeholder="Ketik CID / nama / no HP... (coba: Hanif, Affifta, C1X4, Jetis)"
+                                        oninput="onCustomerSearch(this.value)"
+                                        onkeydown="onSuggestionKeydown(event)"
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg pl-9 pr-16 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono">
+                                    <kbd class="absolute right-3 top-2">/</kbd>
+                                    <div id="custSuggestions" class="hidden absolute top-full left-0 right-0 mt-1 bg-[#131b2e] border border-whus-border rounded-lg shadow-2xl max-h-56 overflow-y-auto z-40"></div>
+                                </div>
+
+                                <!-- Peringatan duplikat: tiket open milik pelanggan yang sama -->
+                                <div id="dupWarning" class="hidden mb-3 p-2.5 rounded-lg bg-amber-950/40 border border-amber-700/50 text-[11px] text-amber-300 flex items-start gap-2">
+                                    <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+                                    <span id="dupWarningText"></span>
+                                </div>
+
+                                <div class="bg-[#0e1424] border border-whus-border rounded-lg overflow-hidden text-xs">
+                                    <div class="grid grid-cols-2 md:grid-cols-4 border-b border-whus-border">
+                                        <div class="p-2.5 border-r border-whus-border">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">Nama</span>
+                                            <span id="snapName" class="font-semibold text-slate-200">—</span>
+                                        </div>
+                                        <div class="p-2.5 border-r border-whus-border">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">CID</span>
+                                            <span id="snapCid" class="font-mono font-semibold text-blue-400">—</span>
+                                        </div>
+                                        <div class="p-2.5 border-r border-whus-border">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">No HP</span>
+                                            <span id="snapPhone" class="text-slate-200">—</span>
+                                        </div>
+                                        <div class="p-2.5">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">Paket</span>
+                                            <span id="snapPackage" class="text-emerald-400 font-semibold">—</span>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 md:grid-cols-4">
+                                        <div class="p-2.5 border-r border-whus-border col-span-2">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">Alamat</span>
+                                            <span id="snapAddress" class="text-slate-300 block truncate">—</span>
+                                        </div>
+                                        <div class="p-2.5 border-r border-whus-border">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">POP / ODP</span>
+                                            <span id="snapPopOdp" class="text-slate-300">—</span>
+                                        </div>
+                                        <div class="p-2.5">
+                                            <span class="block text-[9px] font-bold text-slate-500 uppercase">Perangkat</span>
+                                            <span id="snapOnt" class="text-slate-300 font-mono truncate block">—</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Blok manual (mode tanpa pelanggan) -->
+                            <div id="manualCustomerBlock" class="hidden grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">NAMA PELAPOR / SEGMEN</label>
+                                    <input type="text" id="fManualName" placeholder="mis. Backbone Jetis&ndash;Siman"
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">NO HP (opsional)</label>
+                                    <input type="text" id="fManualPhone" placeholder="08xxxxxxxxxx"
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">POP / CABANG <span class="text-rose-500">*</span></label>
+                                    <select id="fManualPop" class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></select>
+                                </div>
+                                <p class="md:col-span-3 text-[10px] text-amber-500/80 flex items-start gap-1.5">
+                                    <i class="fa-solid fa-circle-info mt-0.5"></i>
+                                    <span>Tiket tanpa pelanggan wajib punya POP &mdash; dipakai untuk scope akses & routing FOP. Tidak bisa dieskalasi ke FOP sebelum lokasi kerja diisi.</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- SECTION 03: KELUHAN -->
+                        <div class="bg-whus-card border border-whus-border rounded-xl p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            <h2 class="text-[11px] font-bold uppercase tracking-wider text-blue-400 mb-3 flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                03 &mdash; Keluhan & Catatan
+                            </h2>
+
+                            <div class="space-y-3">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <label class="block text-[11px] font-semibold text-slate-300">DETAIL KELUHAN <span class="text-rose-500">*</span></label>
+                                        <span id="templateBadge" class="hidden text-[10px] text-emerald-400 flex items-center gap-1">
+                                            <i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i>
+                                            <span>Terisi dari template kategori &mdash; boleh diedit</span>
+                                        </span>
+                                    </div>
+                                    <textarea id="fComplaint" rows="3" required maxlength="2000"
+                                        placeholder="Keluhan pelanggan..."
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"></textarea>
+
+                                    <!-- Snippet cepat: pengganti copy-paste sel Excel -->
+                                    <div id="snippetRow" class="flex flex-wrap gap-1.5 mt-2"></div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">CATATAN TEKNIS AWAL (opsional)</label>
+                                    <input type="text" id="fNocNotes" placeholder="Analisa awal Helpdesk / NOC..."
+                                        class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pb-4">
+                            <button type="button" onclick="resetRapidForm(true)"
+                                class="px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-medium flex items-center gap-1.5">
+                                <i class="fa-solid fa-trash-can text-[10px]"></i><span>Buang</span><kbd>Esc</kbd>
+                            </button>
+
+                            <button type="submit"
+                                class="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/30 flex items-center gap-2">
+                                <span>SIMPAN & LANJUT</span><kbd class="bg-blue-800 border-blue-700 text-blue-200">Ctrl+Enter</kbd>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Panel antrean kanan -->
+                <div class="w-80 xl:w-96 bg-whus-sidebar border-l border-whus-border flex flex-col shrink-0 overflow-hidden">
+                    <div class="p-3 border-b border-whus-border flex items-center justify-between bg-[#0e1424]">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-xs text-slate-200">List Task Ticketing</span>
+                            <span id="queueBadge" class="bg-blue-600/30 text-blue-400 border border-blue-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                        </div>
+                        <button onclick="renderQueue()" class="text-blue-400 hover:text-blue-300 text-[11px] flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-right text-[10px]"></i><span>Refresh</span>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-3 bg-[#0d1322] p-1 border-b border-whus-border text-center text-xs">
+                        <button onclick="filterQueue('all')" id="tabAll" class="py-1.5 font-medium rounded">Ticket</button>
+                        <button onclick="filterQueue('noc')" id="tabNoc" class="py-1.5 font-medium rounded">Assign NOC</button>
+                        <button onclick="filterQueue('fop')" id="tabFop" class="py-1.5 font-medium rounded">Assign FOP</button>
+                    </div>
+
+                    <div id="queueContainer" class="flex-1 overflow-y-auto p-3 space-y-2.5"></div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- MODE 2: GRID EXCEL                                           -->
+            <!-- ============================================================ -->
+            <div id="viewGrid" class="hidden flex-1 flex flex-col overflow-hidden">
+
+                <div class="bg-[#0e1424] border-b border-whus-border px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <i class="fa-solid fa-circle-info text-blue-400"></i>
+                        <span>
+                            Sel biru <b class="text-slate-200">boleh diedit langsung</b> (kategori, prioritas, keluhan, catatan).
+                            Kolom <b class="text-slate-200">Status</b> read-only &mdash; ubah lewat Drawer supaya riwayat & sinkron FOP tetap tercatat.
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1.5 text-slate-500">
+                            <span class="w-3 h-3 rounded-sm bg-[#0c111f] border border-whus-border"></span>Terkunci (sudah di FOP)
+                        </span>
+                        <span id="gridRowCount" class="font-mono text-slate-400">0 baris</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-auto">
+                    <table class="w-full text-left excel-table">
+                        <thead>
+                            <tr class="text-[11px] text-slate-300 uppercase tracking-wider sticky top-0 z-10">
+                                <th class="w-10 px-2 py-2 text-center">#</th>
+                                <th class="w-36 px-3 py-2">ID Tiket</th>
+                                <th class="w-52 px-3 py-2">Pelanggan / CID</th>
+                                <th class="w-44 px-3 py-2">Kategori Issue</th>
+                                <th class="w-28 px-3 py-2">Prioritas</th>
+                                <th class="w-32 px-3 py-2">POP</th>
+                                <th class="w-80 px-3 py-2">Detail Keluhan</th>
+                                <th class="w-64 px-3 py-2">Catatan NOC</th>
+                                <th class="w-40 px-3 py-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gridBody" class="font-mono text-xs"></tbody>
+                    </table>
+                </div>
+
+                <div class="h-8 bg-[#0e1424] border-t border-whus-border px-4 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+                    <div class="flex items-center gap-4">
+                        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check text-[10px] mr-1"></i>READY</span>
+                        <span>Klik ID Tiket &rarr; Drawer &bull; Klik sel biru &rarr; edit langsung, simpan saat pindah sel</span>
+                    </div>
+                    <span>Tiap edit sel tercatat di Riwayat Tiket</span>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- MODE 3: BATCH INSIDEN                                        -->
+            <!-- ============================================================ -->
+            <div id="viewBatch" class="hidden flex-1 overflow-y-auto p-4 md:p-6">
+                <div class="max-w-6xl mx-auto space-y-4">
+
+                    <div class="bg-gradient-to-r from-amber-950/40 to-whus-card border border-amber-800/40 rounded-xl p-4 flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                            <i class="fa-solid fa-layer-group"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-sm font-bold text-white">Batch Insiden &mdash; Satu Gangguan, Banyak Pelanggan</h1>
+                            <p class="text-[11px] text-slate-400 mt-0.5">
+                                Backbone CUT / ODP mati kena puluhan pelanggan sekaligus. Pilih area terdampak, isi keluhan sekali,
+                                sistem membuat satu tiket per pelanggan yang saling terhubung ke satu nomor insiden.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Filter area terdampak -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <h2 class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>01 &mdash; Area Terdampak
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">POP / CABANG</label>
+                                <select id="bPop" onchange="renderBatchCustomers()" class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">ODP (opsional)</label>
+                                <select id="bOdp" onchange="renderBatchCustomers()" class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">CARI DALAM HASIL</label>
+                                <input type="text" id="bFilter" oninput="renderBatchCustomers()" placeholder="nama / CID..."
+                                    class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono">
+                            </div>
+                        </div>
+
+                        <div class="border border-whus-border rounded-lg overflow-hidden">
+                            <div class="bg-[#0e1424] px-3 py-2 flex items-center justify-between border-b border-whus-border">
+                                <label class="flex items-center gap-2 text-[11px] font-semibold text-slate-300 cursor-pointer">
+                                    <input type="checkbox" id="bSelectAll" onchange="toggleSelectAllBatch(this.checked)" class="w-3.5 h-3.5 accent-amber-500">
+                                    <span>Pilih semua yang tampil</span>
+                                </label>
+                                <span class="text-[11px] text-amber-400 font-semibold">
+                                    <span id="bSelectedCount">0</span> dipilih dari <span id="bTotalCount">0</span>
+                                </span>
+                            </div>
+                            <div id="bCustomerList" class="max-h-72 overflow-y-auto divide-y divide-whus-border"></div>
+                        </div>
+                    </div>
+
+                    <!-- Klasifikasi batch -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <h2 class="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>02 &mdash; Klasifikasi & Keluhan (berlaku untuk semua)
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">KATEGORI ISSUE <span class="text-rose-500">*</span></label>
+                                <select id="bIssue" onchange="onBatchIssueChange()" class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"></select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">PRIORITAS</label>
+                                <select id="bPriority" class="w-full bg-[#131b2e] border border-whus-border rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
+                                    <option value="High">High</option>
+                                    <option value="Medium" selected>Medium</option>
+                                    <option value="Low">Low</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">DETAIL KELUHAN <span class="text-rose-500">*</span></label>
+                            <textarea id="bComplaint" rows="2" class="w-full bg-[#131b2e] border border-whus-border rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                                placeholder="mis. Backbone CUT jalur utama Jetis — seluruh pelanggan ODP terdampak"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pb-6">
+                        <p class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                            <i class="fa-solid fa-link text-[10px]"></i>
+                            Semua tiket batch berbagi satu nomor insiden &mdash; menutup insiden menawarkan penutupan massal.
+                        </p>
+                        <button onclick="submitBatch()" class="px-6 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/30 flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-[10px]"></i>
+                            <span>BUAT <span id="bSubmitCount">0</span> TIKET SEKALIGUS</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- MODE 4: TEMPEL EXCEL                                         -->
+            <!-- ============================================================ -->
+            <div id="viewPaste" class="hidden flex-1 overflow-y-auto p-4 md:p-6">
+                <div class="max-w-6xl mx-auto space-y-4">
+
+                    <div class="bg-gradient-to-r from-emerald-950/40 to-whus-card border border-emerald-800/40 rounded-xl p-4 flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                            <i class="fa-solid fa-file-excel"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-sm font-bold text-white">Tempel dari Excel &mdash; Jembatan Migrasi</h1>
+                            <p class="text-[11px] text-slate-400 mt-0.5">
+                                Blok sel di Excel &rarr; Ctrl+C &rarr; tempel di bawah. Sistem memvalidasi CID, scope POP, dan duplikat
+                                sebelum apa pun disimpan. Tidak ada baris masuk tanpa lolos validasi.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">01 &mdash; Tempel Data</h2>
+                            <span class="text-[10px] font-mono text-slate-500">Kolom: CID &rarr; Kategori &rarr; Keluhan &rarr; Catatan (opsional)</span>
+                        </div>
+
+                        <textarea id="pasteArea" rows="6" oninput="parsePaste()"
+                            class="w-full bg-[#0e1424] border border-whus-border rounded-lg p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+placeholder="C1X4ARQ080723&#9;LOS Red Light&#9;Lampu LOS merah sejak pagi&#9;Cek dropcore
+C1X4CRQ080816&#9;Lemot&#9;Streaming buffering jam 20.00
+C00RQ001555&#9;Backbone CUT&#9;Ikut terdampak putus jalur utama"></textarea>
+
+                        <button onclick="loadPasteSample()" class="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-flask text-[10px]"></i><span>Isi contoh data (termasuk baris bermasalah)</span>
+                        </button>
+                    </div>
+
+                    <div id="pastePreviewWrap" class="hidden bg-whus-card border border-whus-border rounded-xl overflow-hidden">
+                        <div class="px-4 py-2.5 border-b border-whus-border flex flex-wrap items-center justify-between gap-2 bg-[#0e1424]">
+                            <h2 class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">02 &mdash; Pratinjau & Validasi</h2>
+                            <div class="flex items-center gap-3 text-[11px]">
+                                <span class="text-emerald-400"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i><span id="pOkCount">0</span> siap</span>
+                                <span class="text-amber-400"><i class="fa-solid fa-triangle-exclamation text-[10px] mr-1"></i><span id="pWarnCount">0</span> peringatan</span>
+                                <span class="text-rose-400"><i class="fa-solid fa-circle-xmark text-[10px] mr-1"></i><span id="pErrCount">0</span> ditolak</span>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto max-h-80">
+                            <table class="w-full text-left excel-table">
+                                <thead>
+                                    <tr class="text-[10px] text-slate-300 uppercase sticky top-0 z-10">
+                                        <th class="w-10 px-2 py-2 text-center">#</th>
+                                        <th class="w-40 px-3 py-2">CID</th>
+                                        <th class="w-48 px-3 py-2">Pelanggan Ter-resolve</th>
+                                        <th class="w-40 px-3 py-2">Kategori</th>
+                                        <th class="w-72 px-3 py-2">Keluhan</th>
+                                        <th class="w-64 px-3 py-2">Validasi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pasteBody" class="font-mono text-xs"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="px-4 py-3 border-t border-whus-border flex items-center justify-between bg-[#0e1424]">
+                            <p class="text-[11px] text-slate-500">Baris merah dilewati &mdash; perbaiki di Excel lalu tempel ulang.</p>
+                            <button onclick="submitPaste()" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+                                <i class="fa-solid fa-file-import text-[10px]"></i>
+                                <span>IMPOR <span id="pSubmitCount">0</span> BARIS VALID</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ DRAWER DETAIL TIKET ============ -->
+            <div id="drawerBackdrop" onclick="closeDrawer()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+            <div id="ticketDrawer" class="fixed top-0 right-0 h-full w-full max-w-2xl bg-[#0f172a] border-l border-whus-border shadow-2xl z-50 transition-transform duration-300 transform translate-x-full flex flex-col overflow-hidden">
+                <div class="p-4 bg-[#111827] border-b border-whus-border flex items-center justify-between shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                            <i class="fa-solid fa-receipt"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h2 id="dtId" class="text-base font-bold text-blue-400 font-mono">—</h2>
+                                <span id="dtPriority" class="px-2 py-0.5 text-[10px] font-bold rounded border">—</span>
+                                <span id="dtIncident" class="hidden px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded font-mono">—</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Detail Tiket &mdash; Routing Helpdesk / NOC / FOP</p>
+                        </div>
+                    </div>
+                    <button onclick="closeDrawer()" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 md:p-5 space-y-4">
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between border-b border-whus-border pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-slate-400">Status:</span>
+                                <span id="dtStatus" class="px-2.5 py-0.5 text-xs font-bold rounded border">—</span>
+                            </div>
+                            <span id="dtType" class="px-2.5 py-0.5 text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 rounded">—</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="block text-[10px] text-slate-500 uppercase font-semibold">Dibuat Oleh</span>
+                                <span id="dtCreatedBy" class="text-slate-200 font-medium">—</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] text-slate-500 uppercase font-semibold">Waktu</span>
+                                <span id="dtCreatedAt" class="text-slate-200 font-medium">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-2.5 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span>Aksi Routing Tiket
+                        </div>
+                        <div id="dtActions" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+                        <p id="dtLockedNote" class="hidden mt-2.5 text-[11px] text-slate-500 flex items-start gap-1.5">
+                            <i class="fa-solid fa-lock text-[10px] mt-0.5"></i>
+                            <span>Tiket sudah di tangan FOP. Pembatalan & perubahan berikutnya dilakukan dari modul Task FOP.</span>
+                        </p>
+                    </div>
+
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 border-b border-whus-border pb-2">Snapshot Pelanggan</h3>
+                        <div class="bg-[#0e1424] border border-whus-border rounded-lg overflow-hidden text-xs">
+                            <div class="grid grid-cols-2 border-b border-whus-border">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Nama</span>
+                                    <span id="dtCustName" class="font-semibold text-slate-100">—</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">CID</span>
+                                    <span id="dtCustCid" class="font-bold text-blue-400 font-mono">—</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 border-b border-whus-border">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">No HP</span>
+                                    <span id="dtCustPhone" class="text-slate-200">—</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Paket</span>
+                                    <span id="dtCustPackage" class="text-emerald-400 font-semibold">—</span>
+                                </div>
+                            </div>
+                            <div class="p-2.5 border-b border-whus-border">
+                                <span class="block text-[10px] font-bold text-slate-500 uppercase">Alamat</span>
+                                <span id="dtCustAddress" class="text-slate-300">—</span>
+                            </div>
+                            <div class="grid grid-cols-2">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">POP / ODP</span>
+                                    <span id="dtCustPopOdp" class="text-slate-200">—</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Perangkat</span>
+                                    <span id="dtCustOnt" class="text-slate-300 font-mono">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 border-b border-whus-border pb-2">Keluhan & Catatan</h3>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Detail Keluhan</label>
+                            <div id="dtComplaint" class="p-3 bg-[#0e1424] border border-whus-border rounded-lg text-xs font-mono text-slate-200 min-h-[44px]">—</div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Catatan Teknis</label>
+                            <div id="dtNotes" class="p-3 bg-[#0e1424] border border-whus-border rounded-lg text-xs font-mono text-slate-300 italic min-h-[36px]">—</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 space-y-2">
+                        <h3 class="text-xs font-bold uppercase text-slate-200 border-b border-whus-border pb-2">Riwayat Tiket & Audit</h3>
+                        <div id="dtHistory" class="space-y-2 text-xs"></div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-[#111827] border-t border-whus-border flex items-center justify-between shrink-0">
+                    <span class="text-[10px] text-slate-500">Semua perubahan status tercatat di riwayat</span>
+                    <button onclick="closeDrawer()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium">Tutup</button>
+                </div>
+            </div>
+
+            <!-- ============ MODAL ALASAN AKSI ============ -->
+            <div id="reasonModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onclick="closeReasonModal()"></div>
+                <div class="relative w-full max-w-md bg-[#111827] border border-whus-border rounded-xl shadow-2xl overflow-hidden">
+                    <div class="p-4 border-b border-whus-border flex items-center gap-3">
+                        <div id="rmIcon" class="w-9 h-9 rounded-xl flex items-center justify-center"><i class="fa-solid fa-circle-question"></i></div>
+                        <div>
+                            <h3 id="rmTitle" class="text-sm font-bold text-white">Konfirmasi</h3>
+                            <p id="rmSubtitle" class="text-[11px] text-slate-400"></p>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2">
+                        <label class="block text-[11px] font-semibold text-slate-300">
+                            <span id="rmReasonLabel">Alasan</span>
+                            <span id="rmRequired" class="hidden text-rose-500">*</span>
+                        </label>
+                        <textarea id="rmReason" rows="3" class="w-full bg-[#0e1424] border border-whus-border rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-mono" placeholder="Tulis alasan..."></textarea>
+                        <p id="rmError" class="hidden text-[11px] text-rose-400">Alasan wajib diisi untuk aksi ini.</p>
+                    </div>
+                    <div class="p-3 border-t border-whus-border flex justify-end gap-2 bg-[#0e1424]">
+                        <button onclick="closeReasonModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium">Batal</button>
+                        <button id="rmConfirm" class="px-4 py-1.5 rounded-lg text-white text-xs font-bold">Konfirmasi</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ MODAL PINTASAN ============ -->
+            <div id="shortcutModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm" onclick="closeShortcutHelp()"></div>
+                <div class="relative w-full max-w-lg bg-[#111827] border border-whus-border rounded-xl shadow-2xl overflow-hidden">
+                    <div class="p-4 border-b border-whus-border flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-keyboard text-blue-400"></i>Pintasan Keyboard</h3>
+                        <button onclick="closeShortcutHelp()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Fokus cari pelanggan</span><kbd>/</kbd></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Navigasi hasil</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Ambil pelanggan</span><kbd>Enter</kbd></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Simpan tiket</span><kbd>Ctrl+Enter</kbd></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Buang / tutup</span><kbd>Esc</kbd></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border"><span class="text-slate-300">Ganti mode</span><span><kbd>Alt+1..4</kbd></span></div>
+                        <div class="flex items-center justify-between p-2 rounded bg-[#0e1424] border border-whus-border sm:col-span-2"><span class="text-slate-300">Bantuan ini</span><kbd>?</kbd></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+    /* =========================================================================
+     * MOCK DATA
+     * ========================================================================= */
+
+    const POPS = ['Jetis', 'Siman', 'Pacitan Central'];
+
+    // Master Issue: kategori membawa tipe tiket, prioritas default, dan template
+    // keluhan. Satu pilihan mengisi tiga field sekaligus — inti "cepat"-nya.
+    const ISSUE_CATEGORIES = [
+        {
+            id: 1, name: 'Backbone CUT', type: 'MTN', priority: 'High',
+            template: 'Backbone CUT pada jalur utama. Pelanggan terdampak putus total.',
+            snippets: ['Loss di OTB', 'Kabel tertimpa pohon', 'Terkena galian proyek']
+        },
+        {
+            id: 2, name: 'LOS / Red Light', type: 'MTN', priority: 'High',
+            template: 'Lampu indikator LOS menyala merah, koneksi putus total sejak ',
+            snippets: ['Sejak pagi ini', 'Setelah hujan deras', 'Dropcore putus di tiang', 'Kabel digigit tikus']
+        },
+        {
+            id: 3, name: 'Lemot / High Ping', type: 'MTN', priority: 'Medium',
+            template: 'Koneksi terasa lambat / ping tinggi pada jam ',
+            snippets: ['Jam sibuk 19.00-23.00', 'Streaming buffering', 'Game latency tinggi', 'Speedtest jauh di bawah paket']
+        },
+        {
+            id: 4, name: 'Sering RTO / Intermittent', type: 'MTN', priority: 'Medium',
+            template: 'Koneksi putus-nyambung berulang sepanjang hari.',
+            snippets: ['Putus tiap beberapa menit', 'Normal setelah restart ONT', 'Hanya di jam tertentu']
+        },
+        {
+            id: 5, name: 'Wi-Fi No Internet', type: 'C-REQ', priority: 'Low',
+            template: 'Perangkat terhubung ke Wi-Fi tetapi tidak ada akses internet.',
+            snippets: ['Hanya di HP tertentu', 'Setelah ganti password', 'Setelah mati listrik']
+        },
+        {
+            id: 6, name: 'Konfigurasi Router / Wi-Fi', type: 'C-REQ', priority: 'Low',
+            template: 'Permintaan perubahan konfigurasi: ',
+            snippets: ['Ganti nama Wi-Fi', 'Ganti password Wi-Fi', 'Tambah extender', 'Pindah posisi ONT']
+        },
+        {
+            id: 7, name: 'Lainnya', type: 'MTN', priority: 'Medium',
+            template: '', snippets: []
+        }
+    ];
+
+    const CUSTOMERS = [
+        { id: 1, name: 'Moch Hanif Asrofi',      cid: 'C1X4ARQ080723', phone: '6283159938480', package: 'Barbar UpTo 7M',  address: 'Dukuh Karanglo, RT 02/RW 01, Ds Ngasinan Jetis', pop: 'Jetis',           odp: 'ODP-4 JTK00', ont: 'ZTE F660 V8' },
+        { id: 2, name: 'Affifta Atwin Safranda', cid: 'C1X4CRQ080816', phone: '6287737008759', package: 'Home Special 10M', address: 'Jl. Diponegoro No 14, RT 01/03 Jetis',            pop: 'Jetis',           odp: 'ODP-2 JTK01', ont: 'Huawei HG8245H5' },
+        { id: 3, name: 'Chaniago Putra Pertama', cid: 'C00RQ001555',   phone: '6287737008632', package: 'SOHO Speed 20M',  address: 'Dusun Krajan, RT 04/01 Pacitan',                  pop: 'Pacitan Central', odp: 'ODP-1 PCT05', ont: 'Fiberhome AN5506' },
+        { id: 4, name: 'Sri Wahyuni',            cid: 'C1X4ARQ080901', phone: '6281234567801', package: 'Home Special 10M', address: 'Dukuh Karanglo, RT 03/RW 01, Ngasinan Jetis',     pop: 'Jetis',           odp: 'ODP-4 JTK00', ont: 'ZTE F670L' },
+        { id: 5, name: 'Bambang Setiawan',       cid: 'C1X4ARQ080902', phone: '6281234567802', package: 'Barbar UpTo 7M',  address: 'Dukuh Karanglo, RT 03/RW 02, Ngasinan Jetis',     pop: 'Jetis',           odp: 'ODP-4 JTK00', ont: 'ZTE F660 V8' },
+        { id: 6, name: 'Indah Permatasari',      cid: 'C1X4ARQ080903', phone: '6281234567803', package: 'Home Special 10M', address: 'Dukuh Karanglo, RT 04/RW 01, Ngasinan Jetis',     pop: 'Jetis',           odp: 'ODP-4 JTK00', ont: 'Huawei HG8245H5' },
+        { id: 7, name: 'Agus Prasetyo',          cid: 'C2X1BRQ090110', phone: '6281234567804', package: 'SOHO Speed 20M',  address: 'Jl. Raya Siman No 8, RT 01/02 Siman',             pop: 'Siman',           odp: 'ODP-3 SMN02', ont: 'Fiberhome AN5506' },
+        { id: 8, name: 'Dewi Lestari',           cid: 'C2X1BRQ090111', phone: '6281234567805', package: 'Barbar UpTo 7M',  address: 'Jl. Raya Siman No 22, RT 02/02 Siman',            pop: 'Siman',           odp: 'ODP-3 SMN02', ont: 'ZTE F670L' }
+    ];
+
+    // handler: 'helpdesk' | 'noc' | 'fop'  -> handler 'fop' bersifat TERMINAL,
+    // baris grid jadi read-only dan aksi routing di drawer hilang.
+    let tickets = [
+        { id: 'TKT-2026-0006', handler: 'helpdesk', status: 'Ditangani Helpdesk', nocChecked: false, incident: null,
+          customerId: 1, issue: 'Backbone CUT', type: 'MTN', priority: 'High',
+          complaint: 'Backbone CUT pada jalur utama ODP Jetis', notes: 'Opmeter loss -30dB, butuh splicing ulang.',
+          createdBy: 'Super Admin (Owner)', createdAt: '28 Juli 2026, 16.28 WIB', timeAgo: '4 menit lalu',
+          history: [{ action: 'Tiket Dibuat', actor: 'Super Admin (Owner)', at: '28 Juli 2026, 16.28' }] },
+        { id: 'TKT-2026-0005', handler: 'noc', status: 'Pending NOC', nocChecked: false, incident: null,
+          customerId: 2, issue: 'Lemot / High Ping', type: 'MTN', priority: 'Low',
+          complaint: 'Koneksi lambat saat streaming video jam malam', notes: 'Bandwidth usage normal.',
+          createdBy: 'Rina (Helpdesk)', createdAt: '28 Juli 2026, 16.00 WIB', timeAgo: '29 menit lalu',
+          history: [
+            { action: 'Tiket Dibuat', actor: 'Rina (Helpdesk)', at: '28 Juli 2026, 16.00' },
+            { action: 'Dieskalasi ke NOC', actor: 'Rina (Helpdesk)', at: '28 Juli 2026, 16.05' }
+          ] },
+        { id: 'TKT-2026-0004', handler: 'fop', status: 'Ditangani FOP', nocChecked: true, incident: null,
+          customerId: 3, issue: 'LOS / Red Light', type: 'MTN', priority: 'High',
+          complaint: 'Lampu indikator modem kedip merah LOS', notes: 'Dropcore tertekuk di tiang.',
+          createdBy: 'Rina (Helpdesk)', createdAt: '28 Juli 2026, 15.50 WIB', timeAgo: '38 menit lalu',
+          fopTask: 'TFOP-2026-0021',
+          history: [
+            { action: 'Tiket Dibuat', actor: 'Rina (Helpdesk)', at: '28 Juli 2026, 15.50' },
+            { action: 'Dieskalasi ke NOC', actor: 'Rina (Helpdesk)', at: '28 Juli 2026, 15.55' },
+            { action: 'Dicek NOC', actor: 'Yudi (NOC)', at: '28 Juli 2026, 16.02' },
+            { action: 'Dieskalasi ke FOP — TFOP-2026-0021', actor: 'Yudi (NOC)', at: '28 Juli 2026, 16.10' }
+          ] }
+    ];
+
+    /* =========================================================================
+     * STATE
+     * ========================================================================= */
+
+    let mode = 'form';
+    let selectedCustomer = null;
+    let suggestionList = [];
+    let suggestionIndex = -1;
+    let queueFilter = 'all';
+    let sessionCount = 0;
+    let drawerTicketId = null;
+    let ticketSeq = 6;
+    let incidentSeq = 0;
+    let batchSelection = new Set();
+    let pasteRows = [];
+    let reasonCallback = null;
+
+    const DRAFT_KEY = 'whusnet_ticket_draft_v2';
+
+    /* =========================================================================
+     * INIT
+     * ========================================================================= */
+
+    window.onload = function () {
+        populateSelects();
+        renderQueue();
+        renderGrid();
+        renderBatchOdpOptions();
+        renderBatchCustomers();
+        restoreDraft();
+        restoreLockPreference();
+        switchMode('form');
+
+        document.addEventListener('keydown', globalKeydown);
+        // Autosave draft — telepon putus di tengah pengetikan tidak menghapus isian
+        ['fComplaint', 'fNocNotes', 'fManualName', 'fManualPhone'].forEach(id => {
+            document.getElementById(id).addEventListener('input', saveDraft);
+        });
+    };
+
+    function populateSelects() {
+        const optionsHtml = ISSUE_CATEGORIES
+            .map(c => `<option value="${c.id}">${c.name} &mdash; ${c.type} / ${c.priority}</option>`)
+            .join('');
+
+        document.getElementById('fIssue').innerHTML =
+            '<option value="">-- Pilih Kategori Issue --</option>' + optionsHtml;
+        document.getElementById('bIssue').innerHTML =
+            '<option value="">-- Pilih Kategori Issue --</option>' + optionsHtml;
+
+        const popHtml = POPS.map(p => `<option value="${p}">${p}</option>`).join('');
+        document.getElementById('fManualPop').innerHTML = '<option value="">-- Pilih POP --</option>' + popHtml;
+        document.getElementById('bPop').innerHTML = '<option value="">-- Semua POP --</option>' + popHtml;
+    }
+
+    /* =========================================================================
+     * MODE SWITCHER
+     * ========================================================================= */
+
+    const MODE_META = {
+        form:  { view: 'viewForm',  btn: 'modeBtnForm',  label: 'Form Cepat',    color: 'blue' },
+        grid:  { view: 'viewGrid',  btn: 'modeBtnGrid',  label: 'Grid Excel',    color: 'blue' },
+        batch: { view: 'viewBatch', btn: 'modeBtnBatch', label: 'Batch Insiden', color: 'amber' },
+        paste: { view: 'viewPaste', btn: 'modeBtnPaste', label: 'Tempel Excel',  color: 'emerald' }
+    };
+
+    function switchMode(next) {
+        mode = next;
+
+        Object.entries(MODE_META).forEach(([key, meta]) => {
+            const view = document.getElementById(meta.view);
+            const btn = document.getElementById(meta.btn);
+            const active = key === next;
+
+            view.classList.toggle('hidden', !active);
+            if (key === 'form') { view.classList.toggle('flex', active); }
+
+            btn.className = active
+                ? `px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all bg-${meta.color}-600/20 text-${meta.color}-300 border border-${meta.color}-600/40`
+                : 'px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-400 hover:text-slate-200 hover:bg-whus-hover';
+        });
+
+        document.getElementById('breadcrumbMode').textContent = MODE_META[next].label;
+
+        if (next === 'grid') renderGrid();
+        if (next === 'form') setTimeout(() => document.getElementById('custSearch')?.focus(), 50);
+    }
+
+    /* =========================================================================
+     * KEYBOARD
+     * ========================================================================= */
+
+    function globalKeydown(e) {
+        const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable;
+
+        // Alt+1..4 ganti mode dari mana pun
+        if (e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
+            e.preventDefault();
+            switchMode(['form', 'grid', 'batch', 'paste'][parseInt(e.key, 10) - 1]);
+            return;
+        }
+
+        if (e.key === '/' && !typing) {
+            e.preventDefault();
+            switchMode('form');
+            document.getElementById('custSearch').focus();
+            return;
+        }
+
+        if (e.key === '?' && !typing) { e.preventDefault(); openShortcutHelp(); return; }
+
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            if (mode === 'form') document.getElementById('rapidForm').requestSubmit();
+            if (mode === 'batch') submitBatch();
+            if (mode === 'paste') submitPaste();
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            if (!document.getElementById('shortcutModal').classList.contains('hidden')) { closeShortcutHelp(); return; }
+            if (!document.getElementById('reasonModal').classList.contains('hidden')) { closeReasonModal(); return; }
+            if (drawerTicketId) { closeDrawer(); return; }
+            hideSuggestions();
+        }
+    }
+
+    /* =========================================================================
+     * MODE 1 — PENCARIAN PELANGGAN (navigasi keyboard penuh)
+     * ========================================================================= */
+
+    function onCustomerSearch(val) {
+        const q = (val || '').trim().toLowerCase();
+        const box = document.getElementById('custSuggestions');
+
+        if (q.length < 2) { hideSuggestions(); return; }
+
+        suggestionList = CUSTOMERS.filter(c =>
+            c.name.toLowerCase().includes(q) ||
+            c.cid.toLowerCase().includes(q) ||
+            c.phone.includes(q) ||
+            c.pop.toLowerCase().includes(q) ||
+            c.odp.toLowerCase().includes(q)
+        ).slice(0, 8);
+
+        suggestionIndex = suggestionList.length ? 0 : -1;
+
+        if (!suggestionList.length) {
+            box.innerHTML = '<div class="p-3 text-xs text-slate-500 text-center">Pelanggan tidak ditemukan dalam scope POP Anda.</div>';
+        } else {
+            renderSuggestions();
+        }
+        box.classList.remove('hidden');
+    }
+
+    function renderSuggestions() {
+        document.getElementById('custSuggestions').innerHTML = suggestionList.map((c, i) => `
+            <div onclick="pickCustomer(${c.id})" data-sug="${i}"
+                 class="p-2.5 cursor-pointer border-b border-whus-border flex items-center justify-between hover:bg-slate-800 ${i === suggestionIndex ? 'sug-active' : ''}">
+                <div class="min-w-0">
+                    <span class="text-xs font-bold text-slate-200 block truncate">${c.name}</span>
+                    <span class="text-[10px] text-slate-400">${c.pop} &bull; ${c.odp} &bull; ${c.phone}</span>
+                </div>
+                <span class="text-xs font-mono text-blue-400 font-bold shrink-0 ml-2">${c.cid}</span>
+            </div>`).join('');
+    }
+
+    function onSuggestionKeydown(e) {
+        const box = document.getElementById('custSuggestions');
+        if (box.classList.contains('hidden') || !suggestionList.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            suggestionIndex = (suggestionIndex + 1) % suggestionList.length;
+            renderSuggestions();
+            scrollSuggestionIntoView();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            suggestionIndex = (suggestionIndex - 1 + suggestionList.length) % suggestionList.length;
+            renderSuggestions();
+            scrollSuggestionIntoView();
+        } else if (e.key === 'Enter') {
+            // Enter di kotak cari = ambil pelanggan, BUKAN submit form.
+            e.preventDefault();
+            if (suggestionIndex >= 0) pickCustomer(suggestionList[suggestionIndex].id);
+        }
+    }
+
+    function scrollSuggestionIntoView() {
+        document.querySelector(`[data-sug="${suggestionIndex}"]`)
+            ?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function hideSuggestions() {
+        document.getElementById('custSuggestions').classList.add('hidden');
+        suggestionIndex = -1;
+    }
+
+    function pickCustomer(id) {
+        const c = CUSTOMERS.find(x => x.id === id);
+        if (!c) return;
+
+        selectedCustomer = c;
+        document.getElementById('custSearch').value = `${c.name} (${c.cid})`;
+        hideSuggestions();
+
+        document.getElementById('snapName').textContent = c.name;
+        document.getElementById('snapCid').textContent = c.cid;
+        document.getElementById('snapPhone').textContent = c.phone;
+        document.getElementById('snapPackage').textContent = c.package;
+        document.getElementById('snapAddress').textContent = c.address;
+        document.getElementById('snapPopOdp').textContent = `${c.pop} / ${c.odp}`;
+        document.getElementById('snapOnt').textContent = c.ont;
+
+        checkDuplicates(c.id);
+
+        // Alur alami: pelanggan ketemu -> langsung ke keluhan
+        document.getElementById('fComplaint').focus();
+        const ta = document.getElementById('fComplaint');
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+
+    // Deteksi duplikat dicek server-side terhadap SEMUA tiket open milik
+    // pelanggan tsb, bukan cuma yang tampil di panel kanan.
+    function checkDuplicates(customerId) {
+        const open = tickets.filter(t => t.customerId === customerId && t.handler !== 'closed' && !t.closed);
+        const warn = document.getElementById('dupWarning');
+
+        if (!open.length) { warn.classList.add('hidden'); return; }
+
+        document.getElementById('dupWarningText').innerHTML =
+            `Pelanggan ini punya <b>${open.length} tiket masih terbuka</b>: ` +
+            open.map(t => `<span class="font-mono">${t.id}</span> (${t.status})`).join(', ') +
+            `. Pastikan bukan laporan ganda.`;
+        warn.classList.remove('hidden');
+    }
+
+    function onNoCustomerToggle() {
+        const on = document.getElementById('noCustomerMode').checked;
+        document.getElementById('customerSearchBlock').classList.toggle('hidden', on);
+        document.getElementById('manualCustomerBlock').classList.toggle('hidden', !on);
+        document.getElementById('manualCustomerBlock').classList.toggle('grid', on);
+        if (on) { selectedCustomer = null; document.getElementById('fManualName').focus(); }
+        saveDraft();
+    }
+
+    /* =========================================================================
+     * MODE 1 — KATEGORI ISSUE: isi tipe + prioritas + template + snippet
+     * ========================================================================= */
+
+    function onIssueCategoryChange() {
+        const cat = ISSUE_CATEGORIES.find(c => String(c.id) === document.getElementById('fIssue').value);
+        const badge = document.getElementById('templateBadge');
+        const snipRow = document.getElementById('snippetRow');
+
+        if (!cat) {
+            document.getElementById('fTypeAuto').textContent = '—';
+            badge.classList.add('hidden');
+            snipRow.innerHTML = '';
+            return;
+        }
+
+        document.getElementById('fTypeAuto').textContent = cat.type;
+        document.getElementById('fPriority').value = cat.priority;
+
+        // Template hanya menimpa textarea yang masih kosong / masih template lama —
+        // ketikan asli operator tidak boleh hilang.
+        const ta = document.getElementById('fComplaint');
+        const isTemplate = ISSUE_CATEGORIES.some(c => c.template && ta.value === c.template);
+        if (!ta.value.trim() || isTemplate) {
+            ta.value = cat.template;
+            badge.classList.toggle('hidden', !cat.template);
+        }
+
+        snipRow.innerHTML = cat.snippets.map(s => `
+            <button type="button" onclick="appendSnippet('${s.replace(/'/g, "\\'")}')"
+                class="px-2 py-1 rounded-md bg-[#0e1424] border border-whus-border text-[10px] text-slate-400 hover:text-blue-300 hover:border-blue-600/50 transition-colors">
+                + ${s}
+            </button>`).join('');
+
+        saveDraft();
+    }
+
+    function appendSnippet(text) {
+        const ta = document.getElementById('fComplaint');
+        ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + text + '.';
+        ta.focus();
+        saveDraft();
+    }
+
+    /* =========================================================================
+     * MODE 1 — KUNCI KLASIFIKASI
+     * ========================================================================= */
+
+    function onLockToggle() {
+        const on = document.getElementById('lockClassification').checked;
+        document.getElementById('lockIcon').className = on
+            ? 'fa-solid fa-lock text-amber-400 text-xs'
+            : 'fa-solid fa-lock-open text-slate-500 text-xs';
+        document.getElementById('lockBadge').classList.toggle('hidden', !on);
+        document.getElementById('lockStripe').className =
+            'absolute top-0 left-0 w-1 h-full transition-colors ' + (on ? 'bg-amber-500' : 'bg-blue-500');
+        localStorage.setItem('whusnet_lock_classification', on ? '1' : '0');
+        showToast(on ? 'Klasifikasi dikunci — bertahan setelah simpan' : 'Kunci klasifikasi dilepas', 'info');
+    }
+
+    function restoreLockPreference() {
+        if (localStorage.getItem('whusnet_lock_classification') === '1') {
+            document.getElementById('lockClassification').checked = true;
+            onLockToggle();
+        }
+    }
+
+    /* =========================================================================
+     * MODE 1 — DRAFT AUTOSAVE
+     * ========================================================================= */
+
+    function saveDraft() {
+        const draft = {
+            issue: document.getElementById('fIssue').value,
+            priority: document.getElementById('fPriority').value,
+            complaint: document.getElementById('fComplaint').value,
+            notes: document.getElementById('fNocNotes').value,
+            customerId: selectedCustomer?.id || null,
+            noCustomer: document.getElementById('noCustomerMode').checked,
+            manualName: document.getElementById('fManualName').value,
+            manualPhone: document.getElementById('fManualPhone').value
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        flashDraftIndicator();
+    }
+
+    function restoreDraft() {
+        let draft;
+        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { return; }
+        if (!draft) return;
+
+        document.getElementById('fIssue').value = draft.issue || '';
+        if (draft.issue) onIssueCategoryChange();
+        document.getElementById('fPriority').value = draft.priority || 'Medium';
+        document.getElementById('fComplaint').value = draft.complaint || '';
+        document.getElementById('fNocNotes').value = draft.notes || '';
+
+        if (draft.noCustomer) {
+            document.getElementById('noCustomerMode').checked = true;
+            onNoCustomerToggle();
+            document.getElementById('fManualName').value = draft.manualName || '';
+            document.getElementById('fManualPhone').value = draft.manualPhone || '';
+        } else if (draft.customerId) {
+            pickCustomer(draft.customerId);
+        }
+
+        if (draft.complaint || draft.customerId) showToast('Draft terakhir dipulihkan', 'info');
+    }
+
+    let draftTimer = null;
+    function flashDraftIndicator() {
+        const el = document.getElementById('draftIndicator');
+        el.className = 'px-3 py-1 rounded-lg bg-emerald-900/30 border border-emerald-700/40 text-[11px] text-emerald-300 flex items-center gap-2';
+        el.innerHTML = '<i class="fa-solid fa-floppy-disk text-[10px]"></i><span>Draft tersimpan</span>';
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => {
+            el.className = 'px-3 py-1 rounded-lg bg-slate-800 border border-whus-border text-[11px] text-slate-400 flex items-center gap-2';
+        }, 1200);
+    }
+
+    /* =========================================================================
+     * MODE 1 — SUBMIT
+     * ========================================================================= */
+
+    function handleRapidSubmit(e) {
+        e.preventDefault();
+
+        const noCust = document.getElementById('noCustomerMode').checked;
+        const cat = ISSUE_CATEGORIES.find(c => String(c.id) === document.getElementById('fIssue').value);
+
+        if (!cat) { showToast('Pilih kategori issue dulu', 'warning'); return; }
+        if (!noCust && !selectedCustomer) { showToast('Pilih data pelanggan dulu', 'warning'); return; }
+        if (noCust && !document.getElementById('fManualPop').value) {
+            showToast('Tiket tanpa pelanggan wajib memilih POP', 'warning'); return;
+        }
+
+        const t = buildTicket({
+            customer: noCust ? null : selectedCustomer,
+            manual: noCust ? {
+                name: document.getElementById('fManualName').value || 'Tanpa Pelanggan',
+                phone: document.getElementById('fManualPhone').value || '—',
+                pop: document.getElementById('fManualPop').value
+            } : null,
+            issue: cat.name,
+            type: cat.type,
+            priority: document.getElementById('fPriority').value,
+            complaint: document.getElementById('fComplaint').value,
+            notes: document.getElementById('fNocNotes').value
+        });
+
+        tickets.unshift(t);
+        sessionCount++;
+        document.getElementById('sessionCounter').textContent = sessionCount;
+
+        renderQueue();
+        renderGrid();
+        resetRapidForm(false);
+
+        showToast(`${t.id} dibuat. Lanjut tiket berikutnya.`, 'success');
+    }
+
+    function buildTicket({ customer, manual, issue, type, priority, complaint, notes, incident }) {
+        ticketSeq++;
+        return {
+            id: `TKT-2026-${String(ticketSeq).padStart(4, '0')}`,
+            handler: 'helpdesk',
+            status: 'Ditangani Helpdesk',
+            nocChecked: false,
+            incident: incident || null,
+            customerId: customer?.id || null,
+            manual: manual || null,
+            issue, type, priority,
+            complaint: complaint || '—',
+            notes: notes || 'Tidak ada catatan teknis awal.',
+            createdBy: 'Super Admin (Owner)',
+            createdAt: '29 Juli 2026, 08.24 WIB',
+            timeAgo: 'Baru saja',
+            history: [{ action: 'Tiket Dibuat', actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.24' }]
+        };
+    }
+
+    // Reset "beruntun": fokus balik ke kotak cari, klasifikasi dipertahankan
+    // bila Kunci Klasifikasi aktif.
+    function resetRapidForm(full) {
+        const locked = document.getElementById('lockClassification').checked && !full;
+
+        selectedCustomer = null;
+        document.getElementById('custSearch').value = '';
+        document.getElementById('fNocNotes').value = '';
+        document.getElementById('dupWarning').classList.add('hidden');
+        ['snapName','snapCid','snapPhone','snapPackage','snapAddress','snapPopOdp','snapOnt']
+            .forEach(id => document.getElementById(id).textContent = '—');
+        document.getElementById('fManualName').value = '';
+        document.getElementById('fManualPhone').value = '';
+
+        if (locked) {
+            // Template kategori dipasang ulang supaya tinggal lanjut mengetik
+            const cat = ISSUE_CATEGORIES.find(c => String(c.id) === document.getElementById('fIssue').value);
+            document.getElementById('fComplaint').value = cat?.template || '';
+        } else {
+            document.getElementById('fIssue').value = '';
+            document.getElementById('fPriority').value = 'Medium';
+            document.getElementById('fComplaint').value = '';
+            document.getElementById('fTypeAuto').textContent = '—';
+            document.getElementById('snippetRow').innerHTML = '';
+            document.getElementById('templateBadge').classList.add('hidden');
+            document.getElementById('noCustomerMode').checked = false;
+            onNoCustomerToggle();
+        }
+
+        localStorage.removeItem(DRAFT_KEY);
+        document.getElementById('custSearch').focus();
+    }
+
+    /* =========================================================================
+     * PANEL ANTREAN
+     * ========================================================================= */
+
+    function customerOf(t) {
+        if (t.customerId) return CUSTOMERS.find(c => c.id === t.customerId);
+        return { name: t.manual?.name || 'Tanpa Pelanggan', cid: '—', phone: t.manual?.phone || '—',
+                 package: '—', address: '—', pop: t.manual?.pop || '—', odp: '—', ont: '—' };
+    }
+
+    function filterQueue(f) {
+        queueFilter = f;
+        renderQueue();
+    }
+
+    function renderQueue() {
+        const active = tickets.filter(t => !t.closed && !t.cancelled);
+        let list = active;
+        if (queueFilter === 'noc') list = active.filter(t => t.handler === 'noc');
+        if (queueFilter === 'fop') list = active.filter(t => t.handler === 'fop');
+
+        const on = 'py-1.5 font-medium rounded text-blue-400 bg-blue-900/30 border border-blue-700/40';
+        const off = 'py-1.5 font-medium rounded text-slate-400 hover:text-slate-200';
+        document.getElementById('tabAll').className = queueFilter === 'all' ? on : off;
+        document.getElementById('tabNoc').className = queueFilter === 'noc' ? on : off;
+        document.getElementById('tabFop').className = queueFilter === 'fop' ? on : off;
+
+        document.getElementById('queueBadge').textContent = list.length;
+
+        const box = document.getElementById('queueContainer');
+        if (!list.length) {
+            box.innerHTML = '<div class="p-8 text-center text-xs text-slate-500">Tidak ada tiket di antrean ini.</div>';
+            return;
+        }
+
+        box.innerHTML = list.map(t => {
+            const c = customerOf(t);
+            const pri = t.priority === 'High'
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                : t.priority === 'Medium' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-slate-800 text-slate-400 border border-slate-700';
+
+            return `
+            <div onclick="openDrawer('${t.id}')" class="bg-whus-card border border-whus-border hover:border-blue-500/60 cursor-pointer rounded-xl p-3 space-y-2 transition-all">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-blue-400 font-mono">${t.id}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${pri}">${t.priority}</span>
+                        ${t.incident ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono">${t.incident}</span>` : ''}
+                    </div>
+                    <span class="text-[10px] text-slate-500">${t.timeAgo}</span>
+                </div>
+                <div>
+                    <span class="text-xs font-bold text-slate-200 block">${t.issue}</span>
+                    <span class="text-xs text-slate-300 block mt-0.5">${c.name}</span>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                        <span><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${c.pop}</span>
+                        <span>&bull;</span>
+                        <span class="font-mono">${c.cid}</span>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 bg-[#0e1424] p-2 rounded border border-whus-border font-mono line-clamp-2">${t.complaint}</p>
+                <div class="flex items-center justify-between pt-1 border-t border-whus-border text-[10px]">
+                    <span class="${handlerClass(t.handler)}">${t.status}</span>
+                    <span class="text-slate-400 flex items-center gap-1">Buka Drawer <i class="fa-solid fa-chevron-right text-[9px]"></i></span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function handlerClass(h) {
+        if (h === 'noc') return 'text-amber-400 font-semibold';
+        if (h === 'fop') return 'text-purple-400 font-semibold';
+        return 'text-blue-400 font-semibold';
+    }
+
+    /* =========================================================================
+     * MODE 2 — GRID
+     * =========================================================================
+     * Aturan keras: sel yang boleh diedit langsung HANYA field bebas
+     * (kategori, prioritas, keluhan, catatan). Status/handler tidak pernah
+     * berubah dari grid — itu jalur TicketService + riwayat, lewat Drawer.
+     * Baris dengan handler 'fop' terkunci penuh: sisi Ticketing sudah terminal.
+     */
+
+    function renderGrid() {
+        const body = document.getElementById('gridBody');
+        document.getElementById('gridRowCount').textContent = `${tickets.length} baris`;
+
+        body.innerHTML = tickets.map((t, i) => {
+            const c = customerOf(t);
+            const locked = t.handler === 'fop' || t.closed || t.cancelled;
+            const editable = locked ? 'false' : 'true';
+            const cellCls = locked ? 'cell-locked' : 'text-slate-300 hover:bg-slate-800/40';
+
+            const statusCls =
+                t.cancelled ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                t.closed ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                t.handler === 'noc' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                t.handler === 'fop' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                'bg-blue-500/20 text-blue-300 border-blue-500/30';
+
+            return `
+            <tr class="hover:bg-slate-800/30 transition-colors group">
+                <td class="excel-row-num">${i + 1}</td>
+                <td class="px-3 py-2 text-blue-400 font-bold cursor-pointer hover:underline" onclick="openDrawer('${t.id}')">
+                    <span class="inline-flex items-center gap-1.5">
+                        ${locked ? '<i class="fa-solid fa-lock text-[9px] text-slate-500"></i>' : '<i class="fa-solid fa-up-right-from-square text-[9px] opacity-50 group-hover:opacity-100"></i>'}
+                        ${t.id}
+                    </span>
+                    ${t.incident ? `<span class="block text-[9px] text-amber-400/80 font-mono mt-0.5">${t.incident}</span>` : ''}
+                </td>
+                <td class="px-3 py-2 cell-locked">
+                    <span class="block text-slate-300 font-sans">${c.name}</span>
+                    <span class="block text-[10px] text-blue-400/70">${c.cid}</span>
+                </td>
+                <td class="px-3 py-2 ${cellCls}" contenteditable="${editable}"
+                    onblur="editCell('${t.id}','issue',this.innerText)">${t.issue}</td>
+                <td class="px-3 py-2 ${cellCls}" contenteditable="${editable}"
+                    onblur="editCell('${t.id}','priority',this.innerText)">${t.priority}</td>
+                <td class="px-3 py-2 cell-locked">${c.pop}</td>
+                <td class="px-3 py-2 ${cellCls}" contenteditable="${editable}"
+                    onblur="editCell('${t.id}','complaint',this.innerText)">${t.complaint}</td>
+                <td class="px-3 py-2 ${cellCls} italic" contenteditable="${editable}"
+                    onblur="editCell('${t.id}','notes',this.innerText)">${t.notes}</td>
+                <td class="px-3 py-2 cursor-pointer" onclick="openDrawer('${t.id}')" title="Ubah status lewat Drawer">
+                    <span class="px-2 py-0.5 text-[10px] rounded border font-semibold ${statusCls}">${t.status}</span>
+                    <i class="fa-solid fa-lock text-[9px] text-slate-600 ml-1"></i>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function editCell(id, field, value) {
+        const t = tickets.find(x => x.id === id);
+        if (!t) return;
+
+        const clean = (value || '').trim();
+        if (!clean || clean === t[field]) { renderGrid(); return; }
+
+        if (field === 'priority' && !['High', 'Medium', 'Low'].includes(clean)) {
+            showToast('Prioritas hanya High / Medium / Low', 'danger');
+            renderGrid();
+            return;
+        }
+
+        const old = t[field];
+        t[field] = clean;
+        t.history.push({ action: `Edit ${field}: "${old}" → "${clean}"`, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.30' });
+
+        showToast(`${id} — ${field} diperbarui & tercatat di riwayat`, 'success');
+        renderQueue();
+    }
+
+    /* =========================================================================
+     * MODE 3 — BATCH INSIDEN
+     * ========================================================================= */
+
+    function renderBatchOdpOptions() {
+        const odps = [...new Set(CUSTOMERS.map(c => c.odp))].sort();
+        document.getElementById('bOdp').innerHTML =
+            '<option value="">-- Semua ODP --</option>' + odps.map(o => `<option value="${o}">${o}</option>`).join('');
+    }
+
+    function batchFiltered() {
+        const pop = document.getElementById('bPop').value;
+        const odp = document.getElementById('bOdp').value;
+        const q = document.getElementById('bFilter').value.trim().toLowerCase();
+
+        return CUSTOMERS.filter(c =>
+            (!pop || c.pop === pop) &&
+            (!odp || c.odp === odp) &&
+            (!q || c.name.toLowerCase().includes(q) || c.cid.toLowerCase().includes(q))
+        );
+    }
+
+    function renderBatchCustomers() {
+        const list = batchFiltered();
+        document.getElementById('bTotalCount').textContent = list.length;
+
+        document.getElementById('bCustomerList').innerHTML = list.length ? list.map(c => `
+            <label class="flex items-center gap-3 px-3 py-2 hover:bg-slate-800/50 cursor-pointer">
+                <input type="checkbox" ${batchSelection.has(c.id) ? 'checked' : ''}
+                    onchange="toggleBatchCustomer(${c.id}, this.checked)" class="w-3.5 h-3.5 accent-amber-500">
+                <div class="flex-1 min-w-0">
+                    <span class="text-xs font-semibold text-slate-200 block truncate">${c.name}</span>
+                    <span class="text-[10px] text-slate-400">${c.pop} &bull; ${c.odp} &bull; ${c.package}</span>
+                </div>
+                <span class="text-[11px] font-mono text-blue-400 shrink-0">${c.cid}</span>
+            </label>`).join('')
+            : '<div class="p-6 text-center text-xs text-slate-500">Tidak ada pelanggan pada filter ini.</div>';
+
+        updateBatchCount();
+    }
+
+    function toggleBatchCustomer(id, checked) {
+        checked ? batchSelection.add(id) : batchSelection.delete(id);
+        updateBatchCount();
+    }
+
+    function toggleSelectAllBatch(checked) {
+        batchFiltered().forEach(c => checked ? batchSelection.add(c.id) : batchSelection.delete(c.id));
+        renderBatchCustomers();
+    }
+
+    function updateBatchCount() {
+        document.getElementById('bSelectedCount').textContent = batchSelection.size;
+        document.getElementById('bSubmitCount').textContent = batchSelection.size;
+    }
+
+    function onBatchIssueChange() {
+        const cat = ISSUE_CATEGORIES.find(c => String(c.id) === document.getElementById('bIssue').value);
+        if (!cat) return;
+        document.getElementById('bPriority').value = cat.priority;
+        const ta = document.getElementById('bComplaint');
+        if (!ta.value.trim()) ta.value = cat.template;
+    }
+
+    function submitBatch() {
+        const cat = ISSUE_CATEGORIES.find(c => String(c.id) === document.getElementById('bIssue').value);
+        const complaint = document.getElementById('bComplaint').value.trim();
+
+        if (!batchSelection.size) { showToast('Pilih minimal satu pelanggan terdampak', 'warning'); return; }
+        if (!cat) { showToast('Pilih kategori issue', 'warning'); return; }
+        if (!complaint) { showToast('Detail keluhan wajib diisi', 'warning'); return; }
+
+        incidentSeq++;
+        const incident = `INC-2026-${String(incidentSeq).padStart(3, '0')}`;
+        const priority = document.getElementById('bPriority').value;
+
+        // Satu transaksi: semua tiket jadi, atau tidak sama sekali.
+        const created = [...batchSelection].map(id => buildTicket({
+            customer: CUSTOMERS.find(c => c.id === id),
+            issue: cat.name, type: cat.type, priority,
+            complaint, notes: `Bagian dari insiden ${incident}.`, incident
+        }));
+
+        tickets = [...created, ...tickets];
+        sessionCount += created.length;
+        document.getElementById('sessionCounter').textContent = sessionCount;
+
+        batchSelection.clear();
+        document.getElementById('bSelectAll').checked = false;
+        document.getElementById('bComplaint').value = '';
+        renderBatchCustomers();
+        renderQueue();
+        renderGrid();
+
+        showToast(`${created.length} tiket dibuat untuk insiden ${incident}`, 'success');
+        switchMode('grid');
+    }
+
+    /* =========================================================================
+     * MODE 4 — TEMPEL EXCEL
+     * ========================================================================= */
+
+    function loadPasteSample() {
+        document.getElementById('pasteArea').value =
+            'C1X4ARQ080723\tLOS / Red Light\tLampu LOS merah sejak pagi\tCek dropcore di tiang\n' +
+            'C1X4CRQ080816\tLemot / High Ping\tStreaming buffering jam 20.00\n' +
+            'C2X1BRQ090110\tSering RTO / Intermittent\tPutus nyambung sejak kemarin\n' +
+            'C9X9ZZZ999999\tLemot / High Ping\tCID ini sengaja salah\n' +
+            'C1X4ARQ080902\tKategori Ngawur\tKategori tidak ada di master\n' +
+            'C1X4ARQ080903\tKonfigurasi Router / Wi-Fi\t';
+        parsePaste();
+    }
+
+    function parsePaste() {
+        const raw = document.getElementById('pasteArea').value.trim();
+        const wrap = document.getElementById('pastePreviewWrap');
+
+        if (!raw) { wrap.classList.add('hidden'); pasteRows = []; return; }
+
+        pasteRows = raw.split('\n').filter(l => l.trim()).map((line, i) => {
+            const cells = line.split('\t').map(s => s.trim());
+            const [cid, issueName, complaint, notes] = cells;
+
+            const customer = CUSTOMERS.find(c => c.cid.toLowerCase() === (cid || '').toLowerCase());
+            const cat = ISSUE_CATEGORIES.find(c => c.name.toLowerCase() === (issueName || '').toLowerCase());
+            const dup = customer ? tickets.find(t => t.customerId === customer.id && !t.closed && !t.cancelled) : null;
+
+            const errors = [];
+            const warnings = [];
+
+            if (!cid) errors.push('CID kosong');
+            else if (!customer) errors.push('CID tidak ditemukan / di luar scope POP');
+
+            if (!issueName) errors.push('Kategori kosong');
+            else if (!cat) errors.push(`Kategori "${issueName}" tidak ada di Master Issue`);
+
+            if (!complaint) errors.push('Detail keluhan kosong');
+            if (dup) warnings.push(`Duplikat: ${dup.id} masih terbuka`);
+
+            return { no: i + 1, cid, customer, cat, complaint, notes, errors, warnings };
+        });
+
+        renderPastePreview();
+        wrap.classList.remove('hidden');
+    }
+
+    function renderPastePreview() {
+        const ok = pasteRows.filter(r => !r.errors.length && !r.warnings.length).length;
+        const warn = pasteRows.filter(r => !r.errors.length && r.warnings.length).length;
+        const err = pasteRows.filter(r => r.errors.length).length;
+
+        document.getElementById('pOkCount').textContent = ok;
+        document.getElementById('pWarnCount').textContent = warn;
+        document.getElementById('pErrCount').textContent = err;
+        document.getElementById('pSubmitCount').textContent = ok + warn;
+
+        document.getElementById('pasteBody').innerHTML = pasteRows.map(r => {
+            const bad = r.errors.length > 0;
+            const rowCls = bad ? 'bg-rose-950/25' : (r.warnings.length ? 'bg-amber-950/20' : '');
+
+            const badges = bad
+                ? r.errors.map(e => `<span class="block text-rose-400 text-[10px]"><i class="fa-solid fa-circle-xmark mr-1"></i>${e}</span>`).join('')
+                : (r.warnings.length
+                    ? r.warnings.map(w => `<span class="block text-amber-400 text-[10px]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${w}</span>`).join('')
+                    : '<span class="text-emerald-400 text-[10px]"><i class="fa-solid fa-circle-check mr-1"></i>Siap diimpor</span>');
+
+            return `
+            <tr class="${rowCls}">
+                <td class="excel-row-num">${r.no}</td>
+                <td class="px-3 py-2 ${r.customer ? 'text-blue-400' : 'text-rose-400 line-through'}">${r.cid || '—'}</td>
+                <td class="px-3 py-2 text-slate-300 font-sans">${r.customer ? `${r.customer.name}<span class="block text-[10px] text-slate-500">${r.customer.pop} &bull; ${r.customer.odp}</span>` : '<span class="text-slate-600">tidak ter-resolve</span>'}</td>
+                <td class="px-3 py-2 ${r.cat ? 'text-slate-300' : 'text-rose-400'}">${r.cat ? r.cat.name : '—'}</td>
+                <td class="px-3 py-2 text-slate-400 truncate max-w-xs">${r.complaint || '<span class="text-rose-400">kosong</span>'}</td>
+                <td class="px-3 py-2">${badges}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    function submitPaste() {
+        const valid = pasteRows.filter(r => !r.errors.length);
+        if (!valid.length) { showToast('Tidak ada baris valid untuk diimpor', 'warning'); return; }
+
+        const created = valid.map(r => buildTicket({
+            customer: r.customer,
+            issue: r.cat.name, type: r.cat.type, priority: r.cat.priority,
+            complaint: r.complaint, notes: r.notes || 'Impor dari Excel.'
+        }));
+
+        tickets = [...created, ...tickets];
+        sessionCount += created.length;
+        document.getElementById('sessionCounter').textContent = sessionCount;
+
+        const skipped = pasteRows.length - valid.length;
+        document.getElementById('pasteArea').value = '';
+        parsePaste();
+        renderQueue();
+        renderGrid();
+
+        showToast(`${created.length} tiket diimpor${skipped ? `, ${skipped} baris dilewati` : ''}`, 'success');
+        switchMode('grid');
+    }
+
+    /* =========================================================================
+     * DRAWER + AKSI ROUTING
+     * ========================================================================= */
+
+    function openDrawer(id) {
+        const t = tickets.find(x => x.id === id);
+        if (!t) return;
+
+        drawerTicketId = id;
+        const c = customerOf(t);
+
+        document.getElementById('dtId').textContent = t.id;
+        document.getElementById('dtType').textContent = `${t.issue} (${t.type})`;
+        document.getElementById('dtCreatedBy').textContent = t.createdBy;
+        document.getElementById('dtCreatedAt').textContent = t.createdAt;
+        document.getElementById('dtComplaint').textContent = t.complaint;
+        document.getElementById('dtNotes').textContent = t.notes;
+
+        const inc = document.getElementById('dtIncident');
+        inc.classList.toggle('hidden', !t.incident);
+        if (t.incident) inc.textContent = t.incident;
+
+        const pri = document.getElementById('dtPriority');
+        pri.textContent = `Prioritas: ${t.priority}`;
+        pri.className = 'px-2 py-0.5 text-[10px] font-bold rounded border ' + (
+            t.priority === 'High' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+            t.priority === 'Medium' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+            'bg-slate-800 text-slate-400 border-slate-700');
+
+        const st = document.getElementById('dtStatus');
+        st.textContent = t.status;
+        st.className = 'px-2.5 py-0.5 text-xs font-bold rounded border ' + (
+            t.cancelled ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+            t.closed ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+            t.handler === 'noc' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+            t.handler === 'fop' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' :
+            'bg-blue-500/20 text-blue-400 border-blue-500/30');
+
+        document.getElementById('dtCustName').textContent = c.name;
+        document.getElementById('dtCustCid').textContent = c.cid;
+        document.getElementById('dtCustPhone').textContent = c.phone;
+        document.getElementById('dtCustPackage').textContent = c.package;
+        document.getElementById('dtCustAddress').textContent = c.address;
+        document.getElementById('dtCustPopOdp').textContent = `${c.pop} / ${c.odp}`;
+        document.getElementById('dtCustOnt').textContent = c.ont;
+
+        document.getElementById('dtHistory').innerHTML = t.history.map(h => `
+            <div class="p-2.5 bg-[#0e1424] border border-whus-border rounded-lg flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold text-[10px]">${h.action}</span>
+                    <p class="text-slate-300 font-medium mt-1 text-[11px]">${h.actor}</p>
+                </div>
+                <span class="text-[10px] text-slate-500 shrink-0">${h.at}</span>
+            </div>`).reverse().join('');
+
+        renderDrawerActions(t);
+
+        document.getElementById('drawerBackdrop').classList.add('backdrop-open');
+        document.getElementById('ticketDrawer').classList.add('drawer-open');
+    }
+
+    /* Tombol aksi mengikuti "siapa yang lagi pegang tiket":
+     *  - handler helpdesk           -> Selesai / ke NOC / ke FOP / Batal
+     *  - handler noc, belum dicek   -> Helpdesk & NOC dua-duanya masih boleh act, plus Oncheck
+     *  - handler noc, sudah dicek   -> Selesai / ke FOP / Kembalikan Helpdesk / Batal
+     *  - handler fop                -> TERMINAL, tidak ada aksi Ticketing
+     */
+    function renderDrawerActions(t) {
+        const box = document.getElementById('dtActions');
+        const note = document.getElementById('dtLockedNote');
+        note.classList.add('hidden');
+
+        if (t.closed || t.cancelled) {
+            box.innerHTML = '<p class="col-span-4 text-[11px] text-slate-500">Tiket sudah final. Tidak ada aksi tersisa.</p>';
+            return;
+        }
+
+        if (t.handler === 'fop') {
+            box.innerHTML = `<p class="col-span-4 text-[11px] text-slate-400">Task FOP: <span class="font-mono text-purple-400">${t.fopTask || 'TFOP-2026-00xx'}</span></p>`;
+            note.classList.remove('hidden');
+            return;
+        }
+
+        const btns = [];
+        btns.push(actionBtn('Selesai', 'fa-check', 'emerald', 'close'));
+
+        if (t.handler === 'helpdesk') {
+            btns.push(actionBtn('Kirim ke NOC', 'fa-network-wired', 'amber', 'noc'));
+        }
+        if (t.handler === 'noc' && !t.nocChecked) {
+            btns.push(actionBtn('Oncheck NOC', 'fa-user-check', 'sky', 'oncheck'));
+        }
+        if (t.handler === 'noc' && t.nocChecked) {
+            btns.push(actionBtn('Kembalikan Helpdesk', 'fa-rotate-left', 'slate', 'return'));
+        }
+        btns.push(actionBtn('Kirim ke FOP', 'fa-user-gear', 'blue', 'fop'));
+        btns.push(actionBtn('Batalkan', 'fa-xmark', 'rose', 'cancel'));
+
+        box.innerHTML = btns.join('');
+    }
+
+    function actionBtn(label, icon, color, action) {
+        return `<button onclick="requestAction('${action}')"
+            class="py-2 px-3 rounded-lg bg-${color}-600 hover:bg-${color}-500 text-white font-bold text-[11px] shadow-md flex items-center justify-center gap-1.5">
+            <i class="fa-solid ${icon} text-[10px]"></i><span>${label}</span></button>`;
+    }
+
+    const ACTION_META = {
+        close:   { title: 'Selesaikan Tiket', sub: 'Tiket ditutup tanpa ke lapangan.', label: 'Catatan penyelesaian', required: false, color: 'emerald', icon: 'fa-check' },
+        noc:     { title: 'Kirim ke NOC',     sub: 'NOC menerima; Helpdesk masih boleh act sampai NOC Oncheck.', label: 'Alasan eskalasi', required: false, color: 'amber', icon: 'fa-network-wired' },
+        oncheck: { title: 'Oncheck NOC',      sub: 'NOC resmi mengambil alih; Helpdesk lepas kendali.', label: 'Catatan', required: false, color: 'sky', icon: 'fa-user-check' },
+        fop:     { title: 'Kirim ke FOP',     sub: 'Task FOP terbentuk. Sisi Ticketing menjadi terminal — tidak bisa dibalik.', label: 'Alasan eskalasi', required: false, color: 'blue', icon: 'fa-user-gear' },
+        return:  { title: 'Kembalikan ke Helpdesk', sub: 'Tiket kembali ke meja Helpdesk.', label: 'Alasan pengembalian', required: true, color: 'slate', icon: 'fa-rotate-left' },
+        cancel:  { title: 'Batalkan Tiket',   sub: 'Pembatalan pra-FOP. Tercatat permanen di riwayat.', label: 'Alasan pembatalan', required: true, color: 'rose', icon: 'fa-xmark' }
+    };
+
+    function requestAction(action) {
+        const meta = ACTION_META[action];
+        openReasonModal(meta, reason => applyAction(action, reason));
+    }
+
+    function applyAction(action, reason) {
+        const t = tickets.find(x => x.id === drawerTicketId);
+        if (!t) return;
+
+        const suffix = reason ? ` — ${reason}` : '';
+
+        if (action === 'close') {
+            t.closed = true; t.status = 'Selesai';
+            t.history.push({ action: 'Diselesaikan' + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        } else if (action === 'noc') {
+            t.handler = 'noc'; t.nocChecked = false; t.status = 'Pending NOC';
+            t.history.push({ action: 'Dieskalasi ke NOC' + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        } else if (action === 'oncheck') {
+            t.nocChecked = true; t.status = 'Ditangani NOC';
+            t.history.push({ action: 'Dicek NOC' + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        } else if (action === 'return') {
+            t.handler = 'helpdesk'; t.nocChecked = false; t.status = 'Ditangani Helpdesk';
+            t.history.push({ action: 'Dikembalikan ke Helpdesk' + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        } else if (action === 'fop') {
+            t.handler = 'fop'; t.status = 'Ditangani FOP';
+            t.fopTask = `TFOP-2026-${String(20 + tickets.length).padStart(4, '0')}`;
+            t.history.push({ action: `Dieskalasi ke FOP — ${t.fopTask}` + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        } else if (action === 'cancel') {
+            t.cancelled = true; t.status = 'Dibatalkan';
+            t.history.push({ action: 'Dibatalkan' + suffix, actor: 'Super Admin (Owner)', at: '29 Juli 2026, 08.35' });
+        }
+
+        renderQueue();
+        renderGrid();
+        openDrawer(t.id);
+        showToast(`${t.id}: ${t.status}`, 'success');
+    }
+
+    function closeDrawer() {
+        drawerTicketId = null;
+        document.getElementById('ticketDrawer').classList.remove('drawer-open');
+        document.getElementById('drawerBackdrop').classList.remove('backdrop-open');
+    }
+
+    /* =========================================================================
+     * MODAL ALASAN
+     * ========================================================================= */
+
+    function openReasonModal(meta, cb) {
+        reasonCallback = cb;
+        document.getElementById('rmTitle').textContent = meta.title;
+        document.getElementById('rmSubtitle').textContent = meta.sub;
+        document.getElementById('rmReasonLabel').textContent = meta.label;
+        document.getElementById('rmRequired').classList.toggle('hidden', !meta.required);
+        document.getElementById('rmReason').value = '';
+        document.getElementById('rmError').classList.add('hidden');
+        document.getElementById('rmIcon').className =
+            `w-9 h-9 rounded-xl flex items-center justify-center bg-${meta.color}-600/20 border border-${meta.color}-500/30 text-${meta.color}-400`;
+        document.getElementById('rmIcon').innerHTML = `<i class="fa-solid ${meta.icon}"></i>`;
+
+        const confirm = document.getElementById('rmConfirm');
+        confirm.className = `px-4 py-1.5 rounded-lg text-white text-xs font-bold bg-${meta.color}-600 hover:bg-${meta.color}-500`;
+        confirm.onclick = () => {
+            const reason = document.getElementById('rmReason').value.trim();
+            if (meta.required && !reason) {
+                document.getElementById('rmError').classList.remove('hidden');
+                return;
+            }
+            closeReasonModal();
+            reasonCallback?.(reason);
+        };
+
+        document.getElementById('reasonModal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('rmReason').focus(), 50);
+    }
+
+    function closeReasonModal() {
+        document.getElementById('reasonModal').classList.add('hidden');
+        reasonCallback = null;
+    }
+
+    function openShortcutHelp() { document.getElementById('shortcutModal').classList.remove('hidden'); }
+    function closeShortcutHelp() { document.getElementById('shortcutModal').classList.add('hidden'); }
+
+    /* =========================================================================
+     * EXPORT & TOAST
+     * ========================================================================= */
+
+    function exportToCSV() {
+        let csv = 'data:text/csv;charset=utf-8,ID,Insiden,Pelanggan,CID,Kategori,Tipe,Prioritas,POP,Keluhan,Catatan,Status\n';
+        tickets.forEach(t => {
+            const c = customerOf(t);
+            csv += `"${t.id}","${t.incident || ''}","${c.name}","${c.cid}","${t.issue}","${t.type}","${t.priority}","${c.pop}","${t.complaint}","${t.notes}","${t.status}"\n`;
+        });
+        const link = document.createElement('a');
+        link.setAttribute('href', encodeURI(csv));
+        link.setAttribute('download', 'WHUSNET_Worksheet_Ticketing.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Worksheet diekspor ke CSV', 'success');
+    }
+
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+
+        let cls = 'bg-slate-800 border-slate-700 text-slate-200';
+        let icon = 'fa-circle-info text-blue-400';
+        if (type === 'success') { cls = 'bg-emerald-950/95 border-emerald-700/60 text-emerald-200'; icon = 'fa-circle-check text-emerald-400'; }
+        if (type === 'warning') { cls = 'bg-amber-950/95 border-amber-700/60 text-amber-200'; icon = 'fa-triangle-exclamation text-amber-400'; }
+        if (type === 'danger')  { cls = 'bg-rose-950/95 border-rose-700/60 text-rose-300'; icon = 'fa-circle-xmark text-rose-400'; }
+
+        toast.className = `pointer-events-auto px-4 py-3 rounded-lg border shadow-xl flex items-center gap-3 text-xs font-medium transition-all duration-300 transform translate-x-10 opacity-0 ${cls}`;
+        toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i><span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => toast.classList.remove('translate-x-10', 'opacity-0'), 10);
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-10');
+            setTimeout(() => toast.remove(), 300);
+        }, 3200);
+    }
+    </script>
+</body>
+</html>

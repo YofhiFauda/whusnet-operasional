@@ -378,7 +378,11 @@ class Customer extends Model
         }
 
         if (in_array($status, ['active', 'suspended'], true)) {
-            if ($this->distribution_id && $this->cid) {
+            // Sejajarkan dengan Pop::resolveDisplayId(): yang menentukan ini
+            // CID-nya sudah ada atau belum, BUKAN distribution_id. Pelanggan
+            // legacy ber-CID "XX" (distribusi tak diketahui) tetap menampilkan
+            // CID, jadi labelnya juga harus "CID" — bukan "ID".
+            if ($this->cid) {
                 return 'CID';
             }
 

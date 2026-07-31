@@ -1161,8 +1161,10 @@ class FopTaskController extends Controller
         }
 
         // --- 2. Auto-Sync Installation ---
+        // 'latestSurvey' ikut di-eager-load karena tanggal request pemasangan
+        // pelanggan disimpan di sana (customer_surveys.requested_installation_date).
         $installCustomers = Customer::whereIn('status', ['waiting_installation', 'waiting_installations', 'surveyed'])
-            ->with('pop')
+            ->with(['pop', 'latestSurvey'])
             ->whereDoesntHave('fopTasks', function ($q) {
                 $q->where('category', TaskType::PEMASANGAN->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
@@ -1181,12 +1183,40 @@ class FopTaskController extends Controller
                 'issue' => 'Auto-Sync dari antrean pemasangan',
                 'status' => TaskStatus::DRAFT,
                 'priority' => FopTaskPriority::MEDIUM, // will be recalculated below
+                'client_request_date' => $c->latestSurvey?->requested_installation_date,
             ]);
+        }
+
+        // --- 2b. Refresh tanggal request pemasangan ---
+        // client_request_date pada task PEMASANGAN adalah nilai TURUNAN dari
+        // customer_surveys.requested_installation_date — bukan data milik FopTask.
+        // Di-refresh tiap sync karena FopTaskController::update() sengaja me-null-kan
+        // field ini tiap status keluar dari Pending. Tanpa langkah ini, tanggal
+        // request pelanggan hilang begitu FOP menjadwalkan task, dan urutan papan
+        // (orderByRaw client_request_date di index()) langsung salah.
+        //
+        // Jalur Pending manual untuk kategori NON-Pemasangan tidak tersentuh —
+        // di sana client_request_date tetap milik FOP sepenuhnya.
+        $psbTasks = FopTask::with('customer.latestSurvey')
+            ->where('category', TaskType::PEMASANGAN->value)
+            ->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])
+            ->whereNotNull('customer_id')
+            ->get();
+
+        foreach ($psbTasks as $task) {
+            $requested = $task->customer?->latestSurvey?->requested_installation_date;
+
+            $current = $task->client_request_date?->toDateString();
+            $target = $requested?->toDateString();
+
+            if ($current !== $target) {
+                $task->update(['client_request_date' => $requested]);
+            }
         }
 
         // --- 3. Dynamic Priority Update ---
         // Menggunakan eager loading (N+1 safe) agar query tidak dilooping
-        $activeTasks = FopTask::with(['customer.tasks' => function ($q) {
+        $activeTasks = FopTask::with(['task:id,scheduled_at', 'customer.tasks' => function ($q) {
             $q->where('task_type', TaskType::SURVEY->value)
                 ->where('status', TaskStatus::SELESAI->value)
                 ->orderByDesc('completed_at');
@@ -1204,6 +1234,22 @@ class FopTaskController extends Controller
                 continue;
             }
 
+            // Task yang tanggal request pelanggannya masih di masa depan TIDAK
+            // dihitung SLA-nya. Pelanggan sendiri yang minta tanggal itu, jadi
+            // "telat" belum punya arti sampai harinya tiba. Tanpa guard ini, PSB
+            // request 3 minggu ke depan naik jadi URGENT dalam beberapa hari dan
+            // menutupi task yang benar-benar harus dikerjakan hari ini.
+            //
+            // Kondisinya diambil dari FopTask (bukan ditulis ulang di sini) supaya
+            // badge prioritas dan countdown timer gak pernah pakai syarat beda.
+            if ($task->isScheduledForFutureClientDate()) {
+                if ($task->priority !== FopTaskPriority::LOW) {
+                    $task->update(['priority' => FopTaskPriority::LOW]);
+                }
+
+                continue;
+            }
+
             $totalSeconds = 0;
             $remainSeconds = 0;
 
@@ -1217,13 +1263,23 @@ class FopTaskController extends Controller
                 $totalSeconds = $slaHours * 3600;
                 $remainSeconds = -$deadline->diffInSeconds($now, false);
             } elseif ($task->category === TaskType::PEMASANGAN) {
-                $slaHours = $task->category->defaultHandlingSlaHours();
-                // Ambil task survey dari relation yang sudah di-eager load (bukan query baru)
-                $surveyTask = $customer->tasks->first();
+                if ($task->usesClientRequestDeadline()) {
+                    // Tanggal request pelanggan sudah tiba/lewat. Deadline & durasinya
+                    // diambil dari FopTask (endOfDay tanggal request, jendela 1 hari)
+                    // supaya identik dengan angka yang ditampilkan countdown timer.
+                    // Kalau dihitung ulang di sini, prioritas dan timer bisa beda.
+                    $deadline = $task->slaDeadline();
+                    $totalSeconds = $task->slaTotalSeconds();
+                } else {
+                    $slaHours = $task->category->defaultHandlingSlaHours();
+                    // Ambil task survey dari relation yang sudah di-eager load (bukan query baru)
+                    $surveyTask = $customer->tasks->first();
 
-                $refDate = $surveyTask?->completed_at ? Carbon::parse($surveyTask->completed_at) : Carbon::parse($customer->updated_at);
-                $deadline = $refDate->addHours($slaHours);
-                $totalSeconds = $slaHours * 3600;
+                    $refDate = $surveyTask?->completed_at ? Carbon::parse($surveyTask->completed_at) : Carbon::parse($customer->updated_at);
+                    $deadline = $refDate->addHours($slaHours);
+                    $totalSeconds = $slaHours * 3600;
+                }
+
                 $remainSeconds = -$deadline->diffInSeconds($now, false);
             }
 

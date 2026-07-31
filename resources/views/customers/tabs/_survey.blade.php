@@ -124,6 +124,12 @@
                             <span class="text-text-muted">ODP Terdekat</span>
                             <span class="font-semibold text-text-main">{{ $survey->nearest_odp ?? '-' }}</span>
                         </div>
+                        @if($survey->requested_installation_date)
+                        <div class="flex justify-between border-b border-border py-1">
+                            <span class="text-text-muted">Request Pemasangan</span>
+                            <span class="font-semibold text-text-main font-mono">{{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}</span>
+                        </div>
+                        @endif
                         @if($survey->assigned_at)
                         <div class="flex justify-between border-b border-border py-1">
                             <span class="text-text-muted">Tanggal Penugasan FOP</span>
@@ -154,8 +160,29 @@
                             <span class="font-semibold text-text-main">{{ $survey->surveyors }}</span>
                         </div>
                         @endif
+                        @php
+                            // Estimasi material dicari lewat customer_id, bukan lewat $survey:
+                            // barisnya menempel di FopTask Survey, sementara halaman ini
+                            // bicara soal pelanggan. Lihat TaskMaterialService.
+                            $estimasiMaterial = \App\Models\TaskMaterial::where('customer_id', $customer->id)
+                                ->estimasi()->orderBy('id')->get();
+                        @endphp
+                        @if($estimasiMaterial->isNotEmpty())
                         <div class="pt-2">
-                            <span class="block text-text-muted mb-1">Kebutuhan Alat:</span>
+                            <span class="block text-text-muted mb-1">Estimasi Kebutuhan Alat:</span>
+                            <div class="rounded border border-border overflow-hidden">
+                                @foreach($estimasiMaterial as $material)
+                                <div class="flex justify-between px-3 py-1.5 {{ $loop->even ? 'bg-surface-muted' : '' }}">
+                                    <span class="text-text-secondary">{{ $material->item_name }}</span>
+                                    <span class="font-mono font-semibold text-text-main">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endif
+
+                        <div class="pt-2">
+                            <span class="block text-text-muted mb-1">Alat Khusus / Kendala Peralatan:</span>
                             <p class="p-3 bg-surface-muted rounded border border-border italic">{{ $survey->required_tools ?? 'Tidak ada catatan' }}</p>
                         </div>
                         <div class="pt-2">

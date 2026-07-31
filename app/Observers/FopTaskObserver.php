@@ -34,13 +34,19 @@ class FopTaskObserver
             return;
         }
 
-        if ($fopTask->status !== TaskStatus::DIBATALKAN) {
-            return;
-        }
-
         $ticket = Ticket::where('fop_task_id', $fopTask->id)->first();
 
         if (! $ticket) {
+            return;
+        }
+
+        // CATATAN: observer ini SENGAJA gak nyentuh `tickets.resolved_at`.
+        // Sempat begitu (diisi dari `tasks.completed_at` waktu FopTask selesai),
+        // tapi dibatalkan: History Ticketing berhenti di titik penyerahan ke
+        // FOP — progres lapangan bukan urusan modul Ticketing. Waktunya ditulis
+        // sekali di TicketService::escalateToFop() dan gak berubah lagi setelah
+        // itu (docs/plan/analisa-halaman-history-ticketing.md §4.1).
+        if ($fopTask->status !== TaskStatus::DIBATALKAN) {
             return;
         }
 

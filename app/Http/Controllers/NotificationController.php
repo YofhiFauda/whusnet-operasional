@@ -21,7 +21,7 @@ class NotificationController extends Controller
         $allowedPopIds = app(EffectiveAccessService::class)->getAllowedPopIds($user);
         $scopeType = app(EffectiveAccessService::class)->getScopeType($user);
 
-        $query = DatabaseNotification::query();
+        $query = DatabaseNotification::with('notifiable');
 
         // POP Scope Enforcement
         if ($scopeType !== ScopeType::ALL_POP) {

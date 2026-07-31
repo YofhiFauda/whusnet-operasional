@@ -54,7 +54,10 @@ class TicketService
                 // 'pop' WAJIB ikut — Customer::getDisplayIdAttribute() butuh
                 // relasi ini buat resolve CID (lihat syncToFopTask() & bug CID
                 // yang sama di docs/ticketing/business-logic.md §7).
-                ->with(['internetPackage', 'customerDevice', 'pop'])
+                // 'village' dipakai snapshotCustomer() buat kolom
+                // customer_village — tanpa eager load ini nilainya diam-diam
+                // null (preventLazyLoading aktif di test).
+                ->with(['internetPackage', 'customerDevice', 'pop', 'village'])
                 ->whereKey($data['customer_id'])
                 ->firstOrFail();
 
@@ -90,6 +93,10 @@ class TicketService
 
                 $ticket->fop_task_id = $fopTask->id;
                 $ticket->handler = TicketHandler::FOP;
+                // Submit langsung dari halaman Task FOP — tiket lahir DAN
+                // langsung diserahkan, jadi waktu lepas dari meja Ticketing =
+                // waktu dibuat (lihat catatan `resolved_at` di escalateToFop()).
+                $ticket->resolved_at = now();
                 $ticket->save();
 
                 if (! empty($assignment['technicians'])) {
@@ -143,10 +150,14 @@ class TicketService
 
             $this->assertActorOwnsTicket($ticket, $actor);
             $this->assertTicketStillOpen($ticket);
-            $this->assertNocCheckedBeforeClose($ticket, $actor);
 
             $fromHandler = $ticket->handler->value;
             $ticket->status = TicketHandlingStatus::CLOSED;
+            // `resolved_at` = kapan tiket LEPAS dari meja Ticketing. Di sini
+            // artinya beneran selesai (Helpdesk/NOC nutup sendiri); jalur FOP
+            // nulis kolom yang sama di escalateToFop() dengan arti "diserahkan".
+            // Lihat docs/plan/analisa-halaman-history-ticketing.md §4.1.
+            $ticket->resolved_at = now();
             $ticket->save();
 
             $ticket->histories()->create([
@@ -225,71 +236,17 @@ class TicketService
             }
 
             $fromHandler = $ticket->handler->value;
+            // Begitu dikirim ke NOC, tiket LANGSUNG berstatus diproses NOC.
+            // Gak ada lagi window "Pending NOC" + aksi Oncheck (dihapus
+            // 2026-07-29, ADHOC-06) — dulu tiket nyangkut di limbo sampai NOC
+            // menekan Oncheck, padahal pada praktiknya assign = mulai kerja.
+            // Helpdesk TETAP boleh act atas tiket ini (lihat holderRoles()).
             $ticket->handler = TicketHandler::NOC;
-            // Window "pending NOC" mulai dari sini — null berarti NOC belum
-            // resmi ambil alih (lihat onCheckNoc()), Helpdesk MASIH boleh
-            // act (assertActorOwnsTicket() izinin dua-duanya selama null).
-            $ticket->noc_checked_at = null;
             $ticket->save();
 
             $ticket->histories()->create([
                 'action' => TicketHistoryAction::DIESKALASI,
                 'from_status' => $fromHandler,
-                'to_status' => TicketHandler::NOC->value,
-                'reason' => $reason,
-                'actor_id' => $actor->id,
-                'happened_at' => now(),
-            ]);
-
-            return $ticket->fresh();
-        });
-
-        broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
-
-        return $ticket;
-    }
-
-    /**
-     * NOC resmi ambil alih tiket yang lagi "pending" (baru dikirim Helpdesk,
-     * belum di-check). Sebelum ini, Helpdesk MASIH pegang kendali penuh
-     * (assertActorOwnsTicket() izinin helpdesk & noc dua-duanya). Begitu
-     * di-check, Helpdesk kehilangan akses — cuma NOC yang bisa lanjut.
-     *
-     * Guard beda dari close()/escalate() lain: BUKAN assertActorOwnsTicket()
-     * biasa (yang di window pending justru izinin helpdesk JUGA) — aksi ini
-     * spesifik cuma buat NOC, gak peduli window pending atau enggak.
-     */
-    public function onCheckNoc(Ticket $ticket, User $actor, ?string $reason = null): Ticket
-    {
-        $ticket = DB::transaction(function () use ($ticket, $actor, $reason) {
-            $ticket = Ticket::whereKey($ticket->id)->lockForUpdate()->firstOrFail();
-
-            $this->assertTicketStillOpen($ticket);
-
-            if ($ticket->handler !== TicketHandler::NOC) {
-                throw ValidationException::withMessages([
-                    'target' => 'Cuma tiket yang lagi di tangan NOC yang bisa di-check.',
-                ]);
-            }
-
-            if (! $actor->hasFullAccess() && ! $actor->hasRole('noc')) {
-                throw ValidationException::withMessages([
-                    'target' => 'Cuma NOC yang bisa Oncheck tiket ini.',
-                ]);
-            }
-
-            if ($ticket->noc_checked_at !== null) {
-                throw ValidationException::withMessages([
-                    'target' => 'Tiket ini udah di-check NOC.',
-                ]);
-            }
-
-            $ticket->noc_checked_at = now();
-            $ticket->save();
-
-            $ticket->histories()->create([
-                'action' => TicketHistoryAction::DICEK_NOC,
-                'from_status' => TicketHandler::NOC->value,
                 'to_status' => TicketHandler::NOC->value,
                 'reason' => $reason,
                 'actor_id' => $actor->id,
@@ -327,6 +284,12 @@ class TicketService
 
             $ticket->fop_task_id = $fopTask->id;
             $ticket->handler = TicketHandler::FOP;
+            // Titik ini = akhir keterlibatan Ticketing atas tiket ini, jadi
+            // `resolved_at` diisi SEKALI di sini dan gak berubah lagi walau
+            // task lapangannya nanti selesai/dibatalkan. History Ticketing
+            // memang berhenti di "Assign FOP" — progres lapangan diukur di
+            // modul FOP (SLA pengerjaan), bukan di sini.
+            $ticket->resolved_at = now();
             $ticket->save();
 
             $ticket->histories()->create([
@@ -370,9 +333,6 @@ class TicketService
 
             $fromHandler = $ticket->handler->value;
             $ticket->handler = TicketHandler::HELPDESK;
-            // Reset — kalau dikirim ulang ke NOC belakangan, window pending
-            // harus fresh lagi, bukan mewarisi status checked yang lama.
-            $ticket->noc_checked_at = null;
             $ticket->save();
 
             $ticket->histories()->create([
@@ -393,14 +353,13 @@ class TicketService
     }
 
     /**
-     * Cuma pihak yang lagi pegang tiket yang boleh close/escalate — Helpdesk
-     * gak boleh utak-atik tiket yang udah dilempar ke NOC, begitu juga
-     * sebaliknya. Full-access (owner/admin) dibebaskan dari batasan ini.
+     * Cuma pihak yang lagi pegang tiket yang boleh close/escalate. Daftar role
+     * yang sah datang dari Ticket::holderRoles() — SATU-SATUNYA sumbernya,
+     * jangan diduplikasi di sini. Full-access (owner/admin) dibebaskan.
      *
-     * Pengecualian window "pending NOC": begitu Helpdesk kirim ke NOC tapi
-     * NOC BELUM Oncheck (`noc_checked_at` null), Helpdesk MASIH boleh act —
-     * dua role (`helpdesk` + `noc`) sama-sama valid di window ini. Begitu
-     * NOC Oncheck, cuma `noc` yang lolos (lihat holderRoles()).
+     * Tiket di tangan NOC dipegang BERSAMA `helpdesk` + `noc` (keputusan
+     * ADHOC-06, 2026-07-29): Helpdesk yang mengirim tetap boleh
+     * menyelesaikan/membatalkan tiketnya sendiri walau sudah diproses NOC.
      */
     private function assertActorOwnsTicket(Ticket $ticket, User $actor): void
     {
@@ -413,26 +372,6 @@ class TicketService
         if (empty($expectedRoles) || ! collect($expectedRoles)->contains(fn ($role) => $actor->hasRole($role))) {
             throw ValidationException::withMessages([
                 'target' => 'Tiket ini bukan di tangan Anda — cuma pihak yang lagi menangani yang bisa selesaikan/kirim tiket ini.',
-            ]);
-        }
-    }
-
-    /**
-     * NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket — gak boleh
-     * langsung Close dari tab "Ticket Masuk" (pending, belum di-check).
-     * Cuma berlaku buat role `noc` non-full-access; Helpdesk yang close
-     * tiketnya sendiri (baik masih di dia, atau masih window pending-NOC)
-     * gak kena guard ini.
-     */
-    private function assertNocCheckedBeforeClose(Ticket $ticket, User $actor): void
-    {
-        if ($actor->hasFullAccess() || ! $actor->hasRole('noc')) {
-            return;
-        }
-
-        if ($ticket->handler === TicketHandler::NOC && $ticket->noc_checked_at === null) {
-            throw ValidationException::withMessages([
-                'target' => 'NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket ini.',
             ]);
         }
     }
@@ -548,6 +487,10 @@ class TicketService
 
         $ticket->customer_name = $customer->full_name;
         $ticket->customer_address = $customer->address;
+        // Desa ikut di-snapshot, BUKAN dibaca lewat relasi waktu ditampilkan —
+        // pelanggan bisa pindah desa dan rekap bulan lalu gak boleh ikut berubah
+        // (docs/plan/analisa-halaman-history-ticketing.md §4.2).
+        $ticket->customer_village = $customer->village?->name;
         $ticket->customer_phone = $customer->primary_phone;
         $ticket->customer_odp = $customer->odp_code ?: $device?->odp;
         $ticket->customer_package = $customer->internetPackage?->name;

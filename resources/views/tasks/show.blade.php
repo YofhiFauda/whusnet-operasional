@@ -276,6 +276,13 @@
                                     <span class="font-semibold text-text-main text-xs mt-0.5 block font-ui">{{ $survey->required_tools ?: 'Standar' }}</span>
                                 </div>
                             </div>
+                            @if($survey->requested_installation_date)
+                            {{-- Tanggal yang diminta pelanggan — teknisi perlu tahu supaya
+                                 tidak datang di hari yang salah. --}}
+                            <p class="text-[11px] mt-1.5 font-ui font-semibold" style="color:var(--color-info, #0284c7)">
+                                Pelanggan meminta dipasang: {{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}
+                            </p>
+                            @endif
                             @if($survey->survey_note)
                             <p class="text-[11px] text-text-secondary mt-1.5 italic font-ui">"{{ $survey->survey_note }}"</p>
                             @endif
@@ -283,6 +290,27 @@
                             <p class="text-[11px] text-warning font-ui">Data hasil survey sebelumnya belum tercatat di sistem.</p>
                             @endif
                         </div>
+
+                        @php
+                            $estimasiMaterial = $task->customer
+                                ? \App\Models\TaskMaterial::where('customer_id', $task->customer->id)->estimasi()->orderBy('id')->get()
+                                : collect();
+                        @endphp
+                        @if($estimasiMaterial->isNotEmpty())
+                        {{-- Daftar material yang diestimasi surveyor — dibawa teknisi ke
+                             lapangan, dan jadi baris awal di form Laporan Pemasangan. --}}
+                        <div class="pt-3 border-t border-border">
+                            <span class="block text-[9px] font-semibold text-text-muted uppercase mb-1.5 font-ui">Estimasi Kebutuhan Alat</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                @foreach($estimasiMaterial as $material)
+                                <div class="flex justify-between border-b border-border py-1">
+                                    <span class="text-text-secondary font-ui">{{ $material->item_name }}</span>
+                                    <span class="font-mono font-bold text-text-main">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endif
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-border text-xs">
                             <div>

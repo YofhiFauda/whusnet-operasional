@@ -29,16 +29,6 @@
             </div>
             <p class="text-xs text-text-muted mt-1 font-medium">{{ $activeBucket->description() }}</p>
         </div>
-
-        @if(auth()->user()->hasPermission('tickets.create'))
-        <a href="{{ route('tickets.create') }}"
-           class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider shadow-md shadow-sky-600/20 hover:bg-sky-700 transition-all cursor-pointer">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            New Ticket
-        </a>
-        @endif
     </div>
 
     {{--
@@ -117,7 +107,7 @@
             @php
                 $borderAccent = $ticket->bucket()->borderAccentClasses();
                 $ticketActions = $ticket->actionFlagsFor(auth()->user());
-                $hasActions = $ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'] || $ticketActions['can_oncheck_noc'];
+                $hasActions = $ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'];
             @endphp
 
             <div class="flex flex-col border-l-4 {{ $borderAccent }} group" data-ticket-row="{{ $ticket->id }}">
@@ -249,14 +239,6 @@
                 --}}
                 @if($hasActions)
                 <div class="flex items-center gap-2 px-4 pb-3 pl-[4.4rem]">
-                    @if($ticketActions['can_oncheck_noc'])
-                    <button type="button"
-                            onclick="confirmTicketRowAction(this, '{{ route('tickets.oncheck-noc', $ticket) }}', {}, 'Oncheck NOC', 'Catatan (opsional)', false, 'Ambil alih tiket {{ $ticket->ticket_number }}?')"
-                            class="px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
-                        Oncheck NOC
-                    </button>
-                    @endif
-
                     @if($ticketActions['can_close'])
                     <button type="button"
                             onclick="confirmTicketRowAction(this, '{{ route('tickets.close', $ticket) }}', {}, 'Selesaikan Tiket', 'Apa yang sudah dikerjakan? (opsional)', false, 'Tandai tiket {{ $ticket->ticket_number }} selesai?')"

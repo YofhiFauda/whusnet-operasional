@@ -301,8 +301,16 @@
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Kebutuhan FOP / Tiang</span>
                         <span class="block text-sm text-text-main">{{ $survey->fop_id ?? '-' }}</span>
                     </div>
+                    @if($survey->requested_installation_date)
+                    <div>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Request Pemasangan Pelanggan</span>
+                        <span class="block text-sm font-mono font-bold text-text-main">{{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}</span>
+                    </div>
+                    @endif
                     <div class="md:col-span-3">
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alat Tambahan / Kebutuhan Material</span>
+                        {{-- Catatan alat kerja non-material. Material habis pakai ada di
+                             tabel Estimasi vs Terpakai di bawah. --}}
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alat Khusus / Kendala Peralatan</span>
                         <p class="text-sm text-text-secondary whitespace-pre-wrap">{{ $survey->required_tools ?? '-' }}</p>
                     </div>
                     @if($survey->survey_note)
@@ -465,6 +473,45 @@
                     </div>
                 </div>
             </div>
+
+            {{-- MATERIAL: ESTIMASI VS TERPAKAI --}}
+            {{-- Selisih besar = estimasi survey meleset atau pemakaian tidak wajar.
+                 Dua-duanya keputusan admin verifikasi, bukan sistem — makanya
+                 ditampilkan apa adanya tanpa ambang otomatis. --}}
+            @if(!empty($materialVariance))
+            <div class="mb-6">
+                <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Material — Estimasi vs Terpakai
+                </h4>
+                <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-5 overflow-x-auto">
+                    <table class="w-full text-sm min-w-[480px]">
+                        <thead>
+                            <tr class="text-[10px] font-bold uppercase tracking-wider text-text-muted border-b border-border">
+                                <th class="text-left pb-2">Barang</th>
+                                <th class="text-right pb-2">Estimasi</th>
+                                <th class="text-right pb-2">Terpakai</th>
+                                <th class="text-right pb-2">Selisih</th>
+                                <th class="text-left pb-2 pl-4">Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            @foreach($materialVariance as $row)
+                            <tr>
+                                <td class="py-2 text-text-main font-medium">{{ $row['label'] }}</td>
+                                <td class="py-2 text-right font-mono text-text-muted">{{ rtrim(rtrim(number_format($row['estimasi'], 2, ',', '.'), '0'), ',') }}</td>
+                                <td class="py-2 text-right font-mono text-text-main font-semibold">{{ rtrim(rtrim(number_format($row['terpakai'], 2, ',', '.'), '0'), ',') }}</td>
+                                <td class="py-2 text-right font-mono font-semibold {{ $row['selisih'] > 0 ? 'text-error' : ($row['selisih'] < 0 ? 'text-success' : 'text-text-muted') }}">
+                                    {{ $row['selisih'] > 0 ? '+' : '' }}{{ rtrim(rtrim(number_format($row['selisih'], 2, ',', '.'), '0'), ',') }}
+                                </td>
+                                <td class="py-2 pl-4 text-text-muted">{{ $row['unit'] }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
 
             {{-- DATA JARINGAN / ODP / OLT --}}
             <div class="mb-6">

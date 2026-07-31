@@ -86,8 +86,7 @@ class TicketingRbacTest extends TestCase
     {
         return [
             'New Ticket' => ['tickets.create', 'tickets.create'],
-            'Worksheet NOC — Masuk' => ['noc.worksheet.masuk', 'noc_worksheet.masuk.view'],
-            'Worksheet NOC — Diproses' => ['noc.worksheet.diproses', 'noc_worksheet.diproses.view'],
+            'Worksheet NOC' => ['noc.worksheet', 'noc_worksheet.view'],
             'Dashboard NOC' => ['noc.dashboard', 'noc_dashboard.view'],
             'Ticket Selesai' => ['tickets.selesai', 'tickets.selesai.view'],
             'Ticket Dibatalkan' => ['tickets.dibatalkan', 'tickets.dibatalkan.view'],
@@ -161,8 +160,7 @@ class TicketingRbacTest extends TestCase
     {
         $noc = $this->makeUser('noc');
 
-        $this->actingAs($noc)->get(route('noc.worksheet.masuk'))->assertOk();
-        $this->actingAs($noc)->get(route('noc.worksheet.diproses'))->assertOk();
+        $this->actingAs($noc)->get(route('noc.worksheet'))->assertOk();
         $this->actingAs($noc)->get(route('noc.dashboard'))->assertOk();
         $this->actingAs($noc)->get(route('tickets.create'))->assertOk();
     }
@@ -179,7 +177,7 @@ class TicketingRbacTest extends TestCase
         $this->actingAs($helpdesk)->get(route('tickets.selesai'))->assertOk();
         $this->actingAs($helpdesk)->get(route('tickets.dibatalkan'))->assertOk();
 
-        $this->actingAs($helpdesk)->get(route('noc.worksheet.masuk'))->assertForbidden();
+        $this->actingAs($helpdesk)->get(route('noc.worksheet'))->assertForbidden();
         $this->actingAs($helpdesk)->get(route('noc.dashboard'))->assertForbidden();
     }
 
@@ -195,38 +193,22 @@ class TicketingRbacTest extends TestCase
         $this->actingAs($atasan)->get(route('tickets.selesai'))->assertOk();
         $this->actingAs($atasan)->get(route('tickets.dibatalkan'))->assertOk();
 
-        $this->actingAs($atasan)->get(route('noc.worksheet.masuk'))->assertForbidden();
+        $this->actingAs($atasan)->get(route('noc.worksheet'))->assertForbidden();
         $this->actingAs($atasan)->get(route('tickets.create'))->assertForbidden();
     }
 
     /**
-     * Entry point Worksheet NOC nyesuain permission — kalau user cuma boleh
-     * tab Diproses, dia dilempar ke sana (bukan 403 gara-gara default-nya
-     * nunjuk tab Masuk).
+     * Worksheet NOC jadi SATU halaman tanpa tab (ADHOC-06) — gerbangnya
+     * `noc_worksheet.view`. Dua permission tab lama dipensiunkan: masih ada di
+     * DB (biar role yang terlanjur punya gak error) tapi gak lagi membuka
+     * halaman apa pun sendirian.
      */
-    public function test_worksheet_entry_point_follows_available_permission(): void
+    public function test_worksheet_is_gated_by_root_permission_only(): void
     {
         $user = $this->makeUser('noc');
-        $this->revokePermission($user, 'noc_worksheet.masuk.view');
+        $this->revokePermission($user, 'noc_worksheet.view');
 
-        $this->actingAs($user)
-            ->get(route('noc.worksheet'))
-            ->assertRedirect(route('noc.worksheet.diproses'));
-    }
-
-    /**
-     * Tab yang gak boleh diakses juga gak dirender navigasinya — bukan cuma
-     * ditolak pas diklik.
-     */
-    public function test_forbidden_tab_is_not_rendered_in_navigation(): void
-    {
-        $user = $this->makeUser('noc');
-        $this->revokePermission($user, 'noc_worksheet.diproses.view');
-
-        $this->actingAs($user)
-            ->get(route('noc.worksheet.masuk'))
-            ->assertOk()
-            ->assertDontSee(route('noc.worksheet.diproses'), false);
+        $this->actingAs($user)->get(route('noc.worksheet'))->assertForbidden();
     }
 
     public function test_forbidden_archive_page_is_not_rendered_in_navigation(): void

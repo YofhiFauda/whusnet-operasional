@@ -12,6 +12,7 @@ use App\Models\Ticket;
 use App\Models\TicketAttachment;
 use App\Models\TicketIssueCategory;
 use App\Services\TicketService;
+use App\Support\IndonesianDate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,7 +104,10 @@ class TicketController extends Controller
             ->applyUserScope()
             ->activeForWorksheet()
             ->with([
-                'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id',
+                // primary_phone/address/odp_code ikut di-select karena kartu &
+                // tabel worksheet nampilin kontak + lokasi; tanpa itu nilainya
+                // null dan diam-diam jatuh ke snapshot tiket.
+                'customer:id,full_name,cid,customer_code,pop_id,status,distribution_id,primary_phone,address,odp_code',
                 'customer.pop:id,name,cid_prefix',
                 'issueCategory:id,name',
                 'fopTask:id,task_number,status',
@@ -145,10 +149,21 @@ class TicketController extends Controller
             'title' => $ticket->issueCategory?->name ?? Str::limit($ticket->detail_keluhan, 60),
             'desc' => $ticket->detail_keluhan,
             'time' => $ticket->created_at->diffForHumans(),
+            // `time` = relatif ("2 menit lalu"), `time_at` = jam absolut. Tabel
+            // worksheet nampilin dua-duanya sebaris — relatif buat rasa urgensi,
+            // absolut buat dicocokin sama log/chat pelanggan.
+            'time_at' => $ticket->created_at->format('H:i:s'),
             'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code) ?: '—',
             'customer_name' => $customer?->full_name ?? $ticket->customer_name ?? '—',
             'customer_phone' => $customer?->primary_phone ?? $ticket->customer_phone ?? '—',
+            // Kolom "Lokasi / POP / ODP" di tabel worksheet. Snapshot tiket
+            // didahulukan (customer_odp/customer_address) — itu kondisi saat
+            // tiket dibuat; data pelanggan bisa udah berubah sejak itu.
+            'pop' => $customer?->pop?->name ?: '—',
+            'odp' => $ticket->customer_odp ?: ($customer?->odp_code ?: '—'),
+            'address' => $ticket->customer_address ?: ($customer?->address ?: '—'),
             'issue_category' => $ticket->issueCategory?->name,
+            'status_label' => $ticket->statusLabel(),
             'bucket' => $ticket->bucket()->value,
             'handler' => $ticket->handler->value,
             'actions' => $ticket->actionFlagsFor(auth()->user()),
@@ -161,6 +176,102 @@ class TicketController extends Controller
             'escalated_fop_by' => $ticket->escalatedToFopBy()?->name,
             'returned_to_helpdesk_by' => $ticket->returnedToHelpdeskBy()?->name,
         ];
+    }
+
+    /**
+     * Detail tiket buat **drawer kanan** di Worksheet Helpdesk & Worksheet NOC —
+     * dua halaman kerja itu gak boleh melempar user ke halaman baru cuma buat
+     * baca detail (navigasi penuh disisakan buat halaman arsip: Ticket Selesai,
+     * Ticket Dibatalkan, History Ticketing).
+     *
+     * SENGAJA endpoint sendiri, BUKAN memperbesar worksheetCardPayload(): payload
+     * kartu dimuat 30 baris sekaligus tiap load halaman, sedangkan riwayat +
+     * lampiran cuma dibutuhin buat SATU tiket yang lagi dibuka.
+     *
+     * Gerbangnya sama dengan show(): `tickets.view` + POP scope.
+     */
+    public function detailJson(Ticket $ticket): JsonResponse
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.view'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        $ticket->load([
+            'customer.pop',
+            'customer.customerDevice',
+            'creator',
+            'pop',
+            'issueCategory',
+            'fopTask.technicians',
+            'fopTask.statusHistories.changedByUser',
+            'attachments.uploader',
+            'histories.actor',
+        ]);
+
+        $customer = $ticket->customer;
+
+        return response()->json([
+            'id' => $ticket->id,
+            'code' => $ticket->ticket_number,
+            'type' => $ticket->type->value,
+            'type_label' => $ticket->type->value.' — '.$ticket->type->label(),
+            'priority' => $ticket->priority?->value,
+            'status_label' => $ticket->statusLabel(),
+            'status_badge' => $ticket->statusBadgeClasses(),
+            'handler_label' => $ticket->handler->label(),
+            'created_by' => $ticket->creator?->name,
+            'created_at' => IndonesianDate::dateTime($ticket->created_at),
+            'resolved_at' => $ticket->resolved_at ? IndonesianDate::dateTime($ticket->resolved_at) : null,
+            'solving_time' => $ticket->solvingTimeLabel(),
+            'fop_task_number' => $ticket->fopTask?->task_number,
+            // Tiket "Terputus" — pernah dieskalasi ke FOP tapi FopTask-nya udah
+            // dihapus (fop_task_id nullOnDelete). WAJIB flag sendiri: begitu
+            // relasinya hilang, `fop_task` DAN `fop_task_number` dua-duanya jadi
+            // null, jadi drawer gak punya cara lain buat bedain "belum pernah ke
+            // FOP" dari "task-nya udah gak ada".
+            'fop_task_orphan' => $ticket->isOrphan(),
+            'fop_task' => $ticket->fopTask ? [
+                'id' => $ticket->fopTask->id,
+                'number' => $ticket->fopTask->task_number,
+                'can_view' => auth()->user()->hasPermission('fop_tasks.view'),
+                'url' => route('fop-tasks.index'),
+                'technicians' => $ticket->fopTask->technicians->pluck('name')->join(', '),
+                'histories' => $ticket->fopTask->statusHistories->map(fn ($h) => [
+                    'label' => $h->label(),
+                    'changed_by' => $h->changedByUser?->name ?? 'Sistem',
+                    'happened_at' => IndonesianDate::dateTime($h->changed_at),
+                ])->all(),
+            ] : null,
+            'issue_category' => $ticket->issueCategory?->name,
+            'customer' => [
+                'name' => $customer?->full_name ?? $ticket->customer_name,
+                'cid' => $customer?->display_id ?: ($customer?->cid ?: $customer?->customer_code),
+                'phone' => $ticket->customer_phone ?: $customer?->primary_phone,
+                'address' => $ticket->customer_address ?: $customer?->address,
+                'village' => $ticket->customer_village,
+                'package' => $ticket->customer_package,
+                'device' => $ticket->customer_device,
+                'odp' => $ticket->customer_odp,
+                'pop' => $ticket->pop?->name ?: $customer?->pop?->name,
+                'maps_url' => $ticket->customerMapsUrl(),
+            ],
+            'detail_keluhan' => $ticket->detail_keluhan,
+            'catatan_teknis' => $ticket->catatan_teknis,
+            'actions' => $ticket->actionFlagsFor(auth()->user()),
+            'attachments' => $ticket->attachments->map(fn (TicketAttachment $attachment) => [
+                'name' => $attachment->original_name,
+                'size' => $attachment->humanSize(),
+                'uploader' => $attachment->uploader?->name ?? 'Sistem',
+                'is_image' => $attachment->isImage(),
+                'url' => route('tickets.attachments.download', $attachment),
+            ])->all(),
+            'histories' => $ticket->histories->map(fn ($history) => [
+                'label' => $history->action->label(),
+                'badge' => $history->action->badgeClasses(),
+                'actor' => $history->actor?->name ?? 'Sistem',
+                'reason' => $history->reason,
+                'happened_at' => IndonesianDate::dateTime($history->happened_at),
+            ])->all(),
+        ]);
     }
 
     public function show(Ticket $ticket)
@@ -331,38 +442,6 @@ class TicketController extends Controller
         } catch (ValidationException $e) {
             return $this->respondToTicketActionError($request, $e);
         }
-
-        if ($request->wantsJson()) {
-            return response()->json([
-                'message' => $message,
-                'ticket' => $this->worksheetCardPayload($ticket->fresh(['customer.pop', 'issueCategory', 'fopTask', 'creator', 'histories.actor'])),
-            ]);
-        }
-
-        return redirect()->route('tickets.show', $ticket)->with('success', $message);
-    }
-
-    /**
-     * NOC resmi ambil alih tiket yang lagi "pending" (baru dikirim Helpdesk,
-     * belum di-check) — sebelum ini Helpdesk masih pegang kendali penuh
-     * (lihat Ticket::holderRoles()/isPendingNoc()).
-     */
-    public function onCheckNoc(Request $request, Ticket $ticket): RedirectResponse|JsonResponse
-    {
-        abort_unless(auth()->user()->hasPermission('tickets.update'), 403);
-        $this->authorizeTicketScope($ticket);
-
-        $validated = $request->validate([
-            'reason' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        try {
-            $this->ticketService->onCheckNoc($ticket, auth()->user(), $validated['reason'] ?? null);
-        } catch (ValidationException $e) {
-            return $this->respondToTicketActionError($request, $e);
-        }
-
-        $message = "Ticket {$ticket->ticket_number} di-check NOC.";
 
         if ($request->wantsJson()) {
             return response()->json([

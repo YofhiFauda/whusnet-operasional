@@ -14,6 +14,7 @@ Untuk mempelajari setiap modul master, silakan buka sub-folder masing-masing yan
 | **POP (Cabang)** | [`docs/master/pop/`](pop/README.md) | Titik Point of Presence untuk RBAC dan prefix id pelanggan. |
 | **Distribusi** | [`docs/master/distribution/`](distribution/README.md) | Kode titik distribusi jaringan — segmen ke-3 di CID pelanggan. |
 | **Master Timeline SLA** | [`docs/master/sla-timeline/`](sla-timeline/README.md) | Batas waktu wajib mulai ditangani per jenis tiket, beda-beda per paket internet. |
+| **Barang / Material** | [`docs/master/item/`](item/README.md) | Daftar barang yang boleh dicatat di Estimasi Kebutuhan Alat & Perangkat Pasif Terpakai. |
 
 Setiap folder di atas minimal memiliki 4 file standar:
 1. `README.md` - Penjelasan umum fitur.

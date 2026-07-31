@@ -943,3 +943,78 @@ html {
   padding-top: 6px;
 }
 
+
+/* ─────────────────────────────────────────────────────────
+   Worksheet Ticketing — animasi kartu antrean
+   Dipakai di resources/views/tickets/create.blade.php. Kartu di-render
+   x-for, jadi transisi Alpine gak kepakai buat item baru; pakai CSS
+   animation + animation-delay per index (stagger) yang di-set inline.
+   ───────────────────────────────────────────────────────── */
+@keyframes ticket-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ticket-card {
+  /* ease-out murni, TANPA overshoot — kurva pegas (0.16,1,0.3,1) sempat
+     dipakai di sini dan bikin kartu kelihatan mantul. */
+  animation: ticket-card-in 260ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/*
+   Grid kartu antrean — jumlah kolom ngikut lebar panel lewat auto-fill,
+   bukan class grid-cols-* yang di-swap Alpine. Waktu panel form dilipat,
+   panel kanan melebar terus-menerus dan kolom nambah sendiri di titik yang
+   pas, jadi gak ada lompatan layout di tengah animasi.
+*/
+.ticket-grid {
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-items: start;
+}
+
+/*
+   Motion panel lipat/buka. Yang dianimasikan cuma `width` + `opacity`
+   dengan kurva ease-in-out standar (tanpa overshoot) dan durasi yang SAMA
+   buat strip & panel form, supaya jumlah lebar keduanya konstan sepanjang
+   animasi — itu kuncinya biar panel kanan gak nyentak/mantul.
+*/
+/* Panel form worksheet: di bawah xl dia OVERLAY yang menggeser (transform),
+   dari xl ke atas dia panel statis yang melebar/menyempit (width). Dua-duanya
+   pakai durasi + easing yang sama, jadi transisinya konsisten di semua lebar
+   layar. `width` sengaja tetap di daftar walau di bawah xl gak dianimasikan —
+   satu kelas buat dua rezim, biar gak ada dua sumber timing. */
+.panel-motion {
+  transition-property: width, transform, opacity;
+  transition-duration: 320ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width, transform;
+}
+
+/* Dipasang sebelum frame pertama selesai — cegah animasi "mental sendiri"
+   pas halaman dimuat dalam kondisi terlipat. */
+.panel-motion-off {
+  transition: none !important;
+}
+
+/* Hormati preferensi OS — animasi masuk, efek angkat, dan animasi panel mati. */
+@media (prefers-reduced-motion: reduce) {
+  .ticket-card {
+    animation: none;
+  }
+
+  .ticket-card:hover {
+    transform: none;
+  }
+
+  .panel-motion {
+    transition: none;
+  }
+}

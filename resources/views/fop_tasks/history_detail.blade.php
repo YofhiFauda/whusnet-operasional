@@ -383,7 +383,9 @@
             @if($survey)
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
                 <div class="col-span-2">
-                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>
+                    {{-- Catatan alat kerja, bukan material habis pakai. Material ada di
+                         daftar Estimasi Kebutuhan Alat di bawah. --}}
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Khusus / Kendala Peralatan</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200">{{ $survey->required_tools ?? '—' }}</p>
                 </div>
                 <div>
@@ -394,6 +396,26 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">ODP Terdekat</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200">{{ $survey->nearest_odp ?? '—' }}</p>
                 </div>
+                @if($survey->requested_installation_date)
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Request Pemasangan Pelanggan</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 font-mono">{{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}</p>
+                </div>
+                @endif
+                @php
+                    $estimasiMaterial = $fopTask->materials()->estimasi()->orderBy('id')->get();
+                @endphp
+                @if($estimasiMaterial->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Estimasi Kebutuhan Alat</p>
+                    @foreach($estimasiMaterial as $material)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Catatan Survey</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line">{{ $survey->survey_note ?? '—' }}</p>
@@ -431,6 +453,21 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kualitas Sinyal</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200">Jitter {{ $technicalDetail?->jitter_ms ?? '—' }}ms, Loss {{ $technicalDetail?->packet_loss_percent ?? '—' }}%</p>
                 </div>
+                @php
+                    $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                @endphp
+                @if($materialTerpakai->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Pasif Terpakai</p>
+                    @foreach($materialTerpakai as $material)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $material->item_name }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Catatan Pemasangan</p>
                     <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line">{{ $installation?->installation_note ?? '—' }}</p>

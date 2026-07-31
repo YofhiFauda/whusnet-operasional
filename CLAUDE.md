@@ -70,7 +70,7 @@ php artisan horizon
 - `TaskType`: `SURVEY`, `PSB`, `MTN`, `DEAC`, `C-REQ`, `O-REQ`, `INFR REQ`. `SURVEY`/`PSB`/`DEAC` = `autoOnlyValues()` — gak bisa dipilih manual, `DEAC` cuma lewat tombol "Ambil Alat" di List Putus Langganan. `RELOKASI` dihapus permanen dari sistem.
 - `TicketHandler`: `helpdesk`, `noc`, `fop` — siapa yang lagi pegang tiket. Beku permanen begitu `fop`.
 - `TicketHandlingStatus`: `open`, `closed`, `cancelled` — status internal tiket, cuma bermakna selama `handler` ≠ `fop`.
-- `TicketHistoryAction`: `dibuat`, `dieskalasi`, `dicek_noc`, `diselesaikan`, `dikembalikan`, `dibatalkan`
+- `TicketHistoryAction`: `dibuat`, `dieskalasi`, `diselesaikan`, `dikembalikan`, `dibatalkan`, + `dicek_noc` (**usang** — aksi Oncheck NOC dihapus ADHOC-06; case-nya SENGAJA dipertahankan supaya baris riwayat lama tetap bisa di-cast, jangan dihapus dari enum)
 - `TicketBucket`: `masuk`, `diproses`, `selesai`, `dibatalkan` — **klasifikasi, bukan route** (route `/tickets/{bucket}` sudah dihapus).
   → **Tiap `TaskStatus` baru wajib dipetakan ke bucket.** Ada test yang sengaja gagal kalau lupa.
 - `InvoiceStatus`: `belum_dibayar`, `sebagian`, `lunas`, `batal`
@@ -87,9 +87,9 @@ Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
        │
        ├─ close()/cancel()  → selesai/batal TANPA pernah nyentuh FOP
        │
-       ├─ escalateToNoc()   → handler=NOC, noc_checked_at=NULL ("Pending NOC",
-       │                       Helpdesk MASIH boleh act)
-       │      └─ onCheckNoc() → noc_checked_at terisi, Helpdesk lepas kendali
+       ├─ escalateToNoc()   → handler=NOC ("Diproses NOC" seketika).
+       │                       Helpdesk TETAP ikut pegang tiket (holderRoles()
+       │                       = ['helpdesk','noc']). Gak ada langkah "terima".
        │
        └─ escalateToFop()   → SATU-SATUNYA titik FopTask kebentuk
              └─ syncToFopTask() → FopTask (TFOP-YYYY-NNNN, status DRAFT)
@@ -104,9 +104,11 @@ Ticket (TKT-YYYY-NNNN)          FopTask TIDAK auto-dibuat saat submit!
 
 Aturan:
 
-1. **Tiket PUNYA kolom status sendiri** — `handler` (`TicketHandler`) + `status` (`TicketHandlingStatus`) + `noc_checked_at`. Selama `handler` ≠ FOP, status tiket **tidak** diturunkan dari FopTask. Jangan balik lagi ke asumsi lama "tiket gak punya status".
+1. **Tiket PUNYA kolom status sendiri** — `handler` (`TicketHandler`) + `status` (`TicketHandlingStatus`). Selama `handler` ≠ FOP, status tiket **tidak** diturunkan dari FopTask. Jangan balik lagi ke asumsi lama "tiket gak punya status".
 2. **`handler=FOP` itu terminal buat sisi Ticketing** — `assertTicketStillOpen()` nolak semua aksi Ticketing begitu sampai sini. Pembatalan pasca-FOP wajib lewat `/fop-tasks`.
-3. **Window "Pending NOC"** — `Ticket::holderRoles()` adalah SATU-SATUNYA sumber "siapa yang boleh act": handler=NOC + `noc_checked_at` NULL ⇒ `['helpdesk','noc']`; setelah di-Oncheck ⇒ `['noc']`. Dipakai bareng `TicketService::assertActorOwnsTicket()` (otorisasi asli) dan `Ticket::actionFlagsFor()` (gerbang tombol). Jangan duplikasi logic ini di tempat ketiga.
+3. **`Ticket::holderRoles()` = SATU-SATUNYA sumber "siapa yang boleh act"** — handler=HELPDESK ⇒ `['helpdesk']`; handler=NOC ⇒ `['helpdesk','noc']` (dipegang berdua); handler=FOP ⇒ `[]`. Dipakai bareng `TicketService::assertActorOwnsTicket()` (otorisasi asli) dan `Ticket::actionFlagsFor()` (gerbang tombol). Jangan duplikasi logic ini di tempat ketiga.
+   → Window **"Pending NOC"** + aksi **Oncheck NOC** sudah **DIHAPUS** (ADHOC-06, 2026-07-29): assign ke NOC = langsung diproses. Kolom `noc_checked_at`, endpoint `tickets.oncheck-noc`, flag `can_oncheck_noc`, dan label `Pending NOC`/`OnCheck NOC` tidak ada lagi. Jangan dihidupkan sebagian — kalau perlu balik, balikkan utuh.
+   → Dua tab di Worksheet NOC (**Tiket Masuk** = `handler=noc & open`, **Assign FOP** = `handler=fop` + jejak eskalasi lewat NOC; ADHOC-09) **bukan** tab Pending NOC yang itu: keduanya murni turunan data, satu permission (`noc_worksheet.view`), dan tetap tanpa langkah "terima tiket".
 4. **`TFOP-` digenerate di dua tempat** — `TicketService::generateFopTaskNumber()` dan `FopTaskController::generateTaskNumber()`. Format wajib identik, keduanya nulis ke deret yang sama.
 5. **`fop_task.tugas` = `"{display_id}_{full_name}"`** (mis. `C1X4ARQ000631_Masudah Yuni Fitri`) — identitas pelanggan konsisten seluruh sistem, bukan label tipe tiket generik.
 6. **`fop_task.notes` cuma pointer pendek** (`"Ticket TKT-… — dikirim oleh …"`). Jangan salin `catatan_teknis` ke sini — itu bikin dua sumber kebenaran yang gampang menyimpang.

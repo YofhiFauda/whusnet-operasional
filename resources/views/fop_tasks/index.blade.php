@@ -270,8 +270,22 @@
                                 </div>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">
+                                {{-- Tanggal pemasangan yang diminta pelanggan belum tiba: task ini
+                                     memang belum waktunya dikerjakan, jadi TIDAK ditampilkan countdown.
+                                     Countdown hijau berdurasi 3 minggu justru menyesatkan ("santai
+                                     banget") padahal artinya "belum waktunya". Badge netral ini juga
+                                     menjelaskan kenapa task-nya ada di dasar papan & prioritasnya Low. --}}
+                                @if($task->isScheduledForFutureClientDate())
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 mb-1">
+                                        <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Dijadwalkan {{ \App\Support\IndonesianDate::date($task->client_request_date) }}
+                                    </span>
+                                @endif
+
                                 @if($canEditFopTaskType)
-                                    <select @change="updatePriority({{ $task->id }}, $event.target.value)" 
+                                    <select @change="updatePriority({{ $task->id }}, $event.target.value)"
                                             x-data="{ currentPriority: '{{ $task->priority->value }}' }"
                                             x-model="currentPriority"
                                             class="text-[11px] font-medium rounded border px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 w-24 transition-colors duration-200"
@@ -286,7 +300,7 @@
                                         <option value="High">High</option>
                                         <option value="Urgent">Urgent</option>
                                     </select>
-                                @else
+                                @elseif(! $task->isScheduledForFutureClientDate())
                                     <x-countdown-timer
                                         deadline="{{ $task->slaDeadline()->toIso8601String() }}"
                                         :total-seconds="$task->slaTotalSeconds()"

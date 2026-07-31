@@ -149,6 +149,64 @@ class TicketCidDisplayTest extends TestCase
     }
 
     /**
+     * Bug 2026-07-30 — Search Customer di Worksheet Helpdesk menampilkan
+     * "C00RQ000011" untuk pelanggan yang CID tersimpannya justru sudah ada:
+     * "C1XXRQ000011" (segmen distribusi "XX" = tidak diketahui, hasil migrasi
+     * legacy) TAPI `distribution_id`-nya NULL.
+     *
+     * Dulu syaratnya `distribution_id && cid`, jadi CID asli diabaikan dan
+     * diganti format default karangan yang tidak pernah ada di kenyataan —
+     * dan tidak ketemu waktu dicari pakai CID sungguhan. 331 pelanggan aktif
+     * kena ini di produksi.
+     */
+    public function test_stored_cid_is_used_even_when_distribution_is_unknown(): void
+    {
+        $customer = Customer::factory()->create([
+            'pop_id' => $this->pop->id,
+            'village_id' => $this->village->id,
+            'distribution_id' => null,
+            'customer_code' => 'RQ000011',
+            'cid' => 'C1XXRQ000011',
+            'status' => 'active',
+        ]);
+
+        $this->assertSame('C1XXRQ000011', $customer->fresh()->display_id);
+        $this->assertSame('CID', $customer->fresh()->display_id_label);
+
+        $this->createTicketFor($customer);
+
+        $this->actingAs($this->helpdeskUser)
+            ->get(route('tickets.create'))
+            ->assertOk()
+            ->assertSee('C1XXRQ000011')
+            ->assertDontSee('C00RQ000011');
+    }
+
+    /**
+     * Search Customer harus bisa menemukan pelanggan itu lewat CID yang
+     * ditampilkan — dulu yang tampil (C00RQ…) beda dari yang tersimpan
+     * (C1XXRQ…), jadi menyalin angka dari layar justru gak dapat hasil.
+     */
+    public function test_customer_lookup_finds_legacy_cid_and_returns_it(): void
+    {
+        $customer = Customer::factory()->create([
+            'pop_id' => $this->pop->id,
+            'village_id' => $this->village->id,
+            'distribution_id' => null,
+            'customer_code' => 'RQ000021',
+            'cid' => 'C1XXRQ000021',
+            'status' => 'active',
+            'full_name' => 'Pelanggan Legacy',
+        ]);
+
+        $response = $this->actingAs($this->helpdeskUser)
+            ->getJson(route('tickets.lookup-customer', ['q' => 'C1XXRQ000021']));
+
+        $response->assertOk();
+        $response->assertJsonFragment(['id' => $customer->id, 'cid' => 'C1XXRQ000021']);
+    }
+
+    /**
      * Regresi: halaman detail ticket (yang sebelumnya udah bener, gak
      * dibatasi kolom) tetap konsisten nampilin CID lengkap yang sama.
      */

@@ -14,10 +14,11 @@ use Illuminate\Database\Seeder;
  *
  *   tickets                  (root) — Ticketing (buat/lihat/aksi tiket)
  *     ├─ tickets.selesai            — halaman arsip Ticket Selesai
- *     └─ tickets.dibatalkan         — halaman arsip Ticket Dibatalkan
- *   noc_worksheet            (root) — Worksheet NOC
- *     ├─ noc_worksheet.masuk        — halaman Ticket Masuk (pending, belum di-Oncheck)
- *     └─ noc_worksheet.diproses     — halaman Ticket Diproses (udah di-Oncheck)
+ *     ├─ tickets.dibatalkan         — halaman arsip Ticket Dibatalkan
+ *     └─ tickets.history            — halaman History Ticketing (semua tiket + ekspor)
+ *   noc_worksheet            (root) — Worksheet NOC (SATU halaman, tanpa tab)
+ *     ├─ noc_worksheet.masuk        — DINONAKTIFKAN (ADHOC-06), tab dilebur
+ *     └─ noc_worksheet.diproses     — DINONAKTIFKAN (ADHOC-06), tab dilebur
  *   noc_dashboard            (root) — Dashboard NOC
  *
  * Tiap halaman punya feature (=permission) SENDIRI — dulu semuanya numpang
@@ -60,8 +61,7 @@ class TicketFeatureSeeder extends Seeder
         $subFeatures = [
             ['parent' => 'tickets', 'code' => 'tickets.selesai', 'name' => 'Ticket Selesai', 'sort_order' => 1],
             ['parent' => 'tickets', 'code' => 'tickets.dibatalkan', 'name' => 'Ticket Dibatalkan', 'sort_order' => 2],
-            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.masuk', 'name' => 'Ticket Masuk (NOC)', 'sort_order' => 1],
-            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.diproses', 'name' => 'Ticket Diproses (NOC)', 'sort_order' => 2],
+            ['parent' => 'tickets', 'code' => 'tickets.history', 'name' => 'History Ticketing', 'sort_order' => 3],
         ];
 
         foreach ($subFeatures as $sf) {
@@ -76,6 +76,14 @@ class TicketFeatureSeeder extends Seeder
                 ]
             );
         }
+
+        // Dua tab Worksheet NOC dilebur jadi satu halaman (ADHOC-06,
+        // 2026-07-29) — feature-nya DINONAKTIFKAN, bukan dihapus: role yang
+        // terlanjur punya permission ini gak boleh error, dan barisnya masih
+        // dipakai buat membaca audit log lama. Halaman Worksheet NOC sekarang
+        // digerbangi `noc_worksheet.view` (feature root).
+        Feature::whereIn('code', ['noc_worksheet.masuk', 'noc_worksheet.diproses'])
+            ->update(['is_active' => false]);
 
         app(PermissionGeneratorService::class)->generate();
 

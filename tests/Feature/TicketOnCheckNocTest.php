@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ScopeType;
 use App\Enums\TaskType;
 use App\Enums\TicketHandler;
-use App\Enums\TicketHistoryAction;
+use App\Enums\TicketHandlingStatus;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
@@ -20,13 +20,22 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
- * Window "pending NOC" + aksi Oncheck NOC — Helpdesk kirim ke NOC, tiket
- * "pending" (Helpdesk MASIH pegang kendali) sampai NOC resmi Oncheck. Begitu
- * di-check, Helpdesk kehilangan akses, cuma NOC yang lanjut. Kembaran
- * TicketCloseEscalateTest, fokus khusus mekanisme baru ini.
+ * PENJAGA REGRESI — window "Pending NOC" + aksi "Oncheck NOC" SUDAH DIHAPUS
+ * (ADHOC-06, 2026-07-29).
+ *
+ * Dulu file ini menguji mekanisme itu: Helpdesk kirim ke NOC → tiket "pending"
+ * (Helpdesk masih pegang kendali) sampai NOC menekan Oncheck, baru Helpdesk
+ * kehilangan akses. Pada praktiknya assign = mulai kerja, jadi langkah "terima
+ * dulu" cuma bikin tiket menggantung.
+ *
+ * Isinya sekarang menjaga supaya mekanisme itu TIDAK diam-diam balik: tiket
+ * yang dikirim ke NOC langsung "Diproses NOC", endpoint & kolomnya hilang, dan
+ * Helpdesk tetap ikut memegang tiket. Nama file sengaja dipertahankan supaya
+ * jejak kenapa fitur ini pernah ada tidak hilang dari repo.
  */
 class TicketOnCheckNocTest extends TestCase
 {
@@ -35,8 +44,6 @@ class TicketOnCheckNocTest extends TestCase
     private User $helpdeskUser;
 
     private User $nocUser;
-
-    private User $fopUser;
 
     private Customer $customer;
 
@@ -54,7 +61,6 @@ class TicketOnCheckNocTest extends TestCase
 
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
         $this->nocUser = $this->makeUserWithAllPopScope('noc');
-        $this->fopUser = $this->makeUserWithAllPopScope('fop');
 
         $city = City::create(['name' => 'Ponorogo']);
         $district = District::create(['city_id' => $city->id, 'name' => 'Babadan']);
@@ -89,214 +95,88 @@ class TicketOnCheckNocTest extends TestCase
         return $user;
     }
 
-    private function submitTicketToNoc(): Ticket
+    private function escalatedToNocTicket(): Ticket
     {
-        $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), [
+        $this->actingAs($this->helpdeskUser)->postJson(route('tickets.store'), [
             'type' => TaskType::MAINTENANCE->value,
             'customer_id' => $this->customer->id,
             'detail_keluhan' => 'Internet mati total sejak pagi.',
             'priority' => 'High',
-        ])->assertRedirect();
+        ])->assertCreated();
 
         $ticket = Ticket::latest('id')->firstOrFail();
 
         $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
-            ->assertRedirect();
+            ->postJson(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->assertOk();
 
         return $ticket->fresh();
     }
 
-    public function test_ticket_is_pending_noc_right_after_escalation(): void
+    public function test_ticket_sent_to_noc_is_immediately_processed(): void
     {
-        $ticket = $this->submitTicketToNoc();
+        $ticket = $this->escalatedToNocTicket();
 
-        $this->assertTrue($ticket->isPendingNoc());
-        $this->assertFalse($ticket->isOnCheckNoc());
-        $this->assertNull($ticket->noc_checked_at);
+        $this->assertSame(TicketHandler::NOC, $ticket->handler);
+        $this->assertSame(TicketHandlingStatus::OPEN, $ticket->status);
+        $this->assertSame('Diproses NOC', $ticket->statusLabel());
     }
 
-    public function test_noc_can_oncheck_pending_ticket(): void
+    public function test_oncheck_endpoint_no_longer_exists(): void
     {
-        $ticket = $this->submitTicketToNoc();
+        $ticket = $this->escalatedToNocTicket();
+
+        $this->assertFalse(app('router')->has('tickets.oncheck-noc'));
 
         $this->actingAs($this->nocUser)
-            ->post(route('tickets.oncheck-noc', $ticket), ['reason' => 'Mulai investigasi.'])
-            ->assertRedirect(route('tickets.show', $ticket));
-
-        $ticket->refresh();
-        $this->assertNotNull($ticket->noc_checked_at);
-        $this->assertTrue($ticket->isOnCheckNoc());
-        $this->assertFalse($ticket->isPendingNoc());
-
-        $entry = $ticket->histories()->where('action', TicketHistoryAction::DICEK_NOC)->first();
-        $this->assertNotNull($entry);
-        $this->assertSame('Mulai investigasi.', $entry->reason);
-        $this->assertSame($this->nocUser->id, $entry->actor_id);
+            ->post("/tickets/{$ticket->id}/oncheck-noc")
+            ->assertNotFound();
     }
 
-    public function test_helpdesk_cannot_oncheck(): void
+    public function test_noc_checked_at_column_is_gone(): void
     {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.oncheck-noc', $ticket))
-            ->assertSessionHasErrors('target');
-
-        $this->assertNull($ticket->fresh()->noc_checked_at);
+        $this->assertFalse(Schema::hasColumn('tickets', 'noc_checked_at'));
     }
 
-    public function test_oncheck_rejected_if_already_checked(): void
+    public function test_action_flags_no_longer_expose_oncheck(): void
     {
-        $ticket = $this->submitTicketToNoc();
+        $ticket = $this->escalatedToNocTicket();
 
-        $this->actingAs($this->nocUser)->post(route('tickets.oncheck-noc', $ticket))->assertRedirect();
+        $this->assertArrayNotHasKey('can_oncheck_noc', $ticket->actionFlagsFor($this->nocUser));
+    }
+
+    public function test_noc_can_close_immediately_without_accepting_first(): void
+    {
+        $ticket = $this->escalatedToNocTicket();
 
         $this->actingAs($this->nocUser)
-            ->post(route('tickets.oncheck-noc', $ticket))
-            ->assertSessionHasErrors('target');
-    }
-
-    public function test_oncheck_rejected_once_ticket_reaches_fop(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->nocUser)
-            ->postJson(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->postJson(route('tickets.close', $ticket), ['reason' => 'Beres dari sisi NOC.'])
             ->assertOk();
 
-        $this->assertSame(TicketHandler::FOP, $ticket->fresh()->handler);
-
-        $this->actingAs($this->nocUser)
-            ->post(route('tickets.oncheck-noc', $ticket))
-            ->assertSessionHasErrors('target');
+        $this->assertSame(TicketHandlingStatus::CLOSED, $ticket->fresh()->status);
     }
 
-    // ── Window pending: Helpdesk masih pegang kendali ──────────────
-
-    public function test_helpdesk_can_close_during_pending_window(): void
+    public function test_helpdesk_still_holds_ticket_after_assigning_to_noc(): void
     {
-        $ticket = $this->submitTicketToNoc();
+        $ticket = $this->escalatedToNocTicket();
+
+        $this->assertSame(['helpdesk', 'noc'], $ticket->holderRoles());
 
         $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.close', $ticket), ['reason' => 'Ternyata bisa dibenerin sendiri.'])
-            ->assertRedirect();
-
-        $this->assertSame('closed', $ticket->fresh()->status->value);
-    }
-
-    public function test_helpdesk_can_escalate_to_fop_during_pending_window(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->helpdeskUser)
-            ->postJson(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->postJson(route('tickets.close', $ticket), ['reason' => 'Ternyata bisa dibenerin sendiri.'])
             ->assertOk();
 
-        $this->assertSame(TicketHandler::FOP, $ticket->fresh()->handler);
+        $this->assertSame(TicketHandlingStatus::CLOSED, $ticket->fresh()->status);
     }
 
-    public function test_helpdesk_can_cancel_during_pending_window(): void
+    public function test_noc_worksheet_shows_ticket_right_after_assignment(): void
     {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->helpdeskUser)
-            ->postJson(route('tickets.cancel', $ticket), ['reason' => 'Batal, pelanggan gak jadi komplain.'])
-            ->assertOk();
-
-        $this->assertSame('cancelled', $ticket->fresh()->status->value);
-    }
-
-    // ── NOC boleh Assign FOP / Kembalikan TANPA Oncheck dulu ───────
-
-    public function test_noc_can_escalate_to_fop_without_checking_first(): void
-    {
-        $ticket = $this->submitTicketToNoc();
+        $ticket = $this->escalatedToNocTicket();
 
         $this->actingAs($this->nocUser)
-            ->postJson(route('tickets.escalate', $ticket), ['target' => 'fop'])
-            ->assertOk();
-
-        $this->assertSame(TicketHandler::FOP, $ticket->fresh()->handler);
-    }
-
-    public function test_noc_can_return_to_helpdesk_without_checking_first(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->nocUser)
-            ->postJson(route('tickets.return-to-helpdesk', $ticket))
-            ->assertOk();
-
-        $this->assertSame(TicketHandler::HELPDESK, $ticket->fresh()->handler);
-        $this->assertNull($ticket->fresh()->noc_checked_at);
-    }
-
-    // ── NOC WAJIB check dulu sebelum Selesaikan ─────────────────────
-
-    public function test_noc_cannot_close_before_checking(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->nocUser)
-            ->post(route('tickets.close', $ticket))
-            ->assertSessionHasErrors('target');
-
-        $this->assertSame('open', $ticket->fresh()->status->value);
-    }
-
-    public function test_noc_can_close_after_checking(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->nocUser)->post(route('tickets.oncheck-noc', $ticket))->assertRedirect();
-
-        $this->actingAs($this->nocUser)
-            ->post(route('tickets.close', $ticket), ['reason' => 'Selesai dikerjakan.'])
-            ->assertRedirect();
-
-        $this->assertSame('closed', $ticket->fresh()->status->value);
-    }
-
-    // ── Lockout setelah checked ─────────────────────────────────────
-
-    public function test_helpdesk_locked_out_after_noc_checks(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $this->actingAs($this->nocUser)->post(route('tickets.oncheck-noc', $ticket))->assertRedirect();
-
-        $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.close', $ticket))
-            ->assertSessionHasErrors('target');
-
-        $this->actingAs($this->helpdeskUser)
-            ->post(route('tickets.escalate', $ticket), ['target' => 'fop'])
-            ->assertSessionHasErrors('target');
-    }
-
-    // ── actionFlagsFor() konsisten sama guard Service ───────────────
-
-    public function test_action_flags_expose_oncheck_only_when_pending_and_role_noc(): void
-    {
-        $ticket = $this->submitTicketToNoc();
-
-        $nocFlags = $ticket->actionFlagsFor($this->nocUser);
-        $this->assertTrue($nocFlags['can_oncheck_noc']);
-        $this->assertFalse($nocFlags['can_close']); // wajib check dulu
-
-        $helpdeskFlags = $ticket->actionFlagsFor($this->helpdeskUser);
-        $this->assertFalse($helpdeskFlags['can_oncheck_noc']);
-        $this->assertTrue($helpdeskFlags['can_close']); // masih window pending
-
-        $this->actingAs($this->nocUser)->post(route('tickets.oncheck-noc', $ticket))->assertRedirect();
-        $ticket->refresh()->load('histories');
-
-        $nocFlagsAfter = $ticket->actionFlagsFor($this->nocUser);
-        $this->assertFalse($nocFlagsAfter['can_oncheck_noc']);
-        $this->assertTrue($nocFlagsAfter['can_close']);
-
-        $helpdeskFlagsAfter = $ticket->actionFlagsFor($this->helpdeskUser);
-        $this->assertFalse($helpdeskFlagsAfter['can_close']);
+            ->get(route('noc.worksheet'))
+            ->assertOk()
+            ->assertSee($ticket->ticket_number)
+            ->assertDontSee('Oncheck NOC');
     }
 }

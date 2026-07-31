@@ -13,9 +13,12 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 1. Buka `/surveys/queue`, cari pelanggan (search by nama/NIK/HP).
 2. Klik "Mulai Survey" → sistem cek gak ada Task lain yang lagi `in_progress` di tim teknisi itu (kalau ada, ditolak — harus selesaikan dulu task sebelumnya).
 3. Timer survey mulai jalan (`started_at` dicatat).
-4. Datang ke lokasi, kerjakan survey, balik ke app → isi form laporan: alat yang dibutuhkan, estimasi kabel, ODP terdekat, tingkat kesulitan, foto ODP + foto rumah (wajib), catatan.
-5. Pilih status laporan: `completed` (survey selesai, lanjut ke antrean verifikasi) / `failed` / `pending` (belum kelar, submit ulang nanti).
-6. Submit → kalau `completed`, pelanggan otomatis pindah ke antrean Verifikasi FOP.
+4. Datang ke lokasi, kerjakan survey, balik ke app → isi form laporan: estimasi kabel, ODP terdekat, tingkat kesulitan, foto ODP + foto rumah (wajib), catatan.
+5. **Tanggal Request Pemasangan** (opsional, 2026-07-31) — diisi hanya kalau pelanggan minta dipasang di tanggal tertentu. Efeknya: task pemasangan menunggu di dasar papan FOP sampai tanggal itu tiba, dan tidak dihitung telat selama menunggu. Dikosongkan = "secepatnya".
+6. **Estimasi Kebutuhan Alat** (2026-07-31) — daftar barang berulang (pilih dari Master Barang, isi jumlah + satuan). Estimasi kabel di atas otomatis jadi satu baris dropcore, tidak perlu diketik ulang. Barang di luar master dipilih "Lainnya" lalu ketik namanya.
+7. **Alat Khusus / Kendala Peralatan** — kolom teks bebas, isinya peralatan kerja (tangga panjang, bor beton), **bukan** material habis pakai.
+8. Pilih status laporan: `completed` (survey selesai, lanjut ke antrean verifikasi) / `failed` / `pending` (belum kelar, submit ulang nanti).
+9. Submit → kalau `completed`, pelanggan otomatis pindah ke antrean Verifikasi FOP.
 
 ### 2b. FOP/Admin — Batalkan Survey (baru 2026-07-21)
 
@@ -37,8 +40,9 @@ Buat pelanggan yang **belum ditugaskan** (belum ada teknisi jalan) ATAU **udah d
 1. Buka antrean pemasangan, klik "Mulai Pemasangan" → sama seperti survey, dicek dulu gak ada task lain yang lagi jalan.
 2. Timer pemasangan mulai. Kerjakan instalasi fisik.
 3. Isi form laporan lengkap: device (tipe, brand, serial, MAC, WiFi, PPPoE), data teknis (ODP/OLT/VLAN), hasil speedtest (upload/download/jitter/latency/packet loss), foto pemasangan + kontrak + TTD pelanggan + foto speedtest.
-4. Pilih status: `completed` (semua foto wajib lengkap, kalau kurang satu aja ditolak dengan pesan spesifik) / `failed` (butuh revisi, balik ke antrean) / progress (belum kelar).
-5. Submit `completed` → pelanggan otomatis masuk antrean Verifikasi Admin.
+4. **Perangkat Pasif Terpakai** (2026-07-31) — daftar sudah terisi dari estimasi surveyor; teknisi tinggal **mengubah jumlahnya ke realita**, tambah atau hapus baris. Ini yang benar-benar dipakai, bukan perkiraan. Wajib minimal satu baris kalau status `completed`.
+5. Pilih status: `completed` (semua foto wajib lengkap + minimal satu baris material, kalau kurang satu aja ditolak dengan pesan spesifik) / `failed` (butuh revisi, balik ke antrean) / progress (belum kelar).
+6. Submit `completed` → pelanggan otomatis masuk antrean Verifikasi Admin. Admin melihat tabel **Estimasi vs Terpakai + selisih** di halaman verifikasi.
 
 ### 4b. Admin/FOP — Batalkan Pemasangan (baru 2026-07-21)
 

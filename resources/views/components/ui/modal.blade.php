@@ -23,7 +23,8 @@
     x-on:keydown.escape.window="show = false"
     x-effect="document.body.classList.toggle('overflow-hidden', show)"
     style="display: none;"
-    class="fixed inset-0 z-modal overflow-y-auto"
+    {{-- z-[80] literal — lihat catatan `z-drawer` di components/ui/drawer.blade.php --}}
+    class="fixed inset-0 z-[80] overflow-y-auto"
     aria-labelledby="modal-title" role="dialog" aria-modal="true"
 >
     <!-- Overlay -->

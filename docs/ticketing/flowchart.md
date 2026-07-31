@@ -17,24 +17,10 @@
   ┌───────────┐   ┌──────────────────────────┐         │
   │  CLOSED   │   │ handler = NOC            │         │
   └───────────┘   │ status  = OPEN           │         │
-        ▲         │ noc_checked_at = NULL    │         │
-        │         │ ── PENDING NOC ──        │         │
+        ▲         │ ── DIPROSES NOC ──       │         │
+        │         │ (seketika, tanpa Oncheck)│         │
         │         │ Helpdesk & NOC bisa act  │         │
         │         └──────────────────────────┘         │
-        │            │       │        │                │
-        │            │       │        └────────────────┤ escalateToFop()
-        │            │       │ returnToHelpdesk()      │
-        │            │       └──────► balik ke HELPDESK│
-        │            │                (noc_checked_at  │
-        │            │                 di-reset NULL)  │
-        │            │ onCheckNoc()  [cuma role noc]   │
-        │            ▼                                  │
-        │  ┌──────────────────────────┐                │
-        │  │ handler = NOC            │                │
-        │  │ noc_checked_at = <ts>    │                │
-        │  │ ── ONCHECK NOC ──        │                │
-        │  │ CUMA NOC yang bisa act   │                │
-        │  └──────────────────────────┘                │
         │            │       │        │                │
         └────────────┘       │        └────────────────┤ escalateToFop()
              close()         │ returnToHelpdesk()      │
@@ -152,22 +138,16 @@ TicketService::<aksi>()  — DB::transaction
 close()
 └─ assertNocCheckedBeforeClose()
      aktor role 'noc' (bukan full-access) DAN handler=NOC DAN
-     noc_checked_at NULL?
-        YES → tolak "NOC wajib Oncheck dulu sebelum bisa Selesaikan"
+     (guard "NOC wajib Oncheck dulu" DIHAPUS — ADHOC-06)
         NO  → lanjut
    [Helpdesk TIDAK kena guard ini — dia boleh close kapan pun
-    selama masih pegang tiket, termasuk di window pending]
+    selama masih pegang tiket — tiket di NOC dipegang helpdesk + noc]
 
 escalateToNoc()
 └─ handler harus HELPDESK
      (NOC gak bisa kirim ke NOC lagi)
 
-onCheckNoc()
-├─ handler harus NOC
-├─ aktor harus role 'noc' atau full-access
-│    [sengaja BUKAN assertActorOwnsTicket() — guard itu di window
-│     pending juga meloloskan 'helpdesk', padahal Oncheck khusus NOC]
-└─ noc_checked_at harus masih NULL (idempotent guard)
+[onCheckNoc() DIHAPUS — ADHOC-06, 2026-07-29]
 
 escalateToFop()
 └─ (tanpa guard handler tambahan — boleh dari Helpdesk maupun NOC)
@@ -214,20 +194,28 @@ Ticket::scopeInBucket($bucket) / Ticket::bucket()
 ├─ [kiri]  Form submit tiket
 └─ [kanan] Panel "List Task Ticketing" — filter per HANDLER, bukan bucket
              ├─ Tab "Ticket"      → handler = helpdesk
-             ├─ Tab "Assign NOC"  → handler = noc  (Pending / OnCheck)
+             ├─ Tab "Assign NOC"  → handler = noc  (Diproses NOC)
              └─ Tab "Assign FOP"  → handler = fop  (pantau status FopTask)
            Sumber: scopeActiveForWorksheet() — exclude Selesai & Dibatalkan
            di AKAR query, bukan disaring client-side. Cap 30 terbaru.
 
-/noc/worksheet — entry point sidebar
+/noc/worksheet — SATU route, SATU permission (noc_worksheet.view), dua tab via ?tab=
 │
-└─ redirect ke tab pertama yang user punya permission-nya
-     ├─ punya noc_worksheet.masuk.view    → /noc/worksheet/masuk
-     ├─ else punya ...diproses.view       → /noc/worksheet/diproses
-     └─ gak punya dua-duanya              → 403
+├─ ?tab=masuk (default)      → handler=noc & status=open
+│                              (yang diassign Helpdesk; BISA diaksi)
+└─ ?tab=assign_fop           → handler=fop
+                               AND EXISTS ticket_histories(action=dieskalasi,
+                                                           to_status=noc)
+                               ("pernah lewat meja NOC"; READ-ONLY)
 
-/noc/worksheet/masuk     → handler=noc & status=open & noc_checked_at IS NULL
-/noc/worksheet/diproses  → handler=noc & status=open & noc_checked_at NOT NULL
+   Tab asing (?tab=apapun-selain-itu) → jatuh ke `masuk`, bukan 500.
+   Filter: q, pop_id, issue_category_id, type, priority, created_by,
+           date_from, date_to — dipakai SAMA di tabel & counter kedua tab.
+   Aksi: drawer baris terpilih → endpoint TicketController (close/escalate/
+         return-to-helpdesk/cancel). Bukan Oncheck — window Pending NOC tetap
+         tidak ada (ADHOC-06).
+
+/noc/worksheet/masuk, /noc/worksheet/diproses → redirect ke /noc/worksheet
 
 /tickets/selesai         → scopeInBucket(SELESAI)
 /tickets/dibatalkan      → scopeInBucket(DIBATALKAN)
@@ -251,7 +239,7 @@ can_escalate_noc     = $canAct  DAN handler = HELPDESK
 can_escalate_fop     = $canAct
 can_return_to_helpdesk = $canAct DAN handler = NOC
 can_cancel           = $canAct  DAN punya tickets.cancel
-can_oncheck_noc      = isPendingNoc() DAN punya tickets.update
+(can_oncheck_noc DIHAPUS — ADHOC-06)
                        DAN (full-access ATAU role noc)
 ```
 
@@ -260,8 +248,7 @@ Hasilnya per state:
 | State | Helpdesk lihat | NOC lihat |
 |---|---|---|
 | handler=HELPDESK | Selesai, Ke NOC, Ke FOP, Batalkan | — (bukan pemegang) |
-| Pending NOC | Selesai, Ke FOP, Kembalikan*, Batalkan | **Oncheck NOC**, Ke FOP, Kembalikan, Batalkan (Selesai **tidak** muncul) |
-| OnCheck NOC | — (kehilangan akses) | Selesai, Ke FOP, Kembalikan, Batalkan |
+| Diproses NOC | Selesai, Ke FOP, Kembalikan, Batalkan | Selesai, Ke FOP, Kembalikan, Batalkan |
 | handler=FOP | — | — |
 
 \* `can_return_to_helpdesk` hanya syarat `handler=NOC`, jadi secara teknis muncul juga buat Helpdesk di window pending; tanpa efek berarti karena tiket memang balik ke dia sendiri.

@@ -249,11 +249,12 @@ class Pop extends Model
      *   Status pending/survey/installation/installed/terminated
      *     → REQ ID murni: "RQ######"
      *
-     *   Status active/suspended + punya distribusi
-     *     → CID lengkap: "{cid_prefix}{mini_pop}{dist_code}{req_id}_{DESA}_{NAMA}"
-     *       Contoh: D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH
+     *   Status active/suspended + `customers.cid` SUDAH terisi
+     *     → pakai CID tersimpan apa adanya: "{cid_prefix}{mini_pop}{dist_code}{req_id}"
+     *       Contoh: D2X6CRQ001296 — termasuk CID legacy yang segmen distribusinya
+     *       "XX" (C1XXRQ000011) karena distribusinya memang tidak diketahui.
      *
-     *   Status active/suspended + belum punya distribusi
+     *   Status active/suspended + CID belum pernah digenerate
      *     → Format default: "{cid_prefix}00{req_id}"
      *       Contoh: C00RQ001296
      */
@@ -268,8 +269,16 @@ class Pop extends Model
             return $reqId;
         }
 
-        // Jika sudah masuk distribusi → tampilkan CID lengkap
-        if ($customer->distribution_id && $customer->cid) {
+        // CID tersimpan = identitas OTORITATIF pelanggan; kalau sudah ada,
+        // itu yang ditampilkan.
+        //
+        // SENGAJA tidak lagi mensyaratkan `distribution_id` terisi. Dulu begitu,
+        // dan akibatnya 331 pelanggan aktif hasil migrasi legacy — yang CID-nya
+        // sudah ada (mis. C1XXRQ000011, segmen distribusi "XX" karena tidak
+        // diketahui) tapi `distribution_id`-nya NULL — ditampilkan sebagai
+        // "C00RQ000011": CID karangan yang tidak pernah ada di kenyataan, beda
+        // dari nilai di kolom `cid`, dan tidak ketemu waktu dicari.
+        if ($customer->cid) {
             return $customer->cid;
         }
 

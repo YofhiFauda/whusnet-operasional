@@ -122,6 +122,26 @@
                                 <span class="font-semibold text-text-main font-mono">{{ \App\Support\IndonesianDate::dateTime($installation->assigned_at) }}</span>
                             </div>
                         @endif
+                        @php
+                            // Konsumsi material saat pemasangan — beda dari tab Perangkat
+                            // (aset yang terpasang permanen di sisi pelanggan).
+                            $materialTerpakai = \App\Models\TaskMaterial::where('customer_id', $customer->id)
+                                ->terpakai()->orderBy('id')->get();
+                        @endphp
+                        @if($materialTerpakai->isNotEmpty())
+                        <div class="pt-2">
+                            <span class="block text-text-muted mb-1">Perangkat Pasif Terpakai:</span>
+                            <div class="rounded border border-border overflow-hidden">
+                                @foreach($materialTerpakai as $material)
+                                <div class="flex justify-between px-3 py-1.5 {{ $loop->even ? 'bg-surface-muted' : '' }}">
+                                    <span class="text-text-secondary">{{ $material->item_name }}</span>
+                                    <span class="font-mono font-semibold text-text-main">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }} {{ $material->unit }}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endif
+
                         <div class="pt-2">
                             <span class="block text-text-muted mb-1">Catatan Pemasangan:</span>
                             <p class="p-3 bg-surface-muted rounded border border-border italic">{{ $installation->installation_note ?? 'Tidak ada catatan' }}</p>

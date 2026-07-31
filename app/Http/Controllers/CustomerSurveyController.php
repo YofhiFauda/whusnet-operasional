@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\MaterialKind;
+use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -9,9 +11,11 @@ use App\Events\SurveyCompleted;
 use App\Events\SurveyStarted;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
+use App\Models\Item;
 use App\Models\Task;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
+use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
@@ -216,7 +220,23 @@ class CustomerSurveyController extends Controller
             return redirect()->route('surveys.queue')->with('error', 'Data waktu mulai survey tidak ditemukan.');
         }
 
-        return view('surveys.report', compact('customer', 'survey'));
+        // Master barang aktif buat dropdown material. Baris estimasi yang sudah
+        // pernah disimpan ikut dikirim supaya laporan yang dibuka ulang gak
+        // kehilangan isinya.
+        $items = Item::active()->orderBy('name')->get();
+        $materialRows = app(TaskMaterialService::class)
+            ->estimatesForCustomer($customer)
+            ->map(fn ($row) => [
+                'item_id' => $row->item_id,
+                'item_name' => $row->item_name,
+                'item_type' => $row->item_type->value,
+                'qty' => (float) $row->qty,
+                'unit' => $row->unit,
+                'note' => $row->note,
+            ])
+            ->all();
+
+        return view('surveys.report', compact('customer', 'survey', 'items', 'materialRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -258,8 +278,25 @@ class CustomerSurveyController extends Controller
             'house_photo' => 'required_if:survey_status,completed|nullable|image|max:2048',
             'survey_note' => 'required_if:survey_status,failed|nullable|string',
             'difficulty_level' => 'required_if:survey_status,completed|nullable|in:MUDAH,SEDANG,SULIT',
+            // Opsional — cuma diisi kalau pelanggan minta tanggal tertentu.
+            // after_or_equal:today: minta dipasang di tanggal yang sudah lewat
+            // tidak punya arti, dan kalau lolos akan langsung bikin task lahir
+            // dalam kondisi TERLAMBAT di papan FOP.
+            'requested_installation_date' => 'nullable|date|after_or_equal:today',
+            // Estimasi kebutuhan alat — daftar baris, bukan teks bebas.
+            // Semuanya nullable per baris: baris kosong dibuang di
+            // TaskMaterialService, bukan ditolak, supaya form repeatable yang
+            // menyisakan baris kosong terakhir gak bikin submit gagal.
+            'materials' => 'nullable|array',
+            'materials.*.item_id' => 'nullable|integer|exists:items,id',
+            'materials.*.item_name' => 'nullable|string|max:150',
+            'materials.*.item_type' => 'nullable|string|in:'.implode(',', MaterialType::values()),
+            'materials.*.qty' => 'nullable|numeric|min:0',
+            'materials.*.unit' => 'nullable|string|max:20',
+            'materials.*.note' => 'nullable|string|max:255',
         ], [
             'survey_note.required_if' => 'Alasan tidak layak pasang wajib diisi.',
+            'requested_installation_date.after_or_equal' => 'Tanggal request pemasangan tidak boleh sebelum hari ini.',
         ]);
 
         $difficulty = $validated['difficulty_level'] ?? null;
@@ -270,6 +307,47 @@ class CustomerSurveyController extends Controller
         $validated['survey_note'] = $note;
         unset($validated['difficulty_level']);
 
+        // Baris material dipisah dari payload survey — tujuannya tabel lain
+        // (task_materials), bukan kolom customer_surveys.
+        $materialRows = $validated['materials'] ?? [];
+        unset($validated['materials']);
+
+        // Estimasi kabel sudah punya kolom sendiri sejak lama dan tetap dipakai.
+        // Nilainya diturunkan jadi satu baris material supaya teknisi gak diminta
+        // mengisi angka yang sama dua kali — dan supaya perbandingan realisasi
+        // di halaman verifikasi punya lawan tanding untuk kabel.
+        $cableMeter = $validated['cable_estimation_meter'] ?? null;
+
+        // Tipe baris dicek lewat master kalau item_id dikirim — form memang tidak
+        // selalu menyertakan item_type untuk barang terdaftar (tipe-nya ikut
+        // master). Kalau cuma membaca item_type mentah, baris dropcore dari master
+        // tak terdeteksi dan kabel tercatat dua kali.
+        // NB: pluck() di Eloquent tetap menerapkan cast, jadi nilainya instance
+        // MaterialType — bukan string. Dibandingkan langsung ke string selalu
+        // false (kelas bug yang sama dengan catatan enum-vs-string di FopTask).
+        $masterTypes = Item::whereIn('id', collect($materialRows)->pluck('item_id')->filter())
+            ->pluck('type', 'id')
+            ->map(fn (MaterialType $type) => $type->value);
+
+        $hasCableRow = collect($materialRows)->contains(function ($row) use ($masterTypes) {
+            $type = ! empty($row['item_id'])
+                ? ($masterTypes[$row['item_id']] ?? null)
+                : ($row['item_type'] ?? null);
+
+            return $type === MaterialType::KABEL_DROPCORE->value;
+        });
+
+        if ($cableMeter > 0 && ! $hasCableRow) {
+            array_unshift($materialRows, [
+                'item_id' => null,
+                'item_name' => 'Kabel Dropcore',
+                'item_type' => MaterialType::KABEL_DROPCORE->value,
+                'qty' => $cableMeter,
+                'unit' => 'meter',
+                'note' => 'Otomatis dari estimasi kabel survey',
+            ]);
+        }
+
         if ($request->hasFile('survey_photo')) {
             $validated['survey_photo'] = FileUploadService::uploadSurveyPhoto($request->file('survey_photo'), $customer, 'odp');
         }
@@ -278,7 +356,7 @@ class CustomerSurveyController extends Controller
             $validated['house_photo'] = FileUploadService::uploadSurveyPhoto($request->file('house_photo'), $customer, 'house');
         }
 
-        DB::transaction(function () use ($customer, $validated, $workflowService) {
+        DB::transaction(function () use ($customer, $validated, $materialRows, $workflowService) {
             $survey = $customer->latestSurvey()->first();
 
             if (! $survey) {
@@ -341,6 +419,18 @@ class CustomerSurveyController extends Controller
             $survey->surveyors = $surveyorsText;
 
             $survey->save();
+
+            // Estimasi material menempel di FopTask SURVEY pelanggan ini.
+            // Kalau task-nya belum ada (laporan disimpan sebelum papan FOP sempat
+            // auto-sync), baris material dilewat — laporan survey tetap tersimpan.
+            // Menggagalkan seluruh laporan cuma karena anchor-nya belum terbentuk
+            // jelas lebih merugikan daripada kehilangan daftar estimasi.
+            $materialService = app(TaskMaterialService::class);
+            $surveyFopTask = $materialService->resolveTaskFor($customer, TaskType::SURVEY);
+
+            if ($surveyFopTask) {
+                $materialService->sync($surveyFopTask, MaterialKind::ESTIMASI, $materialRows, auth()->id());
+            }
 
             if ($validated['survey_status'] === 'completed' && $customer->status === 'survey_in_progress') {
                 // Selesaikan task survey jika ada

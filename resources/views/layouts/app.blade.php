@@ -287,7 +287,7 @@
                     @endif
                     @endif
 
-                    @if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('noc_worksheet.masuk.view') || auth()->user()->hasPermission('noc_worksheet.diproses.view') || auth()->user()->hasPermission('noc_dashboard.view'))
+                    @if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
@@ -314,11 +314,11 @@
                             @endif
 
                             {{--
-                                Worksheet NOC — SATU entry. Dua tab (Ticket
-                                Masuk / Ticket Diproses) ada DI DALAM halaman,
-                                bukan dipecah jadi dua menu.
+                                Worksheet NOC — satu entry, satu halaman.
+                                Tab Masuk/Diproses dilebur (ADHOC-06) karena
+                                window Pending NOC dihapus.
                             --}}
-                            @if(auth()->user()->hasPermission('noc_worksheet.masuk.view') || auth()->user()->hasPermission('noc_worksheet.diproses.view'))
+                            @if(auth()->user()->hasPermission('noc_worksheet.view'))
                             <a href="{{ route('noc.worksheet') }}"
                                class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('noc.worksheet*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 Worksheet NOC
@@ -342,6 +342,18 @@
                             <a href="{{ route('tickets.dibatalkan') }}"
                                class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.dibatalkan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 Ticket Dibatalkan
+                            </a>
+                            @endif
+
+                            {{--
+                                History Ticketing — arsip semua tiket (pengganti
+                                sheet Excel Helpdesk). Superset Ticket Selesai/
+                                Dibatalkan, permission-nya sendiri.
+                            --}}
+                            @if(auth()->user()->hasPermission('tickets.history.view'))
+                            <a href="{{ route('tickets.history') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.history') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                History Ticketing
                             </a>
                             @endif
                         </div>

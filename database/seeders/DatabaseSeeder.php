@@ -31,8 +31,10 @@ class DatabaseSeeder extends Seeder
         $this->call(SlaTimelineFeatureSeeder::class); // UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
         $this->call(TicketFeatureSeeder::class); // Ticketing + Worksheet/Dashboard NOC
         $this->call(TicketIssueCategoryFeatureSeeder::class);
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_* ke-sync ke owner
+        $this->call(ItemFeatureSeeder::class); // Master Barang/Material
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
+        $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
 
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);

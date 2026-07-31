@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
+use App\Services\TaskMaterialService;
 use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
@@ -133,7 +134,12 @@ class CustomerVerificationController extends Controller
             'city',
         ]);
 
-        return view('verifications.admin', compact('customer'));
+        // Selisih estimasi vs realisasi material — inti nilai bisnis pencatatan
+        // material sebelum modul Inventory ada. Kosong untuk pelanggan lama yang
+        // laporannya dibuat sebelum fitur ini.
+        $materialVariance = app(TaskMaterialService::class)->varianceForCustomer($customer);
+
+        return view('verifications.admin', compact('customer', 'materialVariance'));
     }
 
     public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService)

@@ -21,15 +21,19 @@
     x-on:keydown.escape.window="show = false"
     x-effect="document.body.classList.toggle('overflow-hidden', show)"
     style="display: none;"
-    class="relative z-drawer"
+    {{-- z-[60] literal — `z-drawer` bukan utility Tailwind yang valid: token
+         --z-drawer cuma ada di :root, di luar @theme, dan z-index bukan
+         namespace yang di-generate Tailwind v4. Class itu resolve ke
+         z-index:auto (cek CSS hasil build: cuma ada .z-10..z-50). --}}
+    class="relative z-[60]"
     aria-labelledby="slide-over-title" role="dialog" aria-modal="true"
 >
     <!-- Overlay -->
-    <div x-show="show" x-transition.opacity class="fixed inset-0 bg-text-main/50 transition-opacity"></div>
+    <div x-show="show" x-transition.opacity class="fixed inset-0 top-16 bg-text-main/50 transition-opacity"></div>
 
-    <div class="fixed inset-0 overflow-hidden">
+    <div class="fixed inset-0 top-16 overflow-hidden">
         <div class="absolute inset-0 overflow-hidden">
-            <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+            <div class="pointer-events-none fixed top-16 bottom-0 right-0 flex max-w-full pl-10">
                 <!-- Drawer Panel -->
                 <div 
                     x-show="show"

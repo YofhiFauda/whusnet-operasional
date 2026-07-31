@@ -64,6 +64,12 @@ Teknisi isi & submit laporan (POST /customers/{c}/survey)
         │ tidak
         ▼
 simpan CustomerSurvey (foto ODP+rumah wajib, hitung surveyor 1/2/3 dari anggota tim)
+  + requested_installation_date (opsional, harus >= hari ini)
+        │
+        ▼
+sync task_materials kind=estimasi ke FopTask kategori SURVEY
+  cable_estimation_meter → 1 baris kabel_dropcore (kalau belum ada baris dropcore manual)
+  FopTask SURVEY belum ada? → baris material dilewat, laporan TETAP tersimpan
         │
         ▼
    survey_status == completed? ──tidak──▶ selesai (data tersimpan, status tetap)
@@ -143,7 +149,12 @@ Teknisi isi & submit laporan (POST /customers/{c}/installation)
         │         │ tidak lengkap ──▶ TOLAK per-field
         │         │ lengkap
         │         ▼
+        │      cek wajib: minimal 1 baris material terpakai (qty>0 & barang terisi)?
+        │         │ kosong ──▶ TOLAK (errors: materials)
+        │         │ ada
+        │         ▼
         │      simpan CustomerTechnicalDetail + CustomerDevice (dobel-tulis)
+        │      sync task_materials kind=terpakai ke FopTask kategori PEMASANGAN
         │      hitung speed_conformity_percent
         │      Task Pemasangan → complete()
         │      transition → installed → verification_admin (2x berturutan)

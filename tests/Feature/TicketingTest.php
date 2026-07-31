@@ -369,9 +369,9 @@ class TicketingTest extends TestCase
             ->post(route('tickets.escalate', $ticket), ['target' => 'noc'])
             ->assertRedirect();
 
-        // Window "pending NOC" — belum di-check, bukan "Ditangani NOC" lagi
-        // (lihat TicketOnCheckNocTest buat mekanisme Oncheck NOC).
-        $this->assertSame('Pending NOC', $ticket->refresh()->statusLabel());
+        // Diassign ke NOC = langsung diproses (ADHOC-06). Label "Pending NOC"
+        // & "OnCheck NOC" sudah dihapus — lihat TicketOnCheckNocTest.
+        $this->assertSame('Diproses NOC', $ticket->refresh()->statusLabel());
     }
 
     public function test_attachments_are_stored_privately_and_downloadable(): void
@@ -611,12 +611,59 @@ class TicketingTest extends TestCase
         $response = $this->actingAs($this->helpdeskUser)->get(route('tickets.create'));
 
         $response->assertOk()
-            ->assertSee('List Task Ticketing')
+            // Panel kanan sekarang tabel (Frame 139) — judul "List Task Ticketing"
+            // diganti header kolom + tab; header kolom ini penanda panelnya render.
+            ->assertSee('Quick Dispatch Actions')
             ->assertSee('Backbone CUT')
             ->assertDontSee('Kategori Nonaktif');
 
         // Tiket yang udah dibuat sebelumnya nampil di panel kanan (initial load server-side).
         $response->assertSee(Ticket::first()->ticket_number);
+    }
+
+    /**
+     * Panel kanan worksheet = tabel padat (Frame 139): 6 kolom tetap + tab
+     * per-handler + filter prioritas. Header kolom & kontrolnya dirender
+     * server-side, jadi bisa dites tanpa browser.
+     */
+    public function test_worksheet_panel_renders_dense_table_layout(): void
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload());
+
+        $this->actingAs($this->helpdeskUser)
+            ->get(route('tickets.create'))
+            ->assertOk()
+            ->assertSee('Ticket ID &amp; Time', false)
+            ->assertSee('Status / Issue')
+            ->assertSee('Pelanggan (CID &amp; Contact)', false)
+            ->assertSee('Lokasi / POP / ODP')
+            ->assertSee('Keluhan (Detail)')
+            ->assertSee('Quick Dispatch Actions')
+            ->assertSee('Semua Prioritas');
+    }
+
+    /**
+     * Kolom "Lokasi / POP / ODP" + jam absolut + label status di tabel
+     * worksheet butuh field baru di payload kartu. Bentuk payload ini dipakai
+     * initial load DAN respons aksi AJAX — kalau salah satu field ilang,
+     * kolomnya kosong tanpa error, jadi dikunci di test.
+     */
+    public function test_worksheet_payload_includes_location_and_status_fields(): void
+    {
+        $this->actingAs($this->helpdeskUser)
+            ->post(route('tickets.store'), $this->validPayload());
+
+        $response = $this->actingAs($this->helpdeskUser)
+            ->getJson(route('tickets.worksheet-tasks'));
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'total',
+            'tasks' => [['id', 'code', 'time', 'time_at', 'pop', 'odp', 'address', 'status_label']],
+        ]);
+        $response->assertJsonPath('tasks.0.pop', 'POP Polorejo');
+        $response->assertJsonPath('tasks.0.status_label', 'Ditangani Helpdesk');
     }
 
     /**

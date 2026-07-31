@@ -10,6 +10,193 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-01 | Desain Ulang List Pelanggan & Dark Theme Toggle | Done |
 | ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi, Detail Pelanggan & Sub-Tabs Dark/Light Theme Support | Done |
 | ADHOC-03 | Restrukturisasi Modul Ticketing (lihat detail di bawah) | Done — 2026-07-28 |
+| ADHOC-04 | Layout Worksheet Helpdesk — panel form lipat + motion & responsif | Done — 2026-07-29 |
+| ADHOC-05 | Halaman History Ticketing (lihat detail di bawah) | Done — 2026-07-29 |
+| ADHOC-06 | Hapus window Pending NOC + aksi Oncheck NOC (lihat detail di bawah) | Done — 2026-07-29 |
+| ADHOC-07 | Support Dark & Light Theme untuk Halaman Report Survey (`surveys.report`) dan Report Pemasangan (`installations.report`) | Done — 2026-07-30 |
+| ADHOC-11 | Tanggal Request Pemasangan (Laporan Survey) + Pencatatan Material Estimasi vs Terpakai + Master Barang (lihat detail di bawah) | Done — 2026-07-31 |
+| ADHOC-10 | Detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** (partial bersama + endpoint detail JSON); navigasi halaman penuh disisakan buat Ticket Selesai / Dibatalkan / History (lihat detail di bawah) | Done — 2026-07-30 |
+| ADHOC-09 | Redesign Worksheet NOC (`noc.worksheet`) — tabel padat 1 baris/tiket + pencarian + filter + dua tab bercounter (Tiket Masuk / Assign FOP) + aksi lewat drawer baris terpilih (lihat detail di bawah) | Done — 2026-07-30 |
+| ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
+
+#### ADHOC-11 — Tanggal Request Pemasangan & Material Task (2026-07-31)
+
+Rancangan lengkap + keputusan: [docs/plan/rancangan-request-pemasangan-dan-material-task.md](plan/rancangan-request-pemasangan-dan-material-task.md).
+
+**Bagian 1 — Tanggal Request Pemasangan**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | `customer_surveys.requested_installation_date` (opsional) | **Satu-satunya sumber kebenaran.** `fop_tasks.client_request_date` kategori PSB cuma turunan, di-refresh tiap auto-sync — `update()` me-null-kannya tiap status keluar dari Pending, jadi tanpa refresh tanggalnya hilang begitu FOP menjadwalkan task |
+| 2 | Task PSB dengan tanggal masa depan **tidak kena SLA** | Prioritas dipaksa `LOW`, sorting existing (`FopTaskController::index()` baris 63) sudah menenggelamkannya ke dasar papan — tidak diubah |
+| 3 | Deadline = **akhir hari** tanggal request | Bukan `tanggal + handlingSlaHours()`. Yang dijanjikan ke pelanggan "dipasang tanggal 20", jadi lewat tengah malam = telat. Kolom SLA nampilin badge "Dijadwalkan {tgl}" sebelum hari-H, countdown normal di hari-H, `−HH:MM:SS` merah setelah lewat (komponen `x-countdown-timer` existing, tidak diubah) |
+| 4 | Gerbang tunggal `FopTask::usesClientRequestDeadline()` / `isScheduledForFutureClientDate()` | Dipakai bareng `slaDeadline()`, `slaTotalSeconds()`, papan FOP, DAN `autoSyncAndCalculatePriority()`. **Jangan tulis ulang kondisinya di tempat keempat** — timer & badge prioritas harus dari syarat yang sama |
+
+**Bagian 2 — Material (Estimasi vs Terpakai)**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 5 | Tabel `task_materials` (satu tabel, dua fase `kind`) | Anchor ke `fop_task_id` (bukan `customer_installations`) — FopTask satu-satunya entitas milik SEMUA jenis pekerjaan. Ini **adalah** `fop_task_materials` di `docs/post-mvp/inventory-fop.md`, dibangun lebih awal dengan bentuk final |
+| 6 | Master `items` + halaman Master Barang | Minimum by design: TANPA stok/harga/gudang. Tujuannya cuma penamaan seragam sejak baris pertama; Inventory nanti menambah di atasnya. Tanpa hapus — barang lama dinonaktifkan |
+| 7 | Estimasi di Laporan Survey; `required_tools` turun peran | `required_tools` jadi "Alat Khusus / Kendala Peralatan" (peralatan kerja, bukan material). Tidak di-drop — ada data survey lama. `cable_estimation_meter` otomatis jadi baris dropcore |
+| 8 | Perangkat Pasif Terpakai di Laporan Pemasangan | Prefill dari estimasi; wajib ≥1 baris saat `completed`. **Tidak menggantikan** `customer_technical_details.passive_device*` — itu aset terpasang, ini konsumsi material |
+| 9 | Tabel Estimasi vs Terpakai + selisih di Verifikasi Admin | Sengaja tanpa ambang otomatis — menilai wajar/tidaknya itu keputusan admin |
+
+Tiga bug ditemukan lewat test & diperbaiki: satuan form menang atas master di
+`TaskMaterialService`; dedup baris dropcore tak mendeteksi barang master; `pluck()`
+Eloquent tetap menerapkan cast sehingga banding enum-vs-string selalu false.
+
+Test: `SurveyRequestedInstallationDateTest`, `FopTaskClientRequestDateTest`,
+`TaskMaterialTest`, `MaterialReportFlowTest`. `FopTaskSortingTest` dijalankan sebagai
+regresi (lolos).
+
+Halaman lain yang ikut diperbarui supaya data baru tidak "hilang" setelah disimpan:
+tab Survey & tab Pemasangan detail pelanggan, halaman Task teknisi (`tasks/show`),
+Riwayat Detail FOP (`fop_tasks/history_detail`), ringkasan survey di form Pemasangan.
+
+**Belum dijalankan:** `php artisan migrate` (DB MySQL tidak terjangkau saat implementasi)
+dan seeder `ItemFeatureSeeder` + `ItemSeeder`. Migrasi sudah teruji lewat sqlite
+`:memory:` di test suite.
+
+#### ADHOC-10 — Detail tiket lewat drawer kanan (2026-07-30)
+
+Acuan layout: `worksheet_helpdesk_noc_v2.html` (`#ticketDrawer`).
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Partial bersama `tickets/partials/detail-drawer.blade.php` | Dipakai Worksheet Helpdesk (`tickets/create.blade.php`) DAN Worksheet NOC. Isi: Status & atribusi, Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan, Lampiran, Riwayat Ticket & Audit |
+| 2 | Endpoint `GET /api/tickets/{ticket}/detail` (`tickets.detail-json`) | `TicketController@detailJson`, gerbang sama dengan `show()`: `tickets.view` + `authorizeTicketScope()`. SENGAJA bukan memperbesar `worksheetCardPayload()` — riwayat & lampiran cuma perlu buat satu tiket yang dibuka, bukan 30–50 baris daftar |
+| 3 | Kontrak event, bukan duplikasi logic | Drawer men-dispatch `ticket-drawer-action`; konfirmasi + POST tetap di halaman pemanggil, jadi update array `tasks`/baris tabel & riwayat tetap satu jalur. `open-ticket-drawer` / `close-ticket-drawer` buat buka-tutup |
+| 4 | Link `/tickets/{id}` dicabut dari dua halaman kerja | Nomor tiket (tabel) & kartu sekarang buka drawer. Halaman penuh disisakan buat **Ticket Selesai**, **Ticket Dibatalkan**, **History Ticketing** + link notifikasi |
+| 5 | Tombol **Batalkan** di Worksheet Helpdesk | Sebelumnya gak ada di panel; sekarang ada, tapi **cuma di drawer** — aksi destruktif jangan gampang kepencet dari baris daftar |
+
+| 6 | **Isi drawer disamakan dengan `/tickets/{id}`** (2026-07-31) | Tambahan payload `detailJson()`: `type_label` (`MTN — Maintenance`), `fop_task{number, technicians, histories, can_view, url}`, `fop_task_orphan`, lampiran `size`+`uploader`. Drawer dapat blok **Task FOP Lapangan Terkait** (teknisi + tombol Buka Task FOP, digerbangi `fop_tasks.view`) & **Riwayat Task FOP** |
+| 7 | **Drawer di BAWAH navbar** (`top-16` + `h-[calc(100dvh-4rem)]`) | Navbar (`glass-header`, `backdrop-blur`) gak lagi ketiban panel setengah transparan. `dvh` bukan `vh` — address bar mobile bikin footer drawer kepotong |
+| 8 | **Fix class z-index mati** | `z-drawer`/`z-dropdown`/`z-modal`/`z-sticky` **tidak pernah ada** di CSS hasil build: tokennya (`--z-drawer` dst.) cuma di `:root`, DI LUAR `@theme`, dan z-index bukan namespace yang di-generate Tailwind v4. Semua elemen itu jatuh ke `z-index:auto`. Diganti literal `z-[60]`/`z-[40]`/`z-[80]`/`z-[20]` di `detail-drawer`, `components/ui/{drawer,dropdown,modal}`, `components/layout/topbar`. **Wajib `npm run build`** — kalau enggak, `top-16` & `z-[60]` gak ada di asset dan drawer balik nabrak navbar |
+| 9 | Scroll halaman dikunci saat drawer kebuka | `x-effect` toggle `overflow-hidden` di body — tanpa ini scroll di atas backdrop malah menggeser tabel di belakangnya |
+
+Test: `TicketDetailDrawerTest` (payload + flag aksi, terminal pasca-FOP, 403 tanpa
+`tickets.view`, 403 luar POP scope, dua worksheet buka drawer & barisnya gak nge-link,
+`type_label`, teknisi + riwayat Task FOP, flag orphan, metadata lampiran).
+`TicketCloseEscalateTest::test_worksheet_action_buttons_are_not_native_forms()` disesuaikan
+ke mekanisme baru — intinya tetap sama: JANGAN `<form method="POST">`.
+
+> **Catatan `fop_task_orphan`:** tiket "Terputus" bikin `fop_task` DAN `fop_task_number`
+> dua-duanya null (turunan relasi yang sama), jadi kondisi
+> `!fop_task && fop_task_number` gak akan pernah nyala. Bedanya wajib dibaca dari
+> `Ticket::isOrphan()` (`handler=FOP` + `fop_task_id` null), bukan dari nomor task.
+
+#### ADHOC-09 — Redesign Worksheet NOC (2026-07-30)
+
+Daftar kartu vertikal (~120px/tiket, tanpa pencarian sama sekali) diganti tabel padat
+bergaya History Ticketing supaya NOC bisa membaca puluhan tiket sekaligus dan menemukan
+tiket tertentu tanpa scroll.
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | **Tabel padat**, 1 baris = 1 tiket | Kolom: Masuk · Tiket · Nama/CID · HP · Desa · POP · Aduan · Kategori · Prioritas · **Umur** (≥8 jam kuning, ≥24 jam merah). Tab Assign FOP menukar Umur dengan Status / Diserahkan / Dikirim Oleh |
+| 2 | **Dua tab bercounter** via `?tab=` | `masuk` (default) = `handler=noc & status=open`; `assign_fop` = `handler=fop` **AND** ada `ticket_histories(action=dieskalasi, to_status=noc)`. Tab asing jatuh ke `masuk` |
+| 3 | **Pencarian + filter** GET | `q` (nomor tiket, nama, CID, desa, keluhan), `pop_id`, `issue_category_id`, `type`, `priority`, `created_by`, `date_from`/`date_to`. Filter dipakai SAMA di tabel & kedua counter tab |
+| 4 | **Aksi lewat drawer baris terpilih** | Klik baris → `components/ui/drawer.blade.php` (komponen lama yang belum terpakai) berisi detail + tombol Selesai/Assign FOP/Kembalikan/Batalkan. URL endpoint ditaruh di `data-*` baris & cuma dirender kalau flag `actionFlagsFor()` nyala → tab Assign FOP read-only total |
+| 5 | Tanpa migrasi, tanpa route/permission baru | Gerbang tetap `noc_worksheet.view`; `TicketService`/`TicketController` tidak disentuh |
+
+> **BUKAN pembalikan ADHOC-06.** Tab **Assign FOP** murni turunan data tiket yang sudah
+> lepas ke FOP — bukan window "Pending NOC", tidak ada aksi Oncheck/"ambil tiket", dan
+> tiket yang diassign ke NOC tetap langsung berstatus diproses. Test
+> `test_worksheet_has_no_pending_noc_window()` menjaga itu.
+
+Test: `NocWorksheetTest` 24 test (tab per-isi, exclude tiket yang Helpdesk kirim langsung ke
+FOP, tab read-only, tab asing, pencarian `#[DataProvider]`, filter POP/prioritas/kategori/
+tanggal, counter ikut filter, POP scope di kedua tab).
+
+#### ADHOC-06 — Hapus Pending NOC & Oncheck NOC (2026-07-29)
+
+Membalik ADHOC-03 #1. Assign ke NOC = **langsung diproses**; langkah "terima
+dulu" ternyata tidak mencerminkan cara kerja sebenarnya dan hanya membuat tiket
+menggantung.
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Status **Pending NOC** & **OnCheck NOC** dihapus → satu label **Diproses NOC** | `Ticket::statusLabel()`; `isPendingNoc()`/`isOnCheckNoc()` dihapus |
+| 2 | Tombol + endpoint **Oncheck NOC** dihapus | `TicketService::onCheckNoc()`, `TicketController::onCheckNoc()`, route `tickets.oncheck-noc`, flag `can_oncheck_noc`, guard `assertNocCheckedBeforeClose()` |
+| 3 | Kolom **`tickets.noc_checked_at` di-DROP** | migrasi `2026_07_29_000003` — destruktif, disetujui eksplisit |
+| 4 | **Kepemilikan bersama permanen**: tiket di tangan NOC dipegang `['helpdesk','noc']` | Keputusan pemilik produk: Helpdesk yang mengirim tetap boleh menyelesaikan/membatalkan |
+| 5 | **Worksheet NOC jadi SATU halaman tanpa tab** | Gerbang `noc_worksheet.view`; URL tab lama di-redirect ke `/noc/worksheet` |
+| 6 | Permission `noc_worksheet.masuk.view` & `.diproses.view` **dipensiunkan** | Feature di-set `is_active=false`, barisnya **tidak** dihapus dari DB biar role yang terlanjur punya tidak error |
+| 7 | Counter Dashboard NOC "Pending NOC" + "OnCheck NOC" dilebur jadi "Diproses NOC" | `NocDashboardController` |
+
+**Enum `TicketHistoryAction::DICEK_NOC` SENGAJA dipertahankan** — baris
+`ticket_histories` lama masih menyimpan `dicek_noc` dan kolomnya di-cast ke enum
+itu; menghapus case-nya bikin riwayat tiket lama meledak saat dibaca.
+
+**Test:** `TicketOnCheckNocTest` ditulis ulang jadi penjaga regresi (nama file
+dipertahankan supaya jejak fitur lama tidak hilang) — memastikan endpoint,
+kolom, flag, dan label benar-benar tidak balik lagi. `NocWorksheetTest`,
+`TicketingRbacTest`, `TicketCloseEscalateTest`, `TicketingTest`,
+`NocDashboardTest`, `TicketHistoryTest` menyesuaikan perilaku baru.
+
+Setelah pull:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+#### ADHOC-05 — Halaman History Ticketing (2026-07-29)
+
+Analisa lengkap: **`docs/plan/analisa-halaman-history-ticketing.md`**.
+
+Satu halaman arsip yang menampung **seluruh** tiket (semua handler & status,
+termasuk tiket orphan `handler=fop` + `fop_task_id` NULL), menggantikan sheet
+Google Sheets "Helpdesk Task Manager" yang dipakai Helpdesk sebelum sistem ini.
+
+Keputusan yang sudah dikunci:
+
+| # | Keputusan |
+|---|---|
+| 1 | FopTask yang tidak lahir dari tiket **tidak** masuk — Ticketing khusus keluhan pelanggan, Task FOP tetap di modulnya sendiri |
+| 2 | ~~Waktu selesai jalur FOP dari `tasks.completed_at`~~ → **direvisi 2026-07-30**: dari **waktu penyerahan ke FOP** |
+| 3 | Permission halaman sendiri `tickets.history.view` + `.export`; default Owner, NOC, Helpdesk |
+| 4 | Kolom DESA **di-snapshot saat tiket dibuat** (`tickets.customer_village`), bukan join relasi — supaya laporan lama tidak berubah saat pelanggan pindah desa |
+| 5 | **Revisi 2026-07-30:** History **hanya** menampung tiket yang sudah lepas dari meja Ticketing — Selesai, Dibatalkan, Assign FOP. Tiket `open` di Helpdesk/NOC adalah pekerjaan berjalan, rumahnya Worksheet Helpdesk / Worksheet NOC |
+| 6 | **Revisi 2026-07-30:** tiket jalur FOP berlabel **"Assign FOP"** saja — progres lapangan (Terjadwal/In Progress/Selesai/Dibatalkan/orphan) tidak dicerminkan di History, dibaca di `/fop-tasks` |
+
+Tiga migrasi: `resolved_at` + `customer_village` (keduanya dengan backfill), dan
+`2026_07_29_000004` yang **memperbaiki** `resolved_at` jalur FOP ke waktu
+penyerahan setelah revisi keputusan #2. Penulis `resolved_at`:
+`TicketService::close()` (selesai internal) dan `TicketService::escalateToFop()`
+(penyerahan) — `FopTaskObserver` sengaja TIDAK menyentuhnya, sempat begitu lalu
+dibatalkan.
+
+Test baru: `TicketHistoryTest` — **25 test lulus** (cakupan: yang masuk vs yang
+tidak, tiket yang dikembalikan keluar lagi, label "Assign FOP" untuk semua status
+FopTask, kolom "Oleh" per hasil akhir, kolom Tim sudah hilang, POP scope, RBAC,
+`resolved_at` tiga arti, snapshot desa tidak ikut berubah, durasi sub-menit,
+filter, ekspor).
+
+Penyesuaian 2026-07-30 (lanjutan): kolom **TIM dihapus** (teknisi = data
+pengerjaan lapangan, dibaca di `/fop-tasks`), dan **SOLVED BY → "Oleh"** yang
+menyesuaikan hasil akhir — yang menyelesaikan / membatalkan / **mengirim ke FOP**.
+
+Route baru: `/tickets/history` + `/tickets/history/export` (didaftarkan SEBELUM
+`/tickets/{ticket}`). Permission baru: `tickets.history.view`,
+`tickets.history.export`. `RolePermissionSeeder` **tidak** diubah — Owner (`*`)
+serta NOC/Helpdesk/Admin (`tickets.*`) sudah tercakup wildcard; Atasan sengaja
+tidak, bisa dinyalakan lewat Role Matrix.
+
+Setelah pull, jalankan:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+#### ADHOC-04 — Layout Worksheet Helpdesk (2026-07-29)
+
+`tickets/create.blade.php` diubah ke layout dua panel full-bleed sesuai rancangan:
+panel form kiri yang bisa dilipat (state persist di `localStorage`, shortcut `N`)
++ strip vertikal "Ticketing" saat terlipat, panel antrean kanan melebar otomatis.
+
+Motion sengaja hanya menganimasikan `width` + `opacity` dengan durasi & easing
+identik untuk strip dan panel form (`.panel-motion` di `resources/css/app.css`) —
+`x-show` sempat dipakai dan `display:none` membuat lebar hilang seketika sehingga
+panel kanan menyentak (terbaca sebagai "bounce"). Jumlah kolom kartu diatur
+`auto-fill/minmax` (`.ticket-grid`), bukan swap class `grid-cols-*`, supaya kolom
+tidak melompat di tengah animasi. `prefers-reduced-motion` mematikan semuanya.
+
+Butuh `npm run build` setelah pull (ada class & CSS baru).
 
 #### ADHOC-03 — Restrukturisasi Modul Ticketing (2026-07-28)
 

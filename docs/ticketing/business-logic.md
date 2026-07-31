@@ -19,15 +19,13 @@ Tiket punya kolom status **sendiri** selama masih ditangani internal, dan baru n
 |---|---|---|
 | `handler` | `TicketHandler` (`helpdesk`/`noc`/`fop`) | Siapa yang lagi pegang tiket |
 | `status` | `TicketHandlingStatus` (`open`/`closed`/`cancelled`) | Status internal — **cuma bermakna selama `handler` ≠ FOP** |
-| `noc_checked_at` | timestamp nullable | Penanda NOC sudah resmi ambil alih (lihat § 3) |
 
 State yang mungkin:
 
-| `handler` | `status` | `noc_checked_at` | Label | Siapa yang boleh bertindak |
+| `handler` | `status` | Label | Siapa yang boleh bertindak |
 |---|---|---|---|---|
 | `helpdesk` | `open` | — | Ditangani Helpdesk | `helpdesk` |
-| `noc` | `open` | NULL | **Pending NOC** | `helpdesk` **DAN** `noc` |
-| `noc` | `open` | terisi | **OnCheck NOC** | `noc` saja |
+| `noc` | `open` | **Diproses NOC** | `helpdesk` **DAN** `noc` |
 | `helpdesk`/`noc` | `closed` | — | Selesai (…) | tidak ada (final) |
 | `helpdesk`/`noc` | `cancelled` | — | Dibatalkan (…) | tidak ada (final) |
 | `fop` | (diabaikan) | (diabaikan) | turunan `FopTask.status` | tidak ada di sisi Ticketing |
@@ -38,11 +36,13 @@ State yang mungkin:
 
 **`handler=FOP` itu beku permanen.** Dipakai juga buat membedakan dua kasus `fop_task_id` NULL yang artinya beda: tiket yang **belum pernah** dieskalasi (`handler` masih helpdesk/noc) vs tiket yang **sudah pernah** tapi FopTask-nya dihapus FOP (orphan/"Terputus").
 
-## 3. Window "Pending NOC" & Aksi Oncheck NOC
+## 3. Kepemilikan Tiket di Tangan NOC
 
-Begitu Helpdesk klik "Ke NOC" (`escalateToNoc()`), `handler` langsung jadi `noc` **tapi** `noc_checked_at` masih NULL. Di jendela ini Helpdesk **belum kehilangan akses** — dia masih boleh Selesaikan, Assign FOP, atau Batalkan tiketnya. NOC melihat tiket ini di tab **Ticket Masuk**.
+Begitu Helpdesk klik "Ke NOC" (`escalateToNoc()`), `handler` jadi `noc` dan tiket **langsung berstatus Diproses NOC**. Tiket muncul seketika di tab **Tiket Masuk** Worksheet NOC sebagai pekerjaan berjalan — tab itu isinya `handler=noc & status=open`, jadi "masuk" di situ berarti "masuk ke meja NOC", **bukan** antrean pending yang harus di-Oncheck dulu (window itu dihapus ADHOC-06). Setelah NOC meneruskannya ke FOP, tiket pindah ke tab **Assign FOP** yang read-only.
 
-NOC klik **"Oncheck NOC"** (`onCheckNoc()`) → `noc_checked_at` terisi, tiket pindah ke tab **Ticket Diproses**, dan mulai titik ini **cuma NOC** yang boleh bertindak.
+> **Dihapus (ADHOC-06, 2026-07-29):** window "Pending NOC", aksi "Oncheck NOC", kolom `noc_checked_at`, endpoint `tickets.oncheck-noc`, guard `assertNocCheckedBeforeClose()`, dan flag `can_oncheck_noc`. Dulu tiket menggantung di state "sudah dikirim tapi belum diterima" sampai NOC menekan Oncheck. Pada praktiknya assign = mulai kerja, jadi langkah itu cuma menambah klik tanpa mengubah siapa yang mengerjakan.
+
+Tiket di tangan NOC dipegang **berdua**: `helpdesk` (yang mengirim) **dan** `noc` (yang mengerjakan). Helpdesk tetap boleh Selesaikan/Assign FOP/Batalkan tiketnya sendiri — pilihan sadar supaya tiket tidak macet kalau NOC belum sempat menyentuhnya.
 
 ```php
 // Ticket::holderRoles() — SATU-SATUNYA sumber; dipakai
@@ -50,18 +50,16 @@ NOC klik **"Oncheck NOC"** (`onCheckNoc()`) → `noc_checked_at` terisi, tiket p
 // Ticket::actionFlagsFor() (gerbang tampilan tombol).
 match ($this->handler) {
     TicketHandler::HELPDESK => ['helpdesk'],
-    TicketHandler::NOC      => $this->noc_checked_at === null
-                                 ? ['helpdesk', 'noc']   // window pending
-                                 : ['noc'],              // sudah di-Oncheck
-    TicketHandler::FOP      => [],                       // terminal
+    TicketHandler::NOC      => ['helpdesk', 'noc'],   // dipegang berdua
+    TicketHandler::FOP      => [],                    // terminal
 };
 ```
 
 **Kenapa ada jendela ini sama sekali.** Kalau Helpdesk langsung kehilangan akses begitu klik "Ke NOC", tiket menggantung tanpa pemilik selama NOC belum sempat membuka worksheet-nya — pelanggan nelpon lagi, Helpdesk gak bisa apa-apa. Sebaliknya kalau Helpdesk memegang kendali selamanya, dua orang bisa Close/Assign FOP di objek yang sama nyaris bersamaan (`FopTask` dobel, riwayat konflik). Titik serah-terima yang eksplisit menutup dua-duanya.
 
-**Guard tambahan: NOC wajib Oncheck sebelum boleh Selesaikan.** `assertNocCheckedBeforeClose()` menolak `close()` dari role `noc` selama `noc_checked_at` masih NULL — kalau enggak, "Oncheck NOC" cuma jadi tombol hiasan yang bisa dilewati. Aksi lain (Assign FOP, Kembalikan, Batalkan) **tidak** kena guard ini: NOC memang boleh langsung melempar/menolak tiket dari tab Ticket Masuk tanpa harus mengklaimnya dulu.
+NOC boleh langsung Selesaikan/Assign FOP/Kembalikan/Batalkan begitu tiket masuk — tidak ada langkah klaim yang harus dilewati dulu.
 
-**`returnToHelpdesk()` me-reset `noc_checked_at` ke NULL** — kalau tiket dikirim ulang ke NOC belakangan, jendela pending mulai fresh lagi.
+**`returnToHelpdesk()`** mengembalikan `handler` ke `helpdesk`; tiket bisa dikirim ulang ke NOC kapan pun tanpa state sisa.
 
 ## 4. Dua Jalur Masuk, Satu Logic
 
@@ -102,10 +100,9 @@ Semua aksi lewat `TicketService`, semuanya dibuka dengan `lockForUpdate()` di da
 | Aksi | Method | Guard tambahan | Efek |
 |---|---|---|---|
 | Selesai | `close()` | `assertNocCheckedBeforeClose()` | `status=CLOSED` |
-| Ke NOC | `escalateToNoc()` | wajib `handler=HELPDESK` | `handler=NOC`, `noc_checked_at=NULL` |
-| Oncheck NOC | `onCheckNoc()` | wajib `handler=NOC`, aktor role `noc`/full-access, belum pernah di-check | `noc_checked_at=now()` |
+| Ke NOC | `escalateToNoc()` | wajib `handler=HELPDESK` | `handler=NOC` (langsung Diproses NOC) |
 | Ke FOP | `escalateToFop()` | — (boleh dari Helpdesk maupun NOC) | `handler=FOP`, `FopTask` DRAFT kebentuk |
-| Kembalikan | `returnToHelpdesk()` | wajib `handler=NOC` | `handler=HELPDESK`, `noc_checked_at=NULL` |
+| Kembalikan | `returnToHelpdesk()` | wajib `handler=NOC` | `handler=HELPDESK` |
 | Batalkan | `cancel()` | `reason` **wajib** (validasi controller) | `status=CANCELLED` |
 
 Dua guard yang berlaku ke hampir semua aksi:
@@ -113,7 +110,7 @@ Dua guard yang berlaku ke hampir semua aksi:
 - **`assertActorOwnsTicket()`** — aktor harus punya salah satu role dari `holderRoles()` (§ 3). Full-access (owner/admin) dibebaskan.
 - **`assertTicketStillOpen()`** — tolak kalau `handler=FOP` ("udah di FOP, lihat Task FOP"), `status=CLOSED`, atau `status=CANCELLED`.
 
-**`onCheckNoc()` sengaja TIDAK pakai `assertActorOwnsTicket()`** — di window pending guard itu mengizinkan `helpdesk` juga, padahal Oncheck spesifik cuma buat NOC. Jadi dia mengecek role secara langsung.
+**Semua aksi lewat `assertActorOwnsTicket()`** yang membaca `Ticket::holderRoles()` — tidak ada aksi yang mengecek role secara langsung lagi (dulu `onCheckNoc()` melakukan itu karena Oncheck khusus NOC).
 
 **Kenapa `reason` wajib khusus Batalkan:** membatalkan keluhan pelanggan itu keputusan yang menutup jalur, beda dari menyelesaikan (yang hasilnya terbukti dari kondisi layanan). Tanpa alasan tertulis, audit gak punya apa-apa buat ditelusuri.
 
@@ -158,8 +155,8 @@ Empat bucket ini wajib saling lepas dan menutupi seluruh `TaskStatus` — dijaga
 
 | Bucket | Dulu | Sekarang |
 |---|---|---|
-| Masuk | `/tickets/masuk` | Tab **Ticket** di panel List Task Ticketing (handler=helpdesk) + tab **Ticket Masuk** Worksheet NOC (pending NOC) |
-| Diproses | `/tickets/diproses` | Tab **Assign NOC**/**Assign FOP** di panel + tab **Ticket Diproses** Worksheet NOC |
+| Masuk | `/tickets/masuk` | Tab **Ticket** di panel List Task Ticketing (handler=helpdesk) |
+| Diproses | `/tickets/diproses` | Tab **Assign NOC**/**Assign FOP** di panel + tab **Tiket Masuk** Worksheet NOC (handler=noc & open) |
 | Selesai | `/tickets/selesai` (bucket) | Halaman sendiri, controller + permission sendiri |
 | Dibatalkan | `/tickets/dibatalkan` (bucket) | idem |
 

@@ -9,6 +9,7 @@ customers ──1:1──▶ customer_addresses
     │      ──1:1──▶ customer_devices (legacy, subset technical_details)
     │      ──1:N──▶ customer_surveys ──belongsTo──▶ users (technician_id, surveyor_2_id, surveyor_3_id)
     │      ──1:N──▶ customer_installations ──belongsTo──▶ users (technician_id)
+    │      ──1:N──▶ task_materials ──belongsTo──▶ fop_tasks, items (estimasi & terpakai)
     │      ──1:N──▶ customer_documents ──belongsTo──▶ users (uploaded_by)
     │      ──1:N──▶ customer_status_logs ──belongsTo──▶ users (changed_by)
     │      ──1:N──▶ tasks (Task eksekusi teknisi)
@@ -81,7 +82,7 @@ Migrasi: `2026_06_11_140000_create` + beberapa alter (`add_activated_by_user_id`
 
 ## Tabel `customer_surveys` (1:N)
 
-Migrasi: `2026_06_13_104704_create` + `add_multi_surveyor_house_photo`.
+Migrasi: `2026_06_13_104704_create` + `add_multi_surveyor_house_photo` + `2026_07_31_000001_add_requested_installation_date`.
 
 | Kolom | Tipe | Keterangan |
 |-------|------|------------|
@@ -93,7 +94,9 @@ Migrasi: `2026_06_13_104704_create` + `add_multi_surveyor_house_photo`.
 | `surveyor_2_id`, `surveyor_3_id` | FK users | Anggota tim survey lain (maks 3 tercatat) |
 | `surveyors` | string | Teks ringkas "Petugas Survey N - Nama" |
 | `fop_id` | | FOP/pembuat task terkait |
-| `required_tools`, `cable_estimation_meter`, `nearest_odp` | | |
+| `required_tools` | text | **Alat khusus / kendala peralatan** (tangga, bor) — catatan bebas, BUKAN material habis pakai. Material terstruktur ada di `task_materials` |
+| `cable_estimation_meter`, `nearest_odp` | | `cable_estimation_meter` otomatis diturunkan jadi satu baris `task_materials` bertipe `kabel_dropcore` |
+| `requested_installation_date` | date, nullable | Tanggal pemasangan yang diminta pelanggan. **Satu-satunya sumber kebenaran** — `fop_tasks.client_request_date` kategori PSB cuma turunannya. Kosong = "secepatnya" |
 | `survey_photo`, `house_photo` | string | Wajib diisi saat submit |
 | `survey_note` | text | Gabungan tingkat kesulitan + catatan bebas |
 
@@ -110,6 +113,44 @@ Migrasi: `2026_06_13_110000_create` + `add_multi_technician`, `add_contract_and_
 | `technician_id`, `fop_id` | FK users | |
 | `installation_photo`, `contract_photo`, `signature_photo` | string | Wajib saat status `completed` |
 | `installation_note` | text | Diprepend catatan revisi kalau ada |
+
+## Tabel `task_materials` (material per task)
+
+Migrasi: `2026_07_31_000003_create_task_materials_table`. Menampung **dua fase** pencatatan material dalam satu tabel.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `fop_task_id` | FK `fop_tasks`, cascade delete | Anchor. Sengaja ke FopTask (bukan `customer_installations`) — FopTask satu-satunya entitas yang dimiliki SEMUA jenis pekerjaan |
+| `customer_id` | FK, nullOnDelete | Jalan pintas baca lintas task: estimasi menempel di task SURVEY, realisasi di task PSB |
+| `kind` | string(20) | `estimasi` (dari Laporan Survey) / `terpakai` (dari Laporan Pemasangan) — `App\Enums\MaterialKind` |
+| `item_id` | FK `items`, nullable, nullOnDelete | Null **hanya** untuk barang "lainnya" di luar master |
+| `item_type` | string(50) | Snapshot — `App\Enums\MaterialType` |
+| `item_name` | string(150) | Snapshot nama; laporan lama tidak berubah kalau master di-rename |
+| `qty` | decimal(10,2) | Decimal, bukan integer — kabel dihitung meter |
+| `unit` | string(20) | `meter`/`pcs`/`roll`/`set`. Untuk barang master, **selalu** diambil dari master |
+| `unit_price_snapshot` | decimal(12,2), nullable | Kosong sampai modul Inventory ada |
+| `note` | string(255), nullable | |
+| `recorded_by` | FK users, nullOnDelete | |
+
+Index: `(fop_task_id, kind)`.
+
+> Tabel ini **adalah** `fop_task_materials` yang direncanakan [docs/post-mvp/inventory-fop.md](../post-mvp/inventory-fop.md), dibangun lebih awal dengan bentuk final. Inventory nanti **menambah** (kolom stok/harga di `items`, tabel pergerakan stok, dashboard biaya) — bukan mengubah bentuk tabel ini atau UI-nya.
+
+## Tabel `items` (master barang/material)
+
+Migrasi: `2026_07_31_000002_create_items_table`.
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | bigint PK | |
+| `code` | string(30), unique | mis. `DC-1C`, `SPL-1X8` |
+| `name` | string(150) | |
+| `type` | string(50) | `App\Enums\MaterialType` |
+| `unit` | string(20) | Satuan resmi barang |
+| `is_active` | boolean, default true | Barang tak terpakai **dinonaktifkan**, bukan dihapus — baris `task_materials` lama menunjuk ke sini |
+
+**Sengaja tidak ada:** stok, harga, lokasi gudang, minimum stock. Itu wilayah modul Inventory. Tabel ini cuma menjawab "barang apa saja yang boleh dicatat" supaya penamaan seragam sejak baris pertama.
 
 ## Tabel `customer_technical_details` (1:1)
 

@@ -76,7 +76,7 @@
         @endif
 
         <!-- Master Data -->
-        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view'))
+        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view'))
         <div class="pt-4 pb-1">
             <p x-show="sidebarOpen" class="px-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Master Data</p>
             <div x-show="!sidebarOpen" class="w-full border-t border-border mt-2"></div>
@@ -100,6 +100,13 @@
         <a href="{{ route('master.pop.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md {{ request()->routeIs('master.pop.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span x-show="sidebarOpen" class="truncate">POP / Cabang</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('items.view'))
+        <a href="{{ route('master.items.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md {{ request()->routeIs('master.items.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="m21 16-9 5-9-5V8l9-5 9 5z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Barang / Material</span>
         </a>
         @endif
         @endif

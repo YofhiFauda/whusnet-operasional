@@ -15,6 +15,15 @@ enum TicketHistoryAction: string
     case DIESKALASI = 'dieskalasi';
     case DISELESAIKAN = 'diselesaikan';
     case DIKEMBALIKAN = 'dikembalikan';
+
+    /**
+     * USANG — aksi "Oncheck NOC" dihapus (ADHOC-06, 2026-07-29): tiket yang
+     * diassign ke NOC langsung diproses, gak ada langkah terima.
+     *
+     * Case-nya SENGAJA dipertahankan. Baris `ticket_histories` lama masih
+     * menyimpan nilai 'dicek_noc' dan kolomnya di-cast ke enum ini — hapus
+     * case-nya, riwayat tiket lama langsung meledak waktu dibaca.
+     */
     case DICEK_NOC = 'dicek_noc';
 
     public function label(): string

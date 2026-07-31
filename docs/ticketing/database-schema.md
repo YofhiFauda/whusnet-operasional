@@ -11,7 +11,10 @@
 | `2026_07_25_000001_create_ticket_issue_categories_table.php` | Master kategori keluhan |
 | `2026_07_25_000002_add_issue_category_id_to_tickets_table.php` | FK ke master kategori |
 | `2026_07_25_000003_add_handler_and_status_to_tickets_table.php` | **`handler` + `status`** — tiket mulai punya status sendiri |
-| `2026_07_28_000001_add_noc_checked_at_to_tickets_table.php` | **`noc_checked_at`** — penanda NOC sudah Oncheck |
+| `2026_07_28_000001_add_noc_checked_at_to_tickets_table.php` | **`noc_checked_at`** — penanda NOC sudah Oncheck (**di-drop lagi** oleh `2026_07_29_000003`) |
+| `2026_07_29_000001_add_resolved_at_to_tickets_table.php` | **`resolved_at`** — waktu keluhan benar-benar beres (History Ticketing) |
+| `2026_07_29_000002_add_customer_village_to_tickets_table.php` | **`customer_village`** — snapshot desa saat tiket dibuat |
+| `2026_07_29_000003_drop_noc_checked_at_from_tickets_table.php` | **DROP `noc_checked_at`** — window Pending NOC dihapus (ADHOC-06) |
 
 ### Catatan migrasi `2026_07_25_000003`
 
@@ -19,9 +22,13 @@ Kolom ditambahkan sebagai `string` biasa dengan default dari PHP enum (`->defaul
 
 Migrasi ini melakukan backfill `DB::table('tickets')->update(['handler' => FOP])`: semua tiket yang sudah ada dibuat sebelum perubahan ini **pasti** punya `FopTask` (dulu auto-sync), jadi menandainya sebagai `FOP` menjaga tampilan riwayat lama tetap benar.
 
-### Catatan migrasi `2026_07_28_000001`
+### Catatan migrasi `2026_07_29_000003` (drop `noc_checked_at`)
 
-`noc_checked_at` nullable **tanpa backfill**. Tiket lama ber-`handler=noc` otomatis terbaca "Pending NOC", yang justru membuat guard lebih longgar untuk data lama (Helpdesk masih bisa bantu) — bukan lebih ketat, jadi aman.
+Destruktif dan disetujui eksplisit: jam Oncheck yang tersimpan hilang permanen. Jejak **siapa** yang dulu meng-Oncheck tetap ada di `ticket_histories` (action `dicek_noc`), jadi audit lama tidak hilang total — itu yang membuat penghapusan kolom ini bisa diterima. `down()` hanya mengembalikan kolom kosong.
+
+### Catatan migrasi `2026_07_29_000001` & `000002`
+
+`resolved_at` dan `customer_village` sama-sama **di-backfill**: `resolved_at` dari `ticket_histories` (jalur internal) dan `tasks.completed_at` (jalur FOP); `customer_village` dari `customers.village_id` saat migrasi jalan — nilai perkiraan terbaik, bukan desa pelanggan pada saat tiket dulu dibuat.
 
 ## Tabel `tickets`
 
@@ -46,7 +53,8 @@ Migrasi ini melakukan backfill `DB::table('tickets')->update(['handler' => FOP])
 | `priority` | string(20) | `FopTaskPriority` (`low`/`Medium`/`High`/`Urgent`) |
 | **`handler`** | string(20), default `helpdesk` | `TicketHandler` — siapa yang lagi pegang. Beku permanen begitu jadi `fop` |
 | **`status`** | string(20), default `open` | `TicketHandlingStatus` — `open`/`closed`/`cancelled`. Cuma bermakna selama `handler` ≠ `fop` |
-| **`noc_checked_at`** | timestamp, nullable | NULL = NOC belum Oncheck (window "Pending NOC"); terisi = NOC sudah ambil alih |
+| **`resolved_at`** | timestamp, nullable | Waktu keluhan beres. Jalur internal diisi `TicketService::close()`; jalur FOP diisi `FopTaskObserver` dari `tasks.completed_at` |
+| **`customer_village`** | string(150), nullable | Snapshot nama desa saat tiket dibuat (bukan join relasi — pelanggan bisa pindah desa) |
 | `created_by` | FK → `users` | `restrictOnDelete` — "Assigned by" |
 | `fop_task_id` | FK → `fop_tasks`, nullable | `nullOnDelete` — kalau FOP hapus `FopTask`, tiket TETAP ada (jadi "Terputus") |
 | `created_at`, `updated_at` | timestamp | |
@@ -59,11 +67,10 @@ Migrasi ini melakukan backfill `DB::table('tickets')->update(['handler' => FOP])
 
 ### Kombinasi kolom status yang valid
 
-| `handler` | `status` | `noc_checked_at` | Arti |
+| `handler` | `status` | Arti |
 |---|---|---|---|
 | `helpdesk` | `open` | NULL | Ditangani Helpdesk |
-| `noc` | `open` | NULL | Pending NOC (Helpdesk & NOC dua-duanya boleh act) |
-| `noc` | `open` | terisi | OnCheck NOC (cuma NOC) |
+| `noc` | `open` | Diproses NOC (Helpdesk & NOC dua-duanya boleh act) |
 | `helpdesk`/`noc` | `closed` | apa saja | Selesai internal |
 | `helpdesk`/`noc` | `cancelled` | apa saja | Dibatalkan pra-FOP |
 | `fop` | diabaikan | diabaikan | Status ikut `fopTask.status` |
@@ -116,7 +123,7 @@ Migrasi ini melakukan backfill `DB::table('tickets')->update(['handler' => FOP])
 |---|---|---|
 | `dibuat` | `TicketService::create()` | Tiket disubmit |
 | `dieskalasi` | `escalateToNoc()` / `escalateToFop()` | Kirim ke NOC atau FOP (`to_status` membedakan) |
-| `dicek_noc` | `onCheckNoc()` | NOC klik "Oncheck NOC" |
+| `dicek_noc` | — (**usang**, ADHOC-06) | Dulu: NOC klik "Oncheck NOC". Case enum dipertahankan supaya riwayat lama tetap bisa dibaca |
 | `diselesaikan` | `close()` | Selesai internal |
 | `dikembalikan` | `returnToHelpdesk()` | NOC balikin ke Helpdesk |
 | `dibatalkan` | `cancel()` (pra-FOP) **atau** `FopTaskObserver` (pasca-FOP) | Pembatalan |
@@ -152,16 +159,16 @@ TicketHistory
 ```php
 'handler'        => TicketHandler::class,
 'status'         => TicketHandlingStatus::class,
-'noc_checked_at' => 'datetime',
+'resolved_at' => 'datetime',
 ```
 
 | Helper | Kembalian |
 |---|---|
-| `isPendingNoc()` | `handler=NOC` & `status=OPEN` & `noc_checked_at` NULL |
-| `isOnCheckNoc()` | `handler=NOC` & `status=OPEN` & `noc_checked_at` terisi |
+| `isOrphan()` | `handler=FOP` & `fop_task_id` NULL (FopTask dihapus — label "Terputus") |
+| `resolutionMinutes()` | `resolved_at` − `created_at`, null kalau belum selesai |
 | `holderRoles()` | Role yang sah bertindak sekarang — dipakai Service (otorisasi) & `actionFlagsFor()` (UI) |
 | `bucket()` / `scopeInBucket()` | Klasifikasi bucket, dua rezim (internal vs FopTask) |
-| `checkedBy()` | User yang Oncheck NOC (dari `ticket_histories`, butuh `histories.actor` eager-loaded) |
+| `checkedBy()` | **Usang** — user yang dulu Oncheck NOC; cuma relevan buat tiket lama (butuh `histories.actor` eager-loaded) |
 
 ## Kolom yang Butuh Diperhatikan Saat Eager-Load
 

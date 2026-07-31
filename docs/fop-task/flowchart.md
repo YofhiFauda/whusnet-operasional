@@ -45,6 +45,14 @@ FopTaskController::autoSyncAndCalculatePriority()
 ├─ 2. Customer status IN (waiting_installation, waiting_installations, surveyed)
 │     AND belum punya FopTask kategori PSB yang aktif
 │     → buat FopTask baru, category=PSB, priority=Medium (sementara)
+│       client_request_date ← customer.latestSurvey.requested_installation_date
+│
+├─ 2b. Refresh client_request_date SEMUA FopTask PSB aktif (2026-07-31)
+│      ← customer.latestSurvey.requested_installation_date
+│      Wajib tiap sync karena update() me-null-kan field ini tiap status
+│      keluar dari Pending — tanpa langkah ini tanggal request pelanggan
+│      hilang begitu FOP menjadwalkan task, dan urutan papan langsung salah.
+│      Kategori NON-PSB tidak disentuh (di sana field ini milik alur Pending).
 │
 └─ 3. Recalculate priority semua FopTask aktif kategori Survey/PSB
       berdasar sisa waktu SLA (lihat bagian 3)
@@ -53,6 +61,12 @@ FopTaskController::autoSyncAndCalculatePriority()
 ## 3. Kalkulasi Prioritas Dinamis (SLA-based)
 
 ```
+   PSB & client_request_date masih di masa depan? (2026-07-31)
+        │ ya → priority DIPAKSA Low, SLA TIDAK dihitung, lanjut task berikutnya
+        │      (pelanggan sendiri yang minta tanggal itu — "telat" belum punya
+        │       arti sampai harinya tiba)
+        │ tidak
+        ▼
                      hitung % sisa SLA
                             │
      percentage = (sisa_detik / total_detik) * 100
@@ -68,10 +82,13 @@ FopTaskController::autoSyncAndCalculatePriority()
 
 SLA per kategori:
 - **Survey** (belum ada Task tereksekusi): `customer.created_at + 1 hari`, total 86400 detik.
-- **PSB/Pemasangan** (belum ada Task): `survey.completed_at` (fallback `customer.updated_at`) `+ 3 hari`, total 259200 detik.
+- **PSB/Pemasangan dengan `client_request_date`** (2026-07-31): deadline = **akhir hari** tanggal request, total 86400 detik. Bukan `tanggal request + handlingSlaHours()` — yang dijanjikan ke pelanggan adalah "dipasang tanggal 20", jadi lewat tengah malam tanggal 20 = sudah telat. Kalau dipakai +SLA jam, timernya bohong terhadap janji yang dipegang pelanggan.
+- **PSB/Pemasangan tanpa `client_request_date`** (belum ada Task): `survey.completed_at` (fallback `customer.updated_at`) `+ 3 hari`, total 259200 detik.
 - **Tipe lain / udah ada Task tereksekusi**: `task.scheduled_at + TaskType::slaMinutes()` (lihat tabel di [database-schema.md](database-schema.md)).
 
 Method sumber: `FopTask::slaDeadline()`, `FopTask::slaTotalSeconds()`.
+
+**Gerbang tunggal `client_request_date`:** `FopTask::usesClientRequestDeadline()` dan `FopTask::isScheduledForFutureClientDate()`. `slaDeadline()`, `slaTotalSeconds()`, tampilan papan FOP, DAN `autoSyncAndCalculatePriority()` semua bertanya ke dua method itu. **Jangan tulis ulang kondisinya di tempat lain** — kalau countdown dan badge prioritas menghitung dari syarat yang beda, satu task bisa menampilkan dua kebenaran sekaligus (kelas bug yang sama dengan catatan enum-vs-string di `FopTask::slaDeadline()`).
 
 ## 4. Assignment Teknisi → Auto-buat `Task` Eksekusi + Auto-Team Rebuild
 
@@ -241,6 +258,8 @@ ORDER BY
 - Task dengan `client_request_date` hari ini (atau udah lewat) masuk bucket 0 — ikut aturan sorting normal (priority dulu, baru category/created_at) berbarengan sama task yang gak punya `client_request_date` sama sekali.
 - **Gak ada cron.** Bucket dihitung ulang tiap kali `GET /fop-tasks` di-load — begitu tanggal sistem nyampe/lewat `client_request_date`, task otomatis "naik" ke sorting normal di request berikutnya, tanpa job terjadwal.
 - Badge visual di kolom "Tanggal" (`fop_tasks/index.blade.php`): **"JADWAL HARI INI"** (merah) kalau `client_request_date <= hari ini`, **"Terjadwal — {tanggal}"** (abu-abu) kalau di masa depan.
+- **Sumber isian PSB berubah (2026-07-31):** untuk kategori PSB, `client_request_date` tidak lagi cuma dari alur Pending manual — nilainya diturunkan dari `customer_surveys.requested_installation_date` (diisi teknisi di Laporan Survey) dan di-refresh tiap sync. Perilaku sorting di bagian ini **tidak berubah sama sekali**; yang berubah cuma dari mana datanya datang dan berapa banyak task yang punya nilai itu.
+- **Kolom SLA (2026-07-31):** task PSB yang tanggal request-nya belum tiba **tidak** menampilkan countdown — diganti badge netral **"Dijadwalkan {tanggal}"**. Countdown hijau berdurasi tiga minggu menyesatkan ("santai banget") padahal artinya "belum waktunya". Begitu tanggalnya tiba, countdown normal muncul menuju akhir hari; lewat tengah malam, komponen `x-countdown-timer` masuk state TERLAMBAT dan menampilkan **`−HH:MM:SS`** merah berkedip.
 - **Kenapa `>= besok`, bukan `> hari ini`:** ditemukan lewat test bahwa kolom `client_request_date` tersimpan dengan suffix waktu (`'... 00:00:00'`) di DB — perbandingan string `> 'YYYY-MM-DD'` (tanpa waktu) SELALU true karena string yang lebih panjang (ada suffix) dianggap "lebih besar" dari prefix-nya. Threshold `>= tanggal besok` menghindari ini sekaligus tetap portable ke MySQL & SQLite (gak pakai `CURDATE()` yang MySQL-only — dipakai binding parameter PHP `now()->addDay()->toDateString()` sebagai gantinya).
 - Detail implementasi & test: [analisa-auto-team.md § Task 8](analisa-auto-team.md).
 

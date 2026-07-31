@@ -34,10 +34,14 @@ Panel di kanan halaman New Ticket, memantau tiket yang sedang berjalan. Filterny
 | Tab | Isi | Tombol aksi yang muncul |
 |---|---|---|
 | **Ticket** | Tiket yang masih di tangan pembuat, belum dikirim ke mana pun | Selesai, Ke NOC, Ke FOP |
-| **Assign NOC** | Sudah dikirim ke NOC — badge menunjukkan **Pending NOC** atau **OnCheck NOC** | Selesai, Ke FOP, Kembalikan (selama masih Pending) |
+| **Assign NOC** | Sudah dikirim ke NOC — badge **Diproses NOC** | Selesai, Ke FOP, Kembalikan, Batalkan |
 | **Assign FOP** | Sudah dikirim ke FOP — pantau status Task FOP-nya | — (read-only, kendali ada di modul FOP) |
 
 Panel auto-refresh lewat Reverb saat ada perubahan dari user lain. Tombol **Refresh** manual jadi cadangan kalau Reverb tidak aktif. Kalau tiket aktif lebih dari 30, muncul indikator "+N tiket aktif lainnya".
+
+**Detail tiket = drawer kanan** (ADHOC-10). Klik nomor tiket (mode tabel) atau kartunya (mode kartu) → drawer kanan terbuka berisi Status & atribusi, Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan Teknis, Lampiran, dan Riwayat Ticket & Audit. Halaman kerja **tidak** melempar user ke `/tickets/{id}` — keluar halaman berarti kehilangan form yang sedang diisi, tab, dan posisi scroll. Navigasi halaman penuh cuma dipakai halaman arsip (**Ticket Selesai**, **Ticket Dibatalkan**, **History Ticketing**).
+
+Tombol **Batalkan** sengaja **hanya ada di drawer**, bukan di baris tabel/kartu — aksi destruktif jangan sampai kepencet sambil scroll.
 
 ### Skenario A — Helpdesk selesaikan sendiri
 
@@ -48,8 +52,8 @@ Panel auto-refresh lewat Reverb saat ada perubahan dari user lain. Tombol **Refr
 ### Skenario B — Helpdesk kirim ke NOC
 
 1. Klik **Ke NOC** → isi catatan buat NOC (opsional) → konfirmasi.
-2. Tiket pindah ke tab **Assign NOC**, statusnya **Pending NOC**.
-3. **Helpdesk masih bisa bertindak** di jendela ini — Selesai, Ke FOP, atau Batalkan tetap bisa selama NOC belum klik Oncheck.
+2. Tiket pindah ke tab **Assign NOC**, statusnya langsung **Diproses NOC**.
+3. **Helpdesk tetap bisa bertindak** — Selesai, Ke FOP, atau Batalkan tetap tersedia sampai tiket ditutup atau dikirim ke FOP.
 
 ### Skenario C — Helpdesk kirim langsung ke FOP
 
@@ -61,33 +65,42 @@ Panel auto-refresh lewat Reverb saat ada perubahan dari user lain. Tombol **Refr
 
 ## 3. NOC — Worksheet NOC
 
-Sidebar **Ticketing** → **Worksheet NOC** (`/noc/worksheet`). Satu halaman, dua tab.
+Sidebar **Ticketing** → **Worksheet NOC** (`/noc/worksheet`). Satu halaman berisi **tabel padat** (satu baris = satu tiket) dengan dua tab bercounter, pencarian, dan filter.
 
-### Tab "Ticket Masuk" — tiket Pending NOC
+### Tab
 
-Tiket yang dikirim Helpdesk tapi **belum** di-Oncheck. Tombol yang tersedia:
+| Tab | Isi | Bisa diaksi? |
+|---|---|---|
+| **Tiket Masuk** (default, `?tab=masuk`) | Tiket yang diassign ke NOC oleh Helpdesk — `handler=noc`, `status=open` | Ya |
+| **Assign FOP** (`?tab=assign_fop`) | Tiket yang sudah NOC teruskan ke FOP (`handler=fop` + jejak eskalasi lewat NOC) | **Tidak** — tindak lanjut di `/fop-tasks` |
+
+### Kolom & filter
+
+Kolom: Masuk · Tiket · Nama/CID · HP · Desa · POP · Aduan · Kategori · Prioritas, ditutup **Umur** (lama menunggu di meja NOC; ≥8 jam kuning, ≥24 jam merah) di tab Tiket Masuk, atau **Status / Diserahkan / Dikirim Oleh** di tab Assign FOP.
+
+Filter (GET, ikut kebawa di URL & paginasi): **Cari** (nomor tiket, nama, CID, desa, keluhan), rentang tanggal, POP, Kategori Issue, Prioritas, Tipe Tiket, Dikirim Oleh. Angka di badge tab ikut filter yang aktif.
+
+### Aksi — klik baris
+
+Klik baris mana pun (atau nomor tiketnya) → **drawer kanan** berisi detail lengkap: Status & atribusi, Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan Teknis, Lampiran, Riwayat Ticket & Audit. Drawer-nya partial yang sama dengan Worksheet Helpdesk (`tickets/partials/detail-drawer.blade.php`), isinya di-fetch dari `tickets.detail-json`. Baris tabel **tidak** menaut ke `/tickets/{id}` — halaman penuh cuma buat halaman arsip. Tombolnya:
 
 | Tombol | Efek |
 |---|---|
-| **Oncheck NOC** | NOC resmi ambil alih. Tiket pindah ke tab Ticket Diproses; Helpdesk kehilangan akses |
-| **Assign FOP** | Lempar ke FOP tanpa perlu Oncheck dulu (mis. jelas butuh teknisi lapangan) |
+| **Selesai** | Tutup tiket, isi "Apa yang sudah dikerjakan?" (opsional) |
+| **Assign FOP** | Lempar ke FOP (mis. jelas butuh teknisi lapangan) — Task FOP dibuat, tiket keluar dari tab Tiket Masuk |
 | **Kembalikan** | Balikin ke Helpdesk (salah kirim/bukan ranah NOC) |
 | **Batalkan** | Batalkan tiket (alasan **wajib**) |
 
-**Tombol "Selesai" sengaja TIDAK ada di tab ini** — NOC wajib Oncheck dulu sebelum boleh menyelesaikan. Kalau dipaksa lewat request manual, server menolak dengan pesan *"NOC wajib Oncheck dulu sebelum bisa Selesaikan tiket ini."*
-
-### Tab "Ticket Diproses" — tiket yang sudah di-Oncheck
-
-Tombol berubah jadi: **Selesai**, **Assign FOP**, **Kembalikan**, **Batalkan**.
+Nomor tiket di kolom **Tiket** membuka drawer yang sama, bukan halaman baru.
 
 Alur NOC lengkap:
 
-1. Buka tab **Ticket Masuk** → klik **Oncheck NOC** pada tiket yang mau dikerjakan.
-2. Kerjakan perbaikan (konfigurasi/routing/dll).
-3. Buka tab **Ticket Diproses** → klik **Selesai** → isi **"Apa yang sudah dikerjakan?"** → konfirmasi.
-4. Kalau ternyata butuh lapangan: klik **Assign FOP** → Task FOP dibuat, tiket keluar dari worksheet NOC.
+1. Buka **Worksheet NOC** — tiket yang diassign Helpdesk sudah langsung ada di tab **Tiket Masuk** (gak ada langkah "terima").
+2. Cari/filter tiket yang mau dikerjakan, klik barisnya untuk baca detail.
+3. Kerjakan perbaikan (konfigurasi/routing/dll) → **Selesai** → isi apa yang dikerjakan → konfirmasi.
+4. Kalau ternyata butuh lapangan: **Assign FOP** → Task FOP dibuat, tiket pindah ke tab **Assign FOP** (read-only).
 
-> Tab yang tidak dimiliki izinnya tidak ditampilkan sama sekali. Kalau user cuma punya akses satu tab, membuka `/noc/worksheet` otomatis mengarahkan ke tab itu.
+> **Berubah (ADHOC-09, 2026-07-30):** daftar kartu jadi tabel padat + cari + filter + dua tab. **Ini bukan pengembalian window Pending NOC** yang dihapus ADHOC-06 — tab **Assign FOP** murni turunan data (tiket yang sudah lepas ke FOP), gak ada aksi "Oncheck"/"ambil tiket", dan tiket yang diassign ke NOC tetap langsung berstatus diproses. Satu permission (`noc_worksheet.view`) menggerbangi kedua tab.
 
 ---
 
@@ -97,7 +110,7 @@ Sidebar **Ticketing** → **Dashboard NOC** (`/noc/dashboard`). Isinya:
 
 | Bagian | Isi |
 |---|---|
-| **Stat counter** | Pending NOC, OnCheck NOC, Selesai hari ini, Dibatalkan hari ini |
+| **Stat counter** | Diproses NOC, Selesai hari ini, Dibatalkan hari ini |
 | **Tiket Aktif NOC** | Tiket `handler=NOC` yang masih berjalan, diurut **paling lama menunggu di atas** + indikator umur — untuk melihat mana yang keteteran |
 | **Aktivitas Terbaru** | 20 kejadian terakhir dari `ticket_histories` (siapa mengerjakan apa) |
 | **Statistik per Issue** | 10 kategori keluhan terbanyak |
@@ -132,7 +145,7 @@ Butuh permission `tickets.cancel` dan harus jadi pemegang tiket saat itu.
 
 **Dari sisi Ticketing** (`/tickets/{id}`):
 
-- Header: nomor tiket, tipe, status (mis. *Pending NOC*, *OnCheck NOC*, *Selesai (NOC)*), prioritas, nama pelanggan, POP, **Assigned by**, **Created**.
+- Header: nomor tiket, tipe, status (mis. *Diproses NOC*, *Selesai (NOC)*), prioritas, nama pelanggan, POP, **Assigned by**, **Created**.
 - Panel **Aksi Tiket** — tombol yang muncul mengikuti state & role (lihat flowchart.md § 7). Semua tombol membuka dialog konfirmasi + kolom alasan.
 - Info box link ke Task FOP terkait (kalau ada).
 - Panel snapshot data pelanggan (kondisi saat tiket dibuat).

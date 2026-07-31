@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'required_tools',
     'cable_estimation_meter',
     'nearest_odp',
+    'requested_installation_date',
     'survey_photo',
     'house_photo',
     'survey_note',
@@ -46,6 +47,7 @@ class CustomerSurvey extends Model
         return [
             'survey_date' => 'date',
             'end_date' => 'date',
+            'requested_installation_date' => 'date',
             'assigned_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',

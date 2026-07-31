@@ -153,6 +153,15 @@ class FopTask extends Model
     }
 
     /**
+     * Material yang tercatat pada task ini — estimasi (survey) + terpakai
+     * (pemasangan). Ditulis lewat TaskMaterialService.
+     */
+    public function materials(): HasMany
+    {
+        return $this->hasMany(TaskMaterial::class);
+    }
+
+    /**
      * Batas waktu wajib mulai ditangani (Master Timeline SLA) dalam jam.
      * Pakai snapshot handling_sla_hours (di-freeze saat tiket dibuat, resolve
      * dari paket internet customer saat itu). Fallback ke default global
@@ -187,6 +196,16 @@ class FopTask extends Model
         }
 
         if ($this->category === TaskType::PEMASANGAN && $this->customer) {
+            // Tanggal yang diminta pelanggan mengalahkan SLA turunan survey.
+            // Deadline-nya AKHIR HARI tanggal itu, bukan tanggal + handlingSlaHours():
+            // yang dijanjikan ke pelanggan adalah "dipasang tanggal 20", jadi lewat
+            // tengah malam tanggal 20 = sudah telat. Kalau dipakai +SLA jam, badge
+            // baru merah 2-3 hari setelah tanggal janji — timernya bohong terhadap
+            // janji yang dipegang pelanggan.
+            if ($this->client_request_date) {
+                return Carbon::parse($this->client_request_date)->endOfDay();
+            }
+
             // NB: ini Collection::where (in-memory), bukan query builder — 'task_type'
             // & 'status' attribute-nya di-cast ke enum (TaskType/TaskStatus), jadi
             // bandingnya harus ke enum instance, BUKAN ->value string. Enum vs
@@ -212,10 +231,49 @@ class FopTask extends Model
      */
     public function slaTotalSeconds(): int
     {
+        // Deadline-nya endOfDay tanggal request (lihat slaDeadline()), jadi
+        // jendela yang bermakna buat ambang warna countdown adalah satu hari
+        // penuh — bukan handlingSlaHours() yang gak dipakai di jalur ini.
+        if ($this->usesClientRequestDeadline()) {
+            return 86400;
+        }
+
         if (! $this->task?->scheduled_at) {
             return $this->handlingSlaHours() * 3600;
         }
 
         return $this->category->slaMinutes() * 60;
+    }
+
+    /**
+     * True kalau deadline task ini ditentukan tanggal request pelanggan, bukan
+     * SLA turunan survey.
+     *
+     * SATU-SATUNYA gerbang untuk perilaku "request client": dipakai barengan
+     * oleh slaDeadline(), slaTotalSeconds(), tampilan papan FOP, dan
+     * FopTaskController::autoSyncAndCalculatePriority(). Jangan duplikasi
+     * kondisinya di tempat lain — kalau timer dan badge prioritas menghitung
+     * dari syarat yang beda, satu task bisa nampilin dua kebenaran sekaligus.
+     */
+    public function usesClientRequestDeadline(): bool
+    {
+        // Urutan syaratnya WAJIB cermin slaDeadline(): task yang sudah punya
+        // jadwal eksekusi (task.scheduled_at) memakai SLA pengerjaan, jadi
+        // tanggal request tidak lagi jadi deadline-nya.
+        return ! $this->task?->scheduled_at
+            && $this->category === TaskType::PEMASANGAN
+            && $this->customer !== null
+            && $this->client_request_date !== null;
+    }
+
+    /**
+     * True selama tanggal request pelanggan masih di masa depan — task belum
+     * boleh dihitung telat, dan di papan FOP ditampilkan sebagai badge
+     * "Dijadwalkan", bukan countdown.
+     */
+    public function isScheduledForFutureClientDate(): bool
+    {
+        return $this->usesClientRequestDeadline()
+            && $this->client_request_date->isAfter(Carbon::now()->startOfDay());
     }
 }

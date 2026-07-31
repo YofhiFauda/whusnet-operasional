@@ -4,12 +4,36 @@
 @section('page_title', 'Worksheet Helpdesk — New Ticket')
 
 @section('content')
-<div x-data="ticketPage()" @keydown.window="handleShortcut($event)" class="max-w-[1700px] mx-auto">
+{{--
+    Layout worksheet (rancangan whusnet_helpdesk_ticketing_system.html):
+    dua kolom full-bleed — panel form kiri yang bisa dilipat + panel antrean
+    kanan yang melebar otomatis begitu form dilipat. Bukan grid 12-kolom biasa
+    karena panel kanan harus punya area scroll sendiri, bukan ikut scroll
+    halaman.
+
+    `-m-4 sm:-m-6 lg:-m-8` sengaja mengimbangi padding <main> di
+    layouts/app.blade.php supaya panel benar-benar nempel ke tepi konten;
+    tingginya dikunci 100dvh dikurangi tinggi header (h-16 = 4rem) supaya
+    <main> sendiri gak ikut scroll.
+--}}
+{{--
+    `relative` dipakai buat jangkar panel form yang di bawah xl jadi overlay
+    (absolute inset-y-0) — lihat komentar panel form di bawah.
+--}}
+<div x-data="ticketPage()" @keydown.window="handleShortcut($event)"
+     @ticket-drawer-action.window="handleDrawerAction($event.detail)"
+     class="relative -m-4 sm:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex overflow-hidden bg-background">
 
     {{-- Toast Notification --}}
-    <div x-show="toast.show" x-transition x-cloak
-         class="fixed top-20 right-6 z-50 max-w-sm rounded-lg shadow-lg border px-4 py-3 flex items-start gap-2.5"
-         :class="toast.type === 'error' ? 'bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'">
+    <div x-show="toast.show" x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-3 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 translate-y-3 scale-95"
+         class="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl shadow-2xl border px-4 py-3 flex items-start gap-2.5"
+         :class="toast.type === 'error' ? 'bg-rose-50 dark:bg-rose-900/40 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200' : 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-200'">
         <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path x-show="toast.type !== 'error'" stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             <path x-show="toast.type === 'error'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -17,544 +41,889 @@
         <span class="text-xs font-semibold" x-text="toast.message"></span>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
+    {{--
+        STRIP TERLIPAT — pengganti panel form waktu dilipat. Klik di mana pun
+        pada strip membuka form lagi (target klik selebar strip, bukan cuma
+        ikonnya).
 
-        {{-- LEFT COLUMN: WORKSHEET FORM --}}
-        <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+        SENGAJA gak pakai x-show/x-transition: display:none bikin lebarnya
+        hilang mendadak, panel kanan nge-snap, dan gerakan slide strip nabrak
+        gerakan panel form — itu sumber kesan "bounce". Di sini strip & panel
+        form sama-sama cuma menganimasikan LEBAR dengan durasi + easing yang
+        identik, jadi total lebar dua panel selalu konstan dan panel kanan
+        melebar mulus tanpa lompatan.
+    --}}
+    <button type="button" @click="setFormOpen(true)" tabindex="-1"
+            :aria-hidden="formOpen ? 'true' : 'false'"
+            :tabindex="formOpen ? '-1' : '0'"
+            title="Buka form tiket baru (N)"
+            class="group shrink-0 overflow-hidden flex flex-col items-center justify-between py-6 bg-surface border-r border-border hover:bg-sky-50 dark:hover:bg-slate-800/60 cursor-pointer panel-motion"
+            :class="[
+                formOpen ? 'w-0 border-r-0 opacity-0 pointer-events-none' : 'w-11 opacity-100',
+                animReady ? '' : 'panel-motion-off',
+            ]">
+        <div class="flex flex-col items-center gap-4">
+            <span class="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-900/40 border border-sky-300 dark:border-sky-700 text-sky-600 dark:text-sky-400 flex items-center justify-center transition-transform duration-200 group-hover:scale-110 group-hover:bg-sky-600 group-hover:text-white">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+            </span>
+            <span class="[writing-mode:vertical-rl] text-[11px] font-bold uppercase tracking-[0.35em] text-text-muted group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
+                Ticketing
+            </span>
+        </div>
+        <svg class="h-3.5 w-3.5 text-text-muted group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-all duration-200 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m13 5 7 7-7 7M5 5l7 7-7 7" />
+        </svg>
+    </button>
 
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs text-text-muted">
-                    <span>Ticketing</span>
-                    <span>/</span>
-                    <span class="text-text-main font-semibold">Worksheet Helpdesk — New Ticket</span>
-                </div>
+    {{--
+        ══════════ PANEL KIRI: WORKSHEET FORM ══════════
+        DUA REZIM, dipisah di `xl`:
 
-                <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Draft Mode
+        • < xl — form jadi OVERLAY (`absolute inset-y-0 left-0 w-full`) di atas
+          panel antrean, buka/tutup dengan geser (`translate-x`). Sidebar app
+          lebarnya 256px dan static dari `md`, jadi panel yang dulu `w-screen`
+          (= 100vw) selalu LEBIH LEBAR dari area konten — itu penyebab layout
+          tablet/laptop kecil berantakan & scroll horizontal. `w-full` ngukur
+          area konten, bukan viewport.
+
+        • ≥ xl — kembali jadi panel statis dua kolom yang menganimasikan LEBAR,
+          karena di lebar ini form + tabel muat berdampingan.
+
+        Lebar dikunci 360px (xl) / 400px (2xl): sisanya dikasih ke tabel antrean
+        supaya kolomnya fit tanpa scroll horizontal.
+    --}}
+    {{--
+        Backdrop khusus rezim overlay (< xl) — klik di sisa area antrean nutup
+        form, pola yang sama kayak sidebar app di mobile. Di xl ke atas
+        dimatikan total karena panelnya udah gak numpuk.
+    --}}
+    <div x-show="formOpen" x-cloak @click="setFormOpen(false)"
+         x-transition.opacity.duration.200ms
+         class="absolute inset-0 z-10 bg-slate-900/40 dark:bg-slate-950/60 xl:hidden"></div>
+
+    {{-- inert waktu terlipat — field form yang lebarnya 0 gak boleh kejaring Tab. --}}
+    <div class="absolute inset-y-0 left-0 z-20 w-full max-w-[440px] xl:static xl:z-auto xl:max-w-none shrink-0 overflow-hidden flex panel-motion"
+         :inert="!formOpen"
+         :class="[
+             formOpen
+                 ? 'translate-x-0 opacity-100 xl:w-[360px] 2xl:w-[400px]'
+                 : '-translate-x-full opacity-0 xl:translate-x-0 xl:w-0',
+             animReady ? '' : 'panel-motion-off',
+         ]">
+    <div class="w-full xl:w-[360px] 2xl:w-[400px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-xl z-10">
+
+        {{-- Header Panel --}}
+        <div class="shrink-0 px-4 sm:px-5 py-3.5 border-b border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <span class="shrink-0 text-sky-600 dark:text-sky-400">
+                </span>
+                <div class="min-w-0">
+                    <h1 class="text-sm font-extrabold text-text-main uppercase tracking-wide truncate">Create Service Ticket</h1>
+                    <p class="text-[11px] text-text-muted truncate">Input tiket baru dengan cepat</p>
                 </div>
             </div>
 
-            <div class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden transition-all">
-
-                <div class="px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between">
-                    <div>
-                        <h1 class="text-lg font-bold text-text-main tracking-tight flex items-center gap-2">
-                            <svg class="h-5 w-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                            </svg>
-                            Create Service Ticket
-                        </h1>
-                        <p class="text-[11px] text-text-muted font-medium uppercase tracking-wider mt-0.5">
-                            Worksheet Helpdesk — Pengganti Pencatatan Manual Excel
-                        </p>
-                    </div>
-
-                    <a href="{{ route('dashboard') }}" class="text-xs text-text-muted hover:text-text-main transition-colors flex items-center gap-1">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Tutup
-                    </a>
-                </div>
-
-                {{--
-                    Submit mode — rancangan bagian D (RANCANGAN_MASTER_ISSUE_TICKETING.md):
-                    fetch() POST JSON (Accept: application/json) ke /tickets, BUKAN native
-                    form POST — user tetap di halaman ini setelah simpan, gak ada history
-                    entry POST yang bisa di-refresh & resubmit (prinsip PRG tetap terjaga
-                    lewat mekanisme lain, lihat docs/PRG_REDIRECT_CONVENTION.md).
-                    TicketController@store bercabang wantsJson(): fallback non-JS (mis.
-                    submit dari /fop-tasks) tetap PRG normal.
-                --}}
-                <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="divide-y divide-border">
-
-                    <!-- <div x-show="Object.keys(errors).length > 0" x-cloak class="p-4 bg-rose-50 dark:bg-rose-900/20 border-b border-rose-200 dark:border-rose-800">
-                        <p class="text-xs font-bold text-rose-700 dark:text-rose-300 mb-1">Validasi gagal — periksa kembali field bertanda merah:</p>
-                        <ul class="text-xs text-rose-600 dark:text-rose-400 list-disc list-inside">
-                            <template x-for="(msg, field) in errors" :key="field">
-                                <li x-text="msg"></li>
-                            </template>
-                        </ul>
-                    </div> -->
-
-                    {{-- SECTION 01: CLASSIFICATION --}}
-                    <div class="p-6 space-y-4">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
-                            <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 01: CLASSIFICATION</h2>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="space-y-1.5">
-                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                    Ticket Type <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <select x-model="ticketType" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
-                                        <option value="" disabled>-- SELECT CLASSIFICATION --</option>
-                                        @foreach($typeOptions as $opt)
-                                            <option value="{{ $opt['value'] }}">{{ $opt['value'] }} — {{ $opt['label'] }}</option>
-                                        @endforeach
-                                    </select>
-                                    <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                    Prioritas <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <select x-model="priority" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
-                                        @foreach($priorityOptions as $p)
-                                            <option value="{{ $p->value }}">{{ $p->value }}</option>
-                                        @endforeach
-                                    </select>
-                                    <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- SECTION 02: CUSTOMER IDENTITY --}}
-                    <div class="p-6 bg-slate-50/30 dark:bg-slate-900/20 space-y-4">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
-                            <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 02: CUSTOMER IDENTITY</h2>
-                        </div>
-
-                        <div class="space-y-1.5 relative">
-                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                Search Customer Data <span class="text-rose-500">*</span>
-                            </label>
-
-                            <div class="relative flex items-center">
-                                <svg class="h-4 w-4 absolute left-3 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-
-                                <input type="text" x-ref="searchInput" x-model="cidQuery" @input.debounce.300ms="searchCustomer()"
-                                       :disabled="selected !== null"
-                                       placeholder="ENTER CID OR NAME..."
-                                       class="w-full text-sm font-mono tracking-wide rounded-lg border border-border bg-surface pl-9 pr-10 py-2.5 text-text-main placeholder:text-text-muted placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-text-muted transition-all">
-
-                                <button type="button" x-show="selected" @click="clearSelection()" class="absolute right-3 text-xs font-bold text-sky-600 hover:text-sky-700 underline cursor-pointer">
-                                    Ganti
-                                </button>
-
-                                <button type="button" x-show="cidQuery && !selected" @click="cidQuery = ''; results = []" class="absolute right-3 text-text-muted hover:text-text-main">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <div x-show="results.length > 0 && !selected" x-cloak class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y divide-border">
-                                <template x-for="r in results" :key="r.id">
-                                    <button type="button" @click="pick(r)" class="w-full text-left px-4 py-3 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between cursor-pointer group">
-                                        <div>
-                                            <div class="font-bold text-text-main group-hover:text-sky-600 transition-colors" x-text="r.nama"></div>
-                                            <div class="text-xs text-text-muted font-mono" x-text="r.cid"></div>
-                                        </div>
-                                        <div class="text-right text-xs">
-                                            <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold text-[10px]" x-text="r.pop || 'NO POP'"></span>
-                                        </div>
-                                    </button>
-                                </template>
-                            </div>
-
-                            <p x-show="searching" x-cloak class="text-xs text-sky-600 animate-pulse mt-1 flex items-center gap-1">
-                                <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Mencari data pelanggan di database...
-                            </p>
-
-                            <p x-show="!searching && searched && results.length === 0 && !selected" x-cloak class="text-xs text-rose-500 mt-1 font-medium">
-                                Pelanggan tidak ditemukan. Silakan periksa kembali CID atau Nama.
-                            </p>
-                        </div>
-
-                        {{-- Duplicate Ticket Warning — dicek dari snapshot tasks panel kanan --}}
-                        <div x-show="selected && duplicateTickets.length > 0" x-cloak class="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                            <svg class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                                Pelanggan ini masih punya <span x-text="duplicateTickets.length"></span> tiket open:
-                                <template x-for="d in duplicateTickets" :key="d.id">
-                                    <span class="font-mono" x-text="d.code + ' (' + bucketLabel(d.bucket) + ')  '"></span>
-                                </template>
-                            </p>
-                        </div>
-
-                        <div class="border border-border rounded-lg overflow-hidden bg-border shadow-xs">
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border">
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Customer Name</span>
-                                    <div class="text-sm font-semibold text-text-main truncate" x-text="selected?.nama || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">CID Number</span>
-                                    <div class="text-sm font-bold font-mono text-sky-600 dark:text-sky-400 truncate" x-text="selected?.cid || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Phone / HP</span>
-                                    <div class="text-sm font-mono text-text-main truncate" x-text="selected?.no_hp || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Active Package</span>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="text-sm font-medium text-text-main truncate" x-text="selected?.paket || '—'"></div>
-                                        <span x-show="selected?.paket" class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300">Active</span>
-                                    </div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1 md:col-span-2">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Site Address</span>
-                                    <div class="text-xs text-text-main line-clamp-2" x-text="selected?.alamat || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">POP / Cabang</span>
-                                    <div class="text-xs font-semibold text-text-main" x-text="selected?.pop || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">ODP Port</span>
-                                    <div class="text-xs font-mono font-medium text-text-main" x-text="selected?.odp || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1 md:col-span-2">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">Perangkat Pelanggan (ONT/Router)</span>
-                                    <div class="text-xs font-mono text-text-main" x-text="selected?.perangkat || '—'"></div>
-                                </div>
-                                <div class="bg-surface p-3 space-y-1 md:col-span-2">
-                                    <span class="block text-[10px] font-bold text-text-muted uppercase tracking-wider">GPS Coordinates</span>
-                                    <div class="text-xs font-mono text-sky-600 dark:text-sky-400 flex items-center gap-1">
-                                        <svg class="h-3.5 w-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        <template x-if="selected?.maps_url">
-                                            <a :href="selected.maps_url" target="_blank" rel="noopener" class="hover:underline font-bold" x-text="selected.koordinat"></a>
-                                        </template>
-                                        <template x-if="!selected?.maps_url">
-                                            <span>—</span>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- SECTION 03: COMPLAINT & NOTES --}}
-                    <div class="p-6 space-y-4">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="w-1 h-4 bg-sky-600 rounded-full"></span>
-                            <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">SECTION 03: COMPLAINT &amp; NOTES</h2>
-                        </div>
-
-                        <div class="space-y-4">
-                            {{-- Kategori Issue — Master Issue (rancangan bagian C) --}}
-                            <div class="space-y-1.5">
-                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                    Kategori Issue <span class="text-rose-500">*</span>
-                                </label>
-                                <div class="relative">
-                                    <select x-model="issueCategoryId" @change="onIssueCategoryChange()" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
-                                        <option value="" disabled>-- PILIH KATEGORI ISSUE --</option>
-                                        <template x-for="c in issueCategories" :key="c.id">
-                                            <option :value="c.id" x-text="c.name"></option>
-                                        </template>
-                                        <option value="lainnya">Lainnya (isi manual)</option>
-                                    </select>
-                                    <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                                <p class="text-[10px] text-text-muted">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
-                                <p x-show="selectedCategorySlaSource" x-cloak class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
-                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4m0-4h.01"></path></svg>
-                                    SLA kategori ini: <span x-text="selectedCategorySlaSource === 'paket' ? 'sesuai Paket Internet pelanggan' : 'sesuai Prioritas di atas'"></span>
-                                </p>
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                    Detail Keluhan (Customer Complaint) <span class="text-rose-500">*</span>
-                                </label>
-                                <textarea x-model="detailKeluhan" @input="delete errors.detail_keluhan" rows="4" required maxlength="2000"
-                                          placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..."
-                                          :class="errors.detail_keluhan ? 'border-rose-400 focus:ring-rose-500/30 focus:border-rose-500' : 'border-border focus:ring-sky-500/30 focus:border-sky-500'"
-                                          class="w-full text-sm rounded-lg border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all"></textarea>
-                                <p x-show="errors.detail_keluhan" x-cloak class="text-[11px] font-semibold text-rose-600 dark:text-rose-400" x-text="errors.detail_keluhan"></p>
-                            </div>
-
-                            <button type="button" @click="showExtra = !showExtra" class="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">
-                                <svg class="h-3.5 w-3.5 transition-transform" :class="showExtra ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
-                                </svg>
-                                <span x-text="showExtra ? 'Sembunyikan Detail Tambahan' : 'Tampilkan Detail Tambahan (Catatan Teknis & Lampiran, Opsional)'"></span>
-                            </button>
-
-                            <div x-show="showExtra" x-cloak x-transition class="space-y-4">
-                                <div class="space-y-1.5">
-                                    <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                        Catatan Teknis
-                                    </label>
-                                    <textarea x-model="catatanTeknis" rows="3" maxlength="2000"
-                                              placeholder="NOC assessment, ping results, optical power checks (-dBm), redaman OPM, atau petunjuk awal untuk teknisi FOP..."
-                                              class="w-full font-mono text-xs rounded-lg border border-border bg-slate-900/5 dark:bg-slate-900/40 p-3 text-text-main italic placeholder:text-text-muted placeholder:not-italic focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all"></textarea>
-                                </div>
-
-                                <div class="space-y-1.5 pt-2">
-                                    <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                                        Lampiran (Evidence / OPM Screenshot)
-                                    </label>
-                                    <div class="flex items-center justify-center w-full">
-                                        <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-border border-dashed rounded-lg cursor-pointer bg-slate-50/50 dark:bg-slate-900/20 hover:bg-sky-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <div class="flex flex-col items-center justify-center pt-3 pb-3">
-                                                <svg class="w-6 h-6 mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                </svg>
-                                                <p class="text-xs text-text-secondary font-medium"><span class="font-bold text-sky-600">Klik untuk upload file</span> atau drag &amp; drop</p>
-                                                <p class="text-[10px] text-text-muted mt-0.5">Maks. 5 file, tiap file maks. 5 MB (JPG, PNG, WEBP, PDF)</p>
-                                            </div>
-                                            <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
-                                        </label>
-                                    </div>
-                                    <p x-show="attachments.length > 0" x-cloak class="text-[10px] text-text-muted" x-text="attachments.length + ' file dipilih'"></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- Footer Info & Actions --}}
-                    <div class="p-6 bg-slate-50/50 dark:bg-slate-900/40 border-t border-border">
-
-                        <div class="flex items-center justify-between pt-2">
-                            <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main transition-colors">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                DISCARD <span class="opacity-60 normal-case font-normal">(Esc)</span>
-                            </button>
-
-                            <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-md shadow-sky-600/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-show="!submitting">CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
-                                <span x-show="submitting">MENYIMPAN...</span>
-                                <svg x-show="!submitting" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                </svg>
-                                <svg x-show="submitting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
+            {{-- Tombol lipat panel (bukan navigasi keluar halaman) --}}
+            <button type="button" @click="setFormOpen(false)" title="Tutup form (N)"
+                    class="shrink-0 p-1.5 rounded-lg text-text-muted hover:bg-rose-600 hover:text-white active:scale-95 transition-all duration-200 cursor-pointer">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
 
         {{--
-            RIGHT COLUMN: LIST TASK TICKETING PANEL — rancangan bagian E.
-            Initial load lewat data server-side ($initialTasks). Realtime push
-            (Echo listener TicketQueueUpdated) masih Task 3 terpisah — di sini
-            item baru yang habis disubmit di-prepend lokal (optimistik) dari
-            respons JSON, bukan broadcast asli.
+            Submit mode — rancangan bagian D (RANCANGAN_MASTER_ISSUE_TICKETING.md):
+            fetch() POST JSON (Accept: application/json) ke /tickets, BUKAN native
+            form POST — user tetap di halaman ini setelah simpan, gak ada history
+            entry POST yang bisa di-refresh & resubmit (prinsip PRG tetap terjaga
+            lewat mekanisme lain, lihat docs/PRG_REDIRECT_CONVENTION.md).
+            TicketController@store bercabang wantsJson(): fallback non-JS (mis.
+            submit dari /fop-tasks) tetap PRG normal.
         --}}
-        <div class="lg:col-span-5 xl:col-span-4 space-y-4">
-            <div class="bg-surface border border-border rounded-xl shadow-sm p-5 sticky top-20 flex flex-col min-h-[calc(100vh-120px)]">
+        <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
 
-                <div class="pb-4 border-b border-border space-y-3">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-base font-bold text-text-main tracking-tight">List Task Ticketing</h2>
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300" x-text="tasks.length + ' Ticket'"></span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            {{--
-                                Refresh manual + auto-refresh via broadcast Reverb
-                                (App\Events\TicketQueueUpdated, Gap #3). Auto-refresh
-                                jalan sendiri kalau Echo kekoneksi; tombol ini fallback
-                                kalau Reverb down/gak jalan di browser user.
-                            --}}
-                            <button type="button" @click="refreshWorksheet()" :disabled="refreshing"
-                                    class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 disabled:opacity-50 cursor-pointer">
-                                <svg class="h-3.5 w-3.5" :class="refreshing ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <div class="flex-1 overflow-y-auto custom-scrollbar">
+
+                {{-- SECTION 01: CLASSIFICATION --}}
+                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
+                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 01: CLASSIFICATION</h2>
+
+                    {{-- Selalu 2 kolom: breakpoint `md:` ngukur viewport, bukan lebar panel. --}}
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                Ticket Type <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select x-model="ticketType" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
+                                    <option value="" disabled>-- SELECT CLASSIFICATION --</option>
+                                    @foreach($typeOptions as $opt)
+                                        <option value="{{ $opt['value'] }}">{{ $opt['value'] }} — {{ $opt['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                                 </svg>
-                                <span>Refresh</span>
-                            </button>
-                            {{--
-                                Halaman list penuh sekarang kepecah per-halaman
-                                (Worksheet NOC / Ticket Selesai / Dibatalkan) —
-                                gak ada lagi bucket generik. Link cuma muncul buat
-                                yang emang punya akses Worksheet NOC.
-                            --}}
-                            @if(auth()->user()->hasPermission('noc_worksheet.masuk.view'))
-                            <a href="{{ route('noc.worksheet.masuk') }}" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
-                                <span>Worksheet NOC</span>
-                            </a>
-                            @endif
+                            </div>
                         </div>
+
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                Prioritas <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select x-model="priority" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                                    @foreach($priorityOptions as $p)
+                                        <option value="{{ $p->value }}">{{ $p->value }}</option>
+                                    @endforeach
+                                </select>
+                                <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {{-- SECTION 02: CUSTOMER IDENTITY --}}
+                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 02: CUSTOMER IDENTITY</h2>
+                        {{-- Badge "Matched" cuma nyala kalau pelanggan beneran kepilih dari lookup --}}
+                        <span x-show="selected" x-cloak class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Matched</span>
+                    </div>
+
+                    <div class="space-y-1.5 relative">
+                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                            Search Customer Data <span class="text-rose-500">*</span>
+                        </label>
+
+                        <div class="relative flex items-center">
+                            <svg class="h-4 w-4 absolute left-3 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+
+                            <input type="text" x-ref="searchInput" x-model="cidQuery" @input.debounce.300ms="searchCustomer()"
+                                   :disabled="selected !== null"
+                                   placeholder="ENTER CID OR NAME..."
+                                   class="w-full text-sm font-mono tracking-wide rounded-lg border border-border bg-surface pl-9 pr-16 py-2.5 text-text-main placeholder:text-text-muted placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 disabled:bg-surface-muted disabled:text-text-muted transition-all">
+
+                            <button type="button" x-show="selected" x-cloak @click="clearSelection()" class="absolute right-3 text-xs font-bold text-sky-600 hover:text-sky-700 underline cursor-pointer">
+                                Ganti
+                            </button>
+
+                            <button type="button" x-show="cidQuery && !selected" x-cloak @click="cidQuery = ''; results = []" class="absolute right-3 text-text-muted hover:text-text-main transition-colors cursor-pointer">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div x-show="results.length > 0 && !selected" x-cloak
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 -translate-y-1"
+                             class="absolute z-30 mt-1 w-full bg-surface border border-border rounded-lg shadow-xl max-h-60 overflow-y-auto custom-scrollbar divide-y divide-border">
+                            <template x-for="r in results" :key="r.id">
+                                <button type="button" @click="pick(r)" class="w-full text-left px-4 py-3 text-sm hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-between cursor-pointer group">
+                                    <div>
+                                        <div class="font-bold text-text-main group-hover:text-sky-600 transition-colors" x-text="r.nama"></div>
+                                        <div class="text-xs text-text-muted font-mono" x-text="r.cid"></div>
+                                    </div>
+                                    <div class="text-right text-xs">
+                                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold text-[10px]" x-text="r.pop || 'NO POP'"></span>
+                                    </div>
+                                </button>
+                            </template>
+                        </div>
+
+                        <p x-show="searching" x-cloak class="text-xs text-sky-600 mt-1 flex items-center gap-1">
+                            <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Mencari data pelanggan di database...
+                        </p>
+
+                        <p x-show="!searching && searched && results.length === 0 && !selected" x-cloak class="text-xs text-rose-500 mt-1 font-medium">
+                            Pelanggan tidak ditemukan. Silakan periksa kembali CID atau Nama.
+                        </p>
+                    </div>
+
+                    {{-- Duplicate Ticket Warning — dicek dari snapshot tasks panel kanan --}}
+                    <div x-show="selected && duplicateTickets.length > 0" x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-1"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                        <svg class="h-4 w-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <p class="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            Pelanggan ini masih punya <span x-text="duplicateTickets.length"></span> tiket open:
+                            <template x-for="d in duplicateTickets" :key="d.id">
+                                <span class="font-mono" x-text="d.code + ' (' + bucketLabel(d.bucket) + ')  '"></span>
+                            </template>
+                        </p>
                     </div>
 
                     {{--
-                        Filter Tabs — value = TicketHandler->value asli (helpdesk/noc/fop),
-                        BUKAN TicketBucket lagi. Tab di sini nunjukin "tiket ini lagi
-                        di tangan siapa", bukan status pengerjaannya:
-                          Ticket     = masih di tangan pembuat, belum dikirim ke mana pun
-                          Assign NOC = udah dikirim ke NOC (Pending / OnCheck)
-                          Assign FOP = udah dikirim ke FOP (pantau status Task FOP)
+                        Kartu identitas pelanggan — versi ringkas (Frame 139):
+                        satu blok, bukan grid 8 sel. Nama + CID/HP + status di
+                        baris atas, Paket & POP/ODP dua kolom, alamat sebaris
+                        pin. Perangkat & GPS tetap ada di baris paling bawah:
+                        Helpdesk butuh SN ONT + titik lokasi buat diteruskan ke
+                        NOC/FOP, jadi SENGAJA gak dibuang walau mockup gak
+                        nampilinnya.
                     --}}
-                    <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted">
-                        <button type="button" @click="taskFilter = 'helpdesk'" :class="taskFilter === 'helpdesk' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Ticket</button>
-                        <button type="button" @click="taskFilter = 'noc'" :class="taskFilter === 'noc' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Assign NOC</button>
-                        <button type="button" @click="taskFilter = 'fop'" :class="taskFilter === 'fop' ? 'bg-white dark:bg-slate-800 text-text-main font-semibold shadow-xs' : 'hover:text-text-main'" class="flex-1 py-1.5 px-2 rounded-md transition-all text-center">Assign FOP</button>
+                    <div class="border border-border rounded-lg bg-surface p-3 space-y-2.5 shadow-xs">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="text-sm font-bold text-text-main truncate" x-text="selected?.nama || '—'"></div>
+                                <div class="flex items-center gap-2 text-[11px] font-mono text-text-muted mt-0.5 truncate">
+                                    <span class="px-1 rounded bg-surface-muted dark:bg-slate-800 font-bold text-sky-600 dark:text-sky-400" x-text="selected?.cid || '—'"></span>
+                                    <span>•</span>
+                                    <span x-text="selected?.no_hp || '—'"></span>
+                                </div>
+                            </div>
+                            <span x-show="selected" x-cloak class="shrink-0 px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded bg-emerald-500 text-white">Active</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+                            <div class="min-w-0">
+                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">Paket Aktif</span>
+                                <div class="text-xs font-semibold text-text-main truncate" x-text="selected?.paket || '—'"></div>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">POP / ODP</span>
+                                <div class="text-xs font-semibold text-text-main truncate" x-text="(selected?.pop || '—') + ' / ' + (selected?.odp || '—')"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-1.5 text-[11px] text-text-muted">
+                            <svg class="h-3.5 w-3.5 text-rose-500 shrink-0 mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span class="truncate" x-text="selected?.alamat || '—'"></span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-1.5 pt-2 border-t border-border">
+                            <div class="min-w-0">
+                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">Perangkat (ONT/Router)</span>
+                                <div class="text-[11px] font-mono text-text-main truncate" x-text="selected?.perangkat || '—'"></div>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="block text-[9px] font-bold text-text-muted uppercase tracking-wider">GPS Coordinates</span>
+                                <div class="text-[11px] font-mono text-sky-600 dark:text-sky-400 truncate">
+                                    <template x-if="selected?.maps_url">
+                                        <a :href="selected.maps_url" target="_blank" rel="noopener" class="hover:underline font-bold" x-text="selected.koordinat"></a>
+                                    </template>
+                                    <template x-if="!selected?.maps_url">
+                                        <span class="text-text-muted">—</span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-[10px] text-text-muted">Selesai &amp; Dibatalkan gak masuk antrean kerja — ada di halaman sendiri.</p>
+                </section>
+
+                {{-- SECTION 03: COMPLAINT & NOTES --}}
+                <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
+                    <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 03: COMPLAINT &amp; NOTES</h2>
+
+                    {{-- Kategori Issue — Master Issue (rancangan bagian C) --}}
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                            Kategori Issue <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <select x-model="issueCategoryId" @change="onIssueCategoryChange()" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all">
+                                <option value="" disabled>-- PILIH KATEGORI ISSUE --</option>
+                                <template x-for="c in issueCategories" :key="c.id">
+                                    <option :value="c.id" x-text="c.name"></option>
+                                </template>
+                                <option value="lainnya">Lainnya (isi manual)</option>
+                            </select>
+                            <svg class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                        <p class="text-[10px] text-text-muted">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
+                        <p x-show="selectedCategorySlaSource" x-cloak class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4m0-4h.01"></path></svg>
+                            SLA kategori ini: <span x-text="selectedCategorySlaSource === 'paket' ? 'sesuai Paket Internet pelanggan' : 'sesuai Prioritas di atas'"></span>
+                        </p>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                            Detail Keluhan (Customer Complaint) <span class="text-rose-500">*</span>
+                        </label>
+                        <textarea x-model="detailKeluhan" @input="delete errors.detail_keluhan" rows="4" required maxlength="2000"
+                                  placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..."
+                                  :class="errors.detail_keluhan ? 'border-rose-400 focus:ring-rose-500/30 focus:border-rose-500' : 'border-border focus:ring-sky-500/30 focus:border-sky-500'"
+                                  class="w-full text-sm rounded-lg border bg-background p-3 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 transition-all resize-none"></textarea>
+                        <p x-show="errors.detail_keluhan" x-cloak class="text-[11px] font-semibold text-rose-600 dark:text-rose-400" x-text="errors.detail_keluhan"></p>
+                    </div>
+
+                    <button type="button" @click="showExtra = !showExtra" class="flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer">
+                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="showExtra ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" />
+                        </svg>
+                        <span x-text="showExtra ? 'Sembunyikan Detail Tambahan' : 'Tampilkan Detail Tambahan (Catatan Teknis & Lampiran, Opsional)'"></span>
+                    </button>
+
+                    <div x-show="showExtra" x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 -translate-y-2"
+                         class="space-y-4">
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                Catatan Teknis
+                            </label>
+                            <textarea x-model="catatanTeknis" rows="3" maxlength="2000"
+                                      placeholder="NOC assessment, ping results, optical power checks (-dBm), redaman OPM, atau petunjuk awal untuk teknisi FOP..."
+                                      class="w-full font-mono text-xs rounded-lg border border-border bg-slate-900/5 dark:bg-slate-900/40 p-3 text-text-main italic placeholder:text-text-muted placeholder:not-italic focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all resize-none"></textarea>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                                Lampiran (Evidence / OPM Screenshot)
+                            </label>
+                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-border border-dashed rounded-lg cursor-pointer bg-surface-muted/50 dark:bg-slate-900/20 hover:bg-sky-50/60 dark:hover:bg-slate-800/50 hover:border-sky-400 transition-colors">
+                                <div class="flex flex-col items-center justify-center pt-3 pb-3">
+                                    <svg class="w-6 h-6 mb-1 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    <p class="text-xs text-text-secondary font-medium"><span class="font-bold text-sky-600">Klik untuk upload file</span> atau drag &amp; drop</p>
+                                    <p class="text-[10px] text-text-muted mt-0.5">Maks. 5 file, tiap file maks. 5 MB (JPG, PNG, WEBP, PDF)</p>
+                                </div>
+                                <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden">
+                            </label>
+                            <p x-show="attachments.length > 0" x-cloak class="text-[10px] text-text-muted" x-text="attachments.length + ' file dipilih'"></p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            {{-- Action Bar --}}
+            <div class="shrink-0 px-4 py-3 border-t border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-3">
+                <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-text-muted hover:text-text-main hover:bg-surface border border-transparent hover:border-border active:scale-95 transition-all duration-200 cursor-pointer">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    DISCARD <span class="opacity-60 normal-case font-normal">(Esc)</span>
+                </button>
+
+                <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-lg shadow-sky-600/25 hover:shadow-sky-600/40 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
+                    <span x-show="!submitting">CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
+                    <span x-show="submitting" x-cloak>MENYIMPAN...</span>
+                    <svg x-show="!submitting" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                    <svg x-show="submitting" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
+
+    {{--
+        ══════════ PANEL KANAN: LIST TASK TICKETING ══════════
+        rancangan bagian E. Initial load lewat data server-side ($initialTasks).
+        Update dari aktor lain masuk lewat broadcast Reverb (initEchoListeners());
+        item baru hasil submit di-prepend lokal (optimistik) dari respons JSON.
+
+        Isinya dibungkus lapisan lebar-minimum yang cuma DIPOTONG (overflow-hidden),
+        bukan disembunyikan pakai `hidden`: waktu form kebuka di layar sempit panel
+        ini kegeser keluar layar dengan mulus, dan kartu di dalamnya gak reflow
+        tiap frame animasi.
+    --}}
+    <div class="flex-1 flex min-w-0 overflow-hidden bg-background">
+    <div class="flex-1 flex flex-col min-w-[320px] overflow-hidden">
+
+        <div class="shrink-0 p-3 border-b border-border bg-surface flex items-center gap-2 flex-wrap">
+            {{--
+                Filter Tabs — value = TicketHandler->value asli (helpdesk/noc/fop),
+                BUKAN TicketBucket lagi. Tab di sini nunjukin "tiket ini lagi
+                di tangan siapa", bukan status pengerjaannya:
+                  Ticket     = masih di tangan pembuat, belum dikirim ke mana pun
+                  Assign NOC = udah dikirim ke NOC (langsung diproses NOC)
+                  Assign FOP = udah dikirim ke FOP (pantau status Task FOP)
+
+                Badge angka = jumlah tiket per handler SEBELUM filter prioritas
+                (tabCounts), biar user tetap lihat antrean penuh tiap tab walau
+                sedang menyaring prioritas tertentu.
+            --}}
+            <div class="flex-1 basis-full sm:basis-0 min-w-[200px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted">
+                <template x-for="tab in tabs" :key="tab.value">
+                    <button type="button" @click="taskFilter = tab.value"
+                            :class="taskFilter === tab.value ? 'bg-surface text-text-main font-bold shadow-sm' : 'hover:text-text-main'"
+                            class="flex-1 min-w-0 py-1.5 px-1.5 sm:px-2 rounded-md transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer">
+                        {{-- Label pendek di layar sempit ("NOC"), lengkap dari sm ke atas. --}}
+                        <span class="truncate sm:hidden" x-text="tab.shortLabel"></span>
+                        <span class="truncate hidden sm:inline" x-text="tab.label"></span>
+                        <span class="shrink-0 px-1.5 py-px rounded-full text-[10px] font-bold font-mono text-white" :class="tab.badgeClass" x-text="tabCounts[tab.value]"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div class="shrink-0 flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap">
+                {{-- Input Cari Tiket Aktif --}}
+                <div class="relative min-w-[130px] max-w-[180px]">
+                    <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input type="text" x-model="searchQuery"
+                           placeholder="Cari tiket..."
+                           class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-border bg-surface-muted dark:bg-slate-900 text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all font-medium">
+                    <button type="button" x-show="searchQuery" @click="searchQuery = ''"
+                            class="absolute inset-y-0 right-0 pr-2 flex items-center text-text-muted hover:text-text-main cursor-pointer"
+                            title="Hapus pencarian">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
-                <div class="flex-1 overflow-y-auto py-4 space-y-3 pr-1 custom-scrollbar">
-                    <template x-if="filteredTasks.length === 0">
-                        <p class="text-xs text-text-muted text-center py-6">Belum ada tiket di tab ini.</p>
-                    </template>
-                    <template x-for="task in filteredTasks" :key="task.id">
-                        <div class="p-3.5 rounded-lg border border-border bg-slate-50/50 dark:bg-slate-900/40 hover:border-sky-500/50 transition-all space-y-2.5">
-                            <a :href="'{{ url('/tickets') }}/' + task.id" class="block space-y-2.5">
-                                <div class="flex items-start justify-between gap-2">
-                                    <div>
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-xs font-bold font-mono text-sky-600 dark:text-sky-400" x-text="task.code"></span>
-                                            <span class="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase"
-                                                :class="{
-                                                    'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300': task.priority === 'Urgent',
-                                                    'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': task.priority === 'High',
-                                                    'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300': task.priority === 'Medium' || task.priority === 'low'
-                                                }"
-                                                x-text="task.priority">
-                                            </span>
+                {{-- Filter prioritas — murni client-side atas array `tasks` yang udah dimuat. --}}
+                <select x-model="filterPriority"
+                        class="max-w-[9.5rem] bg-surface-muted dark:bg-slate-900 border border-border text-xs font-medium rounded-lg px-2 py-1.5 text-text-main focus:outline-none focus:ring-2 focus:ring-sky-500/30">
+                    <option value="ALL">Semua Prioritas</option>
+                    <option value="Urgent">🔴 Urgent</option>
+                    <option value="High">🟠 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="low">🔵 Low</option>
+                </select>
+
+                {{--
+                    Table vs Card — pilihan disimpan biar gak reset tiap buka
+                    halaman. Toggle disembunyiin di bawah `lg`: di lebar itu
+                    tampilan dipaksa kartu (activeViewMode), jadi tombolnya cuma
+                    bikin bingung.
+                --}}
+                <div class="hidden lg:flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-muted dark:bg-slate-900 border border-border">
+                    <button type="button" @click="setViewMode('table')" title="Tampilan tabel padat"
+                            :class="viewMode === 'table' ? 'bg-surface text-sky-600 dark:text-sky-400 shadow-sm' : 'text-text-muted hover:text-text-main'"
+                            class="p-1.5 rounded-md transition-all duration-200 cursor-pointer">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h18M3 10h18M3 15h18M3 20h18" />
+                        </svg>
+                    </button>
+                    <button type="button" @click="setViewMode('cards')" title="Tampilan kartu"
+                            :class="viewMode === 'cards' ? 'bg-surface text-sky-600 dark:text-sky-400 shadow-sm' : 'text-text-muted hover:text-text-main'"
+                            class="p-1.5 rounded-md transition-all duration-200 cursor-pointer">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{--
+                    Refresh manual + auto-refresh via broadcast Reverb
+                    (App\Events\TicketQueueUpdated, Gap #3). Auto-refresh
+                    jalan sendiri kalau Echo kekoneksi; tombol ini fallback
+                    kalau Reverb down/gak jalan di browser user.
+                --}}
+                <button type="button" @click="refreshWorksheet()" :disabled="refreshing" title="Refresh antrean tiket"
+                        class="p-1.5 rounded-lg text-text-muted hover:text-sky-600 dark:hover:text-sky-400 hover:bg-surface-muted dark:hover:bg-slate-900 disabled:opacity-50 transition-colors cursor-pointer">
+                    <svg class="h-4 w-4" :class="refreshing ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-3">
+            <template x-if="filteredTasks.length === 0">
+                <p class="text-xs text-text-muted text-center py-10">Belum ada tiket di tab ini.</p>
+            </template>
+
+            {{--
+                ── MODE TABEL (default, Frame 139) ──
+                Satu tiket = satu baris, 6 kolom tetap. Dipilih sebagai default
+                karena posisi kolom yang konsisten bikin mata Helpdesk cepat
+                nyisir antrean panjang — lebih cepat dari kartu yang tiap
+                blok posisinya bergeser.
+            --}}
+            <div x-show="activeViewMode === 'table'" class="border border-border bg-surface overflow-hidden shadow-xs">
+                {{--
+                    `table-fixed` + lebar kolom persen = tabel MUAT di lebar
+                    panel, gak ada scroll horizontal. Tanpa fixed, kolom
+                    Keluhan/Pelanggan melar ngikutin teks terpanjang dan
+                    tabelnya kedorong keluar layar. Konsekuensinya tiap sel
+                    WAJIB punya truncate/line-clamp sendiri (lihat di bawah) —
+                    kalau nggak, teks panjang nembus batas kolom.
+                --}}
+                {{--
+                    Jumlah kolom ikut lebar layar, BUKAN cuma dikecilin:
+                      < 2xl → 5 kolom (Lokasi/POP/ODP disembunyiin; POP & ODP
+                              nyempil jadi baris kecil di kolom Pelanggan)
+                      ≥ 2xl → 6 kolom penuh sesuai Frame 139
+
+                    Lebar kolom ditaruh di <th> (bukan <colgroup>): `display:none`
+                    di <col> gak diakui browser buat nyembunyiin kolom, jadi
+                    kolom yang disembunyiin harus lewat th/td `hidden`.
+
+                    `min-w-[660px]` = ambang 5 kolom masih kebaca. Di bawah itu
+                    yang nge-scroll cuma kontainer tabelnya, halaman sendiri gak
+                    pernah scroll horizontal. Dari 2xl min-width dilepas biar
+                    `table-fixed` pas ngepasin lebar panel (fit, tanpa scroll).
+                --}}
+                <div class="overflow-x-auto 2xl:overflow-x-hidden custom-scrollbar">
+                    <table class="w-full min-w-[660px] 2xl:min-w-0 table-fixed text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-surface-muted/60 dark:bg-slate-900/40 text-text-muted border-b border-border uppercase tracking-wider text-[10px] font-bold">
+                                <th class="py-2.5 px-3 w-[16%] 2xl:w-[14%] whitespace-nowrap">Ticket ID &amp; Time</th>
+                                <th class="py-2.5 px-3 w-[14%] 2xl:w-[12%] whitespace-nowrap">Status / Issue</th>
+                                <th class="py-2.5 px-3 w-[20%] 2xl:w-[18%]">Pelanggan (CID &amp; Contact)</th>
+                                <th class="py-2.5 px-3 hidden 2xl:table-cell 2xl:w-[15%]">Lokasi / POP / ODP</th>
+                                <th class="py-2.5 px-3 w-[24%] 2xl:w-[22%]">Keluhan (Detail)</th>
+                                <th class="py-2.5 px-3 text-right w-[26%] 2xl:w-[19%] whitespace-nowrap">Quick Dispatch Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-border">
+                            <template x-for="task in filteredTasks" :key="task.id">
+                                <tr class="hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors align-top group">
+
+                                    {{-- Ticket ID & Time --}}
+                                    <td class="py-2.5 px-3">
+                                        <div class="flex items-center gap-1.5 min-w-0">
+                                            {{--
+                                                Detail buka DRAWER kanan, bukan halaman
+                                                /tickets/{id}: worksheet ini halaman kerja —
+                                                keluar halaman berarti kehilangan form yang
+                                                sedang diisi, filter tab, & posisi scroll.
+                                                Navigasi halaman penuh disisakan buat halaman
+                                                arsip (Ticket Selesai/Dibatalkan/History).
+                                            --}}
+                                            <button type="button" @click="openTicketDetail(task.id)"
+                                                    class="font-mono font-extrabold text-sky-600 dark:text-sky-400 hover:underline truncate cursor-pointer text-left" x-text="task.code"></button>
+                                            <span class="shrink-0 px-1.5 py-px rounded text-[9px] font-extrabold uppercase" :class="priorityBadgeClass(task.priority)" x-text="task.priority"></span>
                                         </div>
-                                        <h4 class="text-xs font-bold text-text-main mt-0.5" x-text="task.title"></h4>
-                                    </div>
-                                    <span class="text-[10px] text-text-muted shrink-0 font-mono" x-text="task.time"></span>
-                                </div>
-
-                                <div>
-                                    <span class="text-xs font-semibold text-text-main truncate block" x-text="task.customer_name"></span>
-                                    <div class="flex items-center gap-3 mt-1 text-[11px] text-text-muted truncate">
-                                        <template x-if="task.issue_category">
-                                            <span class="flex items-center gap-1">
-                                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                                </svg>
-                                                <span x-text="task.issue_category"></span>
-                                            </span>
-                                        </template>
-
-                                        <span class="flex items-center gap-1">
-                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                              <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        <div class="mt-0.5 flex items-center gap-1 text-[10px] text-text-muted font-mono min-w-0">
+                                            <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2"></path>
                                             </svg>
-                                            <span x-text="task.customer_phone"></span>
-                                        </span>
-                                    </div>
-                                </div>
+                                            <span class="truncate" x-text="task.time + ' (' + task.time_at + ')'"></span>
+                                        </div>
+                                    </td>
 
-                                <p class="text-xs text-text-muted line-clamp-2" x-text="task.desc"></p>
+                                    {{-- Status / Issue --}}
+                                    <td class="py-2.5 px-3">
+                                        <span class="block truncate px-2 py-0.5 rounded text-[10px] font-bold" :class="issueBadgeClass(task.issue_category)"
+                                              :title="task.issue_category" x-text="task.issue_category || 'Tanpa Kategori'"></span>
+                                        <div class="mt-1 flex items-center gap-1 text-[10px] text-text-muted min-w-0">
+                                            <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="bucketDotClass(task.bucket)"></span>
+                                            <span class="truncate" x-text="task.status_label"></span>
+                                        </div>
+                                    </td>
+
+                                    {{-- Pelanggan --}}
+                                    <td class="py-2.5 px-3">
+                                        <div class="font-bold text-text-main truncate" :title="task.customer_name" x-text="task.customer_name"></div>
+                                        <div class="mt-0.5 flex items-center gap-1.5 text-[11px] font-mono text-text-muted min-w-0">
+                                            <span class="font-bold text-text-secondary truncate" x-text="task.cid"></span>
+                                            <span class="shrink-0">•</span>
+                                            <a :href="'https://wa.me/' + task.customer_phone" target="_blank" rel="noopener"
+                                               class="text-emerald-600 dark:text-emerald-400 hover:underline truncate" x-text="task.customer_phone"></a>
+                                        </div>
+                                        {{-- Pengganti kolom Lokasi waktu kolomnya disembunyiin (< 2xl). --}}
+                                        <div class="2xl:hidden mt-0.5 text-[10px] text-text-muted truncate" :title="task.pop + ' / ' + task.odp + ' — ' + task.address"
+                                             x-text="task.pop + ' / ' + task.odp"></div>
+                                    </td>
+
+                                    {{-- Lokasi / POP / ODP --}}
+                                    <td class="py-2.5 px-3 text-[11px] hidden 2xl:table-cell">
+                                        <div class="font-semibold text-text-secondary truncate" :title="task.pop + ' / ' + task.odp">
+                                            <span x-text="task.pop"></span>
+                                            <span class="text-text-muted font-normal" x-text="' / ' + task.odp"></span>
+                                        </div>
+                                        <div class="text-[10px] text-text-muted truncate" :title="task.address" x-text="task.address"></div>
+                                    </td>
+
+                                    {{-- Keluhan --}}
+                                    <td class="py-2.5 px-3">
+                                        <p class="text-[11px] text-text-secondary line-clamp-2 leading-snug" :title="task.desc" x-text="task.desc"></p>
+                                        <div class="flex items-center gap-2 flex-wrap text-[10px] text-text-muted mt-0.5"
+                                             x-show="task.escalated_noc_by || task.escalated_fop_by || task.returned_to_helpdesk_by || task.closed_by">
+                                            <span x-show="task.escalated_noc_by">→ NOC: <span class="font-semibold text-text-secondary" x-text="task.escalated_noc_by"></span></span>
+                                            <span x-show="task.escalated_fop_by">→ FOP: <span class="font-semibold text-text-secondary" x-text="task.escalated_fop_by"></span></span>
+                                            <span x-show="task.returned_to_helpdesk_by">↩ Helpdesk: <span class="font-semibold text-text-secondary" x-text="task.returned_to_helpdesk_by"></span></span>
+                                        </div>
+                                    </td>
+
+                                    {{--
+                                        Quick Dispatch Actions — `flex-wrap`:
+                                        kolomnya lebar tetap (17%), jadi tombol
+                                        turun baris waktu sempit, BUKAN nembus
+                                        keluar tabel.
+                                    --}}
+                                    <td class="py-2.5 px-3">
+                                        <div class="flex items-center justify-end gap-1 sm:gap-1.5 flex-nowrap">
+                                            <button type="button" x-show="task.actions?.can_close" :disabled="actionLoadingId === task.id"
+                                                    @click="closeTicket(task)"
+                                                    class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer shrink-0 shadow-2xs">
+                                                Selesai
+                                            </button>
+                                            <button type="button" x-show="task.actions?.can_escalate_noc" :disabled="actionLoadingId === task.id"
+                                                    @click="escalateTicket(task, 'noc')"
+                                                    class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-600 text-white hover:bg-amber-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer shrink-0 shadow-2xs">
+                                                Ke NOC
+                                            </button>
+                                            <button type="button" x-show="task.actions?.can_escalate_fop" :disabled="actionLoadingId === task.id"
+                                                    @click="escalateTicket(task, 'fop')"
+                                                    class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer shrink-0 shadow-2xs">
+                                                Ke FOP
+                                            </button>
+                                            <button type="button" x-show="task.actions?.can_return_to_helpdesk" :disabled="actionLoadingId === task.id"
+                                                    @click="returnTicketToHelpdesk(task)"
+                                                    class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-600 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer shrink-0 shadow-2xs">
+                                                Kembalikan
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {{-- ── MODE KARTU ── satu baris kartu per tiket (layout sebelumnya) --}}
+            <div x-show="activeViewMode === 'cards'" class="space-y-2">
+                <template x-for="(task, index) in filteredTasks" :key="task.id">
+                    {{--
+                        Tepi kiri kartu diwarnai per prioritas (border-l-2).
+                        Bukan hiasan: di mode kartu tiket kebaca dari atas ke
+                        bawah, dan warna tepi bikin Urgent/High kelihatan tanpa
+                        harus baca badge dulu. Badge teksnya tetap ada buat yang
+                        gak bisa mengandalkan warna.
+                    --}}
+                    <div class="ticket-card flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5 p-3 2xl:py-2.5 rounded-xl border border-l-2 border-border bg-surface hover:border-sky-500/60 hover:shadow-md transition-[transform,box-shadow,border-color,background-color] duration-200 group"
+                         :class="{
+                             'border-l-rose-500': task.priority === 'Urgent',
+                             'border-l-amber-500': task.priority === 'High',
+                             'border-l-border': task.priority !== 'Urgent' && task.priority !== 'High',
+                         }"
+                         :style="`animation-delay:${Math.min(index, 8) * 30}ms`">
+                        
+                        {{-- Core Content Link --}}
+                        {{--
+                            TIGA REZIM, karena lebar area konten beda jauh
+                            (sidebar app 256px static dari md, plus panel form):
+
+                              < md   → 1 kolom, semuanya bertumpuk
+                              md–2xl → GRID 2 kolom: baris identitas tiket
+                                       ngambil lebar penuh, di bawahnya
+                                       "pelanggan | keluhan" berdampingan.
+                                       Ini yang benerin kartu jangkung &
+                                       berantakan di 768–1024.
+                              ≥ 2xl  → balik ke satu baris flex (4 kolom)
+                        --}}
+                        {{-- Klik kartu → drawer detail (bukan pindah halaman, lihat catatan di mode tabel) --}}
+                        <div @click="openTicketDetail(task.id)" role="button" tabindex="0"
+                             @keydown.enter="openTicketDetail(task.id)"
+                             class="flex-1 min-w-0 cursor-pointer grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 2xl:flex 2xl:flex-row 2xl:items-center 2xl:gap-2.5">
+
+                            {{-- Col 1: Kode Tiket, Prioritas, & Status Bucket --}}
+                            {{--
+                                Lebar minimum kolom cuma dipasang dari 2xl (waktu
+                                kartu jadi satu baris). Di bawah itu kartu numpuk
+                                vertikal — min-width tetap malah bikin badge
+                                nembus tepi kartu di layar sempit.
+                            --}}
+                            <div class="flex items-center gap-1.5 flex-wrap min-w-0 md:col-span-2 md:pb-2 md:border-b md:border-border/70 2xl:col-span-1 2xl:pb-0 2xl:border-b-0 2xl:shrink-0 2xl:min-w-[210px]">
+                                <span class="text-xs font-bold font-mono text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/60 px-2 py-0.5 rounded shadow-2xs" x-text="task.code"></span>
+                                
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase shrink-0"
+                                    :class="{
+                                        'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800': task.priority === 'Urgent',
+                                        'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800': task.priority === 'High',
+                                        'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700': task.priority === 'Medium' || task.priority === 'low'
+                                    }"
+                                    x-text="task.priority">
+                                </span>
+
+                                <span class="font-semibold text-[10px] flex items-center gap-1 shrink-0 px-2 py-0.5 rounded border"
+                                    :class="{
+                                        'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800': task.bucket === 'diproses',
+                                        'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-800': task.bucket === 'masuk',
+                                        'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800': task.bucket === 'selesai',
+                                        'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700': task.bucket === 'dibatalkan'
+                                    }">
+                                    <span class="w-1.5 h-1.5 rounded-full animate-pulse"
+                                        :class="{
+                                            'bg-amber-500': task.bucket === 'diproses',
+                                            'bg-sky-500': task.bucket === 'masuk',
+                                            'bg-emerald-500': task.bucket === 'selesai',
+                                            'bg-slate-400': task.bucket === 'dibatalkan'
+                                        }">
+                                    </span>
+                                    <span x-text="bucketLabel(task.bucket)"></span>
+                                </span>
 
                                 {{--
-                                    Atribusi "siapa ngapain" — dibuat/dikirim ke NOC/dikirim
-                                    ke FOP/diselesaikan siapa. Dari ticket_histories via
-                                    TicketController::worksheetCardPayload(); null kalau
-                                    belum kejadian (mis. tiket masih di Helpdesk, belum
-                                    pernah dieskalasi).
+                                    Waktu nempel di baris pertama (kanan) buat
+                                    < 2xl. Dulu ikut baris tombol aksi — tiket
+                                    yang gak punya aksi (udah di tangan FOP)
+                                    jadi kehilangan timestamp sama sekali.
                                 --}}
-                                <div class="flex items-center gap-2 flex-wrap text-[10px] text-text-muted font-medium" x-show="task.escalated_noc_by || task.escalated_fop_by || task.returned_to_helpdesk_by || task.closed_by">
-                                    <span x-show="task.escalated_noc_by">→ NOC oleh <span class="font-bold text-text-secondary" x-text="task.escalated_noc_by"></span></span>
-                                    <span x-show="task.escalated_fop_by">→ FOP oleh <span class="font-bold text-text-secondary" x-text="task.escalated_fop_by"></span></span>
-                                    <span x-show="task.returned_to_helpdesk_by">↩ Kembali ke Helpdesk oleh <span class="font-bold text-text-secondary" x-text="task.returned_to_helpdesk_by"></span></span>
-                                    <span x-show="task.closed_by">✓ Selesai oleh <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="task.closed_by"></span></span>
-                                </div>
+                                <span class="2xl:hidden ml-auto shrink-0 flex items-center gap-1 text-[10px] text-text-muted font-mono">
+                                    <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2"></path>
+                                    </svg>
+                                    <span x-text="task.time"></span>
+                                </span>
+                            </div>
 
-                                <div class="flex items-center justify-between pt-1 border-t border-border/60 text-[11px]">
-                                    <span class="font-medium text-text-secondary">CID: <span class="font-mono text-text-main" x-text="task.cid"></span></span>
-                                    <span class="font-semibold flex items-center gap-1"
-                                        :class="{
-                                            'text-amber-600 dark:text-amber-400': task.bucket === 'diproses',
-                                            'text-sky-600 dark:text-sky-400': task.bucket === 'masuk',
-                                            'text-emerald-600 dark:text-emerald-400': task.bucket === 'selesai',
-                                            'text-slate-500 dark:text-slate-400': task.bucket === 'dibatalkan'
-                                        }">
-                                        <span class="w-1.5 h-1.5 rounded-full"
-                                            :class="{
-                                                'bg-amber-500': task.bucket === 'diproses',
-                                                'bg-sky-500': task.bucket === 'masuk',
-                                                'bg-emerald-500': task.bucket === 'selesai',
-                                                'bg-slate-400': task.bucket === 'dibatalkan'
-                                            }">
-                                        </span>
-                                        <span x-text="bucketLabel(task.bucket)"></span>
+                            {{-- Col 2: Pelanggan, CID & Telepon --}}
+                            <div class="min-w-0 2xl:w-auto 2xl:min-w-[190px] 2xl:max-w-[240px] 2xl:shrink-0">
+                                <div class="text-xs font-bold text-text-main group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors truncate" x-text="task.customer_name"></div>
+                                <div class="flex items-center gap-2 text-[11px] text-text-muted mt-0.5 flex-wrap">
+                                    <span class="font-mono text-sky-600 dark:text-sky-400 font-semibold" x-text="'CID: ' + task.cid"></span>
+                                    <span class="text-text-muted">•</span>
+                                    <span class="flex items-center gap-1 font-mono text-[10px]">
+                                        <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                        <span x-text="task.customer_phone"></span>
                                     </span>
                                 </div>
-                            </a>
+                                {{--
+                                    Lokasi cuma ada di kartu < 2xl: di 2xl kartu
+                                    balik jadi satu baris dan ruangnya dipakai
+                                    kolom keluhan.
+                                --}}
+                                <div class="2xl:hidden mt-0.5 flex items-center gap-1 text-[10px] text-text-muted min-w-0">
+                                    <svg class="h-3 w-3 shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <span class="truncate" :title="task.address" x-text="task.pop + ' / ' + task.odp + ' — ' + task.address"></span>
+                                </div>
+                            </div>
 
+                            {{-- Col 3: Judul Issue, Keluhan Ringkas & Atribusi Escalation --}}
                             {{--
-                                Aksi Selesaikan Sendiri / Kirim ke NOC / Kirim ke FOP
-                                (docs/plan/RANCANGAN_WORKSHEET_TICKETING.MD) — kembaran
-                                panel "Aksi Tiket" di tickets/show.blade.php, cuma di sini
-                                langsung dari List Task Ticketing. Flag task.actions.* dari
-                                TicketController::ticketActionFlags() (server-side, UI-only
-                                gate — otorisasi sungguhan tetap TicketService::assertActorOwnsTicket()).
+                                Garis pemisah cuma di rezim grid (md–2xl):
+                                nandain batas "identitas pelanggan | masalahnya".
+                                Di satu baris (2xl) jaraknya udah jelas, jadi
+                                garisnya dimatikan biar gak nambah noise.
                             --}}
-                            <div x-show="task.actions && (task.actions.can_close || task.actions.can_escalate_noc || task.actions.can_escalate_fop || task.actions.can_return_to_helpdesk)"
-                                 class="flex items-center gap-1.5 pt-2 border-t border-border/60">
+                            <div class="min-w-0 pr-1 md:border-l md:border-border/70 md:pl-4 2xl:w-auto 2xl:flex-1 2xl:border-l-0 2xl:pl-0">
+                                {{--
+                                    `title` di payload = nama kategori issue kalau
+                                    kategorinya keisi (lihat worksheetCardPayload()),
+                                    jadi badge + judul sering PERSIS SAMA — itu
+                                    yang bikin "Backbone CUT" kebaca dobel di
+                                    kartu. Judul cuma dirender kalau beda dari
+                                    badge kategori.
+                                --}}
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <template x-if="task.issue_category">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-muted dark:bg-slate-800 text-text-secondary border border-border shrink-0 truncate max-w-[60%]" x-text="task.issue_category"></span>
+                                    </template>
+                                    <h4 x-show="task.title && task.title !== task.issue_category"
+                                        class="text-xs font-bold text-text-main truncate" x-text="task.title"></h4>
+                                </div>
+                                {{-- 2 baris di kartu bertumpuk, 1 baris waktu kartu jadi satu baris (2xl). --}}
+                                <p class="text-[11px] text-text-muted mt-0.5 italic leading-snug line-clamp-2 2xl:line-clamp-1" x-text="task.desc" :title="task.desc"></p>
+                                
+                                {{-- Atribusi Escalation --}}
+                                <div class="flex items-center gap-2 flex-wrap text-[10px] text-text-muted font-medium mt-0.5" x-show="task.escalated_noc_by || task.escalated_fop_by || task.returned_to_helpdesk_by || task.closed_by">
+                                    <span x-show="task.escalated_noc_by">→ NOC: <span class="font-semibold text-text-secondary" x-text="task.escalated_noc_by"></span></span>
+                                    <span x-show="task.escalated_fop_by">→ FOP: <span class="font-semibold text-text-secondary" x-text="task.escalated_fop_by"></span></span>
+                                    <span x-show="task.returned_to_helpdesk_by">↩ Ret Helpdesk: <span class="font-semibold text-text-secondary" x-text="task.returned_to_helpdesk_by"></span></span>
+                                    <span x-show="task.closed_by">✓ Selesai: <span class="font-semibold text-emerald-600 dark:text-emerald-400" x-text="task.closed_by"></span></span>
+                                </div>
+                            </div>
+
+                            {{-- Col 4: Waktu / Diff time (tampil di kanan khusus 2xl) --}}
+                            <div class="hidden 2xl:block shrink-0 text-right min-w-[85px]">
+                                <span class="text-[10px] text-text-muted font-mono flex items-center justify-end gap-1">
+                                    <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2"></path>
+                                    </svg>
+                                    <span x-text="task.time"></span>
+                                </span>
+                            </div>
+                        </div>
+
+                        {{-- Action Buttons & Timestamp Row (< 2xl) --}}
+                        <div x-show="task.actions && (task.actions.can_close || task.actions.can_escalate_noc || task.actions.can_escalate_fop || task.actions.can_return_to_helpdesk)"
+                             class="pt-2 2xl:pt-0 border-t 2xl:border-t-0 border-border/60 flex items-center justify-end gap-2 w-full 2xl:w-auto">
+                            
+                            {{-- Action Buttons Group --}}
+                            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-stretch sm:justify-end">
                                 <button type="button" x-show="task.actions.can_close" :disabled="actionLoadingId === task.id"
                                         @click="closeTicket(task)"
-                                        class="flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                                        class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Selesai
                                 </button>
                                 <button type="button" x-show="task.actions.can_escalate_noc" :disabled="actionLoadingId === task.id"
                                         @click="escalateTicket(task, 'noc')"
-                                        class="flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                                        class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-600 text-white hover:bg-amber-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Ke NOC
                                 </button>
                                 <button type="button" x-show="task.actions.can_escalate_fop" :disabled="actionLoadingId === task.id"
                                         @click="escalateTicket(task, 'fop')"
-                                        class="flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                                        class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Ke FOP
                                 </button>
-                                {{-- Gap #7 — jalur pemulihan kalau NOC salah terima/pencet. --}}
                                 <button type="button" x-show="task.actions.can_return_to_helpdesk" :disabled="actionLoadingId === task.id"
                                         @click="returnTicketToHelpdesk(task)"
-                                        class="flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-600 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                                        class="flex-1 sm:flex-initial text-center justify-center inline-flex items-center px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-600 text-white hover:bg-slate-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all duration-200 cursor-pointer shadow-2xs shrink-0">
                                     Kembalikan
                                 </button>
                             </div>
                         </div>
-                    </template>
-
-                    {{--
-                        Gap #4 (docs/plan/analisa-efektivitas-worksheet-ticketing.md)
-                        — panel cuma nampilin WORKSHEET_DISPLAY_LIMIT (30) tiket
-                        terbaru. Sebelumnya sisanya diem-diem ilang tanpa indikator.
-                        worksheetTotalCount dari server (activeForWorksheet()->count())
-                        gak kena limit, jadi bisa dibandingin buat tau ada berapa lagi.
-                    --}}
-                    <template x-if="worksheetTotalCount > tasks.length">
-                        <p class="block text-center text-xs font-semibold text-text-muted py-3 border-t border-border/60 mt-2">
-                            <span x-text="'+ ' + (worksheetTotalCount - tasks.length) + ' tiket aktif lainnya (di luar 30 terbaru)'"></span>
-                        </p>
-                    </template>
-                </div>
+                    </div>
+                </template>
             </div>
+
+            {{--
+                Gap #4 (docs/plan/analisa-efektivitas-worksheet-ticketing.md)
+                — panel cuma nampilin WORKSHEET_DISPLAY_LIMIT (30) tiket
+                terbaru. Sebelumnya sisanya diem-diem ilang tanpa indikator.
+                worksheetTotalCount dari server (activeForWorksheet()->count())
+                gak kena limit, jadi bisa dibandingin buat tau ada berapa lagi.
+            --}}
+            <template x-if="worksheetTotalCount > tasks.length">
+                <p class="block text-center text-xs font-semibold text-text-muted py-3 border-t border-border/60 mt-3">
+                    <span x-text="'+ ' + (worksheetTotalCount - tasks.length) + ' tiket aktif lainnya (di luar 30 terbaru)'"></span>
+                </p>
+            </template>
+
+            {{-- Panel ini cuma antrean kerja; tiket final punya halaman sendiri. --}}
+            <p class="mt-3 text-[10px] text-text-muted italic">
+                Menampilkan <span x-text="filteredTasks.length"></span> tiket.
+                Selesai &amp; Dibatalkan gak masuk antrean kerja — ada di halaman sendiri.
+            </p>
         </div>
+    </div>
     </div>
 </div>
 @include('tickets.partials.action-dialog')
+{{--
+    Drawer detail kanan — partial BERSAMA dengan Worksheet NOC. Dirender di luar
+    kontainer `overflow-hidden` di atas biar panelnya gak kepotong.
+--}}
+@include('tickets.partials.detail-drawer')
 @endsection
 
 @push('scripts')
@@ -581,6 +950,50 @@
             actionLoadingId: null,
             refreshing: false,
 
+            // Panel kanan: tabel (default) atau kartu. Disimpan di localStorage
+            // sama kayak formOpen — dibaca sebelum render pertama biar gak
+            // kedip ganti mode pas halaman dimuat.
+            viewMode: localStorage.getItem('ticket-view-mode') === 'cards' ? 'cards' : 'table',
+
+            // Filter prioritas panel kanan — client-side atas array `tasks`.
+            // Nilainya WAJIB sama persis App\Enums\FopTaskPriority (perhatikan
+            // 'low' huruf kecil, sisanya kapital — itu memang value enumnya).
+            filterPriority: 'ALL',
+
+            // Input pencarian cepat panel kanan (nomor tiket, nama, CID, desa, keluhan)
+            searchQuery: '',
+
+            // Layar sempit (< lg) — dipaksa mode kartu lewat activeViewMode.
+            // Ambangnya lg, bukan md: sidebar app 256px static dari md, jadi di
+            // tablet 768px area kontennya cuma ~512px — tabel 5 kolom pun jadi
+            // scroll horizontal terus. Pilihan `viewMode` user TETAP disimpan
+            // apa adanya, biar balik sendiri begitu layarnya lebar lagi.
+            narrowViewport: window.matchMedia('(max-width: 1023px)').matches,
+
+            get activeViewMode() {
+                return this.narrowViewport ? 'cards' : this.viewMode;
+            },
+
+            // Label tab = "di tangan siapa" (TicketHandler), bukan bucket.
+            // shortLabel dipakai di layar sempit — "Assign NOC" kepanjangan
+            // buat tab sepertiga lebar layar HP.
+            tabs: [
+                { value: 'helpdesk', label: 'Ticket', shortLabel: 'Ticket', badgeClass: 'bg-slate-700 dark:bg-slate-600' },
+                { value: 'noc', label: 'Assign NOC', shortLabel: 'NOC', badgeClass: 'bg-amber-600' },
+                { value: 'fop', label: 'Assign FOP', shortLabel: 'FOP', badgeClass: 'bg-sky-600' },
+            ],
+
+            // Panel form kebuka/kelipat — dibaca SEBELUM render pertama
+            // (bukan di init()) supaya gak ada kedipan panel kebuka lalu
+            // langsung nutup pas halaman dimuat dalam kondisi terlipat.
+            formOpen: localStorage.getItem('ticket-form-open') !== 'false',
+
+            // Transisi lebar panel baru diaktifkan setelah frame pertama.
+            // Tanpa ini, halaman yang dimuat dalam kondisi terlipat bakal
+            // "menganimasikan" dirinya sendiri dari 0 pas load — kelihatan
+            // seperti panel mental sendiri.
+            animReady: false,
+
             // Master Issue — dari Master Data sungguhan (Task 1 rancangan), bukan mock lagi.
             issueCategories: @json($issueCategories),
 
@@ -599,6 +1012,25 @@
 
             init() {
                 this.initEchoListeners();
+                // matchMedia, bukan listener 'resize': cuma nyala pas breakpoint
+                // beneran kelewat, gak tiap piksel geseran.
+                const narrow = window.matchMedia('(max-width: 1023px)');
+                narrow.addEventListener('change', (e) => { this.narrowViewport = e.matches; });
+                // Dua rAF: satu buat nunggu Alpine selesai render class awal,
+                // satu lagi buat memastikan browser sudah melukisnya sebelum
+                // properti transition dipasang.
+                requestAnimationFrame(() => requestAnimationFrame(() => { this.animReady = true; }));
+            },
+
+            setFormOpen(open) {
+                this.formOpen = open;
+                localStorage.setItem('ticket-form-open', open ? 'true' : 'false');
+                // Fokus baru dipindah setelah animasi lebar kelar — fokus ke
+                // elemen yang lagi bergerak bikin browser auto-scroll dan
+                // gerakannya kelihatan tersendat.
+                if (open) {
+                    setTimeout(() => this.$refs.searchInput?.focus(), 320);
+                }
             },
 
             /**
@@ -647,6 +1079,50 @@
                 return this.issueCategories.find(c => c.id == this.issueCategoryId)?.sla_source || null;
             },
 
+            setViewMode(mode) {
+                this.viewMode = mode;
+                localStorage.setItem('ticket-view-mode', mode);
+            },
+
+            // Jumlah tiket per tab — SENGAJA tanpa filter prioritas, biar badge
+            // tetap nunjukin antrean penuh tiap tab walau list sedang disaring.
+            get tabCounts() {
+                return {
+                    helpdesk: this.tasks.filter(t => t.handler === 'helpdesk').length,
+                    noc: this.tasks.filter(t => t.handler === 'noc').length,
+                    fop: this.tasks.filter(t => t.handler === 'fop').length,
+                };
+            },
+
+            priorityBadgeClass(priority) {
+                return {
+                    Urgent: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
+                    High: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
+                    Medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+                }[priority] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+            },
+
+            // Warna badge kategori issue di-derive dari NAMA kategori (Master
+            // Issue bisa nambah kapan aja, jadi gak ada peta warna hardcode
+            // lengkap) — kategori yang gak dikenal jatuh ke netral, bukan error.
+            issueBadgeClass(category) {
+                const name = (category || '').toLowerCase();
+                if (name.includes('los') || name.includes('down') || name.includes('mati')) return 'bg-rose-600 text-white';
+                if (name.includes('lemot') || name.includes('lambat') || name.includes('latency')) return 'bg-amber-500 text-white';
+                if (name.includes('putus') || name.includes('kabel') || name.includes('cut')) return 'bg-purple-600 text-white';
+                if (!category) return 'bg-surface-muted dark:bg-slate-800 text-text-secondary border border-border';
+                return 'bg-sky-600 text-white';
+            },
+
+            bucketDotClass(bucket) {
+                return {
+                    masuk: 'bg-sky-500',
+                    diproses: 'bg-amber-500',
+                    selesai: 'bg-emerald-500',
+                    dibatalkan: 'bg-slate-400',
+                }[bucket] || 'bg-slate-400';
+            },
+
             // Label persis App\Enums\TicketBucket::label() — jangan bikin teks bebas.
             bucketLabel(bucket) {
                 return { masuk: 'Ticket Masuk', diproses: 'Ticket di Proses', selesai: 'Ticket Selesai', dibatalkan: 'Ticket Dibatalkan' }[bucket] || bucket;
@@ -657,6 +1133,36 @@
             // tampilannya seragam sama seluruh app, dialog ini bisa nampung
             // textarea alasan yang kekirim sebagai `reason` ke
             // ticket_histories (lihat tickets/partials/action-dialog.blade.php).
+            /**
+             * Detail tiket = drawer kanan (tickets/partials/detail-drawer.blade.php),
+             * BUKAN navigasi ke /tickets/{id}. Partial-nya yang fetch isinya dari
+             * tickets.detail-json; halaman ini cuma ngasih id.
+             */
+            openTicketDetail(id) {
+                window.dispatchEvent(new CustomEvent('open-ticket-drawer', { detail: { id } }));
+            },
+
+            /**
+             * Tombol aksi DI DALAM drawer cuma men-dispatch niat — konfirmasi &
+             * POST tetap lewat fungsi di bawah ini, satu jalur dengan tombol di
+             * tabel/kartu (biar array `tasks` & counter tetap ke-update sekali).
+             */
+            handleDrawerAction({ id, action }) {
+                const task = this.tasks.find(t => t.id === id);
+
+                if (! task) {
+                    return;
+                }
+
+                switch (action) {
+                    case 'close': this.closeTicket(task); break;
+                    case 'noc': this.escalateTicket(task, 'noc'); break;
+                    case 'fop': this.escalateTicket(task, 'fop'); break;
+                    case 'return': this.returnTicketToHelpdesk(task); break;
+                    case 'cancel': this.cancelTicket(task); break;
+                }
+            },
+
             closeTicket(task) {
                 window.confirmTicketAction({
                     title: 'Selesaikan Tiket',
@@ -703,6 +1209,26 @@
             },
 
             /**
+             * Pembatalan pra-FOP — permission `tickets.cancel`, alasan WAJIB
+             * (ReasonValidationRule di server). Cuma muncul dari drawer: tombol
+             * merah di tabel/kartu bikin aksi destruktif kepencet sambil scroll.
+             */
+            cancelTicket(task) {
+                window.confirmTicketAction({
+                    title: 'Batalkan Tiket',
+                    message: `Batalkan tiket ${task.code}?`,
+                    label: 'Alasan pembatalan (wajib diisi)',
+                    required: true,
+                    confirmText: 'Ya, Batalkan',
+                    confirmType: 'danger',
+                    icon: 'error',
+                    onConfirm: (reason) => this.performTicketAction(
+                        task.id, `{{ url('/tickets') }}/${task.id}/cancel`, { reason }
+                    ),
+                });
+            },
+
+            /**
              * Dipakai closeTicket()/escalateTicket() — POST JSON, lalu update
              * item task.id di array `tasks` in-place dari respons server
              * (worksheetCardPayload() balikin bentuk yang sama persis kayak
@@ -742,6 +1268,10 @@
                     }
 
                     this.showToast(body.message);
+                    // Tiket yang baru diaksi udah gak relevan lagi di drawer —
+                    // flag aksinya pasti berubah, dan barisnya bisa hilang dari
+                    // daftar. Tutup, jangan biarkan nampilin state basi.
+                    window.dispatchEvent(new CustomEvent('close-ticket-drawer'));
                 } catch (e) {
                     this.showToast('Aksi gagal, coba lagi.', 'error');
                 } finally {
@@ -750,9 +1280,27 @@
             },
 
             // Filter per TAB = per `handler` (di tangan siapa tiketnya), BUKAN
-            // per bucket/status pengerjaan. Lihat komentar tab di atas.
+            // per bucket/status pengerjaan. Juga mendukung filter prioritas & pencarian cepat (searchQuery).
             get filteredTasks() {
-                return this.tasks.filter(t => t.handler === this.taskFilter);
+                const q = (this.searchQuery || '').toLowerCase().trim();
+
+                return this.tasks.filter(t => {
+                    if (t.handler !== this.taskFilter) return false;
+                    if (this.filterPriority !== 'ALL' && t.priority !== this.filterPriority) return false;
+
+                    if (q) {
+                        const code = (t.code || '').toLowerCase();
+                        const name = (t.customer?.name || '').toLowerCase();
+                        const cid = (t.customer?.cid || '').toLowerCase();
+                        const village = (t.customer?.village || '').toLowerCase();
+                        const title = (t.title || '').toLowerCase();
+                        const desc = (t.desc || '').toLowerCase();
+
+                        return code.includes(q) || name.includes(q) || cid.includes(q) || village.includes(q) || title.includes(q) || desc.includes(q);
+                    }
+
+                    return true;
+                });
             },
 
             // Tiket open milik customer terpilih (masuk/diproses) — bantu Helpdesk
@@ -846,6 +1394,15 @@
                 }
                 if (e.key === 'Escape') {
                     this.resetForm();
+                    return;
+                }
+                // "N" buka/lipat panel form — cuma waktu fokus TIDAK di field
+                // input, biar gak ketelan waktu user lagi ngetik keluhan.
+                if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const tag = (e.target.tagName || '').toLowerCase();
+                    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+                    e.preventDefault();
+                    this.setFormOpen(!this.formOpen);
                 }
             },
 

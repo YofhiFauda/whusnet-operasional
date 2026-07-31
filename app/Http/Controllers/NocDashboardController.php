@@ -7,44 +7,168 @@ use App\Enums\TicketHandlingStatus;
 use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
- * Dashboard NOC — tracking tiket buat NOC (bukan buat teknisi lapangan,
- * beda dari FopDashboardController). Pola sama (stat cards, list aktif,
- * Echo auto-refresh channel POP), tapi data & scope-nya khusus tiket
- * `handler=NOC`.
+ * Dashboard NOC — pusat analisa dan pemantauan operasional tiket NOC.
+ * Mendukung filter periode (default: 1 bulan berjalan) & POP scope,
+ * kalkulasi durasi rata-rata di Ticketing, statistik daerah, issue category,
+ * trend daerah x issue category, serta daftar antrean tiket aktif terurut aging.
  */
 class NocDashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         abort_unless(auth()->user()->hasPermission('noc_dashboard.view'), 403);
 
+        // Filter Param Handling (Default preset: month_to_date)
+        $datePreset = $request->query('date_preset', 'month_to_date');
+        $selectedPopId = $request->query('pop_id');
+        $dateFromInput = $request->query('date_from');
+        $dateToInput = $request->query('date_to');
+
+        $now = Carbon::now();
+        $dateFrom = null;
+        $dateTo = null;
+
+        switch ($datePreset) {
+            case '7_days':
+                $dateFrom = $now->copy()->subDays(6)->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+            case '30_days':
+                $dateFrom = $now->copy()->subDays(29)->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+            case 'this_month':
+                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->endOfMonth()->endOfDay();
+                break;
+            case 'last_month':
+                $dateFrom = $now->copy()->subMonth()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->subMonth()->endOfMonth()->endOfDay();
+                break;
+            case 'all_time':
+                $dateFrom = null;
+                $dateTo = null;
+                break;
+            case 'custom':
+                if ($dateFromInput) {
+                    $dateFrom = Carbon::parse($dateFromInput)->startOfDay();
+                }
+                if ($dateToInput) {
+                    $dateTo = Carbon::parse($dateToInput)->endOfDay();
+                }
+                break;
+            case 'month_to_date':
+            default:
+                $datePreset = 'month_to_date';
+                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+        }
+
+        // Base Query with User Scope (RBAC) & POP Filter
+        $baseQuery = Ticket::query()->applyUserScope();
+
+        if ($selectedPopId) {
+            $baseQuery->where('pop_id', $selectedPopId);
+        }
+
+        // Filtered Query for Period Metrics
+        $filteredQuery = (clone $baseQuery);
+        if ($dateFrom) {
+            $filteredQuery->where('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $filteredQuery->where('created_at', '<=', $dateTo);
+        }
+
+        // 1. Core Summary Metrics
+        $totalTicket = (clone $filteredQuery)->count();
+
+        $ticketSelesai = (clone $filteredQuery)
+            ->where('status', TicketHandlingStatus::CLOSED->value)
+            ->count();
+
+        $ticketAssignFop = (clone $filteredQuery)
+            ->where('handler', TicketHandler::FOP->value)
+            ->count();
+
+        $ticketDibatalkan = (clone $filteredQuery)
+            ->where('status', TicketHandlingStatus::CANCELLED->value)
+            ->count();
+
+        $diprosesNoc = (clone $baseQuery)
+            ->where('handler', TicketHandler::NOC->value)
+            ->where('status', TicketHandlingStatus::OPEN->value)
+            ->count();
+
+        $selesaiHariIni = (clone $baseQuery)
+            ->where('status', TicketHandlingStatus::CLOSED->value)
+            ->whereDate('updated_at', today())
+            ->count();
+
+        $dibatalkanHariIni = (clone $baseQuery)
+            ->where('status', TicketHandlingStatus::CANCELLED->value)
+            ->whereDate('updated_at', today())
+            ->count();
+
+        // 2. Average Handling Duration in Ticketing
+        $resolvedTickets = (clone $filteredQuery)
+            ->where(function ($q) {
+                $q->whereNotNull('resolved_at')
+                    ->orWhere('status', TicketHandlingStatus::CLOSED->value)
+                    ->orWhere('handler', TicketHandler::FOP->value);
+            })
+            ->get();
+
+        $avgMinutes = null;
+        if ($resolvedTickets->isNotEmpty()) {
+            $durations = $resolvedTickets->map(function (Ticket $t) {
+                if ($t->resolved_at) {
+                    return (int) $t->created_at->diffInMinutes($t->resolved_at);
+                }
+
+                return (int) $t->created_at->diffInMinutes($t->updated_at);
+            });
+            $avgMinutes = (int) round($durations->avg());
+        }
+
+        $avgDurationLabel = '-';
+        if ($avgMinutes !== null) {
+            if ($avgMinutes < 60) {
+                $avgDurationLabel = "{$avgMinutes} Mns";
+            } else {
+                $h = intdiv($avgMinutes, 60);
+                $m = $avgMinutes % 60;
+                $avgDurationLabel = $m > 0 ? "{$h} Jam {$m} Mns" : "{$h} Jam";
+            }
+        }
+
         $stats = [
-            'pending_noc' => Ticket::query()->applyUserScope()
-                ->where('handler', TicketHandler::NOC->value)->where('status', 'open')
-                ->whereNull('noc_checked_at')->count(),
-            'on_check_noc' => Ticket::query()->applyUserScope()
-                ->where('handler', TicketHandler::NOC->value)->where('status', 'open')
-                ->whereNotNull('noc_checked_at')->count(),
-            'selesai_hari_ini' => Ticket::query()->applyUserScope()
-                ->where('status', TicketHandlingStatus::CLOSED->value)
-                ->whereDate('updated_at', today())->count(),
-            'dibatalkan_hari_ini' => Ticket::query()->applyUserScope()
-                ->where('status', TicketHandlingStatus::CANCELLED->value)
-                ->whereDate('updated_at', today())->count(),
+            'total_ticket' => $totalTicket,
+            'ticket_selesai' => $ticketSelesai,
+            'ticket_assign_fop' => $ticketAssignFop,
+            'ticket_dibatalkan' => $ticketDibatalkan,
+            'diproses_noc' => $diprosesNoc,
+            'selesai_hari_ini' => $selesaiHariIni,
+            'dibatalkan_hari_ini' => $dibatalkanHariIni,
+            'avg_duration_label' => $avgDurationLabel,
+            'avg_duration_minutes' => $avgMinutes,
         ];
 
-        // List tiket aktif + aging — paling lama nunggu di atas, biar keliatan
-        // mana yang keteteran.
-        $activeTickets = Ticket::query()->applyUserScope()
+        // 3. Tiket Aktif NOC (Aging Queue: Paling lama nunggu di atas)
+        $activeTickets = (clone $baseQuery)
             ->where('handler', TicketHandler::NOC->value)
-            ->where('status', 'open')
-            ->with(['customer:id,full_name,cid,customer_code', 'creator:id,name', 'issueCategory:id,name'])
-            ->orderBy('created_at')
+            ->where('status', TicketHandlingStatus::OPEN->value)
+            ->with(['customer:id,full_name,cid,customer_code', 'creator:id,name', 'issueCategory:id,name', 'pop:id,name'])
+            ->orderBy('created_at', 'asc')
             ->limit(30)
             ->get();
 
+        // 4. Activity Feed
         $activityFeed = TicketHistory::query()
             ->whereHas('ticket', fn ($q) => $q->applyUserScope())
             ->with(['actor:id,name', 'ticket:id,ticket_number'])
@@ -52,8 +176,8 @@ class NocDashboardController extends Controller
             ->limit(20)
             ->get();
 
-        $issueStats = Ticket::query()->applyUserScope()
-            ->whereNotNull('issue_category_id')
+        // 5. Statistik per Issue (Categorized & Percentage)
+        $issueStatsRaw = (clone $filteredQuery)
             ->with('issueCategory:id,name')
             ->get()
             ->groupBy(fn (Ticket $t) => $t->issueCategory?->name ?? 'Lainnya')
@@ -61,13 +185,62 @@ class NocDashboardController extends Controller
             ->sortDesc()
             ->take(10);
 
-        $regionStats = Ticket::query()->applyUserScope()
-            ->with('customer.district:id,name')
+        $issueStatsTotal = $issueStatsRaw->sum();
+        $issueStats = $issueStatsRaw->map(function ($count) use ($issueStatsTotal) {
+            return [
+                'count' => $count,
+                'percentage' => $issueStatsTotal > 0 ? round(($count / $issueStatsTotal) * 100, 1) : 0,
+            ];
+        });
+
+        // 6. Statistik per Daerah (District/POP Categorized & Percentage)
+        $regionStatsRaw = (clone $filteredQuery)
+            ->with(['customer.district:id,name', 'pop:id,name'])
             ->get()
-            ->groupBy(fn (Ticket $t) => $t->customer?->district?->name ?? 'Tidak diketahui')
+            ->groupBy(function (Ticket $t) {
+                return $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
+            })
             ->map->count()
             ->sortDesc()
             ->take(10);
+
+        $regionStatsTotal = $regionStatsRaw->sum();
+        $regionStats = $regionStatsRaw->map(function ($count) use ($regionStatsTotal) {
+            return [
+                'count' => $count,
+                'percentage' => $regionStatsTotal > 0 ? round(($count / $regionStatsTotal) * 100, 1) : 0,
+            ];
+        });
+
+        // 7. Trend Matrix: Daerah vs Issue Category
+        $allFilteredTickets = (clone $filteredQuery)
+            ->with(['customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
+            ->get();
+
+        $topRegions = $regionStatsRaw->keys()->take(6)->toArray();
+        $topIssues = $issueStatsRaw->keys()->take(6)->toArray();
+
+        $matrix = [];
+        $maxCellCount = 0;
+
+        foreach ($topRegions as $regionName) {
+            $matrix[$regionName] = [];
+            foreach ($topIssues as $issueName) {
+                $count = $allFilteredTickets->filter(function (Ticket $t) use ($regionName, $issueName) {
+                    $r = $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
+                    $i = $t->issueCategory?->name ?? 'Lainnya';
+
+                    return $r === $regionName && $i === $issueName;
+                })->count();
+
+                $matrix[$regionName][$issueName] = $count;
+                if ($count > $maxCellCount) {
+                    $maxCellCount = $count;
+                }
+            }
+        }
+
+        $userPops = Pop::forUser(auth()->user())->get(['id', 'name', 'code']);
 
         return view('noc.dashboard', [
             'stats' => $stats,
@@ -75,7 +248,20 @@ class NocDashboardController extends Controller
             'activityFeed' => $activityFeed,
             'issueStats' => $issueStats,
             'regionStats' => $regionStats,
-            'allowedPopIds' => Pop::forUser(auth()->user())->pluck('id'),
+            'trendMatrix' => [
+                'regions' => $topRegions,
+                'issues' => $topIssues,
+                'matrix' => $matrix,
+                'maxCount' => $maxCellCount,
+            ],
+            'allowedPops' => $userPops,
+            'allowedPopIds' => $userPops->pluck('id'),
+            'filters' => [
+                'date_preset' => $datePreset,
+                'pop_id' => $selectedPopId,
+                'date_from' => $dateFrom ? $dateFrom->toDateString() : '',
+                'date_to' => $dateTo ? $dateTo->toDateString() : '',
+            ],
         ]);
     }
 }

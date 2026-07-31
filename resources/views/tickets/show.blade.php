@@ -139,21 +139,13 @@
         $ticketActions = $ticket->actionFlagsFor(auth()->user());
     @endphp
 
-    @if($ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'] || $ticketActions['can_oncheck_noc'])
+    @if($ticketActions['can_close'] || $ticketActions['can_escalate_noc'] || $ticketActions['can_escalate_fop'] || $ticketActions['can_return_to_helpdesk'] || $ticketActions['can_cancel'])
     <div class="bg-surface border border-amber-200 dark:border-amber-900/50 rounded-xl p-5 shadow-sm">
         <div class="flex items-center gap-2 mb-3">
             <span class="w-1 h-4 bg-amber-500 rounded-full"></span>
             <h2 class="text-xs font-bold uppercase tracking-wider text-text-main">Aksi Tiket — Ditangani {{ $ticket->handler->label() }}</h2>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            @if($ticketActions['can_oncheck_noc'])
-            <button type="button"
-                onclick="confirmTicketDetailAction('{{ route('tickets.oncheck-noc', $ticket) }}', null, 'Oncheck NOC', 'Catatan (opsional)', false, 'Ambil alih tiket ini?')"
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors cursor-pointer">
-                Oncheck NOC
-            </button>
-            @endif
-
             @if($ticketActions['can_close'])
             <button type="button"
                 onclick="confirmTicketDetailAction('{{ route('tickets.close', $ticket) }}', null, 'Selesaikan Tiket', 'Apa yang sudah dikerjakan? (opsional)', false, 'Tandai tiket ini selesai?')"
