@@ -76,7 +76,7 @@
         @endif
 
         <!-- Master Data -->
-        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view'))
+        @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
         <div class="pt-4 pb-1">
             <p x-show="sidebarOpen" class="px-3 text-xs font-semibold text-text-muted uppercase tracking-wider">Master Data</p>
             <div x-show="!sidebarOpen" class="w-full border-t border-border mt-2"></div>
@@ -107,6 +107,20 @@
         <a href="{{ route('master.items.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md {{ request()->routeIs('master.items.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="m21 16-9 5-9-5V8l9-5 9 5z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             <span x-show="sidebarOpen" class="truncate">Barang / Material</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('item_categories.view'))
+        <a href="{{ route('master.item-categories.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md {{ request()->routeIs('master.item-categories.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M7 7h.01"/><path d="M20.4 14.5 16 10 4 20"/><path d="M3 7a4 4 0 0 1 4-4h5a2 2 0 0 1 1.4.6l7 7a2 2 0 0 1 0 2.8l-7 7a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12z"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Kategori Barang</span>
+        </a>
+        @endif
+
+        @if(auth()->user()->hasPermission('work_tools.view'))
+        <a href="{{ route('master.work-tools.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-md {{ request()->routeIs('master.work-tools.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span x-show="sidebarOpen" class="truncate">Alat Kerja</span>
         </a>
         @endif
         @endif

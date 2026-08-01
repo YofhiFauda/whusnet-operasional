@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\FopTaskPriority;
 use App\Enums\MaterialKind;
-use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\City;
@@ -12,6 +11,7 @@ use App\Models\Customer;
 use App\Models\District;
 use App\Models\FopTask;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Village;
 use App\Services\TaskMaterialService;
@@ -73,7 +73,7 @@ class TaskMaterialTest extends TestCase
         $this->dropcore = Item::create([
             'code' => 'DC-1C',
             'name' => 'Kabel Dropcore 1 Core',
-            'type' => MaterialType::KABEL_DROPCORE->value,
+            'item_category_id' => ItemCategory::where('code', ItemCategory::CODE_KABEL_DROPCORE)->value('id'),
             'unit' => 'meter',
             'is_active' => true,
         ]);
@@ -108,7 +108,9 @@ class TaskMaterialTest extends TestCase
         $row = $this->surveyTask->materials()->estimasi()->first();
 
         $this->assertSame('Kabel Dropcore 1 Core', $row->item_name);
-        $this->assertSame(MaterialType::KABEL_DROPCORE, $row->item_type);
+        // Kategori disimpan sebagai code string (snapshot) + FK ke master.
+        $this->assertSame(ItemCategory::CODE_KABEL_DROPCORE, $row->item_type);
+        $this->assertSame($this->dropcore->item_category_id, $row->item_category_id);
         $this->assertSame('meter', $row->unit);
         $this->assertSame($this->dropcore->id, $row->item_id);
     }
@@ -116,7 +118,7 @@ class TaskMaterialTest extends TestCase
     public function test_baris_lainnya_tanpa_master_tetap_tersimpan(): void
     {
         $this->service->sync($this->installTask, MaterialKind::TERPAKAI, [
-            ['item_id' => null, 'item_name' => 'Tray Kabel Custom', 'item_type' => MaterialType::AKSESORIS_PASANG->value, 'qty' => 2, 'unit' => ''],
+            ['item_id' => null, 'item_name' => 'Tray Kabel Custom', 'item_type' => 'aksesoris_pasang', 'qty' => 2, 'unit' => ''],
         ]);
 
         $row = $this->installTask->materials()->terpakai()->first();
@@ -179,13 +181,13 @@ class TaskMaterialTest extends TestCase
     {
         $this->service->sync($this->surveyTask, MaterialKind::ESTIMASI, [
             ['item_id' => $this->dropcore->id, 'qty' => 100],
-            ['item_id' => null, 'item_name' => 'Klem Kabel', 'item_type' => MaterialType::AKSESORIS_PASANG->value, 'qty' => 10],
+            ['item_id' => null, 'item_name' => 'Klem Kabel', 'item_type' => 'aksesoris_pasang', 'qty' => 10],
         ]);
 
         $this->service->sync($this->installTask, MaterialKind::TERPAKAI, [
             ['item_id' => $this->dropcore->id, 'qty' => 130],
             // Beda kapitalisasi — harus tetap dikelompokkan jadi satu baris.
-            ['item_id' => null, 'item_name' => 'klem kabel', 'item_type' => MaterialType::AKSESORIS_PASANG->value, 'qty' => 8],
+            ['item_id' => null, 'item_name' => 'klem kabel', 'item_type' => 'aksesoris_pasang', 'qty' => 8],
         ]);
 
         $variance = collect($this->service->varianceForCustomer($this->customer))->keyBy('label');

@@ -3,13 +3,20 @@
 namespace App\Enums;
 
 /**
- * Tipe material/perangkat pasif yang dipakai pekerjaan lapangan.
+ * Tipe material/perangkat pasif — **USANG sebagai daftar pilihan.**
  *
- * Nilainya SENGAJA identik dengan daftar `passive_device_type` di
- * CustomerDeviceController — dua tempat itu bicara barang yang sama, cuma beda
- * sudut pandang (aset terpasang vs material terpakai). Kalau daftarnya
- * menyimpang, laporan pemakaian dan data perangkat pelanggan gak bisa
- * dicocokkan lagi.
+ * Kategori sudah pindah ke master `item_categories` (model `ItemCategory`);
+ * dropdown, validasi, dan penamaan semuanya baca dari sana. Enum ini SENGAJA
+ * dipertahankan, jangan dihapus, karena dua alasan:
+ *
+ * 1. Tujuh case di bawah adalah code kategori bawaan (`is_system`) yang ditanam
+ *    migrasi. Nilainya jadi kontrak, dan enum ini dokumentasi kontrak itu.
+ * 2. Kode lama & data lama (`task_materials.item_type`,
+ *    `customer_technical_details.passive_device_type`) menyimpan value-nya.
+ *
+ * Yang TIDAK boleh: menambah case baru di sini. Kategori baru dibuat admin
+ * lewat Master Kategori Barang — nambah case cuma menghidupkan lagi dua daftar
+ * yang harus disinkronkan manual, persis masalah yang bikin enum ini dipensiun.
  */
 enum MaterialType: string
 {

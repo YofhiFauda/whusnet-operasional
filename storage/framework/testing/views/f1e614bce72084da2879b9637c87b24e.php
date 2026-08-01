@@ -1,325 +1,658 @@
-<?php $__env->startSection('title', 'Tambah Pelanggan Baru - Whusnet Operasional'); ?>
+<?php $__env->startSection('title', 'Tambah Pelanggan Baru — WHUSNET Operasional'); ?>
 <?php $__env->startSection('page_title', 'Tambah Pelanggan Baru'); ?>
 <?php $__env->startSection('breadcrumb_parent', 'Pelanggan'); ?>
-<?php $__env->startSection('breadcrumb_parent_url', '/customers'); ?>
+<?php $__env->startSection('breadcrumb_parent_url', route('customers.index')); ?>
 
 <?php $__env->startSection('content'); ?>
-<!-- Form Container -->
-<form action="/customers" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
-    <?php echo csrf_field(); ?>
+<div class="max-w-6xl mx-auto space-y-6">
 
-    <!-- TOP PANEL: Progress Bar -->
-    <div class="bg-surface border border-border rounded-lg p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-3">
-            <div>
-                <h3 class="text-sm font-bold text-text-main uppercase tracking-wider">Kelengkapan Formulir Registrasi</h3>
-                <p class="text-xs text-text-muted mt-0.5">Semua data akan divalidasi sebelum disimpan ke database</p>
+    <!-- LAYER 1: NAKED PAGE HEADER (Strict Design System Rule: No card wrapper) -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Registrasi Pelanggan Baru</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
+                    <i class="fa-solid fa-wand-magic-sparkles text-[10px] mr-1.5"></i> Form Wizard
+                </span>
             </div>
-            <div class="text-right">
-                <span id="progress-percentage" class="text-sm font-extrabold text-primary data-text">0%</span>
-                <span class="text-xs text-text-muted block mt-0.5"><span id="filled-fields-count" class="data-text">0</span> dari <span class="data-text">25</span> field terisi</span>
-            </div>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                Masukkan data identitas calon pelanggan, wilayah pemasangan, foto dokumen KTP, dan paket layanan internet.
+            </p>
         </div>
-        <!-- Progress bar background -->
-        <div class="w-full bg-surface-muted rounded-full h-3.5 overflow-hidden border border-border">
-            <div id="progress-bar-fill" class="bg-gradient-to-r from-sky-500 to-sky-600 h-full w-0 transition-all duration-500 ease-out"></div>
+
+        <div class="flex items-center gap-2">
+            <a href="<?php echo e(route('customers.index')); ?>" class="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left text-xs"></i>
+                <span>Kembali ke List</span>
+            </a>
         </div>
     </div>
 
-    <!-- MAIN GRID -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        
-        <!-- LEFT COLUMN: Stepper & Completeness Checklist -->
-        <div class="lg:col-span-1 flex flex-col gap-4">
-            <div class="bg-surface border border-border rounded-lg p-5 shadow-sm space-y-5">
-                <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider">Tahapan Formulir</h4>
-                
-                <div class="space-y-4">
-                    <!-- Step 1 Trigger -->
-                    <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3.5 rounded-lg border border-primary bg-primary-soft/30 transition-all group focus:outline-none">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 shrink-0" id="step-nav-icon-1">
-                                <!-- Will be inserted by JS -->
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-text-main">1. Data Diri & Wilayah</span>
-                                <span id="step-nav-status-1" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-1" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
-                            </div>
-                        </div>
-                    </button>
+    <!-- MAIN FORM CONTAINER -->
+    <form action="<?php echo e(route('customers.store')); ?>" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
+        <?php echo csrf_field(); ?>
 
-                    <!-- Step 2 Trigger -->
-                    <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3.5 rounded-lg border border-border bg-surface hover:bg-surface-muted transition-all group focus:outline-none">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 shrink-0" id="step-nav-icon-2">
-                                <!-- Will be inserted by JS -->
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-text-secondary group-hover:text-text-main">2. Dokumen Lampiran</span>
-                                <span id="step-nav-status-2" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-2" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <!-- Step 3 Trigger -->
-                    <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-lg border border-border bg-surface hover:bg-surface-muted transition-all group focus:outline-none">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
-                                <!-- Will be inserted by JS -->
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="block text-xs font-bold text-text-secondary group-hover:text-text-main">3. Layanan & Paket</span>
-                                <span id="step-nav-status-3" class="text-[9px] font-bold block mt-1 uppercase tracking-wider">Mengevaluasi...</span>
-                                <span id="step-nav-missing-3" class="text-[9px] text-text-muted block mt-1 leading-relaxed whitespace-pre-wrap"></span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <!-- Step 4 and 5 Removed -->
+        <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/50">
+                        <i class="fa-solid fa-list-check text-xs"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Formulir Registrasi</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Semua data akan divalidasi sebelum disimpan ke master pelanggan</p>
+                    </div>
                 </div>
+                <div class="text-right">
+                    <span id="progress-percentage" class="text-sm sm:text-base font-extrabold text-sky-600 dark:text-sky-400 data-text">0%</span>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400 block"><span id="filled-fields-count" class="data-text font-semibold">0</span> dari <span class="data-text font-semibold">25</span> field terisi</span>
+                </div>
+            </div>
+
+            <!-- Progress Bar Fill Strip -->
+            <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2.5 overflow-hidden border border-slate-200/60 dark:border-slate-700">
+                <div id="progress-bar-fill" class="bg-gradient-to-r from-sky-500 to-sky-600 h-full w-0 transition-all duration-500 ease-out" style="width: 0%;"></div>
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: Wizard Steps Form Panels -->
-        <div class="lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm overflow-hidden min-h-[480px] flex flex-col justify-between">
+        <!-- MOBILE RESPONSIVE STEPPER (Visible on < lg screens: 1 row x 3 items) -->
+        <div class="lg:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 shadow-sm">
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                    <span class="w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">1</span>
+                    <span class="truncate text-[11px] font-semibold">1. Data Diri</span>
+                </button>
+                <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
+                    <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">2</span>
+                    <span class="truncate text-[11px] font-semibold">2. KTP</span>
+                </button>
+                <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
+                    <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">3</span>
+                    <span class="truncate text-[11px] font-semibold">3. Paket</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN GRID LAYOUT -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            <!-- FORM BODY -->
-            <div class="p-6 md:p-8 flex-1">
-                
-                <!-- Errors Block ditangani otomatis oleh global Component Toast (x-toast) -->
+            <!-- LEFT COLUMN: Desktop Stepper Checklist (Visible on >= lg screens) -->
+            <div class="hidden lg:block lg:col-span-4 space-y-4">
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-5 shadow-sm space-y-4">
+                    <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tahapan Formulir</h4>
 
-                <!-- STEP 1 PANEL: Data Diri & Wilayah -->
-                <div id="step-panel-1" class="step-panel space-y-6">
-                    <div class="border-b border-border pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">1. IDENTITAS PELANGGAN & ALAMAT</h4>
-                        <p class="text-xs text-text-muted mt-1">Masukkan data diri lengkap dan wilayah instalasi pelanggan</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-text-secondary">
-                        <div>
-                            <label for="full_name" class="block mb-2 uppercase tracking-wide">NAMA LENGKAP <span class="text-red-500">*</span></label>
-                            <input type="text" name="full_name" id="full_name" value="<?php echo e(old('full_name')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: Budi Santoso">
-                        </div>
-
-                        <div>
-                            <label for="identity_number" class="block mb-2 uppercase tracking-wide">NOMOR IDENTITAS (NIK) <span class="text-red-500">*</span></label>
-                            <input type="text" name="identity_number" id="identity_number" value="<?php echo e(old('identity_number')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 3502182039200001">
-                        </div>
-
-                        <div>
-                            <label for="gender" class="block mb-2 uppercase tracking-wide">JENIS KELAMIN <span class="text-red-500">*</span></label>
-                            <select name="gender" id="gender" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Jenis Kelamin</option>
-                                <option value="Laki-laki" <?php echo e(old('gender') === 'Laki-laki' ? 'selected' : ''); ?>>Laki-laki</option>
-                                <option value="Perempuan" <?php echo e(old('gender') === 'Perempuan' ? 'selected' : ''); ?>>Perempuan</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="primary_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP UTAMA <span class="text-red-500">*</span></label>
-                            <input type="text" name="primary_phone" id="primary_phone" value="<?php echo e(old('primary_phone')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 082139xxxxxx">
-                        </div>
-
-                        <div>
-                            <label for="alternative_phone" class="block mb-2 uppercase tracking-wide">NOMOR HP ALTERNATIF</label>
-                            <input type="text" name="alternative_phone" id="alternative_phone" value="<?php echo e(old('alternative_phone')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 082139xxxxxx">
-                        </div>
-
-                        <div>
-                            <label for="npwp" class="block mb-2 uppercase tracking-wide">NPWP</label>
-                            <input type="text" name="npwp" id="npwp" value="<?php echo e(old('npwp')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 12.345.678.9-012.000">
-                        </div>
-
-                        <div>
-                            <label for="email" class="block mb-2 uppercase tracking-wide">ALAMAT EMAIL</label>
-                            <input type="email" name="email" id="email" value="<?php echo e(old('email')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: budi@gmail.com">
-                        </div>
-
-                        <div>
-                            <label for="registration_date" class="block mb-2 uppercase tracking-wide">TANGGAL REGISTRASI <span class="text-red-500">*</span></label>
-                            <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', now()->format('Y-m-d'))); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                        </div>
-
-                        <div>
-                            <label for="pop_id" class="block mb-2 uppercase tracking-wide">POP CABANG <span class="text-red-500">*</span></label>
-                            <select name="pop_id" id="pop_id" onchange="filterDistributionsByPop(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih POP Cabang</option>
-                                <?php $__currentLoopData = $pops; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $pop): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($pop->id); ?>" <?php echo e(old('pop_id') == $pop->id ? 'selected' : ''); ?>><?php echo e($pop->name); ?></option>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                            </select>
-                        </div>
-
-
-
-                        <div class="md:col-span-2">
-                            <label for="address" class="block mb-2 uppercase tracking-wide">ALAMAT INSTALASI LENGKAP <span class="text-red-500">*</span></label>
-                            <textarea name="address" id="address" rows="2" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Nama Jalan, RT/RW, nomor rumah, detail lainnya..."><?php echo e(old('address')); ?></textarea>
-                        </div>
-
-                        <!-- Region Selection -->
-                        <div>
-                            <label for="city_id" class="block mb-2 uppercase tracking-wide">KOTA <span class="text-red-500">*</span></label>
-                            <select name="city_id" id="city_id" onchange="loadDistricts(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Kota</option>
-                                <?php $__currentLoopData = $cities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $city): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($city->id); ?>" <?php echo e(old('city_id', \App\Models\City::where('name', 'Ponorogo')->first()->id ?? '') == $city->id ? 'selected' : ''); ?>><?php echo e($city->name); ?></option>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="district_id" class="block mb-2 uppercase tracking-wide">KECAMATAN <span class="text-red-500">*</span></label>
-                            <select name="district_id" id="district_id" onchange="loadVillages(this.value)" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Kecamatan (Pilih Kota Dulu)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label for="village_id" class="block mb-2 uppercase tracking-wide">DESA / KELURAHAN <span class="text-red-500">*</span></label>
-                            <select name="village_id" id="village_id" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Desa (Pilih Kecamatan Dulu)</option>
-                                <!-- Async Populated -->
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 md:col-span-1">
-                            <div>
-                                <label for="latitude" class="block mb-2 uppercase tracking-wide">LATITUDE</label>
-                                <input type="text" name="latitude" id="latitude" value="<?php echo e(old('latitude')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="-7.86940">
-                            </div>
-                            <div>
-                                <label for="longitude" class="block mb-2 uppercase tracking-wide">LONGITUDE</label>
-                                <input type="text" name="longitude" id="longitude" value="<?php echo e(old('longitude')); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="111.46210">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- STEP 2 PANEL: Dokumen Lampiran -->
-                <div id="step-panel-2" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-border pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                        <p class="text-xs text-text-muted mt-1">Upload lampiran dokumen pendukung pelanggan (opsional)</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Foto KTP -->
-                        <div class="border border-border bg-surface rounded-lg p-5 flex flex-col justify-between hover:border-primary-border transition-colors shadow-sm relative">
-                            <div id="default-placeholder-foto_ktp" class="text-center py-4">
-                                <svg class="mx-auto h-10 w-10 text-text-disabled" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
-                                </svg>
-                                <span class="block text-xs font-bold text-text-secondary mt-3">FOTO KTP <span class="text-red-500">*</span></span>
-                                <span class="block text-[10px] text-text-muted mt-1">Format: JPG, PNG (Max 2MB)</span>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="preview-container-foto_ktp" class="hidden text-center py-2 flex flex-col items-center justify-center">
-                                <div class="relative inline-block">
-                                    <img id="preview-img-foto_ktp" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="" alt="Preview Foto KTP">
-                                    <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-2 -right-2 bg-error hover:bg-error/90 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                    <div class="space-y-3">
+                        <!-- Step 1 Navigation Card -->
+                        <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3.5 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none">
+                            <div class="flex items-start gap-3">
+                                <div class="mt-0.5 shrink-0" id="step-nav-icon-1">
+                                    <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                    </span>
                                 </div>
-                                <span class="block text-xs font-bold text-text-secondary mt-2">PREVIEW FOTO KTP</span>
+                                <div class="flex-1 min-w-0">
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">1. Data Diri &amp; Wilayah</span>
+                                    <span id="step-nav-status-1" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
+                                    <span id="step-nav-missing-1" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Nama Lengkap, NIK, Jenis Kelamin, HP, POP, Alamat, Kecamatan, Desa</span>
+                                </div>
                             </div>
+                        </button>
 
-                            <div class="mt-4">
-                                <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
-                                <label for="foto_ktp" class="block w-full text-center bg-surface-muted border border-border hover:bg-surface hover:border-border-strong text-text-secondary text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
-                                    Pilih File
-                                </label>
-                                <span id="file-label-foto_ktp" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
+                        <!-- Step 2 Navigation Card -->
+                        <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
+                            <div class="flex items-start gap-3">
+                                <div class="mt-0.5 shrink-0" id="step-nav-icon-2">
+                                    <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                    </span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">2. Dokumen Lampiran</span>
+                                    <span id="step-nav-status-2" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
+                                    <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Foto KTP</span>
+                                </div>
                             </div>
-                        </div>
+                        </button>
+
+                        <!-- Step 3 Navigation Card -->
+                        <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
+                            <div class="flex items-start gap-3">
+                                <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
+                                    <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                    </span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">3. Layanan &amp; Paket</span>
+                                    <span id="step-nav-status-3" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
+                                    <span id="step-nav-missing-3" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Paket Internet, Jenis Kontrak, Masa Kontrak, Diskon</span>
+                                </div>
+                            </div>
+                        </button>
                     </div>
                 </div>
-
-                <!-- STEP 3 PANEL: Layanan & Paket -->
-                <div id="step-panel-3" class="step-panel space-y-6 hidden">
-                    <div class="border-b border-border pb-3 mb-6">
-                        <h4 class="text-sm font-bold text-text-main uppercase tracking-wider">3. LAYANAN & PAKET LAYANAN INTERNET</h4>
-                        <p class="text-xs text-text-muted mt-1">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs font-semibold text-text-secondary">
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="internet_package_id">PAKET INTERNET <span class="text-red-500">*</span></label>
-                            <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Paket Internet</option>
-                                <?php $__currentLoopData = $packages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($package->id); ?>" data-price="<?php echo e($package->monthly_price); ?>" <?php echo e(old('internet_package_id') == $package->id ? 'selected' : ''); ?>><?php echo e($package->package_code); ?> - <?php echo e($package->name); ?> (Rp <?php echo e(number_format($package->monthly_price, 0, ',', '.')); ?>/bln)</option>
-                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="jenis_kontrak">JENIS KONTRAK <span class="text-red-500">*</span></label>
-                            <select name="jenis_kontrak" id="jenis_kontrak" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25">
-                                <option value="" disabled selected>Pilih Jenis Kontrak</option>
-                                <option value="sewa" <?php echo e(old('jenis_kontrak') === 'sewa' ? 'selected' : ''); ?>>Sewa</option>
-                                <option value="beli" <?php echo e(old('jenis_kontrak') === 'beli' ? 'selected' : ''); ?>>Beli</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="contract_period_months">MASA KONTRAK (BULAN) <span class="text-red-500">*</span></label>
-                            <input type="number" name="contract_period_months" id="contract_period_months" value="<?php echo e(old('contract_period_months', 12)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 12">
-                        </div>
-
-                        <div>
-                            <label class="block mb-2 uppercase tracking-wide" for="discount_amount">DISKON PROMOSI (RP) <span class="text-red-500">*</span></label>
-                            <input type="number" name="discount_amount" id="discount_amount" value="<?php echo e(old('discount_amount', 0)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Removed Step 4 and 5 -->
-
             </div>
 
-            <!-- BUTTONS NAVIGATION FOOTER -->
-            <div class="px-6 py-4 bg-surface-muted border-t border-border flex items-center justify-between">
-                <div>
-                    <button type="button" id="btn-prev" onclick="prevStep()" class="px-4 py-2 border border-border rounded-md bg-surface text-text-secondary hover:bg-surface-muted transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
-                        Sebelumnya
-                    </button>
-                </div>
+            <!-- RIGHT COLUMN: Wizard Steps Form Panels (SINGLE MAIN CARD BUDGET) -->
+            <div class="lg:col-span-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl shadow-sm overflow-hidden min-h-[520px] flex flex-col justify-between">
                 
-                <div class="flex gap-2">
-                    <a href="/customers" class="px-4 py-2 border border-border rounded-md bg-surface text-text-secondary hover:bg-surface-muted transition-colors text-xs font-semibold cursor-pointer focus:outline-none">
-                        Batal
-                    </a>
-                    
-                    <button type="button" id="btn-next" onclick="nextStep()" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer focus:outline-none">
-                        Lanjut
-                    </button>
+                <!-- FORM BODY -->
+                <div class="p-5 sm:p-7 flex-1">
 
-                    <button type="submit" id="btn-submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none">
-                        Simpan Registrasi
-                    </button>
+                    <!-- STEP 1 PANEL: Data Diri & Wilayah -->
+                    <div id="step-panel-1" class="step-panel space-y-6">
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">1. IDENTITAS PELANGGAN &amp; ALAMAT</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Masukkan data diri lengkap dan wilayah instalasi pelanggan</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div>
+                                <label for="full_name" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nama Lengkap <span class="text-rose-500">*</span></label>
+                                <input type="text" name="full_name" id="full_name" value="<?php echo e(old('full_name')); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['full_name'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Cth: Ihda Ainin Nadhira">
+                                <?php $__errorArgs = ['full_name'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="identity_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nomor Identitas (NIK KTP) <span class="text-rose-500">*</span></label>
+                                <input type="text" name="identity_number" id="identity_number" value="<?php echo e(old('identity_number')); ?>" maxlength="16" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['identity_number'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="3502182039200001">
+                                <?php $__errorArgs = ['identity_number'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="gender" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Jenis Kelamin <span class="text-rose-500">*</span></label>
+                                <select name="gender" id="gender" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['gender'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled <?php echo e(old('gender') ? '' : 'selected'); ?>>Pilih Jenis Kelamin</option>
+                                    <option value="Laki-laki" <?php echo e(old('gender') === 'Laki-laki' ? 'selected' : ''); ?>>Laki-laki</option>
+                                    <option value="Perempuan" <?php echo e(old('gender') === 'Perempuan' ? 'selected' : ''); ?>>Perempuan</option>
+                                </select>
+                                <?php $__errorArgs = ['gender'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="primary_phone" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nomor HP Utama (WhatsApp) <span class="text-rose-500">*</span></label>
+                                <input type="text" name="primary_phone" id="primary_phone" value="<?php echo e(old('primary_phone')); ?>" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['primary_phone'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="082139xxxxxx">
+                                <?php $__errorArgs = ['primary_phone'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="alternative_phone" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Nomor HP Alternatif (Opsional)</label>
+                                <input type="text" name="alternative_phone" id="alternative_phone" value="<?php echo e(old('alternative_phone')); ?>" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="082139xxxxxx">
+                            </div>
+
+                            <div>
+                                <label for="npwp" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">NPWP (Opsional)</label>
+                                <input type="text" name="npwp" id="npwp" value="<?php echo e(old('npwp')); ?>" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="12.345.678.9-012.000">
+                            </div>
+
+                            <div>
+                                <label for="email" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Alamat Email (Opsional)</label>
+                                <input type="email" name="email" id="email" value="<?php echo e(old('email')); ?>" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="ihda@gmail.com">
+                            </div>
+
+                            <div>
+                                <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
+                                <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', now()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <?php $__errorArgs = ['registration_date'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="pop_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">POP Cabang <span class="text-rose-500">*</span></label>
+                                <select name="pop_id" id="pop_id" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['pop_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled <?php echo e(old('pop_id') ? '' : 'selected'); ?>>Pilih POP Cabang</option>
+                                    <?php $__currentLoopData = $pops; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $pop): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($pop->id); ?>" <?php echo e(old('pop_id') == $pop->id ? 'selected' : ''); ?>><?php echo e($pop->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <?php $__errorArgs = ['pop_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label for="address" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Alamat Instalasi Lengkap <span class="text-rose-500">*</span></label>
+                                <textarea name="address" id="address" rows="2" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['address'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Jln. Raya Siman No. 42, RT 02/RW 01, Gang Melati..."><?php echo e(old('address')); ?></textarea>
+                                <?php $__errorArgs = ['address'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <!-- Region Selection -->
+                            <div>
+                                <label for="city_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Kota / Kabupaten <span class="text-rose-500">*</span></label>
+                                <select name="city_id" id="city_id" onchange="loadDistricts(this.value)" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['city_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled <?php echo e(old('city_id') ? '' : 'selected'); ?>>Pilih Kota</option>
+                                    <?php $__currentLoopData = $cities; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $city): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($city->id); ?>" <?php echo e(old('city_id', \App\Models\City::where('name', 'Ponorogo')->first()->id ?? '') == $city->id ? 'selected' : ''); ?>><?php echo e($city->name); ?></option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <?php $__errorArgs = ['city_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="district_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Kecamatan <span class="text-rose-500">*</span></label>
+                                <select name="district_id" id="district_id" onchange="loadVillages(this.value)" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['district_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled selected>Pilih Kecamatan (Pilih Kota Dulu)</option>
+                                </select>
+                                <?php $__errorArgs = ['district_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="village_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Desa / Kelurahan <span class="text-rose-500">*</span></label>
+                                <select name="village_id" id="village_id" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['village_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled selected>Pilih Desa (Pilih Kecamatan Dulu)</option>
+                                </select>
+                                <?php $__errorArgs = ['village_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 md:col-span-1">
+                                <div>
+                                    <label for="latitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Latitude</label>
+                                    <input type="text" name="latitude" id="latitude" value="<?php echo e(old('latitude')); ?>" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="-7.86940">
+                                </div>
+                                <div>
+                                    <label for="longitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Longitude</label>
+                                    <input type="text" name="longitude" id="longitude" value="<?php echo e(old('longitude')); ?>" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="111.46210">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2 PANEL: Dokumen Lampiran KTP -->
+                    <div id="step-panel-2" class="step-panel space-y-6 hidden">
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Upload file foto KTP asli calon pelanggan untuk verifikasi identitas</p>
+                        </div>
+
+                        <div class="max-w-xl mx-auto">
+                            <!-- Foto KTP Dropzone -->
+                            <div class="border-2 border-dashed <?php $__errorArgs = ['foto_ktp'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 bg-rose-50/20 <?php else: ?> border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 rounded-2xl p-6 text-center transition-all shadow-sm relative group">
+                                <div id="default-placeholder-foto_ktp" class="py-6 space-y-3">
+                                    <div class="w-14 h-14 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-2xl border border-sky-200 dark:border-sky-800">
+                                        <i class="fa-regular fa-id-card"></i>
+                                    </div>
+                                    <div>
+                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">UPLOAD FOTO KTP <span class="text-rose-500">*</span></span>
+                                        <span class="block text-[11px] text-slate-400 dark:text-slate-500 mt-1">Format gambar JPG, PNG (Maksimal 2MB)</span>
+                                    </div>
+                                </div>
+
+                                <!-- Preview Container -->
+                                <div id="preview-container-foto_ktp" style="display: none;" class="py-3 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block">
+                                        <img id="preview-img-foto_ktp" class="max-h-48 max-w-full rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-md" src="" alt="Preview Foto KTP">
+                                        <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-3 -right-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus Foto KTP">
+                                            <i class="fa-solid fa-xmark text-xs"></i>
+                                        </button>
+                                    </div>
+                                    <span class="block text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-3 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-circle-check text-xs"></i> File KTP Siap Diunggah
+                                    </span>
+                                </div>
+
+                                <div class="mt-4">
+                                    <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
+                                    <label for="foto_ktp" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-5 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        <i class="fa-solid fa-upload text-xs"></i>
+                                        <span>Pilih File Gambar</span>
+                                    </label>
+                                    <span id="file-label-foto_ktp" class="block text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
+                                </div>
+
+                                <?php $__errorArgs = ['foto_ktp'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-2"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3 PANEL: Layanan & Paket Internet -->
+                    <div id="step-panel-3" class="step-panel space-y-6 hidden">
+                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <div class="md:col-span-2">
+                                <label for="internet_package_id" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Paket Internet <span class="text-rose-500">*</span></label>
+                                <select name="internet_package_id" id="internet_package_id" onchange="updateLayananBreakdown()" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['internet_package_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled <?php echo e(old('internet_package_id') ? '' : 'selected'); ?>>Pilih Paket Internet</option>
+                                    <?php $__currentLoopData = $packages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($package->id); ?>" data-price="<?php echo e($package->monthly_price); ?>" <?php echo e(old('internet_package_id') == $package->id ? 'selected' : ''); ?>>
+                                            <?php echo e($package->package_code); ?> — <?php echo e($package->name); ?> (Rp <?php echo e(number_format($package->monthly_price, 0, ',', '.')); ?>/bln)
+                                        </option>
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                </select>
+                                <?php $__errorArgs = ['internet_package_id'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="jenis_kontrak" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Jenis Kontrak <span class="text-rose-500">*</span></label>
+                                <select name="jenis_kontrak" id="jenis_kontrak" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['jenis_kontrak'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled <?php echo e(old('jenis_kontrak') ? '' : 'selected'); ?>>Pilih Jenis Kontrak</option>
+                                    <option value="sewa" <?php echo e(old('jenis_kontrak', 'sewa') === 'sewa' ? 'selected' : ''); ?>>Sewa (Modem Dipinjamkan ISP)</option>
+                                    <option value="beli" <?php echo e(old('jenis_kontrak') === 'beli' ? 'selected' : ''); ?>>Beli Putus (Modem Milik Pelanggan)</option>
+                                </select>
+                                <?php $__errorArgs = ['jenis_kontrak'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="contract_period_months" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Masa Kontrak (Bulan) <span class="text-rose-500">*</span></label>
+                                <input type="number" name="contract_period_months" id="contract_period_months" value="<?php echo e(old('contract_period_months', 12)); ?>" min="1" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['contract_period_months'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="12">
+                                <?php $__errorArgs = ['contract_period_months'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                            <div>
+                                <label for="discount_amount" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Diskon Promosi (Rp) <span class="text-rose-500">*</span></label>
+                                <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', 0)); ?>" min="0" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['discount_amount'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> border-rose-500 <?php else: ?> border-slate-200 dark:border-slate-700 <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?> rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="0">
+                                <?php $__errorArgs = ['discount_amount'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+
+                        </div>
+
+                        <!-- Live Price Breakdown Card -->
+                        <div id="layanan-breakdown-card" class="bg-sky-50/70 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/60 rounded-xl p-4 sm:p-5 space-y-3">
+                            <div class="flex items-center justify-between border-b border-sky-200/60 dark:border-sky-800/50 pb-2">
+                                <span class="text-xs font-bold text-sky-900 dark:text-sky-200 uppercase tracking-wider flex items-center gap-1.5">
+                                    <i class="fa-solid fa-calculator text-sky-600 dark:text-sky-400"></i> Ringkasan Biaya Bulanan
+                                </span>
+                                <span class="text-[10px] text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded font-semibold">Live Preview</span>
+                            </div>
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between text-slate-600 dark:text-slate-300">
+                                    <span>Harga Master Paket:</span>
+                                    <span id="breakdown-base-price" class="data-text font-semibold">Rp 0</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600 dark:text-slate-300">
+                                    <span>Diskon Promosi:</span>
+                                    <span id="breakdown-discount" class="data-text font-semibold text-rose-600 dark:text-rose-400">- Rp 0</span>
+                                </div>
+                                <div class="flex justify-between pt-2 border-t border-sky-200/60 dark:border-sky-800/50 text-slate-900 dark:text-slate-100 font-bold text-sm">
+                                    <span>Estimasi Net / Bulan:</span>
+                                    <span id="breakdown-total" class="data-text text-sky-600 dark:text-sky-400">Rp 0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
                 </div>
+
+                <!-- BUTTONS NAVIGATION FOOTER -->
+                <div class="px-4 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0">
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <button type="button" id="btn-prev" onclick="prevStep()" style="display: none;" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-chevron-left text-[10px]"></i> Sebelumnya
+                            </button>
+                            <a href="<?php echo e(route('customers.index')); ?>" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none text-center inline-flex items-center justify-center">
+                                Batal
+                            </a>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <button type="button" id="btn-next" onclick="nextStep()" class="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                Lanjut <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+
+                            <button type="submit" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Registrasi
+                            </button>
+                        </div>
+                </div>
+
             </div>
 
         </div>
-    </div>
-</form>
+    </form>
+</div>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('scripts'); ?>
 <script>
+    /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
     const totalStepsCount = 3;
 
-    // Define wizard fields configurations
     const formFields = {
         'data-diri': {
-            required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id', 'status'],
+            required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
             optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
         },
         'dokumen': {
@@ -332,7 +665,6 @@
         }
     };
 
-    // Mapping steps to keys
     const stepKeys = {
         1: 'data-diri',
         2: 'dokumen',
@@ -340,28 +672,27 @@
     };
 
     document.addEventListener("DOMContentLoaded", function() {
-        // Dynamic checks on input change
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);
             input.addEventListener('change', runLiveProgressUpdates);
         });
 
-        // Run validation immediately on load to set defaults
+        // Initialize districts for city
+        const oldCityId = "<?php echo e(old('city_id', \App\Models\City::where('name', 'Ponorogo')->first()->id ?? '')); ?>";
+        const oldDistrictId = "<?php echo e(old('district_id')); ?>";
+        const oldVillageId = "<?php echo e(old('village_id')); ?>";
+
+        if (oldCityId) {
+            loadDistricts(oldCityId, oldDistrictId, oldVillageId);
+        }
+
+        updateWizardButtons();
         runLiveProgressUpdates();
+        updateLayananBreakdown();
     });
 
-    // Check if City had old value
-    const oldCityId = "<?php echo e(old('city_id', \App\Models\City::where('name', 'Ponorogo')->first()->id ?? '')); ?>";
-    const oldDistrictId = "<?php echo e(old('district_id')); ?>";
-    const oldVillageId = "<?php echo e(old('village_id')); ?>";
-    if (oldCityId) {
-        loadDistricts(oldCityId, oldDistrictId, oldVillageId);
-    }
-
-    // Distribution filtering removed
-
-    // Dynamic dropdown for Districts
+    /* Dynamic Districts AJAX */
     function loadDistricts(cityId, selectedDistrictId = null, selectedVillageId = null) {
         const districtSelect = document.getElementById('district_id');
         const villageSelect = document.getElementById('village_id');
@@ -386,7 +717,6 @@
                 if (selectedDistrictId) {
                     loadVillages(selectedDistrictId, selectedVillageId);
                 }
-                
                 runLiveProgressUpdates();
             })
             .catch(err => {
@@ -395,7 +725,7 @@
             });
     }
 
-    // Dynamic dropdown for Villages
+    /* Dynamic Villages AJAX */
     function loadVillages(districtId, selectedVillageId = null) {
         const villageSelect = document.getElementById('village_id');
         villageSelect.innerHTML = '<option value="" disabled selected>Memuat desa...</option>';
@@ -413,7 +743,6 @@
                     }
                     villageSelect.appendChild(opt);
                 });
-                // Update live calculations once loaded
                 runLiveProgressUpdates();
             })
             .catch(err => {
@@ -422,71 +751,40 @@
             });
     }
 
-    // File selection UI update helper
+    /* File Change & Preview Helper */
     function onFileChange(fieldId) {
         const input = document.getElementById(fieldId);
         const label = document.getElementById('file-label-' + fieldId);
         const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
         const previewContainer = document.getElementById('preview-container-' + fieldId);
         const previewImg = document.getElementById('preview-img-' + fieldId);
-        const previewPdf = document.getElementById('preview-pdf-' + fieldId);
 
         if (input.files && input.files.length > 0) {
             const file = input.files[0];
             label.textContent = file.name;
-            // Mark file input as populated
             input.setAttribute('data-populated', 'true');
 
-            // Handle preview generating
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    if (previewImg) {
-                        previewImg.src = e.target.result;
-                        previewImg.classList.remove('hidden');
-                    }
-                    if (previewPdf) {
-                        previewPdf.classList.add('hidden');
-                    }
+                    if (previewImg) previewImg.src = e.target.result;
                     if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                    if (previewContainer) previewContainer.classList.remove('hidden');
+                    // Preview pakai inline style karena kontainernya juga ber-class 'flex'
+                    // — alasan sama seperti di setElementVisible().
+                    setElementVisible(previewContainer, true);
                 };
                 reader.readAsDataURL(file);
-            } else if (file.type === 'application/pdf') {
-                if (previewImg) {
-                    previewImg.classList.add('hidden');
-                    previewImg.src = '';
-                }
-                if (previewPdf) {
-                    previewPdf.classList.remove('hidden');
-                }
-                if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                if (previewContainer) previewContainer.classList.remove('hidden');
-            } else {
-                // Unknown file type, show fallback but still populate
-                if (previewImg) {
-                    previewImg.classList.add('hidden');
-                    previewImg.src = '';
-                }
-                if (previewPdf) {
-                    previewPdf.classList.add('hidden');
-                }
-                if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
-                if (previewContainer) previewContainer.classList.add('hidden');
             }
         } else {
             label.textContent = "Belum ada file dipilih";
             input.removeAttribute('data-populated');
             if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
-            if (previewContainer) previewContainer.classList.add('hidden');
-            if (previewImg) {
-                previewImg.src = '';
-            }
+            setElementVisible(previewContainer, false);
+            if (previewImg) previewImg.src = '';
         }
         runLiveProgressUpdates();
     }
 
-    // Clear file selection helper
     function clearFile(fieldId) {
         const input = document.getElementById(fieldId);
         if (input) {
@@ -495,39 +793,62 @@
         }
     }
 
-    // Estimate monthly total preview removed
+    /* Live Layanan Billing Calculation */
+    function updateLayananBreakdown() {
+        const select = document.getElementById('internet_package_id');
+        const discountInput = document.getElementById('discount_amount');
+        
+        let basePrice = 0;
+        let discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
 
-    // Central live validation validator
+        if (select && select.selectedIndex >= 0) {
+            const selectedOpt = select.options[select.selectedIndex];
+            if (selectedOpt && selectedOpt.dataset.price) {
+                basePrice = parseFloat(selectedOpt.dataset.price) || 0;
+            }
+        }
+
+        const netTotal = Math.max(0, basePrice - discount);
+
+        const formatRupiah = (val) => 'Rp ' + new Intl.NumberFormat('id-ID').format(val);
+
+        const baseEl = document.getElementById('breakdown-base-price');
+        const discEl = document.getElementById('breakdown-discount');
+        const totalEl = document.getElementById('breakdown-total');
+
+        if (baseEl) baseEl.textContent = formatRupiah(basePrice);
+        if (discEl) discEl.textContent = '- ' + formatRupiah(discount);
+        if (totalEl) totalEl.textContent = formatRupiah(netTotal);
+    }
+
+    /* Live Stepper Auditor & Progress Calculator */
     function runLiveProgressUpdates() {
         let totalFieldsCount = 0;
         let filledFieldsCount = 0;
 
-        // Loop each step definition
         for (let step = 1; step <= totalStepsCount; step++) {
             const stepKey = stepKeys[step];
             const config = formFields[stepKey];
             let requiredMissing = [];
             let optionalMissing = [];
 
-            // 1. Required fields audit
             config.required.forEach(field => {
                 totalFieldsCount++;
                 const el = document.getElementById(field);
                 if (el) {
-                    if (el.value.trim() !== "") {
+                    const isFilePopulated = el.type === 'file' && el.getAttribute('data-populated') === 'true';
+                    if (el.value.trim() !== "" || isFilePopulated) {
                         filledFieldsCount++;
                     } else {
-                        requiredMissing.push(el.getAttribute('placeholder') || getLabelName(field));
+                        requiredMissing.push(getLabelName(field));
                     }
                 }
             });
 
-            // 2. Optional fields audit
             config.optional.forEach(field => {
                 totalFieldsCount++;
                 const el = document.getElementById(field);
                 if (el) {
-                    // Check if file input is populated
                     const isFilePopulated = el.type === 'file' && el.getAttribute('data-populated') === 'true';
                     if (el.value.trim() !== "" || isFilePopulated) {
                         filledFieldsCount++;
@@ -537,143 +858,132 @@
                 }
             });
 
-            // Render status on Left Stepper
             updateStepNavStatus(step, requiredMissing, optionalMissing);
         }
 
-        // Calculate and update the overall progress bar
         const progressPercentage = totalFieldsCount > 0 ? Math.round((filledFieldsCount / totalFieldsCount) * 100) : 0;
-        document.getElementById('progress-percentage').textContent = progressPercentage + '%';
-        document.getElementById('filled-fields-count').textContent = filledFieldsCount;
-        document.getElementById('progress-bar-fill').style.width = progressPercentage + '%';
+        const pctEl = document.getElementById('progress-percentage');
+        const countEl = document.getElementById('filled-fields-count');
+        const fillEl = document.getElementById('progress-bar-fill');
+
+        if (pctEl) pctEl.textContent = progressPercentage + '%';
+        if (countEl) countEl.textContent = filledFieldsCount;
+        if (fillEl) fillEl.style.width = progressPercentage + '%';
     }
 
-    // Set step nav status classes and content dynamically
     function updateStepNavStatus(step, requiredMissing, optionalMissing) {
         const navBtn = document.getElementById('step-nav-' + step);
         const iconDiv = document.getElementById('step-nav-icon-' + step);
         const statusSpan = document.getElementById('step-nav-status-' + step);
         const missingSpan = document.getElementById('step-nav-missing-' + step);
 
-        iconDiv.innerHTML = '';
-        missingSpan.textContent = '';
+        if (!navBtn || !iconDiv || !statusSpan || !missingSpan) return;
 
         if (requiredMissing.length > 0) {
-            // State: Belum Lengkap (Red Warning)
             statusSpan.textContent = 'Belum Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-error';
-            
-            // Red warning icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-error-bg border border-error-border flex items-center justify-center text-error">
-                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </span>`;
-
+            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-0.5';
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><i class="fa-solid fa-xmark text-xs"></i></span>`;
             missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
-            
+
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-error-border bg-error-bg/10 hover:bg-error-bg/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none";
             }
         } else if (optionalMissing.length > 0) {
-            // State: Kekurangan Data (Amber Warning)
             statusSpan.textContent = 'Kekurangan Data';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-warning';
-
-            // Amber alert icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-warning-bg border border-warning-border flex items-center justify-center text-warning">
-                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-            </span>`;
-
+            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-amber-600 dark:text-amber-400 mt-0.5';
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400"><i class="fa-solid fa-exclamation text-xs"></i></span>`;
             missingSpan.textContent = 'Kurang: ' + optionalMissing.join(', ');
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-warning-border bg-warning-bg/10 hover:bg-warning-bg/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-all group focus:outline-none";
             }
         } else {
-            // State: Lengkap (Green Check)
             statusSpan.textContent = 'Lengkap';
-            statusSpan.className = 'text-[9px] font-bold block mt-1 uppercase tracking-wider text-success';
-
-            // Green check icon (SVG)
-            iconDiv.innerHTML = `<span class="h-5 w-5 rounded-full bg-success flex items-center justify-center text-white">
-                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-            </span>`;
-
+            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-0.5';
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center"><i class="fa-solid fa-check text-xs"></i></span>`;
             missingSpan.textContent = 'Semua data terisi';
 
             if (currentActiveStep !== step) {
-                navBtn.className = "w-full text-left p-3.5 rounded-lg border border-success-border bg-success-bg/10 hover:bg-success-bg/20 transition-all group focus:outline-none";
+                navBtn.className = "w-full text-left p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all group focus:outline-none";
             }
         }
 
-        // Highlight active step specifically
         if (currentActiveStep === step) {
-            navBtn.className = "w-full text-left p-3.5 rounded-lg border-2 border-primary bg-primary-soft/30 transition-all group focus:outline-none";
+            navBtn.className = "w-full text-left p-3.5 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-sm";
         }
     }
 
-    // Field names translator helper
     function getLabelName(field) {
         const labels = {
             full_name: 'Nama Lengkap',
             identity_number: 'NIK',
             gender: 'Jenis Kelamin',
-            phone: 'Nomor HP',
-            primary_phone: 'Nomor HP Utama',
-            alternative_phone: 'Nomor HP Alternatif',
-            npwp: 'NPWP',
+            primary_phone: 'HP Utama',
             pop_id: 'POP Cabang',
-            email: 'Email',
             registration_date: 'Tgl Registrasi',
             address: 'Alamat',
             city_id: 'Kota',
             district_id: 'Kecamatan',
             village_id: 'Desa',
-            latitude: 'Latitude',
-            longitude: 'Longitude',
             foto_ktp: 'Foto KTP',
             internet_package_id: 'Paket Internet',
             jenis_kontrak: 'Jenis Kontrak',
             contract_period_months: 'Masa Kontrak',
-            discount_amount: 'Diskon',
-            status: 'Status Awal'
+            discount_amount: 'Diskon'
         };
         return labels[field] || field;
     }
 
-    // Step switching workflow
+    /* Stepper Page Switcher */
     function goToStep(stepNumber) {
-        // Hide active panel
         document.getElementById('step-panel-' + currentActiveStep).classList.add('hidden');
-        
-        // Update current step index
         currentActiveStep = stepNumber;
-
-        // Show new panel
         document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');
 
-        // Adjust navigation button visibility
-        if (currentActiveStep === 1) {
-            document.getElementById('btn-prev').classList.add('hidden');
-        } else {
-            document.getElementById('btn-prev').classList.remove('hidden');
+        // Update mobile stepper buttons UI
+        for (let i = 1; i <= 3; i++) {
+            const mBtn = document.getElementById('mobile-step-btn-' + i);
+            if (mBtn) {
+                if (i === currentActiveStep) {
+                    mBtn.className = "py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm";
+                } else {
+                    mBtn.className = "py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5";
+                }
+            }
         }
 
-        if (currentActiveStep === totalStepsCount) {
-            document.getElementById('btn-next').classList.add('hidden');
-            document.getElementById('btn-submit').classList.remove('hidden');
-        } else {
-            document.getElementById('btn-next').classList.remove('hidden');
-            document.getElementById('btn-submit').classList.add('hidden');
-        }
-
-        // Re-run status colorizer to update border highlight
+        updateWizardButtons();
         runLiveProgressUpdates();
+    }
+
+    /*
+     * Aturan tombol wizard — satu-satunya tempat visibilitas tombol ditentukan.
+     * Step pertama  : Batal + Lanjut
+     * Step tengah   : Sebelumnya + Batal + Lanjut
+     * Step terakhir : Sebelumnya + Batal + Simpan Registrasi
+     * "Batal" selalu tampil, jadi tidak ikut diatur di sini.
+     * Dipanggil juga saat load supaya markup awal tidak jadi sumber kebenaran kedua.
+     *
+     * Sengaja pakai inline style, BUKAN class 'hidden': tombol-tombol ini sudah
+     * memakai utility display 'inline-flex', dan di CSS Tailwind keduanya utility
+     * display dengan specificity sama — 'inline-flex' menang, jadi 'hidden' tidak
+     * pernah berefek dan semua tombol tampil bersamaan. Inline style selalu menang.
+     */
+    function updateWizardButtons() {
+        const isFirstStep = currentActiveStep === 1;
+        const isLastStep = currentActiveStep === totalStepsCount;
+
+        setElementVisible(document.getElementById('btn-prev'), ! isFirstStep);
+        setElementVisible(document.getElementById('btn-next'), ! isLastStep);
+        setElementVisible(document.getElementById('btn-submit'), isLastStep);
+    }
+
+    function setElementVisible(el, visible) {
+        if (! el) {
+            return;
+        }
+        // String kosong = balik ke display dari class (inline-flex), bukan 'block'.
+        el.style.display = visible ? '' : 'none';
     }
 
     function nextStep() {
@@ -689,6 +999,5 @@
     }
 </script>
 <?php $__env->stopSection(); ?>
-
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/customers/create.blade.php ENDPATH**/ ?>

@@ -52,14 +52,14 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <!-- Tipe -->
             <div>
-                <label for="type" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Tipe <span class="text-rose-500">*</span></label>
-                <select name="type" id="type" required
-                        class="w-full px-3 py-2 border @error('type') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 bg-white dark:bg-slate-800">
-                    @foreach(\App\Enums\MaterialType::cases() as $materialType)
-                        <option value="{{ $materialType->value }}" {{ old('type', $item->type->value) === $materialType->value ? 'selected' : '' }}>{{ $materialType->label() }}</option>
+                <label for="item_category_id" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori <span class="text-rose-500">*</span></label>
+                <select name="item_category_id" id="item_category_id" required
+                        class="w-full px-3 py-2 border @error('item_category_id') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 bg-white dark:bg-slate-800">
+                    @foreach($categories as $category)
+                        <option value="{{ $category->id }}" {{ (int) old('item_category_id', $item->item_category_id) === $category->id ? 'selected' : '' }}>{{ $category->name }}{{ $category->is_active ? '' : ' (nonaktif)' }}</option>
                     @endforeach
                 </select>
-                @error('type')
+                @error('item_category_id')
                     <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
                 @enderror
             </div>

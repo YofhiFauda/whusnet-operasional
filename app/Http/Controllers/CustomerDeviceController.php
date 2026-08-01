@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\CustomerTechnicalDetail;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CustomerDeviceController extends Controller
 {
@@ -40,7 +41,12 @@ class CustomerDeviceController extends Controller
             'olt_port' => 'nullable|string|max:50',
             'tech_vlan' => 'nullable|string|max:20',
             'passive_device' => 'nullable|string|max:150',
-            'passive_device_type' => 'nullable|string|in:splitter_odp,kabel_dropcore,patch_cord,media_converter,antena_radio,aksesoris_pasang,lainnya',
+            // Dulu daftar ini disalin literal dari enum MaterialType dan wajib
+            // dijaga tetap sama secara manual. Sekarang dua-duanya baca master
+            // `item_categories` yang sama — aset terpasang & material terpakai
+            // memang bicara barang yang sama, cuma beda sudut pandang, dan
+            // laporan pemakaian tak bisa dicocokkan kalau daftarnya menyimpang.
+            'passive_device_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
             'passive_device_qty' => 'nullable|string|max:50',
             'passive_device_note' => 'nullable|string|max:255',
             'branch_number' => 'nullable|string|max:50',

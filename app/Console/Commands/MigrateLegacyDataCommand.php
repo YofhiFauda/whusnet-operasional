@@ -482,15 +482,6 @@ class MigrateLegacyDataCommand extends Command
                 }
             }
 
-            // Date formatting
-            $regDate = now()->format('Y-m-d');
-            if (! empty($row['inserted_at'])) {
-                try {
-                    $regDate = Carbon::parse($row['inserted_at'])->format('Y-m-d');
-                } catch (\Exception $e) {
-                }
-            }
-
             // Survey lookups for coords & photos
             $custSurvey = $this->resolveLegacySurveyRow([
                 'IDPERMINTAAN' => $row['IDPERMINTAAN'] ?? null,
@@ -504,15 +495,46 @@ class MigrateLegacyDataCommand extends Command
             // Laporan lookups for contract photo and sales code
             $custLaporan = $laporanMap[$row['IDPENGGUNA']] ?? null;
             $salesCode = '';
+            $legacyRequestInsertedAt = null;
             foreach ($layananRows as $lRow) {
                 if (($lRow['IDPENGGUNA'] ?? '') === $row['IDPENGGUNA']) {
                     $salesCode = $lRow['CREATED'] ?? '';
+                    $legacyRequestInsertedAt = $lRow['inserted_at'] ?? $legacyRequestInsertedAt;
                     if (! $custLaporan) {
                         $custLaporan = $laporanMap[$lRow['IDPERMINTAAN']] ?? null;
                     }
                 }
             }
             $fotoKontrak = $custLaporan['FOTOFORMULIR'] ?? null;
+
+            // Date formatting — tanggal registrasi diambil dari inserted_at
+            // baris PERMINTAAN (prosedure_permintaan_wifi), BUKAN baris
+            // pengguna. pengguna.inserted_at ternyata timestamp sinkronisasi/
+            // sentuhan terakhir record pengguna (bisa jauh lebih baru dari
+            // tanggal daftar aslinya — kasus Ardiyanto: pengguna.inserted_at
+            // = 10 Mei 2022, padahal PENGAJUAN aslinya 6 Jan 2022 per
+            // riwayat_pelanggan & inserted_at baris RQ-nya sendiri).
+            //
+            // inserted_at kolomnya bertipe MySQL TIMESTAMP (bukan DATETIME
+            // seperti TGLSURVEY/TGLDIACC/TGLDIPROSES/VERIFIED_AT) — TIMESTAMP
+            // otomatis dikonversi ke/dari UTC oleh server lama, sedangkan
+            // kolom DATETIME lain di dump ini literal (tidak dikonversi).
+            // Itu sebabnya inserted_at kebaca 7 jam mundur dari jam yang
+            // ditampilkan aplikasi lama (kasus Ardiyanto: 08:34:22 di dump vs
+            // 15:34:22 WIB di UI) — perlu digeser eksplisit UTC → Asia/Jakarta,
+            // beda dari field tanggal lain yang sudah literal.
+            $regDateTime = now()->format('Y-m-d H:i:s');
+            if (! empty($legacyRequestInsertedAt)) {
+                try {
+                    $regDateTime = Carbon::parse($legacyRequestInsertedAt, 'UTC')->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                } catch (\Exception $e) {
+                }
+            } elseif (! empty($row['inserted_at'])) {
+                try {
+                    $regDateTime = Carbon::parse($row['inserted_at'], 'UTC')->setTimezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+                } catch (\Exception $e) {
+                }
+            }
 
             $legacyBranchId = trim((string) ($row['IDCABANG'] ?? ''));
             $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
@@ -562,7 +584,14 @@ class MigrateLegacyDataCommand extends Command
                 'full_address' => $this->resolveLegacyAddressText($row),
                 'old_region_id' => $row['IDWILAYAH'] ?? '',
                 'old_branch_id' => $legacyBranchId,
-                'registration_date' => $regDate,
+                'registration_date' => $regDateTime,
+                // CREATED di prosedure_permintaan_wifi nyimpen kode aktor yang
+                // input permintaan (mis. 'PE21000001' = "Faruqi R"), bukan cuma
+                // kode sales — sales_code di atas dibiarkan mentah (dipakai
+                // tempat lain sebagai kode), nama hasil resolve dikirim
+                // terpisah biar timeline riwayat pelanggan bisa nampilin aktor
+                // registrasi yang benar, bukan admin yang jalanin importnya.
+                'registered_by_name' => $this->resolveLegacyUserLabel($salesCode, $penggunaMap),
                 'pop_code' => $miniPopCode,
                 'pop_name' => $legacyPop['pop_name'],
                 'distribution_code' => $legacyDistributionByCustomer[$row['IDPENGGUNA']] ?? '',
@@ -683,19 +712,26 @@ class MigrateLegacyDataCommand extends Command
             }
 
             // Lookup survey info
+            //
+            // prosedure_permintaan_wifi.TGLSURVEY (row['TGLSURVEY']) adalah tanggal
+            // proses survey resmi — ini yang dipakai "TANGGAL SURVEY" di aplikasi lama.
+            // survey_pemasangan_wifi.TGLSURVEY di tabel terpisah malah keisi belakangan,
+            // pas teknisi submit LAPORAN hasil survey (bisa berhari-hari setelahnya),
+            // jadi harus jadi fallback — bukan prioritas. Ketertukar urutan ini yang
+            // bikin migrasi lama nge-grab tanggal report survey, bukan tanggal survey.
             $survey = $this->resolveLegacySurveyRow($row, $surveyMap);
             $surveyDate = null;
             $surveyStartTime = null;
-            if ($survey && ! empty($survey['TGLSURVEY'])) {
+            if (! empty($row['TGLSURVEY'])) {
                 try {
-                    $cDate = Carbon::parse($survey['TGLSURVEY']);
+                    $cDate = Carbon::parse($row['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
                 } catch (\Exception $e) {
                 }
-            } elseif (! empty($row['TGLSURVEY'])) {
+            } elseif ($survey && ! empty($survey['TGLSURVEY'])) {
                 try {
-                    $cDate = Carbon::parse($row['TGLSURVEY']);
+                    $cDate = Carbon::parse($survey['TGLSURVEY']);
                     $surveyDate = $cDate->format('Y-m-d');
                     $surveyStartTime = $cDate->format('H:i:s');
                 } catch (\Exception $e) {
@@ -781,6 +817,14 @@ class MigrateLegacyDataCommand extends Command
                 'installation_note' => $laporan['KETERANGAN'] ?? '',
                 'installation_assigned_at' => $row['TGLDIPROSES'] ?? null,
                 'installation_fop_id' => $row['IDPERMINTAAN'],
+
+                // Langkah "ACC" / filter admin (TGLDIACC/DIACC) sebelumnya gak
+                // pernah disimpan ke sheet manapun — cuma numpang jadi salah satu
+                // fallback activation_date di atas. Dikirim di sini biar
+                // confirmImport() bisa nyatet riwayat status waiting_acc-nya,
+                // bukan hilang total.
+                'admin_filter_at' => ! $isZeroDate($row['TGLDIACC'] ?? null) ? $row['TGLDIACC'] : null,
+                'admin_filter_by' => $this->resolveLegacyUserLabel($row['DIACC'] ?? '', $penggunaMap),
             ];
         }
 

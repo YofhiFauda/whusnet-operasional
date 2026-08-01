@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50 dark:bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="F5Fygwf2koIKBbJ0FMh87MS6RA25CJPgJv6GlQRo">
+
+    <title>Lapor Data Survey Pelanggan — WHUSNET Operasional</title>
+
+    <!-- Theme Initializer (Prevents FOUC) -->
+    <script>
+        (function () {
+            const saved = localStorage.getItem('whusnet-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (!saved && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Google Fonts: Inter (Sans) & JetBrains Mono (Technical/Monospace) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        skybrand: {
+                            50: '#F0F9FF',
+                            100: '#E0F2FE',
+                            200: '#BAE6FD',
+                            500: '#0EA5E9',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            900: '#0C4A6E',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- NProgress -->
+    <link rel="stylesheet" href="./Lapor Data Survey Pelanggan - Whusnet Operasional_files/nprogress.min.css">
+    <script src="./Lapor Data Survey Pelanggan - Whusnet Operasional_files/nprogress.min.js.download"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof NProgress !== 'undefined') {
+                NProgress.configure({ showSpinner: false, minimum: 0.1 });
+                NProgress.done();
+            }
+        });
+        window.addEventListener('beforeunload', () => {
+            if (typeof NProgress !== 'undefined') NProgress.start();
+        });
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .data-text, .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.4); }
+
+        .kbd {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #334155;
+            white-space: nowrap;
+        }
+        html.dark .kbd { border-color: #334155; background: #0f172a; color: #cbd5e1; }
+    </style>
+</head>
+<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans bg-slate-50 dark:bg-slate-900 selection:bg-sky-500 selection:text-white">
+
+<div class="flex h-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700/60 fixed inset-y-0 left-0 z-40 w-64 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 -translate-x-full shrink-0">
+        
+        <!-- Logo Header -->
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-base tracking-wider shrink-0 shadow-sm">
+                    W
+                </div>
+                <span class="font-bold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">WHUSNET</span>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Operasional</p>
+                <div class="space-y-1">
+                    <a href="http://localhost:8000/" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <i class="fa-solid fa-chart-pie text-slate-400 w-5"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')" class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-users text-sky-600 dark:text-sky-400 w-5"></i>
+                                <span>Pelanggan</span>
+                            </div>
+                            <i id="chevron-pelanggan" class="fa-solid fa-chevron-down text-xs transition-transform duration-200 rotate-180"></i>
+                        </button>
+
+                        <div id="submenu-pelanggan" class="pl-9 pr-2 space-y-1 text-xs">
+                            <a href="http://localhost:8000/customers/create" class="block py-2 px-3 rounded-md text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+                                Registrasi Pelanggan
+                            </a>
+                            <a href="http://localhost:8000/surveys/queue" class="flex items-center justify-between py-2 px-3 rounded-md font-semibold text-sky-600 dark:text-sky-400 bg-sky-100/50 dark:bg-sky-900/40">
+                                <span>Antrean Survey</span>
+                                <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">4</span>
+                            </a>
+                            <a href="http://localhost:8000/verifications/queue" class="flex items-center justify-between py-2 px-3 rounded-md text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+                                <span>Verif & Pemasangan</span>
+                                <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">7</span>
+                            </a>
+                            <a href="http://localhost:8000/customers" class="block py-2 px-3 rounded-md text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+                                List Pelanggan
+                            </a>
+                            <a href="http://localhost:8000/customers/failed" class="block py-2 px-3 rounded-md text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+                                Pelanggan Gagal
+                            </a>
+                            <a href="http://localhost:8000/customers/terminated" class="block py-2 px-3 rounded-md text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20">
+                                Pelanggan Putus
+                            </a>
+                        </div>
+                    </div>
+
+                    <a href="http://localhost:8000/invoices" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <i class="fa-solid fa-file-invoice-dollar text-slate-400 w-5"></i>
+                        <span>Tagihan</span>
+                    </a>
+                    <a href="http://localhost:8000/payments" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <i class="fa-solid fa-wallet text-slate-400 w-5"></i>
+                        <span>Pembayaran</span>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Jaringan & Tiket</p>
+                <div class="space-y-1">
+                    <a href="http://localhost:8000/noc/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <i class="fa-solid fa-headset text-slate-400 w-5"></i>
+                        <span>Ticketing NOC</span>
+                    </a>
+                    <a href="http://localhost:8000/fop" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <i class="fa-solid fa-screwdriver-wrench text-slate-400 w-5"></i>
+                        <span>FOP Teknis</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center border border-sky-200 dark:border-sky-700 shrink-0">
+                        SU
+                    </div>
+                    <div class="truncate">
+                        <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">Super Admin</p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate">superadmin@whusnet.com</p>
+                    </div>
+                </div>
+                <form id="logout-form" action="http://localhost:8000/logout" method="POST" class="hidden">
+                    <input type="hidden" name="_token" value="F5Fygwf2koIKBbJ0FMh87MS6RA25CJPgJv6GlQRo">
+                </form>
+                <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors" title="Keluar">
+                    <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- BACKDROP MOBILE -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 z-30 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm hidden md:hidden"></div>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <!-- TOP BAR HEADER (Sticky, 64px) -->
+        <header class="h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/60 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30 shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+
+                <!-- Breadcrumb Navigation -->
+                <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 min-w-0">
+                    <a href="http://localhost:8000/surveys/queue" class="hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0">Antrean Survey</a>
+                    <span class="text-slate-300 dark:text-slate-600">/</span>
+                    <span aria-current="page" class="font-semibold text-sky-600 dark:text-sky-400 truncate">Lapor Data Survey</span>
+                </nav>
+            </div>
+
+            <!-- Global Search & Actions -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <div class="hidden md:block relative w-64 lg:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+                    <input type="search" id="globalSearch" onkeydown="handleGlobalSearch(event)" placeholder="Cari pelanggan, CID, invoice, tiket..." class="w-full h-8 pl-9 pr-8 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all">
+                    <kbd class="hidden lg:block absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.2 bg-white dark:bg-slate-800">/</kbd>
+                </div>
+
+                <!-- Theme Toggle Button -->
+                <button onclick="toggleTheme()" id="themeToggle" aria-label="Ganti tema" class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors" title="Toggle Mode Terang/Gelap">
+                    <i id="themeIconMoon" class="fa-solid fa-moon text-base"></i>
+                    <i id="themeIconSun" class="fa-solid fa-sun text-base hidden"></i>
+                </button>
+
+                <!-- Help Button -->
+                <button onclick="openHelp()" aria-label="Bantuan" title="Bantuan (?)" class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
+                    <i class="fa-regular fa-circle-question text-base"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN SCROLLABLE AREA -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div class="max-w-6xl mx-auto space-y-6">
+
+                <!-- LAYER 1: NAKED PAGE HEADER (Strict Design System Rule: No card wrapper) -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Laporan Survey Lapangan</h1>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
+                                <i class="fa-solid fa-user-check text-[10px] mr-1.5"></i> Dinar Markondang
+                            </span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                            Lapor data teknis pantauan lapangan, ketersediaan ODP, foto lokasi, serta perkiraan alat dan material instalasi.
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <a href="http://localhost:8000/surveys/queue" class="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-2">
+                            <i class="fa-solid fa-arrow-left text-xs"></i>
+                            <span>Kembali ke Antrean</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- MAIN FORM CONTAINER -->
+                <form action="http://localhost:8000/customers/1916/survey" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
+                    <input type="hidden" name="_token" value="F5Fygwf2koIKBbJ0FMh87MS6RA25CJPgJv6GlQRo">
+                    <input type="hidden" name="survey_status" id="survey_status_input" value="completed">
+
+                    <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
+                    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/50">
+                                    <i class="fa-solid fa-clipboard-check text-xs"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Laporan Survey</h3>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Semua data wajib akan divalidasi sebelum laporan disimpan</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span id="progress-percentage" class="text-sm sm:text-base font-extrabold text-sky-600 dark:text-sky-400 data-text">0%</span>
+                                <span class="text-[11px] text-slate-500 dark:text-slate-400 block"><span id="filled-fields-count" class="data-text font-semibold">0</span> dari <span id="total-fields-count" class="data-text font-semibold">5</span> field terisi</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar Fill Strip -->
+                        <div class="w-full bg-slate-100 dark:bg-slate-700/60 rounded-full h-2.5 overflow-hidden border border-slate-200/60 dark:border-slate-700">
+                            <div id="progress-bar-fill" class="bg-gradient-to-r from-sky-500 to-sky-600 h-full w-0 transition-all duration-500 ease-out" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- MOBILE RESPONSIVE STEPPER (Visible on < lg screens: 2 rows x 2 items) -->
+                    <div class="lg:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 shadow-sm">
+                        <div class="grid grid-cols-2 gap-2 text-center">
+                            <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="py-2.5 px-2 rounded-lg text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 transition-all flex items-center justify-center gap-1.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">✓</span>
+                                <span class="truncate text-[11px] font-semibold">1. Data Diri</span>
+                            </button>
+                            <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
+                                <span class="w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">2</span>
+                                <span class="truncate text-[11px] font-semibold">2. Dokumen</span>
+                            </button>
+                            <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="py-2.5 px-2 rounded-lg text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 transition-all flex items-center justify-center gap-1.5">
+                                <span class="w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">✓</span>
+                                <span class="truncate text-[11px] font-semibold">3. Layanan</span>
+                            </button>
+                            <button type="button" onclick="goToStep(4)" id="mobile-step-btn-4" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
+                                <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">4</span>
+                                <span class="truncate text-[11px] font-semibold">4. Laporan</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- MAIN GRID LAYOUT -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        
+                        <!-- LEFT COLUMN: Desktop Stepper Checklist (Visible on >= lg screens) -->
+                        <div class="hidden lg:block lg:col-span-4 space-y-4">
+                            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-5 shadow-sm space-y-4">
+                                <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tahapan Laporan</h4>
+
+                                <div class="space-y-3">
+                                    <!-- Step 1 Navigation Card (Read-only) -->
+                                    <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3.5 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none">
+                                        <div class="flex items-start gap-3">
+                                            <div class="mt-0.5 shrink-0" id="step-nav-icon-1">
+                                                <span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                                                    <i class="fa-solid fa-check text-xs"></i>
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">1. Data Diri Pelanggan</span>
+                                                <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mt-0.5">Lengkap</span>
+                                                <span class="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">Data Read-only dari registrasi</span>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <!-- Step 2 Navigation Card -->
+                                    <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
+                                        <div class="flex items-start gap-3">
+                                            <div class="mt-0.5 shrink-0" id="step-nav-icon-2">
+                                                <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">2. Dokumen Lampiran</span>
+                                                <span id="step-nav-status-2" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
+                                                <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Foto Rumah, Foto ODP Terdekat</span>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <!-- Step 3 Navigation Card (Read-only) -->
+                                    <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
+                                        <div class="flex items-start gap-3">
+                                            <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
+                                                <span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                                                    <i class="fa-solid fa-check text-xs"></i>
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">3. Layanan & Paket</span>
+                                                <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mt-0.5">Lengkap</span>
+                                                <span class="text-[10px] text-slate-400 dark:text-slate-500 block mt-1">Data Read-only</span>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <!-- Step 4 Navigation Card -->
+                                    <button type="button" onclick="goToStep(4)" id="step-nav-4" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
+                                        <div class="flex items-start gap-3">
+                                            <div class="mt-0.5 shrink-0" id="step-nav-icon-4">
+                                                <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                                </span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">4. Laporan Survey</span>
+                                                <span id="step-nav-status-4" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
+                                                <span id="step-nav-missing-4" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: ODP Terdekat, Estimasi Kabel, Tingkat Kesulitan</span>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT COLUMN: Wizard Form Content Panels -->
+                        <div class="lg:col-span-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl shadow-sm overflow-hidden flex flex-col justify-between min-h-[520px]">
+                            
+                            <!-- FORM BODY -->
+                            <div class="p-5 sm:p-7 flex-1">
+
+                                <!-- STEP 1 PANEL: Data Diri Pelanggan (Read-Only) -->
+                                <div id="step-panel-1" class="step-panel space-y-6">
+                                    <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                                        <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">1. IDENTITAS PELANGGAN & ALAMAT</h4>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Data identitas calon pelanggan yang diisi pada saat registrasi.</p>
+                                    </div>
+
+                                    <div class="bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 text-xs">
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Nama Lengkap</span>
+                                            <span class="block text-sm font-bold text-slate-800 dark:text-slate-100">Dinar Markondang</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Nomor Identitas (NIK)</span>
+                                            <span class="block text-sm data-text font-semibold text-slate-800 dark:text-slate-100">3502120509950001</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Jenis Kelamin</span>
+                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">Laki-laki</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Nomor HP Utama</span>
+                                            <span class="block text-xs data-text font-semibold text-slate-800 dark:text-slate-200">628977955002</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Nomor HP Alternatif</span>
+                                            <span class="block text-xs text-slate-400 dark:text-slate-500">-</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Alamat Email</span>
+                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">123@gmail.com</span>
+                                        </div>
+
+                                        <div class="md:col-span-2 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Alamat Instalasi Lengkap</span>
+                                            <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">Jl. Ponorogo - Solo, Plosojenar, Kel. Kauman, Kec. Ponorogo</span>
+                                            <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">Kel. Kauman, Kec. Kauman, Ponorogo</span>
+                                        </div>
+
+                                        <div class="grid grid-cols-2 gap-3 md:col-span-1 pt-2">
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Latitude</span>
+                                                <span class="block text-xs data-text font-semibold text-slate-800 dark:text-slate-200">-7.8664870</span>
+                                            </div>
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Longitude</span>
+                                                <span class="block text-xs data-text font-semibold text-slate-800 dark:text-slate-200">111.4094710</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="pt-2 md:col-span-1">
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">POP Cabang</span>
+                                            <span class="block text-xs font-bold text-sky-600 dark:text-sky-400">Sandya</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- STEP 2 PANEL: Dokumen Lampiran -->
+                                <div id="step-panel-2" class="step-panel space-y-6 hidden">
+                                    <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                                        <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tinjau foto KTP dari registrasi, lalu unggah Foto Rumah dan Foto ODP / Jalur terdekat.</p>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        
+                                        <!-- Foto KTP (Read Only dari Registrasi) -->
+                                        <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto KTP (Registrasi)</span>
+                                                <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                                                    <img class="max-h-36 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer" src="./Lapor Data Survey Pelanggan - Whusnet Operasional_files/9bbfb852175cb02146252af1fccd0ebd.jpeg" alt="Preview Foto KTP" onclick="window.open('./Lapor Data Survey Pelanggan - Whusnet Operasional_files/9bbfb852175cb02146252af1fccd0ebd.jpeg', '_blank')">
+                                                </div>
+                                            </div>
+                                            <span class="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                                <i class="fa-solid fa-circle-check text-xs"></i> Terlampir di System
+                                            </span>
+                                        </div>
+
+                                        <!-- Foto Rumah (Input Upload Baru) -->
+                                        <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-sky-500 dark:hover:border-sky-400 bg-slate-50/50 dark:bg-slate-900/40 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative group">
+                                            <div id="default-placeholder-house_photo" class="py-4 space-y-2">
+                                                <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                                    <i class="fa-solid fa-house"></i>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH <span class="text-rose-500">*</span></span>
+                                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                                </div>
+                                            </div>
+
+                                            <div id="preview-container-house_photo" class="hidden py-2 flex flex-col items-center justify-center">
+                                                <div class="relative inline-block w-full">
+                                                    <img id="preview-img-house_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
+                                                    <button type="button" onclick="clearFile('house_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                                    </button>
+                                                </div>
+                                                <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
+                                            </div>
+
+                                            <div class="mt-2">
+                                                <input type="file" name="house_photo" id="house_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('house_photo')">
+                                                <label for="house_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                                    Pilih Foto Rumah
+                                                </label>
+                                                <span id="file-label-house_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Foto ODP (Input Upload Baru) -->
+                                        <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-sky-500 dark:hover:border-sky-400 bg-slate-50/50 dark:bg-slate-900/40 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative group">
+                                            <div id="default-placeholder-survey_photo" class="py-4 space-y-2">
+                                                <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                                    <i class="fa-solid fa-network-wired"></i>
+                                                </div>
+                                                <div>
+                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO ODP / JALUR <span class="text-rose-500">*</span></span>
+                                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                                </div>
+                                            </div>
+
+                                            <div id="preview-container-survey_photo" class="hidden py-2 flex flex-col items-center justify-center">
+                                                <div class="relative inline-block w-full">
+                                                    <img id="preview-img-survey_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto ODP">
+                                                    <button type="button" onclick="clearFile('survey_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                                    </button>
+                                                </div>
+                                                <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
+                                            </div>
+
+                                            <div class="mt-2">
+                                                <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                                <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                                    Pilih Foto ODP
+                                                </label>
+                                                <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <!-- STEP 3 PANEL: Layanan & Paket (Read-Only) -->
+                                <div id="step-panel-3" class="step-panel space-y-6 hidden">
+                                    <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                                        <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. LAYANAN & PAKET LAYANAN INTERNET</h4>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Rincian paket layanan internet yang dipilih saat pendaftaran.</p>
+                                    </div>
+
+                                    <div class="bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 text-xs">
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Paket Internet</span>
+                                            <span class="block text-sm font-bold text-slate-800 dark:text-slate-100">PK000001 - default</span>
+                                        </div>
+
+                                        <div>
+                                            <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Biaya Bulanan Dasar</span>
+                                            <span class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">Rp 0</span>
+                                        </div>
+
+                                        <div class="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Jenis Kontrak</span>
+                                                <span class="block text-xs font-bold uppercase text-slate-800 dark:text-slate-200">sewa</span>
+                                            </div>
+
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Masa Kontrak</span>
+                                                <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200">12 Bulan</span>
+                                            </div>
+
+                                            <div>
+                                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Diskon Promosi</span>
+                                                <span class="block text-xs data-text font-semibold text-slate-800 dark:text-slate-200">Rp 0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- STEP 4 PANEL: Laporan Survey Lapangan -->
+                                <div id="step-panel-4" class="step-panel space-y-6 hidden">
+                                    <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
+                                        <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">4. LAPORAN SURVEY LAPANGAN</h4>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Masukkan data teknis hasil pengamatan dan estimasi kebutuhan di lokasi.</p>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 text-xs">
+                                        <!-- ODP Terdekat -->
+                                        <div>
+                                            <label for="nearest_odp" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">ODP Terdekat <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="nearest_odp" id="nearest_odp" value="" class="w-full text-xs data-text px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: ODP-BBD-01">
+                                        </div>
+                                        
+                                        <!-- Estimasi Kabel -->
+                                        <div>
+                                            <label for="cable_estimation_meter" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Estimasi Kabel (Meter) <span class="text-rose-500">*</span></label>
+                                            <input type="number" name="cable_estimation_meter" id="cable_estimation_meter" min="0" value="" class="w-full text-xs data-text px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: 150">
+                                        </div>
+
+                                        <!-- Tanggal Request Pemasangan -->
+                                        <div>
+                                            <label for="requested_installation_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Tanggal Request Pemasangan</label>
+                                            <input type="date" name="requested_installation_date" id="requested_installation_date" min="2026-08-01" value="" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Kosongkan jika pelanggan tidak meminta tanggal spesifik.</span>
+                                        </div>
+
+                                        <!-- Tingkat Kesulitan -->
+                                        <div>
+                                            <label for="difficulty_level" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Tingkat Kesulitan <span class="text-rose-500">*</span></label>
+                                            <select name="difficulty_level" id="difficulty_level" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                                <option value="" disabled selected>Pilih Tingkat Kesulitan</option>
+                                                <option value="MUDAH">MUDAH</option>
+                                                <option value="SEDANG">SEDANG</option>
+                                                <option value="SULIT">SULIT</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Estimasi Kebutuhan Alat (Alpine.js Dynamic Rows Component) -->
+                                        <div class="md:col-span-2 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                            <label class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Estimasi Kebutuhan Alat & Material</label>
+                                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">Perkiraan barang/material habis pakai yang akan dipakai saat pemasangan. Estimasi kabel otomatis menjadi satu baris.</p>
+                                            
+                                            <div x-data="materialRows(
+                                                JSON.parse('[{\u0022id\u0022:1,\u0022name\u0022:\u0022Kabel Dropcore 1 Core\u0022,\u0022code\u0022:\u0022DC-1C\u0022,\u0022type\u0022:\u0022kabel_dropcore\u0022,\u0022unit\u0022:\u0022meter\u0022},{\u0022id\u0022:2,\u0022name\u0022:\u0022Kabel Dropcore 2 Core\u0022,\u0022code\u0022:\u0022DC-2C\u0022,\u0022type\u0022:\u0022kabel_dropcore\u0022,\u0022unit\u0022:\u0022meter\u0022},{\u0022id\u0022:10,\u0022name\u0022:\u0022Klem Kabel\u0022,\u0022code\u0022:\u0022AKS-KLEM\u0022,\u0022type\u0022:\u0022aksesoris_pasang\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:8,\u0022name\u0022:\u0022Media Converter 100 Mbps\u0022,\u0022code\u0022:\u0022MC-100\u0022,\u0022type\u0022:\u0022media_converter\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:5,\u0022name\u0022:\u0022ODP 8 Port\u0022,\u0022code\u0022:\u0022ODP-8\u0022,\u0022type\u0022:\u0022splitter_odp\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:6,\u0022name\u0022:\u0022Patch Cord SC\\\/UPC 1 Meter\u0022,\u0022code\u0022:\u0022PC-SCUPC-1M\u0022,\u0022type\u0022:\u0022patch_cord\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:7,\u0022name\u0022:\u0022Patch Cord SC\\\/UPC 3 Meter\u0022,\u0022code\u0022:\u0022PC-SCUPC-3M\u0022,\u0022type\u0022:\u0022patch_cord\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:4,\u0022name\u0022:\u0022Splitter 1:16\u0022,\u0022code\u0022:\u0022SPL-1X16\u0022,\u0022type\u0022:\u0022splitter_odp\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:3,\u0022name\u0022:\u0022Splitter 1:8\u0022,\u0022code\u0022:\u0022SPL-1X8\u0022,\u0022type\u0022:\u0022splitter_odp\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:11,\u0022name\u0022:\u0022Tiang Penyangga\u0022,\u0022code\u0022:\u0022AKS-TIANG\u0022,\u0022type\u0022:\u0022aksesoris_pasang\u0022,\u0022unit\u0022:\u0022pcs\u0022},{\u0022id\u0022:9,\u0022name\u0022:\u0022Tray Kabel\u0022,\u0022code\u0022:\u0022AKS-TRAY\u0022,\u0022type\u0022:\u0022aksesoris_pasang\u0022,\u0022unit\u0022:\u0022pcs\u0022}]'),
+                                                JSON.parse('[{\u0022code\u0022:\u0022splitter_odp\u0022,\u0022name\u0022:\u0022Splitter \\\/ ODP\u0022,\u0022default_unit\u0022:\u0022pcs\u0022},{\u0022code\u0022:\u0022kabel_dropcore\u0022,\u0022name\u0022:\u0022Kabel Dropcore\u0022,\u0022default_unit\u0022:\u0022meter\u0022},{\u0022code\u0022:\u0022patch_cord\u0022,\u0022name\u0022:\u0022Patch Cord\u0022,\u0022default_unit\u0022:\u0022pcs\u0022},{\u0022code\u0022:\u0022media_converter\u0022,\u0022name\u0022:\u0022Media Converter\u0022,\u0022default_unit\u0022:\u0022pcs\u0022},{\u0022code\u0022:\u0022antena_radio\u0022,\u0022name\u0022:\u0022Antena \\\/ Radio\u0022,\u0022default_unit\u0022:\u0022pcs\u0022},{\u0022code\u0022:\u0022aksesoris_pasang\u0022,\u0022name\u0022:\u0022Aksesoris Pemasangan\u0022,\u0022default_unit\u0022:\u0022pcs\u0022},{\u0022code\u0022:\u0022lainnya\u0022,\u0022name\u0022:\u0022Lainnya\u0022,\u0022default_unit\u0022:\u0022pcs\u0022}]'),
+                                                [],
+                                                'materials',
+                                                'lainnya'
+                                            )" class="space-y-3">
+                                                
+                                                <p x-show="rows.length === 0" class="text-xs text-slate-400 dark:text-slate-500 italic py-1">Belum ada material diestimasi. Klik Tambah Barang bila perlu.</p>
+
+                                                <template x-for="(row, index) in rows" :key="index">
+                                                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200/60 dark:border-slate-700/60 items-center">
+                                                        <div class="sm:col-span-4">
+                                                            <select x-model="row.item_id" @change="onItemChange(index)" :name="`${fieldName}[${index}][item_id]`" class="w-full text-xs font-sans px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500">
+                                                                <option value="">-- Pilih Barang Master --</option>
+                                                                <template x-for="item in itemOptions" :key="item.id">
+                                                                    <option :value="item.id" x-text="`${item.name} (${item.code})`"></option>
+                                                                </template>
+                                                            </select>
+                                                        </div>
+
+                                                        <div class="sm:col-span-3" x-show="!row.item_id">
+                                                            <input type="text" x-model="row.item_name" :name="`${fieldName}[${index}][item_name]`" placeholder="Nama barang manual..." class="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500">
+                                                        </div>
+
+                                                        <div class="sm:col-span-2">
+                                                            <input type="number" x-model="row.qty" :name="`${fieldName}[${index}][qty]`" placeholder="Qty" min="1" class="w-full text-xs data-text px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500">
+                                                        </div>
+
+                                                        <div class="sm:col-span-2">
+                                                            <input type="text" x-model="row.unit" :name="`${fieldName}[${index}][unit]`" placeholder="Satuan" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500">
+                                                        </div>
+
+                                                        <div class="sm:col-span-1 text-right">
+                                                            <button type="button" @click="removeRow(index)" class="p-1.5 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors" title="Hapus Row">
+                                                                <i class="fa-solid fa-trash-can text-xs"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <button type="button" @click="addRow()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 rounded-lg transition-colors shadow-sm">
+                                                    <i class="fa-solid fa-plus text-xs"></i>
+                                                    <span>Tambah Barang</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Tool Checklist Component (Alpine.js) -->
+                                        <div class="md:col-span-2 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                            <div x-data="workToolChecklist([], 'work_tools')" class="space-y-3">
+                                                <div>
+                                                    <label class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Alat Kerja Yang Perlu Dibawa Teknisi</label>
+                                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">Centang alat kerja spesifik yang harus dibawa tim pemasangan dari pengamatan medan di lokasi.</p>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="1" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Tangga</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Sebutkan panjang di catatan bila perlu</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="2" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Fusion Splicer</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="3" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">OPM (Optical Power Meter)</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="4" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">OTDR</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Penelusuran gangguan kabel</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="5" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">VFL (Visual Fault Locator)</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="6" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Bor Beton</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Tembus cor/dinding tebal</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="7" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Tang Krimping</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="8" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Toolkit Standar</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Obeng, tang, cutter, isolasi</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="9" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Genset / Power Bank</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Lokasi tanpa listrik</span>
+                                                        </span>
+                                                    </label>
+
+                                                    <label class="flex items-start gap-2 bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-3 py-2.5 cursor-pointer hover:border-sky-400 dark:hover:border-sky-600 transition-colors">
+                                                        <input type="checkbox" name="work_tools_ids[]" value="10" class="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+                                                        <span class="min-w-0">
+                                                            <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Alat Keselamatan</span>
+                                                            <span class="block text-[10px] text-slate-400 dark:text-slate-500 truncate">Helm, sarung tangan, harness</span>
+                                                        </span>
+                                                    </label>
+                                                </div>
+
+                                                <div class="pt-2 space-y-2">
+                                                    <template x-for="(row, index) in manualRows" :key="index">
+                                                        <div class="flex items-center gap-2">
+                                                            <input type="text" x-model="row.tool_name" :name="`${fieldName}[${index}][tool_name]`" placeholder="Nama alat tambahan..." class="flex-1 text-xs px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">
+                                                            <button type="button" @click="removeRow(index)" class="p-1 text-rose-500 hover:text-rose-700">
+                                                                <i class="fa-solid fa-trash-can text-xs"></i>
+                                                            </button>
+                                                        </div>
+                                                    </template>
+
+                                                    <button type="button" @click="addRow()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 rounded-lg transition-colors shadow-sm">
+                                                        <i class="fa-solid fa-plus text-xs"></i>
+                                                        <span>Alat Lain</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Catatan Kendala Peralatan -->
+                                        <div class="md:col-span-2">
+                                            <label for="required_tools" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Catatan Kendala Peralatan</label>
+                                            <textarea name="required_tools" id="required_tools" rows="2" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Cth: Tangga harus ekstra panjang, lokasi masuk gang sempit..."></textarea>
+                                        </div>
+
+                                        <!-- Catatan Teknis Survey -->
+                                        <div class="md:col-span-2">
+                                            <label for="survey_note" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Catatan Teknis Survey</label>
+                                            <textarea name="survey_note" id="survey_note" rows="3" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Tuliskan kendala teknis atau informasi penting untuk tim instalasi..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- BUTTONS NAVIGATION FOOTER -->
+                            <div class="px-4 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0">
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <button type="button" id="btn-prev" onclick="prevStep()" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                        <i class="fa-solid fa-chevron-left text-[10px]"></i> Sebelumnya
+                                    </button>
+                                    <a href="http://localhost:8000/surveys/queue" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none text-center inline-flex items-center justify-center">
+                                        Batal
+                                    </a>
+                                </div>
+                                
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <button type="button" id="btn-next" onclick="nextStep()" class="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                        Lanjut <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                                    </button>
+
+                                    <button type="submit" id="btn-submit" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer hidden focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                                        <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Laporan Survey
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- KEYBOARD SHORTCUTS & HELP MODAL -->
+<div id="shortcutsModal" onclick="closeHelp()" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle" class="hidden fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div onclick="event.stopPropagation()" class="bg-white dark:bg-slate-800 rounded-xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between shrink-0">
+            <h2 id="shortcutsTitle" class="font-bold text-slate-900 dark:text-slate-50 text-sm flex items-center gap-2">
+                <i class="fa-regular fa-circle-question text-sky-600 dark:text-sky-400 text-base"></i> Bantuan & Pintasan
+            </h2>
+            <button onclick="closeHelp()" aria-label="Tutup" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-5 text-xs text-slate-600 dark:text-slate-300 space-y-4">
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Navigasi Global</p>
+                <dl class="space-y-2">
+                    <div class="flex justify-between"><dt>Fokus Pencarian</dt><dd><kbd class="kbd">/</kbd></dd></div>
+                    <div class="flex justify-between"><dt>Tutup Modal Bantuan</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
+                    <div class="flex justify-between"><dt>Buka Bantuan</dt><dd><kbd class="kbd">?</kbd></dd></div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GLOBAL TOAST CONTAINER -->
+<div id="toast-container" class="fixed top-6 right-6 z-50 w-[calc(100%-3rem)] sm:w-[350px] h-0 pointer-events-none"></div>
+
+<!-- JAVASCRIPT LOGIC & INTERACTIONS -->
+<script>
+    /* ── Sidebar Toggle ── */
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const isHidden = sidebar.classList.contains('-translate-x-full');
+        if (isHidden) {
+            sidebar.classList.remove('-translate-x-full');
+            backdrop && backdrop.classList.remove('hidden');
+        } else {
+            sidebar.classList.add('-translate-x-full');
+            backdrop && backdrop.classList.add('hidden');
+        }
+    }
+
+    function toggleSubmenu(menuId, chevronId) {
+        const menu = document.getElementById(menuId);
+        const chevron = document.getElementById(chevronId);
+        if (menu) {
+            menu.classList.toggle('hidden');
+            chevron && chevron.classList.toggle('rotate-180');
+        }
+    }
+
+    /* ── Theme Toggle ── */
+    function toggleTheme() {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('dark');
+        localStorage.setItem('whusnet-theme', isDark ? 'dark' : 'light');
+        syncThemeIcon(isDark);
+    }
+
+    function syncThemeIcon(isDark) {
+        const moon = document.getElementById('themeIconMoon');
+        const sun = document.getElementById('themeIconSun');
+        if (moon) moon.classList.toggle('hidden', isDark);
+        if (sun) sun.classList.toggle('hidden', !isDark);
+    }
+    (function () {
+        const isDark = document.documentElement.classList.contains('dark');
+        syncThemeIcon(isDark);
+    })();
+
+    /* ── Keyboard Help Modal ── */
+    function openHelp() {
+        const m = document.getElementById('shortcutsModal');
+        if (m) m.classList.remove('hidden');
+    }
+    function closeHelp() {
+        const m = document.getElementById('shortcutsModal');
+        if (m) m.classList.add('hidden');
+    }
+    function handleGlobalSearch(e) {
+        if (e.key === 'Escape') e.target.blur();
+    }
+    document.addEventListener('keydown', e => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+        const helpOpen = !document.getElementById('shortcutsModal')?.classList.contains('hidden');
+        if (e.key === 'Escape' && helpOpen) { closeHelp(); return; }
+        if (typing) return;
+        if (e.key === '/') {
+            const search = document.getElementById('globalSearch');
+            if (search) { e.preventDefault(); search.focus(); }
+        }
+        if (e.key === '?') { e.preventDefault(); openHelp(); }
+    });
+</script>
+
+<script>
+    /* ── Wizard Form Stepper & Live Validation Logic ── */
+    let currentActiveStep = 1;
+    const totalStepsCount = 4;
+
+    const formFields = {
+        'dokumen': {
+            required: ['house_photo', 'survey_photo'],
+            optional: []
+        },
+        'laporan': {
+            required: ['nearest_odp', 'cable_estimation_meter', 'difficulty_level'],
+            optional: ['required_tools', 'survey_note', 'requested_installation_date']
+        }
+    };
+
+    const stepKeys = {
+        2: 'dokumen',
+        4: 'laporan'
+    };
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
+        inputs.forEach(input => {
+            input.addEventListener('input', runLiveProgressUpdates);
+            input.addEventListener('change', runLiveProgressUpdates);
+        });
+
+        runLiveProgressUpdates();
+    });
+
+    /* File Change & Preview Helper */
+    function onFileChange(fieldId) {
+        const input = document.getElementById(fieldId);
+        const label = document.getElementById('file-label-' + fieldId);
+        const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
+        const previewContainer = document.getElementById('preview-container-' + fieldId);
+        const previewImg = document.getElementById('preview-img-' + fieldId);
+
+        if (input.files && input.files.length > 0) {
+            const file = input.files[0];
+            label.textContent = file.name;
+            input.setAttribute('data-populated', 'true');
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (previewImg) previewImg.src = e.target.result;
+                    if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                    if (previewContainer) previewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        } else {
+            label.textContent = "Belum ada file dipilih";
+            input.removeAttribute('data-populated');
+            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
+            if (previewContainer) previewContainer.classList.add('hidden');
+            if (previewImg) previewImg.src = '';
+        }
+        runLiveProgressUpdates();
+    }
+
+    function clearFile(fieldId) {
+        const input = document.getElementById(fieldId);
+        if (input) {
+            input.value = '';
+            onFileChange(fieldId);
+        }
+    }
+
+    /* Live Stepper Auditor & Progress Calculator */
+    function runLiveProgressUpdates() {
+        let totalRequiredFieldsCount = 0;
+        let filledRequiredFieldsCount = 0;
+
+        [2, 4].forEach(step => {
+            const stepKey = stepKeys[step];
+            const config = formFields[stepKey];
+            let requiredMissing = [];
+            let optionalMissing = [];
+
+            config.required.forEach(field => {
+                totalRequiredFieldsCount++;
+                const el = document.getElementById(field);
+                if (el) {
+                    const isFilePopulated = el.type === 'file' && el.getAttribute('data-populated') === 'true';
+                    if (el.value.trim() !== "" || isFilePopulated) {
+                        filledRequiredFieldsCount++;
+                    } else {
+                        requiredMissing.push(getLabelName(field));
+                    }
+                }
+            });
+
+            config.optional.forEach(field => {
+                const el = document.getElementById(field);
+                if (el && el.value.trim() === "") {
+                    optionalMissing.push(getLabelName(field));
+                }
+            });
+
+            updateStepNavStatus(step, requiredMissing, optionalMissing);
+        });
+
+        const progressPercentage = totalRequiredFieldsCount > 0 ? Math.round((filledRequiredFieldsCount / totalRequiredFieldsCount) * 100) : 0;
+        document.getElementById('progress-percentage').textContent = progressPercentage + '%';
+        document.getElementById('filled-fields-count').textContent = filledRequiredFieldsCount;
+        document.getElementById('total-fields-count').textContent = totalRequiredFieldsCount;
+        document.getElementById('progress-bar-fill').style.width = progressPercentage + '%';
+    }
+
+    function updateStepNavStatus(step, requiredMissing, optionalMissing) {
+        const navBtn = document.getElementById('step-nav-' + step);
+        const iconDiv = document.getElementById('step-nav-icon-' + step);
+        const statusSpan = document.getElementById('step-nav-status-' + step);
+        const missingSpan = document.getElementById('step-nav-missing-' + step);
+
+        if (!navBtn || !iconDiv || !statusSpan || !missingSpan) return;
+
+        iconDiv.innerHTML = '';
+        missingSpan.textContent = '';
+
+        if (requiredMissing.length > 0) {
+            statusSpan.textContent = 'Belum Lengkap';
+            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-0.5';
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><i class="fa-solid fa-xmark text-xs"></i></span>`;
+            missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
+
+            if (currentActiveStep !== step) {
+                navBtn.className = "w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none";
+            }
+        } else {
+            statusSpan.textContent = 'Lengkap';
+            statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-0.5';
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center"><i class="fa-solid fa-check text-xs"></i></span>`;
+            missingSpan.textContent = optionalMissing.length > 0 ? 'Beberapa opsional kosong' : 'Semua terisi';
+
+            if (currentActiveStep !== step) {
+                navBtn.className = "w-full text-left p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all group focus:outline-none";
+            }
+        }
+
+        if (currentActiveStep === step) {
+            navBtn.className = "w-full text-left p-3.5 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-sm";
+        }
+    }
+
+    function getLabelName(field) {
+        const labels = {
+            house_photo: 'Foto Rumah',
+            survey_photo: 'Foto ODP Terdekat',
+            nearest_odp: 'ODP Terdekat',
+            cable_estimation_meter: 'Estimasi Kabel',
+            difficulty_level: 'Tingkat Kesulitan',
+            required_tools: 'Alat Khusus',
+            survey_note: 'Catatan Teknis',
+            requested_installation_date: 'Tanggal Request Pemasangan'
+        };
+        return labels[field] || field;
+    }
+
+    /* Stepper Page Switcher */
+    function goToStep(stepNumber) {
+        document.getElementById('step-panel-' + currentActiveStep).classList.add('hidden');
+        currentActiveStep = stepNumber;
+        document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');
+
+        // Update mobile stepper buttons UI
+        for (let i = 1; i <= 4; i++) {
+            const mBtn = document.getElementById('mobile-step-btn-' + i);
+            if (mBtn) {
+                if (i === currentActiveStep) {
+                    mBtn.className = "py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm";
+                } else if (i === 1 || i === 3) {
+                    mBtn.className = "py-2.5 px-2 rounded-lg text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 transition-all flex items-center justify-center gap-1.5";
+                } else {
+                    mBtn.className = "py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5";
+                }
+            }
+        }
+
+        if (currentActiveStep === 1) {
+            document.getElementById('btn-prev').classList.add('hidden');
+        } else {
+            document.getElementById('btn-prev').classList.remove('hidden');
+        }
+
+        if (currentActiveStep === totalStepsCount) {
+            document.getElementById('btn-next').classList.add('hidden');
+            document.getElementById('btn-submit').classList.remove('hidden');
+        } else {
+            document.getElementById('btn-next').classList.remove('hidden');
+            document.getElementById('btn-submit').classList.add('hidden');
+        }
+
+        runLiveProgressUpdates();
+
+        [1, 3].forEach(step => {
+            const navBtn = document.getElementById('step-nav-' + step);
+            if (navBtn) {
+                if (currentActiveStep === step) {
+                    navBtn.className = "w-full text-left p-3.5 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-sm";
+                } else {
+                    navBtn.className = "w-full text-left p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all group focus:outline-none";
+                }
+            }
+        });
+    }
+
+    function nextStep() {
+        if (currentActiveStep < totalStepsCount) {
+            goToStep(currentActiveStep + 1);
+        }
+    }
+
+    function prevStep() {
+        if (currentActiveStep > 1) {
+            goToStep(currentActiveStep - 1);
+        }
+    }
+</script>
+
+<script>
+/* Alpine.js materialRows function */
+function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType) {
+    return {
+        itemOptions: itemOptions,
+        categoryOptions: categoryOptions,
+        rows: initialRows,
+        fieldName: fieldName,
+        fallbackType: fallbackType,
+
+        addRow() {
+            this.rows.push({
+                item_id: '',
+                item_name: '',
+                item_type: this.fallbackType,
+                qty: '',
+                unit: this.defaultUnitFor(this.fallbackType),
+                note: '',
+            });
+        },
+
+        typeOptionsFor(row) {
+            const known = this.categoryOptions.some(c => c.code === row.item_type);
+            if (known || !row.item_type) {
+                return this.categoryOptions;
+            }
+            return [...this.categoryOptions, { code: row.item_type, name: `${row.item_type} (nonaktif)`, default_unit: 'pcs' }];
+        },
+
+        defaultUnitFor(code) {
+            return this.categoryOptions.find(c => c.code === code)?.default_unit ?? 'pcs';
+        },
+
+        removeRow(index) {
+            this.rows.splice(index, 1);
+        },
+
+        onItemChange(index) {
+            const row = this.rows[index];
+            const opt = this.itemOptions.find(o => String(o.id) === String(row.item_id));
+            if (opt) {
+                row.item_name = opt.name;
+                row.item_type = opt.type;
+                row.unit = opt.unit;
+            }
+        },
+
+        onTypeChange(index) {
+            const row = this.rows[index];
+            if (row.item_id) return;
+            row.unit = this.defaultUnitFor(row.item_type);
+        },
+    };
+}
+
+/* Alpine.js workToolChecklist function */
+function workToolChecklist(manualRows, fieldName) {
+    return {
+        manualRows: manualRows,
+        fieldName: fieldName,
+
+        addRow() {
+            this.manualRows.push({ tool_name: '', note: '' });
+        },
+
+        removeRow(index) {
+            this.manualRows.splice(index, 1);
+        },
+    };
+}
+</script>
+
+</body>
+</html>

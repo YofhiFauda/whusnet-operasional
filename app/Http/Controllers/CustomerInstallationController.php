@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MaterialKind;
-use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -12,16 +11,20 @@ use App\Events\InstallationStarted;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
+use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class CustomerInstallationController extends Controller
 {
@@ -178,7 +181,8 @@ class CustomerInstallationController extends Controller
         $customer->loadMissing(['customerDevice', 'customerTechnicalDetail', 'latestSurvey', 'internetPackage']);
 
         $materialService = app(TaskMaterialService::class);
-        $items = Item::active()->orderBy('name')->get();
+        $items = Item::active()->with('category')->orderBy('name')->get();
+        $itemCategories = ItemCategory::options();
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
@@ -196,13 +200,23 @@ class CustomerInstallationController extends Controller
         $materialRows = $sourceRows->map(fn ($row) => [
             'item_id' => $row->item_id,
             'item_name' => $row->item_name,
-            'item_type' => $row->item_type->value,
+            'item_type' => $row->item_type,
             'qty' => (float) $row->qty,
             'unit' => $row->unit,
             'note' => $row->note,
         ])->all();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'materialRows'));
+        // Checklist alat: yang sudah tersimpan di task PEMASANGAN menang; kalau
+        // belum ada, prefill dari survey — surveyor yang menilai medan, teknisi
+        // pemasangan tinggal menyesuaikan.
+        $workToolService = app(TaskWorkToolService::class);
+        $workTools = WorkTool::options();
+        $installWorkTools = $workToolService->rowsFor($installFopTask);
+        $workToolRows = ! empty($installWorkTools)
+            ? $installWorkTools
+            : $workToolService->surveyRowsForCustomer($customer);
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -282,10 +296,18 @@ class CustomerInstallationController extends Controller
             'materials' => 'nullable|array',
             'materials.*.item_id' => 'nullable|integer|exists:items,id',
             'materials.*.item_name' => 'nullable|string|max:150',
-            'materials.*.item_type' => 'nullable|string|in:'.implode(',', MaterialType::values()),
+            // Kategori divalidasi ke master, bukan ke daftar enum yang beku —
+            // kategori buatan admin harus langsung bisa dipakai tanpa deploy.
+            'materials.*.item_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
             'materials.*.qty' => 'nullable|numeric|min:0',
             'materials.*.unit' => 'nullable|string|max:20',
             'materials.*.note' => 'nullable|string|max:255',
+            // Checklist alat kerja — lihat catatan di CustomerSurveyController.
+            'work_tools_ids' => 'nullable|array',
+            'work_tools_ids.*' => 'nullable|integer|exists:work_tools,id',
+            'work_tools_manual' => 'nullable|array',
+            'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
+            'work_tools_manual.*.note' => 'nullable|string|max:255',
         ]);
 
         $installation = $customer->installations()->latest()->first();
@@ -424,6 +446,19 @@ class CustomerInstallationController extends Controller
                     $installFopTask,
                     MaterialKind::TERPAKAI,
                     $validated['materials'] ?? [],
+                    auth()->id()
+                );
+
+                // Checklist alat menempel di task PEMASANGAN sendiri, bukan
+                // menimpa daftar survey — daftar survey tetap jadi rekaman apa
+                // yang surveyor nilai perlu waktu itu.
+                $workToolService = app(TaskWorkToolService::class);
+                $workToolService->sync(
+                    $installFopTask,
+                    $workToolService->rowsFromRequest(
+                        $validated['work_tools_ids'] ?? [],
+                        $validated['work_tools_manual'] ?? []
+                    ),
                     auth()->id()
                 );
             }

@@ -19,7 +19,18 @@ class CustomerFieldworkController extends Controller
 {
     public function show(Customer $customer)
     {
-        $customer->load(['customerDevice', 'customerTechnicalDetail', 'installations.technician']);
+        // pop/miniPop/distribution ikut dimuat sejak tab Perangkat menampilkan
+        // sub-section "Infrastruktur OLT Node & Distribusi ODP" + accessor
+        // display_id — tanpa ini tiga relasi itu jadi lazy-load per render.
+        $customer->load([
+            'customerDevice',
+            'customerTechnicalDetail',
+            'installations.technician',
+            'pop',
+            'miniPop',
+            'distribution',
+            'internetPackage',
+        ]);
 
         return view('customers.fieldwork', compact('customer'));
     }

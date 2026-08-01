@@ -279,6 +279,13 @@
                                     <span class="font-semibold text-text-main text-xs mt-0.5 block font-ui"><?php echo e($survey->required_tools ?: 'Standar'); ?></span>
                                 </div>
                             </div>
+                            <?php if($survey->requested_installation_date): ?>
+                            
+                            <p class="text-[11px] mt-1.5 font-ui font-semibold" style="color:var(--color-info, #0284c7)">
+                                Pelanggan meminta dipasang: <?php echo e(\App\Support\IndonesianDate::date($survey->requested_installation_date)); ?>
+
+                            </p>
+                            <?php endif; ?>
                             <?php if($survey->survey_note): ?>
                             <p class="text-[11px] text-text-secondary mt-1.5 italic font-ui">"<?php echo e($survey->survey_note); ?>"</p>
                             <?php endif; ?>
@@ -286,6 +293,26 @@
                             <p class="text-[11px] text-warning font-ui">Data hasil survey sebelumnya belum tercatat di sistem.</p>
                             <?php endif; ?>
                         </div>
+
+                        <?php
+                            $estimasiMaterial = $task->customer
+                                ? \App\Models\TaskMaterial::where('customer_id', $task->customer->id)->estimasi()->orderBy('id')->get()
+                                : collect();
+                        ?>
+                        <?php if($estimasiMaterial->isNotEmpty()): ?>
+                        
+                        <div class="pt-3 border-t border-border">
+                            <span class="block text-[9px] font-semibold text-text-muted uppercase mb-1.5 font-ui">Estimasi Kebutuhan Alat</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                <?php $__currentLoopData = $estimasiMaterial; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $material): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                <div class="flex justify-between border-b border-border py-1">
+                                    <span class="text-text-secondary font-ui"><?php echo e($material->item_name); ?></span>
+                                    <span class="font-mono font-bold text-text-main"><?php echo e(rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',')); ?> <?php echo e($material->unit); ?></span>
+                                </div>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-border text-xs">
                             <div>
@@ -437,6 +464,26 @@
                     </div>
                     <?php endif; ?>
                 </div>
+
+                
+                <?php
+                    $workToolRows = app(\App\Services\TaskWorkToolService::class)->displayRowsForTask($task);
+                ?>
+                <?php if($workToolRows->isNotEmpty()): ?>
+                <div class="pt-4 border-t border-border">
+                    <p class="text-[10px] font-semibold uppercase tracking-widest text-text-muted font-ui mb-2">Alat Kerja Yang Perlu Dibawa</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        <?php $__currentLoopData = $workToolRows; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded border border-border bg-surface-muted text-text-main font-ui">
+                            <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <?php echo e($row->tool_name); ?><?php if($row->note): ?><span class="font-normal text-text-muted"> · <?php echo e($row->note); ?></span><?php endif; ?>
+                        </span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 
                 <?php if(!in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])): ?>

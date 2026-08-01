@@ -152,7 +152,7 @@ class CustomerDeviceTest extends TestCase
             ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('Spesifikasi Lengkap Perangkat');
         $response->assertSee('MikroTik');
         $response->assertSee('router002@whusnet');
         $response->assertSee('router-secret');
@@ -201,7 +201,7 @@ class CustomerDeviceTest extends TestCase
             ->get(route('customers.show', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('Spesifikasi Lengkap Perangkat');
         $response->assertSee('ZTE');
         $response->assertSee('zte004@whusnet');
         $response->assertDontSee('hidden-pppoe');

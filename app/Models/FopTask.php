@@ -162,6 +162,15 @@ class FopTask extends Model
     }
 
     /**
+     * Alat kerja yang perlu dibawa — checklist, bukan konsumsi. Lihat
+     * TaskWorkTool untuk alasan tabelnya dipisah dari materials().
+     */
+    public function workTools(): HasMany
+    {
+        return $this->hasMany(TaskWorkTool::class);
+    }
+
+    /**
      * Batas waktu wajib mulai ditangani (Master Timeline SLA) dalam jam.
      * Pakai snapshot handling_sla_hours (di-freeze saat tiket dibuat, resolve
      * dari paket internet customer saat itu). Fallback ke default global

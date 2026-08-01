@@ -136,7 +136,7 @@ class CustomerInstallationTest extends TestCase
             ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Pemasangan Pelanggan');
+        $response->assertSee('Hasil Laporan Pemasangan Perangkat');
         $response->assertSee('Visible Installation Customer');
         $response->assertSee('Jadwal pemasangan siang.');
     }

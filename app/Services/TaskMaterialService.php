@@ -3,12 +3,12 @@
 namespace App\Services;
 
 use App\Enums\MaterialKind;
-use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\TaskMaterial;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +51,7 @@ class TaskMaterialService
                     'kind' => $kind->value,
                     'item_id' => $normalized['item_id'],
                     'item_type' => $normalized['item_type'],
+                    'item_category_id' => $normalized['item_category_id'],
                     'item_name' => $normalized['item_name'],
                     'qty' => $normalized['qty'],
                     'unit' => $normalized['unit'],
@@ -73,7 +74,7 @@ class TaskMaterialService
     private function normalizeRow(array $row): ?array
     {
         $itemId = ! empty($row['item_id']) ? (int) $row['item_id'] : null;
-        $item = $itemId ? Item::find($itemId) : null;
+        $item = $itemId ? Item::with('category')->find($itemId) : null;
 
         // Nama & tipe di-snapshot dari master kalau item terdaftar; kalau tidak
         // (kasus "lainnya"), pakai isian manual teknisi.
@@ -89,9 +90,13 @@ class TaskMaterialService
             return null;
         }
 
-        $type = $item?->type
-            ?? MaterialType::tryFrom((string) ($row['item_type'] ?? ''))
-            ?? MaterialType::LAINNYA;
+        // Kategori barang terdaftar SELALU menang atas kiriman form — form
+        // mengunci kolomnya waktu item master dipilih, tapi POST yang dirakit
+        // tangan tidak. Baris "lainnya" (tanpa item_id) baru boleh menentukan
+        // kategorinya sendiri, dan itu pun harus code yang ada di master.
+        $category = $item?->category
+            ?? ItemCategory::where('code', (string) ($row['item_type'] ?? ''))->first()
+            ?? ItemCategory::where('code', ItemCategory::CODE_LAINNYA)->first();
 
         // Barang terdaftar: satuan diambil dari master, bukan dari form. Form
         // memang mengunci kolom ini waktu item master dipilih, tapi kalau yang
@@ -100,12 +105,15 @@ class TaskMaterialService
         $unit = $item?->unit ?? trim((string) ($row['unit'] ?? ''));
 
         if ($unit === '') {
-            $unit = $type->defaultUnit();
+            $unit = $category?->default_unit ?? 'pcs';
         }
 
         return [
             'item_id' => $item?->id,
-            'item_type' => $type->value,
+            // Snapshot code + FK sekaligus: code buat riwayat yang harus tetap
+            // terbaca walau kategorinya dihapus, FK buat agregasi/join.
+            'item_type' => $category?->code ?? ItemCategory::CODE_LAINNYA,
+            'item_category_id' => $category?->id,
             'item_name' => $name,
             'qty' => $qty,
             'unit' => $unit,

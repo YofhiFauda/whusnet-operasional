@@ -23,12 +23,14 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\Master\DistributionController;
 use App\Http\Controllers\Master\InternetPackageController;
+use App\Http\Controllers\Master\ItemCategoryController;
 use App\Http\Controllers\Master\ItemController;
 use App\Http\Controllers\Master\PopController;
 use App\Http\Controllers\Master\RegionController;
 use App\Http\Controllers\Master\SlaTimelineController;
 use App\Http\Controllers\Master\SubscriptionStatusController;
 use App\Http\Controllers\Master\TicketIssueCategoryController;
+use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
@@ -274,6 +276,40 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/items/{item}/edit', [ItemController::class, 'edit'])->name('master.items.edit');
         Route::put('/master/items/{item}', [ItemController::class, 'update'])->name('master.items.update');
         Route::post('/master/items/{item}/toggle', [ItemController::class, 'toggleStatus'])->name('master.items.toggle');
+    });
+
+    // Master Kategori Barang - Static Routes First
+    Route::middleware('permission:item_categories.create|item_categories.update')->group(function () {
+        Route::get('/master/item-categories/create', [ItemCategoryController::class, 'create'])->name('master.item-categories.create');
+        Route::post('/master/item-categories', [ItemCategoryController::class, 'store'])->name('master.item-categories.store');
+    });
+
+    Route::middleware('permission:item_categories.view')->group(function () {
+        Route::get('/master/item-categories', [ItemCategoryController::class, 'index'])->name('master.item-categories.index');
+    });
+
+    // Master Kategori Barang - Dynamic Routes Last
+    Route::middleware('permission:item_categories.create|item_categories.update')->group(function () {
+        Route::get('/master/item-categories/{itemCategory}/edit', [ItemCategoryController::class, 'edit'])->name('master.item-categories.edit');
+        Route::put('/master/item-categories/{itemCategory}', [ItemCategoryController::class, 'update'])->name('master.item-categories.update');
+        Route::post('/master/item-categories/{itemCategory}/toggle', [ItemCategoryController::class, 'toggleStatus'])->name('master.item-categories.toggle');
+    });
+
+    // Master Alat Kerja - Static Routes First
+    Route::middleware('permission:work_tools.create|work_tools.update')->group(function () {
+        Route::get('/master/work-tools/create', [WorkToolController::class, 'create'])->name('master.work-tools.create');
+        Route::post('/master/work-tools', [WorkToolController::class, 'store'])->name('master.work-tools.store');
+    });
+
+    Route::middleware('permission:work_tools.view')->group(function () {
+        Route::get('/master/work-tools', [WorkToolController::class, 'index'])->name('master.work-tools.index');
+    });
+
+    // Master Alat Kerja - Dynamic Routes Last
+    Route::middleware('permission:work_tools.create|work_tools.update')->group(function () {
+        Route::get('/master/work-tools/{workTool}/edit', [WorkToolController::class, 'edit'])->name('master.work-tools.edit');
+        Route::put('/master/work-tools/{workTool}', [WorkToolController::class, 'update'])->name('master.work-tools.update');
+        Route::post('/master/work-tools/{workTool}/toggle', [WorkToolController::class, 'toggleStatus'])->name('master.work-tools.toggle');
     });
 
     // Paket Internet Management - Static Routes First

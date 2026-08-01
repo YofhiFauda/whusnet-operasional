@@ -459,6 +459,32 @@
                     @endif
                 </div>
 
+                {{-- ══ Alat Kerja Yang Perlu Dibawa ═══════════════════
+                     SENGAJA di luar percabangan tipe task: alat kerja berlaku
+                     untuk semua jenis pekerjaan, dan inilah alasan utama fitur
+                     ini ada — dibaca teknisi SEBELUM berangkat. Untuk task PSB
+                     yang belum punya daftar sendiri, service jatuh ke daftar
+                     survey; teknisi lebih butuh daftar surveyor daripada kolom
+                     kosong. --}}
+                @php
+                    $workToolRows = app(\App\Services\TaskWorkToolService::class)->displayRowsForTask($task);
+                @endphp
+                @if($workToolRows->isNotEmpty())
+                <div class="pt-4 border-t border-border">
+                    <p class="text-[10px] font-semibold uppercase tracking-widest text-text-muted font-ui mb-2">Alat Kerja Yang Perlu Dibawa</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($workToolRows as $row)
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded border border-border bg-surface-muted text-text-main font-ui">
+                            <svg class="h-3 w-3 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            {{ $row->tool_name }}@if($row->note)<span class="font-normal text-text-muted"> · {{ $row->note }}</span>@endif
+                        </span>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
                 {{-- ══ Foto Bukti (Non-Survey/PSB) ══════════════════ --}}
                 @if(!in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value]))
                 <div class="pt-4 border-t border-border"

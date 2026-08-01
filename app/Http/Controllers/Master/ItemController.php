@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\Master;
 
-use App\Enums\MaterialType;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
 
 /**
@@ -27,25 +26,32 @@ class ItemController extends Controller
         $status = $request->query('status');
 
         $items = Item::query()
+            ->with('category')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%");
                 });
             })
-            ->when($type, fn ($query) => $query->where('type', $type))
+            // Filter tetap memakai code kategori di query string supaya URL/bookmark
+            // lama tidak putus waktu kategori pindah dari enum ke tabel.
+            ->when($type, fn ($query) => $query->whereRelation('category', 'code', $type))
             ->when($status === 'active', fn ($query) => $query->where('is_active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('is_active', false))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
 
-        return view('master.items.index', compact('items', 'search', 'type', 'status'));
+        $categories = ItemCategory::active()->ordered()->get();
+
+        return view('master.items.index', compact('items', 'categories', 'search', 'type', 'status'));
     }
 
     public function create(): View
     {
-        return view('master.items.create');
+        $categories = ItemCategory::active()->ordered()->get();
+
+        return view('master.items.create', compact('categories'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -61,7 +67,15 @@ class ItemController extends Controller
 
     public function edit(Item $item): View
     {
-        return view('master.items.edit', compact('item'));
+        // Kategori nonaktif tetap ikut kalau barang ini masih memakainya —
+        // kalau tidak, membuka form edit lalu menyimpan diam-diam memindahkan
+        // barang ke kategori lain karena pilihannya tidak ada di dropdown.
+        $categories = ItemCategory::query()
+            ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $item->item_category_id))
+            ->ordered()
+            ->get();
+
+        return view('master.items.edit', compact('item', 'categories'));
     }
 
     public function update(Request $request, Item $item): RedirectResponse
@@ -97,7 +111,7 @@ class ItemController extends Controller
                 Rule::unique('items', 'code')->ignore($item),
             ],
             'name' => ['required', 'string', 'max:150'],
-            'type' => ['required', new Enum(MaterialType::class)],
+            'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
         ]);

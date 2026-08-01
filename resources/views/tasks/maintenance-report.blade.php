@@ -76,82 +76,40 @@
                 </div>
             </div>
 
-            {{-- ── Section 2: Material / Alat ─────────────────────────── --}}
-            <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
-                <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
-                    Alat &amp; Material Yang Digunakan
+            {{-- ── Section 2: Material Terpakai ────────────────────────
+                 Menggantikan lima kolom teks lama (kabel/modem/patchcord/
+                 sleeve/lainnya) — satu kolom per jenis barang, hardcode, tidak
+                 bisa dijumlah dan tidak bisa disambung ke master. Kolomnya
+                 masih ada di DB untuk laporan lama, tapi tidak lagi diisi dari
+                 form ini. --}}
+            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
+                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
+                    Material Terpakai
                 </p>
-                <div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-
-                    {{-- Kabel --}}
-                    <div>
-                        <label class="block mb-1.5" style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted)">Kabel</label>
-                        <input type="text"
-                               name="kabel"
-                               value="{{ old('kabel') }}"
-                               placeholder="Misal: 100m"
-                               class="w-full rounded-md text-sm transition-colors"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);height:36px;padding:0 10px;outline:none;font-family:var(--font-ui,'Inter',sans-serif)"
-                               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 3px rgba(2,132,199,0.15)'"
-                               onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
-                    </div>
-
-                    {{-- Modem --}}
-                    <div>
-                        <label class="block mb-1.5" style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted)">Modem</label>
-                        <input type="text"
-                               name="modem"
-                               value="{{ old('modem') }}"
-                               placeholder="Merk / SN"
-                               class="w-full rounded-md text-sm transition-colors"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);height:36px;padding:0 10px;outline:none;font-family:var(--font-ui,'Inter',sans-serif)"
-                               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 3px rgba(2,132,199,0.15)'"
-                               onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
-                    </div>
-
-                    {{-- Patchcord --}}
-                    <div>
-                        <label class="block mb-1.5" style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted)">Patchcord</label>
-                        <input type="text"
-                               name="patchcord"
-                               value="{{ old('patchcord') }}"
-                               placeholder="Misal: 1 pcs"
-                               class="w-full rounded-md text-sm transition-colors"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);height:36px;padding:0 10px;outline:none;font-family:var(--font-ui,'Inter',sans-serif)"
-                               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 3px rgba(2,132,199,0.15)'"
-                               onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
-                    </div>
-
-                    {{-- Sleeve --}}
-                    <div>
-                        <label class="block mb-1.5" style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted)">Sleeve</label>
-                        <input type="text"
-                               name="sleeve"
-                               value="{{ old('sleeve') }}"
-                               placeholder="Misal: 2 pcs"
-                               class="w-full rounded-md text-sm transition-colors"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);height:36px;padding:0 10px;outline:none;font-family:var(--font-ui,'Inter',sans-serif)"
-                               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 3px rgba(2,132,199,0.15)'"
-                               onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
-                    </div>
-
-                    {{-- Lainnya (full width) --}}
-                    <div class="col-span-2 sm:col-span-4">
-                        <label class="block mb-1.5" style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted)">Lainnya</label>
-                        <input type="text"
-                               name="lainnya"
-                               value="{{ old('lainnya') }}"
-                               placeholder="Material atau alat tambahan lainnya..."
-                               class="w-full rounded-md text-sm transition-colors"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);height:36px;padding:0 10px;outline:none;font-family:var(--font-ui,'Inter',sans-serif)"
-                               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 3px rgba(2,132,199,0.15)'"
-                               onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
-                    </div>
-
-                </div>
+                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
+                    Barang yang <b>habis dipakai</b> dan ditinggal di pelanggan — patch cord diganti, splitter diganti, kabel sambungan. Peralatan kerja yang dibawa pulang dicatat terpisah di bawah.
+                </p>
+                <x-material-rows
+                    name="materials"
+                    :items="$items"
+                    :categories="$itemCategories"
+                    :rows="$materialRows"
+                    empty-label="Belum ada material dicatat. Kalau perbaikan ini tidak memakai material, biarkan kosong."
+                />
             </div>
 
-            {{-- ── Section 3: Foto Bukti ───────────────────────────────── --}}
+            {{-- ── Section 3: Alat Kerja ───────────────────────────────── --}}
+            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
+                <x-work-tool-checklist
+                    name="work_tools"
+                    :tools="$workTools"
+                    :rows="$workToolRows"
+                    label="Alat Kerja Yang Dipakai"
+                    hint="Peralatan yang dibawa ke lokasi lalu dibawa pulang — tangga, splicer, OPM. Bukan material yang ditinggal di pelanggan."
+                />
+            </div>
+
+            {{-- ── Section 4: Foto Bukti ───────────────────────────────── --}}
             <div class="px-6 py-4" style="border-bottom:1px solid var(--color-border)">
                 <p class="mb-4" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
                     Foto Bukti

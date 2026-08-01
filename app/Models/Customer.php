@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'primary_phone',
     'alternative_phone',
     'registration_date',
+    'registered_by_name',
     'data_completeness_status',
     'pop_id',
     'distribution_id',
@@ -78,7 +79,7 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
-            'registration_date' => 'date',
+            'registration_date' => 'datetime',
             'rejected_at' => 'datetime',
             'terminated_at' => 'datetime',
             'gender' => Gender::class,

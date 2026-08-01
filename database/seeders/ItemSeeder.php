@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Enums\MaterialType;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use Illuminate\Database\Seeder;
 
 /**
@@ -20,18 +20,22 @@ class ItemSeeder extends Seeder
 {
     public function run(): void
     {
+        // Kategori bawaan ditanam migrasi (bukan seeder) karena code-nya jadi
+        // kontrak; di sini tinggal dirujuk.
+        $categoryIds = ItemCategory::pluck('id', 'code');
+
         $items = [
-            ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'type' => MaterialType::KABEL_DROPCORE, 'unit' => 'meter'],
-            ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'type' => MaterialType::KABEL_DROPCORE, 'unit' => 'meter'],
-            ['code' => 'SPL-1X8', 'name' => 'Splitter 1:8', 'type' => MaterialType::SPLITTER_ODP, 'unit' => 'pcs'],
-            ['code' => 'SPL-1X16', 'name' => 'Splitter 1:16', 'type' => MaterialType::SPLITTER_ODP, 'unit' => 'pcs'],
-            ['code' => 'ODP-8', 'name' => 'ODP 8 Port', 'type' => MaterialType::SPLITTER_ODP, 'unit' => 'pcs'],
-            ['code' => 'PC-SCUPC-1M', 'name' => 'Patch Cord SC/UPC 1 Meter', 'type' => MaterialType::PATCH_CORD, 'unit' => 'pcs'],
-            ['code' => 'PC-SCUPC-3M', 'name' => 'Patch Cord SC/UPC 3 Meter', 'type' => MaterialType::PATCH_CORD, 'unit' => 'pcs'],
-            ['code' => 'MC-100', 'name' => 'Media Converter 100 Mbps', 'type' => MaterialType::MEDIA_CONVERTER, 'unit' => 'pcs'],
-            ['code' => 'AKS-TRAY', 'name' => 'Tray Kabel', 'type' => MaterialType::AKSESORIS_PASANG, 'unit' => 'pcs'],
-            ['code' => 'AKS-KLEM', 'name' => 'Klem Kabel', 'type' => MaterialType::AKSESORIS_PASANG, 'unit' => 'pcs'],
-            ['code' => 'AKS-TIANG', 'name' => 'Tiang Penyangga', 'type' => MaterialType::AKSESORIS_PASANG, 'unit' => 'pcs'],
+            ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
+            ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter'],
+            ['code' => 'SPL-1X8', 'name' => 'Splitter 1:8', 'category' => 'splitter_odp', 'unit' => 'pcs'],
+            ['code' => 'SPL-1X16', 'name' => 'Splitter 1:16', 'category' => 'splitter_odp', 'unit' => 'pcs'],
+            ['code' => 'ODP-8', 'name' => 'ODP 8 Port', 'category' => 'splitter_odp', 'unit' => 'pcs'],
+            ['code' => 'PC-SCUPC-1M', 'name' => 'Patch Cord SC/UPC 1 Meter', 'category' => 'patch_cord', 'unit' => 'pcs'],
+            ['code' => 'PC-SCUPC-3M', 'name' => 'Patch Cord SC/UPC 3 Meter', 'category' => 'patch_cord', 'unit' => 'pcs'],
+            ['code' => 'MC-100', 'name' => 'Media Converter 100 Mbps', 'category' => 'media_converter', 'unit' => 'pcs'],
+            ['code' => 'AKS-TRAY', 'name' => 'Tray Kabel', 'category' => 'aksesoris_pasang', 'unit' => 'pcs'],
+            ['code' => 'AKS-KLEM', 'name' => 'Klem Kabel', 'category' => 'aksesoris_pasang', 'unit' => 'pcs'],
+            ['code' => 'AKS-TIANG', 'name' => 'Tiang Penyangga', 'category' => 'aksesoris_pasang', 'unit' => 'pcs'],
         ];
 
         foreach ($items as $item) {
@@ -39,7 +43,7 @@ class ItemSeeder extends Seeder
                 ['code' => $item['code']],
                 [
                     'name' => $item['name'],
-                    'type' => $item['type']->value,
+                    'item_category_id' => $categoryIds[$item['category']] ?? null,
                     'unit' => $item['unit'],
                     'is_active' => true,
                 ]

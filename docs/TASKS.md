@@ -14,10 +14,125 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-05 | Halaman History Ticketing (lihat detail di bawah) | Done — 2026-07-29 |
 | ADHOC-06 | Hapus window Pending NOC + aksi Oncheck NOC (lihat detail di bawah) | Done — 2026-07-29 |
 | ADHOC-07 | Support Dark & Light Theme untuk Halaman Report Survey (`surveys.report`) dan Report Pemasangan (`installations.report`) | Done — 2026-07-30 |
+| ADHOC-13 | Master Alat Kerja (`work_tools`) + material terstruktur di Laporan Maintenance (lihat detail di bawah) | Done — 2026-07-31 |
+| ADHOC-12 | Kategori material jadi Master (`item_categories`) — enum `MaterialType` turun peran (lihat detail di bawah) | Done — 2026-07-31 |
 | ADHOC-11 | Tanggal Request Pemasangan (Laporan Survey) + Pencatatan Material Estimasi vs Terpakai + Master Barang (lihat detail di bawah) | Done — 2026-07-31 |
 | ADHOC-10 | Detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** (partial bersama + endpoint detail JSON); navigasi halaman penuh disisakan buat Ticket Selesai / Dibatalkan / History (lihat detail di bawah) | Done — 2026-07-30 |
 | ADHOC-09 | Redesign Worksheet NOC (`noc.worksheet`) — tabel padat 1 baris/tiket + pencarian + filter + dua tab bercounter (Tiket Masuk / Assign FOP) + aksi lewat drawer baris terpilih (lihat detail di bawah) | Done — 2026-07-30 |
 | ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
+
+#### ADHOC-13 — Master Alat Kerja + Material di Laporan Maintenance (2026-07-31)
+
+Batch B dari rangkaian yang diminta, digabung dengan satu lubang yang ketahuan
+saat mengeceknya.
+
+**Bagian 1 — Master Alat Kerja**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Master `work_tools` + halaman Master Alat Kerja | Peralatan yang DIBAWA dan DIBAWA PULANG. Tabel terpisah dari `items` karena cara hitungnya beda — alat tidak habis dipakai dan **tidak punya qty** |
+| 2 | `task_work_tools` **anchor ke `fop_task_id`** | Rancangan pivot-ke-`customer_surveys` ditolak: MTN/C-REQ tidak pernah lewat survey, padahal perbaikan gangguan paling sering butuh tangga & splicer. FopTask satu-satunya entitas milik SEMUA jenis pekerjaan — alasan yang sama dengan `task_materials` |
+| 3 | **TANPA fase estimasi/terpakai** | Beda disengaja dari material. Untuk material selisihnya uang; untuk alat, mencentang ulang "benar saya bawa tangga" cuma menambah isian lapangan tanpa angka yang dipakai siapa pun |
+| 4 | Checklist di TIGA form laporan | Survey (isi dari nol), Pemasangan (prefill dari survey, boleh disunting), Maintenance (isi dari nol). Satu komponen `x-work-tool-checklist` |
+| 5 | Tampil di `tasks/show` **di luar percabangan tipe task** | Ini alasan utama fitur ada — dibaca teknisi sebelum berangkat. Task PSB yang belum punya daftar sendiri jatuh ke daftar survey lewat `displayRowsForTask()`; kolom kosong justru muncul tepat saat teknisi paling butuh |
+| 6 | `required_tools` turun peran lagi | Dari "Alat Khusus / Kendala Peralatan" jadi **"Catatan Kendala Peralatan"** — keterangan yang tidak masuk checklist (akses lokasi, spesifikasi tak biasa). Tidak di-drop, ada data survey lama |
+| 7 | Alat di luar master lewat baris manual | Tersimpan `work_tool_id` null + `tool_name` snapshot. Duplikat dibuang (case-insensitive) karena tanpa qty, dua baris "Tangga" cuma bikin daftar berulang |
+
+**Bagian 2 — Material terstruktur di Laporan Maintenance**
+
+Lubang warisan ADHOC-11 yang ketahuan saat mengecek Batch B: `x-material-rows`
+cuma dipakai Survey & Pemasangan. Material maintenance selama ini dicatat di
+lima kolom teks bebas `maintenance_reports.{kabel,modem,patchcord,sleeve,lainnya}`
+— satu kolom per jenis barang, hardcode, tak bisa dijumlah, tak tersambung master.
+Patch cord yang diganti saat perbaikan gangguan tidak pernah masuk agregasi mana pun.
+
+Sekarang Laporan Maintenance memakai `x-material-rows` yang sama (kind `TERPAKAI`,
+anchor FopTask). Lima kolom lama **tidak di-drop dan tetap divalidasi** — ada
+laporan lama yang memakainya — tapi sudah tidak ditampilkan di form. Jangan
+hidupkan sebagian.
+
+Anchor maintenance dicari lewat `fop_tasks.task_id` (`TaskWorkToolService::resolveTaskFor(Task)`),
+**bukan** `TaskMaterialService::resolveTaskFor(Customer, kategori)` yang mengambil
+`latest('id')` — satu pelanggan bisa punya banyak task MTN sepanjang tahun, dan
+"MTN terakhir milik pelanggan ini" akan menempel ke task yang salah.
+
+Seeder `WorkToolSeeder` berisi 10 alat, diambil dari isi `required_tools` nyata
+dikurangi "Dropcore" — itu material yang nyasar ke kolom alat.
+
+**Bagian 3 — Bug RBAC warisan ADHOC-11 (ketahuan saat melengkapi sidebar & RBAC)**
+
+`PermissionGeneratorService::generate()` melakukan loop atas `config/rbac.php` →
+`allowed_actions`, **BUKAN** atas tabel `features`. Feature yang punya seeder tapi
+tidak terdaftar di config dilewati **diam-diam, tanpa error apa pun**.
+
+`items` persis begitu sejak ADHOC-11: `ItemFeatureSeeder` membuat feature-nya,
+tapi `items` tidak pernah didaftarkan di `config/rbac.php`, jadi permission
+`items.view/create/update/delete` **tidak pernah lahir**. Akibatnya Master Barang
+cuma bisa dibuka Owner (yang lolos lewat wildcard `*`) dan tidak akan pernah
+muncul di Role Matrix untuk role lain. Tidak terdeteksi karena test memakai Owner.
+
+`items`, `item_categories`, dan `work_tools` sekarang terdaftar. **Tiap
+FeatureSeeder baru WAJIB menambah entri di `config/rbac.php` juga** — seeder saja
+tidak cukup.
+
+Sidebar: tiga entri Master Data (`Barang / Material`, `Kategori Barang`,
+`Alat Kerja`), masing-masing digerbangi permission sendiri, dan gerbang seksi
+Master Data ikut menyertakan ketiganya.
+
+Test: `WorkToolChecklistTest` (10 test), `MasterBarangPermissionGeneratedTest`
+(4 test — menjaga supaya feature master berikutnya tidak mengulang bug yang sama).
+
+**Belum dijalankan:** `php artisan migrate` — DB MySQL masih tak terjangkau.
+Seeder yang perlu dijalankan setelahnya: `WorkToolFeatureSeeder`, `WorkToolSeeder`,
+lalu `RolePermissionSeeder`.
+
+#### ADHOC-12 — Kategori Material jadi Master (2026-07-31)
+
+Batch A dari tiga batch yang diminta ("item survey & pemasangan masih hardcode").
+Master Barang (`items`) sebenarnya sudah ada sejak ADHOC-11; yang benar-benar masih
+hardcode adalah **kategorinya** — enum `MaterialType`, plus dua salinan literal
+daftar yang sama di `CustomerDeviceController` dan `_device.blade.php` (salinan
+ketiga bahkan sudah menyimpang: "Kabel Dropcore / FO" vs "Kabel Dropcore").
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Tabel `item_categories` + halaman Master Kategori Barang | `code` (bukan `id`) yang jadi kunci pemakaian — `task_materials.item_type` & `passive_device_type` menyimpannya sebagai snapshot string. Tanpa delete, sama seperti Master Barang |
+| 2 | Tujuh kategori bawaan ditanam **di migrasi**, bukan seeder | Migrasi berikutnya mem-backfill dengan mencocokkan code; seeder jalan setelah semua migrasi selesai, jadi kalau ditaruh di seeder backfill-nya no-op dan data lama kehilangan kategori. `is_system` mengunci code-nya |
+| 3 | `items.type` → `item_category_id` (kolom lama di-drop); `task_materials.item_type` **dipertahankan** + FK ditambah | Perlakuan sengaja dibalik: master menunjuk relasi (ubah nama kategori harus ikut berubah), riwayat menyimpan snapshot (laporan tahun lalu harus terbaca apa adanya) |
+| 4 | Cast enum `item_type` **dilepas** dari `TaskMaterial` | Kategori buatan admin tidak punya case enum; cast akan melempar `ValueError` saat baris itu sekadar ditampilkan. Bacanya lewat `category_label` (fallback ke code mentah) |
+| 5 | Enum `MaterialType` turun peran, TIDAK dihapus | Jadi dokumentasi kontrak tujuh code bawaan. **Jangan tambah case baru** — kategori baru lewat Master, kalau tidak dua daftar itu hidup lagi |
+| 6 | Validasi `in:` → `Rule::exists('item_categories','code')` di tiga tempat | Survey, Pemasangan, dan `CustomerDeviceController` (yang dulu menyalin daftar enum literal). Kategori baru langsung terpakai tanpa deploy |
+| 7 | Dropdown kategori nonaktif tetap muncul **untuk baris yang memakainya** | Tanpa ini, `<select>` tanpa option cocok jatuh ke option pertama saat render — membuka laporan lama lalu menyimpannya diam-diam memindahkan kategorinya |
+| 8 | `defaultUnit()` match() → kolom `default_unit` | JS form juga: `row.item_type === 'kabel_dropcore' ? 'meter' : 'pcs'` diganti lookup master |
+
+Satu bug ditemukan lewat test: `whereIn('id', ...)` jadi ambigu begitu join
+`item_categories` ikut (dua tabel sama-sama punya `id`) — di-prefix jadi `items.id`.
+
+Permission `item_categories.*` lewat `ItemCategoryFeatureSeeder` — feature terpisah
+dari `items` karena mengubah kategori berefek ke seluruh data material lintas modul,
+sedangkan menambah barang cuma menambah pilihan.
+
+Test: `ItemCategoryMasterTest` (10 test). `TaskMaterialTest` & `MaterialReportFlowTest`
+disesuaikan ke bentuk baru (`item_category_id`, `item_type` string).
+
+**Belum dijalankan:** `php artisan migrate` — DB MySQL masih tak terjangkau, sama
+seperti catatan ADHOC-11. Migrasi teruji lewat sqlite `:memory:` di test suite.
+Seeder yang perlu dijalankan: `ItemCategoryFeatureSeeder`, lalu `RolePermissionSeeder`.
+
+**Batch B — SELESAI, dikerjakan sebagai ADHOC-13 di atas.**
+
+Tanpa qty dan tanpa kepemilikan alat per-teknisi/per-POP; itu pelacakan aset,
+wilayah Inventory (lihat Batch C).
+
+**Batch C — TIDAK dikerjakan sekarang (keputusan user, 2026-07-31).** Harga/stok/gudang
+di master barang = pembukaan modul Inventory (`docs/post-mvp/inventory-fop.md`), bukan
+perluasan master. Keputusan ADHOC-11 poin 6 (master minimum, TANPA stok/harga/gudang)
+**tetap berlaku** — jangan tambah kolom itu ke `items` sebagai perbaikan sambil lalu.
+Kalau nanti dibuka, prasyaratnya: (a) keputusan stok per-POP atau global, (b) siapa
+yang berwenang mengurangi stok — teknisi saat submit laporan atau admin gudang, dan
+(c) **wajib** ikut `harga_saat_pakai` snapshot di `task_materials`; tanpa itu laporan
+biaya lama berubah nilainya tiap harga master naik. Kolom `unit_price_snapshot` di
+`task_materials` sudah disiapkan ADHOC-11 dan masih kosong — itu tempatnya.
 
 #### ADHOC-11 — Tanggal Request Pemasangan & Material Task (2026-07-31)
 

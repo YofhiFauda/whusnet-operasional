@@ -43,11 +43,11 @@
 
             <!-- Filter Tipe -->
             <div>
-                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Tipe</label>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Kategori</label>
                 <select name="type" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-slate-800">
-                    <option value="">Semua Tipe</option>
-                    @foreach(\App\Enums\MaterialType::cases() as $materialType)
-                    <option value="{{ $materialType->value }}" {{ $type === $materialType->value ? 'selected' : '' }}>{{ $materialType->label() }}</option>
+                    <option value="">Semua Kategori</option>
+                    @foreach($categories as $category)
+                    <option value="{{ $category->code }}" {{ $type === $category->code ? 'selected' : '' }}>{{ $category->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -118,7 +118,7 @@
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-16">No</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kode</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nama Barang</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tipe</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kategori</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Satuan</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                     @if(auth()->user()->hasPermission('items.update'))
@@ -139,7 +139,7 @@
                         <div class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $item->name }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="text-sm text-slate-600 dark:text-slate-400">{{ $item->type->label() }}</span>
+                        <span class="text-sm text-slate-600 dark:text-slate-400">{{ $item->category?->name ?? '-' }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="text-sm font-mono text-slate-600 dark:text-slate-400">{{ $item->unit }}</span>

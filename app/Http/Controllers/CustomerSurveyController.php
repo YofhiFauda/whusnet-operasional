@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MaterialKind;
-use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -12,15 +11,19 @@ use App\Events\SurveyStarted;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
+use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class CustomerSurveyController extends Controller
 {
@@ -223,20 +226,29 @@ class CustomerSurveyController extends Controller
         // Master barang aktif buat dropdown material. Baris estimasi yang sudah
         // pernah disimpan ikut dikirim supaya laporan yang dibuka ulang gak
         // kehilangan isinya.
-        $items = Item::active()->orderBy('name')->get();
+        $items = Item::active()->with('category')->orderBy('name')->get();
+        $itemCategories = ItemCategory::options();
         $materialRows = app(TaskMaterialService::class)
             ->estimatesForCustomer($customer)
             ->map(fn ($row) => [
                 'item_id' => $row->item_id,
                 'item_name' => $row->item_name,
-                'item_type' => $row->item_type->value,
+                'item_type' => $row->item_type,
                 'qty' => (float) $row->qty,
                 'unit' => $row->unit,
                 'note' => $row->note,
             ])
             ->all();
 
-        return view('surveys.report', compact('customer', 'survey', 'items', 'materialRows'));
+        // Checklist alat kerja — peralatan yang dibawa lalu dibawa pulang,
+        // tabel & komponen terpisah dari material.
+        $workToolService = app(TaskWorkToolService::class);
+        $workTools = WorkTool::options();
+        $workToolRows = $workToolService->rowsFor(
+            $workToolService->resolveTaskForCustomer($customer, TaskType::SURVEY)
+        );
+
+        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -290,10 +302,19 @@ class CustomerSurveyController extends Controller
             'materials' => 'nullable|array',
             'materials.*.item_id' => 'nullable|integer|exists:items,id',
             'materials.*.item_name' => 'nullable|string|max:150',
-            'materials.*.item_type' => 'nullable|string|in:'.implode(',', MaterialType::values()),
+            // Kategori divalidasi ke master, bukan ke daftar enum yang beku —
+            // kategori buatan admin harus langsung bisa dipakai tanpa deploy.
+            'materials.*.item_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
             'materials.*.qty' => 'nullable|numeric|min:0',
             'materials.*.unit' => 'nullable|string|max:20',
             'materials.*.note' => 'nullable|string|max:255',
+            // Checklist alat kerja. Dua bagian karena checkbox tidak bisa
+            // membawa catatan per-baris; digabung di TaskWorkToolService.
+            'work_tools_ids' => 'nullable|array',
+            'work_tools_ids.*' => 'nullable|integer|exists:work_tools,id',
+            'work_tools_manual' => 'nullable|array',
+            'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
+            'work_tools_manual.*.note' => 'nullable|string|max:255',
         ], [
             'survey_note.required_if' => 'Alasan tidak layak pasang wajib diisi.',
             'requested_installation_date.after_or_equal' => 'Tanggal request pemasangan tidak boleh sebelum hari ini.',
@@ -312,36 +333,45 @@ class CustomerSurveyController extends Controller
         $materialRows = $validated['materials'] ?? [];
         unset($validated['materials']);
 
+        // Idem untuk checklist alat kerja → task_work_tools.
+        $workToolRows = app(TaskWorkToolService::class)->rowsFromRequest(
+            $validated['work_tools_ids'] ?? [],
+            $validated['work_tools_manual'] ?? []
+        );
+        unset($validated['work_tools_ids'], $validated['work_tools_manual']);
+
         // Estimasi kabel sudah punya kolom sendiri sejak lama dan tetap dipakai.
         // Nilainya diturunkan jadi satu baris material supaya teknisi gak diminta
         // mengisi angka yang sama dua kali — dan supaya perbandingan realisasi
         // di halaman verifikasi punya lawan tanding untuk kabel.
         $cableMeter = $validated['cable_estimation_meter'] ?? null;
 
-        // Tipe baris dicek lewat master kalau item_id dikirim — form memang tidak
-        // selalu menyertakan item_type untuk barang terdaftar (tipe-nya ikut
-        // master). Kalau cuma membaca item_type mentah, baris dropcore dari master
-        // tak terdeteksi dan kabel tercatat dua kali.
-        // NB: pluck() di Eloquent tetap menerapkan cast, jadi nilainya instance
-        // MaterialType — bukan string. Dibandingkan langsung ke string selalu
-        // false (kelas bug yang sama dengan catatan enum-vs-string di FopTask).
-        $masterTypes = Item::whereIn('id', collect($materialRows)->pluck('item_id')->filter())
-            ->pluck('type', 'id')
-            ->map(fn (MaterialType $type) => $type->value);
+        // Kategori baris dicek lewat master kalau item_id dikirim — form memang
+        // tidak selalu menyertakan item_type untuk barang terdaftar (kategorinya
+        // ikut master). Kalau cuma membaca item_type mentah, baris dropcore dari
+        // master tak terdeteksi dan kabel tercatat dua kali.
+        // Sejak kategori pindah ke tabel, nilai yang dibandingkan sudah string
+        // code biasa — cast enum yang dulu bikin banding selalu false sudah
+        // dilepas dari model.
+        // Kolom di-prefix tabel: tanpa itu `whereIn('id', ...)` jadi ambigu
+        // begitu join item_categories ikut (dua tabel sama-sama punya `id`).
+        $masterTypes = Item::whereIn('items.id', collect($materialRows)->pluck('item_id')->filter())
+            ->join('item_categories', 'item_categories.id', '=', 'items.item_category_id')
+            ->pluck('item_categories.code', 'items.id');
 
         $hasCableRow = collect($materialRows)->contains(function ($row) use ($masterTypes) {
             $type = ! empty($row['item_id'])
                 ? ($masterTypes[$row['item_id']] ?? null)
                 : ($row['item_type'] ?? null);
 
-            return $type === MaterialType::KABEL_DROPCORE->value;
+            return $type === ItemCategory::CODE_KABEL_DROPCORE;
         });
 
         if ($cableMeter > 0 && ! $hasCableRow) {
             array_unshift($materialRows, [
                 'item_id' => null,
                 'item_name' => 'Kabel Dropcore',
-                'item_type' => MaterialType::KABEL_DROPCORE->value,
+                'item_type' => ItemCategory::CODE_KABEL_DROPCORE,
                 'qty' => $cableMeter,
                 'unit' => 'meter',
                 'note' => 'Otomatis dari estimasi kabel survey',
@@ -356,7 +386,7 @@ class CustomerSurveyController extends Controller
             $validated['house_photo'] = FileUploadService::uploadSurveyPhoto($request->file('house_photo'), $customer, 'house');
         }
 
-        DB::transaction(function () use ($customer, $validated, $materialRows, $workflowService) {
+        DB::transaction(function () use ($customer, $validated, $materialRows, $workToolRows, $workflowService) {
             $survey = $customer->latestSurvey()->first();
 
             if (! $survey) {
@@ -430,6 +460,9 @@ class CustomerSurveyController extends Controller
 
             if ($surveyFopTask) {
                 $materialService->sync($surveyFopTask, MaterialKind::ESTIMASI, $materialRows, auth()->id());
+                // Anchor yang sama dipakai checklist alat — dilewat dengan alasan
+                // yang sama kalau FopTask belum terbentuk.
+                app(TaskWorkToolService::class)->sync($surveyFopTask, $workToolRows, auth()->id());
             }
 
             if ($validated['survey_status'] === 'completed' && $customer->status === 'survey_in_progress') {

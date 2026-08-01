@@ -291,6 +291,39 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
         ],
+
+        // Master Barang/Material, Kategori Barang, dan Alat Kerja.
+        //
+        // PermissionGeneratorService melakukan loop atas daftar INI, bukan atas
+        // tabel `features` — feature yang punya seeder tapi tidak terdaftar di
+        // sini permission-nya tidak pernah lahir, tanpa error apa pun. `items`
+        // sempat begitu (ADHOC-11): halamannya cuma bisa diakses Owner lewat
+        // wildcard `*` dan tidak bisa diberikan ke role lain lewat Role Matrix.
+        // Tiap FeatureSeeder baru WAJIB menambah entri di sini juga.
+        //
+        // DELETE digenerate tapi TIDAK dipasang ke route CRUD — ketiganya
+        // di-toggle is_active, bukan dihapus keras, biar baris yang sudah
+        // dipakai laporan lama tidak kehilangan rujukan.
+        'items' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        'item_categories' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
+
+        'work_tools' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::UPDATE->value,
+            ActionCode::DELETE->value,
+        ],
     ],
 
     /*

@@ -423,12 +423,12 @@
             @endif
 
             {{-- ── Group: MASTER & PENGATURAN ── --}}
-            @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
+            @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
             <div>
                 <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Master &amp; Pengaturan</p>
                 <div class="space-y-1">
 
-                    @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view'))
+                    @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-master', 'chevron-master')"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
@@ -467,6 +467,15 @@
                             @endif
                             @if(auth()->user()->hasPermission('ticket_issue_categories.view'))
                             <a href="/master/issue-categories" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/issue-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Kategori Tiket</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('items.view'))
+                            <a href="/master/items" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/items*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Item (Barang)</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('item_categories.view'))
+                            <a href="/master/item-categories" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/item-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Kategori Item</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('work_tools.view'))
+                            <a href="/master/work-tools" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/work-tools*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Alat Kerja</a>
                             @endif
                         </div>
                     </div>

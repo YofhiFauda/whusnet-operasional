@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\FopTaskPriority;
-use App\Enums\MaterialType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\Item;
+use App\Models\ItemCategory;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -71,7 +71,7 @@ class MaterialReportFlowTest extends TestCase
         $this->dropcore = Item::create([
             'code' => 'DC-1C',
             'name' => 'Kabel Dropcore 1 Core',
-            'type' => MaterialType::KABEL_DROPCORE->value,
+            'item_category_id' => ItemCategory::where('code', ItemCategory::CODE_KABEL_DROPCORE)->value('id'),
             'unit' => 'meter',
             'is_active' => true,
         ]);
@@ -112,7 +112,7 @@ class MaterialReportFlowTest extends TestCase
                 'cable_estimation_meter' => 0,
                 'materials' => [
                     ['item_id' => $this->dropcore->id, 'qty' => 120],
-                    ['item_id' => null, 'item_name' => 'Klem Kabel', 'item_type' => MaterialType::AKSESORIS_PASANG->value, 'qty' => 10, 'unit' => 'pcs'],
+                    ['item_id' => null, 'item_name' => 'Klem Kabel', 'item_type' => 'aksesoris_pasang', 'qty' => 10, 'unit' => 'pcs'],
                 ],
             ]);
 
@@ -141,7 +141,7 @@ class MaterialReportFlowTest extends TestCase
         $rows = TaskMaterial::where('customer_id', $this->customer->id)->estimasi()->get();
 
         $this->assertCount(1, $rows);
-        $this->assertSame(MaterialType::KABEL_DROPCORE, $rows->first()->item_type);
+        $this->assertSame(ItemCategory::CODE_KABEL_DROPCORE, $rows->first()->item_type);
         $this->assertSame('85.00', $rows->first()->qty);
     }
 

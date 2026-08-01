@@ -21,23 +21,38 @@
 @props([
     'name' => 'materials',
     'items' => null,
+    'categories' => null,
     'rows' => [],
     'emptyLabel' => 'Belum ada material dicatat.',
 ])
 
 @php
+    // Fallback query kalau pemanggil belum mengirim prop — komponen ini dipakai
+    // dua halaman dan satu di antaranya bisa saja terlewat waktu kategori pindah
+    // ke master. Lebih baik satu query ekstra daripada dropdown kosong di
+    // laporan lapangan.
+    $categoryOptions = collect($categories ?? \App\Models\ItemCategory::options())->map(fn ($category) => [
+        'code' => $category->code,
+        'name' => $category->name,
+        'default_unit' => $category->default_unit,
+    ])->values();
+
+    $fallbackType = $categoryOptions->firstWhere('code', \App\Models\ItemCategory::CODE_LAINNYA)
+        ? \App\Models\ItemCategory::CODE_LAINNYA
+        : ($categoryOptions->first()['code'] ?? \App\Models\ItemCategory::CODE_LAINNYA);
+
     $itemOptions = collect($items ?? [])->map(fn ($item) => [
         'id' => $item->id,
         'name' => $item->name,
         'code' => $item->code,
-        'type' => $item->type->value,
+        'type' => $item->category?->code ?? $fallbackType,
         'unit' => $item->unit,
     ])->values();
 
     $initialRows = collect($rows)->map(fn ($row) => [
         'item_id' => $row['item_id'] ?? '',
         'item_name' => $row['item_name'] ?? '',
-        'item_type' => $row['item_type'] ?? 'lainnya',
+        'item_type' => $row['item_type'] ?? $fallbackType,
         'qty' => $row['qty'] ?? '',
         'unit' => $row['unit'] ?? '',
         'note' => $row['note'] ?? '',
@@ -47,8 +62,10 @@
 <div
     x-data="materialRows(
         @js($itemOptions),
+        @js($categoryOptions),
         @js($initialRows),
-        '{{ $name }}'
+        '{{ $name }}',
+        @js($fallbackType)
     )"
     class="space-y-3"
 >
@@ -95,9 +112,11 @@
                     :disabled="!!row.item_id"
                     class="w-full text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400 disabled:opacity-60"
                 >
-                    @foreach(\App\Enums\MaterialType::cases() as $type)
-                        <option value="{{ $type->value }}">{{ $type->label() }}</option>
-                    @endforeach
+                    {{-- Opsi dari master, plus kategori lama baris ini kalau
+                         sudah dinonaktifkan admin — lihat catatan di typeOptionsFor(). --}}
+                    <template x-for="opt in typeOptionsFor(row)" :key="opt.code">
+                        <option :value="opt.code" x-text="opt.name"></option>
+                    </template>
                 </select>
             </div>
 
@@ -167,21 +186,42 @@
 @once
 @push('scripts')
 <script>
-function materialRows(itemOptions, initialRows, fieldName) {
+function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fallbackType) {
     return {
         itemOptions: itemOptions,
+        categoryOptions: categoryOptions,
         rows: initialRows,
         fieldName: fieldName,
+        fallbackType: fallbackType,
 
         addRow() {
             this.rows.push({
                 item_id: '',
                 item_name: '',
-                item_type: 'lainnya',
+                item_type: this.fallbackType,
                 qty: '',
-                unit: 'pcs',
+                unit: this.defaultUnitFor(this.fallbackType),
                 note: '',
             });
+        },
+
+        // Kategori baris yang sudah dinonaktifkan admin tetap ditawarkan UNTUK
+        // BARIS ITU SAJA. Tanpa ini, <select> tanpa option yang cocok akan
+        // jatuh ke option pertama saat render, dan sekadar membuka laporan lama
+        // lalu menyimpannya diam-diam memindahkan kategorinya — pemakaian
+        // material historis berubah tanpa ada yang mengubahnya.
+        typeOptionsFor(row) {
+            const known = this.categoryOptions.some(c => c.code === row.item_type);
+
+            if (known || !row.item_type) {
+                return this.categoryOptions;
+            }
+
+            return [...this.categoryOptions, { code: row.item_type, name: `${row.item_type} (nonaktif)`, default_unit: 'pcs' }];
+        },
+
+        defaultUnitFor(code) {
+            return this.categoryOptions.find(c => c.code === code)?.default_unit ?? 'pcs';
         },
 
         removeRow(index) {
@@ -201,7 +241,9 @@ function materialRows(itemOptions, initialRows, fieldName) {
             }
         },
 
-        // Barang "lainnya": satuan default ikut tipe, tapi tetap boleh diubah.
+        // Barang "lainnya": satuan default ikut kategori (dari master, bukan
+        // if-else 'kabel_dropcore' yang dulu di-hardcode di sini), tapi tetap
+        // boleh diubah teknisi.
         onTypeChange(index) {
             const row = this.rows[index];
 
@@ -209,7 +251,7 @@ function materialRows(itemOptions, initialRows, fieldName) {
                 return;
             }
 
-            row.unit = row.item_type === 'kabel_dropcore' ? 'meter' : 'pcs';
+            row.unit = this.defaultUnitFor(row.item_type);
         },
     };
 }

@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <!-- Header Summary -->
-    <div class="border border-border rounded-xl p-5 bg-gradient-to-r from-surface-muted/30 via-surface to-surface-muted/30 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5 bg-slate-50/70 dark:bg-slate-900/40 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center font-bold text-sm">
@@ -8,9 +8,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <h3 class="text-sm font-bold text-text-main">List Riwayat Perbaruan Data Pelanggan</h3>
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">List Riwayat Perbaruan Data Pelanggan</h3>
             </div>
-            <p class="text-xs text-text-muted mt-1.5">
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                 Setiap perubahan data (seperti update paket internet, informasi kontak, alamat, atau perangkat) dicatat secara terperinci mencakup nilai sebelum dan sesudah, pelaku pembaruan, serta waktu kejadian.
             </p>
         </div>
@@ -176,11 +176,25 @@
         foreach ($auditLogs as $alog) {
             if ($alog->action === 'create') {
                 if (!$creationLog || ($alog->created_at && $alog->created_at->lt($creationLog['created_at']))) {
-                    $creationLog = [
-                        'user_name' => $alog->user ? $alog->user->name : 'Petugas Registrasi',
-                        'user_role' => $alog->user ? ($alog->user->role?->name ?? 'Petugas') : 'System',
-                        'created_at' => $alog->created_at ?: $customer->created_at,
-                    ];
+                    // Pelanggan hasil migrasi legacy: audit log 'create' selalu
+                    // nyatet waktu & aktor SAAT IMPORT dijalankan (wall clock +
+                    // admin yang jalanin command), bukan kapan/siapa yang
+                    // beneran mendaftarkan pelanggan itu di sistem lama.
+                    // registered_by_name cuma keisi lewat jalur migrasi, jadi
+                    // aman dipakai sebagai penanda "ini data legacy".
+                    if ($customer->registered_by_name) {
+                        $creationLog = [
+                            'user_name' => $customer->registered_by_name,
+                            'user_role' => 'Data Migrasi Legacy',
+                            'created_at' => $customer->registration_date ? \Carbon\Carbon::parse($customer->registration_date) : ($alog->created_at ?: $customer->created_at),
+                        ];
+                    } else {
+                        $creationLog = [
+                            'user_name' => $alog->user ? $alog->user->name : 'Petugas Registrasi',
+                            'user_role' => $alog->user ? ($alog->user->role?->name ?? 'Petugas') : 'System',
+                            'created_at' => $alog->created_at ?: $customer->created_at,
+                        ];
+                    }
                 }
                 continue;
             }
@@ -278,18 +292,18 @@
     ?>
 
     <?php if(empty($groupedUpdates)): ?>
-        <div class="py-12 text-center text-text-muted border border-border rounded-xl bg-surface-muted/20">
-            <svg class="mx-auto h-12 w-12 text-border mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="py-12 text-center text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/30">
+            <svg class="mx-auto h-12 w-12 text-slate-300 dark:text-slate-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h4 class="text-sm font-semibold text-text-main">Belum Ada Perbaruan Data</h4>
-            <p class="text-xs text-text-muted mt-1 max-w-md mx-auto">
+            <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Belum Ada Perbaruan Data</h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
                 Sejak pelanggan ini didaftarkan, belum ada aktivitas perubahan data (seperti penggantian paket, update alamat, atau ganti perangkat) yang tercatat oleh sistem.
             </p>
         </div>
     <?php else: ?>
         <!-- Timeline List Perbaruan Data -->
-        <div class="relative pl-6 border-l-2 border-primary/20 space-y-6 ml-2 my-4">
+        <div class="relative pl-6 border-l-2 border-sky-200 dark:border-sky-800 space-y-6 ml-2 my-4">
             <?php $__currentLoopData = $groupedUpdates; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $group): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <?php
                     $changedKeysList = array_map(fn($item) => $item['key'], $group['changes']);
@@ -298,14 +312,14 @@
 
                 <div class="relative group">
                     <!-- Timeline Bullet Indicator -->
-                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-surface flex items-center justify-center shadow-sm <?php echo e($group['is_post_activation'] ? 'bg-sky-600 text-white' : 'bg-slate-500 text-white'); ?>">
+                    <div class="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center shadow-sm <?php echo e($group['is_post_activation'] ? 'bg-sky-600 text-white' : 'bg-slate-500 text-white'); ?>">
                         <span class="text-xs leading-none"><?php echo e($categoryInfo['icon']); ?></span>
                     </div>
 
                     <!-- Card List Item -->
-                    <div class="border border-border rounded-xl bg-surface shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-border/80">
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-slate-300 dark:border-slate-600">
                         <!-- Card Header Bar -->
-                        <div class="px-5 py-3.5 bg-surface-muted/50 border-b border-border flex flex-wrap items-center justify-between gap-3">
+                        <div class="px-5 py-3.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 <span class="px-2.5 py-0.5 rounded-full text-xs font-bold border <?php echo e($categoryInfo['badge_class']); ?>">
                                     <?php echo e($categoryInfo['icon']); ?> <?php echo e($categoryInfo['label']); ?>
@@ -319,12 +333,12 @@
                                         Pasca Aktivasi
                                     </span>
                                 <?php else: ?>
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-surface-muted text-text-muted border border-border">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                         Pra Aktivasi
                                     </span>
                                 <?php endif; ?>
 
-                                <span class="font-bold text-text-main">
+                                <span class="font-bold text-slate-900 dark:text-slate-100">
                                     <?php echo e($group['created_at'] ? \Carbon\Carbon::parse($group['created_at'])->translatedFormat('d M Y, H:i') . ' WIB' : '-'); ?>
 
                                 </span>
@@ -333,42 +347,42 @@
 
                         <!-- Card Body: User Info & Table of Changed Fields -->
                         <div class="p-5">
-                            <div class="flex items-center justify-between gap-2 mb-3.5 pb-3 border-b border-border text-xs">
+                            <div class="flex items-center justify-between gap-2 mb-3.5 pb-3 border-b border-slate-200 dark:border-slate-700 text-xs">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-text-muted">Diperbarui Oleh:</span>
-                                    <span class="font-bold text-text-main bg-surface-muted px-2 py-0.5 rounded border border-border">
+                                    <span class="text-slate-500 dark:text-slate-400">Diperbarui Oleh:</span>
+                                    <span class="font-bold text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                                         <?php echo e($group['user_name']); ?>
 
                                     </span>
-                                    <span class="text-text-muted font-medium">(<?php echo e($group['user_role']); ?>)</span>
+                                    <span class="text-slate-500 dark:text-slate-400 font-medium">(<?php echo e($group['user_role']); ?>)</span>
                                 </div>
-                                <span class="text-[11px] text-text-muted font-mono">
+                                <span class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                                     Total <?php echo e(count($group['changes'])); ?> atribut diubah
                                 </span>
                             </div>
 
                             <!-- List of Changes Table -->
-                            <div class="border border-border rounded-lg overflow-hidden">
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr class="bg-surface-muted/80 border-b border-border text-[11px] font-bold text-text-muted">
+                                        <tr class="bg-slate-100/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400">
                                             <th class="py-2.5 px-4 w-1/3">Data / Atribut yang Diperbarui</th>
-                                            <th class="py-2.5 px-4 w-1/3 text-error bg-error-bg/10">Data Sebelum Perubahan</th>
-                                            <th class="py-2.5 px-4 w-1/3 text-success bg-success-bg/10">Data Sesudah Perubahan</th>
+                                            <th class="py-2.5 px-4 w-1/3 text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/20">Data Sebelum Perubahan</th>
+                                            <th class="py-2.5 px-4 w-1/3 text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/20">Data Sesudah Perubahan</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-border">
+                                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                                         <?php $__currentLoopData = $group['changes']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $change): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <tr class="hover:bg-surface-muted/50 transition-colors">
-                                                <td class="py-3 px-4 font-bold text-text-main bg-surface-muted/20">
+                                            <tr class="hover:bg-slate-50 dark:bg-slate-900/50 transition-colors">
+                                                <td class="py-3 px-4 font-bold text-slate-900 dark:text-slate-100 bg-slate-50/50 dark:bg-slate-900/30">
                                                     <?php echo e($change['label']); ?>
 
                                                 </td>
-                                                <td class="py-3 px-4 text-error bg-error-bg/5 font-medium break-words">
+                                                <td class="py-3 px-4 text-rose-600 dark:text-rose-400 bg-rose-50/40 dark:bg-rose-950/10 font-medium break-words">
                                                     <?php echo e($change['old']); ?>
 
                                                 </td>
-                                                <td class="py-3 px-4 text-success bg-success-bg/5 font-bold break-words">
+                                                <td class="py-3 px-4 text-emerald-600 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/10 font-bold break-words">
                                                     <?php echo e($change['new']); ?>
 
                                                 </td>
@@ -386,17 +400,17 @@
 
     <!-- Initial Creation Milestone -->
     <?php if($creationLog): ?>
-        <div class="mt-8 border border-dashed border-border rounded-xl p-4 bg-surface-muted/30 flex items-center justify-between text-xs text-text-secondary">
+        <div class="mt-8 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/60 dark:bg-slate-900/40 flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                     ✨
                 </div>
                 <div>
-                    <span class="font-bold text-text-main">Registrasi & Pembuatan Data Awal Pelanggan</span>
-                    <p class="text-[11px] text-text-muted mt-0.5">Didaftarkan ke dalam sistem oleh <strong class="text-text-secondary"><?php echo e($creationLog['user_name']); ?></strong> (<?php echo e($creationLog['user_role']); ?>)</p>
+                    <span class="font-bold text-slate-900 dark:text-slate-100">Registrasi & Pembuatan Data Awal Pelanggan</span>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Didaftarkan ke dalam sistem oleh <strong class="text-slate-700 dark:text-slate-300"><?php echo e($creationLog['user_name']); ?></strong> (<?php echo e($creationLog['user_role']); ?>)</p>
                 </div>
             </div>
-            <div class="text-right font-mono text-[11px] text-text-muted font-semibold">
+            <div class="text-right font-mono text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
                 <?php echo e($creationLog['created_at'] ? \Carbon\Carbon::parse($creationLog['created_at'])->translatedFormat('d M Y, H:i') . ' WIB' : '-'); ?>
 
             </div>

@@ -979,9 +979,17 @@ class CustomerController extends Controller
             'customerAddress',
             'customerService',
             'customerTechnicalDetail',
-            'creator',
+            // .role ikut dimuat: tabel "Ringkasan Waktu & Penanggung Jawab" di tab
+            // Ringkasan menampilkan role tiap PIC.
+            'creator.role',
             'updater',
-            'installations.technician',
+            'customerService.activatedBy.role',
+            'surveys.technician.role',
+            'surveys.surveyor2',
+            'surveys.surveyor3',
+            'installations.technician.role',
+            'installations.technician2',
+            'installations.technician3',
             'customerDevice',
             'documents.uploader',
             'invoices' => function ($query) {
@@ -1037,45 +1045,137 @@ class CustomerController extends Controller
             default => 1,
         };
 
-        // Generate dynamic timeline based on status
+        // Timeline & tabel "Ringkasan Waktu + PIC" di tab Ringkasan.
+        //
+        // Sebelumnya blok ini MENGARANG tanggal (regDate->addDays(2)/addDays(4))
+        // dan menempel angka literal ("dropcore 85m", "Redaman awal -17.80 dBm")
+        // untuk SEMUA pelanggan. Data karangan di halaman detail lebih berbahaya
+        // daripada kolom kosong — petugas tidak bisa membedakan mana tanggal
+        // survey sungguhan dan mana tanggal hasil aritmetika. Sekarang murni dari
+        // customer_surveys / customer_installations / customer_services; kalau
+        // record-nya belum ada, tanggalnya '-'.
+        $latestSurvey = $customer->surveys()->latest('id')->first();
+        $latestInstallation = $customer->installations()->latest('id')->first();
+        $service = $customer->customerService;
+
+        $surveyDate = $latestSurvey?->end_date ?? $latestSurvey?->survey_date;
+        $installationDate = $latestInstallation?->finished_date ?? $latestInstallation?->scheduled_date;
+        $activationDate = $service?->activation_date;
+
         $timeline = [
             [
                 'step' => 'Registrasi',
                 'title' => 'Pendaftaran Pelanggan',
                 'date' => IndonesianDate::date($regDate),
-                'notes' => 'Pendaftaran berhasil dengan kode registrasi '.$customer->customer_code,
+                'notes' => 'Kode registrasi '.$customer->customer_code,
                 'status' => 'completed',
             ],
             [
                 'step' => 'Survey',
                 'title' => 'Survey Lokasi & Kelayakan',
-                'date' => $statusRank >= 3 ? IndonesianDate::date($regDate->copy()->addDays(2)) : '-',
-                'notes' => $statusRank >= 3
-                    ? 'Hasil: LAYAK (Kabel dropcore 85m, ODP terdekat: '.($customer->odp_code ?? '-').')'
-                    : ($statusRank == 2 ? 'Sedang dijadwalkan / dalam antrean.' : 'Menunggu penyelesaian tahap sebelumnya.'),
-                'status' => $statusRank >= 3 ? 'completed' : ($statusRank == 2 ? 'current' : 'pending'),
+                'date' => $surveyDate ? IndonesianDate::date($surveyDate) : '-',
+                'notes' => $latestSurvey
+                    ? trim(($latestSurvey->survey_status === 'completed' ? 'LAYAK' : strtoupper((string) $latestSurvey->survey_status))
+                        .' — dropcore '.($latestSurvey->cable_estimation_meter ?? 0).'m, ODP '.($latestSurvey->nearest_odp ?: '-'))
+                    : ($statusRank == 2 ? 'Sedang dijadwalkan / dalam antrean.' : 'Belum ada laporan survey.'),
+                'status' => $latestSurvey && $latestSurvey->survey_status === 'completed'
+                    ? 'completed'
+                    : ($statusRank == 2 || $latestSurvey ? 'current' : 'pending'),
             ],
             [
                 'step' => 'Pemasangan',
                 'title' => 'Penarikan Kabel & Pemasangan ONT',
-                'date' => $statusRank >= 5 ? IndonesianDate::date($regDate->copy()->addDays(4)) : '-',
-                'notes' => $statusRank >= 5
-                    ? 'Pemasangan ONT selesai (SN: '.($customer->ont_sn ?? '-').'). Redaman awal: -17.80 dBm'
-                    : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Menunggu penyelesaian tahap sebelumnya.'),
-                'status' => $statusRank >= 5 ? 'completed' : ($statusRank == 4 ? 'current' : 'pending'),
+                'date' => $installationDate ? IndonesianDate::date($installationDate) : '-',
+                'notes' => $latestInstallation
+                    ? 'SN ONT: '.($customer->ont_sn ?: '-')
+                        .($customer->customerTechnicalDetail?->initial_attenuation ? ', redaman awal '.$customer->customerTechnicalDetail->initial_attenuation.' dBm' : '')
+                    : ($statusRank == 4 ? 'Teknisi sedang melakukan penarikan kabel dropcore.' : 'Belum ada laporan pemasangan.'),
+                'status' => $latestInstallation && $latestInstallation->installation_status === 'completed'
+                    ? 'completed'
+                    : ($latestInstallation ? 'current' : 'pending'),
             ],
             [
-                'step' => 'Aktivasi',
-                'title' => 'Aktivasi PPPoE Billing',
-                'date' => $statusRank >= 6 ? IndonesianDate::date($regDate->copy()->addDays(5)) : '-',
-                'notes' => $statusRank >= 6
-                    ? ($status === 'active' ? 'Layanan telah aktif sepenuhnya.' : ($status === 'suspended' ? 'Layanan diisolir sementara.' : 'Layanan diterminasi.'))
+                'step' => 'Aktivasi Billing',
+                'title' => 'Aktivasi Layanan & Siap Billing',
+                'date' => $activationDate ? IndonesianDate::date($activationDate) : '-',
+                'notes' => $activationDate
+                    ? ($service->activation_time ? substr((string) $service->activation_time, 0, 5).' WIB' : 'Layanan aktif')
                     : 'Menunggu proses pemasangan & uji speedtest selesai.',
-                'status' => $statusRank >= 6
+                'status' => $activationDate
                     ? ($status === 'suspended' ? 'warning' : ($status === 'terminated' ? 'danger' : 'completed'))
                     : 'pending',
             ],
         ];
+
+        // Rekap "siapa mengerjakan apa, kapan" — dipakai tabel Ringkasan Waktu &
+        // Penanggung Jawab di tab Ringkasan. Sengaja hanya tahap yang punya
+        // record; tahap tanpa data tetap dibariskan dengan PIC '-' supaya urutan
+        // workflow tetap terbaca utuh.
+        $workflowStages = [
+            [
+                'no' => 1,
+                'title' => 'Registrasi & Input Pelanggan',
+                'subtitle' => 'Pendaftaran Awal Data Pelanggan',
+                // Pelanggan hasil migrasi legacy: $customer->created_at &
+                // creator selalu mencatat SAAT IMPORT dijalankan (wall clock +
+                // admin yang jalanin command), bukan kapan/siapa yang beneran
+                // mendaftarkan pelanggan itu di sistem lama. registration_date
+                // & registered_by_name (diisi khusus dari jalur migrasi) yang
+                // jadi sumber kebenaran kalau ada.
+                'at' => $customer->registered_by_name ? $regDate : $customer->created_at,
+                'date_fallback' => IndonesianDate::date($regDate),
+                'pic' => $customer->registered_by_name ?? $customer->creator?->name,
+                'pic_role' => $customer->registered_by_name ? 'Data Migrasi Legacy' : $customer->creator?->role?->name,
+                'accent' => 'sky',
+            ],
+            [
+                'no' => 2,
+                'title' => 'Survey Lokasi & Jalur Optik',
+                'subtitle' => 'Pemeriksaan Jalur & ODP',
+                'at' => $latestSurvey?->assigned_at,
+                'date_fallback' => $surveyDate ? IndonesianDate::date($surveyDate) : null,
+                'pic' => $latestSurvey?->technician?->name ?? $latestSurvey?->surveyors,
+                'pic_role' => $latestSurvey?->technician?->role?->name ?? 'Surveyor FOP',
+                'accent' => 'indigo',
+            ],
+            [
+                'no' => 3,
+                'title' => 'Review & Filter Admin',
+                'subtitle' => 'Verifikasi Hasil Survey (ACC)',
+                'at' => $service?->admin_filter_at,
+                'date_fallback' => null,
+                'pic' => $service?->admin_filter_by_name,
+                'pic_role' => 'Admin POP',
+                'accent' => 'amber',
+            ],
+            [
+                'no' => 4,
+                'title' => 'Proses Pemasangan Perangkat & FO',
+                'subtitle' => 'Penarikan Dropcore & ONT',
+                'at' => $latestInstallation?->assigned_at,
+                'date_fallback' => $installationDate ? IndonesianDate::date($installationDate) : null,
+                'pic' => $latestInstallation?->technician?->name ?? $latestInstallation?->technicians,
+                'pic_role' => $latestInstallation?->technician?->role?->name ?? 'Teknisi FOP',
+                'accent' => 'purple',
+            ],
+            [
+                'no' => 5,
+                'title' => 'Aktivasi Layanan & Verifikasi Final',
+                'subtitle' => 'Siap Billing & Dial-up PPPoE',
+                'at' => null,
+                'date_fallback' => $activationDate
+                    ? IndonesianDate::date($activationDate).($service->activation_time ? ' ('.substr((string) $service->activation_time, 0, 5).' WIB)' : '')
+                    : null,
+                'pic' => $service?->activatedBy?->name ?? $service?->activated_by_name,
+                'pic_role' => $service?->activatedBy?->role?->name ?? 'Verifikator',
+                'accent' => 'emerald',
+            ],
+        ];
+
+        // Anomali migrasi legacy: tanggal registrasi bisa tercatat LEBIH AKHIR
+        // dari tanggal survey/pasang. Ditandai eksplisit di UI supaya tidak
+        // dilaporkan berulang sebagai bug tampilan.
+        $timelineAnomaly = $surveyDate && $regDate->gt(Carbon::parse($surveyDate));
 
         // 1. Audit Logs untuk Riwayat Perubahan Data Pelanggan
         $auditableConditions = [
@@ -1146,6 +1246,8 @@ class CustomerController extends Controller
             'displayIdLabel',
             'completeness',
             'timeline',
+            'workflowStages',
+            'timelineAnomaly',
             'activeUsers',
             'auditLogs',
             'statusLogs',
@@ -1671,7 +1773,7 @@ class CustomerController extends Controller
                 'full_address' => $fullAddress,
                 'old_region_id' => $this->cleanLegacyValue($row['old_region_id'] ?? null),
                 'old_branch_id' => $this->cleanLegacyValue($row['old_branch_id'] ?? null),
-                'registration_date' => $this->normalizeLegacyDate($row['registration_date'] ?? null) ?? now()->format('Y-m-d'),
+                'registration_date' => $this->normalizeLegacyDateTime($row['registration_date'] ?? null) ?? now()->format('Y-m-d H:i:s'),
                 'pop_id' => $pop?->id,
                 'pop_name' => $pop?->name,
                 'pop_code' => $pop?->pop_code,
@@ -2238,6 +2340,7 @@ class CustomerController extends Controller
                         'alternative_phone' => $row['alternative_phone'] ?? null,
                         'email' => $row['email'] ?? null,
                         'registration_date' => $row['registration_date'] ?? now()->format('Y-m-d'),
+                        'registered_by_name' => $row['registered_by_name'] ?? null,
                         'pop_id' => $pop?->id,
                         'distribution_id' => $distribution?->id,
                         'status' => 'registered', // Default, updated by service activation or mapping
@@ -2357,6 +2460,8 @@ class CustomerController extends Controller
                         'contract_type' => $row['contract_type'] ?? null,
                         'activation_time' => $row['activation_time'] ?? null,
                         'activated_by_name' => $row['activated_by_name'] ?? null,
+                        'admin_filter_at' => $row['admin_filter_at'] ?? null,
+                        'admin_filter_by_name' => $row['admin_filter_by'] ?? null,
                     ]);
 
                     // Survey creation
@@ -2959,6 +3064,27 @@ class CustomerController extends Controller
 
         try {
             return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Sama seperti normalizeLegacyDate(), tapi jam:menit:detik dipertahankan.
+     * Dipakai khusus registration_date — tabel Ringkasan Waktu & Penanggung
+     * Jawab di halaman detail pelanggan nampilin jam registrasi, jadi
+     * normalizeLegacyDate() yang motong ke Y-m-d bakal bikin jamnya
+     * selalu 00:00:00.
+     */
+    private function normalizeLegacyDateTime(mixed $value): ?string
+    {
+        $value = $this->cleanLegacyValue($value);
+        if ($value === null || str_starts_with($value, '0000-00-00')) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d H:i:s');
         } catch (\Throwable) {
             return null;
         }
