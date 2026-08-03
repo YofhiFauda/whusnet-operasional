@@ -14,7 +14,7 @@
             <div class="flex items-center gap-2.5 flex-wrap">
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Laporan Hasil Pemasangan</h1>
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
-                    <i class="fa-solid fa-user-check text-[10px] mr-1.5"></i> {{ $customer->full_name }}
+                    <x-ui.icon name="user-check" class="w-2.5 h-2.5 mr-1.5" /> {{ $customer->full_name }}
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -26,14 +26,14 @@
             @if($installation && $installation->started_at)
                 <!-- Real-time Timer Counter Widget — hanya relevan kalau task sudah dimulai -->
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 shadow-sm" title="Durasi Pengerjaan Pemasangan">
-                    <i class="fa-solid fa-stopwatch text-xs animate-pulse text-amber-600 dark:text-amber-400"></i>
+                    <x-ui.icon name="timer" class="w-3 h-3 animate-pulse text-amber-600 dark:text-amber-400" />
                     <span class="text-xs font-semibold">Durasi:</span>
                     <span id="timer-display" class="font-mono text-sm font-extrabold tracking-wider">00:00:00</span>
                 </div>
             @endif
 
             <a href="{{ route('verifications.queue') }}" class="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-2">
-                <i class="fa-solid fa-arrow-left text-xs"></i>
+                <x-ui.icon name="arrow-left" class="w-3 h-3" />
                 <span>Kembali ke Antrean</span>
             </a>
         </div>
@@ -54,7 +54,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/50">
-                        <i class="fa-solid fa-screwdriver-wrench text-xs"></i>
+                        <x-ui.icon name="wrench" class="w-3 h-3" />
                     </div>
                     <div>
                         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Laporan Pemasangan</h3>
@@ -116,7 +116,7 @@
                         <button type="button" onclick="goToStep(1)" id="step-nav-1" class="w-full text-left p-3 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-sm">
                             <div class="flex items-center gap-3">
                                 <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0">
-                                    <i class="fa-solid fa-check text-[10px]"></i>
+                                    <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
                                 <div class="min-w-0">
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">1. Data Diri Pelanggan</span>
@@ -129,7 +129,7 @@
                         <button type="button" onclick="goToStep(2)" id="step-nav-2" class="w-full text-left p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
                             <div class="flex items-center gap-3">
                                 <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0">
-                                    <i class="fa-solid fa-check text-[10px]"></i>
+                                    <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
                                 <div class="min-w-0">
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">2. Dokumen Lampiran</span>
@@ -142,7 +142,7 @@
                         <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
                             <div class="flex items-center gap-3">
                                 <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0">
-                                    <i class="fa-solid fa-check text-[10px]"></i>
+                                    <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
                                 <div class="min-w-0">
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">3. Layanan &amp; Paket</span>
@@ -155,7 +155,7 @@
                         <button type="button" onclick="goToStep(4)" id="step-nav-4" class="w-full text-left p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 transition-all group focus:outline-none">
                             <div class="flex items-center gap-3">
                                 <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0">
-                                    <i class="fa-solid fa-check text-[10px]"></i>
+                                    <x-ui.icon name="check" class="w-2.5 h-2.5" />
                                 </span>
                                 <div class="min-w-0">
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">4. Laporan Survey Lapangan</span>
@@ -169,7 +169,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-5">
                                     <span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                                        <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
@@ -185,7 +185,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-6">
                                     <span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                                        <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
@@ -261,12 +261,12 @@
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <i class="fa-solid fa-circle-check text-xs"></i> Sudah diupload
+                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Sudah diupload
                                     </span>
                                 @else
                                     <div class="flex flex-col justify-center py-4">
                                         <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-base mb-2">
-                                            <i class="fa-regular fa-id-card"></i>
+                                            <x-ui.icon name="id-card" class="w-4 h-4" />
                                         </div>
                                         <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto KTP</span>
                                         <span class="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">Belum diupload saat registrasi</span>
@@ -287,12 +287,12 @@
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <i class="fa-solid fa-circle-check text-xs"></i> Terlampir
+                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Terlampir
                                     </span>
                                 @else
                                     <div class="flex flex-col justify-center py-4">
                                         <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-base mb-2">
-                                            <i class="fa-solid fa-house"></i>
+                                            <x-ui.icon name="house" class="w-4 h-4" />
                                         </div>
                                         <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto Rumah</span>
                                         <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">Tidak ada di survey</span>
@@ -313,12 +313,12 @@
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <i class="fa-solid fa-circle-check text-xs"></i> Terlampir
+                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Terlampir
                                     </span>
                                 @else
                                     <div class="flex flex-col justify-center py-4">
                                         <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-base mb-2">
-                                            <i class="fa-solid fa-network-wired"></i>
+                                            <x-ui.icon name="network" class="w-4 h-4" />
                                         </div>
                                         <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto ODP</span>
                                         <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1">Tidak ada di survey</span>
@@ -413,7 +413,7 @@
                         @if($failedInstallation)
                             <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl p-4 space-y-2 shadow-sm">
                                 <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                                    <i class="fa-solid fa-triangle-exclamation text-amber-600 dark:text-amber-400"></i>
+                                    <x-ui.icon name="triangle-alert" class="w-4 h-4 text-amber-600 dark:text-amber-400" />
                                     Instruksi Revisi Pemasangan
                                 </div>
                                 <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Catatan dari Admin Verifikasi:</p>
@@ -426,7 +426,7 @@
                             <!-- Sub-section: Perangkat Aktif -->
                             <div class="space-y-3">
                                 <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <i class="fa-solid fa-microchip"></i> Informasi Perangkat Aktif
+                                    <x-ui.icon name="cpu" class="w-4 h-4" /> Informasi Perangkat Aktif
                                 </h5>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -502,7 +502,7 @@
                             <!-- Sub-section: Distribusi Jaringan -->
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
                                 <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <i class="fa-solid fa-diagram-project"></i> Distribusi Jaringan (ODP / OLT)
+                                    <x-ui.icon name="workflow" class="w-4 h-4" /> Distribusi Jaringan (ODP / OLT)
                                 </h5>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -577,7 +577,7 @@
                             <!-- Sub-section: Upload Bukti Pemasangan -->
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
                                 <h5 class="text-xs font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <i class="fa-solid fa-camera"></i> Foto Bukti Pemasangan &amp; Kontrak
+                                    <x-ui.icon name="camera" class="w-4 h-4" /> Foto Bukti Pemasangan &amp; Kontrak
                                 </h5>
 
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -585,7 +585,7 @@
                                     <div class="border-2 border-dashed @error('installation_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
                                         <div id="default-placeholder-installation_photo" class="py-3 space-y-2">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <i class="fa-solid fa-screwdriver-wrench"></i>
+                                                <x-ui.icon name="wrench" class="w-4 h-4" />
                                             </div>
                                             <div>
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO PEMASANGAN <span class="text-rose-500">*</span></span>
@@ -597,7 +597,7 @@
                                             <div class="relative inline-block w-full">
                                                 <img id="preview-img-installation_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Pemasangan">
                                                 <button type="button" onclick="clearFile('installation_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                                 </button>
                                             </div>
                                             <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
@@ -616,7 +616,7 @@
                                     <div class="border-2 border-dashed @error('contract_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
                                         <div id="default-placeholder-contract_photo" class="py-3 space-y-2">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <i class="fa-solid fa-file-contract"></i>
+                                                <x-ui.icon name="file-text" class="w-4 h-4" />
                                             </div>
                                             <div>
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO KONTRAK <span class="text-rose-500">*</span></span>
@@ -628,7 +628,7 @@
                                             <div class="relative inline-block w-full">
                                                 <img id="preview-img-contract_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Kontrak">
                                                 <button type="button" onclick="clearFile('contract_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                                 </button>
                                             </div>
                                             <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
@@ -647,7 +647,7 @@
                                     <div class="border-2 border-dashed @error('signature_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
                                         <div id="default-placeholder-signature_photo" class="py-3 space-y-2">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <i class="fa-solid fa-signature"></i>
+                                                <x-ui.icon name="signature" class="w-4 h-4" />
                                             </div>
                                             <div>
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO TTD PELANGGAN <span class="text-rose-500">*</span></span>
@@ -659,7 +659,7 @@
                                             <div class="relative inline-block w-full">
                                                 <img id="preview-img-signature_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto TTD">
                                                 <button type="button" onclick="clearFile('signature_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
                                                 </button>
                                             </div>
                                             <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
@@ -740,7 +740,7 @@
                                 <div class="border-2 border-dashed @error('speedtest_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-5 text-center transition-all shadow-sm flex flex-col justify-between relative">
                                     <div id="default-placeholder-speedtest_photo" class="py-3 space-y-2">
                                         <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
-                                            <i class="fa-solid fa-gauge-high"></i>
+                                            <x-ui.icon name="gauge" class="w-4 h-4" />
                                         </div>
                                         <div>
                                             <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO BUKTI SPEEDTEST <span class="text-rose-500">*</span></span>
@@ -752,7 +752,7 @@
                                         <div class="relative inline-block w-full">
                                             <img id="preview-img-speedtest_photo" class="max-h-36 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Speedtest">
                                             <button type="button" onclick="clearFile('speedtest_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                <i class="fa-solid fa-xmark text-xs"></i>
+                                                <x-ui.icon name="x" class="w-3 h-3" />
                                             </button>
                                         </div>
                                         <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Speedtest Terpilih</span>
@@ -777,7 +777,7 @@
                 <div class="px-4 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0">
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <button type="button" id="btn-prev" onclick="prevStep()" style="display: none;" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-chevron-left text-[10px]"></i> Sebelumnya
+                            <x-ui.icon name="chevron-left" class="w-2.5 h-2.5" /> Sebelumnya
                         </button>
                         <a href="{{ route('verifications.queue') }}" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none text-center inline-flex items-center justify-center">
                             Batal
@@ -786,11 +786,11 @@
 
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <button type="button" id="btn-next" onclick="nextStep()" class="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                            Lanjut <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            Lanjut <x-ui.icon name="chevron-right" class="w-2.5 h-2.5" />
                         </button>
 
                         <button type="button" onclick="handleSubmit()" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                            <i class="fa-solid fa-paper-plane text-xs"></i> Simpan &amp; Laporkan Pemasangan
+                            <x-ui.icon name="send" class="w-3 h-3" /> Simpan &amp; Laporkan Pemasangan
                         </button>
                     </div>
                 </div>
@@ -1010,7 +1010,7 @@
         if (requiredMissing.length > 0) {
             statusSpan.textContent = 'Belum Lengkap';
             statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><i class="fa-solid fa-xmark text-[10px]"></i></span>`;
+            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><x-ui.icon name="x" class="w-2.5 h-2.5" /></span>`;
             missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
 
             if (currentActiveStep !== step) {
@@ -1019,7 +1019,7 @@
         } else {
             statusSpan.textContent = 'Lengkap';
             statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-check text-[10px]"></i></span>`;
+            iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0"><x-ui.icon name="check" class="w-2.5 h-2.5" /></span>`;
             missingSpan.textContent = 'Semua terisi';
 
             if (currentActiveStep !== step) {

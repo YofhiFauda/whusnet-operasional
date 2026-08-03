@@ -129,6 +129,27 @@ class PaymentController extends Controller
     }
 
     /**
+     * Struk/kwitansi cetak untuk satu pembayaran.
+     *
+     * Dipakai tombol "Cetak Struk" di Modal Hub List Pelanggan dan dari detail
+     * pembayaran. Scope POP dicek ulang di sini — struk memuat identitas dan
+     * nominal pelanggan, jadi tidak boleh bisa dibuka lintas cabang cuma karena
+     * ID pembayarannya ketebak.
+     */
+    public function receipt(Payment $payment): View
+    {
+        abort_unless(
+            Payment::query()->applyUserScope()->whereKey($payment->id)->exists(),
+            403,
+            'Anda tidak memiliki akses ke pembayaran POP ini.'
+        );
+
+        $payment->load(['invoice.internetPackage', 'customer', 'pop', 'receiver']);
+
+        return view('payments.receipt', compact('payment'));
+    }
+
+    /**
      * Show payment input form for an invoice.
      */
     public function create(Invoice $invoice): View

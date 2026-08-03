@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DocumentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\PaymentStatus;
@@ -132,7 +133,7 @@ class CustomerController extends Controller
                 'city_id', 'district_id', 'village_id', 'internet_package_id',
                 'created_at', 'updated_at',
             ])
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice']);
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment']);
 
         // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
         // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
@@ -1283,14 +1284,19 @@ class CustomerController extends Controller
         $recentPayments = Payment::where('customer_id', $customer->id)
             ->with('invoice:id,invoice_number')
             ->orderByDesc('payment_date')
+            ->orderByDesc('id')
             ->take(3)
             ->get()
             ->map(function ($p) {
                 return [
+                    'id' => $p->id,
                     'date' => IndonesianDate::date($p->payment_date),
                     'amount' => (float) $p->amount,
                     'method' => ucfirst($p->payment_method),
                     'invoice_number' => $p->invoice?->invoice_number ?? '-',
+                    // Struk dicetak per pembayaran, bukan per invoice — satu invoice
+                    // bisa dicicil beberapa kali dan tiap setoran punya struk sendiri.
+                    'receipt_url' => route('payments.receipt', $p->id),
                 ];
             });
 
@@ -1302,6 +1308,30 @@ class CustomerController extends Controller
         $lat = $address?->latitude;
         $lng = $address?->longitude;
         $mapsUrl = ($lat && $lng) ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}" : null;
+
+        // Berkas KTP & Foto Rumah untuk kartu pratinjau di tab Profil & Berkas.
+        // Yang dikirim cuma dokumen TERBARU per tipe: kartu di modal hanya ruang
+        // untuk satu pratinjau, riwayat lengkapnya tetap di halaman Detail.
+        $latestDocuments = $customer->documents()
+            ->whereIn('document_type', [DocumentType::KTP->value, DocumentType::RUMAH->value])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('document_type')
+            ->map(fn ($docs) => $docs->first());
+
+        $documentPayload = collect([DocumentType::KTP->value, DocumentType::RUMAH->value])
+            ->mapWithKeys(function (string $type) use ($latestDocuments) {
+                $doc = $latestDocuments->get($type);
+
+                return [$type => [
+                    'exists' => $doc !== null,
+                    // URL file selalu lewat controller (cek permission + POP scope),
+                    // jangan pernah bikin URL storage langsung yang bisa ditebak.
+                    'url' => $doc ? route('customers.documents.show', $doc->id) : null,
+                    'uploaded_at' => $doc ? IndonesianDate::date($doc->created_at) : null,
+                ]];
+            });
 
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
@@ -1330,6 +1360,8 @@ class CustomerController extends Controller
                 'maps_url' => $mapsUrl,
             ],
             'recent_payments' => $recentPayments,
+            'documents' => $documentPayload,
+            'documents_upload_url' => route('customers.documents.store', $customer->id),
             'completeness' => [
                 'percentage' => $completeness['percentage'],
                 'missing_required' => $completeness['missing_required'],

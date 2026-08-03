@@ -203,10 +203,15 @@ class CustomerVerificationController extends Controller
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.validate'), 403);
 
         // Hanya field yang benar-benar diinput admin yang divalidasi di sini.
-        // subtotal/discount/ppn/prorate_amount/total_amount memang dikirim form
-        // (input readonly hasil hitungan JavaScript), tapi SENGAJA tidak dipakai —
-        // readonly cuma penghalang UI, POST manual bisa mengirim nominal apa pun.
-        // Nominal otoritatif dihitung ulang di InitialInvoiceService di bawah.
+        // subtotal/discount/ppn/total_amount memang dikirim form (input readonly
+        // hasil hitungan JavaScript), tapi SENGAJA tidak dipakai — readonly cuma
+        // penghalang UI, POST manual bisa mengirim nominal apa pun. Nominal
+        // otoritatif dihitung ulang di InitialInvoiceService di bawah.
+        //
+        // `prorate_amount_override` PENGECUALIAN: admin boleh menimpa hasil
+        // hitung prorata otomatis (nego harga / koreksi pembulatan). Server
+        // tetap menjaga floor 0 lewat InitialInvoiceService::calculate() —
+        // jangan biarkan negatif lolos ke invoice.
         //
         // `billing_period` dan `due_date` juga tidak lagi diterima dari klien:
         // keduanya turunan matematis dari tanggal aktivasi, bukan keputusan
@@ -221,6 +226,7 @@ class CustomerVerificationController extends Controller
             'extra_cable_fee' => 'nullable|numeric|min:0',
             'extra_pole_fee' => 'nullable|numeric|min:0',
             'other_fee' => 'nullable|numeric|min:0',
+            'prorate_amount_override' => 'nullable|numeric|min:0',
         ]);
 
         $service = $customer->customerService;

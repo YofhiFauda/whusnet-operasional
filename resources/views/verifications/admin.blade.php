@@ -765,7 +765,7 @@
                             <label for="issue_date" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">TANGGAL AKTIVASI <span class="text-red-500">*</span></label>
                             <input type="date" name="issue_date" id="issue_date"
                                 class="w-full text-sm px-3 py-2.5 border border-border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 bg-surface text-text-main"
-                                required value="{{ old('issue_date', date('Y-m-d')) }}" onchange="calculateFees()">
+                                required value="{{ old('issue_date', date('Y-m-d')) }}" onchange="resetProrateOverride(); calculateFees();">
                             <p class="text-[10px] text-text-muted mt-1">
                                 Menentukan tagihan prorata, periode tagihan (<span id="derived_period_info" class="font-semibold text-text-secondary">—</span>),
                                 dan jatuh tempo. Tagihan pertama dibayar saat aktivasi, jadi jatuh temponya tanggal ini juga.
@@ -773,18 +773,22 @@
                         </div>
 
                         <div class="border-t border-border pt-5">
-                            <h5 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Biaya Sekali Bayar</h5>
-
-                            {{-- Nominal turunan (prorata, subtotal, diskon, PPN, total) TIDAK lagi
-                                 jadi input. Server menghitung ulang semuanya di InitialInvoiceService
-                                 dan mengabaikan kiriman klien, jadi input readonly cuma bikin admin
+                            {{-- Nominal turunan (subtotal, diskon, PPN, total) TIDAK jadi input.
+                                 Server menghitung ulang semuanya di InitialInvoiceService dan
+                                 mengabaikan kiriman klien, jadi input readonly cuma bikin admin
                                  ragu-ragu memverifikasi aritmatika yang bukan urusannya. Angkanya
                                  tampil di kwitansi di bawah. Basis prorata dan parameter layanan
-                                 dititipkan di data-* — bukan <input>, supaya tidak ikut ter-POST. --}}
+                                 dititipkan di data-* — bukan <input>, supaya tidak ikut ter-POST.
+                                 SATU pengecualian: biaya berlangganan (prorata) di bawah — server
+                                 tetap menghitung ulang otomatis, tapi admin boleh menimpanya untuk
+                                 kasus nego harga / koreksi pembulatan (lihat
+                                 InitialInvoiceService::calculate()). --}}
                             <div id="billing_params" class="hidden"
                                 data-monthly-price="{{ $service->monthly_price ?? 0 }}"
                                 data-discount="{{ $service->discount ?? 0 }}"
                                 data-ppn="{{ $service->ppn ?? 0 }}"></div>
+
+                            <h5 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Biaya Sekali Bayar</h5>
 
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                                 <div>
@@ -830,10 +834,31 @@
                                 </div>
                             </div>
 
-                            {{-- KWITANSI. Bahasa manusia, bukan kalkulator: "10 dari 31 hari"
-                                 menjelaskan prorata tanpa menyebut kata prorata. Baris terakhir
-                                 menjawab pertanyaan pelanggan yang paling sering ("bulan depan
-                                 bayar berapa?") tanpa admin perlu menghitung sendiri. --}}
+                            <div class="mb-5">
+                                <label for="fv_prorate_amount" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">BIAYA BERLANGGANAN (PRORATA)</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
+                                    {{-- Terisi otomatis dari hitungan prorata (hari aktif / hari
+                                         sebulan × harga paket) tiap kali TANGGAL AKTIVASI berubah.
+                                         Admin bisa mengedit manual untuk berjaga-jaga (nego harga,
+                                         koreksi pembulatan) — sekali diedit manual, nilainya tidak
+                                         ditimpa ulang oleh perhitungan otomatis kecuali tanggal
+                                         aktivasi diganti lagi. Server tetap validasi >= 0 di
+                                         InitialInvoiceService; kosongkan untuk kembali ke hasil
+                                         hitung otomatis. --}}
+                                    <input type="number" step="0.01" min="0" name="prorate_amount_override" id="fv_prorate_amount"
+                                        class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                        value="{{ old('prorate_amount_override', '') }}" oninput="onProrateManualEdit()">
+                                </div>
+                                <p class="text-[10px] text-text-muted mt-1">Otomatis dari prorata (<span id="prorate_auto_hint">—</span>). Bisa diedit manual bila perlu.</p>
+                            </div>
+
+                            {{-- KWITANSI. Bahasa manusia, bukan kalkulator: "ditagih 30 hari
+                                 (2–31 Agu 2026)" menjelaskan prorata pakai rentang tanggal, bukan
+                                 cuma "30 dari 31 hari" yang ambigu (kenapa bukan 31?). Baris
+                                 terakhir menjawab pertanyaan pelanggan yang paling sering
+                                 ("bulan depan bayar berapa?") tanpa admin perlu menghitung
+                                 sendiri. --}}
                             <div class="mt-6 rounded-xl border border-border bg-surface-muted dark:bg-transparent p-5">
                                 <p id="kwitansi_header" class="text-xs font-semibold text-text-muted mb-4">—</p>
 
@@ -1070,6 +1095,20 @@
     const rupiah = (n) => 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n * 100) / 100);
     const namaBulan = (d) => new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(d);
 
+    // Admin mengedit field prorata manual → tandai dirty supaya calculateFees()
+    // berhenti menimpanya, sampai tanggal aktivasi diganti lagi
+    // (resetProrateOverride, dipanggil dari onchange issue_date).
+    function onProrateManualEdit() {
+        document.getElementById('fv_prorate_amount').dataset.dirty = '1';
+        calculateFees();
+    }
+
+    function resetProrateOverride() {
+        const el = document.getElementById('fv_prorate_amount');
+        delete el.dataset.dirty;
+        el.value = '';
+    }
+
     function calculateFees() {
         // Parameter layanan dititipkan di data-* supaya tidak ikut ter-POST.
         const params = document.getElementById('billing_params').dataset;
@@ -1082,9 +1121,12 @@
         const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
         const otherFee = parseFloat(document.getElementById('fv_other_fee').value) || 0;
 
-        // Calculate Prorate
+        // Calculate Prorate (auto). Nilai final dipakai kwitansi diambil dari
+        // input fv_prorate_amount — auto-filled di sini kecuali admin sudah
+        // edit manual (dataset.dirty), lihat onProrateManualEdit().
+        const prorateInput = document.getElementById('fv_prorate_amount');
         const issueDateInput = document.getElementById('issue_date').value;
-        let prorateAmount = 0;
+        let autoProrateAmount = 0;
         let daysActive = 0;
         let daysInMonth = 30;
 
@@ -1100,20 +1142,36 @@
             // terakhir bulan ditagih sebulan penuh. Wajib identik dengan
             // App\Services\InitialInvoiceService::calculate().
             daysActive = daysInMonth - date;
-            if (daysActive <= 0) {
+            const isFullMonthEdgeCase = daysActive <= 0;
+            if (isFullMonthEdgeCase) {
                 daysActive = daysInMonth;
             }
 
             // Prorate formula = (daysActive / daysInMonth) * baseMonthly
-            prorateAmount = Math.round((daysActive / daysInMonth) * baseMonthly);
+            autoProrateAmount = Math.round((daysActive / daysInMonth) * baseMonthly);
 
             const bulanAktivasi = namaBulan(issueDateObj);
-            const tanggalAktivasi = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(issueDateObj);
+            const fmtTanggal = (d) => new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+            const tanggalAktivasi = fmtTanggal(issueDateObj);
+
+            // Rentang hari yang benar-benar ditagih: mulai sehari setelah
+            // aktivasi (hari aktivasi gratis) sampai akhir bulan. Kasus
+            // aktivasi di hari terakhir bulan itu pengecualian — bukan rentang
+            // tanggal, tapi sebulan penuh (lihat komentar di atas & docblock
+            // InitialInvoiceService::calculate()).
+            let periodeTagihanText;
+            if (isFullMonthEdgeCase) {
+                periodeTagihanText = `1 bulan penuh (aktivasi di hari terakhir bulan, bukan dihitung per hari)`;
+            } else {
+                const mulaiTagih = new Date(year, month, date + 1);
+                const akhirBulan = new Date(year, month, daysInMonth);
+                periodeTagihanText = `${daysActive} hari (${fmtTanggal(mulaiTagih)}–${fmtTanggal(akhirBulan)})`;
+            }
 
             document.getElementById('kwitansi_header').textContent =
-                `Aktif ${tanggalAktivasi} · ditagih ${daysActive} dari ${daysInMonth} hari`;
+                `Aktif ${tanggalAktivasi} (hari aktivasi gratis) · ditagih ${periodeTagihanText}`;
             document.getElementById('kwitansi_langganan_label').textContent =
-                `Langganan ${bulanAktivasi} (${daysActive} dari ${daysInMonth} hari)`;
+                `Langganan ${bulanAktivasi} — ditagih ${periodeTagihanText}`;
 
             // Periode & jatuh tempo tidak lagi diinput admin — tampilkan hasil
             // turunannya supaya tetap terlihat sebelum submit.
@@ -1131,8 +1189,16 @@
             document.getElementById('kwitansi_bulan_depan').textContent =
                 `Mulai ${namaBulan(bulanDepanObj)}: ${rupiah(nextMonthAmount)}/bulan, jatuh tempo tanggal 10.`;
         } else {
-            prorateAmount = baseMonthly;
+            autoProrateAmount = baseMonthly;
         }
+
+        document.getElementById('prorate_auto_hint').textContent = rupiah(autoProrateAmount);
+
+        // Auto-fill field prorata kecuali admin sudah edit manual (dirty).
+        if (!prorateInput.dataset.dirty) {
+            prorateInput.value = autoProrateAmount;
+        }
+        const prorateAmount = parseFloat(prorateInput.value) || 0;
 
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di

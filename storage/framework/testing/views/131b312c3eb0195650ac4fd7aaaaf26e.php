@@ -994,7 +994,6 @@
                         <div class="flex justify-between gap-4"><dt>Pindah baris</dt><dd><kbd class="kbd">&uarr;</kbd> <kbd class="kbd">&darr;</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Baris pertama / terakhir</dt><dd><kbd class="kbd">Home</kbd> <kbd class="kbd">End</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Halaman sebelum / sesudah</dt><dd><kbd class="kbd">PgUp</kbd> <kbd class="kbd">PgDn</kbd></dd></div>
-                        <div class="flex justify-between gap-4"><dt>Pilih / lepas baris</dt><dd><kbd class="kbd">Space</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Buka menu aksi baris</dt><dd><kbd class="kbd">Enter</kbd></dd></div>
                     </dl>
                 </div>
@@ -1002,7 +1001,6 @@
                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Global</p>
                     <dl class="space-y-1.5">
                         <div class="flex justify-between gap-4"><dt>Fokus pencarian global</dt><dd><kbd class="kbd">/</kbd></dd></div>
-                        <div class="flex justify-between gap-4"><dt>Tambah pelanggan baru</dt><dd><kbd class="kbd">Alt</kbd> + <kbd class="kbd">N</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Tutup menu / modal</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Buka bantuan ini</dt><dd><kbd class="kbd">?</kbd></dd></div>
                     </dl>

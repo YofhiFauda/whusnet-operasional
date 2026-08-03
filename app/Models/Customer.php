@@ -226,6 +226,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasOne<Payment, $this>
+     */
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->latestOfMany('payment_date');
+    }
+
+    /**
      * @return HasMany<CustomerSurvey, $this>
      */
     public function surveys(): HasMany

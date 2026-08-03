@@ -14,7 +14,7 @@
             <div class="flex items-center gap-2.5 flex-wrap">
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Registrasi Pelanggan Baru</h1>
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
-                    <i class="fa-solid fa-wand-magic-sparkles text-[10px] mr-1.5"></i> Form Wizard
+                    <x-ui.icon name="sparkles" class="w-2.5 h-2.5 mr-1.5" /> Form Wizard
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -24,7 +24,7 @@
 
         <div class="flex items-center gap-2">
             <a href="{{ route('customers.index') }}" class="px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-2">
-                <i class="fa-solid fa-arrow-left text-xs"></i>
+                <x-ui.icon name="arrow-left" class="w-3 h-3" />
                 <span>Kembali ke List</span>
             </a>
         </div>
@@ -39,7 +39,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800/50">
-                        <i class="fa-solid fa-list-check text-xs"></i>
+                        <x-ui.icon name="list-checks" class="w-3 h-3" />
                     </div>
                     <div>
                         <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Formulir Registrasi</h3>
@@ -90,7 +90,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-1">
                                     <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                        <x-ui.icon name="x" class="w-3 h-3" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
@@ -106,7 +106,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-2">
                                     <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                        <x-ui.icon name="x" class="w-3 h-3" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
@@ -122,7 +122,7 @@
                             <div class="flex items-start gap-3">
                                 <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
                                     <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <i class="fa-solid fa-xmark text-xs"></i>
+                                        <x-ui.icon name="x" class="w-3 h-3" />
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
@@ -289,7 +289,7 @@
                             <div class="border-2 border-dashed @error('foto_ktp') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-2xl p-6 text-center transition-all shadow-sm relative group">
                                 <div id="default-placeholder-foto_ktp" class="py-6 space-y-3">
                                     <div class="w-14 h-14 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-2xl border border-sky-200 dark:border-sky-800">
-                                        <i class="fa-regular fa-id-card"></i>
+                                        <x-ui.icon name="id-card" class="w-4 h-4" />
                                     </div>
                                     <div>
                                         <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">UPLOAD FOTO KTP <span class="text-rose-500">*</span></span>
@@ -302,18 +302,18 @@
                                     <div class="relative inline-block">
                                         <img id="preview-img-foto_ktp" class="max-h-48 max-w-full rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-md" src="" alt="Preview Foto KTP">
                                         <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-3 -right-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus Foto KTP">
-                                            <i class="fa-solid fa-xmark text-xs"></i>
+                                            <x-ui.icon name="x" class="w-3 h-3" />
                                         </button>
                                     </div>
                                     <span class="block text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-3 flex items-center gap-1.5">
-                                        <i class="fa-solid fa-circle-check text-xs"></i> File KTP Siap Diunggah
+                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> File KTP Siap Diunggah
                                     </span>
                                 </div>
 
                                 <div class="mt-4">
                                     <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
                                     <label for="foto_ktp" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-5 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        <i class="fa-solid fa-upload text-xs"></i>
+                                        <x-ui.icon name="upload" class="w-3 h-3" />
                                         <span>Pilih File Gambar</span>
                                     </label>
                                     <span id="file-label-foto_ktp" class="block text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
@@ -383,7 +383,7 @@
                         <div id="layanan-breakdown-card" class="bg-sky-50/70 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/60 rounded-xl p-4 sm:p-5 space-y-3">
                             <div class="flex items-center justify-between border-b border-sky-200/60 dark:border-sky-800/50 pb-2">
                                 <span class="text-xs font-bold text-sky-900 dark:text-sky-200 uppercase tracking-wider flex items-center gap-1.5">
-                                    <i class="fa-solid fa-calculator text-sky-600 dark:text-sky-400"></i> Ringkasan Biaya Bulanan
+                                    <x-ui.icon name="calculator" class="w-4 h-4 text-sky-600 dark:text-sky-400" /> Ringkasan Biaya Bulanan
                                 </span>
                                 <span class="text-[10px] text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded font-semibold">Live Preview</span>
                             </div>
@@ -411,7 +411,7 @@
                 <div class="px-4 sm:px-7 py-3.5 sm:py-4 bg-slate-50/90 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-700/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0">
                         <div class="flex items-center gap-2 w-full sm:w-auto">
                             <button type="button" id="btn-prev" onclick="prevStep()" style="display: none;" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                                <i class="fa-solid fa-chevron-left text-[10px]"></i> Sebelumnya
+                                <x-ui.icon name="chevron-left" class="w-2.5 h-2.5" /> Sebelumnya
                             </button>
                             <a href="{{ route('customers.index') }}" class="w-full sm:w-auto px-4 py-2.5 sm:py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer focus:outline-none text-center inline-flex items-center justify-center">
                                 Batal
@@ -420,11 +420,11 @@
                         
                         <div class="flex items-center gap-2 w-full sm:w-auto">
                             <button type="button" id="btn-next" onclick="nextStep()" class="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                                Lanjut <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                                Lanjut <x-ui.icon name="chevron-right" class="w-2.5 h-2.5" />
                             </button>
 
                             <button type="submit" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                                <i class="fa-solid fa-floppy-disk text-xs"></i> Simpan Registrasi
+                                <x-ui.icon name="save" class="w-3 h-3" /> Simpan Registrasi
                             </button>
                         </div>
                 </div>
@@ -674,7 +674,7 @@
         if (requiredMissing.length > 0) {
             statusSpan.textContent = 'Belum Lengkap';
             statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-rose-600 dark:text-rose-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><i class="fa-solid fa-xmark text-xs"></i></span>`;
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400"><x-ui.icon name="x" class="w-3 h-3" /></span>`;
             missingSpan.textContent = 'Wajib diisi: ' + requiredMissing.join(', ');
 
             if (currentActiveStep !== step) {
@@ -683,7 +683,7 @@
         } else if (optionalMissing.length > 0) {
             statusSpan.textContent = 'Kekurangan Data';
             statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-amber-600 dark:text-amber-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400"><i class="fa-solid fa-exclamation text-xs"></i></span>`;
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400"><x-ui.icon name="circle-alert" class="w-3 h-3" /></span>`;
             missingSpan.textContent = 'Kurang: ' + optionalMissing.join(', ');
 
             if (currentActiveStep !== step) {
@@ -692,7 +692,7 @@
         } else {
             statusSpan.textContent = 'Lengkap';
             statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mt-0.5';
-            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center"><i class="fa-solid fa-check text-xs"></i></span>`;
+            iconDiv.innerHTML = `<span class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center"><x-ui.icon name="check" class="w-3 h-3" /></span>`;
             missingSpan.textContent = 'Semua data terisi';
 
             if (currentActiveStep !== step) {

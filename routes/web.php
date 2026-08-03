@@ -176,6 +176,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:payments.view')->group(function () {
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        // Struk/kwitansi cetak — didaftarkan SEBELUM /payments/{payment} biar
+        // segmen 'kwitansi' tidak ketelan route dynamic di atasnya.
+        Route::get('/payments/{payment}/kwitansi', [PaymentController::class, 'receipt'])->name('payments.receipt');
         Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
     });
 

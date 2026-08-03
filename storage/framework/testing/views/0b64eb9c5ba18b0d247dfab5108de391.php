@@ -1,9 +1,4 @@
 <?php
-    // $statusGroup dikirim controller (bisa dari query string DI /customers,
-    // atau di-paksa 'terminated'/'failed' oleh CustomerTerminatedController/
-    // CustomerFailedController yang URL-nya /customers/terminated|failed —
-    // gak ada query string status_group di URL itu). JANGAN dibaca ulang
-    // dari request()->query() di sini, bakal nimpa nilai forced-nya jadi ''.
     $pageTitle = match ($statusGroup) {
         'failed' => 'Pelanggan Gagal',
         'terminated' => 'Pelanggan Putus',
@@ -25,42 +20,71 @@
     .toggle-checkbox:not(:checked) + .toggle-label .check-icon { display: none; }
     .toggle-checkbox:not(:checked) + .toggle-label .x-icon { display: block; }
 
-    /*
-     * Kerapatan tabel. Default LONGGAR; "rapat" untuk melihat lebih banyak baris.
-     * Selektor ID supaya menang atas utility Tailwind tanpa !important.
-     */
-    #customerTable tbody td { padding-top: 14px; padding-bottom: 14px; }
-    html.density-compact #customerTable tbody td { padding-top: 8px; padding-bottom: 8px; }
+    /* Custom scrollbar & mobile tab scrollbar */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* Baris aktif navigasi keyboard — harus terlihat tanpa mengandalkan hover. */
+    /* Compact table padding override */
+    #customerTable tbody td { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    html.density-compact #customerTable tbody td { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+
+    /* Baris aktif navigasi keyboard */
     #customerTable tbody tr.row-active { outline: 2px solid #0284c7; outline-offset: -2px; }
     html.dark #customerTable tbody tr.row-active { outline-color: #38bdf8; }
+
+    /* Touch target minimum height for mobile accessibility */
+    .touch-target { min-height: 40px; }
+
+    /* Keyframe Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+        0% { opacity: 0; transform: scale(0.9); }
+        65% { transform: scale(1.03); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes pulseGlow {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(1.25); }
+    }
+    .animate-fade-in { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
+
+    .btn-interactive { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    .btn-interactive:hover { transform: translateY(-1px); }
+    .btn-interactive:active { transform: translateY(0) scale(0.98); }
+
+    .card-interactive { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    .card-interactive:hover { transform: translateY(-2px); }
 </style>
 
 
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
     <div>
         <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight"><?php echo e($pageTitle); ?></h1>
-        <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola data pelanggan, status layanan internet, penagihan, dan verifikasi dokumen.</p>
+        <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola data pelanggan, jaringan distribusi, status layanan internet, dan penagihan.</p>
     </div>
     <div class="flex items-center gap-2.5 flex-wrap shrink-0">
         <?php if(auth()->user()->hasPermission('customers.import.view')): ?>
         <a href="/customers/import"
-           class="h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
-                  text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60
-                  text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer">
+           class="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900
+                  text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800
+                  text-xs font-semibold inline-flex items-center gap-2 transition-all shadow-sm">
             <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m17 8-5-5-5 5"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
             </svg>
             <span>Import Pelanggan</span>
         </a>
         <?php endif; ?>
         <?php if(auth()->user()->hasPermission('customers.create')): ?>
         <a href="/customers/create"
-           class="h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white
-                  text-xs font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer">
+           class="h-9 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 text-white
+                  text-xs font-semibold inline-flex items-center gap-2 transition-all shadow-md shadow-sky-600/20 active:scale-95">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
             </svg>
             <span>Tambah Pelanggan</span>
         </a>
@@ -68,85 +92,116 @@
     </div>
 </div>
 
+<!-- Modern Stats Summary Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+    <!-- Total -->
+    <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Pelanggan</p>
+            <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1"><?php echo e(number_format($totalCustomers)); ?></h3>
+            <p class="text-[10px] text-slate-500 mt-0.5">Terdaftar dalam sistem</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        </div>
+    </div>
 
-<div class="summary-strip mb-5 flex-col sm:flex-row">
-    <div class="summary-col">
-        <span class="summary-label">Total Pelanggan</span>
-        <span class="summary-value"><?php echo e(number_format($totalCustomers)); ?></span>
-        <span class="summary-sub">Seluruh data terdaftar</span>
+    <!-- Aktif -->
+    <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Layanan Aktif</p>
+            <h3 class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1"><?php echo e(number_format($statusCounts['active'] ?? 0)); ?></h3>
+            <p class="text-[10px] text-slate-500 mt-0.5">Berlangganan lancar</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
     </div>
-    <div class="summary-col">
-        <span class="summary-label">Pelanggan Aktif</span>
-        <span class="summary-value success"><?php echo e(number_format($statusCounts['active'] ?? 0)); ?></span>
-        <span class="summary-sub">Langganan berjalan</span>
+
+    <!-- Isolir -->
+    <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Isolir / Suspend</p>
+            <h3 class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1"><?php echo e(number_format($statusCounts['suspended'] ?? 0)); ?></h3>
+            <p class="text-[10px] text-slate-500 mt-0.5">Penangguhan sementara</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
     </div>
-    <div class="summary-col">
-        <span class="summary-label">Pelanggan Isolir</span>
-        <span class="summary-value purple"><?php echo e(number_format($statusCounts['suspended'] ?? 0)); ?></span>
-        <span class="summary-sub">Diblokir billing / admin</span>
-    </div>
-    <div class="summary-col">
-        <span class="summary-label">Lewat Tempo</span>
-        <span class="summary-value error"><?php echo e(number_format($overdueCount ?? 0)); ?></span>
-        <span class="summary-sub">Tagihan belum terbayar</span>
+
+    <!-- Lewat Tempo -->
+    <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lewat Tempo</p>
+            <h3 class="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1"><?php echo e(number_format($overdueCount ?? 0)); ?></h3>
+            <p class="text-[10px] text-slate-500 mt-0.5">Menunggu pembayaran</p>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
     </div>
 </div>
 
 
-<div class="space-y-3 mb-5">
+<div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 shadow-sm space-y-3 mb-5">
 
-    
+    <!-- Status Tabs & Search Row -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-
-        
-        <div class="flex items-center p-1 bg-slate-200/60 dark:bg-slate-900/60 rounded-lg w-fit text-xs font-semibold">
+        <!-- Status Tabs Filter -->
+        <div class="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit text-xs font-semibold">
             <a href="<?php echo e(route('customers.index')); ?>"
-               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
-                      <?php echo e($status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+               class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
+                      <?php echo e($status === '' && empty($statusGroup) ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'); ?>">
                 <span>Semua</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             <?php echo e($status === '' && empty($statusGroup) ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($totalCustomers); ?></span>
+                             <?php echo e($status === '' && empty($statusGroup) ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($totalCustomers); ?></span>
             </a>
             <a href="<?php echo e(route('customers.index', ['status' => 'active'])); ?>"
-               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
-                      <?php echo e($status === 'active' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+               class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
+                      <?php echo e($status === 'active' ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'); ?>">
                 <span>Aktif</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             <?php echo e($status === 'active' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($statusCounts['active'] ?? 0); ?></span>
+                             <?php echo e($status === 'active' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($statusCounts['active'] ?? 0); ?></span>
             </a>
             <a href="<?php echo e(route('customers.index', ['status' => 'suspended'])); ?>"
-               class="px-4 py-2 rounded-md transition-all flex items-center gap-2 cursor-pointer
-                      <?php echo e($status === 'suspended' ? 'bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+               class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
+                      <?php echo e($status === 'suspended' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'); ?>">
                 <span>Isolir</span>
                 <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
-                             <?php echo e($status === 'suspended' ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($statusCounts['suspended'] ?? 0); ?></span>
+                             <?php echo e($status === 'suspended' ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400' : 'bg-slate-200/60 dark:bg-slate-700 text-slate-600 dark:text-slate-300'); ?>"><?php echo e($statusCounts['suspended'] ?? 0); ?></span>
             </a>
         </div>
 
-        
-        
-        <form action="<?php echo e(url()->current()); ?>" method="GET" id="searchForm" class="relative flex-1 max-w-md">
-            <?php if($statusGroup !== ''): ?>
-                <input type="hidden" name="status_group" value="<?php echo e($statusGroup); ?>">
-            <?php endif; ?>
-            <?php if($status !== ''): ?>
-                <input type="hidden" name="status" value="<?php echo e($status); ?>">
-            <?php endif; ?>
-            <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/>
-            </svg>
-            <input type="text" name="search" id="search" value="<?php echo e($search); ?>"
-               placeholder="Cari nama, CID, No HP, Desa, atau ID..."
-               class="w-full pl-11 pr-4 h-[38px] rounded-full border border-slate-200 dark:border-slate-700
-                      bg-white dark:bg-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-100
-                      placeholder-slate-400 dark:placeholder-slate-500
-                      focus:outline-none focus:border-sky-600 dark:focus:border-sky-500
-                      focus:ring-2 focus:ring-sky-600/12 transition-all">
-        </form>
+        <!-- Search & Density Control -->
+        <div class="flex items-center gap-3">
+            <form action="<?php echo e(url()->current()); ?>" method="GET" id="searchForm" class="relative flex-1 max-w-md">
+                <?php if($statusGroup !== ''): ?>
+                    <input type="hidden" name="status_group" value="<?php echo e($statusGroup); ?>">
+                <?php endif; ?>
+                <?php if($status !== ''): ?>
+                    <input type="hidden" name="status" value="<?php echo e($status); ?>">
+                <?php endif; ?>
+                <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" name="search" id="search" value="<?php echo e($search); ?>"
+                       placeholder="Cari Nama, CID, HP, atau Desa..."
+                       class="w-full h-9 pl-10 pr-4 rounded-full border border-slate-200 dark:border-slate-700
+                              bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-800 dark:text-slate-100
+                              placeholder-slate-400 dark:placeholder-slate-500
+                              focus:outline-none focus:bg-white dark:focus:bg-slate-800 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all">
+            </form>
+
+            <div class="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                <div class="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-[11px] font-medium">
+                    <button type="button" onclick="setDensity('comfortable')" id="density-comfortable" class="px-2.5 py-1 rounded-lg transition-all">Longgar</button>
+                    <button type="button" onclick="setDensity('compact')" id="density-compact" class="px-2.5 py-1 rounded-lg transition-all">Rapat</button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    
-    <form action="<?php echo e(url()->current()); ?>" method="GET" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5" id="filterForm">
+    <!-- Multi Dropdown Filters Grid -->
+    <form action="<?php echo e(url()->current()); ?>" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800" id="filterForm">
         <?php if($statusGroup !== ''): ?>
             <input type="hidden" name="status_group" value="<?php echo e($statusGroup); ?>">
         <?php endif; ?>
@@ -203,10 +258,8 @@
 
         
         <select name="package_id" id="package_id" onchange="this.form.submit()"
-                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
-                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
-                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
-            <option value="">Semua Paket</option>
+                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="">Semua Paket Internet</option>
             <?php $__currentLoopData = $packages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <option value="<?php echo e($package->id); ?>" <?php echo e($packageId == $package->id ? 'selected' : ''); ?>><?php echo e($package->package_code); ?> - <?php echo e($package->name); ?></option>
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -214,10 +267,8 @@
 
         
         <select name="completeness_status" id="completeness_status" onchange="this.form.submit()"
-                class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700
-                       text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800
-                       focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
-            <option value="">Semua Kelengkapan</option>
+                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="">Semua Kelengkapan Berkas</option>
             <option value="draft" <?php echo e($completenessStatus === 'draft' ? 'selected' : ''); ?>>Draft</option>
             <option value="perlu_dilengkapi" <?php echo e($completenessStatus === 'perlu_dilengkapi' ? 'selected' : ''); ?>>Perlu Dilengkapi</option>
             <option value="lengkap" <?php echo e($completenessStatus === 'lengkap' ? 'selected' : ''); ?>>Lengkap</option>
@@ -225,55 +276,24 @@
         </select>
 
         
-        <div class="col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
+        <div class="col-span-1 sm:col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
             <a href="<?php echo e(url()->current()); ?>"
-               class="h-[38px] px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800
-                      text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700
-                      text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
-                <svg class="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
-                </svg>
-                Reset
+               class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Reset Filter</span>
             </a>
         </div>
     </form>
-
-    
-    <div class="flex items-center justify-between gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-        <div class="flex items-center gap-1.5">
-            <span class="hidden sm:inline">Kerapatan</span>
-            <div class="flex items-center p-0.5 bg-slate-200/60 dark:bg-slate-900/60 rounded-lg font-semibold">
-                <button type="button" onclick="setDensity('comfortable')" id="density-comfortable" class="px-2.5 py-1 rounded-md transition-colors">Longgar</button>
-                <button type="button" onclick="setDensity('compact')" id="density-compact" class="px-2.5 py-1 rounded-md transition-colors">Rapat</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- BULK ACTION BAR -->
-<div id="bulkBar" class="hidden items-center justify-between gap-3 px-4 py-2.5 rounded-lg bg-sky-50 dark:bg-sky-900/30 border border-sky-200 dark:border-sky-700 mb-4">
-    <div class="flex items-center gap-3 text-xs">
-        <span class="font-semibold text-sky-700 dark:text-sky-300">
-            <span id="bulkCount" class="font-mono">0</span> baris dipilih
-        </span>
-        <button type="button" onclick="clearSelection()" class="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer">Batalkan</button>
-    </div>
-    <div class="flex items-center gap-2 flex-wrap justify-end">
-        <button type="button" onclick="bulkCetak()" class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer">
-            <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/>
-            </svg>
-            <span>Cetak Tagihan</span>
-        </button>
-    </div>
 </div>
 
 
-<div class="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+
+<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
 
     <?php if(!empty($statusGroup)): ?>
     
-    <div class="border-b border-slate-200 dark:border-slate-700 px-6 py-3 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
+    <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
         <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">
             <?php if($statusGroup === 'survey'): ?> Daftar Survey Pelanggan
             <?php elseif($statusGroup === 'verification'): ?> Daftar Verifikasi Pelanggan
@@ -281,358 +301,461 @@
             <?php elseif($statusGroup === 'terminated'): ?> Daftar Pelanggan Putus
             <?php endif; ?>
         </span>
-        <a href="<?php echo e(route('customers.index')); ?>" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua</a>
+        <a href="<?php echo e(route('customers.index')); ?>" class="text-xs text-sky-600 dark:text-sky-400 hover:underline">Lihat Semua Pelanggan</a>
     </div>
     <?php endif; ?>
 
     
-    <div class="overflow-x-auto">
-        <?php if($statusGroup === 'failed'): ?>
-        <table class="w-full border-collapse text-left">
-            <thead>
-                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    <th scope="col" class="px-6 py-3.5 w-12 text-center">No</th>
-                    <th scope="col" class="px-6 py-3.5">CID</th>
-                    <th scope="col" class="px-6 py-3.5">Nama Pelanggan</th>
-                    <th scope="col" class="px-6 py-3.5">POP</th>
-                    <th scope="col" class="px-6 py-3.5">Alasan</th>
-                    <th scope="col" class="px-6 py-3.5">Tgl Pemutusan</th>
-                    <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
-                <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/20 transition-colors">
-                    <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">
-                        <?php echo e(($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration); ?>
+    <?php if($statusGroup === 'failed'): ?>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th class="py-3.5 px-4 w-12 text-center">No</th>
+                        <th class="py-3.5 px-4">CID</th>
+                        <th class="py-3.5 px-4">Nama Pelanggan</th>
+                        <th class="py-3.5 px-4">POP</th>
+                        <th class="py-3.5 px-4">Alasan</th>
+                        <th class="py-3.5 px-4">Tgl Pemutusan</th>
+                        <th class="py-3.5 px-4 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs text-slate-700 dark:text-slate-200">
+                    <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors">
+                        <td class="px-4 py-3.5 text-center text-slate-400 font-mono">
+                            <?php echo e(($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration); ?>
 
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
-                        <?php echo e($customer->display_id); ?>
+                        </td>
+                        <td class="px-4 py-3.5 font-mono font-semibold text-sky-600 dark:text-sky-400">
+                            <?php echo e($customer->display_id); ?>
 
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900 dark:text-slate-50">
-                        <?php echo e($customer->full_name); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
-                        <?php echo e($customer->pop->name ?? '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 max-w-xs text-slate-700 dark:text-slate-300">
-                        <?php echo e($customer->reject_reason ?? '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
-                        <?php echo e($customer->rejected_at ? \App\Support\IndonesianDate::date($customer->rejected_at) : '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
-                        <div class="inline-flex items-center gap-2">
-                            <a href="<?php echo e(route('customers.show', $customer->id)); ?>"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:hover:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
-                                Detail
-                            </a>
-                            <?php if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject): ?>
-                            <form action="<?php echo e(route('customers.restore-from-failed', $customer->id)); ?>" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Apakah Anda yakin ingin mengembalikan <?php echo e($customer->full_name); ?> ke proses sebelum ditolak?', this);">
-                                <?php echo csrf_field(); ?>
-                                <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-amber-600 hover:text-amber-800 dark:hover:text-amber-400 dark:hover:text-amber-300 transition-colors border border-amber-200 dark:border-amber-800/60 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded px-2.5 py-1 cursor-pointer">
-                                    Kembalikan
-                                </button>
-                            </form>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
-                        Tidak ada data pelanggan gagal.
-                    </td>
-                </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-        <?php elseif($statusGroup === 'terminated'): ?>
-        <table class="w-full border-collapse text-left">
-            <thead>
-                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    <th scope="col" class="px-6 py-3.5 w-12 text-center">No</th>
-                    <th scope="col" class="px-6 py-3.5">ID</th>
-                    <th scope="col" class="px-6 py-3.5">Nama Pelanggan</th>
-                    <th scope="col" class="px-6 py-3.5">POP</th>
-                    <th scope="col" class="px-6 py-3.5">Kontrak</th>
-                    <th scope="col" class="px-6 py-3.5">Alasan Putus</th>
-                    <th scope="col" class="px-6 py-3.5">Tgl Pemutusan</th>
-                    <th scope="col" class="px-6 py-3.5 text-center">Status Alat</th>
-                    <th scope="col" class="px-6 py-3.5 text-right">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
-                <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                <?php
-                    $contractType = match($customer->customerService->contract_type ?? null) {
-                        'sewa' => 'Sewa',
-                        'beli' => 'Beli',
-                        default => '-',
-                    };
-                    $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
-                ?>
-                <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/20 transition-colors">
-                    <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">
-                        <?php echo e(($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text font-mono">
-                        <?php echo e($customer->display_id); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-900 dark:text-slate-50">
-                        <?php echo e($customer->full_name); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
-                        <?php echo e($customer->pop->name ?? '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
-                        <?php echo e($contractType); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 max-w-xs text-slate-700 dark:text-slate-300">
-                        <?php echo e($customer->termination_reason ?? '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 whitespace-nowrap data-text">
-                        <?php echo e($customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-'); ?>
-
-                    </td>
-                    <td class="px-6 py-3.5 text-center whitespace-nowrap">
-                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($isDeviceRetrieved ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800/50' : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50'); ?>">
-                            <?php echo e($isDeviceRetrieved ? 'Sudah di Ambil' : 'Belum di Ambil'); ?>
-
-                        </span>
-                    </td>
-                    <td class="px-6 py-3.5 text-right whitespace-nowrap">
-                        <div class="inline-flex items-center gap-2">
-                            <a href="<?php echo e(route('customers.show', $customer->id)); ?>"
-                               class="inline-flex items-center text-xs font-medium text-sky-600 hover:text-sky-800 dark:hover:text-sky-400 dark:hover:text-sky-300 transition-colors border border-sky-200 dark:border-sky-800/60 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded px-2.5 py-1 cursor-pointer">
-                                Detail
-                            </a>
-                            <?php if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve')): ?>
-                            <form action="<?php echo e(route('customers.retrieve-device', $customer->id)); ?>" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk <?php echo e($customer->full_name); ?>?', this);">
-                                <?php echo csrf_field(); ?>
-                                <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-slate-600 hover:text-slate-800 dark:hover:text-slate-300 dark:hover:text-slate-100 transition-colors border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded px-2.5 py-1 cursor-pointer">
-                                    Ambil Alat
-                                </button>
-                            </form>
-                            <?php endif; ?>
-                            <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
-                            <form action="<?php echo e(route('customers.reactivate', $customer->id)); ?>" method="POST"
-                                  onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan <?php echo e($customer->full_name); ?>?', this);">
-                                <?php echo csrf_field(); ?>
-                                <button type="submit"
-                                        class="inline-flex items-center text-xs font-medium text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-400 dark:hover:text-emerald-300 transition-colors border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded px-2.5 py-1 cursor-pointer">
-                                    Langganan Lagi
-                                </button>
-                            </form>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                <tr>
-                    <td colspan="9" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">
-                        Tidak ada data pelanggan putus langganan.
-                    </td>
-                </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-        <?php else: ?>
-        <table class="w-full border-collapse text-left" id="customerTable">
-            <thead>
-                <tr class="bg-slate-100/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    <th scope="col" class="py-3.5 pl-4 pr-0 w-10">
-                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"
-                               aria-label="Pilih semua baris di halaman ini"
-                               class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-600/40 cursor-pointer align-middle">
-                    </th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID PELANGGAN</th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">NAMA LENGKAP</th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">POP &middot; DESA</th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PAKET INTERNET</th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">NO. TELEPON</th>
-                    <th scope="col" class="py-3.5 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">JATUH TEMPO</th>
-                    <th scope="col" class="py-3.5 px-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">TAGIHAN</th>
-                    <th scope="col" class="py-3.5 px-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">BERKAS</th>
-                    <th scope="col" class="py-3.5 px-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">STATUS</th>
-                    <th scope="col" class="py-3.5 px-4 text-center w-16 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">AKSI</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 text-xs text-slate-700 dark:text-slate-200">
-                <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                <?php
-                    $isCustomer = $customer->status === 'active';
-                    $isTerminated = $customer->status === 'terminated';
-                    $displayId = $customer->display_id;
-                    $completeness = $customer->dataCompleteness();
-                ?>
-                <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-900/20 transition-colors group">
-                    <!-- Checkbox -->
-                    <td class="pl-4 pr-0">
-                        <input type="checkbox" name="selected_customers[]" value="<?php echo e($customer->id); ?>"
-                               onchange="toggleRow('<?php echo e($customer->id); ?>', this.checked)"
-                               class="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-600/40 cursor-pointer align-middle select-customer">
-                    </td>
-                    <!-- ID Pelanggan -->
-                    <td class="py-3.5 px-4 font-mono font-semibold text-sky-600 dark:text-sky-400">
-                        <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
-                        <button type="button" onclick="openNetworkAssignmentModal(<?php echo e($customer->id); ?>)"
-                                class="text-sky-600 dark:text-sky-400 hover:underline cursor-pointer font-mono font-semibold text-left" title="Atur Mini POP & Distribusi">
-                            <?php echo e($displayId); ?>
-
-                        </button>
-                        <?php else: ?>
-                        <?php echo e($displayId); ?>
-
-                        <?php endif; ?>
-                    </td>
-                    <!-- Nama Lengkap -->
-                    <td class="py-3.5 px-4">
-                        <span class="font-medium text-slate-900 dark:text-slate-50 group-hover:text-sky-700 dark:group-hover:text-sky-300 transition-colors">
+                        </td>
+                        <td class="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
                             <?php echo e($customer->full_name); ?>
 
-                        </span>
-                    </td>
-                    <!-- POP & Desa -->
-                    <td class="py-3.5 px-4 whitespace-nowrap">
-                        <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs">
+                        </td>
+                        <td class="px-4 py-3.5 font-medium text-slate-700 dark:text-slate-300">
                             <?php echo e($customer->pop->name ?? '-'); ?>
 
-                        </span>
-                        <span class="text-slate-500 dark:text-slate-400 ml-1.5 text-xs">
-                            <?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? '-')); ?>
+                        </td>
+                        <td class="px-4 py-3.5 max-w-xs text-slate-600 dark:text-slate-400 truncate">
+                            <?php echo e($customer->reject_reason ?? '-'); ?>
 
-                        </span>
-                    </td>
-                    <!-- Paket Internet -->
-                    <td class="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300 text-xs">
-                        <?php echo e($customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-'); ?>
+                        </td>
+                        <td class="px-4 py-3.5 font-mono text-slate-500">
+                            <?php echo e($customer->rejected_at ? \App\Support\IndonesianDate::date($customer->rejected_at) : '-'); ?>
 
-                    </td>
-                    <!-- No. Telepon -->
-                    <td class="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300 text-xs">
-                        <?php if($customer->primary_phone): ?>
-                        <a href="https://wa.me/<?php echo e($customer->primary_phone); ?>" target="_blank" class="hover:text-emerald-600 flex items-center gap-1">
-                            <span class="text-emerald-500 text-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 0 1 6.988 2.896 9.83 9.83 0 0 1 2.893 6.994c-.003 5.45-4.437 9.886-9.885 9.886m8.413-18.297A11.8 11.8 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.9 11.9 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.82 11.82 0 0 0-3.48-8.413"/></svg>
+                        </td>
+                        <td class="px-4 py-3.5 text-right">
+                            <div class="inline-flex items-center gap-2">
+                                <a href="<?php echo e(route('customers.show', $customer->id)); ?>"
+                                   class="px-2.5 py-1 text-xs font-medium text-sky-600 hover:text-sky-700 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 transition-colors">
+                                    Detail
+                                </a>
+                                <?php if(auth()->user()->hasPermission('customers.detail.installation.validate') && $customer->status_before_reject): ?>
+                                <form action="<?php echo e(route('customers.restore-from-failed', $customer->id)); ?>" method="POST"
+                                      onsubmit="event.preventDefault(); window.confirmAction('Kembalikan <?php echo e($customer->full_name); ?> ke proses sebelum ditolak?', this);">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="px-2.5 py-1 text-xs font-medium text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors">
+                                        Kembalikan
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan gagal.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+    
+    <?php elseif($statusGroup === 'terminated'): ?>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th class="py-3.5 px-4 w-12 text-center">No</th>
+                        <th class="py-3.5 px-4">CID</th>
+                        <th class="py-3.5 px-4">Nama Pelanggan</th>
+                        <th class="py-3.5 px-4">POP</th>
+                        <th class="py-3.5 px-4">Kontrak</th>
+                        <th class="py-3.5 px-4">Alasan Putus</th>
+                        <th class="py-3.5 px-4">Tgl Pemutusan</th>
+                        <th class="py-3.5 px-4 text-center">Status Alat</th>
+                        <th class="py-3.5 px-4 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs text-slate-700 dark:text-slate-200">
+                    <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        $contractType = match($customer->customerService->contract_type ?? null) {
+                            'sewa' => 'Sewa',
+                            'beli' => 'Beli',
+                            default => '-',
+                        };
+                        $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                    ?>
+                    <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors">
+                        <td class="px-4 py-3.5 text-center text-slate-400 font-mono">
+                            <?php echo e(($customers->currentPage() - 1) * $customers->perPage() + $loop->iteration); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 font-mono font-semibold text-sky-600 dark:text-sky-400">
+                            <?php echo e($customer->display_id); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
+                            <?php echo e($customer->full_name); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 font-medium text-slate-700 dark:text-slate-300">
+                            <?php echo e($customer->pop->name ?? '-'); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 font-medium">
+                            <?php echo e($contractType); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 max-w-xs text-slate-600 dark:text-slate-400 truncate">
+                            <?php echo e($customer->termination_reason ?? '-'); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 font-mono text-slate-500">
+                            <?php echo e($customer->terminated_at ? \App\Support\IndonesianDate::date($customer->terminated_at) : '-'); ?>
+
+                        </td>
+                        <td class="px-4 py-3.5 text-center">
+                            <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($isDeviceRetrieved ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300'); ?>">
+                                <?php echo e($isDeviceRetrieved ? 'Sudah Diambil' : 'Belum Diambil'); ?>
+
                             </span>
-                            <span><?php echo e($customer->primary_phone); ?></span>
-                        </a>
-                        <?php else: ?>
-                        -
-                        <?php endif; ?>
-                    </td>
-                    <!-- Jatuh Tempo -->
-                    <td class="py-3.5 px-4 font-mono text-xs">
-                        <?php if($customer->latestInvoice): ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-right">
+                            <div class="inline-flex items-center gap-2">
+                                <a href="<?php echo e(route('customers.show', $customer->id)); ?>"
+                                   class="px-2.5 py-1 text-xs font-medium text-sky-600 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 transition-colors">
+                                    Detail
+                                </a>
+                                <?php if(!$isDeviceRetrieved && auth()->user()->hasPermission('customers.detail.devices.retrieve')): ?>
+                                <form action="<?php echo e(route('customers.retrieve-device', $customer->id)); ?>" method="POST"
+                                      onsubmit="event.preventDefault(); window.confirmAction('Buat Task FOP pengambilan alat untuk <?php echo e($customer->full_name); ?>?', this);">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="px-2.5 py-1 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                        Ambil Alat
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
+                                <form action="<?php echo e(route('customers.reactivate', $customer->id)); ?>" method="POST"
+                                      onsubmit="event.preventDefault(); window.confirmAction('Aktifkan kembali langganan <?php echo e($customer->full_name); ?>?', this);">
+                                    <?php echo csrf_field(); ?>
+                                    <button type="submit" class="px-2.5 py-1 text-xs font-medium text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors">
+                                        Langganan Lagi
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <tr>
+                        <td colspan="9" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan putus.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+    
+    <?php else: ?>
+        <!-- DESKTOP TABLE VIEW (hidden di mobile) -->
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full min-w-[960px] border-collapse text-left" id="customerTable">
+                <thead>
+                    <tr class="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th class="py-3.5 pl-4 px-3">CID (ID PELANGGAN)</th>
+                        <th class="py-3.5 px-3">NAMA LENGKAP</th>
+                        <th class="py-3.5 px-3">POP & DESA</th>
+                        <th class="py-3.5 px-3">PAKET INTERNET</th>
+                        <th class="py-3.5 px-3">NO. TELEPON</th>
+                        <th class="py-3.5 px-3">JATUH TEMPO</th>
+                        <th class="py-3.5 px-3 text-right">TAGIHAN</th>
+                        <th class="py-3.5 px-3 text-center">BERKAS</th>
+                        <th class="py-3.5 px-3 text-center">STATUS</th>
+                        <th class="py-3.5 px-3 text-center w-16">AKSI</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs text-slate-700 dark:text-slate-200">
+                    <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        $displayId = $customer->display_id;
+                        $completeness = $customer->dataCompleteness();
+                        $cleanPhone = preg_replace('/[^0-9]/', '', $customer->primary_phone ?? '');
+                        if (str_starts_with($cleanPhone, '0')) {
+                            $cleanPhone = '62' . substr($cleanPhone, 1);
+                        }
+                    ?>
+                    
+                    <tr data-customer-row class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors group">
+                        <!-- CID (Klik untuk Atur Mini POP / Jaringan) -->
+                        <td class="py-3.5 pl-4 px-3 font-mono font-semibold">
+                            <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
+                            <button type="button" onclick="openNetworkAssignmentModal(<?php echo e($customer->id); ?>)"
+                                    class="text-sky-600 dark:text-sky-400 hover:text-sky-700 hover:underline flex items-center gap-1 text-left group-hover:scale-[1.01] transition-transform"
+                                    title="Klik untuk Atur Mini POP & Distribusi">
+                                <span><?php echo e($displayId); ?></span>
+                                <svg class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-sky-500 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
+                            </button>
+                            <?php else: ?>
+                            <span class="text-sky-600 dark:text-sky-400 font-mono"><?php echo e($displayId); ?></span>
+                            <?php endif; ?>
+                        </td>
+
+                        <!-- Nama Lengkap -->
+                        <td class="py-3.5 px-3">
+                            <span class="font-bold text-slate-900 dark:text-white group-hover:text-sky-600 transition-colors">
+                                <?php echo e($customer->full_name); ?>
+
+                            </span>
+                        </td>
+
+                        <!-- POP & Desa -->
+                        <td class="py-3.5 px-3 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-[11px]">
+                                    <?php echo e($customer->pop->name ?? '-'); ?>
+
+                                </span>
+                                <span class="text-slate-400">·</span>
+                                <span class="text-slate-500 dark:text-slate-400">
+                                    <?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? '-')); ?>
+
+                                </span>
+                            </div>
+                        </td>
+
+                        <!-- Paket Internet -->
+                        <td class="py-3.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                            <?php echo e($customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-'); ?>
+
+                        </td>
+
+                        <!-- No. Telepon WA -->
+                        <td class="py-3.5 px-3 font-mono">
+                            <?php if($cleanPhone): ?>
+                                <div class="inline-flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1.1em" height="1.1em" fill="currentColor" class="text-emerald-500 shrink-0">
+                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884a9.82 9.82 0 0 1 6.988 2.896 9.83 9.83 0 0 1 2.893 6.994c-.003 5.45-4.437 9.886-9.885 9.886m8.413-18.297A11.8 11.8 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.9 11.9 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.82 11.82 0 0 0-3.48-8.413"/>
+                                    </svg>
+                                    <span><?php echo e($customer->primary_phone); ?></span>
+                                </div>
+                            <?php else: ?>
+                                <span class="text-slate-400 italic">-</span>
+                            <?php endif; ?>
+                        </td>
+
+                        <!-- Jatuh Tempo -->
+                        <td class="py-3.5 px-3 font-mono text-[11px]">
+                            <?php if($customer->latestInvoice): ?>
+                                <?php
+                                    $isOverdue = $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast() && $customer->latestInvoice->invoice_status !== \App\Enums\InvoiceStatus::LUNAS;
+                                ?>
+                                <span class="<?php echo e($isOverdue ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-600 dark:text-slate-400'); ?>">
+                                    <?php echo e(\App\Support\IndonesianDate::date($customer->latestInvoice->due_date)); ?>
+
+                                </span>
+                            <?php else: ?>
+                                <span class="text-slate-400">-</span>
+                            <?php endif; ?>
+                        </td>
+
+                        <!-- Tagihan -->
+                        <td class="py-3.5 px-3 text-right font-mono">
+                            <?php if($customer->latestInvoice): ?>
+                                <?php
+                                    $isPaid = $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
+                                    $isOverdue = !$isPaid && $customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast();
+                                ?>
+                                <span class="font-bold <?php echo e($isPaid ? 'text-emerald-600 dark:text-emerald-400' : ($isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white')); ?>">
+                                    Rp <?php echo e(number_format($customer->latestInvoice->total_amount, 0, ',', '.')); ?>
+
+                                </span>
+                                <span class="block text-[10px] font-sans font-semibold <?php echo e($isPaid ? 'text-emerald-500' : ($isOverdue ? 'text-rose-500' : 'text-slate-400')); ?>">
+                                    <?php echo e($isPaid ? 'Lunas' : ($isOverdue ? 'Lewat Tempo' : 'Belum Bayar')); ?>
+
+                                </span>
+                            <?php else: ?>
+                                <span class="text-slate-400">-</span>
+                            <?php endif; ?>
+                        </td>
+
+                        <!-- Berkas -->
+                        <td class="py-3.5 px-3 text-center font-mono">
+                            <span class="px-2 py-0.5 rounded-full font-bold text-[11px] <?php echo e($completeness['percentage'] >= 80 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400'); ?>">
+                                <?php echo e($completeness['percentage']); ?>%
+                            </span>
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td class="py-3.5 px-3 text-center">
                             <?php
-                                $billState = 'belum';
-                                if ($customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS) {
-                                    $billState = 'lunas';
-                                } elseif ($customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast()) {
-                                    $billState = 'overdue';
-                                }
-                                $dueClass = $billState === 'overdue' ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-slate-600 dark:text-slate-300';
+                                $statusLabel = $customer->subscriptionStatus->name ?? ucfirst($customer->status);
+                                $isSuspended = $customer->status === 'suspended';
+                                $isActive = $customer->status === 'active';
                             ?>
-                            <span class="<?php echo e($dueClass); ?>">
-                                <?php echo e(\App\Support\IndonesianDate::date($customer->latestInvoice->due_date)); ?>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border
+                                  <?php echo e($isActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : ''); ?>
 
+                                  <?php echo e($isSuspended ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : ''); ?>
+
+                                  <?php echo e(!$isActive && !$isSuspended ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' : ''); ?>">
+                                <span class="w-1.5 h-1.5 rounded-full <?php echo e($isActive ? 'bg-emerald-500 animate-pulse-glow' : ($isSuspended ? 'bg-amber-500' : 'bg-rose-500')); ?> mr-1.5"></span>
+                                <span><?php echo e($statusLabel); ?></span>
                             </span>
-                        <?php else: ?>
-                            -
-                        <?php endif; ?>
-                    </td>
-                    <!-- Tagihan -->
-                    <td class="py-3.5 px-4 text-right text-xs">
-                        <?php if($customer->latestInvoice): ?>
-                            <?php
-                                $billState = 'belum';
-                                if ($customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS) {
-                                    $billState = 'lunas';
-                                } elseif ($customer->latestInvoice->due_date && $customer->latestInvoice->due_date->isPast()) {
-                                    $billState = 'overdue';
-                                }
-                                
-                                $amountClass = $billState === 'lunas'   ? 'text-emerald-600 dark:text-emerald-400'
-                                              : ($billState === 'overdue' ? 'text-rose-600 dark:text-rose-400 font-semibold'
-                                              : 'text-slate-900 dark:text-slate-50');
-                                
-                                $billNote = $billState === 'lunas'   ? '<span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Lunas</span>'
-                                           : ($billState === 'overdue' ? '<span class="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">Lewat tempo</span>'
-                                           : '<span class="text-[10px] text-slate-400 dark:text-slate-500">Belum dibayar</span>');
-                            ?>
-                            <span class="font-mono tabular-nums <?php echo e($amountClass); ?>">
-                                Rp <?php echo e(number_format($customer->latestInvoice->total_amount, 0, ',', '.')); ?>
+                        </td>
 
+                        <!-- Aksi Button -->
+                        <td class="py-3.5 px-3 text-center">
+                            <button type="button"
+                                    onclick="openActionsModal(this)"
+                                    data-id="<?php echo e($customer->id); ?>"
+                                    data-code="<?php echo e($displayId); ?>"
+                                    data-name="<?php echo e($customer->full_name); ?>"
+                                    data-nik="<?php echo e($customer->identity_number ?? '-'); ?>"
+                                    data-phone="<?php echo e($customer->primary_phone); ?>"
+                                    data-email="<?php echo e($customer->email ?? '-'); ?>"
+                                    data-status="<?php echo e($customer->subscriptionStatus->name ?? Str::headline($customer->status)); ?>"
+                                    data-raw-status="<?php echo e($customer->status); ?>"
+                                    data-pop="<?php echo e($customer->pop->name ?? '-'); ?>"
+                                    data-reg="<?php echo e(\App\Support\IndonesianDate::date($customer->registration_date)); ?>"
+                                    data-package="<?php echo e($customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-'); ?>"
+                                    data-bandwidth="<?php echo e($customer->internetPackage?->speed_mbps ? $customer->internetPackage->speed_mbps . ' Mbps' : '-'); ?>"
+                                    data-price="<?php echo e($customer->internetPackage ? 'Rp ' . number_format($customer->internetPackage->monthly_price, 0, ',', '.') : '-'); ?>"
+                                    data-due-date="<?php echo e($customer->latestInvoice ? \App\Support\IndonesianDate::date($customer->latestInvoice->due_date) : '-'); ?>"
+                                    data-address="<?php echo e($customer->address); ?>"
+                                    data-landmark="<?php echo e($customer->customerAddress->landmark ?? '-'); ?>"
+                                    data-rt-rw="<?php echo e(($customer->customerAddress?->rt ? 'RT ' . $customer->customerAddress->rt : '') . ($customer->customerAddress?->rw ? ' / RW ' . $customer->customerAddress->rw : '') ?: '-'); ?>"
+                                    data-village="<?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? '-')); ?>"
+                                    data-district="<?php echo e($customer->district->name ?? ($customer->customerAddress->district ?? '-')); ?>"
+                                    data-city="<?php echo e($customer->city->name ?? ($customer->customerAddress->city ?? 'Kab. Ponorogo')); ?>"
+                                    data-postal-code="<?php echo e($customer->customerAddress->postal_code ?? '-'); ?>"
+                                    data-lat="<?php echo e($customer->customerAddress->latitude ?? ''); ?>"
+                                    data-lng="<?php echo e($customer->customerAddress->longitude ?? ''); ?>"
+                                    data-completeness-pct="<?php echo e($completeness['percentage']); ?>"
+                                    data-completeness-status="<?php echo e(Str::headline($customer->data_completeness_status ?? 'draft')); ?>"
+                                    data-pppoe="<?php echo e($customer->customerService->pppoe_username ?? '-'); ?>"
+                                    data-ip="<?php echo e($customer->customerService->ip_address ?? '-'); ?>"
+                                    data-vlan="<?php echo e($customer->customerService->vlan_id ?? '-'); ?>"
+                                    data-onu="<?php echo e($customer->customerDevice->onu_sn ?? ($customer->customerDevice->mac_address ?? '-')); ?>"
+                                    data-onu-brand="<?php echo e($customer->customerDevice->onu_brand ?? '-'); ?>"
+                                    data-router="<?php echo e($customer->customerDevice->router_sn ?? '-'); ?>"
+                                    data-router-brand="<?php echo e($customer->customerDevice->router_brand ?? '-'); ?>"
+                                    data-contract="<?php echo e(match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' }); ?>"
+                                    data-distribution="<?php echo e($customer->distribution->name ?? '-'); ?>"
+                                    class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 hover:border-sky-300 text-slate-500 hover:text-sky-600 inline-flex items-center justify-center transition-all shadow-sm cursor-pointer"
+                                    title="Buka Modal Hub Aksi Cepat">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <tr>
+                        <td colspan="10" class="px-6 py-8 text-center text-slate-400">Tidak ada data pelanggan yang cocok.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- MOBILE & TABLET PORTRAIT CARD VIEW (block di mobile) -->
+        <div class="block md:hidden p-3 sm:p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <?php $__empty_1 = true; $__currentLoopData = $customers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $customer): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <?php
+                    $displayId = $customer->display_id;
+                    $completeness = $customer->dataCompleteness();
+                    $isActive = $customer->status === 'active';
+                    $isSuspended = $customer->status === 'suspended';
+                    $isPaid = $customer->latestInvoice && $customer->latestInvoice->invoice_status === \App\Enums\InvoiceStatus::LUNAS;
+                ?>
+                <div class="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:border-sky-300 dark:hover:border-sky-800 transition-all card-interactive flex flex-col justify-between space-y-3">
+                    <div class="space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
+                                <button type="button" onclick="openNetworkAssignmentModal(<?php echo e($customer->id); ?>)"
+                                        class="font-mono text-xs font-bold text-sky-600 dark:text-sky-400 flex items-center gap-1 hover:underline text-left">
+                                    <span><?php echo e($displayId); ?></span>
+                                    <svg class="w-3 h-3 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
+                                </button>
+                                <?php else: ?>
+                                <span class="font-mono text-xs font-bold text-sky-600 dark:text-sky-400"><?php echo e($displayId); ?></span>
+                                <?php endif; ?>
+                                <h4 class="font-bold text-slate-900 dark:text-white text-base mt-0.5"><?php echo e($customer->full_name); ?></h4>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0
+                                  <?php echo e($isActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : ''); ?>
+
+                                  <?php echo e($isSuspended ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : ''); ?>
+
+                                  <?php echo e(!$isActive && !$isSuspended ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' : ''); ?>">
+                                <span class="w-1.5 h-1.5 rounded-full <?php echo e($isActive ? 'bg-emerald-500 animate-pulse-glow' : ($isSuspended ? 'bg-amber-500' : 'bg-rose-500')); ?> mr-1"></span>
+                                <span><?php echo e($customer->subscriptionStatus->name ?? ucfirst($customer->status)); ?></span>
                             </span>
-                            <br>
-                            <?php echo $billNote; ?>
+                        </div>
 
+                        <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">POP / Desa</span>
+                                <span class="font-medium text-slate-700 dark:text-slate-200"><?php echo e($customer->pop->name ?? '-'); ?> · <?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? '-')); ?></span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">Tagihan</span>
+                                <span class="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                    Rp <?php echo e(number_format($customer->latestInvoice->total_amount ?? 0, 0, ',', '.')); ?>
+
+                                </span>
+                                <span class="text-[9px] font-bold block <?php echo e($isPaid ? 'text-emerald-500' : 'text-rose-500'); ?>">
+                                    ● <?php echo e($isPaid ? 'LUNAS' : 'BELUM BAYAR'); ?>
+
+                                </span>
+                            </div>
+                            <div class="col-span-2">
+                                <span class="text-slate-400 text-[10px] block">Paket Internet</span>
+                                <span class="font-mono text-slate-600 dark:text-slate-300"><?php echo e($customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-'); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <?php if($customer->latestPayment): ?>
+                            <a href="<?php echo e(route('payments.receipt', $customer->latestPayment->id)); ?>"
+                               target="_blank"
+                               title="Cetak Struk / Kwitansi Pembayaran Terakhir"
+                               class="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-rose-100 shrink-0 touch-target btn-interactive">
+                                <svg class="w-4 h-4 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                <span>Invoice / Struk</span>
+                            </a>
                         <?php else: ?>
-                            -
+                            <button type="button"
+                                    onclick="showModalToast('Belum ada pembayaran/kwitansi untuk pelanggan ini.')"
+                                    title="Belum ada pembayaran yang bisa dicetak"
+                                    class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 text-xs font-semibold inline-flex items-center gap-1.5 opacity-60 cursor-not-allowed shrink-0">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
+                                <span>Invoice</span>
+                            </button>
                         <?php endif; ?>
-                    </td>
-                    <!-- Berkas -->
-                    <td class="py-3.5 px-4 text-center font-mono font-semibold text-xs">
-                        <?php
-                            $berkasClass = $completeness['percentage'] >= 80 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
-                        ?>
-                        <span class="<?php echo e($berkasClass); ?>">
-                            <?php echo e($completeness['percentage']); ?>%
-                        </span>
-                    </td>
-                    <!-- Status -->
-                    <td class="py-3.5 px-4 text-center">
-                        <?php
-                            $statusLabel = $customer->subscriptionStatus->name ?? ucfirst($customer->status);
-                            
-                            $isSuspended = $customer->status === 'suspended';
-                            $isTerminated = $customer->status === 'terminated';
-                            $isFailed = in_array($customer->status, ['failed', 'rejected', 'gagal']);
-                            
-                            if ($customer->status === 'active') {
-                                $statusBadgeClass = 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
-                                $dotColor = 'bg-emerald-500';
-                            } elseif ($isSuspended) {
-                                $statusBadgeClass = 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
-                                $dotColor = 'bg-amber-500';
-                            } elseif ($isTerminated || $isFailed) {
-                                $statusBadgeClass = 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
-                                $dotColor = 'bg-rose-500';
-                            } else {
-                                $statusBadgeClass = 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
-                                $dotColor = 'bg-slate-500';
-                            }
-                        ?>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border <?php echo e($statusBadgeClass); ?>">
-                            <span class="w-1.5 h-1.5 rounded-full <?php echo e($dotColor); ?> mr-1.5"></span>
-                            <?php echo e($statusLabel); ?>
 
-                        </span>
-                    </td>
-                    <!-- Aksi -->
-                    <td class="py-3.5 px-4 text-center">
-                        <button type="button" 
+                        <button type="button"
                                 onclick="openActionsModal(this)"
                                 data-id="<?php echo e($customer->id); ?>"
                                 data-code="<?php echo e($displayId); ?>"
-                                data-raw-code="<?php echo e($customer->customer_code); ?>"
                                 data-name="<?php echo e($customer->full_name); ?>"
                                 data-nik="<?php echo e($customer->identity_number ?? '-'); ?>"
                                 data-phone="<?php echo e($customer->primary_phone); ?>"
@@ -644,6 +767,7 @@
                                 data-package="<?php echo e($customer->internetPackage ? $customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name : '-'); ?>"
                                 data-bandwidth="<?php echo e($customer->internetPackage?->speed_mbps ? $customer->internetPackage->speed_mbps . ' Mbps' : '-'); ?>"
                                 data-price="<?php echo e($customer->internetPackage ? 'Rp ' . number_format($customer->internetPackage->monthly_price, 0, ',', '.') : '-'); ?>"
+                                data-due-date="<?php echo e($customer->latestInvoice ? \App\Support\IndonesianDate::date($customer->latestInvoice->due_date) : '-'); ?>"
                                 data-address="<?php echo e($customer->address); ?>"
                                 data-landmark="<?php echo e($customer->customerAddress->landmark ?? '-'); ?>"
                                 data-rt-rw="<?php echo e(($customer->customerAddress?->rt ? 'RT ' . $customer->customerAddress->rt : '') . ($customer->customerAddress?->rw ? ' / RW ' . $customer->customerAddress->rw : '') ?: '-'); ?>"
@@ -664,24 +788,18 @@
                                 data-router-brand="<?php echo e($customer->customerDevice->router_brand ?? '-'); ?>"
                                 data-contract="<?php echo e(match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' }); ?>"
                                 data-distribution="<?php echo e($customer->distribution->name ?? '-'); ?>"
-                                class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 hover:border-sky-300 dark:hover:border-sky-600 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 inline-flex items-center justify-center transition-colors shadow-sm cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sm">
-                                <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-                            </svg>
+                                class="flex-1 py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-sky-600/20 transition-all btn-interactive touch-target">
+                            <span>Buka Quick Hub</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
-                    </td>
-                </tr>
+                    </div>
+                </div>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                <tr>
-                    <td colspan="11" class="px-6 py-8 text-center text-slate-400">
-                        Tidak ada data pelanggan yang cocok dengan pencarian Anda.
-                    </td>
-                </tr>
+                <div class="p-8 text-center text-slate-400 text-xs">Tidak ada data pelanggan yang cocok.</div>
                 <?php endif; ?>
-            </tbody>
-        </table>
-        <?php endif; ?>
-    </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     
     <?php
@@ -693,24 +811,22 @@
         $btnDisabled = 'px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-600 text-xs font-semibold opacity-40 cursor-not-allowed';
         $btnActive = 'px-3 py-1.5 rounded-lg bg-sky-600 text-white font-semibold text-xs font-mono';
     ?>
-    <div class="p-4 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="p-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-500">
 
-        
         <div class="flex items-center gap-4">
-            <div class="text-xs text-slate-500 dark:text-slate-400">
+            <div>
                 <?php if($customers->total() > 0): ?>
                     Menampilkan
-                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-100"><?php echo e(number_format($customers->firstItem(), 0, ',', '.')); ?>&ndash;<?php echo e(number_format($customers->lastItem(), 0, ',', '.')); ?></span>
+                    <strong class="text-slate-800 dark:text-white font-mono"><?php echo e(number_format($customers->firstItem(), 0, ',', '.')); ?>&ndash;<?php echo e(number_format($customers->lastItem(), 0, ',', '.')); ?></strong>
                     dari
-                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-100"><?php echo e(number_format($customers->total(), 0, ',', '.')); ?></span>
+                    <strong class="text-slate-800 dark:text-white font-mono"><?php echo e(number_format($customers->total(), 0, ',', '.')); ?></strong>
                     pelanggan
                 <?php else: ?>
                     Tidak ada data
                 <?php endif; ?>
             </div>
 
-            
-            <form method="GET" action="/customers" class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <form method="GET" action="/customers" class="flex items-center gap-1.5">
                 <?php $__currentLoopData = request()->except(['per_page', 'page']); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $qk => $qv): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <?php if(is_array($qv)): ?>
                         <?php $__currentLoopData = $qv; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $qvItem): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -722,7 +838,7 @@
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 <span class="hidden sm:inline">Baris</span>
                 <select name="per_page" onchange="this.form.submit()"
-                        class="h-8 pl-2 pr-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-sky-600 dark:focus:border-sky-500">
+                        class="h-8 pl-2 pr-7 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-sky-600">
                     <?php $__currentLoopData = [10, 25, 50, 100]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ppOption): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <option value="<?php echo e($ppOption); ?>" <?php echo e((int) request('per_page', 10) === $ppOption ? 'selected' : ''); ?>><?php echo e($ppOption); ?></option>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -730,29 +846,21 @@
             </form>
         </div>
 
-        
         <?php if($last > 1): ?>
         <div class="flex items-center gap-1.5">
-            
             <?php if($customers->onFirstPage()): ?>
-                <span class="<?php echo e($btnDisabled); ?> inline-flex items-center gap-1">
-                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg> Prev
-                </span>
+                <span class="<?php echo e($btnDisabled); ?>">Prev</span>
             <?php else: ?>
-                <a href="<?php echo e($customers->previousPageUrl()); ?>" id="paginatePrev" class="<?php echo e($btnBase); ?> inline-flex items-center gap-1">
-                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg> Prev
-                </a>
+                <a href="<?php echo e($customers->previousPageUrl()); ?>" id="paginatePrev" class="<?php echo e($btnBase); ?>">Prev</a>
             <?php endif; ?>
 
-            
             <?php if($winStart > 1): ?>
                 <a href="<?php echo e($customers->url(1)); ?>" class="<?php echo e($btnBase); ?> font-mono">1</a>
                 <?php if($winStart > 2): ?>
-                    <span class="px-1 text-slate-400 dark:text-slate-500 text-xs">&hellip;</span>
+                    <span class="px-1 text-slate-400">&hellip;</span>
                 <?php endif; ?>
             <?php endif; ?>
 
-            
             <?php for($n = $winStart; $n <= $winEnd; $n++): ?>
                 <?php if($n === $cur): ?>
                     <span aria-current="page" class="<?php echo e($btnActive); ?>"><?php echo e($n); ?></span>
@@ -761,271 +869,324 @@
                 <?php endif; ?>
             <?php endfor; ?>
 
-            
             <?php if($winEnd < $last): ?>
                 <?php if($winEnd < $last - 1): ?>
-                    <span class="px-1 text-slate-400 dark:text-slate-500 text-xs">&hellip;</span>
+                    <span class="px-1 text-slate-400">&hellip;</span>
                 <?php endif; ?>
                 <a href="<?php echo e($customers->url($last)); ?>" class="<?php echo e($btnBase); ?> font-mono"><?php echo e($last); ?></a>
             <?php endif; ?>
 
-            
             <?php if($customers->hasMorePages()): ?>
-                <a href="<?php echo e($customers->nextPageUrl()); ?>" id="paginateNext" class="<?php echo e($btnBase); ?> inline-flex items-center gap-1">
-                    Next <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
-                </a>
+                <a href="<?php echo e($customers->nextPageUrl()); ?>" id="paginateNext" class="<?php echo e($btnBase); ?>">Next</a>
             <?php else: ?>
-                <span class="<?php echo e($btnDisabled); ?> inline-flex items-center gap-1">
-                    Next <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
-                </span>
+                <span class="<?php echo e($btnDisabled); ?>">Next</span>
             <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- Customer Action & Quick Operational Hub Modal (Design.md Compliant) -->
-<div id="actions-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center hidden z-50 p-3 sm:p-5 transition-all duration-300 overflow-y-auto">
-    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 my-auto flex flex-col max-h-[92vh]">
-        
-        <!-- Modal Header (White Canvas / Naked Style - Design.md §1.3 & §6.4) -->
-        <div class="px-6 py-4 bg-white border-b border-slate-200 shrink-0">
-            <div class="flex items-start justify-between gap-3">
-                <div class="space-y-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight" id="actions-modal-title">Nama Pelanggan</h3>
-                        
-                        <!-- CID Display Badge (JetBrains Mono - Design.md §13.2) -->
-                        <span class="inline-flex items-center gap-1 font-mono text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 rounded px-2 py-0.5" id="actions-modal-code">
-                            ID-0000
-                        </span>
 
-                        <!-- Operational Status Badge with Dot (Design.md §13.1) -->
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200" id="actions-modal-status-badge">
-                            <span class="w-1.5 h-1.5 rounded-full bg-current shrink-0"></span>
+
+<div id="network-modal-wrapper" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">
+    <!-- Backdrop Blur -->
+    <div onclick="closeNetworkAssignmentModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity"></div>
+
+    <!-- Modal Dialog Sheet -->
+    <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden z-10 max-h-[88vh] sm:max-h-[90vh] flex flex-col transform transition-all duration-300">
+        <!-- Mobile Pull Drag Handle Indicator -->
+        <div class="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0"></div>
+
+        <!-- Header -->
+        <div class="px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+            <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold shrink-0 shadow-sm">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate">Atur Jaringan & Mini POP</h3>
+                    <p class="text-[11px] sm:text-xs text-slate-400 truncate">Konfigurasi titik distribusi OLT & pelanggan</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeNetworkAssignmentModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl btn-interactive shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Body Form -->
+        <form id="network-assignment-form" method="POST" class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-y-contain">
+            <?php echo csrf_field(); ?>
+            <?php echo method_field('PUT'); ?>
+
+            <!-- Customer Target Summary Card -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div class="min-w-0 pr-2">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Pelanggan</span>
+                    <p id="na-customer-name" class="font-bold text-slate-800 dark:text-white text-xs sm:text-sm truncate">Memuat...</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">CID / Jaringan</span>
+                    <p id="na-customer-cid" class="font-mono font-bold text-sky-600 dark:text-sky-400 text-xs">—</p>
+                </div>
+            </div>
+
+            <!-- Cabang Context -->
+            <div class="text-xs text-slate-500">
+                <span>Cabang Utama: <strong id="na-pop-name" class="text-slate-800 dark:text-slate-200 font-semibold">—</strong></span>
+            </div>
+
+            <!-- Blocked Warning Banner -->
+            <div id="na-blocked-warning" class="hidden text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-800">
+                Mini POP & Distribusi cuma bisa diatur setelah proses pemasangan dimulai.
+            </div>
+
+            <!-- Mini POP Select -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Mini POP (OLT Target)</label>
+                <select id="na-mini-pop-select" name="mini_pop_id" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                    <option value="">Memuat...</option>
+                </select>
+            </div>
+
+            <!-- Jalur Distribusi (ODP) Select -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Titik Distribusi (ODP / Box)</label>
+                <select id="na-distribution-select" name="distribution_id" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                    <option value="">—</option>
+                </select>
+                <p class="text-[11px] text-slate-400 mt-1">Daftar Distribusi otomatis menyesuaikan dengan Mini POP yang dipilih.</p>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="pt-4 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                <button type="button" onclick="closeNetworkAssignmentModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-center btn-interactive">Batal</button>
+                <button type="submit" id="na-submit-btn" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-md shadow-sky-600/20 text-center btn-interactive">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+
+<div id="actions-modal" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">
+    <!-- Backdrop Blur -->
+    <div onclick="closeActionsModal()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity"></div>
+
+    <!-- Modal Dialog Sheet -->
+    <div class="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden z-10 max-h-[88vh] sm:max-h-[90vh] flex flex-col transform transition-all duration-300">
+        
+        <!-- Mobile Pull Drag Handle Indicator -->
+        <div class="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mt-2.5 mb-1 sm:hidden shrink-0"></div>
+
+        <!-- Toast Notification inside modal -->
+        <div id="modal-toast" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow-lg items-center gap-2 animate-pop-in">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span id="modal-toast-text"></span>
+        </div>
+
+        <!-- Header -->
+        <div class="px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 shrink-0 gap-2">
+            <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div id="actions-modal-avatar" class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-sky-500/20 shrink-0">
+                    CU
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <h3 class="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate max-w-[150px] sm:max-w-none" id="actions-modal-title">Nama Pelanggan</h3>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 shrink-0" id="actions-modal-status-badge">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-glow"></span>
                             <span>ACTIVE</span>
                         </span>
                     </div>
-
-                    <!-- Location & POP Meta Row -->
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-sans pt-0.5">
-                        <span class="inline-flex items-center gap-1">
-                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            <span id="actions-modal-location-text">Lokasi...</span>
-                        </span>
-                        <span class="inline-flex items-center gap-1">
-                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                            <span id="actions-modal-pop-text" class="font-medium text-slate-700">POP Central</span>
-                        </span>
+                    <div class="flex items-center gap-1.5 text-[11px] sm:text-xs mt-0.5">
+                        <span class="font-mono text-sky-600 dark:text-sky-400 font-bold shrink-0" id="actions-modal-code">CID-000</span>
+                        <span class="text-slate-400">•</span>
+                        <span class="text-slate-500 dark:text-slate-400 truncate max-w-[140px] sm:max-w-none" id="actions-modal-location-text">POP Central</span>
                     </div>
                 </div>
-
-                <!-- Close Button -->
-                <button onclick="closeActionsModal()" type="button" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer shrink-0">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
             </div>
-
-            <!-- Quick Direct Operational Toolbar (Design.md §4.1 Toolbar Style) -->
-            <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                <div class="flex flex-wrap items-center gap-2">
-                    <!-- WA Direct -->
-                    <a id="btn-quick-wa" href="#" target="_blank" class="inline-flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-2xs">
-                        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.105 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-                        <span>WA Direct</span>
-                    </a>
-
-                    <!-- Google Maps Direct -->
-                    <a id="btn-quick-maps" href="#" target="_blank" class="inline-flex items-center gap-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-2xs">
-                        <svg class="w-3.5 h-3.5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                        <span>Google Maps</span>
-                    </a>
-
-                    <!-- Copy Technical Info -->
-                    <button onclick="copyTechInfo()" type="button" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-2xs">
-                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                        <span>Copy Teknis</span>
-                    </button>
-                </div>
-
-                <!-- Completeness Badge -->
-                <div class="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-xs">
-                    <span class="text-slate-500 font-medium">Kelengkapan Data:</span>
-                    <span id="actions-modal-completeness-pct" class="font-extrabold text-sky-600 font-mono">0%</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Detail Tabs Navigation Bar (Design.md §6.4) -->
-        <div class="bg-slate-50/80 border-b border-slate-200 px-6 pt-2 flex gap-1 font-sans text-xs select-none overflow-x-auto shrink-0" id="modal-tab-header">
-            <button onclick="switchActionTab('finance')" id="tab-btn-finance" type="button" class="py-2.5 px-4 rounded-t-lg font-semibold flex items-center gap-2 border-b-2 border-sky-600 text-sky-600 bg-white transition-all cursor-pointer">
-                <svg class="w-4 h-4 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                <span>1. Keuangan & Tagihan</span>
-            </button>
-
-            <button onclick="switchActionTab('technical')" id="tab-btn-technical" type="button" class="py-2.5 px-4 rounded-t-lg font-medium text-slate-500 hover:text-slate-900 transition-all cursor-pointer">
-                <svg class="w-4 h-4 text-slate-400 shrink-0 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-                <span>2. Teknis & Perangkat</span>
-            </button>
-
-            <button onclick="switchActionTab('field')" id="tab-btn-field" type="button" class="py-2.5 px-4 rounded-t-lg font-medium text-slate-500 hover:text-slate-900 transition-all cursor-pointer">
-                <svg class="w-4 h-4 text-slate-400 shrink-0 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span>3. Lokasi & Lapangan</span>
-            </button>
-
-            <button onclick="switchActionTab('profile')" id="tab-btn-profile" type="button" class="py-2.5 px-4 rounded-t-lg font-medium text-slate-500 hover:text-slate-900 transition-all cursor-pointer">
-                <svg class="w-4 h-4 text-slate-400 shrink-0 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                <span>4. Profil & Aksi</span>
+            <button type="button" onclick="closeActionsModal()" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl btn-interactive shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
 
-        <!-- Body Canvas Container (Clean Canvas Style - Design.md §6.4 & §6.5) -->
-        <div class="p-6 overflow-y-auto flex-1 bg-white">
+        <!-- MODAL TAB NAVIGATION (SCROLLABLE NO-SCROLLBAR) -->
+        <div class="px-2 sm:px-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40 flex items-center gap-1 overflow-x-auto shrink-0 no-scrollbar snap-x snap-mandatory" id="modal-tab-header">
+            <button type="button" onclick="switchActionTab('finance')" id="tab-btn-finance" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-bold border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                
+                <span class="hidden sm:inline">Ringkasan & Tagihan</span>
+                <span class="sm:hidden">Tagihan</span>
+            </button>
+            <button type="button" onclick="switchActionTab('technical')" id="tab-btn-technical" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                <span class="hidden sm:inline">Teknis & Perangkat</span>
+                <span class="sm:hidden">Teknis</span>
+            </button>
+            <button type="button" onclick="switchActionTab('field')" id="tab-btn-field" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="hidden sm:inline">Lokasi & Lapangan</span>
+                <span class="sm:hidden">Lokasi</span>
+            </button>
+            <button type="button" onclick="switchActionTab('profile')" id="tab-btn-profile" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span class="hidden sm:inline">Profil & Berkas</span>
+                <span class="sm:hidden">Berkas</span>
+            </button>
+        </div>
 
-            <!-- Loading Indicator -->
+        <!-- Body Scrollable Content -->
+        <div class="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1 overscroll-y-contain">
+            
+            <!-- Loading State -->
             <div id="modal-hub-loading" class="py-8 text-center hidden">
                 <svg class="animate-spin h-6 w-6 text-sky-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-xs text-slate-500 font-medium mt-2">Sinkronisasi data tagihan & riwayat...</p>
+                <p class="text-xs text-slate-500 font-medium mt-2">Memuat data tagihan & sistem...</p>
             </div>
 
-            <!-- TAB 1: KEUANGAN & TAGIHAN -->
-            <div id="tab-content-finance" class="tab-pane space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- Left Column: Active Invoice Summary -->
-                    <div class="space-y-4">
-                        <!-- Label-Caps Section Title (Design.md §6.9) -->
-                        <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                            <span class="inline-flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                RINGKASAN TAGIHAN AKTIF
-                            </span>
-                            <span id="hub-invoice-period-badge" class="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono rounded text-[11px] font-semibold">-</span>
-                        </div>
-
-                        <!-- Info Rows with Dividers (Design.md §6.5) -->
-                        <div class="divide-y divide-slate-100 text-xs">
-                            <div class="flex justify-between py-2.5">
-                                <span class="text-slate-500 font-medium">Paket Internet</span>
-                                <span id="hub-fin-package" class="font-semibold text-slate-900 text-right">-</span>
-                            </div>
-                            <div class="flex justify-between py-2.5">
-                                <span class="text-slate-500 font-medium">Harga Bulanan</span>
-                                <span id="hub-fin-price" class="font-mono font-semibold text-slate-900">-</span>
-                            </div>
-                            <div class="flex justify-between py-2.5">
-                                <span class="text-slate-500 font-medium">Jatuh Tempo</span>
-                                <span id="hub-fin-due-date" class="font-mono font-medium text-slate-800">-</span>
-                            </div>
-                            <div class="flex justify-between py-2.5">
-                                <span class="text-slate-500 font-medium">Total Piutang Lintas Periode</span>
-                                <span id="hub-fin-arrears" class="font-mono font-bold text-rose-600">Rp 0</span>
-                            </div>
-                            <div class="flex justify-between py-2.5">
-                                <span class="text-slate-500 font-medium">Diskon Tagihan</span>
-                                <span id="hub-fin-discount" class="font-mono font-semibold text-emerald-600">Rp 0</span>
-                            </div>
-                        </div>
-
-                        <!-- Highlighted Total Pay Row -->
-                        <div class="pt-3 border-t border-slate-200 flex items-baseline justify-between">
-                            <span class="text-xs font-bold text-slate-700">Total Harus Dibayar:</span>
-                            <span id="hub-fin-total-pay" class="font-mono text-xl font-extrabold text-slate-900 tabular-nums">Rp 0</span>
+            <!-- TAB 1: RINGKASAN & KEUANGAN -->
+            <div id="tab-content-finance" class="tab-pane space-y-4 sm:space-y-6">
+                
+                <div class="hidden lg:flex lg:flex-wrap gap-2">
+                    <!-- Kirim WA Dropdown -->
+                    <div class="relative flex-1 min-w-[140px]" id="wa-dropdown-container">
+                        
+                        <button type="button" onclick="toggleWaDropdown()" class="w-full h-11 px-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-all btn-interactive touch-target">
+                            <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                            <span>Kirim WA</span>
+                        </button>
+                        <div id="wa-menu-dropdown" class="hidden absolute left-0 right-0 sm:right-auto mt-1 w-full sm:w-60 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xl z-30 p-2 space-y-1 text-xs">
+                            <span class="text-[10px] font-bold text-slate-400 px-2 uppercase">Pilih Template WA:</span>
+                            <a id="btn-wa-reminder" href="#" target="_blank" class="block p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 btn-interactive">
+                                <p class="font-bold">Pengingat Tagihan</p>
+                                <p class="text-[10px] text-slate-400">Notifikasi invoice & jatuh tempo</p>
+                            </a>
+                            <a id="btn-wa-confirmation" href="#" target="_blank" class="block p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 btn-interactive">
+                                <p class="font-bold">Konfirmasi Pembayaran</p>
+                                <p class="text-[10px] text-slate-400">Terima kasih pembayaran lunas</p>
+                            </a>
+                            <a id="btn-wa-isolir" href="#" target="_blank" class="block p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 btn-interactive">
+                                <p class="font-bold">Pemberitahuan Isolir</p>
+                                <p class="text-[10px] text-slate-400">Penangguhan sementara</p>
+                            </a>
                         </div>
                     </div>
 
-                    <!-- Right Column: Quick Payment Form -->
-                    <div class="space-y-4" id="payment-form-container">
-                        <!-- Label-Caps Section Title (Design.md §6.9) -->
-                        <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                            <span class="inline-flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                INPUT PEMBAYARAN CASIER
-                            </span>
-                            <span class="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Kasir Hub</span>
+                    <!-- Switch Status Layanan -->
+                    <button type="button" onclick="triggerHubToggleConnection()" id="btn-hub-toggle-status" class="flex-1 min-w-[140px] h-11 px-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-100 transition-all btn-interactive touch-target">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        <span id="btn-hub-toggle-status-text">Isolir Layanan</span>
+                    </button>
+
+                    <?php if(auth()->user()->hasPermission('payments.view')): ?>
+                    
+                        <button type="button" onclick="printLatestReceipt()" id="btn-print-receipt" disabled
+                                class="btn-print-receipt-action flex-1 min-w-[140px] h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold flex items-center justify-center gap-1.5 shadow-sm btn-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Cetak struk pembayaran terakhir">
+                            <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+                            <span>Cetak Struk</span>
+                        </button>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Grid Info Tagihan & Form Pembayaran Cepat -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Left: Tagihan Active Card Summary -->
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ringkasan Tagihan</h4>
+                            <span id="hub-invoice-period-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">Periode</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Paket Internet</span>
+                                <span id="hub-fin-package" class="font-semibold text-slate-900 dark:text-white">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Harga Bulanan</span>
+                                <span id="hub-fin-price" class="font-mono font-bold text-slate-900 dark:text-white">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Jatuh Tempo</span>
+                                <span id="hub-fin-due-date" class="font-mono text-slate-800 dark:text-slate-200">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Total Piutang</span>
+                                <span id="hub-fin-arrears" class="font-mono font-bold text-rose-600">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                                <span class="font-bold text-slate-900 dark:text-white">Total Harus Dibayar</span>
+                                <span id="hub-fin-total-pay" class="font-mono font-bold text-base text-emerald-600 dark:text-emerald-400">Rp 0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Form Input Pembayaran Cepat -->
+                    <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-3" id="payment-form-container">
+                        <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                            <h4 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span>Input Pembayaran Instan</span>
+                            </h4>
                         </div>
 
-                        <form id="payment-form" method="POST" action="">
+                        <!-- Notice Badge Saat Belum Ada Tagihan -->
+                        <div id="payment-form-notice" class="hidden p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-300 text-[11px] font-medium flex items-center gap-2">
+                            <svg class="w-4 h-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                            <span id="payment-form-notice-text">Pelanggan ini belum memiliki tagihan aktif.</span>
+                        </div>
+
+                        <form id="payment-form" method="POST" action="" class="space-y-3 text-xs">
                             <?php echo csrf_field(); ?>
-                            <div class="space-y-3 text-xs">
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block font-medium text-slate-600 mb-1">Tanggal Bayar *</label>
-                                        <input type="date" name="payment_date" id="payment_date" value="<?php echo e(date('Y-m-d')); ?>" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" required>
-                                    </div>
-                                    <div>
-                                        <label class="block font-medium text-slate-600 mb-1">Metode *</label>
-                                        <select name="payment_method" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" required>
-                                            <option value="cash">Tunai (Cash)</option>
-                                            <option value="transfer">Transfer Bank</option>
-                                            <option value="qris">QRIS</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="block font-medium text-slate-600 mb-1">Nominal Diterima *</label>
-                                        <input type="number" name="amount" id="payment_amount" class="w-full text-xs font-mono font-bold px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" required>
-                                    </div>
-                                    <div>
-                                        <label class="block font-medium text-slate-600 mb-1">Alokasi Tagihan</label>
-                                        <select id="payment_allocation" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
-                                            <option value="Untuk Tagihan Bulanan">Tagihan Bulanan</option>
-                                            <option value="Bayar Piutang">Bayar Piutang</option>
-                                            <option value="Lebih Bayar">Lebih Bayar</option>
-                                        </select>
-                                    </div>
-                                </div>
-
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Nominal Pembayaran (Rp)</label>
+                                <input type="number" name="amount" id="payment_amount" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-bold text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="block font-medium text-slate-600 mb-1">Keterangan / Catatan</label>
-                                    <input type="text" name="note" id="payment_note" placeholder="Catatan pembayaran opsional..." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Metode</label>
+                                    <select name="payment_method" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
+                                        <option value="cash">Tunai / Kasir</option>
+                                        <option value="transfer">Transfer Bank</option>
+                                        <option value="qris">QRIS</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Tanggal</label>
+                                    <input type="date" name="payment_date" id="payment_date" value="<?php echo e(date('Y-m-d')); ?>" class="w-full h-10 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all" required>
                                 </div>
                             </div>
-
-                            <div class="mt-4">
-                                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-4 rounded-lg shadow-2xs transition-colors cursor-pointer flex items-center justify-center gap-1.5">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                    <span>Konfirmasi Pembayaran</span>
+                            <div class="flex flex-col sm:flex-row items-stretch gap-2">
+                                <button type="submit" class="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 btn-interactive">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Simpan Pembayaran</span>
                                 </button>
                             </div>
                         </form>
                     </div>
-
-                    <!-- No Invoice State -->
-                    <div id="no-invoice-state" class="p-8 text-center hidden md:col-span-1 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        </div>
-                        <p class="text-xs font-bold text-slate-900">Tidak ada tagihan aktif atau piutang</p>
-                        <p class="text-[11px] text-slate-500 mt-0.5">Semua kewajiban tagihan telah lunas.</p>
-                    </div>
                 </div>
 
-                <!-- Recent Payments History Table (Design.md §6.4 & §6.5) -->
-                <div class="pt-4 border-t border-slate-200 space-y-3">
-                    <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                        <span>RIWAYAT 3 PEMBAYARAN TERAKHIR</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs text-slate-700">
+                <!-- Riwayat Pembayaran Terakhir -->
+                <div class="space-y-2">
+                    <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Riwayat 3 Pembayaran Terakhir</h5>
+                    
+                    <div class="border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-x-auto">
+                        <table class="w-full min-w-[420px] text-left text-xs">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                <tr class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
                                     <th class="py-2.5 px-3">TANGGAL</th>
-                                    <th class="py-2.5 px-3">NO. INVOICE</th>
+                                    <th class="py-2.5 px-3">INVOICE</th>
                                     <th class="py-2.5 px-3">METODE</th>
                                     <th class="py-2.5 px-3 text-right">NOMINAL</th>
+                                    <th class="py-2.5 px-3 text-center">STRUK</th>
                                 </tr>
                             </thead>
-                            <tbody id="hub-recent-payments-body" class="divide-y divide-slate-100 font-sans">
+                            <tbody id="hub-recent-payments-body" class="divide-y divide-slate-100 dark:divide-slate-800">
                                 <tr>
-                                    <td colspan="4" class="py-4 text-center text-slate-400">Belum ada riwayat pembayaran.</td>
+                                    <td colspan="5" class="py-4 text-center text-slate-400">Belum ada riwayat pembayaran.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1034,322 +1195,278 @@
             </div>
 
             <!-- TAB 2: TEKNIS & PERANGKAT -->
-            <div id="tab-content-technical" class="tab-pane hidden space-y-6">
-                <!-- Label-Caps Section Title -->
-                <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                    <span class="inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-                        PARAMETRIK KONEKSI & PERANGKAT
-                    </span>
-                    <button onclick="copyTechInfo()" type="button" class="text-sky-600 hover:underline cursor-pointer text-xs font-semibold">Copy Semua Teknis &rarr;</button>
-                </div>
-
-                <!-- Info Rows with Dividers (Clean Canvas Style - Design.md §6.5) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs divide-y sm:divide-y-0 divide-slate-100">
-                    <div class="space-y-1">
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">Username PPPoE</span>
-                            <span id="hub-tech-pppoe" class="font-mono font-bold text-slate-900">-</span>
-                        </div>
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">IP Address</span>
-                            <span id="hub-tech-ip" class="font-mono font-bold text-sky-600">-</span>
-                        </div>
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">SN / MAC ONU</span>
-                            <span id="hub-tech-onu" class="font-mono font-semibold text-slate-800">-</span>
+            <div id="tab-content-technical" class="tab-pane hidden space-y-4 sm:space-y-5">
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-4 text-xs">
+                    <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            <span>Konfigurasi Teknis Jaringan & Perangkat</span>
+                        </h4>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" onclick="copyTechInfo()" class="text-sky-600 dark:text-sky-400 font-semibold hover:underline">Copy Teknis</button>
+                            <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
+                            <button type="button" onclick="triggerNetworkAssignmentFromHub()"
+                                    class="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-800 text-sky-600 dark:text-sky-400 font-semibold hover:bg-sky-50 dark:hover:bg-slate-700 transition-colors btn-interactive inline-flex items-center gap-1.5"
+                                    title="Atur Mini POP & Distribusi">
+                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                                <span>Atur Jaringan</span>
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <div class="space-y-1">
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">SN Router WiFi</span>
-                            <span id="hub-tech-router" class="font-mono font-semibold text-slate-800">-</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">Username PPPoE</span>
+                            <span id="hub-tech-pppoe" class="font-mono font-bold text-slate-900 dark:text-white">-</span>
                         </div>
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">ODP / Distribusi</span>
-                            <span id="hub-tech-distribution" class="font-semibold text-slate-900">-</span>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">IP Address</span>
+                            <span id="hub-tech-ip" class="font-mono font-bold text-sky-600 dark:text-sky-400">-</span>
                         </div>
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">Skema Kontrak</span>
-                            <span id="hub-tech-contract" class="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">-</span>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">VLAN ID</span>
+                            <span id="hub-tech-vlan" class="font-mono font-semibold text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">Bandwidth</span>
+                            <span id="hub-tech-bandwidth" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">SN ONU / Modem</span>
+                            <span id="hub-tech-onu" class="font-mono font-semibold text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">SN Router WiFi</span>
+                            <span id="hub-tech-router" class="font-mono font-semibold text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">ODP / Distribusi</span>
+                            <span id="hub-tech-distribution" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">Skema Kontrak</span>
+                            <span id="hub-tech-contract" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
                         </div>
                     </div>
-                </div>
-
-                <!-- Connection Control Box (Design.md Action Box) -->
-                <div class="pt-4 border-t border-slate-200 flex items-center justify-between gap-4">
-                    <div>
-                        <span class="text-xs font-bold text-slate-900 block">Kontrol Status Koneksi Pelanggan</span>
-                        <span class="text-[11px] text-slate-500">Ubah status koneksi internet pelanggan (Aktif / Isolir Suspend).</span>
-                    </div>
-                    <button id="btn-hub-toggle-connection" onclick="triggerHubToggleConnection()" type="button" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0">
-                        Toggle Koneksi
-                    </button>
                 </div>
             </div>
 
             <!-- TAB 3: LOKASI & LAPANGAN -->
-            <div id="tab-content-field" class="tab-pane hidden space-y-6">
-                <!-- Label-Caps Section Title -->
-                <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                    <span class="inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        DATA ALAMAT & NAVIGASI TEKNISI
-                    </span>
-                </div>
-
-                <div class="space-y-3 text-xs">
-                    <div class="flex flex-col gap-1 py-2 border-b border-slate-100">
-                        <span class="text-slate-500 font-medium">Alamat Pemasangan Lengkap</span>
-                        <p id="hub-field-address-full" class="text-sm font-semibold text-slate-900 leading-relaxed pt-0.5">-</p>
+            <div id="tab-content-field" class="tab-pane hidden space-y-4 sm:space-y-5">
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
+                    <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <span>Alamat Pemasangan & Navigasi</span>
+                        </h4>
                     </div>
 
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-                        <div class="py-2 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium block">Desa / Kelurahan</span>
-                            <span id="hub-field-village" class="font-semibold text-slate-900 mt-1 block">-</span>
+                    <div class="space-y-2">
+                        <div>
+                            <span class="text-slate-400 text-[11px] block">Alamat Pemasangan Lengkap</span>
+                            <p id="hub-field-address-full" class="font-semibold text-slate-900 dark:text-white text-sm">-</p>
                         </div>
-                        <div class="py-2 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium block">Kecamatan</span>
-                            <span id="hub-field-district" class="font-semibold text-slate-900 mt-0.5 block">-</span>
+                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700">
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">Desa / Kelurahan</span>
+                                <span id="hub-field-village" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">Kecamatan</span>
+                                <span id="hub-field-district" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">Kota / Kabupaten</span>
+                                <span id="hub-field-city" class="font-semibold text-slate-800 dark:text-slate-200">-</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 text-[10px] block">Kode Pos</span>
+                                <span id="hub-field-postal-code" class="font-mono text-slate-800 dark:text-slate-200">-</span>
+                            </div>
                         </div>
-                        <div class="py-2 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium block">Kota / Kabupaten</span>
-                            <span id="hub-field-city" class="font-semibold text-slate-900 mt-0.5 block">-</span>
-                        </div>
-                        <div class="py-2 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium block">Kode Pos</span>
-                            <span id="hub-field-postal-code" class="font-mono font-semibold text-slate-800 mt-0.5 block">-</span>
+                        <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700">
+                            <span class="text-slate-400 text-[10px] block">Koordinat GPS</span>
+                            <span id="hub-field-coords" class="font-mono font-bold text-sky-600 dark:text-sky-400 block">-</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Section 3: GPS & Navigasi Direct -->
-                <div class="space-y-3 pt-2">
-                    <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                        <span class="inline-flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                            GEOLOKASI GPS & NAVIGASI LAPANGAN
-                        </span>
+                    <div class="pt-3 flex justify-end">
+                        <a id="btn-field-launch-maps" href="#" target="_blank" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold inline-flex items-center justify-center gap-2 shadow-md shadow-sky-600/20 btn-interactive">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <span>Buka Google Maps</span>
+                        </a>
                     </div>
-
-                    <div class="flex justify-between items-center py-2.5 border-b border-slate-100 text-xs">
-                        <span class="text-slate-500 font-medium">Koordinat GPS (Lat, Lng)</span>
-                        <span id="hub-field-coords" class="font-mono font-bold text-slate-900 text-sm">-</span>
-                    </div>
-                </div>
-
-                <!-- Field Direct Maps Launcher Card -->
-                <div class="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div>
-                        <span class="text-xs font-bold text-slate-900 block">Navigasi Langsung Google Maps</span>
-                        <span class="text-[11px] text-slate-500">Buka peta rute penanganan untuk teknisi lapangan secara instan.</span>
-                    </div>
-                    <a id="btn-field-launch-maps" href="#" target="_blank" class="w-full sm:w-auto bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-2xs transition-colors text-center shrink-0">
-                        Buka Google Maps &rarr;
-                    </a>
                 </div>
             </div>
 
-            <!-- TAB 4: PROFIL & ADMINISTRASI (Rich CS & Admin View) -->
-            <div id="tab-content-profile" class="tab-pane hidden space-y-6">
-                <!-- Section 1: Identitas Master -->
-                <div class="space-y-3">
-                    <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                        <span class="inline-flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            IDENTITAS MASTER PELANGGAN
-                        </span>
+            <!-- TAB 4: PROFIL & BERKAS -->
+            <div id="tab-content-profile" class="tab-pane hidden space-y-4 sm:space-y-5">
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
+                    <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                        <h4 class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            <span>Identitas & Kelengkapan Berkas</span>
+                        </h4>
+                        <span id="hub-prof-completeness-status" class="px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-amber-100 text-amber-700">-</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs divide-y sm:divide-y-0 divide-slate-100">
-                        <div class="space-y-1">
-                            <div class="flex justify-between py-2.5 border-b border-slate-100">
-                                <span class="text-slate-500 font-medium">Nama Lengkap</span>
-                                <span id="hub-prof-fullname" class="font-semibold text-slate-900">-</span>
-                            </div>
-                            <div class="flex justify-between py-2.5 border-b border-slate-100">
-                                <span class="text-slate-500 font-medium">NIK / No. KTP</span>
-                                <span id="hub-prof-nik" class="font-mono font-semibold text-slate-900">-</span>
-                            </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">Nama Lengkap</span>
+                            <span id="hub-prof-fullname" class="font-bold text-slate-900 dark:text-white">-</span>
                         </div>
-
-                        <div class="space-y-1">
-                            <div class="flex justify-between py-2.5 border-b border-slate-100">
-                                <span class="text-slate-500 font-medium">Kode Pelanggan (CID)</span>
-                                <span id="hub-prof-cid" class="font-mono font-bold text-sky-600">-</span>
-                            </div>
-                            <div class="flex justify-between py-2.5 border-b border-slate-100">
-                                <span class="text-slate-500 font-medium">Tanggal Registrasi</span>
-                                <span id="hub-prof-reg" class="font-mono font-semibold text-slate-900">-</span>
-                            </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">NIK / No. KTP</span>
+                            <span id="hub-prof-nik" class="font-mono text-slate-800 dark:text-slate-200">-</span>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Section 2: Kontak Komunikasi -->
-                <div class="space-y-3 pt-2">
-                    <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                        <span class="inline-flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                            KONTAK & SALURAN KOMUNIKASI
-                        </span>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs divide-y sm:divide-y-0 divide-slate-100">
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">Telepon / WhatsApp</span>
-                            <span id="hub-prof-phone" class="font-mono font-bold text-slate-900">-</span>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">Kode Pelanggan (CID)</span>
+                            <span id="hub-prof-cid" class="font-mono font-bold text-sky-600 dark:text-sky-400">-</span>
                         </div>
-                        <div class="flex justify-between py-2.5 border-b border-slate-100">
-                            <span class="text-slate-500 font-medium">Email Pelanggan</span>
-                            <span id="hub-prof-email" class="font-medium text-slate-900 truncate max-w-[160px]">-</span>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">No. HP / WA</span>
+                            <span id="hub-prof-phone" class="font-mono text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">Email</span>
+                            <span id="hub-prof-email" class="text-slate-800 dark:text-slate-200">-</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 text-[10px] block">Tanggal Registrasi</span>
+                            <span id="hub-prof-reg" class="font-mono text-slate-800 dark:text-slate-200">-</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Section 3: Status Kelengkapan Data -->
-                <div class="space-y-3 pt-2">
-                    <div class="text-[10px] font-semibold tracking-wider text-slate-500 uppercase flex items-center justify-between">
-                        <span class="inline-flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            STATUS KELENGKAPAN ADMINISTRASI
-                        </span>
-                        <span id="hub-prof-completeness-status" class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">-</span>
-                    </div>
-
-                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="font-medium text-slate-700">Kemajuan Kelengkapan Berkas:</span>
-                            <span id="hub-prof-completeness-bar-text" class="font-mono font-bold text-sky-600">0%</span>
+                    <!-- Progress Bar Kelengkapan -->
+                    <div class="pt-3 border-t border-slate-200/60 dark:border-slate-700 space-y-1.5">
+                        <div class="flex justify-between text-xs font-semibold">
+                            <span class="text-slate-700 dark:text-slate-200">Kemajuan Kelengkapan Berkas</span>
+                            <span id="hub-prof-completeness-bar-text" class="font-mono text-sky-600 dark:text-sky-400">0%</span>
                         </div>
-                        <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                             <div id="hub-prof-completeness-bar" class="h-full bg-sky-600 transition-all duration-300" style="width: 0%;"></div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Kartu Berkas: KTP & Foto Rumah -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <?php $__currentLoopData = [
+                        ['type' => 'ktp', 'title' => 'Foto KTP / Identitas', 'upload_label' => 'Ganti / Upload KTP'],
+                        ['type' => 'rumah', 'title' => 'Foto Rumah / Lokasi', 'upload_label' => 'Upload Foto Lokasi'],
+                    ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $berkas): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <div class="p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-bold text-slate-800 dark:text-white"><?php echo e($berkas['title']); ?></span>
+                            <span id="hub-doc-<?php echo e($berkas['type']); ?>-badge" class="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold shrink-0">-</span>
+                        </div>
+
+                        <div class="h-28 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 overflow-hidden">
+                            <a id="hub-doc-<?php echo e($berkas['type']); ?>-link" href="#" target="_blank" class="hidden w-full h-full items-center justify-center text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline">
+                                Lihat Berkas Tersimpan
+                            </a>
+                            <span id="hub-doc-<?php echo e($berkas['type']); ?>-empty" class="text-[10px] px-2 text-center">Belum ada berkas diunggah.</span>
+                        </div>
+
+                        <?php if(auth()->user()->hasPermission('customers.detail.documents.upload')): ?>
+                        
+                        <form method="POST" action="" enctype="multipart/form-data" class="space-y-1.5 hub-document-form" data-document-type="<?php echo e($berkas['type']); ?>">
+                            <?php echo csrf_field(); ?>
+                            <input type="hidden" name="document_type" value="<?php echo e($berkas['type']); ?>">
+                            <input type="file" name="document_file" required accept=".jpg,.jpeg,.png,.webp,.pdf"
+                                   class="w-full text-[10px] text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-200">
+                            <button type="submit" class="w-full py-2 rounded-lg border border-sky-200 dark:border-sky-900/60 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 text-[11px] font-semibold touch-target btn-interactive">
+                                <?php echo e($berkas['upload_label']); ?>
+
+                            </button>
+                        </form>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
             </div>
+
         </div>
 
-        <!-- Footer Hub: Primary Action Footer Bar (Requirement User & Design.md) -->
-        <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <!-- Left Group: Navigation & Management Actions -->
-            <div class="flex flex-wrap items-center gap-2">
-                <button onclick="triggerDetail()" type="button" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    <span>Lihat Full Detail</span>
+        <!-- Modal Footer -->
+        
+        <div class="lg:hidden px-2 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
+            <div class="grid grid-cols-6 gap-1">
+                <button type="button" onclick="triggerDetail()" title="Detail Full"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">Detail</span>
                 </button>
 
                 <?php if(auth()->user()->hasPermission('customers.update')): ?>
-                <button onclick="triggerEdit()" type="button" class="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    <span>Edit Master Data</span>
+                <button type="button" onclick="triggerEdit()" title="Edit Data Pelanggan"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">Edit</span>
                 </button>
                 <?php endif; ?>
-            </div>
 
-            <!-- Right Group: Termination & Close Buttons -->
-            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="focusWaTemplates()" data-wa-trigger title="Kirim WhatsApp"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">WA</span>
+                </button>
+
+                <?php if(auth()->user()->hasPermission('payments.view')): ?>
                 
-                <?php if(auth()->user()->hasPermission('customers.deactivate')): ?>
-                <button onclick="triggerTerminate()" type="button" class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                    <span>Putus Langganan</span>
-                </button>
+                    <button type="button" onclick="printLatestReceipt()" id="btn-hub-footer-print-receipt" disabled
+                        class="btn-print-receipt-action flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors btn-interactive disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Cetak struk pembayaran terakhir">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+                        <span class="text-[9px] font-semibold leading-none">PDF</span>
+                    </button>
                 <?php endif; ?>
 
-                <button onclick="closeActionsModal()" type="button" class="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-lg transition-colors cursor-pointer shadow-2xs">
-                    Tutup Modal
+                <button type="button" onclick="triggerHubToggleConnection()" title="Isolir / Aktifkan Layanan"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    <span id="btn-hub-footer-toggle-text" class="text-[9px] font-semibold leading-none">Isolir</span>
                 </button>
+
+                <?php if(auth()->user()->hasPermission('customers.deactivate')): ?>
+                <button type="button" onclick="triggerTerminate()" title="Putus Langganan"
+                        class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors btn-interactive">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-1.756-4.928a4 4 0 005.656 0l4-4a4 4 0 10-5.656-5.656l-1.1 1.1"/></svg>
+                    <span class="text-[9px] font-semibold leading-none">Putus</span>
+                </button>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="hidden lg:flex px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 items-center justify-between gap-2 bg-slate-50/80 dark:bg-slate-900/80 shrink-0 text-xs">
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="triggerDetail()" class="h-10 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold transition-colors shadow-sm btn-interactive inline-flex items-center justify-center text-center">
+                    Detail Full
+                </button>
+                <?php if(auth()->user()->hasPermission('customers.update')): ?>
+                <button type="button" onclick="triggerEdit()" class="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors btn-interactive inline-flex items-center justify-center text-center">
+                    Edit Master Data
+                </button>
+                <?php endif; ?>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <?php if(auth()->user()->hasPermission('customers.deactivate')): ?>
+                <button type="button" onclick="triggerTerminate()" class="h-10 px-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 font-semibold hover:bg-rose-100 dark:hover:bg-rose-950/70 transition-colors btn-interactive inline-flex items-center justify-center text-center">
+                    Putus Langganan
+                </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Customer Detail Modal -->
-<div id="detail-modal" class="fixed inset-0 bg-slate-900/60 flex items-center justify-center hidden z-50 p-4 transition-all duration-300">
-    <div class="bg-white border border-slate-200 rounded-lg w-full max-w-lg shadow-xl overflow-hidden transform scale-95 transition-all duration-300">
-        <!-- Header -->
-        <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <span>Detail Pelanggan</span>
-                <span id="modal-code-badge" class="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs font-mono data-text"></span>
-            </h3>
-            <button onclick="closeDetailModal()" class="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-        <!-- Body -->
-        <div class="p-6 space-y-4 text-sm text-slate-700">
-            <!-- Row 1: Name -->
-            <div>
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">NAMA LENGKAP</span>
-                <span id="modal-name" class="font-semibold text-slate-900 text-base"></span>
-            </div>
-
-            <!-- Row 2: Contact -->
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">TELEPON</span>
-                    <span id="modal-phone" class="font-mono text-slate-900 data-text"></span>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">EMAIL</span>
-                    <span id="modal-email" class="text-slate-900 truncate block"></span>
-                </div>
-            </div>
-
-            <hr class="border-slate-100">
-
-            <!-- Row 3: Service & Date -->
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">PAKET INTERNET</span>
-                    <span id="modal-package" class="font-medium text-slate-900"></span>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">HARGA BULANAN</span>
-                    <span id="modal-price" class="font-mono text-slate-900 data-text"></span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">TANGGAL DAFTAR</span>
-                    <span id="modal-reg-date" class="font-mono text-slate-900 data-text"></span>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">STATUS LAYANAN</span>
-                    <div id="modal-status-container" class="mt-0.5"></div>
-                </div>
-            </div>
-
-            <hr class="border-slate-100">
-
-            <!-- Row 4: Address -->
-            <div>
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">ALAMAT INSTALASI</span>
-                <p id="modal-address" class="text-slate-800 leading-relaxed"></p>
-                <div class="flex gap-1.5 mt-1">
-                    <span id="modal-village" class="px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-500"></span>
-                    <span id="modal-district" class="px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-500"></span>
-                </div>
-            </div>
-        </div>
-        <!-- Footer -->
-        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
-            <button onclick="closeDetailModal()" class="btn-secondary">Tutup</button>
-        </div>
-    </div>
-</div>
 <?php $__env->stopSection(); ?>
 
 <?php $__env->startSection('scripts'); ?>
 <script>
-    /* ── Kerapatan tabel (match template) ── */
+    /* ── Kerapatan tabel ── */
     function setDensity(mode) {
         document.documentElement.classList.toggle('density-compact', mode === 'compact');
         localStorage.setItem('whusnet-density', mode);
@@ -1358,8 +1475,8 @@
 
     function syncDensityButtons() {
         const compact = document.documentElement.classList.contains('density-compact');
-        const on  = 'px-2.5 py-1 rounded-md transition-colors bg-white dark:bg-slate-700 text-sky-700 dark:text-sky-300 shadow-sm';
-        const off = 'px-2.5 py-1 rounded-md transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200';
+        const on  = 'px-2.5 py-1 rounded-lg transition-all bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 font-semibold shadow-sm';
+        const off = 'px-2.5 py-1 rounded-lg transition-all text-slate-500 hover:text-slate-700 dark:hover:text-slate-200';
         const c = document.getElementById('density-compact');
         const f = document.getElementById('density-comfortable');
         if (c) c.className = compact ? on : off;
@@ -1373,17 +1490,15 @@
         syncDensityButtons();
     })();
 
-    /* ──────────────────────────────────────────────────────────────
-     * Navigasi keyboard tabel (match template).
-     * Operator memproses ratusan baris/hari — memaksa tangan bolak-balik
-     * ke mouse tiap baris menyumbang RSI. Pintasan bikin alur tanpa mouse.
-     * ────────────────────────────────────────────────────────────── */
+    /* ── Navigasi keyboard tabel ── */
     (function () {
         const table = document.getElementById('customerTable');
         if (!table) return;
 
         let activeRow = -1;
-        const rowEls = () => Array.from(table.querySelectorAll('tbody tr')).filter(tr => tr.querySelector('.select-customer'));
+        // Baris data ditandai [data-customer-row] — baris "tidak ada data" tidak
+        // punya penanda ini, jadi tidak ikut jadi target navigasi.
+        const rowEls = () => Array.from(table.querySelectorAll('tbody tr[data-customer-row]'));
 
         function setActiveRow(i) {
             const rows = rowEls();
@@ -1397,14 +1512,13 @@
 
         function anyModalOpen() {
             return !document.getElementById('actions-modal')?.classList.contains('hidden')
-                || !document.getElementById('shortcutsModal')?.classList.contains('hidden');
+                || !document.getElementById('network-modal-wrapper')?.classList.contains('hidden');
         }
 
         document.addEventListener('keydown', e => {
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                         || document.activeElement.isContentEditable;
 
-            // Esc — tutup modal aksi pelanggan bila sedang terbuka.
             if (e.key === 'Escape') {
                 const actionsModal = document.getElementById('actions-modal');
                 if (actionsModal && !actionsModal.classList.contains('hidden')) {
@@ -1412,9 +1526,14 @@
                     closeActionsModal();
                     return;
                 }
+                const netModal = document.getElementById('network-modal-wrapper');
+                if (netModal && !netModal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closeNetworkAssignmentModal();
+                    return;
+                }
             }
 
-            // Alt+N — tambah pelanggan, berlaku di mana saja (pakai link yang ada).
             if (e.altKey && e.key.toLowerCase() === 'n') {
                 const addLink = document.querySelector('a[href="/customers/create"]');
                 if (addLink) { e.preventDefault(); window.location = addLink.href; }
@@ -1433,21 +1552,17 @@
                     if (!rows.length) return; e.preventDefault(); setActiveRow(0); break;
                 case 'End':
                     if (!rows.length) return; e.preventDefault(); setActiveRow(rows.length - 1); break;
-                case 'PageDown': {
-                    const next = document.getElementById('paginateNext');
-                    if (next && next.href) { e.preventDefault(); window.location = next.href; }
-                    break;
-                }
+                // PageUp/PageDown pindah halaman paginasi. Sudah didokumentasikan
+                // di modal Pintasan (layouts/app.blade.php) tapi belum pernah
+                // diimplementasikan di halaman ini.
                 case 'PageUp': {
                     const prev = document.getElementById('paginatePrev');
-                    if (prev && prev.href) { e.preventDefault(); window.location = prev.href; }
+                    if (prev && prev.tagName === 'A' && prev.href) { e.preventDefault(); window.location = prev.href; }
                     break;
                 }
-                case ' ': {
-                    if (activeRow < 0) return;
-                    e.preventDefault();
-                    const cb = rows[activeRow].querySelector('.select-customer');
-                    if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+                case 'PageDown': {
+                    const next = document.getElementById('paginateNext');
+                    if (next && next.tagName === 'A' && next.href) { e.preventDefault(); window.location = next.href; }
                     break;
                 }
                 case 'Enter': {
@@ -1463,96 +1578,97 @@
 
     let selectedCustomerData = {};
 
-    const selected = new Set();
-    
-    function toggleRow(id, checked) {
-        if (checked) {
-            selected.add(id);
-        } else {
-            selected.delete(id);
-        }
-        syncSelectAll();
-        renderBulkBar();
-    }
-    
-    function toggleSelectAll(checked) {
-        document.querySelectorAll('.select-customer').forEach(cb => {
-            cb.checked = checked;
-            const id = cb.value;
-            if (checked) {
-                selected.add(id);
-            } else {
-                selected.delete(id);
-            }
-        });
-        renderBulkBar();
-    }
-    
-    function syncSelectAll() {
-        const selectAll = document.getElementById('selectAll');
-        if (!selectAll) return;
-        const cbs = document.querySelectorAll('.select-customer');
-        if (cbs.length === 0) return;
-        const n = Array.from(cbs).filter(cb => cb.checked).length;
-        selectAll.checked = n > 0 && n === cbs.length;
-        selectAll.indeterminate = n > 0 && n < cbs.length;
-    }
-    
-    function clearSelection() {
-        selected.clear();
-        document.querySelectorAll('.select-customer').forEach(cb => cb.checked = false);
-        const selectAll = document.getElementById('selectAll');
-        if (selectAll) {
-            selectAll.checked = false;
-            selectAll.indeterminate = false;
-        }
-        renderBulkBar();
-    }
-    
-    function renderBulkBar() {
-        const bar = document.getElementById('bulkBar');
-        if (!bar) return;
-        const countEl = document.getElementById('bulkCount');
-        if (countEl) countEl.innerText = selected.size;
-        
-        if (selected.size > 0) {
-            bar.classList.remove('hidden');
-            bar.classList.add('flex');
-        } else {
-            bar.classList.add('hidden');
-            bar.classList.remove('flex');
-        }
-    }
-    
-    function bulkCetak() {
-        if (selected.size === 0) return;
-        if (window.Toast) {
-            window.Toast.success('Cetak Massal', `Menyiapkan ${selected.size} PDF tagihan...`);
-        } else {
-            alert(`Menyiapkan ${selected.size} PDF tagihan...`);
-        }
-        clearSelection();
-    }
+    // Cuma kelas STATE yang ditukar, bukan className utuh. Menimpa className
+    // penuh (versi lama) ikut menghapus kelas responsif tab (text-[11px]
+    // sm:text-xs, sm:px-4, snap-start) — begitu user pindah tab sekali, header
+    // tab langsung berantakan di layar kecil.
+    const TAB_ACTIVE_CLASSES = ['font-bold', 'border-sky-600', 'text-sky-600', 'dark:text-sky-400', 'bg-white', 'dark:bg-slate-800'];
+    const TAB_INACTIVE_CLASSES = ['font-medium', 'border-transparent', 'text-slate-500', 'hover:text-slate-700', 'dark:hover:text-slate-300'];
 
     function switchActionTab(tabName) {
         const tabs = ['finance', 'technical', 'field', 'profile'];
         tabs.forEach(t => {
             const btn = document.getElementById(`tab-btn-${t}`);
             const content = document.getElementById(`tab-content-${t}`);
-            if (t === tabName) {
-                if (btn) btn.className = 'py-2.5 px-4 rounded-t-lg font-semibold flex items-center gap-2 border-b-2 border-sky-600 text-sky-600 bg-white transition-all cursor-pointer';
-                if (content) content.classList.remove('hidden');
-            } else {
-                if (btn) btn.className = 'py-2.5 px-4 rounded-t-lg font-medium text-slate-500 hover:text-slate-900 transition-all cursor-pointer';
-                if (content) content.classList.add('hidden');
+            const isActive = t === tabName;
+
+            if (btn) {
+                btn.classList.remove(...(isActive ? TAB_INACTIVE_CLASSES : TAB_ACTIVE_CLASSES));
+                btn.classList.add(...(isActive ? TAB_ACTIVE_CLASSES : TAB_INACTIVE_CLASSES));
             }
+            if (content) content.classList.toggle('hidden', !isActive);
         });
+    }
+
+    function showModalToast(msg) {
+        const toast = document.getElementById('modal-toast');
+        const text = document.getElementById('modal-toast-text');
+        if (!toast || !text) return;
+        text.innerText = msg;
+        toast.classList.remove('hidden');
+        toast.classList.add('flex');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.classList.remove('flex');
+        }, 3000);
+    }
+
+    function toggleWaDropdown() {
+        const dropdown = document.getElementById('wa-menu-dropdown');
+        if (dropdown) dropdown.classList.toggle('hidden');
+    }
+
+    // Tombol WA di bar aksi footer memakai dropdown template yang SUDAH ADA di
+    // tab Ringkasan — bukan salinan kedua. Menduplikasi dropdown berarti dua
+    // elemen dengan id btn-wa-* yang sama, dan href template cuma keisi di salah
+    // satunya. Jadi: pindah tab, scroll ke atas, lalu buka dropdown aslinya.
+    function focusWaTemplates() {
+        switchActionTab('finance');
+
+        const dropdown = document.getElementById('wa-menu-dropdown');
+        const container = document.getElementById('wa-dropdown-container');
+        if (!dropdown || !container) return;
+
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        dropdown.classList.remove('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('wa-dropdown-container');
+        const dropdown = document.getElementById('wa-menu-dropdown');
+        // [data-wa-trigger] dikecualikan: klik tombol WA di footer membuka
+        // dropdown lalu event-nya bubble ke sini, dan tanpa pengecualian ini
+        // dropdown-nya langsung ketutup lagi di klik yang sama.
+        if (container && dropdown && !container.contains(e.target) && !e.target.closest('[data-wa-trigger]')) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    function getWaLink(type) {
+        if (!selectedCustomerData.phone) return '#';
+        let cleanPhone = selectedCustomerData.phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
+        const name = selectedCustomerData.name || 'Pelanggan';
+        const code = selectedCustomerData.code || '';
+        const price = selectedCustomerData.price || '';
+        const dueDate = selectedCustomerData.dueDate || '';
+
+        let msg = '';
+        if (type === 'reminder') {
+            msg = `Halo Kak ${name} (${code}), menginformasikan tagihan internet Whusnet untuk bulan ini sebesar ${price} dengan jatuh tempo ${dueDate}. Pembayaran dapat dilakukan via Kasir POP atau Transfer. Terima kasih!`;
+        } else if (type === 'confirmation') {
+            msg = `Halo Kak ${name} (${code}), pembayaran tagihan internet Whusnet sebesar ${price} telah kami terima. Terima kasih telah berlangganan Whusnet!`;
+        } else if (type === 'isolir') {
+            msg = `Halo Kak ${name} (${code}), menginformasikan layanan internet Whusnet saat ini tertangguh (isolir) karena telah melewati jatuh tempo. Mohon lakukan konfirmasi pembayaran untuk aktivasi kembali.`;
+        } else {
+            msg = `Halo Kak ${name} (${code}), ada yang bisa kami bantu terkait layanan internet Whusnet?`;
+        }
+        return 'https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(msg);
     }
 
     function openActionsModal(button) {
         const modal = document.getElementById('actions-modal');
         if (!modal) return;
-        const content = modal.querySelector('.transform');
 
         selectedCustomerData = {
             id: button.getAttribute('data-id'),
@@ -1568,6 +1684,7 @@
             package: button.getAttribute('data-package') || '-',
             bandwidth: button.getAttribute('data-bandwidth') || '-',
             price: button.getAttribute('data-price') || '-',
+            dueDate: button.getAttribute('data-due-date') || '-',
             address: button.getAttribute('data-address') || '-',
             landmark: button.getAttribute('data-landmark') || '-',
             rtRw: button.getAttribute('data-rt-rw') || '-',
@@ -1595,40 +1712,40 @@
             if (el) el.innerText = txt;
         };
 
-        // 1. Header & Static Hub Bindings
+        // Header & Bindings
         setElemText('actions-modal-title', selectedCustomerData.name);
         setElemText('actions-modal-code', selectedCustomerData.code);
         
-        // Status Badge Style (Design.md §13.1)
+        const avatarEl = document.getElementById('actions-modal-avatar');
+        if (avatarEl && selectedCustomerData.name) {
+            avatarEl.innerText = selectedCustomerData.name.substring(0, 2).toUpperCase();
+        }
+
         const badgeEl = document.getElementById('actions-modal-status-badge');
         if (badgeEl) {
             const statusLabelSpan = badgeEl.querySelector('span:last-child') || badgeEl;
             statusLabelSpan.innerText = selectedCustomerData.status.toUpperCase();
             if (selectedCustomerData.rawStatus === 'active') {
-                badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200';
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
             } else if (selectedCustomerData.rawStatus === 'suspended') {
-                badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-purple-50 text-purple-700 border-purple-200';
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
             } else {
-                badgeEl.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-rose-50 text-rose-700 border-rose-200';
+                badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
             }
         }
 
-        const fullLoc = `Kel. ${selectedCustomerData.village}, Kec. ${selectedCustomerData.district}`;
+        const fullLoc = `${selectedCustomerData.pop} (${selectedCustomerData.village})`;
         setElemText('actions-modal-location-text', fullLoc);
-        setElemText('actions-modal-pop-text', selectedCustomerData.pop);
-        setElemText('actions-modal-completeness-pct', selectedCustomerData.completenessPct + '%');
 
-        // 2. Direct Links (WA & Google Maps)
-        const waBtn = document.getElementById('btn-quick-wa');
-        if (waBtn) {
-            let cleanPhone = selectedCustomerData.phone.replace(/[^0-9]/g, '');
-            if (cleanPhone.startsWith('0')) {
-                cleanPhone = '62' + cleanPhone.substring(1);
-            }
-            waBtn.href = cleanPhone ? `https://wa.me/${cleanPhone}?text=Halo%20${encodeURIComponent(selectedCustomerData.name)},%20kami%20dari%20Whusnet%20Billing...` : '#';
-        }
+        // WA Links
+        const waReminder = document.getElementById('btn-wa-reminder');
+        const waConfirmation = document.getElementById('btn-wa-confirmation');
+        const waIsolir = document.getElementById('btn-wa-isolir');
+        if (waReminder) waReminder.href = getWaLink('reminder');
+        if (waConfirmation) waConfirmation.href = getWaLink('confirmation');
+        if (waIsolir) waIsolir.href = getWaLink('isolir');
 
-        const mapsBtn = document.getElementById('btn-quick-maps');
+        // Maps Link
         const fieldMapsBtn = document.getElementById('btn-field-launch-maps');
         let mapsUrl = '#';
         if (selectedCustomerData.lat && selectedCustomerData.lng) {
@@ -1637,37 +1754,42 @@
             const queryAddr = `${selectedCustomerData.address}, ${selectedCustomerData.village}, ${selectedCustomerData.district}`;
             mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryAddr)}`;
         }
-        if (mapsBtn) mapsBtn.href = mapsUrl;
         if (fieldMapsBtn) fieldMapsBtn.href = mapsUrl;
 
-        // 3. Tab Bindings (Pre-fill immediately)
-        // Tab 1: Finance
+        // Toggle Status Button Text
+        const isActiveService = selectedCustomerData.rawStatus === 'active';
+        const toggleBtnText = document.getElementById('btn-hub-toggle-status-text');
+        if (toggleBtnText) {
+            toggleBtnText.innerText = isActiveService ? 'Isolir Layanan' : 'Aktifkan Layanan';
+        }
+        // Label kembar di bar aksi footer (mobile/tablet) — versinya dipendekkan
+        // karena slotnya cuma selebar ikon.
+        const footerToggleText = document.getElementById('btn-hub-footer-toggle-text');
+        if (footerToggleText) {
+            footerToggleText.innerText = isActiveService ? 'Isolir' : 'Aktifkan';
+        }
+
+        // Pre-fill Static Data
         setElemText('hub-fin-package', selectedCustomerData.package);
         setElemText('hub-fin-price', selectedCustomerData.price);
+        setElemText('hub-fin-due-date', selectedCustomerData.dueDate);
 
-        // Tab 2: Technical
         setElemText('hub-tech-pppoe', selectedCustomerData.pppoe);
         setElemText('hub-tech-ip', selectedCustomerData.ip);
         setElemText('hub-tech-vlan', selectedCustomerData.vlan);
         setElemText('hub-tech-bandwidth', selectedCustomerData.bandwidth);
-        setElemText('hub-tech-pop', selectedCustomerData.pop);
-        setElemText('hub-tech-distribution', selectedCustomerData.distribution);
         setElemText('hub-tech-onu', selectedCustomerData.onu);
-        setElemText('hub-tech-onu-brand', selectedCustomerData.onuBrand);
         setElemText('hub-tech-router', selectedCustomerData.router);
+        setElemText('hub-tech-distribution', selectedCustomerData.distribution);
         setElemText('hub-tech-contract', selectedCustomerData.contract);
 
-        // Tab 3: Field Location
         setElemText('hub-field-address-full', `${selectedCustomerData.address !== '-' ? selectedCustomerData.address + ', ' : ''}Kel. ${selectedCustomerData.village}, Kec. ${selectedCustomerData.district}`);
-        setElemText('hub-field-landmark', selectedCustomerData.landmark);
-        setElemText('hub-field-rt-rw', selectedCustomerData.rtRw);
         setElemText('hub-field-village', selectedCustomerData.village);
         setElemText('hub-field-district', selectedCustomerData.district);
         setElemText('hub-field-city', selectedCustomerData.city);
         setElemText('hub-field-postal-code', selectedCustomerData.postalCode);
         setElemText('hub-field-coords', (selectedCustomerData.lat && selectedCustomerData.lng) ? `${selectedCustomerData.lat}, ${selectedCustomerData.lng}` : 'Belum Diatur');
 
-        // Tab 4: Profile & Administration
         setElemText('hub-prof-fullname', selectedCustomerData.name);
         setElemText('hub-prof-nik', selectedCustomerData.nik);
         setElemText('hub-prof-cid', selectedCustomerData.code);
@@ -1679,19 +1801,18 @@
         const compBar = document.getElementById('hub-prof-completeness-bar');
         if (compBar) compBar.style.width = selectedCustomerData.completenessPct + '%';
 
-        // Default to Tab 1
         switchActionTab('finance');
-
-        // Show Modal with Animation
         modal.classList.remove('hidden');
-        if (content) {
-            setTimeout(() => {
-                content.classList.remove('scale-95');
-                content.classList.add('scale-100');
-            }, 10);
-        }
+        document.body.classList.add('overflow-hidden');
 
-        // 4. Fetch Live Payment & Hub Info concurrently
+        // Set initial state saat data tagihan dimuat
+        togglePaymentFormState(false, 'Memuat data tagihan pelanggan...');
+        // Struk & berkas ikut direset — kalau tidak, data pelanggan sebelumnya
+        // masih nempel selama fetch berjalan.
+        setLatestReceipt(null);
+        renderHubDocuments(null, null);
+
+        // Fetch Live Payment Info
         const loadingEl = document.getElementById('modal-hub-loading');
         if (loadingEl) loadingEl.classList.remove('hidden');
 
@@ -1701,63 +1822,60 @@
                 if (loadingEl) loadingEl.classList.add('hidden');
                 const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 
-                const payFormContainer = document.getElementById('payment-form-container');
-                const noInvoiceState = document.getElementById('no-invoice-state');
-
                 if (data.invoice_id) {
-                    if (payFormContainer) payFormContainer.classList.remove('hidden');
-                    if (noInvoiceState) noInvoiceState.classList.add('hidden');
-
                     setElemText('hub-invoice-period-badge', `Periode: ${data.billing_period || '-'}`);
-                    setElemText('hub-fin-due-date', data.due_date || '-');
+                    setElemText('hub-fin-due-date', data.due_date || selectedCustomerData.dueDate);
                     setElemText('hub-fin-arrears', data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0');
-                    setElemText('hub-fin-discount', data.discount > 0 ? formatRp(data.discount) : 'Rp 0');
                     setElemText('hub-fin-total-pay', formatRp(data.remaining_amount));
 
-                    // Payment Form Setup
                     const payForm = document.getElementById('payment-form');
                     if (payForm) payForm.action = `/invoices/${data.invoice_id}/payments`;
                     
+                    // Enable form jika pelanggan punya tagihan aktif
+                    togglePaymentFormState(true);
+
                     const amountInput = document.getElementById('payment_amount');
                     if (amountInput) {
                         amountInput.value = data.remaining_amount;
-                        amountInput.max = data.remaining_amount;
-                    }
-
-                    const allocSelect = document.getElementById('payment_allocation');
-                    const noteInput = document.getElementById('payment_note');
-                    if (noteInput && allocSelect) {
-                        noteInput.value = 'Pembayaran: ' + allocSelect.value;
                     }
                 } else {
-                    if (payFormContainer) payFormContainer.classList.add('hidden');
-                    if (noInvoiceState) noInvoiceState.classList.remove('hidden');
-
                     setElemText('hub-invoice-period-badge', 'Tidak Ada Tagihan Aktif');
-                    setElemText('hub-fin-due-date', '-');
-                    setElemText('hub-fin-arrears', data.total_piutang > 0 ? formatRp(data.total_piutang) : 'Rp 0');
-                    setElemText('hub-fin-discount', 'Rp 0');
                     setElemText('hub-fin-total-pay', 'Rp 0');
+                    setElemText('hub-fin-arrears', 'Rp 0');
+
+                    // Disable form jika belum ada tagihan
+                    togglePaymentFormState(false, 'Pelanggan ini belum memiliki tagihan aktif untuk dibayar.');
                 }
 
-                // Render 3 Recent Payments
                 const tbody = document.getElementById('hub-recent-payments-body');
                 if (tbody) {
                     if (data.recent_payments && data.recent_payments.length > 0) {
                         tbody.innerHTML = data.recent_payments.map(p => `
-                            <tr class="hover:bg-slate-50 transition-colors">
-                                <td class="py-2.5 px-3 font-mono text-slate-600">${p.date}</td>
-                                <td class="py-2.5 px-3 font-mono font-semibold text-slate-800">${p.invoice_number}</td>
-                                <td class="py-2.5 px-3"><span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold border border-slate-200">${p.method}</span></td>
-                                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">${formatRp(p.amount)}</td>
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td class="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">${p.date}</td>
+                                <td class="py-2.5 px-3 font-mono font-semibold text-slate-800 dark:text-white">${p.invoice_number}</td>
+                                <td class="py-2.5 px-3"><span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded text-[10px] font-semibold border border-slate-200 dark:border-slate-700">${p.method}</span></td>
+                                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">${formatRp(p.amount)}</td>
+                                <td class="py-2.5 px-3 text-center">
+                                    <a href="${p.receipt_url}" target="_blank" class="inline-flex items-center justify-center p-1 rounded text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors" title="Cetak Struk Pembayaran Ini">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+                                    </a>
+                                </td>
                             </tr>
                         `).join('');
                     } else {
-                        tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-slate-400">Belum ada riwayat pembayaran.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">Belum ada riwayat pembayaran.</td></tr>';
                     }
                 }
 
-                // Live overrides if backend technical info returned
+                // Struk hanya bisa dicetak kalau pelanggan sudah pernah bayar —
+                // recent_payments sudah urut terbaru dari server.
+                setLatestReceipt(data.recent_payments && data.recent_payments.length > 0
+                    ? data.recent_payments[0].receipt_url
+                    : null);
+
+                renderHubDocuments(data.documents, data.documents_upload_url);
+
                 if (data.technical) {
                     setElemText('hub-tech-pppoe', data.technical.pppoe_username || selectedCustomerData.pppoe);
                     setElemText('hub-tech-ip', data.technical.ip_address || selectedCustomerData.ip);
@@ -1769,7 +1887,135 @@
             .catch(err => {
                 console.error(err);
                 if (loadingEl) loadingEl.classList.add('hidden');
+                togglePaymentFormState(false, 'Gagal memuat informasi tagihan.');
+                setLatestReceipt(null);
             });
+    }
+
+    // URL struk pembayaran terakhir pelanggan yang lagi dibuka di Modal Hub.
+    // Direset tiap modal dibuka supaya tidak mencetak struk pelanggan sebelumnya.
+    let latestReceiptUrl = null;
+
+    function setLatestReceipt(url) {
+        latestReceiptUrl = url || null;
+        const btns = document.querySelectorAll('.btn-print-receipt-action, #btn-print-receipt, #btn-hub-footer-print-receipt');
+        btns.forEach(btn => {
+            btn.disabled = !latestReceiptUrl;
+            btn.title = latestReceiptUrl
+                ? 'Cetak struk pembayaran terakhir'
+                : 'Belum ada pembayaran yang bisa dicetak';
+        });
+    }
+
+    function printLatestReceipt() {
+        if (!latestReceiptUrl) {
+            showModalToast('Belum ada pembayaran yang bisa dicetak.');
+
+            return;
+        }
+        window.open(latestReceiptUrl, '_blank');
+    }
+
+    function renderHubDocuments(documents, uploadUrl) {
+        document.querySelectorAll('.hub-document-form').forEach(form => {
+            form.action = uploadUrl || '';
+            form.reset();
+        });
+
+        ['ktp', 'rumah'].forEach(type => {
+            const doc = documents ? documents[type] : null;
+            const badge = document.getElementById(`hub-doc-${type}-badge`);
+            const link = document.getElementById(`hub-doc-${type}-link`);
+            const empty = document.getElementById(`hub-doc-${type}-empty`);
+
+            if (doc && doc.exists) {
+                if (badge) {
+                    badge.textContent = 'Ada';
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-semibold shrink-0';
+                }
+                if (link) {
+                    link.href = doc.url;
+                    link.classList.remove('hidden');
+                    link.classList.add('flex');
+                }
+                if (empty) empty.classList.add('hidden');
+            } else {
+                if (badge) {
+                    badge.textContent = 'Belum';
+                    badge.className = 'text-[10px] px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-semibold shrink-0';
+                }
+                if (link) {
+                    link.href = '#';
+                    link.classList.add('hidden');
+                    link.classList.remove('flex');
+                }
+                if (empty) empty.classList.remove('hidden');
+            }
+        });
+    }
+
+    function togglePaymentFormState(enabled, message = '') {
+        const payForm = document.getElementById('payment-form');
+        if (!payForm) return;
+
+        const amountInput = document.getElementById('payment_amount');
+        const methodSelect = payForm.querySelector('select[name="payment_method"]');
+        const dateInput = document.getElementById('payment_date');
+        const submitBtn = payForm.querySelector('button[type="submit"]');
+        const noticeEl = document.getElementById('payment-form-notice');
+        const noticeText = document.getElementById('payment-form-notice-text');
+
+        if (enabled) {
+            if (amountInput) {
+                amountInput.disabled = false;
+                amountInput.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (methodSelect) {
+                methodSelect.disabled = false;
+                methodSelect.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (dateInput) {
+                dateInput.disabled = false;
+                dateInput.classList.remove('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            }
+            if (noticeEl) noticeEl.classList.add('hidden');
+        } else {
+            if (amountInput) {
+                amountInput.disabled = true;
+                amountInput.value = '';
+                amountInput.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (methodSelect) {
+                methodSelect.disabled = true;
+                methodSelect.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (dateInput) {
+                dateInput.disabled = true;
+                dateInput.classList.add('bg-slate-100', 'dark:bg-slate-900', 'cursor-not-allowed', 'opacity-60');
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            }
+            if (noticeEl) {
+                if (noticeText && message) noticeText.innerText = message;
+                noticeEl.classList.remove('hidden');
+            }
+        }
+    }
+
+    function closeActionsModal() {
+        const modal = document.getElementById('actions-modal');
+        if (modal) modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+        // Dropdown template WA ikut ditutup — kalau tidak, dia masih terbuka
+        // waktu modal dibuka lagi untuk pelanggan lain.
+        const waDropdown = document.getElementById('wa-menu-dropdown');
+        if (waDropdown) waDropdown.classList.add('hidden');
     }
 
     function copyTechInfo() {
@@ -1783,11 +2029,7 @@ Router SN: ${selectedCustomerData.router}
 ODP/Distribusi: ${selectedCustomerData.distribution}`;
 
         navigator.clipboard.writeText(textToCopy).then(() => {
-            if (window.Toast) {
-                window.Toast.success('Berhasil Disalin', 'Kredensial teknis telah disalin ke clipboard.');
-            } else {
-                alert('Kredensial teknis telah disalin!');
-            }
+            showModalToast('Kredensial teknis berhasil disalin!');
         });
     }
 
@@ -1795,45 +2037,26 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         const isCurrentActive = selectedCustomerData.rawStatus === 'active';
         const actionText = isCurrentActive ? 'mengisolir / menonaktifkan' : 'mengaktifkan kembali';
 
-        if (window.Confirm) {
-            window.Confirm(
-                'Konfirmasi Status Layanan',
-                `Apakah Anda yakin ingin ${actionText} koneksi internet untuk pelanggan ${selectedCustomerData.name}?`,
-                'warning',
-                () => {
-                    if (window.Toast) {
-                        window.Toast.success('Status Diubah', `Anda berhasil ${actionText} koneksi internet untuk ${selectedCustomerData.name}.`);
-                    }
-                }
-            );
-        } else {
+        if (window.confirmAction) {
             if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
-                alert(`Status koneksi ${selectedCustomerData.name} diubah.`);
+                showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
             }
+        } else if (confirm(`Apakah Anda yakin ingin ${actionText} koneksi internet untuk ${selectedCustomerData.name}?`)) {
+            showModalToast(`Status layanan ${selectedCustomerData.name} berhasil diubah.`);
         }
-    }
-
-    // Event listener for allocation change to update note
-    document.addEventListener('change', function(e) {
-        if (e.target && e.target.id === 'payment_allocation') {
-            const noteInput = document.getElementById('payment_note');
-            const currentNote = noteInput.value.replace(/Pembayaran: [^,]+(,\s*)?/, '');
-            noteInput.value = 'Pembayaran: ' + e.target.value + (currentNote ? ', ' + currentNote : '');
-        }
-    });
-
-    function closeActionsModal() {
-        const modal = document.getElementById('actions-modal');
-        const content = modal.querySelector('.transform');
-        content.classList.remove('scale-100');
-        content.classList.add('scale-95');
-        setTimeout(() => {
-            modal.classList.add('hidden');
-        }, 150);
     }
 
     function triggerDetail() {
         window.location.href = '/customers/' + selectedCustomerData.id;
+    }
+
+    // Jembatan Modal Hub → Modal Atur Jaringan. Dua modal tidak boleh tampil
+    // bersamaan (keduanya z-50 + backdrop), jadi hub ditutup dulu baru network dibuka.
+    function triggerNetworkAssignmentFromHub() {
+        if (!selectedCustomerData || !selectedCustomerData.id) return;
+        const customerId = selectedCustomerData.id;
+        closeActionsModal();
+        openNetworkAssignmentModal(customerId);
     }
 
     function triggerEdit() {
@@ -1842,61 +2065,14 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
 
     function triggerTerminate() {
         closeActionsModal();
-        if (window.Dialog) {
-            window.Dialog.show({
-                title: 'Konfirmasi Terminasi',
-                message: `Apakah Anda yakin ingin melakukan TERMINASI / PEMUTUSAN kontrak layanan untuk ${selectedCustomerData.name} (${selectedCustomerData.code})?`,
-                icon: 'error',
-                buttons: [
-                    { text: 'Batal', type: 'secondary' },
-                    { text: 'Ya, Terminasi', type: 'danger', onClick: () => {
-                        window.Dialog.close();
-                        if (window.Toast) window.Toast.info('Terminasi', `Layanan untuk ${selectedCustomerData.name} telah masuk daftar terminasi.`);
-                    }}
-                ]
-            });
-        } else if (confirm(`Apakah Anda yakin ingin melakukan TERMINASI untuk ${selectedCustomerData.name}?`)) {
-            alert(`Layanan untuk ${selectedCustomerData.name} telah masuk daftar terminasi.`);
+        if (confirm(`Apakah Anda yakin ingin melakukan PEMUTUSAN / TERMINASI untuk ${selectedCustomerData.name}?`)) {
+            window.location.href = '/customers/' + selectedCustomerData.id + '#terminate';
         }
     }
 
-    function toggleConnection(id, name, checkbox) {
-        const isChecked = checkbox.checked;
-        const actionText = isChecked ? 'mengaktifkan kembali' : 'mengisolir / menonaktifkan';
-        
-        if (window.Confirm) {
-            window.Confirm(
-                'Konfirmasi Perubahan Status',
-                `Apakah Anda yakin ingin ${actionText} koneksi internet untuk pelanggan ${name}?`,
-                'warning',
-                () => {
-                    if (window.Toast) window.Toast.success('Koneksi Diubah', `Anda berhasil ${actionText} koneksi internet untuk pelanggan ${name}.`);
-                },
-                () => {
-                    checkbox.checked = !isChecked;
-                }
-            );
-        }
-    }
-
-    function openDetailModal(button) {
-        openActionsModal(button);
-    }
-
-    function closeDetailModal() {
-        const modal = document.getElementById('detail-modal');
-        const content = modal.querySelector('.transform');
-        if (content) {
-            content.classList.remove('scale-100');
-            content.classList.add('scale-95');
-        }
-        setTimeout(() => {
-            if (modal) modal.classList.add('hidden');
-        }, 150);
-    }
-
-    // ══ Modal Atur Mini POP & Distribusi (dipakai bareng semua row) ══════
+    /* ── Modal Atur Mini POP & Jaringan ── */
     function openNetworkAssignmentModal(customerId) {
+        const wrapper = document.getElementById('network-modal-wrapper');
         const form = document.getElementById('network-assignment-form');
         const miniPopSelect = document.getElementById('na-mini-pop-select');
         const distSelect = document.getElementById('na-distribution-select');
@@ -1906,6 +2082,8 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         const custNameEl = document.getElementById('na-customer-name');
         const custCidEl = document.getElementById('na-customer-cid');
         const popNameEl = document.getElementById('na-pop-name');
+
+        if (!wrapper || !form) return;
 
         form.action = `/customers/${customerId}/network-assignment`;
         miniPopSelect.innerHTML = '<option value="">Memuat...</option>';
@@ -1947,12 +2125,20 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
                 custNameEl.textContent = 'Gagal memuat data. Coba lagi.';
             });
 
-        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'network-assignment-list' }));
+        wrapper.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeNetworkAssignmentModal() {
+        const wrapper = document.getElementById('network-modal-wrapper');
+        if (wrapper) wrapper.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
     }
 
     function renderDistributionOptions() {
         const miniPopSelect = document.getElementById('na-mini-pop-select');
         const distSelect = document.getElementById('na-distribution-select');
+        if (!miniPopSelect || !distSelect) return;
         const selectedMiniPopId = miniPopSelect.value;
         const currentDistributionId = distSelect.dataset.currentDistributionId || '';
         const allDistributions = JSON.parse(distSelect.dataset.allOptions || '[]');
@@ -1976,90 +2162,6 @@ ODP/Distribusi: ${selectedCustomerData.distribution}`;
         }
     });
 </script>
-
-<?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>
-<?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['name' => 'network-assignment-list','title' => 'Atur Mini POP & Distribusi','maxWidth' => 'sm']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.modal'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'network-assignment-list','title' => 'Atur Mini POP & Distribusi','maxWidth' => 'sm']); ?>
-    
-    <div class="pb-3 mb-4 border-b border-border space-y-1">
-        <div class="flex justify-between items-start">
-            <div>
-                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Pelanggan</span>
-                <span id="na-customer-name" class="text-sm font-bold text-text-main">Memuat...</span>
-            </div>
-            <div class="text-right">
-                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block">ID Jaringan</span>
-                <span id="na-customer-cid" class="font-mono text-xs text-text-main bg-surface-muted px-1.5 py-0.5 rounded border border-border">—</span>
-            </div>
-        </div>
-        <div class="text-xs text-text-muted pt-1 flex items-center gap-1">
-            <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <span>Cabang: <strong id="na-pop-name" class="text-text-secondary font-semibold">—</strong></span>
-        </div>
-    </div>
-
-    
-    <div class="flex gap-2 text-xs text-text-muted leading-relaxed bg-primary-soft/30 p-2.5 rounded-md border border-primary-border/40 mb-4">
-        <svg class="w-4 h-4 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>Mini POP (OLT) & Distribusi dapat diatur setelah pemasangan dimulai, dan disesuaikan dengan konfigurasi MikroTik aktual.</span>
-    </div>
-
-    
-    <div id="na-blocked-warning" class="hidden flex gap-2 text-xs text-error leading-relaxed bg-error-bg/30 p-2.5 rounded-md border border-error-border/40 mb-4">
-        <svg class="w-4 h-4 text-error shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <span>Mini POP & Distribusi cuma bisa diatur setelah proses pemasangan dimulai.</span>
-    </div>
-
-    <form id="network-assignment-form" method="POST" class="space-y-4">
-        <?php echo csrf_field(); ?>
-        <?php echo method_field('PUT'); ?>
-
-        <div class="space-y-1.5">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Mini POP (OLT)</label>
-            <select id="na-mini-pop-select" name="mini_pop_id" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white font-ui focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
-                <option value="">Memuat...</option>
-            </select>
-        </div>
-
-        <div class="space-y-1.5">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-text-muted">Distribusi</label>
-            <select id="na-distribution-select" name="distribution_id" class="w-full text-sm px-3 py-2 border border-slate-200 rounded-md bg-white font-ui focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 cursor-pointer">
-                <option value="">—</option>
-            </select>
-            <p class="text-[11px] text-text-muted">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-2 border-t border-border mt-4">
-            <button type="button" onclick="window.dispatchEvent(new CustomEvent('close-modal', { detail: 'network-assignment-list' }))"
-                    class="text-sm font-semibold px-4 py-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-text-secondary transition-colors duration-200 cursor-pointer">Batal</button>
-            <button type="submit" id="na-submit-btn" class="text-sm font-semibold px-5 py-2 rounded-md text-white bg-sky-600 hover:bg-sky-700 shadow-sm transition-colors duration-200 cursor-pointer">Simpan</button>
-        </div>
-    </form>
- <?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
-<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
-<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
-<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
-<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
-<?php endif; ?>
-<?php endif; ?>
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/customers/index.blade.php ENDPATH**/ ?>

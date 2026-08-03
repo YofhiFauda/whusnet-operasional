@@ -45,7 +45,14 @@ class InitialInvoiceService
      * boleh disalin ke `customer_services.other_fee` (kolom bernama sama di
      * tabel itu artinya beda: biaya di luar standar yang melekat ke layanan).
      *
-     * @param  array{extra_installation_fee?: mixed, extra_cable_fee?: mixed, extra_pole_fee?: mixed, other_fee?: mixed}  $fees
+     * `prorate_amount_override` adalah SATU-SATUNYA nominal turunan yang boleh
+     * ditimpa admin — dipakai untuk kasus nego harga / koreksi pembulatan yang
+     * tidak tertangkap rumus prorata standar. Semua nominal lain (subtotal,
+     * ppn, total) tetap dihitung ulang penuh di server dan mengabaikan kiriman
+     * klien, sesuai keputusan lama di kelas ini. Kalau override kosong/null,
+     * fallback ke hasil hitung otomatis.
+     *
+     * @param  array{extra_installation_fee?: mixed, extra_cable_fee?: mixed, extra_pole_fee?: mixed, other_fee?: mixed, prorate_amount_override?: mixed}  $fees
      * @return array{prorate_amount: float, prorate_days: int, days_in_month: int, subtotal: float, discount: float, ppn: float, ppn_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float, next_month_amount: float}
      */
     public function calculate(CustomerServiceModel $service, string $issueDate, array $fees = []): array
@@ -63,6 +70,11 @@ class InitialInvoiceService
 
         $basePrice = (float) $service->monthly_price;
         $prorateAmount = round(($prorateDays / $daysInMonth) * $basePrice);
+
+        $prorateOverride = $fees['prorate_amount_override'] ?? null;
+        if ($prorateOverride !== null && $prorateOverride !== '') {
+            $prorateAmount = max(0, (float) $prorateOverride);
+        }
 
         $installationFee = max(0, (float) ($fees['extra_installation_fee'] ?? 0));
         $cableFee = max(0, (float) ($fees['extra_cable_fee'] ?? 0));
