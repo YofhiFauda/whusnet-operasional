@@ -223,6 +223,32 @@
                         </svg>
                     </a>
                     @endif
+
+                    @if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create'))
+                    <a href="{{ route('collectors.index') }}" title="Kolektor"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('collectors*') || Request::is('collector-batch*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('collectors*') || Request::is('collector-batch*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-8.13a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm6 8a4 4 0 1 1 0-8"/>
+                            </svg>
+                            <span class="sidebar-text">Kolektor</span>
+                        </div>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('kolektor.view'))
+                    <a href="{{ route('collector-worklist.index') }}" title="Worklist Saya"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('collector-worklist*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('collector-worklist*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/>
+                            </svg>
+                            <span class="sidebar-text">Worklist Saya</span>
+                        </div>
+                    </a>
+                    @endif
                 </div>
             </div>
 
@@ -618,13 +644,13 @@
             {{-- Right: Actions --}}
             <div class="flex items-center gap-1 sm:gap-2">
                 {{-- Theme Toggle --}}
-                <button onclick="toggleTheme()" id="themeToggle" aria-label="Ganti tema"
+                <button onclick="toggleTheme(event)" id="themeToggle" aria-label="Ganti tema" title="Ganti Tema (Ctrl+D / Alt+T)"
                         class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
-                               hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
-                    <svg id="themeIconMoon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                               hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all duration-200 active:scale-90 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+                    <svg id="themeIconMoon" class="h-5 w-5 theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
                     </svg>
-                    <svg id="themeIconSun" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg id="themeIconSun" class="h-5 w-5 hidden theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
                     </svg>
                 </button>
@@ -740,19 +766,106 @@
         }
     })();
 
-    /* ── Theme Toggle ── */
-    function toggleTheme() {
+    /* ── Theme Toggle with Circular Reveal Motion & View Transitions API ── */
+    function toggleTheme(event) {
         const html = document.documentElement;
-        const isDark = html.classList.toggle('dark');
-        localStorage.setItem('whusnet-theme', isDark ? 'dark' : 'light');
-        syncThemeIcon(isDark);
+        const isDarkNow = html.classList.contains('dark');
+        const willBeDark = !isDarkNow;
+
+        const performToggle = () => {
+            html.classList.toggle('dark', willBeDark);
+            localStorage.setItem('whusnet-theme', willBeDark ? 'dark' : 'light');
+            syncThemeIcon(willBeDark);
+        };
+
+        const prefersReducedMotion = window.matchMedia('(prefers-color-scheme: reduce)').matches ||
+                                     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (document.startViewTransition && !prefersReducedMotion) {
+            let x = window.innerWidth / 2;
+            let y = window.innerHeight / 2;
+
+            if (event && (event.clientX !== undefined || (event.touches && event.touches[0]))) {
+                x = event.clientX ?? event.touches[0].clientX;
+                y = event.clientY ?? event.touches[0].clientY;
+            } else {
+                const btn = document.getElementById('themeToggle');
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    x = rect.left + rect.width / 2;
+                    y = rect.top + rect.height / 2;
+                }
+            }
+
+            const endRadius = Math.hypot(
+                Math.max(x, window.innerWidth - x),
+                Math.max(y, window.innerHeight - y)
+            );
+
+            html.classList.add('theme-transitioning');
+
+            const transition = document.startViewTransition(() => {
+                performToggle();
+            });
+
+            transition.ready.then(() => {
+                const clipPath = [
+                    `circle(0px at ${x}px ${y}px)`,
+                    `circle(${endRadius}px at ${x}px ${y}px)`
+                ];
+
+                const animation = html.animate(
+                    {
+                        clipPath: willBeDark ? clipPath : [...clipPath].reverse()
+                    },
+                    {
+                        duration: 450,
+                        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                        pseudoElement: willBeDark
+                            ? '::view-transition-new(root)'
+                            : '::view-transition-old(root)'
+                    }
+                );
+
+                animation.onfinish = () => {
+                    html.classList.remove('theme-transitioning');
+                };
+            }).catch(() => {
+                html.classList.remove('theme-transitioning');
+            });
+        } else {
+            html.classList.add('theme-transitioning-fallback');
+            performToggle();
+            setTimeout(() => {
+                html.classList.remove('theme-transitioning-fallback');
+            }, 300);
+        }
     }
 
     function syncThemeIcon(isDark) {
         const moon = document.getElementById('themeIconMoon');
         const sun = document.getElementById('themeIconSun');
-        if (moon) moon.classList.toggle('hidden', isDark);
-        if (sun) sun.classList.toggle('hidden', !isDark);
+        if (!moon || !sun) return;
+
+        if (isDark) {
+            moon.classList.add('hidden', 'scale-0', '-rotate-90');
+            moon.classList.remove('scale-100', 'rotate-0');
+
+            sun.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                sun.classList.remove('scale-0', 'rotate-90', 'opacity-0');
+                sun.classList.add('scale-100', 'rotate-0', 'opacity-100');
+            });
+        } else {
+            sun.classList.add('hidden', 'scale-0', 'rotate-90');
+            sun.classList.remove('scale-100', 'rotate-0');
+
+            moon.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                moon.classList.remove('scale-0', '-rotate-90', 'opacity-0');
+                moon.classList.add('scale-100', 'rotate-0', 'opacity-100');
+            });
+        }
     }
 
     /* Init theme icons based on current mode */
@@ -803,6 +916,12 @@
 
         if (e.key === 'Escape' && helpOpen) { closeHelp(); return; }
         if (typing) return;
+
+        if ((e.ctrlKey && e.key.toLowerCase() === 'd') || (e.altKey && e.key.toLowerCase() === 't')) {
+            e.preventDefault();
+            toggleTheme(e);
+            return;
+        }
 
         if (e.key === '/') {
             const search = document.getElementById('globalSearch');
@@ -996,6 +1115,7 @@
                     <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Global</p>
                     <dl class="space-y-1.5">
                         <div class="flex justify-between gap-4"><dt>Fokus pencarian global</dt><dd><kbd class="kbd">/</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Ganti tema Light/Dark</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">D</kbd> / <kbd class="kbd">Alt</kbd>+<kbd class="kbd">T</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Tutup menu / modal</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
                         <div class="flex justify-between gap-4"><dt>Buka bantuan ini</dt><dd><kbd class="kbd">?</kbd></dd></div>
                     </dl>

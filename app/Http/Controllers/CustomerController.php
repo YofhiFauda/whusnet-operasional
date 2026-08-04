@@ -113,6 +113,7 @@ class CustomerController extends Controller
             fn ($v) => $v !== '' && $v !== null
         ));
         $completenessStatus = $request->query('completeness_status', '');
+        $collectorId = $request->query('collector_id', '');
 
         // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
         // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
@@ -129,11 +130,11 @@ class CustomerController extends Controller
                 'full_name', 'primary_phone', 'email', 'identity_number', 'gender',
                 'status', 'data_completeness_status', 'registration_date',
                 'rejected_at', 'terminated_at', 'address',
-                'pop_id', 'distribution_id', 'mini_pop_id',
+                'pop_id', 'distribution_id', 'mini_pop_id', 'collector_id',
                 'city_id', 'district_id', 'village_id', 'internet_package_id',
                 'created_at', 'updated_at',
             ])
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment']);
+            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
 
         // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
         // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
@@ -215,6 +216,15 @@ class CustomerController extends Controller
         // Completeness status filter
         if ($completenessStatus !== '') {
             $query->where('data_completeness_status', $completenessStatus);
+        }
+
+        // Kolektor filter — 'none' = belum ada kolektor sama sekali, angka =
+        // kolektor tertentu. docs/plan/analisa-billing-tagihan-pembayaran-
+        // kolektor.md §B-3 (cara admin lihat "pelanggan ini kolektornya siapa").
+        if ($collectorId === 'none') {
+            $query->whereNull('collector_id');
+        } elseif ($collectorId !== '') {
+            $query->where('collector_id', $collectorId);
         }
 
         if ($statusGroup === 'failed') {
@@ -307,6 +317,10 @@ class CustomerController extends Controller
             ->where('is_active', true)
             ->orderBy('workflow_order')
             ->get();
+        $collectorOptions = User::query()
+            ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         // Customer count by status (for badge list / submenus)
         $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
@@ -344,7 +358,9 @@ class CustomerController extends Controller
             'packageId',
             'popIds',
             'miniPopIds',
-            'completenessStatus'
+            'completenessStatus',
+            'collectorId',
+            'collectorOptions'
         ));
     }
 
@@ -977,6 +993,7 @@ class CustomerController extends Controller
             'internetPackage',
             'subscriptionStatus',
             'pop',
+            'collector',
             'customerAddress',
             'customerService',
             'customerTechnicalDetail',
@@ -994,7 +1011,7 @@ class CustomerController extends Controller
             'customerDevice',
             'documents.uploader',
             'invoices' => function ($query) {
-                $query->orderBy('billing_period', 'desc');
+                $query->with('creator')->orderBy('billing_period', 'desc');
             },
             'payments' => function ($query) {
                 $query->with(['invoice', 'receiver'])->latest('payment_date')->latest('id');
@@ -3281,8 +3298,13 @@ class CustomerController extends Controller
         $normalized = strtolower(str_replace([' ', '-'], '_', $this->cleanLegacyValue($status) ?? 'valid'));
 
         return match ($normalized) {
-            'valid', 'diterima', 'lunas', '' => PaymentStatus::VALID->value,
-            'pending' => PaymentStatus::PENDING->value,
+            // 'pending' legacy tak lagi punya padanan — PaymentStatus::PENDING
+            // dihapus (sistem ini tak punya alur verifikasi bertahap, semua
+            // jalur insert baru selalu VALID langsung). Data legacy berstatus
+            // "pending" berarti sudah tercatat sebagai transaksi, jadi masuk
+            // akal dipetakan VALID juga, bukan dibuang atau diberi status
+            // yang tak ada lagi.
+            'valid', 'diterima', 'lunas', 'pending', '' => PaymentStatus::VALID->value,
             'ditolak', 'rejected', 'batal' => PaymentStatus::DITOLAK->value,
             default => PaymentStatus::VALID->value,
         };

@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CollectorBatchController;
+use App\Http\Controllers\CollectorController;
+use App\Http\Controllers\CollectorWorklistController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
@@ -176,6 +179,9 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:payments.view')->group(function () {
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        // Static route lebih-bayar — didaftarkan SEBELUM /payments/{payment}
+        // biar segmen 'overpay' tidak ketelan route dynamic di atasnya.
+        Route::get('/payments/overpay', [PaymentController::class, 'overpay'])->name('payments.overpay');
         // Struk/kwitansi cetak — didaftarkan SEBELUM /payments/{payment} biar
         // segmen 'kwitansi' tidak ketelan route dynamic di atasnya.
         Route::get('/payments/{payment}/kwitansi', [PaymentController::class, 'receipt'])->name('payments.receipt');
@@ -190,6 +196,37 @@ Route::middleware('auth')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
         Route::post('/invoices/bulk-pay', [PaymentController::class, 'bulkStore'])->name('invoices.payments.bulk-store');
+    });
+
+    Route::middleware('permission:payments.reject')->group(function () {
+        Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+    });
+
+    // Hub Kolektor — daftar kolektor + detail per-kolektor (tab Worklist&Bayar,
+    // tab Atur Pelanggan). Pengganti "Atur Kolektor" + "Tab Kolektor" lama.
+    // View gate: siapa pun yang bisa assign (customers.update) ATAU bayar
+    // (payments.create) boleh lihat. Static routes (/collectors) dulu,
+    // dynamic ({collector}) belakangan.
+    Route::middleware('permission:customers.update|payments.create')->group(function () {
+        Route::get('/collectors', [CollectorController::class, 'index'])->name('collectors.index');
+        Route::get('/collectors/{collector}', [CollectorController::class, 'show'])->name('collectors.show');
+    });
+
+    Route::middleware('permission:customers.update')->group(function () {
+        Route::post('/collectors/{collector}/assign', [CollectorController::class, 'assign'])->name('collectors.assign');
+        Route::post('/collectors/{collector}/customers/{customer}/release', [CollectorController::class, 'release'])->name('collectors.release');
+    });
+
+    // Endpoint bayar batch (1-by-1 maupun massal, lihat CollectorBatchController)
+    // dipakai dari tab Worklist & Bayar di halaman /collectors/{collector}.
+    Route::middleware('permission:payments.create')->group(function () {
+        Route::post('/collector-batch/{collector}', [CollectorBatchController::class, 'store'])->name('collector-batch.store');
+    });
+
+    // Worklist read-only kolektor — permission SENDIRI (kolektor.view), bukan
+    // customers.view. Kolektor cuma boleh baca pelanggannya sendiri.
+    Route::middleware('permission:kolektor.view')->group(function () {
+        Route::get('/collector-worklist', [CollectorWorklistController::class, 'index'])->name('collector-worklist.index');
     });
 
     // Detail Pelanggan — permission SENDIRI (customers.detail.view), terpisah
@@ -399,6 +436,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/invoices/export', [InvoiceReportController::class, 'export'])->name('reports.invoices.export');
         Route::get('/reports/payments', [PaymentReportController::class, 'index'])->name('reports.payments.index');
         Route::get('/reports/payments/export', [PaymentReportController::class, 'export'])->name('reports.payments.export');
+        Route::get('/reports/payments/export-xlsx', [PaymentReportController::class, 'exportXlsx'])->name('reports.payments.export-xlsx');
         Route::get('/reports/imports', [ImportReportController::class, 'index'])->name('reports.imports.index');
         Route::get('/reports/imports/{batch}', [ImportReportController::class, 'show'])->name('reports.imports.show');
         Route::get('/reports/imports/{batch}/export', [ImportReportController::class, 'export'])->name('reports.imports.export');

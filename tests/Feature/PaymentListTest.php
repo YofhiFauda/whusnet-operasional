@@ -41,7 +41,7 @@ class PaymentListTest extends TestCase
         $invoiceA = $this->createInvoice($popA, 'Ahmad Payment Filter', 'INV-202606-7001');
         $invoiceB = $this->createInvoice($popB, 'Budi Payment Filter', 'INV-202607-7002');
         $paymentA = $this->createPayment($invoiceA, 'PAY-202606-7001', '2026-06-13', 'cash', 'valid');
-        $paymentB = $this->createPayment($invoiceB, 'PAY-202607-7002', '2026-07-13', 'transfer', 'pending');
+        $paymentB = $this->createPayment($invoiceB, 'PAY-202607-7002', '2026-07-13', 'transfer', 'ditolak');
 
         $response = $this->actingAs($owner)->get(route('payments.index', [
             'date_from' => '2026-06-01',

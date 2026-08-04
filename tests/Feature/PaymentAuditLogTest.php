@@ -49,7 +49,7 @@ class PaymentAuditLogTest extends TestCase
             'payment_method' => 'cash',
             'amount' => 75000,
             'received_by' => $owner->id,
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
             'note' => 'Pembayaran awal.',
         ]);
 
@@ -68,7 +68,7 @@ class PaymentAuditLogTest extends TestCase
 
         $this->assertNull($createLog->old_values);
         $this->assertSame('PAY-202606-8801', $createLog->new_values['payment_number']);
-        $this->assertSame('pending', $createLog->new_values['payment_status']);
+        $this->assertSame('valid', $createLog->new_values['payment_status']);
         $this->assertNotNull($createLog->created_at);
 
         $payment->update([
@@ -95,7 +95,7 @@ class PaymentAuditLogTest extends TestCase
             ->where('action', 'cancel')
             ->firstOrFail();
 
-        $this->assertSame('pending', $cancelLog->old_values['payment_status']);
+        $this->assertSame('valid', $cancelLog->old_values['payment_status']);
         $this->assertSame('ditolak', $cancelLog->new_values['payment_status']);
     }
 

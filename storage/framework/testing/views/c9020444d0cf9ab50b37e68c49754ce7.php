@@ -9,10 +9,17 @@
         <h3 class="text-text-main text-sm font-semibold uppercase tracking-wider">Daftar dan Filter Pembayaran</h3>
         <p class="text-xs text-text-muted mt-1">Pembayaran selalu terhubung ke invoice, pelanggan, dan POP/Cabang.</p>
     </div>
-    <a href="<?php echo e(route('invoices.index')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
-        Buka Daftar Tagihan
-    </a>
+    <div class="flex items-center gap-2">
+        <a href="<?php echo e(route('payments.overpay')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+            Lebih Bayar
+        </a>
+        <a href="<?php echo e(route('invoices.index')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-surface hover:bg-surface-muted text-text-secondary rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+            Buka Daftar Tagihan
+        </a>
+    </div>
 </div>
+
+<?php echo $__env->make('payments.partials.riwayat-banner', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
 <div class="bg-surface border border-border rounded-lg p-6 mb-6">
     <form action="<?php echo e(route('payments.index')); ?>" method="GET" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 items-end">
@@ -94,6 +101,7 @@
                     <th class="px-6 py-3.5">POP</th>
                     <th class="px-6 py-3.5">TANGGAL</th>
                     <th class="px-6 py-3.5">METODE</th>
+                    <th class="px-6 py-3.5">KOLEKTOR</th>
                     <th class="px-6 py-3.5 text-right">NOMINAL</th>
                     <th class="px-6 py-3.5 text-center">STATUS</th>
                     <th class="px-6 py-3.5 text-right">ACTION</th>
@@ -136,7 +144,25 @@
                         <td class="px-6 py-3.5 whitespace-nowrap font-medium text-text-main"><?php echo e($payment->pop->name ?? '-'); ?></td>
                         <td class="px-6 py-3.5 whitespace-nowrap"><?php echo e(optional($payment->payment_date)->format('d/m/Y')); ?></td>
                         <td class="px-6 py-3.5 whitespace-nowrap font-semibold"><?php echo e(strtoupper($payment->payment_method)); ?></td>
-                        <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp <?php echo e(number_format((float) $payment->amount, 2, ',', '.')); ?></td>
+                        <td class="px-6 py-3.5 whitespace-nowrap">
+                            <?php if($payment->collector): ?>
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                    <?php echo e($payment->collector->name); ?>
+
+                                </span>
+                            <?php else: ?>
+                                <span class="text-text-muted text-xs">Langsung</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="px-6 py-3.5 text-right font-mono font-semibold">
+                            Rp <?php echo e(number_format((float) $payment->amount, 2, ',', '.')); ?>
+
+                            <?php if((float) $payment->overpay_amount > 0): ?>
+                                <span class="block text-[10px] font-semibold text-sky-600 dark:text-sky-400" title="Uang lebih yang diserahkan pelanggan — catatan saja, tidak menambah pembayaran tagihan">
+                                    +<?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?> lebih
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-6 py-3.5 text-center whitespace-nowrap">
                             <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($badgeClass); ?>">
                                 <?php echo e($payment->payment_status->label()); ?>

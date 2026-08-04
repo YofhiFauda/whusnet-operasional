@@ -29,6 +29,14 @@ class DashboardController extends Controller
             if (auth()->user()->hasPermission('customers.view')) {
                 return redirect()->route('customers.index');
             }
+            // Kolektor bisa punya HANYA kolektor.view (worklist read-only,
+            // §B-8 no. 5 — sengaja tanpa dashboard.view/customers.view sama
+            // sekali). Tanpa fallback ini, login sukses tapi redirect default
+            // ke '/' (dashboard) langsung abort 403 — kelihatan kayak "gagal
+            // login" padahal auth-nya sah, cuma landing page-nya salah.
+            if (auth()->user()->hasPermission('kolektor.view')) {
+                return redirect()->route('collector-worklist.index');
+            }
             abort(403, 'Unauthorized action.');
         }
 

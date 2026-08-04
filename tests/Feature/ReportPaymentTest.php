@@ -112,6 +112,68 @@ class ReportPaymentTest extends TestCase
         $response->assertDontSee('PAY-SBY-001');
     }
 
+    /**
+     * Regresi bug scope POP (docs/plan/analisa-billing-tagihan-pembayaran-
+     * kolektor.md §D-2 no. 3 / §A-7 #9). PaymentReportController dulu
+     * memfilter dropdown & validasi pop_id lewat whereHas('users') (pivot
+     * user_pops) — jalur itu tidak paham pop_tree, jadi user ber-scope
+     * pop_tree kehilangan POP turunannya di laporan tanpa error apa pun.
+     * Sekarang lewat Pop::forUser() (EffectiveAccessService), yang resolve
+     * pop_tree dengan benar.
+     */
+    public function test_pop_tree_scope_user_sees_pop_and_descendants_in_report(): void
+    {
+        $adminCabangRole = Role::where('name', '=', 'POP Admin', 'and')->firstOrFail();
+        $user = User::factory()->create([
+            'role_id' => $adminCabangRole->id,
+            'status' => 'active',
+        ]);
+
+        $mainPop = $this->createPop('POP-MAIN', 'MAIN', 'POP Induk');
+        $childPop = Pop::create([
+            'code' => 'POP-CHILD',
+            'pop_code' => 'CHILD',
+            'registration_prefix' => 'CC',
+            'cid_prefix' => 'DD',
+            'name' => 'Mini POP Anak',
+            'type' => 'mini_pop',
+            'status' => 'active',
+            'parent_id' => $mainPop->id,
+        ]);
+        $unrelatedPop = $this->createPop('POP-OTHER', 'OTHER', 'POP Tak Terkait');
+
+        $scope = UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $adminCabangRole->id,
+            'scope_type' => ScopeType::POP_TREE,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $mainPop->id,
+        ]);
+
+        $invoiceMain = $this->createInvoice($mainPop, 'Pelanggan Induk', 'INV-TREE-MAIN');
+        $invoiceChild = $this->createInvoice($childPop, 'Pelanggan Anak', 'INV-TREE-CHILD');
+        $invoiceOther = $this->createInvoice($unrelatedPop, 'Pelanggan Lain', 'INV-TREE-OTHER');
+
+        $paymentMain = $this->createPayment($invoiceMain, 'PAY-TREE-MAIN', '2026-06-05', 'cash', 'valid', 150000.0);
+        $paymentChild = $this->createPayment($invoiceChild, 'PAY-TREE-CHILD', '2026-06-05', 'cash', 'valid', 150000.0);
+        $paymentOther = $this->createPayment($invoiceOther, 'PAY-TREE-OTHER', '2026-06-05', 'cash', 'valid', 150000.0);
+
+        $response = $this->actingAs($user)->get('/reports/payments');
+        $response->assertStatus(200);
+
+        // POP induk & turunannya (mini POP anak) harus tampil — inti bug yang diperbaiki.
+        $response->assertSee('POP Induk');
+        $response->assertSee('Mini POP Anak');
+        $response->assertSee('PAY-TREE-MAIN');
+        $response->assertSee('PAY-TREE-CHILD');
+
+        // POP di luar tree tidak boleh tampil.
+        $response->assertDontSee('POP Tak Terkait');
+        $response->assertDontSee('PAY-TREE-OTHER');
+    }
+
     public function test_payment_report_filtering(): void
     {
         $ownerRole = Role::where('name', '=', 'Owner', 'and')->firstOrFail();
@@ -129,8 +191,8 @@ class ReportPaymentTest extends TestCase
         // 1. POP A, method: cash, status: valid, date: 2026-06-01
         $payment1 = $this->createPayment($invoiceA, 'PAY-001', '2026-06-01', 'cash', 'valid', 150000);
 
-        // 2. POP B, method: transfer, status: pending, date: 2026-07-10
-        $payment2 = $this->createPayment($invoiceB, 'PAY-002', '2026-07-10', 'transfer', 'pending', 120000);
+        // 2. POP B, method: transfer, status: ditolak, date: 2026-07-10
+        $payment2 = $this->createPayment($invoiceB, 'PAY-002', '2026-07-10', 'transfer', 'ditolak', 120000);
 
         // Filter pop_id = popA
         $responsePop = $this->actingAs($user)->get('/reports/payments?pop_id='.$popA->id);
@@ -142,8 +204,8 @@ class ReportPaymentTest extends TestCase
         $responseMethod->assertSee('PAY-002');
         $responseMethod->assertDontSee('PAY-001');
 
-        // Filter status = pending
-        $responseStatus = $this->actingAs($user)->get('/reports/payments?status=pending');
+        // Filter status = ditolak
+        $responseStatus = $this->actingAs($user)->get('/reports/payments?status=ditolak');
         $responseStatus->assertSee('PAY-002');
         $responseStatus->assertDontSee('PAY-001');
 

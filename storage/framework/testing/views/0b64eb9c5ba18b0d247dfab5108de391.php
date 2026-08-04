@@ -276,6 +276,18 @@
         </select>
 
         
+        <?php if($collectorOptions->isNotEmpty()): ?>
+        <select name="collector_id" id="collector_id" onchange="this.form.submit()"
+                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="">Semua (Kolektor &amp; Tanpa Kolektor)</option>
+            <option value="none" <?php echo e($collectorId === 'none' ? 'selected' : ''); ?>>Belum Ada Kolektor</option>
+            <?php $__currentLoopData = $collectorOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $collectorOption): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <option value="<?php echo e($collectorOption->id); ?>" <?php echo e((string) $collectorId === (string) $collectorOption->id ? 'selected' : ''); ?>><?php echo e($collectorOption->name); ?></option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </select>
+        <?php endif; ?>
+
+        
         <div class="col-span-1 sm:col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
             <a href="<?php echo e(url()->current()); ?>"
                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors">
@@ -523,6 +535,14 @@
                                 <?php echo e($customer->full_name); ?>
 
                             </span>
+                            <?php if($customer->collector): ?>
+                                <div class="mt-0.5">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                        Kolektor: <?php echo e($customer->collector->name); ?>
+
+                                    </span>
+                                </div>
+                            <?php endif; ?>
                         </td>
 
                         <!-- POP & Desa -->
@@ -698,6 +718,12 @@
                                 <span class="font-mono text-xs font-bold text-sky-600 dark:text-sky-400"><?php echo e($displayId); ?></span>
                                 <?php endif; ?>
                                 <h4 class="font-bold text-slate-900 dark:text-white text-base mt-0.5"><?php echo e($customer->full_name); ?></h4>
+                                <?php if($customer->collector): ?>
+                                    <span class="inline-flex items-center mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                        Kolektor: <?php echo e($customer->collector->name); ?>
+
+                                    </span>
+                                <?php endif; ?>
                             </div>
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0
                                   <?php echo e($isActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : ''); ?>

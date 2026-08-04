@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'pop_id',
     'distribution_id',
     'mini_pop_id',
+    'collector_id',
     'status',
     'rejected_at',
     'terminated_at',
@@ -167,6 +168,18 @@ class Customer extends Model
     public function miniPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'mini_pop_id');
+    }
+
+    /**
+     * Kolektor yang rutin menagih pelanggan ini — rute permanen, nullable &
+     * reassignable (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md
+     * §B-3). Beda dari `payments.collected_by` (snapshot per transaksi).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function collector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collector_id');
     }
 
     /**

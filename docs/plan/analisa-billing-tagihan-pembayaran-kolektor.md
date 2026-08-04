@@ -757,8 +757,8 @@ Satu invoice, satu hari, dua sesi setoran dengan nominal sama → `SQLSTATE` uni
 | 1 | Admin tahu di halaman mana dia membayar? | ⚠️ SEBAGIAN | 3 pintu masuk, tak ada peta; dok belum menetapkan pintu utama |
 | 2 | Halaman lihat/download laporan harian/mingguan/bulanan | ⚠️ SEBAGIAN | `/reports/payments` + CSV sudah ada; tanpa preset periode, tanpa dimensi kolektor, scope POP pakai jalur usang |
 | 3 | Bayar per kolektor, 1 kolektor banyak pelanggan | ✅ DIRANCANG | §B-5B; belum dikode; gap "banyak invoice per pelanggan" |
-| 4 | Bayar sebagian / dicicil | ✅ JALAN di kode | tapi dipatahkan unique index saat cicil di hari yang sama |
-| 5 | Sisa uang jadi saldo bulan depan | ❌ BERTENTANGAN | §B-8.6 mengunci "tak ada kredit"; kode menolak lebih bayar |
+| 4 | Bayar sebagian / dicicil | ✅ SELESAI (2026-08-03) | unique index pematah sudah di-drop (E1.6); UI cicilan (list parent-child, kolom Cicilan Ke-N, petunjuk di form) selesai — §D-4. Sisa terbuka: indikator umur/aging cicilan |
+| 5 | Sisa uang jadi saldo bulan depan | ❌ TETAP TIDAK | §B-8.6 mengunci "tak ada kredit"; `amount` tetap ditolak kalau melebihi sisa tagihan. `overpay_amount` (2026-08-03) cuma **mencatat** kelebihan, tidak menjadikannya saldo — lihat catatan di §D-5 |
 | 6 | Kerja cepat, pelanggan sangat banyak | ⚠️ SEBAGIAN | arah benar; `paginate(10)` & sequence jebol jadi penghalang |
 | 7 | Laporan bulanan yang datanya valid | ❌ BELUM | tak ada rekonsiliasi, tak ada tutup buku, scope laporan bocor |
 
@@ -850,6 +850,18 @@ Rancangan §B-3 (relasi 1:N) + §B-5B (tab kolektor, batch nominal-per-baris) **
 
 ## D-4. Bayar sebagian / dicicil
 
+> ## ✅ STATUS: UI CICILAN SELESAI (2026-08-03)
+>
+> Mekanisme cicil sendiri memang sudah jalan sejak lama (lihat "Sudah jalan di kode" di bawah) — yang hilang selama ini **tampilannya**: admin tak punya cara melihat sebuah tagihan sedang dicicil ke berapa, dan form bayar tak memberi tahu konsekuensinya sebelum submit. Tiga hal itu sekarang ada:
+>
+> 1. **List tagihan (`invoices/index`)** — tagihan berstatus `sebagian` jadi baris induk yang bisa di-expand (pola chevron sama persis dgn Master POP, `togglePopChildren`). Baris anak = "Cicilan Ke-N" + no. pembayaran + tanggal + badge `payment_method` & `collected_by` **terpisah** (§D-9 no. 3) + sisa setelah cicilan itu. Begitu `lunas`, tombol expand hilang dan baris kembali jadi ringkasan Total & Sisa saja — sesuai usulan "card parent hilang".
+> 2. **Detail tagihan (`invoices/show`)** — tab Riwayat Pembayaran dapat kolom "Cicilan Ke-N" + badge Cicil/Lunas/Ditolak. **Penomoran dihitung menaik dari pembayaran VALID saja**, bukan dari `$loop->iteration` (tabel ditampilkan menurun) dan bukan dari semua payment — pembayaran ditolak sengaja tak diberi nomor supaya urutan cicilan tetap rapat, tidak bolong.
+> 3. **Form input pembayaran (`payments/create`)** — petunjuk hidup: begitu nominal < sisa tagihan, muncul "Tercatat sebagai Cicilan Ke-N, sisa setelah ini: Rp X"; kalau melunasi, muncul konfirmasi status jadi Lunas.
+>
+> **Yang TIDAK ikut dikerjakan:** poin 3 di "Tiga hal yang mematahkannya" (indikator umur/aging cicilan) — masih terbuka, menyambung §D-7. Poin 1 & 2 sudah lunas lebih dulu lewat E1.6 & E2.5.
+>
+> Test: `InstallmentAndOverpayDisplayTest` (8 test, termasuk regresi "pembayaran ditolak tak boleh memakan nomor cicilan" dan "tagihan lunas tak lagi punya baris anak").
+
 ### Sudah jalan di kode
 
 `PaymentController::store` menerima nominal bebas; `remaining <= 0 ? LUNAS : SEBAGIAN` (`:205`); `Invoice hasMany Payment`. §B-12.1 sudah mencontohkan cicilan lintas setoran.
@@ -896,6 +908,31 @@ Parent Card (Tagihan Awal)
 > ## ⛔ DILUAR SCOPE (2026-08-01)
 >
 > **Diputuskan: DROP.** Keputusan asli §B-8.6 (kembalian fisik, tak ada kredit) **berlaku lagi tanpa syarat**. `payment_allocations` + `customer_credits` (perubahan struktural terbesar di dokumen ini) tidak dikerjakan. Analisa di bawah dipertahankan sebagai arsip kalau kebutuhan ini muncul lagi nanti — termasuk jawaban teknis rinci (ledger vs kolom, idempotensi debit, migrasi data lama) yang sudah pernah dibahas.
+>
+> ### ⚠️ CATATAN 2026-08-03 — `payments.overpay_amount` BUKAN pembatalan keputusan ini
+>
+> Ada kolom baru `payments.overpay_amount` (migration `2026_08_03_140001_...`). **Itu catatan informatif, bukan saldo kredit**, dan §D-5 tetap DROP. Bedanya tegas:
+>
+> | | `overpay_amount` (dikerjakan) | Saldo kredit §D-5 (tetap drop) |
+> |---|---|---|
+> | Sisi debit | **Tidak ada** — nilainya tak pernah berkurang, tak pernah dipakai | Ada, dipakai saat invoice berikutnya terbit |
+> | Pengaruh ke invoice | **Nol** — `amount` tetap divalidasi `max: remaining_amount`, `paid_amount` tak pernah melampaui `total_amount` | Mengubah invoice jadi `sebagian`/`lunas` saat terbit |
+> | Struktur | Satu kolom di `payments` | Ledger `customer_credits` + `payment_allocations` |
+> | Penyelesaian | Manual di luar sistem (refund fisik / potong tagihan berikutnya secara manual) | Otomatis oleh generator invoice |
+>
+> **Konsekuensi yang diterima sadar:** kolom ini tak menjawab "sisa uang jadi saldo bulan depan" (§D-2 no. 5 tetap ❌). Ia cuma menjawab "kelebihan itu pernah terjadi, sebesar sekian, di pembayaran mana" supaya tak hilang jejak.
+>
+> **Larangan:** jangan pakai `overpay_amount` sebagai saldo — tak punya sisi debit, jadi begitu dikurangi di satu tempat ia langsung jadi penyakit desync §A-5 yang menyangkut uang pelanggan. Kalau kredit sungguhan dibutuhkan, jalurnya tetap arsip di bawah ini, utuh.
+>
+> **Susulan 2026-08-04 — desain 2-input DIBALIK jadi auto-split, dari laporan lapangan konkret.** Versi awal (dua field terpisah: `amount` dibatasi sisa tagihan + `overpay_amount` manual) gagal di lapangan: contoh nyata Boyke Santiago, sisa Rp141.097, admin terima Rp200.000 — admin harus HITUNG SENDIRI "200000 − 141097 = 58903" dan pisah ke dua field, dan karena `amount` masih dibatasi `max` HTML/validasi, mengetik 200000 langsung ditolak browser sebelum sempat kirim. Diperbaiki: **satu input** `amount` = TOTAL uang diterima dari pelanggan, TIDAK dibatasi sisa tagihan lagi. `PaymentController::store()` yang membagi otomatis di dalam `DB::transaction`: `appliedAmount = min(total, remaining)` disimpan ke `payments.amount` (tetap tak pernah melebihi `total_amount` invoice — jaminan §D-5 soal "paid_amount tak boleh lampaui total" TETAP UTUH, cuma pindah dari validasi input jadi kalkulasi), sisanya `overpayAmount = total - appliedAmount` ke `payments.overpay_amount`. UI (`payments/create.blade.php` & `quick-payment-modal.blade.php`) tinggal preview hidup: kalau amount > sisa, tampilkan "Rp X diterapkan ke tagihan (Lunas), Rp Y tercatat sebagai lebih bayar" — bukan input kedua yang mesti diisi manual. Field "Nominal Lebih" terpisah **dihapus total** dari kedua form.
+>
+> **Susulan 2026-08-04 — lebih bayar & cicilan disebar ke semua permukaan.** Sebelumnya info ini cuma nampak di list/detail tagihan. Ditambahkan `Payment::installmentContext()` (satu sumber kebenaran "Cicilan Ke-N" + apakah payment ini melunasi, dipakai lintas view) dan disebar ke: `payments/show` (badge di header + sub-baris di metric NOMINAL BAYAR + baris di struk print-only), `payments/receipt` (kwitansi thermal — baris Keterangan & Lebih Bayar), `invoices/show` (badge "Lebih Bayar Rp X" di header saat tagihan Lunas), `customers/show` (tab Riwayat Pembayaran Pelanggan), `payments/index` (Riwayat Pembayaran global). Cicilan Ke-N sengaja TIDAK ditambahkan ke `customers/show`/`payments/index` — kedua tabel itu lintas-invoice, penomoran cicilan cuma masuk akal per-invoice.
+>
+> **Susulan 2026-08-04 — label tombol ikut status.** Tombol "Bayar" di `/invoices` (list & detail) berubah jadi "Bayar Cicil" saat `invoice_status = sebagian`, supaya jelas beda dari pembayaran pertama.
+>
+> **Susulan 2026-08-03 — celah "Modal Bayar Cepat" ditemukan & ditutup.** User laporkan field/hint tak muncul sama sekali saat bayar. Penyebab: ada **dua** form input pembayaran, dan pengerjaan pertama cuma menyentuh satu — `payments/create.blade.php` (halaman penuh, ditembus lewat tombol "Bayar" di `invoices/show`). Jalur yang SEBENARNYA paling sering dipakai adalah `payments/partials/quick-payment-modal.blade.php` (modal AJAX, dipakai tombol "Bayar" di `/invoices` list DAN tab Tagihan Detail Pelanggan) — sama sekali beda file, tak ikut ke-review di batch pertama. Field Nominal Lebih + hint cicilan sekarang ditambahkan ke modal ini juga, disinkronkan lewat `qpRefreshInstallmentHint()` (versi JS dari hint yang sama di halaman penuh). Pelajaran: kalau ada dua jalur UI untuk satu aksi, cek KEDUANYA sebelum lapor "selesai".
+>
+> **Susulan 2026-08-03 — Tab Khusus dibangun.** Permintaan asli user eksplisit minta "Tab Khusus untuk menampung" pelanggan lebih bayar, bukan cuma badge di Detail Pelanggan. Dibangun `GET /payments/overpay` (`PaymentController::overpay()`, view `payments/overpay.blade.php`), link dari header `/payments`. **Tetap read-only** — daftar payment yang `overpay_amount > 0` & `payment_status = valid`, scope POP (`applyUserScope()`), tak ada aksi apa pun selain lihat & buka Detail. Reuse permission `payments.view` (bukan permission baru) — ini sudut pandang lain dari data yang sama, bukan objek bisnis baru. Test: 3 tambahan di `InstallmentAndOverpayDisplayTest`.
 
 **Ini keputusan bisnis, bukan detail teknis. Dicatat apa adanya, belum diubah.**
 
@@ -1137,9 +1174,21 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ## FASE 1 — Prasyarat (wajib selesai semua sebelum Fase 2 disentuh)
 
+> **✅ FASE 1 SELESAI (2026-08-03).** Semua 9 task dikerjakan, bukan cuma yang `[BLOCKING]`. Ringkasan:
+> - **Model/skema baru:** `Invoice::recalculateFromPayments()`, `Invoice::SUBSCRIPTION_TYPES` + `hasActiveSubscriptionInvoiceForPeriod()`, tabel `payment_batches` + model `PaymentBatch`, tabel `payment_number_sequences` + model `PaymentNumberSequence`, `Payment::generatePaymentNumber()`, kolom `payments.reject_reason`/`rejected_at`/`rejected_by`/`payment_batch_id`.
+> - **Migration:** drop `payments_invoice_date_amount_unique`; 5 migration baru (lihat commit/file di `database/migrations/2026_08_03_*`).
+> - **Command baru:** `billing:reconcile-invoice-status` (`--fix`, `--fix-threshold`).
+> - **Route baru:** `POST /payments/{payment}/reject` (permission `payments.reject` — sudah tersedia penuh di RBAC matrix sejak awal, tinggal dipakai).
+> - **Bug hidup diperbaiki:** scope POP di `PaymentReportController` (`Pop::forUser()` menggantikan `whereHas('users', ...)`).
+> - **Test baru:** 7 file (`PaymentBurstDuplicateSubmitTest`, `PaymentNumberSequenceWidthExpansionTest`, `ReconcileInvoiceStatusCommandTest`, `PaymentRejectRecalculatesInvoiceTest`, + 1 test baru di `ReportPaymentTest`), total 25 test baru.
+> - **Regresi:** suite penuh 874 passed / 2 failed — dua yang gagal (`CustomerDocumentTest`, `CustomerInstallationTest`) tak menyentuh kode billing sama sekali (modul dokumen pelanggan & instalasi), terkonfirmasi pra-eksisting di luar scope Fase 1.
+> - `vendor/bin/pint --dirty` bersih di semua file yang disentuh.
+>
+> **Belum dikerjakan (sengaja, di luar Fase 1):** UI batch kolektor yang benar-benar memakai `payment_batches.idempotency_key` (E2.5, Fase 2) — skema & mekanismenya sudah siap, tinggal disambung ke form.
+
 ### E1.1 — `Invoice::recalculateFromPayments()` [BLOCKING]
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `Invoice::recalculateFromPayments()`, dipakai `PaymentController::store` & `bulkStore`. Keputusan `payment_status`: VALID saja. Test: suite payment existing tetap hijau.
 - **TUJUAN:** Satu fungsi sumber kebenaran untuk `paid_amount` / `remaining_amount` / `invoice_status`, dipakai semua jalur (single payment, batch, void, setoran).
 - **KONTEKS MASALAH:** Logika ini sekarang ter-duplikasi di `PaymentController::store` (`:203-205`) dan `bulkStore` (`:289-308`). Dua salinan gampang menyimpang — perubahan di satu tempat, lupa di tempat lain, `invoice_status` desync dari `remaining_amount` (§A-5). Fase 2 (batch kolektor, void payment) butuh titik hitung tunggal ini, kalau tidak duplikasi bertambah lagi.
 - **CHECKLIST:**
@@ -1152,7 +1201,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.2 — Command rekonsiliasi `billing:reconcile-invoice-status`
 
-- **STATUS:** Belum Dikerjakan — **prioritas turun** (semula sebagian terkait rekonsiliasi Setoran yang kini di-drop; command ini tetap berguna independen sebagai jaring integritas invoice, boleh dikerjakan belakangan bukan blocking Fase 2).
+- **STATUS:** ✅ Selesai (2026-08-03) — `--fix` cuma untuk selisih ≤ `--fix-threshold` (default Rp100rb), selisih besar ditandai PERLU REVIEW MANUAL, tak di-auto-fix. Audit koreksi otomatis lewat `RecordsAuditLogs` (tak perlu logging terpisah). Test: `ReconcileInvoiceStatusCommandTest` (4 test).
 - **TUJUAN:** Jaring pengaman yang mendeteksi desync `paid_amount ≠ Σ payment` dan status yang tak sesuai `remaining_amount`, sebelum ketahuan lewat komplain pelanggan.
 - **KONTEKS MASALAH:** Tak ada mekanisme yang memaksa konsistensi `invoice_status` terhadap `remaining_amount` (§A-5) — hanya terjaga selama semua jalur bayar lewat `PaymentController`. Ditambah temuan §A-4: **anti-dobel invoice tak punya lapis DB sama sekali**, jadi command ini juga satu-satunya jaring untuk tagihan dobel yang lolos observer.
 - **CHECKLIST:**
@@ -1164,7 +1213,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.3 — Konstanta bersama aturan "abaikan BATAL"
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `Invoice::SUBSCRIPTION_TYPES` + `Invoice::hasActiveSubscriptionInvoiceForPeriod()`, dipakai `InvoiceObserver` & `GenerateMonthlyInvoicesCommand`. `SatuTagihanLanggananPerPeriodeTest`/`AuditTagihanDobelTest` tetap hijau.
 - **TUJUAN:** Satu sumber kebenaran untuk aturan "invoice `BATAL` tak menghalangi penggantinya di periode sama".
 - **KONTEKS MASALAH:** Aturan yang sama ditulis dua kali — `InvoiceObserver:98` dan `GenerateMonthlyInvoicesCommand:78`. Ubah satu, lupa ubah yang lain = tagihan dobel lolos atau tagihan sah ketolak.
 - **CHECKLIST:**
@@ -1176,7 +1225,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.4 — Ganti string literal status jadi enum di `GenerateMonthlyInvoicesCommand`
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `WorkflowTransition::ACTIVE`/`SUSPENDED`, bukan literal `'active'`/`'suspended'`.
 - **TUJUAN:** Cegah silent-skip generator bulanan kalau nama status pelanggan berubah.
 - **KONTEKS MASALAH:** `whereIn('status', ['active','suspended'])` (`:34`) pakai string literal. Kalau status berganti nama, generator diam-diam skip semua pelanggan — tak ada tagihan terbit, tanpa error apa pun. Silent failure paling berbahaya di seluruh alur billing karena tak ada gejala sampai pelanggan komplain tak dapat tagihan.
 - **CHECKLIST:**
@@ -1187,7 +1236,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.5 — Sequence `payment_number` berbasis tabel [BLOCKING]
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — tabel `payment_number_sequences`, `Payment::generatePaymentNumber()` (lock baris counter, sinkron MAX existing, lebar digit auto-expand lewat 9999). Test: `PaymentNumberSequenceWidthExpansionTest` (4 test).
 - **TUJUAN:** Nomor pembayaran yang tak jebol dan tak race di skala ~1000 transaksi/hari.
 - **KONTEKS MASALAH:** `PAY-{Ym}-%04d` (`PaymentController.php:353`) maksimum 9.999/bulan — premis Bagian B (~30.000/bulan) bikin sequence habis di hari ke-10. `lockForUpdate()` tak mengunci apa pun saat periode masih kosong; `bulkStore` bertransaksi per baris → race → tabrakan nomor unik → error ditelan `$failed++` senyap (§A-5).
 - **CHECKLIST:**
@@ -1200,7 +1249,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.6 — Drop unique index `payments`, ganti `idempotency_key` di `payment_batches` [BLOCKING]
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — index lama di-drop, tabel `payment_batches` (+ model `PaymentBatch`) & `payments.payment_batch_id` dibuat. `idempotency_key` disiapkan di skema; pemakaian nyata (klien generate key per submit) menyusul di E2.5 (batch UI belum ada di Fase 1). Dideploy SETELAH E1.8 sesuai urutan wajib.
 - **TUJUAN:** Buka jalan cicilan sah (nominal sama, hari sama) tanpa kehilangan proteksi dobel-submit di jalur batch kolektor.
 - **KONTEKS MASALAH:** `payments_invoice_date_amount_unique` `(invoice_id, payment_date, amount)` menolak cicilan sah dan menolak pola koreksi "void lalu input ulang nominal & tanggal sama". **Keputusan final §D-9 no. 2, disederhanakan 2026-08-01:** drop index, ganti kolom `payment_batches.idempotency_key` (unik, per sesi submit — bukan per baris). Semula direncanakan di `collector_deposits` (tabel Setoran), tapi Setoran di-drop dari scope — dedup/atomicity batch tetap dibutuhkan independen, jadi dipindah ke tabel ringan `payment_batches` (id, `idempotency_key`, `submitted_by`, `submitted_at`, `collector_id` — **tanpa** `declared_total`/`variance`/status selisih).
 - **CHECKLIST:**
@@ -1214,7 +1263,9 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.7 — Void/reject payment + koreksi invoice satu transaksi
 
-- **STATUS:** Belum Dikerjakan — **prioritas turun** (semula wajib karena Setoran butuh koreksi; Setoran di-drop, jadi ini nice-to-have operasional, boleh menyusul setelah Fase 2 jalan kalau perlu segera).
+- **STATUS:** ✅ Selesai (2026-08-03) — route `POST /payments/{payment}/reject` (permission `payments.reject` — ternyata sudah lengkap tersedia di RBAC matrix, action code `REJECT` sudah ada di `payments` sejak awal). Kolom baru `reject_reason`/`rejected_at`/`rejected_by`. Audit `cancel` otomatis lewat mekanisme `Payment::booted()` yang sudah lama mengantisipasi ini. Test: `PaymentRejectRecalculatesInvoiceTest` (7 test: full/partial reject, audit log, validasi alasan wajib, tolak reject-dobel, permission, POP scope).
+- **SUSULAN (2026-08-03):** backend di atas sempat **tanpa tombol sama sekali** — jalurnya hidup tapi tak bisa dipakai dari UI. Sekarang ada tombol "Tolak Pembayaran" di `payments/show`, dibuka jadi modal (alasan wajib, `ReasonValidationRule::required(1000)`), muncul **hanya** saat status masih `valid` dan pemakai punya `payments.reject`. Pembayaran yang sudah ditolak menampilkan panel alasan + siapa/kapan menolak, bukan tombol.
+- **SUSULAN (2026-08-03):** `PaymentStatus::PENDING` **dihapus** dari enum — sistem ini tak punya alur verifikasi bertahap, semua jalur insert baru selalu `VALID` langsung, jadi case-nya cuma jadi status mati yang membingungkan. Default kolom `payments.payment_status` diubah ke `valid` (migration `2026_08_03_130001_...`). Data legacy berstatus `pending` dipetakan ke `VALID` di `mapLegacyPaymentStatus()` — bukan dibuang, karena baris itu memang sudah tercatat sebagai transaksi. Kartu "Pending" di laporan pembayaran diganti kartu "Ditolak".
 - **TUJUAN:** Jalur resmi membatalkan payment yang salah input, dengan invoice ikut terkoreksi otomatis — bukan `LUNAS` palsu setelah payment-nya dibatalkan.
 - **KONTEKS MASALAH:** `Payment.php:61` sudah mengantisipasi `payment_status → DITOLAK` (nulis audit `cancel`), tapi tak ada yang mengembalikan `invoice.paid_amount/remaining_amount/invoice_status`. Jebakan laten (§A-6) — admin salah input batch tetap butuh cara koreksi resmi, meski tak ada lagi kebutuhan "koreksi setoran" secara spesifik.
 - **CHECKLIST:**
@@ -1227,7 +1278,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.8 — Burst-dedup `PaymentObserver` untuk jalur single-payment [BLOCKING]
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `PaymentObserver::rejectBurstDuplicate()`, window 300 detik, dideploy sebelum E1.6. Test: `PaymentBurstDuplicateSubmitTest` (3 test: dobel-submit ditolak, cicilan sah lolos, nominal beda lolos).
 - **TUJUAN:** Ganti proteksi dobel-submit yang hilang dari jalur `PaymentController::store` (non-batch) begitu unique index lama dicabut di E1.6.
 - **KONTEKS MASALAH:** Index `payments_invoice_date_amount_unique` adalah **satu-satunya** guard dobel-submit di jalur single-payment sekarang — `PaymentObserver` cuma menolak `amount <= 0` (`:20`), tak ada burst-dedup seperti `InvoiceObserver`. Kalau E1.6 di-deploy tanpa ini, admin yang klik dobel tombol "Bayar" menciptakan dua payment identik tanpa penjagaan apa pun, invoice ter-update dua kali.
 - **CHECKLIST:**
@@ -1239,7 +1290,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E1.9 — Perbaiki scope POP di `PaymentReportController` (bug hidup)
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `Pop::forUser()` menggantikan `whereHas('users', ...)` di `index()` & `export()`. Audit controller laporan lain: tak ada pola serupa di tempat lain. Test: `ReportPaymentTest::test_pop_tree_scope_user_sees_pop_and_descendants_in_report` (regresi, gagal sebelum fix).
 - **TUJUAN:** User ber-scope `pop_tree` tidak lagi kehilangan POP turunan di laporan pembayaran.
 - **KONTEKS MASALAH:** `PaymentReportController:36` dan `:129` memfilter POP lewat `whereHas('users', ...)` (pivot `user_pops`) — jalur yang menurut `CLAUDE.md` **tidak paham `pop_tree`**. Laporan tampak "kurang" tanpa error apa pun — ini kebocoran integritas data, bukan sekadar kelengkapan fitur. Bug hidup, langsung berdampak ke kebutuhan "lihat track pembayaran cepat" yang diminta user — laporan yang diam-diam bocor scope bukan laporan yang bisa dipercaya.
 - **CHECKLIST:**
@@ -1253,13 +1304,36 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ## FASE 2 — Kolektor & Kasir Cepat
 
+> **✅ FASE 2 SELESAI (2026-08-03).** Semua 9 task aktif dikerjakan (E2.0–E2.5, E2.7–E2.9; E2.6 tetap DILUAR SCOPE). Ringkasan:
+> - **RBAC baru:** role `kolektor` (`is_system`), feature+permission `kolektor.view` (satu-satunya, tanpa `payments.create`).
+> - **Skema baru:** `customers.collector_id` (+3 guard), `payments.collected_by`/`collected_date`.
+> - **Controller baru:** `CollectorAssignmentController` (Atur Kolektor), `CollectorWorklistController` (worklist read-only), `CollectorBatchController` (Tab Kolektor — inti fitur, validasi 2 fase + all-or-nothing + idempotency).
+> - **UI:** banner "riwayat kas" di Pembayaran, tombol Atur Kolektor & Setoran Kolektor di Tagihan, badge kolektor terpisah dari metode bayar (invoice show, payments index/show), preset periode + filter Kolektor + export XLSX di laporan.
+> - **Guard 3** (kolektor bermuatan tak boleh dinonaktifkan) di-hook ke `UserController::update()` — sempat salah taruh di `store()` saat implementasi, ketangkep test, diperbaiki.
+> - **Test baru:** 7 file (`CollectorRoleCannotCreatePaymentsTest`, `CollectorAssignmentGuardsTest`, `PaymentCollectedByNotCopiedFromCustomerTest`, `CollectorWorklistScopeTest`, `CollectorBatchPaymentTest`, `PaymentReportCollectorFilterAndXlsxTest`), total 25 test baru — semua lolos.
+> - **Regresi:** `RoleTest` perlu diupdate (hardcode jumlah role 9→10) — bukan bug, konsekuensi wajar penambahan role. 2 kegagalan pra-eksisting di luar billing (`CustomerDocumentTest`, `CustomerInstallationTest`) tetap ada, tak tersentuh Fase 2.
+> - `vendor/bin/pint --dirty` bersih di semua file yang disentuh.
+>
+> **Backlog aktif dokumen ini SELESAI di titik ini** — kebutuhan simpel yang diminta user (bedain Tagihan/Pembayaran, batch bayar cepat per kolektor, riwayat tanpa banyak tab, cash/transfer/cicil tervalidasi) sudah terpenuhi. Fase 3 & 4 lama (Setoran, tutup buku, saldo kredit) tetap diarsipkan di bagian paling bawah, tak dikerjakan.
+
 **Prasyarat:** Fase 1 [BLOCKING] items selesai & di-deploy (urutan E1.8 → E1.6 khususnya, lihat blocking note di E1.6). E1.2/E1.3/E1.4/E1.7 boleh menyusul paralel, tak wajib selesai dulu.
 
-**Ini Fase terakhir yang aktif** — selesai Fase 2, seluruh kebutuhan simpel yang diminta (bedain Tagihan/Pembayaran, batch bayar cepat per kolektor, riwayat tanpa banyak tab, cash/transfer/cicil tervalidasi) sudah terpenuhi. Fase 3 & 4 lama (Setoran, tutup buku, saldo kredit) diarsipkan di bagian paling bawah.
+### E2.0 — Pintu bayar & banner Pembayaran
+
+- **STATUS:** ✅ Selesai, **direvisi 2026-08-03 (putaran kedua)** — banner riwayat kas tetap sama. Header Tagihan disederhanakan: tombol "Atur Kolektor" + dropdown "Setoran Kolektor" digabung jadi **satu tombol "Kolektor"** menuju hub `/collectors` (lihat E2.5). Badge kolektor per baris di list Tagihan tak berubah.
+- **TUJUAN:** Halaman Tagihan jadi satu-satunya pintu masuk input pembayaran (single-payment maupun batch kolektor); halaman Pembayaran murni riwayat, mengarahkan admin balik ke Tagihan kalau mau input.
+- **KONTEKS MASALAH:** Keputusan sudah dikunci (§D-1, §D-9) tapi belum pernah dituliskan jadi task tersendiri — sebelumnya dianggap "murah, nempel ke E2.5" dan nyaris kececer. Tanpa ini, kebingungan admin baru yang jadi alasan awal seluruh fitur ini (§B-1: "halaman Tagihan vs Pembayaran terlihat mirip") tetap tak terselesaikan meski Tab Kolektor sudah jadi.
+- **CHECKLIST:**
+  - [ ] Halaman Tagihan (`/invoices`): baris biasa tetap punya tombol "Bayar" (jalur non-kolektor, `collected_by = null`).
+  - [ ] Halaman Tagihan: baris ber-badge kolektor tetap punya tombol "Bayar" (bayar langsung/transfer meski ter-assign kolektor) **plus** tombol "Setoran Kolektor" di header yang membuka Tab Kolektor (E2.5).
+  - [ ] Halaman Pembayaran (`/payments`): tambah banner permanen — *"Halaman ini riwayat kas. Untuk input pembayaran, buka Tagihan."* — dengan tombol ke `/invoices`. Pastikan `index`/`show` tetap read-only, tak ada tombol create di halaman ini (sudah begitu di route, tinggal dikuatkan di UI).
+  - [ ] Review: admin baru (tanpa penjelasan lisan) bisa menemukan tombol bayar dari halaman Tagihan tanpa nyasar ke Pembayaran dulu.
+- **ACCEPTANCE CRITERIA:** Tak ada jalur input pembayaran yang start dari halaman Pembayaran. Banner tampil konsisten di `/payments` (index & show). Review UI/UX memastikan satu pintu jelas, bukan tiga pintu tanpa hierarki seperti kondisi awal (§D-1).
+- **Rujukan:** §D-1, §D-9 "Dampak ke dokumen lain".
 
 ### E2.1 — Role `kolektor` + matrix permission
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — role `kolektor` (`RoleSeeder`, `is_system`), feature+permission `kolektor.view` (satu-satunya), tanpa `payments.create`. Test: `CollectorRoleCannotCreatePaymentsTest` (6 test).
 - **TUJUAN:** Identitas RBAC untuk user yang menagih di lapangan, dengan hak paling minimal (tak bisa input pembayaran).
 - **KONTEKS MASALAH:** Kolektor bukan Admin POP (§B-8 no. 4) — role terpisah, global (bukan per-cabang, larangan keras `CLAUDE.md`), dibatasi via scope.
 - **CHECKLIST:**
@@ -1271,7 +1345,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.2 — `customers.collector_id` + 3 guard wajib
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai, **direvisi 2026-08-03 (putaran kedua)** — logic pindah dari `CollectorAssignmentController` (dihapus) ke `CollectorController::assign()`/`release()` dalam hub `/collectors/{collector}` (lihat E2.5). Guard 1 sekarang manifestasinya 404 (kolektor fixed dari route param, gak dipilih dari dropdown). Guard 2 tetap redirect+error. Guard 3 tetap di `UserController::update()`, tak berubah. Reassign/lepas tetap lewat `Customer::update()` → audit log otomatis. Test: `CollectorAssignmentGuardsTest` (6 test, +1 baru buat "release pelanggan yang bukan miliknya ditolak") — sempat menemukan bug nyata (guard 3 salah taruh di `store()`, diperbaiki putaran pertama).
 - **TUJUAN:** Kolom rute permanen kolektor per pelanggan, dengan validasi yang mencegah kebocoran scope.
 - **KONTEKS MASALAH:** FK polos ke `users` tak cukup. Tanpa guard: (a) siapa pun bisa jadi "kolektor" lewat request langsung; (b) assign pelanggan POP A ke kolektor bercakupan POP B = kebocoran lintas cabang (larangan keras #3 `CLAUDE.md`); (c) `nullOnDelete` diam-diam melepas semua pelanggan kalau kolektor dinonaktifkan, worklist lenyap tanpa jejak.
 - **CHECKLIST:**
@@ -1286,7 +1360,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.3 — `payments.collected_by` + `payments.collected_date`
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — kolom + relasi `Payment::collector()`. `collected_by` cuma terisi di jalur batch (E2.5); jalur single-payment tetap `null` walau pelanggan punya `collector_id`. Test: `PaymentCollectedByNotCopiedFromCustomerTest` — skenario kritis §B-3 eksplisit dites.
 - **TUJUAN:** Snapshot beku siapa yang menagih tiap payment + kapan uangnya diterima di lapangan (terpisah dari tanggal posting).
 - **KONTEKS MASALAH:** `collected_by` **tidak** disalin otomatis dari `collector_id` — diisi sesuai jalur masuk (kolektor tab = terisi, jalur Tagihan langsung = `null`), supaya laporan setoran tak mencatat uang yang tak pernah ditagih kolektor bersangkutan (§B-3). `collected_date` mencegah pendapatan lintas-bulan salah potong ketika kolektor telat setor (§B-3).
 - **CHECKLIST:**
@@ -1298,7 +1372,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.4 — Worklist read-only kolektor
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `CollectorWorklistController` + `collector-worklist/index.blade.php`, gate `kolektor.view`. Nol tombol input. Test: `CollectorWorklistScopeTest` (3 test: scope per-kolektor, exclude lunas, nol elemen aksi).
 - **TUJUAN:** Kolektor login melihat daftar pelanggannya yang belum lunas — nol tombol input.
 - **KONTEKS MASALAH:** UI kolektor sengaja minimal (§B-8 no. 5) — kolektor tak berwenang input pembayaran (§B-1), cuma perlu tahu siapa yang harus didatangi.
 - **CHECKLIST:**
@@ -1310,7 +1384,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.5 — Batch pembayaran per kolektor (tab kolektor)
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai, **direvisi 2026-08-03 (putaran kedua)** — atas permintaan user, "Atur Kolektor" (E2.2) + "Tab Kolektor" (E2.5) digabung jadi satu **hub `/collectors`**: daftar semua kolektor (jumlah pelanggan + total tunggakan) → klik masuk `/collectors/{collector}` dengan 2 tab: **Worklist & Bayar** (bayar 1-by-1 per baris ATAU centang banyak baris + Bayar Massal, dua-duanya lewat endpoint yang sama `CollectorBatchController::store()`) dan **Atur Pelanggan** (assign/reassign/lepas, di-scope ke kolektor ini — bukan pilih dari dropdown di tengah proses). `CollectorController` baru (`index`/`show`/`assign`/`release`); `CollectorAssignmentController` lama **dihapus total** (bukan diarsipkan — user pilih "diganti total" saat ditanya). `CollectorBatchController` disusutkan jadi cuma `store()` (validasi + all-or-nothing + idempotency tak berubah). Bug nyata ketemu & diperbaiki: JOIN Invoice+Customer buat hitung total tunggakan per kolektor nabrak `pop_id` ambigu (HasPopScope nulis kolom tanpa qualifier tabel) — diganti agregasi PHP. Test: `CollectorHubTest` (3 test baru) + `CollectorAssignmentGuardsTest`/`CollectorBatchPaymentTest`/`CollectorRoleCannotCreatePaymentsTest` disesuaikan ke route baru — total 26 test kolektor, semua hijau.
 - **TUJUAN:** Admin memproses banyak pembayaran satu kolektor sekaligus, nominal & metode per baris, secepat Excel.
 - **KONTEKS MASALAH:** `bulkStore` lama cuma lunas-penuh, transaksi per baris (§A-5, §C-2c), gagal senyap. Kebutuhan nyata (§D-3): satu pelanggan bisa punya banyak invoice tunggakan sekaligus.
 - **Penyederhanaan (2026-08-01):** semula gap ini dijawab pakai `payment_allocations` (satu payment terpecah ke banyak invoice) — struktur itu ikut di-drop bareng §D-5. Cara lebih sederhana yang tetap memenuhi kebutuhan: batch cukup membuat **satu baris payment per invoice** (struktur `payments.invoice_id` 1:1 yang sudah ada, tak berubah), diurutkan FIFO dari invoice tertua. "Bayar semua tunggakan" di UI = beberapa payment tercipta sekaligus dalam satu transaksi batch, bukan satu payment yang dipecah.
@@ -1335,7 +1409,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.7 — Preset periode & dimensi kolektor di laporan pembayaran
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — 4 tombol preset (JS, submit form), dropdown filter Kolektor (`collected_by`), kolom Kolektor di tabel web. Pola `startOfDay`/`endOfDay` dipertahankan. Test: `PaymentReportCollectorFilterAndXlsxTest`.
 - **TUJUAN:** Admin bisa lihat/download laporan Hari Ini / 7 Hari / Bulan Ini / Bulan Lalu / per Billing Period tanpa isi tanggal manual, plus filter & kolom Kolektor.
 - **KONTEKS MASALAH:** `/reports/payments` sudah ada tapi admin harus ketik dua tanggal tiap kali (§D-2 no. 1); tak ada dimensi kolektor sama sekali (§D-2 no. 2) — begitu Fase 2 selesai, laporan tak bisa menunjukkan hasil kerja kolektor.
 - **CHECKLIST:**
@@ -1350,7 +1424,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.8 — Export laporan format XLSX
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — `PaymentReportController::exportXlsx()` pakai `spatie/simple-excel` (pola sama `TicketHistoryController::export()`), CSV dipertahankan sebagai opsi terpisah. Test: `PaymentReportCollectorFilterAndXlsxTest`.
 - **TUJUAN:** Laporan bulanan yang diarsipkan dalam format yang lazim dipakai (Excel asli, bukan CSV).
 - **KONTEKS MASALAH:** Export sekarang CSV saja. `spatie/simple-excel` sudah jadi dependency (dipakai import pelanggan) — tinggal dipakai untuk export juga.
 - **CHECKLIST:**
@@ -1361,7 +1435,7 @@ Setiap task merujuk balik ke bagian analisa (§A/§B/§C/§D) — jangan kerjaka
 
 ### E2.9 — Pisah kolom `payment_method` vs `collected_by` di UI
 
-- **STATUS:** Belum Dikerjakan
+- **STATUS:** ✅ Selesai (2026-08-03) — badge terpisah di `invoices/show` (tab Riwayat Pembayaran), `payments/index`, `payments/show`. Tak ada lagi string gabungan.
 - **TUJUAN:** Tampilan riwayat pembayaran (termasuk card cicilan parent-child §D-4) menampilkan dua badge terpisah, bukan satu string gabungan.
 - **KONTEKS MASALAH:** Contoh awal di §D-4 menggabungkan jadi satu kolom ("Collector (Sandya)") — menghilangkan kemampuan filter independen yang justru dibutuhkan E2.7.
 - **CHECKLIST:**

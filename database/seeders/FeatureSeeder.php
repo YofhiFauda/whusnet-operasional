@@ -86,6 +86,16 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 12,
             ],
             [
+                // Worklist read-only kolektor — permission SENDIRI, bukan
+                // `customers.view`. Kolektor cuma boleh baca pelanggan yang
+                // ter-assign ke dirinya sendiri (§B-8 no. 5), bukan seluruh
+                // daftar pelanggan yang `customers.view` bukakan.
+                'code' => 'kolektor',
+                'name' => 'Worklist Kolektor',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 12,
+            ],
+            [
                 'code' => 'reports',
                 'name' => 'Laporan',
                 'type' => FeatureType::ROOT,

@@ -86,14 +86,14 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC2');
-        $technician = $this->createUserWithRole('Teknisi');
-        $technician->pops()->attach($pop->id);
-        $this->grantPopScope($technician, $pop);
+        $user = $this->createUserWithRole('NOC');
+        $user->pops()->attach($pop->id);
+        $this->grantPopScope($user, $pop);
         $customer = $this->createCustomer($pop, 'TEST-DOC-002');
 
-        $document = $this->createDocument($customer, $technician, 'rumah');
+        $document = $this->createDocument($customer, $user, 'rumah');
 
-        $response = $this->actingAs($technician)
+        $response = $this->actingAs($user)
             ->get(route('customers.show', $customer->id));
 
         $response->assertStatus(200);

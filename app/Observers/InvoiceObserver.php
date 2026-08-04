@@ -2,29 +2,12 @@
 
 namespace App\Observers;
 
-use App\Enums\InvoiceStatus;
-use App\Enums\InvoiceType;
 use App\Models\Invoice;
 use BackedEnum;
 use InvalidArgumentException;
 
 class InvoiceObserver
 {
-    /**
-     * Jenis tagihan yang mewakili langganan satu periode. Hanya boleh ada satu
-     * per pelanggan per periode — entah AWAL (bulan aktivasi, prorata) atau
-     * BULANAN (bulan penuh), tidak pernah keduanya.
-     *
-     * REAKTIVASI tidak masuk daftar: pelanggan yang disuspend lalu aktif lagi di
-     * bulan yang sama memang boleh punya record tambahan.
-     *
-     * @var list<string>
-     */
-    private const SUBSCRIPTION_TYPES = [
-        InvoiceType::AWAL->value,
-        InvoiceType::BULANAN->value,
-    ];
-
     /**
      * Reject invoices with no invoice_type, and reject an exact-duplicate burst
      * insert (same customer, type, billing period, and amount, seconds/minutes
@@ -80,7 +63,7 @@ class InvoiceObserver
      */
     private function rejectSecondSubscriptionInvoice(Invoice $invoice, ?string $type): void
     {
-        if (! in_array($type, self::SUBSCRIPTION_TYPES, true)) {
+        if (! in_array($type, Invoice::SUBSCRIPTION_TYPES, true)) {
             return;
         }
 
@@ -92,11 +75,7 @@ class InvoiceObserver
             return;
         }
 
-        $exists = Invoice::where('customer_id', $invoice->customer_id)
-            ->where('billing_period', $invoice->billing_period)
-            ->whereIn('invoice_type', self::SUBSCRIPTION_TYPES)
-            ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
-            ->exists();
+        $exists = Invoice::hasActiveSubscriptionInvoiceForPeriod($invoice->customer_id, $invoice->billing_period);
 
         if ($exists) {
             throw new InvalidArgumentException(

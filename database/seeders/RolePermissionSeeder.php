@@ -19,6 +19,13 @@ class RolePermissionSeeder extends Seeder
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
 
+            // Worklist read-only — SATU permission saja, sengaja tanpa
+            // payments.create/customers.view. docs/plan/analisa-billing-
+            // tagihan-pembayaran-kolektor.md §B-8 no. 4 & no. 5.
+            'kolektor' => [
+                'kolektor.view',
+            ],
+
             'atasan' => [
                 'dashboard.view',
                 'pops.view',

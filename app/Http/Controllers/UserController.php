@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ScopeType;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -218,7 +219,7 @@ class UserController extends Controller
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
         ]);
 
-        $validator->after(function ($validator) use ($request) {
+        $validator->after(function ($validator) use ($request, $user) {
             if ($request->role_id && $request->scope_type) {
                 $role = Role::find($request->role_id);
                 if ($role) {
@@ -235,6 +236,22 @@ class UserController extends Controller
                     if ($scopeType === 'selected_pop' && empty($request->pop_ids)) {
                         $validator->errors()->add('pop_ids', 'Minimal 1 POP target wajib dipilih untuk scope ini.');
                     }
+                }
+            }
+
+            // Guard 3 (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md
+            // §B-3, §B-7 no. 6): kolektor yang masih memegang pelanggan tak
+            // boleh dinonaktifkan begitu saja — `collector_id` pakai
+            // nullOnDelete, tak ada cascade otomatis kalau statusnya berubah,
+            // jadi worklist-nya akan tampak "lenyap" tanpa jejak kalau ini
+            // tak ditahan di sini. Reassign dulu lewat layar "Atur Kolektor".
+            if ($request->status === UserStatus::INACTIVE->value && $user->hasRole('kolektor')) {
+                $assignedCount = Customer::where('collector_id', $user->id)->count();
+                if ($assignedCount > 0) {
+                    $validator->errors()->add(
+                        'status',
+                        "Kolektor ini masih memegang {$assignedCount} pelanggan. Pindahkan/lepas dulu lewat layar Atur Kolektor sebelum menonaktifkan."
+                    );
                 }
             }
         });

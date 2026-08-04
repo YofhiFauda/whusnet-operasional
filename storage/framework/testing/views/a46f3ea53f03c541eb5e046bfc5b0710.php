@@ -4,12 +4,10 @@
 <?php $__env->startSection('content'); ?>
 <?php
     $statusBadges = [
-        'pending' => 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50',
         'valid' => 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/50',
         'ditolak' => 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50',
     ];
     $statusLabels = [
-        'pending' => 'Pending',
         'valid' => 'Valid / Disetujui',
         'ditolak' => 'Ditolak',
     ];
@@ -50,24 +48,35 @@
             </div>
         </div>
 
-        <!-- Card Total Pending -->
+        <!-- Card Total Ditolak -->
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div class="h-12 w-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+            <div class="h-12 w-12 rounded-full bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </div>
             <div>
-                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Pending (Verifikasi)</p>
-                <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">Rp <?php echo e(number_format($totalPendingSum, 2, ',', '.')); ?></h3>
+                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pembayaran Ditolak</p>
+                <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">Rp <?php echo e(number_format($totalDitolakSum, 2, ',', '.')); ?></h3>
             </div>
         </div>
     </div>
 
     <!-- Filter Card -->
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-5 shadow-sm">
-        <form method="GET" action="<?php echo e(route('reports.payments.index')); ?>" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <form method="GET" action="<?php echo e(route('reports.payments.index')); ?>" id="report-filter-form" class="space-y-4">
+            <!-- Preset Periode -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">PERIODE CEPAT</label>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="applyDatePreset('today')" class="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Hari Ini</button>
+                    <button type="button" onclick="applyDatePreset('7days')" class="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">7 Hari Terakhir</button>
+                    <button type="button" onclick="applyDatePreset('this_month')" class="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Bulan Ini</button>
+                    <button type="button" onclick="applyDatePreset('last_month')" class="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Bulan Lalu</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                 <!-- Filter POP -->
                 <div>
                     <label for="pop_id" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">POP / Cabang</label>
@@ -110,6 +119,20 @@
                     </select>
                 </div>
 
+                <!-- Filter Kolektor -->
+                <div>
+                    <label for="collector_id" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Kolektor</label>
+                    <select id="collector_id" name="collector_id" class="w-full rounded-md border-slate-300 dark:border-slate-600 text-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">Semua (Kolektor &amp; Langsung)</option>
+                        <?php $__currentLoopData = $collectors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $collector): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($collector->id); ?>" <?php if((string)$collectorId === (string)$collector->id): echo 'selected'; endif; ?>>
+                                <?php echo e($collector->name); ?>
+
+                            </option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </select>
+                </div>
+
                 <!-- Filter Tanggal Bayar Dari -->
                 <div>
                     <label for="start_date" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Tanggal Dari</label>
@@ -140,9 +163,52 @@
                     </svg>
                     Export CSV
                 </a>
+                <a href="<?php echo e(route('reports.payments.export-xlsx', request()->query())); ?>" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-teal-600 dark:bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+                    <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export XLSX
+                </a>
             </div>
         </form>
     </div>
+
+    <?php $__env->startPush('scripts'); ?>
+    <script>
+        function applyDatePreset(preset) {
+            const startInput = document.getElementById('start_date');
+            const endInput = document.getElementById('end_date');
+            const today = new Date();
+            const fmt = (d) => d.toISOString().slice(0, 10);
+
+            let start, end;
+            switch (preset) {
+                case 'today':
+                    start = end = today;
+                    break;
+                case '7days':
+                    start = new Date(today);
+                    start.setDate(start.getDate() - 6);
+                    end = today;
+                    break;
+                case 'this_month':
+                    start = new Date(today.getFullYear(), today.getMonth(), 1);
+                    end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    break;
+                case 'last_month':
+                    start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    end = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+                default:
+                    return;
+            }
+
+            startInput.value = fmt(start);
+            endInput.value = fmt(end);
+            document.getElementById('report-filter-form').submit();
+        }
+    </script>
+    <?php $__env->stopPush(); ?>
 
     <!-- Data Table Card -->
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm overflow-hidden">
@@ -165,6 +231,7 @@
                         <th class="px-6 py-3">POP / Cabang</th>
                         <th class="px-6 py-3 text-center">Tanggal Bayar</th>
                         <th class="px-6 py-3 text-center">Metode</th>
+                        <th class="px-6 py-3">Kolektor</th>
                         <th class="px-6 py-3 text-right">Nominal</th>
                         <th class="px-6 py-3">Penerima</th>
                         <th class="px-6 py-3 text-center">Status</th>
@@ -211,6 +278,16 @@
 
                                 </span>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <?php if($payment->collector): ?>
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/50">
+                                        <?php echo e($payment->collector->name); ?>
+
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-slate-400 dark:text-slate-500 text-xs">Langsung</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="px-6 py-4 text-right font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                 Rp <?php echo e(number_format($payment->amount, 2, ',', '.')); ?>
 
@@ -228,7 +305,7 @@
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="9" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
+                            <td colspan="10" class="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
                                 <svg class="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>

@@ -845,11 +845,19 @@
             <p class="text-[11px] text-text-muted font-ui">Aktivasi pelanggan (CID + tagihan awal) hanya bisa diproses di halaman Verifikasi Admin, bukan dari sini.</p>
         </div>
         <?php if($task->customer_id): ?>
-        <a href="<?php echo e(route('customers.verification.admin', $task->customer_id)); ?>"
-           class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer font-ui"
-           style="background:var(--color-primary)">
-            Buka Verifikasi Admin
-        </a>
+            <?php if(auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess()): ?>
+            <a href="<?php echo e(route('customers.verification.admin', $task->customer_id)); ?>"
+               class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer font-ui"
+               style="background:var(--color-primary)">
+                Buka Verifikasi Admin
+            </a>
+            <?php else: ?>
+            <a href="<?php echo e(route('customers.installation.report', $task->customer_id)); ?>"
+               class="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded text-white transition-colors cursor-pointer font-ui"
+               style="background:var(--color-primary)">
+                Lihat Laporan Pemasangan
+            </a>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
     <?php else: ?>

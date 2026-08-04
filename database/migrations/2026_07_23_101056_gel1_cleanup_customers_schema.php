@@ -20,23 +20,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            // Zombie: duplikat `status` yang gampang menyimpang. Sumber kebenaran
-            // status layanan = customer_services.service_status.
-            $table->dropColumn('customer_status');
+            if (Schema::hasColumn('customers', 'customer_status')) {
+                $table->dropColumn('customer_status');
+            }
 
-            // `phone` disatukan ke `primary_phone` (rancangan §2.3). Seluruh
-            // read/write/search di aplikasi + factory + seeder + ~80 penulisan di
-            // tests sudah dipindah ke primary_phone. `alternative_phone` (kontak
-            // sekunder) tetap. Sheet import legacy masih membawa kolom 'phone'
-            // sebagai SUMBER — dibaca importer jadi fallback primary_phone — jadi
-            // bukan kolom customers, tidak terpengaruh drop ini.
-            $table->dropColumn('phone');
+            if (Schema::hasColumn('customers', 'phone')) {
+                $table->dropColumn('phone');
+            }
 
-            // Jejak status akun sistem lama. Hanya pernah DITULIS saat import,
-            // tidak pernah dibaca logika mana pun (sheet import & template masih
-            // membawanya sebagai kolom SUMBER, tapi tidak lagi dipersist ke
-            // customers). Nilai nol → buang.
-            $table->dropColumn('old_account_status');
+            if (Schema::hasColumn('customers', 'old_account_status')) {
+                $table->dropColumn('old_account_status');
+            }
 
             // Persempit tipe kolom (rancangan §2.4). Di utf8mb4, varchar(255) =
             // 1020 byte per entri index. Kolom ini masuk composite index (status)

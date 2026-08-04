@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +24,15 @@ class InvoiceController extends Controller
 
         $query = Invoice::query()
             ->applyUserScope()
-            ->with(['customer', 'pop', 'customerService', 'internetPackage'])
+            ->with([
+                'customer.collector', 'pop', 'customerService', 'internetPackage',
+                // Dipakai baris anak "Cicilan Ke-N" di list. Hanya pembayaran
+                // VALID — yang ditolak tak boleh ikut menomori cicilan.
+                'payments' => fn ($q) => $q->where('payment_status', PaymentStatus::VALID->value)
+                    ->with('collector:id,name')
+                    ->orderBy('payment_date')
+                    ->orderBy('id'),
+            ])
             ->latest('issue_date')
             ->latest('id');
 
@@ -130,7 +139,7 @@ class InvoiceController extends Controller
             'internetPackage',
             'creator',
             'payments' => function ($query) {
-                $query->with('receiver')->latest('payment_date')->latest('id');
+                $query->with(['receiver', 'collector'])->latest('payment_date')->latest('id');
             },
         ]);
 

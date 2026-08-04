@@ -81,6 +81,14 @@ class CustomerInstallationTest extends TestCase
             'speedtest_photo' => UploadedFile::fake()->image('speedtest.jpg'),
             'installation_note' => 'Instalasi selesai dan koneksi normal.',
             'device_type' => 'ont',
+            'materials' => [
+                [
+                    'item_name' => 'Kabel Dropcore',
+                    'item_type' => 'kabel_dropcore',
+                    'qty' => 50,
+                    'unit' => 'meter',
+                ],
+            ],
         ];
 
         $response = $this->actingAs($technician)

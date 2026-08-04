@@ -21,9 +21,16 @@
         <h3 class="text-slate-800 dark:text-slate-200 text-sm font-semibold uppercase tracking-wider">Daftar dan Filter <?php echo e($pageTitle); ?></h3>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tagihan berasal dari pelanggan aktif dan layanan pelanggan yang sudah tersimpan.</p>
     </div>
-    <a href="/customers" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
-        Buka Data Pelanggan
-    </a>
+    <div class="flex items-center gap-2">
+        <?php if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create')): ?>
+            <a href="<?php echo e(route('collectors.index')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+                Kolektor
+            </a>
+        <?php endif; ?>
+        <a href="/customers" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+            Buka Data Pelanggan
+        </a>
+    </div>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -105,11 +112,6 @@
         <table class="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200">
             <thead>
                 <tr class="bg-slate-50/50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-xs">
-                    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
-                        <th class="px-4 py-3.5 w-8 text-center">
-                            <input type="checkbox" id="bulk-select-all" onclick="toggleAllBulkPay(this)" class="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900 cursor-pointer">
-                        </th>
-                    <?php endif; ?>
                     <th class="px-6 py-3.5 w-12 text-center">NO</th>
                     <th class="px-6 py-3.5">NO. TAGIHAN</th>
                     <th class="px-6 py-3.5">PELANGGAN</th>
@@ -130,18 +132,34 @@
                             'batal' => 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-100 dark:border-red-500/20',
                             default => 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-100 dark:border-slate-500/20',
                         };
+
+                        // Baris induk dapat tombol expand HANYA selama tagihan
+                        // masih dicicil. Begitu lunas, riwayat cicilan tak lagi
+                        // ditumpuk di list — cukup Total & Sisa (§D-4); rincian
+                        // lengkapnya ada di halaman Detail tagihan.
+                        $isInstallment = $invoice->invoice_status->value === 'sebagian'
+                            && $invoice->payments->isNotEmpty();
+                        $columnCount = 9;
                     ?>
                     <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/25 transition-colors" id="invoice-row-<?php echo e($invoice->id); ?>">
-                        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
-                            <td class="px-4 py-3.5 text-center">
-                                <?php if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true)): ?>
-                                    <input type="checkbox" class="bulk-pay-checkbox rounded border-slate-300 dark:border-slate-600 dark:bg-slate-900 cursor-pointer" value="<?php echo e($invoice->id); ?>" onclick="updateBulkPayBar()">
-                                <?php endif; ?>
-                            </td>
-                        <?php endif; ?>
                         <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text"><?php echo e(($invoices->currentPage() - 1) * $invoices->perPage() + $loop->iteration); ?></td>
                         <td class="px-6 py-3.5 whitespace-nowrap">
-                            <a href="<?php echo e(route('invoices.show', $invoice->id)); ?>" class="font-mono font-bold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300"><?php echo e($invoice->invoice_number); ?></a>
+                            <div class="flex items-center gap-1.5">
+                                <?php if($isInstallment): ?>
+                                    <button type="button"
+                                            class="p-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors focus:outline-none cursor-pointer"
+                                            data-expanded="false"
+                                            onclick="toggleInstallments(<?php echo e($invoice->id); ?>, this)"
+                                            title="Lihat riwayat cicilan">
+                                        <svg class="h-4 w-4 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                <?php else: ?>
+                                    <span class="w-5 inline-block"></span>
+                                <?php endif; ?>
+                                <a href="<?php echo e(route('invoices.show', $invoice->id)); ?>" class="font-mono font-bold text-sky-700 dark:text-sky-400 hover:text-sky-900 dark:hover:text-sky-300"><?php echo e($invoice->invoice_number); ?></a>
+                            </div>
                             <div class="flex items-center flex-wrap gap-1.5 mt-1">
                                 <?php if($invoice->old_invoice_id || $invoice->old_cost_id): ?>
                                 <span title="Data Migrasi (ID Lama: <?php echo e($invoice->old_invoice_id ?: $invoice->old_cost_id); ?>)" class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20">
@@ -161,6 +179,12 @@
                         <td class="px-6 py-3.5 whitespace-nowrap">
                             <div class="font-semibold text-slate-900 dark:text-slate-200"><?php echo e($invoice->customer->full_name ?? '-'); ?></div>
                             <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono"><?php echo e($invoice->customer->cid ?? $invoice->customer->customer_code ?? '-'); ?></div>
+                            <?php if($invoice->customer && $invoice->customer->collector_id): ?>
+                                <span class="inline-flex items-center mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                    Kolektor: <?php echo e($invoice->customer->collector?->name ?? '-'); ?>
+
+                                </span>
+                            <?php endif; ?>
                         </td>
                         <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200"><?php echo e($invoice->pop->name ?? '-'); ?></td>
                         <td class="px-6 py-3.5 whitespace-nowrap font-mono"><?php echo e($invoice->billing_period); ?></td>
@@ -179,9 +203,16 @@
                                         <button type="button"
                                                 onclick="openQuickPaymentModal(<?php echo e($invoice->id); ?>, '<?php echo e($invoice->invoice_number); ?>', <?php echo e((float) $invoice->remaining_amount); ?>)"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">
-                                            Bayar
+                                            <?php echo e($invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar'); ?>
+
                                         </button>
                                     <?php endif; ?>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('payments.view') && $invoice->latestPayment): ?>
+                                    <a href="<?php echo e(route('payments.receipt', $invoice->latestPayment->id)); ?>" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-md transition-colors text-xs font-semibold" title="Cetak Struk Pembayaran Terakhir">
+                                        <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+                                        <span>Struk</span>
+                                    </a>
                                 <?php endif; ?>
                                 <a href="<?php echo e(route('invoices.show', $invoice->id)); ?>" class="inline-flex items-center px-3 py-1.5 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors text-xs font-semibold">
                                     Detail
@@ -189,9 +220,42 @@
                             </div>
                         </td>
                     </tr>
+
+                    <?php if($isInstallment): ?>
+                        <?php $runningPaid = 0.0; $invoiceTotal = round((float) $invoice->total_amount, 2); ?>
+                        <?php $__currentLoopData = $invoice->payments; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $installment): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php $runningPaid = round($runningPaid + (float) $installment->amount, 2); ?>
+                            <tr class="hidden bg-slate-50/60 dark:bg-slate-900/40 installment-row-<?php echo e($invoice->id); ?>">
+                                <td colspan="<?php echo e($columnCount); ?>" class="px-6 py-2.5">
+                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-8 text-xs">
+                                        <span class="font-semibold text-slate-700 dark:text-slate-200">Cicilan Ke-<?php echo e($loop->iteration); ?></span>
+                                        <a href="<?php echo e(route('payments.show', $installment->id)); ?>" class="font-mono text-sky-700 dark:text-sky-400 hover:underline"><?php echo e($installment->payment_number); ?></a>
+                                        <span class="text-slate-500 dark:text-slate-400"><?php echo e(optional($installment->payment_date)->format('d/m/Y')); ?></span>
+                                        <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20">
+                                            <?php echo e(strtoupper($installment->payment_method)); ?>
+
+                                        </span>
+                                        <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                            <?php echo e($installment->collector?->name ?? 'Langsung'); ?>
+
+                                        </span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100">Rp <?php echo e(number_format((float) $installment->amount, 2, ',', '.')); ?></span>
+                                        <?php if((float) $installment->overpay_amount > 0): ?>
+                                            <span class="text-[10px] font-semibold text-amber-600 dark:text-amber-400" title="Uang lebih dari pelanggan — catatan saja, tidak menambah pembayaran tagihan">
+                                                +<?php echo e(number_format((float) $installment->overpay_amount, 0, ',', '.')); ?> lebih
+                                            </span>
+                                        <?php endif; ?>
+                                        <span class="text-slate-500 dark:text-slate-400">
+                                            Sisa setelah ini: <span class="font-mono">Rp <?php echo e(number_format(max(0, round($invoiceTotal - $runningPaid, 2)), 2, ',', '.')); ?></span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    <?php endif; ?>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <tr>
-                        <td colspan="10" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada tagihan yang sesuai filter.</td>
+                        <td colspan="9" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada tagihan yang sesuai filter.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
@@ -204,93 +268,22 @@
     </div>
 </div>
 
-<?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
-    <!-- Bulk-pay floating bar -->
-    <div id="bulk-pay-bar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-lg shadow-xl px-5 py-3 flex items-center gap-3 z-40 text-xs">
-        <span id="bulk-pay-count" class="font-semibold">0 tagihan dipilih</span>
-        <input type="date" id="bulk-pay-date" class="px-2 py-1.5 rounded-md text-slate-900 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs">
-        <select id="bulk-pay-method" class="px-2 py-1.5 rounded-md text-slate-900 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs">
-            <option value="cash">Cash</option>
-            <option value="transfer">Transfer</option>
-            <option value="qris">QRIS</option>
-            <option value="lainnya">Lainnya</option>
-        </select>
-        <button type="button" id="bulk-pay-submit" onclick="submitBulkPay()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-md font-semibold cursor-pointer">
-            Bayar Massal (Lunas Penuh)
-        </button>
-        <button type="button" onclick="clearBulkPaySelection()" class="text-slate-300 hover:text-white cursor-pointer">Batal</button>
-    </div>
-
-    <?php $__env->startPush('scripts'); ?>
-        <script>
-            function getSelectedBulkPayIds() {
-                return Array.from(document.querySelectorAll('.bulk-pay-checkbox:checked')).map(el => el.value);
-            }
-
-            function updateBulkPayBar() {
-                const ids = getSelectedBulkPayIds();
-                const bar = document.getElementById('bulk-pay-bar');
-                document.getElementById('bulk-pay-count').textContent = ids.length + ' tagihan dipilih';
-                bar.classList.toggle('hidden', ids.length === 0);
-                if (!document.getElementById('bulk-pay-date').value) {
-                    document.getElementById('bulk-pay-date').value = new Date().toISOString().slice(0, 10);
-                }
-            }
-
-            function toggleAllBulkPay(checkbox) {
-                document.querySelectorAll('.bulk-pay-checkbox').forEach(el => { el.checked = checkbox.checked; });
-                updateBulkPayBar();
-            }
-
-            function clearBulkPaySelection() {
-                document.querySelectorAll('.bulk-pay-checkbox').forEach(el => { el.checked = false; });
-                document.getElementById('bulk-select-all').checked = false;
-                updateBulkPayBar();
-            }
-
-            function submitBulkPay() {
-                const ids = getSelectedBulkPayIds();
-                if (ids.length === 0) return;
-
-                const btn = document.getElementById('bulk-pay-submit');
-                btn.disabled = true;
-                btn.textContent = 'Memproses...';
-
-                fetch('<?php echo e(route('invoices.payments.bulk-store')); ?>', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        invoice_ids: ids,
-                        payment_date: document.getElementById('bulk-pay-date').value,
-                        payment_method: document.getElementById('bulk-pay-method').value,
-                    }),
-                })
-                    .then(async (res) => {
-                        const data = await res.json().catch(() => ({}));
-                        if (!res.ok || !data.success) {
-                            throw new Error(data.message || 'Gagal memproses pembayaran massal.');
-                        }
-                        return data;
-                    })
-                    .then((data) => {
-                        alert(data.message);
-                        window.location.reload();
-                    })
-                    .catch((err) => {
-                        alert(err.message);
-                        btn.disabled = false;
-                        btn.textContent = 'Bayar Massal (Lunas Penuh)';
-                    });
-            }
-        </script>
-    <?php $__env->stopPush(); ?>
-<?php endif; ?>
-
 <?php echo $__env->make('payments.partials.quick-payment-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+
+<?php $__env->startPush('scripts'); ?>
+    <script>
+        function toggleInstallments(invoiceId, button) {
+            const expanded = button.getAttribute('data-expanded') === 'true';
+            button.setAttribute('data-expanded', expanded ? 'false' : 'true');
+            button.querySelector('svg').classList.toggle('rotate-90', !expanded);
+
+            document.querySelectorAll('.installment-row-' + invoiceId).forEach((row) => {
+                row.classList.toggle('hidden', expanded);
+            });
+        }
+    </script>
+<?php $__env->stopPush(); ?>
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/invoices/index.blade.php ENDPATH**/ ?>

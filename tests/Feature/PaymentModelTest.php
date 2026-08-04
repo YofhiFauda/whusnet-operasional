@@ -137,7 +137,7 @@ class PaymentModelTest extends TestCase
             'amount' => 100000.00,
             'received_by' => $user->id,
             'proof_file' => 'payments/proof-001.jpg',
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
             'note' => 'Pembayaran awal.',
         ]);
 
@@ -147,7 +147,7 @@ class PaymentModelTest extends TestCase
             'invoice_id' => $invoice->id,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
         ]);
 
         $payment->refresh();

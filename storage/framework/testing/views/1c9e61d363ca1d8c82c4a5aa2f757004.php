@@ -38,6 +38,31 @@
                     <i class="fa-regular fa-copy"></i>
                 </button>
             </div>
+            <?php if($customer->collector): ?>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20" title="Kolektor yang rutin menagih pelanggan ini">
+                    Kolektor: <?php echo e($customer->collector->name); ?>
+
+                </span>
+            <?php else: ?>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700">
+                    Belum Ada Kolektor
+                </span>
+            <?php endif; ?>
+
+            <?php
+                // Total uang lebih yang pernah diserahkan pelanggan ini.
+                // Pembayaran DITOLAK tak ikut dijumlah — kalau pembayarannya
+                // dibatalkan, lebih bayarnya ikut batal.
+                $totalOverpay = $customer->payments
+                    ->filter(fn ($p) => $p->payment_status === \App\Enums\PaymentStatus::VALID)
+                    ->sum(fn ($p) => (float) $p->overpay_amount);
+            ?>
+            <?php if($totalOverpay > 0): ?>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" title="Total uang lebih yang pernah diserahkan. Catatan saja — bukan saldo, tidak otomatis dipakai untuk tagihan berikutnya.">
+                    Lebih Bayar: Rp <?php echo e(number_format($totalOverpay, 0, ',', '.')); ?>
+
+                </span>
+            <?php endif; ?>
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Paket: <strong><?php echo e($customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket'); ?></strong> (Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln) — <?php echo e($customer->pop->name ?? 'POP Belum Set'); ?> (<?php echo e($customer->miniPop->name ?? 'Mini POP Belum Set'); ?>) — Terdaftar sejak <?php echo e($regDate); ?>
@@ -421,7 +446,7 @@
                         <span class="font-semibold text-amber-600 block mb-1">Field Opsional/Teknis:</span>
                         <div class="flex flex-wrap gap-1.5">
                             <?php $__currentLoopData = $missingOptionalLabels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <span class="px-2.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 rounded text-[10px] font-mono"><?php echo e($label); ?></span>
+                                <span class="px-2.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 rounded text-[10px] font-mono dark:bg-red-950 dark:border-red-200 dark:text-white"><?php echo e($label); ?></span>
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </div>
                     </div>
@@ -999,7 +1024,15 @@
                                     </td>
                                     <td class="px-4 py-3 font-sans searchable-text"><?php echo e(\App\Support\IndonesianDate::date($payment->payment_date)); ?></td>
                                     <td class="px-4 py-3 font-sans uppercase searchable-text"><?php echo e(strtoupper($payment->payment_method->value ?? (string)$payment->payment_method)); ?></td>
-                                    <td class="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100 searchable-text">Rp <?php echo e(number_format((float) $payment->amount, 2, ',', '.')); ?></td>
+                                    <td class="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-100 searchable-text">
+                                        Rp <?php echo e(number_format((float) $payment->amount, 2, ',', '.')); ?>
+
+                                        <?php if((float) $payment->overpay_amount > 0): ?>
+                                            <span class="block text-[10px] font-semibold text-sky-600 dark:text-sky-400" title="Uang lebih yang diserahkan pelanggan — catatan saja, tidak menambah pembayaran tagihan">
+                                                +<?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?> lebih
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="px-4 py-3 font-sans">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide bg-emerald-50 text-emerald-600 border-emerald-200">
                                             <?php echo e($payment->payment_status->label()); ?>

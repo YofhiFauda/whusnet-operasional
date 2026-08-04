@@ -79,6 +79,12 @@
                 <td class="muted">Status</td>
                 <td class="val"><?php echo e($payment->payment_status->label()); ?></td>
             </tr>
+            <?php if($installmentContext): ?>
+            <tr>
+                <td class="muted">Keterangan</td>
+                <td class="val"><?php echo e($installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number']); ?></td>
+            </tr>
+            <?php endif; ?>
         </table>
 
         <div class="sep"></div>
@@ -121,6 +127,12 @@
                 <td>DIBAYAR</td>
                 <td class="val">Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?></td>
             </tr>
+            <?php if((float) $payment->overpay_amount > 0): ?>
+            <tr>
+                <td class="muted">Lebih Bayar</td>
+                <td class="val">Rp <?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?></td>
+            </tr>
+            <?php endif; ?>
             <?php if($payment->invoice): ?>
             <tr>
                 <td class="muted">Sisa Tagihan</td>

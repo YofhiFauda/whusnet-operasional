@@ -140,22 +140,41 @@
                                 </svg>
                             </button>
 
+                            <?php
+                                $canValidate = auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess();
+                                $detailUrl = match(true) {
+                                    $canValidate => route('customers.verification.admin', $customer),
+                                    in_array($customer->status, ['installation_in_progress', 'revision_installation', 'installed', 'verification_admin']) => route('customers.installation.report', $customer),
+                                    in_array($customer->status, ['waiting_acc', 'surveyed', 'waiting_installation']) => route('customers.survey.report', $customer),
+                                    auth()->user()->hasPermission('customers.detail.view') => route('customers.show', $customer),
+                                    default => route('customers.fieldwork', $customer),
+                                };
+                            ?>
+
                             <?php if($customer->status === 'waiting_acc' || $customer->status === 'surveyed'): ?>
-                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>
+                                <?php if($canValidate): ?>
                                 <a href="<?php echo e(route('customers.verification.admin', $customer)); ?>" class="bg-warning hover:bg-warning/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     Detail & Review
                                 </a>
+                                <?php else: ?>
+                                <a href="<?php echo e($detailUrl); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                </a>
                                 <?php endif; ?>
                             <?php elseif($customer->status === 'installed' || $customer->status === 'verification_admin'): ?>
-                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>
+                                <?php if($canValidate): ?>
                                 <a href="<?php echo e(route('customers.verification.admin', $customer)); ?>" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center inline-flex items-center gap-1">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Verifikasi Admin
                                 </a>
+                                <?php else: ?>
+                                <a href="<?php echo e($detailUrl); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                </a>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <a href="<?php echo e(route('customers.verification.admin', $customer)); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
+                                <a href="<?php echo e($detailUrl); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 </a>
                                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>

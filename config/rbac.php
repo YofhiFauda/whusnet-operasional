@@ -197,6 +197,13 @@ return [
             ActionCode::REJECT->value,
         ],
 
+        // Worklist read-only kolektor (docs/plan/analisa-billing-tagihan-
+        // pembayaran-kolektor.md §B-8 no. 5) — permission sendiri, cuma VIEW.
+        // Kolektor TIDAK diberi payments.create sama sekali (§B-8 no. 4).
+        'kolektor' => [
+            ActionCode::VIEW->value,
+        ],
+
         'reports' => [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,

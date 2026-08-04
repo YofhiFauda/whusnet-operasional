@@ -243,6 +243,18 @@
             <option value="siap_billing" {{ $completenessStatus === 'siap_billing' ? 'selected' : '' }}>Siap Billing</option>
         </select>
 
+        {{-- Kolektor --}}
+        @if($collectorOptions->isNotEmpty())
+        <select name="collector_id" id="collector_id" onchange="this.form.submit()"
+                class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+            <option value="">Semua (Kolektor &amp; Tanpa Kolektor)</option>
+            <option value="none" {{ $collectorId === 'none' ? 'selected' : '' }}>Belum Ada Kolektor</option>
+            @foreach($collectorOptions as $collectorOption)
+                <option value="{{ $collectorOption->id }}" {{ (string) $collectorId === (string) $collectorOption->id ? 'selected' : '' }}>{{ $collectorOption->name }}</option>
+            @endforeach
+        </select>
+        @endif
+
         {{-- Reset Button --}}
         <div class="col-span-1 sm:col-span-2 md:col-span-4 lg:col-span-1 flex items-center gap-2">
             <a href="{{ url()->current() }}"
@@ -484,6 +496,13 @@
                             <span class="font-bold text-slate-900 dark:text-white group-hover:text-sky-600 transition-colors">
                                 {{ $customer->full_name }}
                             </span>
+                            @if($customer->collector)
+                                <div class="mt-0.5">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                        Kolektor: {{ $customer->collector->name }}
+                                    </span>
+                                </div>
+                            @endif
                         </td>
 
                         <!-- POP & Desa -->
@@ -651,6 +670,11 @@
                                 <span class="font-mono text-xs font-bold text-sky-600 dark:text-sky-400">{{ $displayId }}</span>
                                 @endif
                                 <h4 class="font-bold text-slate-900 dark:text-white text-base mt-0.5">{{ $customer->full_name }}</h4>
+                                @if($customer->collector)
+                                    <span class="inline-flex items-center mt-1 px-1.5 py-0.5 text-[9px] font-bold rounded border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-100 dark:border-violet-500/20">
+                                        Kolektor: {{ $customer->collector->name }}
+                                    </span>
+                                @endif
                             </div>
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border shrink-0
                                   {{ $isActive ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : '' }}

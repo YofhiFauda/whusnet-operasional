@@ -15,7 +15,7 @@ class RoleTest extends TestCase
     {
         $this->seed(RoleSeeder::class);
 
-        $this->assertSame(9, Role::query()->count());
+        $this->assertSame(10, Role::query()->count());
 
         $expectedRoles = [
             'Owner',
@@ -27,6 +27,7 @@ class RoleTest extends TestCase
             'Teknisi',
             'Sales',
             'POP Admin',
+            'Kolektor',
         ];
 
         foreach ($expectedRoles as $roleName) {

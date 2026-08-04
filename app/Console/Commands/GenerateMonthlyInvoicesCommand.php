@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\Invoice;
 use Carbon\Carbon;
@@ -30,8 +31,13 @@ class GenerateMonthlyInvoicesCommand extends Command
         $billingPeriod = now()->format('Y-m');
         $dryRun = (bool) $this->option('dry-run');
 
+        // Enum, bukan string literal — nama status pelanggan yang berubah tanpa
+        // ubah kode ini dulu akan bikin generator diam-diam skip semua
+        // pelanggan (tanpa tagihan terbit, tanpa error) sampai ada yang sadar
+        // pelanggan tak dapat tagihan (docs/plan/analisa-billing-tagihan-
+        // pembayaran-kolektor.md §A-7 #4).
         $customers = Customer::with('customerService')
-            ->whereIn('status', ['active', 'suspended'])
+            ->whereIn('status', [WorkflowTransition::ACTIVE->value, WorkflowTransition::SUSPENDED->value])
             ->whereHas('customerService')
             ->get();
 
@@ -71,12 +77,11 @@ class GenerateMonthlyInvoicesCommand extends Command
             // REAKTIVASI sengaja tidak dihitung: pelanggan yang disuspend lalu
             // aktif lagi di bulan yang sama memang boleh punya dua record.
             // Invoice BATAL juga tidak dihitung, kalau tidak tagihan yang sudah
-            // dibatalkan akan memblokir penerbitan penggantinya.
-            $alreadyExists = Invoice::where('customer_id', $customer->id)
-                ->where('billing_period', $billingPeriod)
-                ->whereIn('invoice_type', [InvoiceType::AWAL->value, InvoiceType::BULANAN->value])
-                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
-                ->exists();
+            // dibatalkan akan memblokir penerbitan penggantinya. Aturan ini
+            // sama persis dengan InvoiceObserver::rejectSecondSubscriptionInvoice
+            // — satu method bersama, lihat Invoice::hasActiveSubscriptionInvoiceForPeriod()
+            // (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §A-7 #3).
+            $alreadyExists = Invoice::hasActiveSubscriptionInvoiceForPeriod($customer->id, $billingPeriod);
 
             if ($alreadyExists) {
                 $skipped++;

@@ -112,4 +112,15 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Pop::class, 'user_pops');
     }
+
+    /**
+     * Pelanggan yang rutin ditagih user ini (kalau dia kolektor) — rute
+     * permanen `customers.collector_id`, bukan snapshot per transaksi.
+     *
+     * @return HasMany<Customer, $this>
+     */
+    public function assignedCustomers()
+    {
+        return $this->hasMany(Customer::class, 'collector_id');
+    }
 }

@@ -128,7 +128,15 @@
                     
                     <td class="flex justify-end items-center sm:table-cell px-0 pt-3 sm:px-6 sm:py-3.5 mt-2 sm:mt-0 border-t sm:border-0 border-border border-dashed sm:text-right whitespace-nowrap">
                         <div class="flex items-center w-full sm:w-auto justify-end gap-2">
-                            <a href="<?php echo e(route('customers.verification.admin', $customer)); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
+                            <?php
+                                $detailUrl = match(true) {
+                                    auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasPermission('customers.detail.survey.validate') || auth()->user()->hasFullAccess() => route('customers.verification.admin', $customer),
+                                    $customer->status === 'survey_in_progress' => route('customers.survey.report', $customer),
+                                    auth()->user()->hasPermission('customers.detail.view') => route('customers.show', $customer),
+                                    default => route('customers.fieldwork', $customer),
+                                };
+                            ?>
+                            <a href="<?php echo e($detailUrl); ?>" class="text-text-muted hover:text-primary transition-colors p-1" title="Detail">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </a>
                             
