@@ -7,6 +7,7 @@ use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
+use App\Events\FopTaskUpdated;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -198,6 +199,32 @@ class FopTaskController extends Controller
             ->values();
 
         return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks'));
+    }
+
+    /**
+     * Fragment 3 <td> (Teknisi/Team/Status) satu baris — dipanggil dari
+     * fop_tasks/index.blade.php saat Echo nangkep App\Events\FopTaskUpdated,
+     * biar baris di layar FOP lain ikut sinkron tanpa reload
+     * (docs/plan/analisa-realtime-spa-operasional.md §2.2 no. 13). Task yang
+     * udah keluar cakupan papan (selesai/dibatalkan — index() nge-exclude
+     * lewat whereNotIn) balikin 204, biar baris dihapus di klien.
+     */
+    public function row(FopTask $fopTask)
+    {
+        $this->authorizeAccess();
+
+        if (in_array($fopTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true)) {
+            return response('', 204);
+        }
+
+        $fopTask->load([
+            'technicians',
+            'team:id,name',
+            'task:id,scheduled_at,status,report_deferred,fop_review_status',
+            'ticket:id',
+        ]);
+
+        return view('fop_tasks.partials.row-cells', ['task' => $fopTask]);
     }
 
     /**
@@ -569,6 +596,8 @@ class FopTaskController extends Controller
                 }
             }
 
+            FopTaskUpdated::dispatch($fopTask->fresh());
+
             if ($request->wantsJson()) {
                 if (! empty($conflicts)) {
                     session()->flash('fop_team_conflicts', $conflicts);
@@ -717,6 +746,8 @@ class FopTaskController extends Controller
                             'team_member_ids' => $remainingTechs,
                         ], auth()->user());
                     }
+
+                    FopTaskUpdated::dispatch($otherTask->fresh());
                 }
             }
 
@@ -726,6 +757,8 @@ class FopTaskController extends Controller
 
             $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fopTask->task_date->copy());
             $team->refresh();
+
+            FopTaskUpdated::dispatch($fopTask->fresh());
 
             $conflicts = [];
 
@@ -846,6 +879,9 @@ class FopTaskController extends Controller
             // pertama (lihat analisa-sync-execution-task.md), teknisi jadi ke-merge salah.
             $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fromTask->task_date->copy());
             $conflicts = $teamResult['conflicts'];
+
+            FopTaskUpdated::dispatch($fromTask->fresh());
+            FopTaskUpdated::dispatch($toTask->fresh());
 
             if ($request->wantsJson()) {
                 if (! empty($conflicts)) {

@@ -99,7 +99,7 @@
     </div>
 
     {{-- ══ Team FOP Aktif ══════════════════════════════════════════ --}}
-    <div class="flex flex-col gap-3">
+    <div id="fop-teams-board" class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif</p>
             <a href="{{ route('fop-tasks.index') }}" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
@@ -197,6 +197,9 @@
         </div>
         @endif
     </div>
+    {{-- teamsData JS mengikuti board di atas — dipakai submitSwitchTeam() buat
+         refresh partial tanpa reload penuh (lihat refreshTeamsBoard()). --}}
+    <script type="application/json" id="fop-teams-json">@json($activeFopTeams)</script>
 
     {{-- ══ TEAM DETAIL MODAL ══ --}}
     <div x-show="teamDetail.open"
@@ -478,13 +481,6 @@
     <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Status Teknisi</p>
-            <button onclick="window.location.reload();" 
-                    class="group inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary-hover transition-colors cursor-pointer bg-primary-soft px-3 py-1 rounded-full border border-primary-border shadow-xs">
-                <svg class="h-3 w-3 transition-transform duration-300 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
-                </svg>
-                <span>Refresh Data</span>
-            </button>
         </div>
         <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
             @if($teknisiList->count() > 0)
@@ -670,7 +666,7 @@ function fopDashboardHandler() {
                 if (data.success) {
                     this.showToast('success', data.message);
                     this.switchTeamModal.open = false;
-                    setTimeout(() => window.location.reload(), 1000);
+                    this.refreshTeamsBoard();
                 } else {
                     this.showToast('error', data.message || 'Gagal memindahkan task.');
                 }
@@ -698,13 +694,7 @@ function fopDashboardHandler() {
 
         initEchoListeners() {
             const popIds = @json($pops->pluck('id'));
-            let attempts = 0;
-            const setup = () => {
-                if (typeof window.Echo === 'undefined' || !window.Echo) {
-                    attempts++;
-                    if (attempts < 20) setTimeout(setup, 100);
-                    return;
-                }
+            const bind = () => {
                 popIds.forEach(popId => {
                     window.Echo.private(`fop.${popId}`)
                         .listen('TaskStarted', (e) => {
@@ -719,7 +709,17 @@ function fopDashboardHandler() {
                         .listen('InstallationCompleted',  () => this.refreshDashboardContainers());
                 });
             };
-            setup();
+
+            // window.Echo dipasang oleh resources/js/echo.js — script module itu
+            // dieksekusi setelah script Alpine (defer, urut dokumen), jadi normalnya
+            // sudah siap begitu Alpine init() jalan. echo.js menembak event
+            // 'echo:ready' tepat setelah window.Echo di-assign; dengarkan event itu
+            // sebagai jaring pengaman kalau ternyata belum siap — bukan busy-poll.
+            if (window.Echo) {
+                bind();
+            } else {
+                window.addEventListener('echo:ready', bind, { once: true });
+            }
         },
 
         async refreshTaskStats() {
@@ -752,6 +752,39 @@ function fopDashboardHandler() {
                 });
             } catch (e) {
                 console.error('Auto-refresh error:', e);
+            }
+        },
+
+        // Ganti full page reload sehabis switch-team: swap board #fop-teams-board
+        // (outerHTML, bukan innerHTML — elemen di dalamnya pakai binding Alpine
+        // @dragover/@click yang harus di-scan ulang) + sinkronkan teamsData dari
+        // payload JSON yang ikut ke-refresh (#fop-teams-json), lalu re-init Alpine
+        // di subtree baru lewat Alpine.initTree().
+        async refreshTeamsBoard() {
+            try {
+                const res = await fetch(window.location.href);
+                const html = await res.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                const newBoard = doc.getElementById('fop-teams-board');
+                const currentBoard = document.getElementById('fop-teams-board');
+                const newTeamsJson = doc.getElementById('fop-teams-json');
+
+                if (newTeamsJson) {
+                    this.teamsData = JSON.parse(newTeamsJson.textContent);
+                }
+
+                if (newBoard && currentBoard && window.Alpine) {
+                    currentBoard.outerHTML = newBoard.outerHTML;
+                    window.Alpine.initTree(document.getElementById('fop-teams-board'));
+                } else {
+                    // Fallback kalau Alpine global belum siap — reload penuh
+                    // tetap lebih aman daripada board nyangkut stale.
+                    window.location.reload();
+                }
+            } catch (e) {
+                console.error('Auto-refresh error:', e);
+                window.location.reload();
             }
         },
 

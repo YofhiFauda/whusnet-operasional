@@ -3,7 +3,7 @@
 @section('title', 'Task FOP')
 
 @section('content')
-<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open || cancelModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
+<div x-data="fopTaskPageHandler()" x-init="initTeamConflicts(); initFopTaskEchoListeners()" x-effect="document.body.classList.toggle('overflow-hidden', modal.open || teamConflictModal.open || teamSelectionModal.open || switchTechModal.open || cancelModal.open)" class="px-4 py-6 max-w-12xl mx-auto space-y-5">
 
 
 
@@ -118,7 +118,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px] text-slate-700 dark:text-slate-300">
                     @forelse($fopTasks as $task)
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 transition-colors align-top">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:hover:bg-slate-800/50 transition-colors align-top" id="fop-task-row-{{ $task->id }}" data-pop-id="{{ $task->pop_id }}">
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium border {{ $task->category instanceof \App\Enums\TaskType ? $task->category->badgeClasses() : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400' }}">
                                     {{ $task->category instanceof \App\Enums\TaskType ? $task->category->value : $task->category }}
@@ -148,127 +148,17 @@
                             <td class="px-3 py-2 min-w-[150px] whitespace-normal leading-tight text-red-600 dark:text-red-400">
                                 {{ $task->issue ?? '—' }}
                             </td>
-                            <td class="px-3 py-2">
-                                <div class="flex flex-wrap gap-1 items-start min-w-[150px]">
-                                    @php 
-                                        $visibleTechs = $task->technicians->take(2); 
-                                        $hiddenTechsCount = $task->technicians->count() - 2; 
-                                    @endphp
-                                    @forelse($visibleTechs as $tech)
-                                        @php
-                                            // Ambil nama depan saja untuk menghemat ruang
-                                            $firstName = explode(' ', trim($tech->name))[0];
-                                        @endphp
-                                        <button type="button"
-                                            @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name))"
-                                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-300 transition-colors"
-                                            title="{{ $tech->name }} — klik buat Switch Teknisi">
-                                            {{ \Illuminate\Support\Str::limit($firstName, 12) }}
-                                        </button>
-                                    @empty
-                                        <span class="text-slate-400 dark:text-slate-500 text-[10px] italic">Unassigned</span>
-                                    @endforelse
-                                    
-                                    @if($hiddenTechsCount > 0)
-                                        <div class="relative" x-data="{ openHidden: false }">
-                                            <button type="button" @click="openHidden = !openHidden"
-                                                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors">
-                                                +{{ $hiddenTechsCount }}
-                                            </button>
-                                            <div x-show="openHidden" @click.away="openHidden = false"
-                                                class="absolute z-40 mt-1 min-w-[140px] bg-surface border border-border rounded shadow-lg py-1"
-                                                style="display: none;">
-                                                @foreach($task->technicians->skip(2) as $tech)
-                                                    <button type="button"
-                                                        @click="openSwitchModal({{ $task->id }}, '{{ $task->task_number }}', @js($task->tugas), '{{ $task->task_date?->toDateString() }}', {{ $tech->id }}, @js($tech->name)); openHidden = false"
-                                                        class="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-surface-muted transition-colors">
-                                                        {{ $tech->name }}
-                                                    </button>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="px-3 py-2 whitespace-nowrap">
-                                @if($task->team)
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 border border-sky-100 dark:border-sky-800/30">
-                                        {{ $task->team->name }}
-                                    </span>
-                                @elseif($task->technicians->count() === 1)
-                                    <button type="button" 
-                                            @click="openTeamSelectionModal({{ $task->id }}, '{{ $task->task_number }}', '{{ addslashes($task->tugas) }}', '{{ $task->task_date?->format('Y-m-d') }}')" 
-                                            class="text-[10px] text-blue-600 hover:text-blue-800 font-medium underline decoration-dotted">
-                                        + Masukkan ke Team...
-                                    </button>
-                                @else
-                                    @php
-                                        $taskDate = $task->task_date?->toDateString();
-                                        $techIds = $task->technicians->pluck('id')->all();
-                                        $candidates = \App\Models\FopTaskTeam::whereDate('work_date', $taskDate)
-                                            ->whereHas('members', fn($q) => $q->whereIn('users.id', $techIds))
-                                            ->get()
-                                            ->map(fn($t) => ['team_id' => $t->id, 'team_name' => $t->name])
-                                            ->all();
-                                    @endphp
-                                    @if(count($candidates) >= 2)
-                                        <button type="button"
-                                                @click="triggerConflictModal({{ $task->id }}, '{{ $task->task_number }}', {{ json_encode($candidates) }})"
-                                                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30 hover:bg-red-100 transition-colors"
-                                                title="Klik untuk memilih team">
-                                            ⚠️ Konflik Roster
-                                        </button>
-                                    @else
-                                        <span class="text-slate-300 text-[10px]">—</span>
-                                    @endif
-                                @endif
-                            </td>
-                            <td class="px-3 py-2 whitespace-nowrap">
-                                @php
-                                    // FopTask.status share vocab persis sama TaskStatus (unifikasi
-                                    // 2026-07-20) — kalau udah ada Task eksekusi terhubung, pakai label/
-                                    // badge dari situ (bawa nuansa report_deferred). Kalau belum (FopTask
-                                    // standalone, task_id null, masih 'draft' — belum ada teknisi
-                                    // di-assign), pakai punya FopTask sendiri, dikasih label khusus biar
-                                    // gak nyesatin ("draft" doang kurang jelas buat FOP).
-                                    $statusValue = $task->status->value;
-                                    $statusLabel = $task->task
-                                        ? $task->task->status->displayLabel($task->task->report_deferred)
-                                        : ($statusValue === 'draft' ? 'Belum Ditugaskan' : $task->status->displayLabel());
-                                    $statusClasses = $task->task
-                                        ? $task->task->status->displayBadgeClasses($task->task->report_deferred)
-                                        : ($statusValue === 'draft' ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50' : $task->status->displayBadgeClasses());
-
-                                    // SRV/PSB gak boleh dihapus SAMA SEKALI (efek samping: customer
-                                    // otomatis jadi Gagal — kelola lewat halaman Pelanggan). MTN/C-REQ
-                                    // yang asalnya dari Ticketing juga gak boleh (riwayat pengirim harus
-                                    // ke-trace) — toleransi salah input tetap ada lewat Cancel. MTN/C-REQ
-                                    // yang dibuat manual langsung di /fop-tasks (gak punya ->ticket) tetap
-                                    // boleh dihapus seperti biasa. Dicek ulang di server
-                                    // (FopTaskController::destroy()) — ini cuma UI, bukan satu-satunya gerbang.
-                                    $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$task->ticket;
-                                @endphp
-                                <div class="flex flex-col gap-1 items-start">
-                                    <span class="inline-flex items-center px-2 py-1 rounded text-[11px] font-medium border w-fit {{ $statusClasses }}"
-                                          title="Status realtime — derived otomatis dari status Task teknisi, gak bisa diedit manual">
-                                        {{ $statusLabel }}
-                                    </span>
-                                    <div class="flex flex-col gap-0.5 mt-0.5">
-                                        {{-- SRV/PSB gak boleh dibatalkan dari sini — harus lewat halaman
-                                             Customer (tab Survey/Pemasangan), biar masuk List Pelanggan
-                                             Gagal. Lihat TaskPolicy::cancel() & FopTaskController::update(). --}}
-                                        @can('fop_tasks.cancel')
-                                            @if(!in_array($statusValue, ['selesai', 'dibatalkan']) && !in_array($task->category->value, ['SURVEY', 'PSB']))
-                                                <button type="button"
-                                                        @click="openCancelModal({{ $task->id }}, '{{ $task->task_number }}')"
-                                                        class="text-[10px] text-red-600 dark:text-red-400 underline decoration-dotted text-left cursor-pointer">
-                                                    Cancel
-                                                </button>
-                                            @endif
-                                        @endcan
-                                    </div>
-                                </div>
-                            </td>
+                            @include('fop_tasks.partials.row-cells', ['task' => $task])
+                            @php
+                                // SRV/PSB gak boleh dihapus SAMA SEKALI (efek samping: customer
+                                // otomatis jadi Gagal — kelola lewat halaman Pelanggan). MTN/C-REQ
+                                // yang asalnya dari Ticketing juga gak boleh (riwayat pengirim harus
+                                // ke-trace) — toleransi salah input tetap ada lewat Cancel. MTN/C-REQ
+                                // yang dibuat manual langsung di /fop-tasks (gak punya ->ticket) tetap
+                                // boleh dihapus seperti biasa. Dicek ulang di server
+                                // (FopTaskController::destroy()) — ini cuma UI, bukan satu-satunya gerbang.
+                                $canDeleteTask = !in_array($task->category->value, ['SURVEY', 'PSB'], true) && !$task->ticket;
+                            @endphp
                             <td class="px-3 py-2 whitespace-nowrap">
                                 {{-- Tanggal pemasangan yang diminta pelanggan belum tiba: task ini
                                      memang belum waktunya dikerjakan, jadi TIDAK ditampilkan countdown.
@@ -1025,8 +915,9 @@
                     this.switchTechModal.isSubmitting = false;
                     if (data.success) {
                         this.showToast('success', data.message);
+                        this.refreshFopTaskRow(this.switchTechModal.fromTaskId);
+                        this.refreshFopTaskRow(this.switchTechModal.toTaskId);
                         this.switchTechModal.open = false;
-                        setTimeout(() => window.location.reload(), 1000);
                     } else {
                         this.showToast('error', data.message || 'Gagal switch teknisi.');
                     }
@@ -1081,7 +972,7 @@
                     this.teamConflictModal.conflicts = this.teamConflictModal.conflicts.filter(c => c.task_id !== taskId);
                     if (this.teamConflictModal.conflicts.length === 0) this.teamConflictModal.open = false;
                     this.showToast('success', data.message);
-                    setTimeout(() => window.location.reload(), 1000);
+                    this.refreshFopTaskRow(taskId);
                 })
                 .catch(() => this.showToast('error', 'Terjadi kesalahan jaringan.'));
             },
@@ -1102,7 +993,7 @@
                 .then(data => {
                     if (data.success) {
                         this.showToast('success', data.message);
-                        setTimeout(() => window.location.reload(), 1000);
+                        this.refreshFopTaskRow(taskId);
                     } else {
                         if (data.team_conflicts && data.team_conflicts.length > 0) {
                             this.teamConflictModal.conflicts = data.team_conflicts;
@@ -1303,10 +1194,12 @@
             },
 
             updatePriority(taskId, priority) {
-                this.sendUpdateRequest(taskId, { priority });
+                // Priority udah ke-update lokal lewat x-model select-nya —
+                // gak butuh refetch baris atau reload, cukup simpan ke server.
+                this.sendUpdateRequest(taskId, { priority }, false);
             },
 
-            sendUpdateRequest(taskId, data) {
+            sendUpdateRequest(taskId, data, refreshRow = true) {
                 const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                 return fetch(`{{ url('/fop-tasks') }}/${taskId}`, {
                     method: 'PUT',
@@ -1322,7 +1215,9 @@
                     if (ok && body.success) {
                         this.cancelModal.open = false;
                         this.showToast('success', body.message);
-                        setTimeout(() => window.location.reload(), 1000);
+                        if (refreshRow) {
+                            this.refreshFopTaskRow(taskId);
+                        }
                     } else {
                         this.showToast('error', body.message || 'Gagal memperbarui data.');
                     }
@@ -1330,6 +1225,59 @@
                 .catch(err => {
                     console.error(err);
                     this.showToast('error', 'Terjadi kesalahan jaringan.');
+                });
+            },
+
+            // Realtime tanpa reload: refetch 3 sel (Teknisi/Team/Status) satu baris
+            // lewat fop-tasks.row, ganti setTimeout(reload) lama. Dipanggil dari aksi
+            // sendiri (switch teknisi/assign team/cancel) DAN dari broadcast Reverb
+            // (App\Events\FopTaskUpdated) buat baris yang diubah user lain di POP yang
+            // sama. @click di partial-nya pakai directive Alpine, jadi WAJIB
+            // Alpine.initTree() abis diganti biar directive-nya kebind ulang.
+            refreshFopTaskRow(taskId) {
+                const row = document.getElementById('fop-task-row-' + taskId);
+                if (!row) return;
+
+                fetch(`{{ url('/fop-tasks') }}/${taskId}/row`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                }).then(res => {
+                    if (res.status === 204) {
+                        row.remove();
+                        return null;
+                    }
+                    return res.text();
+                }).then(html => {
+                    if (!html) return;
+
+                    const wrapper = document.createElement('table');
+                    wrapper.innerHTML = '<tbody><tr>' + html + '</tr></tbody>';
+
+                    ['tech', 'team', 'status'].forEach(part => {
+                        const fresh = wrapper.querySelector('#' + part + '-cell-' + taskId);
+                        const current = row.querySelector('#' + part + '-cell-' + taskId);
+                        if (fresh && current) {
+                            current.replaceWith(fresh);
+                        }
+                    });
+
+                    if (window.Alpine) {
+                        window.Alpine.initTree(row);
+                    }
+                }).catch(() => {
+                    // Diam-diam gagal — baris tetap nampilin data lama, gak ganggu kerjaan FOP.
+                });
+            },
+
+            initFopTaskEchoListeners() {
+                if (typeof window.Echo === 'undefined' || !window.Echo) return;
+
+                const popIds = [...new Set(
+                    Array.from(document.querySelectorAll('tr[data-pop-id]')).map(row => row.getAttribute('data-pop-id'))
+                )];
+
+                popIds.forEach(popId => {
+                    window.Echo.private('fop-tasks.' + popId)
+                        .listen('.FopTaskUpdated', (e) => this.refreshFopTaskRow(e.fop_task_id));
                 });
             }
         };

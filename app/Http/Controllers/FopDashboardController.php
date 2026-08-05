@@ -17,6 +17,7 @@ use App\Services\TaskService;
 use App\Services\TeknisiWorkloadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -72,44 +73,60 @@ class FopDashboardController extends Controller
             });
 
         // ── Stat cards ──────────────────────────────────────────────
+        // Cache 30 detik per user+tanggal — hanya angka (count), semuanya
+        // skalar dan aman diserialize cache store apa pun. TTL pendek karena
+        // papan FOP live (drag&drop, start/complete task langsung ubah angka
+        // ini). Query listing di bawah (surveyQueue/teknisiList/activeTeams/
+        // activeFopTeams/pops) SENGAJA tidak ikut di-cache — semuanya
+        // Eloquent Collection, dan round-trip Collection lewat cache store
+        // (file MAUPUN redis) di environment ini korup jadi
+        // __PHP_Incomplete_Class (reproduksi independen di luar dashboard
+        // ini: Cache::put pada collect([1,2,3]) polos pun korup). Sampai bug
+        // itu ditelusuri terpisah, jangan cache Eloquent Collection/Model.
+        $statsCacheKey = sprintf('dashboard:fop:stats:%d:%s', $user->id, $today->toDateString());
 
-        // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
-        $overdueSurvey = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['calon_pelanggan', 'waiting_survey', 'registered'])
-            ->where('created_at', '<', now()->subDay())
-            ->count();
+        $stats = Cache::remember(
+            $statsCacheKey,
+            30,
+            function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user) {
+                $surveyStatuses = ['calon_pelanggan', 'waiting_survey', 'registered'];
 
-        // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
-        // Join dengan task survey terbaru yang selesai untuk ambil completed_at
-        $overdueInstallation = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
-            ->whereHas('tasks', function ($q) {
-                $q->where('task_type', TaskType::SURVEY->value)
-                    ->where('status', TaskStatus::SELESAI->value)
-                    ->where('completed_at', '<', now()->subDays(3));
-            })
-            ->count();
-
-        $perluAksiFopCount = Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-            ->whereIn('status', ['waiting_acc', 'surveyed'])
-            ->count();
-
-        $todayTaskCounts = Task::applyUserScope($user)
-            ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::SELESAI->value])
-            // scheduled_at bertipe timestamp — rentang eksplisit supaya index
-            // tanggal bisa dipakai (whereDate() membungkusnya jadi DATE(...)).
-            ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
-            ->get(['status']);
-
-        $stats = [
-            'antrian_survey' => $surveyQueue->count(),
-            'perlu_aksi_fop' => $perluAksiFopCount,
-            'berjalan' => $todayTaskCounts->where('status.value', TaskStatus::IN_PROGRESS->value)->count(),
-            'selesai_hari_ini' => $todayTaskCounts->where('status.value', TaskStatus::SELESAI->value)->count(),
-            'total_hari_ini' => $todayTaskCounts->count(),
-            'overdue_survey' => $overdueSurvey,
-            'overdue_installation' => $overdueInstallation,
-        ];
+                return [
+                    'antrian_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', $surveyStatuses)
+                        ->count(),
+                    'perlu_aksi_fop' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', ['waiting_acc', 'surveyed'])
+                        ->count(),
+                    'berjalan' => Task::applyUserScope($user)
+                        ->where('status', TaskStatus::IN_PROGRESS->value)
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    'selesai_hari_ini' => Task::applyUserScope($user)
+                        ->where('status', TaskStatus::SELESAI->value)
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    'total_hari_ini' => Task::applyUserScope($user)
+                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::SELESAI->value])
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
+                    'overdue_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', $surveyStatuses)
+                        ->where('created_at', '<', now()->subDay())
+                        ->count(),
+                    // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
+                    'overdue_installation' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
+                        ->whereHas('tasks', function ($q) {
+                            $q->where('task_type', TaskType::SURVEY->value)
+                                ->where('status', TaskStatus::SELESAI->value)
+                                ->where('completed_at', '<', now()->subDays(3));
+                        })
+                        ->count(),
+                ];
+            }
+        );
 
         // ── Teknisi di POP yang sama (static, real-time di T009) ────
         $teknisiList = $this->teknisiWorkload->summarize($hasAllPopAccess, $allowedPopIds, $today);

@@ -189,7 +189,7 @@
                         <td class="px-6 py-3.5 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200"><?php echo e($invoice->pop->name ?? '-'); ?></td>
                         <td class="px-6 py-3.5 whitespace-nowrap font-mono"><?php echo e($invoice->billing_period); ?></td>
                         <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp <?php echo e(number_format((float) $invoice->total_amount, 2, ',', '.')); ?></td>
-                        <td class="px-6 py-3.5 text-right font-mono">Rp <?php echo e(number_format((float) $invoice->remaining_amount, 2, ',', '.')); ?></td>
+                        <td class="px-6 py-3.5 text-right font-mono" id="invoice-remaining-<?php echo e($invoice->id); ?>">Rp <?php echo e(number_format((float) $invoice->remaining_amount, 2, ',', '.')); ?></td>
                         <td class="px-6 py-3.5 text-center whitespace-nowrap">
                             <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border <?php echo e($badgeClass); ?>" id="invoice-status-badge-<?php echo e($invoice->id); ?>" data-badge-style="pill">
                                 <?php echo e($invoice->invoice_status->label()); ?>
@@ -199,14 +199,17 @@
                         <td class="px-6 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
                                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
-                                    <?php if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true)): ?>
+                                    <span id="invoice-pay-btn-<?php echo e($invoice->id); ?>" class="<?php echo e(in_array($invoice->invoice_status->value, ['lunas', 'batal'], true) ? 'hidden' : ''); ?>">
                                         <button type="button"
-                                                onclick="openQuickPaymentModal(<?php echo e($invoice->id); ?>, '<?php echo e($invoice->invoice_number); ?>', <?php echo e((float) $invoice->remaining_amount); ?>)"
+                                                data-invoice-id="<?php echo e($invoice->id); ?>"
+                                                data-invoice-number="<?php echo e($invoice->invoice_number); ?>"
+                                                data-remaining="<?php echo e((float) $invoice->remaining_amount); ?>"
+                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">
                                             <?php echo e($invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar'); ?>
 
                                         </button>
-                                    <?php endif; ?>
+                                    </span>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('payments.view') && $invoice->latestPayment): ?>
                                     <a href="<?php echo e(route('payments.receipt', $invoice->latestPayment->id)); ?>" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-md transition-colors text-xs font-semibold" title="Cetak Struk Pembayaran Terakhir">
@@ -282,6 +285,78 @@
                 row.classList.toggle('hidden', expanded);
             });
         }
+    </script>
+<?php $__env->stopPush(); ?>
+
+
+<?php $__env->startPush('scripts'); ?>
+    <script>
+        const INVOICE_STATUS_LABELS = {
+            belum_dibayar: 'Belum Dibayar',
+            sebagian: 'Sebagian',
+            lunas: 'Lunas',
+            batal: 'Batal',
+        };
+
+        const INVOICE_STATUS_BADGE_CLASSES = {
+            lunas: 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-100 dark:border-green-500/20',
+            sebagian: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-500/20',
+            batal: 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-100 dark:border-red-500/20',
+            belum_dibayar: 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-100 dark:border-slate-500/20',
+        };
+
+        function applyInvoiceUpdate(data) {
+            const row = document.getElementById('invoice-row-' + data.invoice_id);
+            if (!row) {
+                return false;
+            }
+
+            const remainingCell = document.getElementById('invoice-remaining-' + data.invoice_id);
+            if (remainingCell) {
+                remainingCell.textContent = 'Rp ' + Number(data.remaining_amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            const badge = document.getElementById('invoice-status-badge-' + data.invoice_id);
+            if (badge) {
+                badge.textContent = data.invoice_status_label || INVOICE_STATUS_LABELS[data.invoice_status] || data.invoice_status;
+                badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full border ' +
+                    (INVOICE_STATUS_BADGE_CLASSES[data.invoice_status] || INVOICE_STATUS_BADGE_CLASSES.belum_dibayar);
+            }
+
+            const payBtnWrap = document.getElementById('invoice-pay-btn-' + data.invoice_id);
+            if (payBtnWrap) {
+                const settled = data.invoice_status === 'lunas' || data.invoice_status === 'batal';
+                payBtnWrap.classList.toggle('hidden', settled);
+
+                const btn = payBtnWrap.querySelector('button');
+                if (btn && !settled) {
+                    btn.dataset.remaining = data.remaining_amount;
+                    btn.textContent = data.invoice_status === 'sebagian' ? 'Bayar Cicil' : 'Bayar';
+                }
+            }
+
+            return true;
+        }
+
+        // Aksi sendiri lewat modal Bayar Cepat — lihat quick-payment-modal.blade.php.
+        document.addEventListener('payment-recorded', function (e) {
+            if (applyInvoiceUpdate(e.detail)) {
+                e.preventDefault();
+            }
+        });
+
+        // Aksi user lain di POP yang sama, lewat Reverb.
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.Echo === 'undefined' || !window.Echo) {
+                return;
+            }
+
+            const popIds = <?php echo json_encode($invoices->pluck('pop_id')->unique()->values(), 15, 512) ?>;
+            popIds.forEach(function (popId) {
+                window.Echo.private('invoices.' + popId)
+                    .listen('.InvoiceStatusUpdated', applyInvoiceUpdate);
+            });
+        });
     </script>
 <?php $__env->stopPush(); ?>
 <?php $__env->stopSection(); ?>

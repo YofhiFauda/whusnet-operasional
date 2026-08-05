@@ -394,6 +394,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:customers.detail.installation.view|customers.detail.installation.update')->group(function () {
         Route::get('/verifications/queue', [CustomerVerificationController::class, 'index'])->name('verifications.queue');
+        Route::get('/verifications/{customer}/row', [CustomerVerificationController::class, 'row'])->name('verifications.row');
         Route::get('/customers/{customer}/installation/report', [CustomerInstallationController::class, 'report'])->name('customers.installation.report');
         Route::post('/customers/{customer}/installation/start', [CustomerInstallationController::class, 'start'])->name('customers.installation.start');
         Route::post('/customers/{customer}/installation', [CustomerInstallationController::class, 'store'])->name('customers.installation.store');
@@ -519,6 +520,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/fop-tasks', [FopTaskController::class, 'index'])->name('fop-tasks.index');
         Route::get('/fop-tasks/history', [FopTaskController::class, 'history'])->name('fop-tasks.history');
         Route::get('/fop-tasks/history/{fop_task}', [FopTaskController::class, 'showHistory'])->name('fop-tasks.history.show');
+        Route::get('/fop-tasks/{fop_task}/row', [FopTaskController::class, 'row'])->name('fop-tasks.row');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
         Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');

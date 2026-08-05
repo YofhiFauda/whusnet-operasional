@@ -453,8 +453,44 @@
                 })
                 .then((data) => {
                     closeQuickPaymentModal();
-                    alert(data.message);
-                    window.location.reload();
+
+                    // Broadcast lokal: halaman yang tahu cara update barisnya
+                    // sendiri (invoices/index, collectors/show) dengar event
+                    // ini dan patch DOM tanpa reload. Payload sama bentuknya
+                    // dengan App\Events\InvoiceStatusUpdated biar satu handler
+                    // dipakai buat update lokal (punya sendiri) maupun remote
+                    // (Echo, punya user lain di POP yang sama).
+                    const invoiceUpdate = data.invoice ? {
+                        invoice_id: data.invoice.id,
+                        invoice_status: data.invoice.invoice_status,
+                        paid_amount: data.invoice.paid_amount,
+                        remaining_amount: data.invoice.remaining_amount,
+                    } : null;
+
+                    // dispatchEvent() balikin false kalau ada listener yang
+                    // preventDefault() — di sini itu sinyal "sudah kupatch
+                    // sendiri, jangan reload".
+                    const handled = invoiceUpdate
+                        ? !document.dispatchEvent(new CustomEvent('payment-recorded', { detail: invoiceUpdate, cancelable: true }))
+                        : false;
+
+                    window.Dialog.show({
+                        title: 'Pembayaran Tercatat',
+                        message: data.message,
+                        icon: 'success',
+                        buttons: [{
+                            text: 'Tutup', type: 'primary', onClick: () => {
+                                window.Dialog.close();
+                                // Listener yang berhasil update DOM-nya sendiri
+                                // memanggil preventDefault() — reload cuma jadi
+                                // fallback buat halaman yang belum tahu cara
+                                // patch barisnya (mis. tab Tagihan pelanggan).
+                                if (!handled) {
+                                    window.location.reload();
+                                }
+                            },
+                        }],
+                    });
                 })
                 .catch((err) => {
                     errorBox.textContent = err.message;

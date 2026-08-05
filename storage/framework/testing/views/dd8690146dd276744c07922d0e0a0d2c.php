@@ -219,7 +219,7 @@
 
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.reject')): ?>
                 <?php if($payment->payment_status->value === 'valid'): ?>
-                    <button type="button" onclick="openRejectModal()" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors">
+                    <button type="button" onclick="openRejectDialog()" class="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         <span>Tolak Pembayaran</span>
                     </button>
@@ -498,52 +498,54 @@
 
 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.reject')): ?>
     <?php if($payment->payment_status->value === 'valid'): ?>
-        <div id="rejectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 no-print">
-            <div class="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-                <form method="POST" action="<?php echo e(route('payments.reject', $payment->id)); ?>">
-                    <?php echo csrf_field(); ?>
-                    <div class="p-5 border-b border-slate-200 dark:border-slate-700">
-                        <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Tolak Pembayaran <?php echo e($payment->payment_number); ?></h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tagihan akan dihitung ulang setelah pembayaran ini ditolak. Tindakan ini butuh alasan.</p>
-                    </div>
-                    <div class="p-5">
-                        <label for="reject_reason" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Alasan Penolakan <span class="text-red-500">*</span></label>
-                        <textarea id="reject_reason" name="reject_reason" rows="4" required maxlength="1000" class="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder="Contoh: bukti transfer tidak valid / duplikat input."><?php echo e(old('reject_reason')); ?></textarea>
-                        <?php $__errorArgs = ['reject_reason'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-                            <p class="text-xs text-red-600 dark:text-red-400 mt-1"><?php echo e($message); ?></p>
-                        <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
-                    </div>
-                    <div class="p-5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-2">
-                        <button type="button" onclick="closeRejectModal()" class="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">Batal</button>
-                        <button type="submit" class="px-3.5 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">Tolak Pembayaran</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        
+        <form id="rejectForm" method="POST" action="<?php echo e(route('payments.reject', $payment->id)); ?>" class="hidden no-print">
+            <?php echo csrf_field(); ?>
+            <input type="hidden" name="reject_reason" id="reject_reason_hidden" value="<?php echo e(old('reject_reason')); ?>">
+        </form>
     <?php endif; ?>
 <?php endif; ?>
 
 <script>
-    function openRejectModal() {
-        const modal = document.getElementById('rejectModal');
-        if (modal) modal.classList.remove('hidden');
+    function openRejectDialog() {
+        window.Dialog.show({
+            title: 'Tolak Pembayaran <?php echo e($payment->payment_number); ?>',
+            icon: 'error',
+            contentHtml: `
+                <p class="mb-3 text-xs text-text-secondary">Tagihan akan dihitung ulang setelah pembayaran ini ditolak. Tindakan ini butuh alasan.</p>
+                <label for="reject-reason-input" class="block text-xs font-semibold text-text-secondary mb-1.5">Alasan Penolakan *</label>
+                <textarea id="reject-reason-input" rows="4" maxlength="1000" class="w-full text-sm rounded-lg border border-border bg-background p-2.5 text-text-main focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" placeholder="Contoh: bukti transfer tidak valid / duplikat input."><?php echo e(old('reject_reason')); ?></textarea>
+                <p id="reject-reason-error" class="hidden text-xs text-red-600 mt-1.5">Alasan wajib diisi.</p>
+            `,
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                {
+                    text: 'Tolak Pembayaran', type: 'danger', onClick: (e) => {
+                        const input = document.getElementById('reject-reason-input');
+                        const reason = (input?.value || '').trim();
+
+                        if (reason === '') {
+                            document.getElementById('reject-reason-error')?.classList.remove('hidden');
+                            const btn = e.currentTarget;
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            input?.focus();
+                            return;
+                        }
+
+                        document.getElementById('reject_reason_hidden').value = reason;
+                        document.getElementById('rejectForm').submit();
+                    },
+                },
+            ],
+        });
+
+        setTimeout(() => document.getElementById('reject-reason-input')?.focus(), 350);
     }
 
     <?php if($errors->has('reject_reason')): ?>
-        document.addEventListener('DOMContentLoaded', openRejectModal);
+        document.addEventListener('DOMContentLoaded', openRejectDialog);
     <?php endif; ?>
-
-    function closeRejectModal() {
-        const modal = document.getElementById('rejectModal');
-        if (modal) modal.classList.add('hidden');
-    }
 
     function togglePrintDropdown(e) {
         if (e) e.stopPropagation();
@@ -592,7 +594,7 @@ unset($__errorArgs, $__bag); ?>
             document.execCommand('copy');
             document.body.removeChild(input);
         }
-        alert(`${label} (${text}) berhasil disalin!`);
+        window.Toast.success('Disalin', `${label} (${text}) berhasil disalin`);
     }
 </script>
 <?php $__env->stopSection(); ?>

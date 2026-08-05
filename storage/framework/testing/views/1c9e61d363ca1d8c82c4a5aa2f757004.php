@@ -917,7 +917,7 @@
                                     </thead>
                                     <tbody class="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300 font-mono">
                                         <?php $__currentLoopData = $group['rows']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $invoice): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors" id="invoice-row-<?php echo e($invoice->id); ?>">
                                                 <td class="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 searchable-text">
                                                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.view')): ?>
                                                         <a href="<?php echo e(route('invoices.show', $invoice->id)); ?>" class="text-sky-600 hover:underline"><?php echo e($invoice->invoice_number); ?></a>
@@ -947,23 +947,24 @@
                                                         };
                                                         $statusLabel = $invoice->invoice_status->label();
                                                     ?>
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide <?php echo e($statusClass); ?>">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide <?php echo e($statusClass); ?>" id="invoice-status-badge-<?php echo e($invoice->id); ?>">
                                                         <?php echo e($statusLabel); ?>
 
                                                     </span>
                                                 </td>
                                                 <td class="px-4 py-3 text-slate-400 font-sans searchable-text"><?php echo e($invoice->creator->name ?? 'System'); ?></td>
                                                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
-                                                    <td class="px-4 py-3 text-center font-sans">
-                                                        <?php if(!in_array($invoice->invoice_status->value, ['lunas', 'batal'], true)): ?>
-                                                            <button type="button"
-                                                                    onclick="openQuickPaymentModal(<?php echo e($invoice->id); ?>, '<?php echo e($invoice->invoice_number); ?>', <?php echo e((float) $invoice->remaining_amount); ?>)"
-                                                                    class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer">
-                                                                Bayar
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <span class="text-slate-400 text-[10px]">—</span>
-                                                        <?php endif; ?>
+                                                    <?php $settled = in_array($invoice->invoice_status->value, ['lunas', 'batal'], true); ?>
+                                                    <td class="px-4 py-3 text-center font-sans" id="invoice-pay-btn-<?php echo e($invoice->id); ?>">
+                                                        <button type="button"
+                                                                data-invoice-id="<?php echo e($invoice->id); ?>"
+                                                                data-invoice-number="<?php echo e($invoice->invoice_number); ?>"
+                                                                data-remaining="<?php echo e((float) $invoice->remaining_amount); ?>"
+                                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer <?php echo e($settled ? 'hidden' : ''); ?>">
+                                                            Bayar
+                                                        </button>
+                                                        <span class="text-slate-400 text-[10px] <?php echo e($settled ? '' : 'hidden'); ?>">—</span>
                                                     </td>
                                                 <?php endif; ?>
                                             </tr>
@@ -1283,6 +1284,74 @@
 <?php endif; ?>
 
 <?php echo $__env->make('payments.partials.quick-payment-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+
+<?php $__env->startPush('scripts'); ?>
+    <script>
+        const CUSTOMER_INVOICE_STATUS_LABELS = {
+            belum_dibayar: 'Belum Dibayar',
+            sebagian: 'Sebagian',
+            lunas: 'Lunas',
+            batal: 'Batal',
+        };
+
+        const CUSTOMER_INVOICE_STATUS_BADGE_CLASSES = {
+            lunas: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+            sebagian: 'bg-sky-50 text-sky-600 border-sky-200',
+            belum_dibayar: 'bg-amber-50 text-amber-600 border-amber-200',
+            batal: 'bg-rose-50 text-rose-600 border-rose-200',
+        };
+
+        function applyCustomerInvoiceUpdate(data) {
+            const row = document.getElementById('invoice-row-' + data.invoice_id);
+            if (!row) {
+                return false;
+            }
+
+            const badge = document.getElementById('invoice-status-badge-' + data.invoice_id);
+            if (badge) {
+                badge.textContent = data.invoice_status_label || CUSTOMER_INVOICE_STATUS_LABELS[data.invoice_status] || data.invoice_status;
+                badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide ' +
+                    (CUSTOMER_INVOICE_STATUS_BADGE_CLASSES[data.invoice_status] || CUSTOMER_INVOICE_STATUS_BADGE_CLASSES.belum_dibayar);
+            }
+
+            const payCell = document.getElementById('invoice-pay-btn-' + data.invoice_id);
+            if (payCell) {
+                const settled = data.invoice_status === 'lunas' || data.invoice_status === 'batal';
+                const btn = payCell.querySelector('button');
+                const dash = payCell.querySelector('span');
+                if (btn) {
+                    btn.classList.toggle('hidden', settled);
+                    if (!settled) {
+                        btn.dataset.remaining = data.remaining_amount;
+                    }
+                }
+                if (dash) {
+                    dash.classList.toggle('hidden', !settled);
+                }
+            }
+
+            return true;
+        }
+
+        // Aksi sendiri lewat modal Bayar Cepat.
+        document.addEventListener('payment-recorded', function (e) {
+            if (applyCustomerInvoiceUpdate(e.detail)) {
+                e.preventDefault();
+            }
+        });
+
+        // Aksi user lain di POP yang sama, lewat Reverb.
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.Echo === 'undefined' || !window.Echo) {
+                return;
+            }
+
+            window.Echo.private('invoices.<?php echo e($customer->pop_id); ?>')
+                .listen('.InvoiceStatusUpdated', applyCustomerInvoiceUpdate);
+        });
+    </script>
+<?php $__env->stopPush(); ?>
 
 <!-- MODAL: Network Assignment -->
 <?php if(auth()->user()->hasPermission('customers.detail.installation.validate')): ?>

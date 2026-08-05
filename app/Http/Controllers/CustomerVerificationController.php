@@ -88,6 +88,57 @@ class CustomerVerificationController extends Controller
         return view('verifications.queue', compact('customers', 'teknisiList'));
     }
 
+    /**
+     * Fragment 3 <td> (STATUS, WAKTU LIVE, ACTION) satu baris antrean —
+     * dipanggil dari verifications/queue.blade.php saat Echo nangkep
+     * App\Events\CustomerVerificationStatusChanged, biar baris di layar admin
+     * lain ikut sinkron tanpa reload (docs/plan/analisa-realtime-spa-
+     * operasional.md §2.1 no. 10). Guard sama seperti showAdmin() — endpoint
+     * ini dipanggil by ID langsung, bukan lewat query index() yang sudah scope.
+     */
+    public function row(Customer $customer)
+    {
+        $user = auth()->user();
+        $hasPermission = $user->hasPermission('customers.detail.installation.validate')
+            || $user->hasPermission('customers.detail.installation.view')
+            || $user->hasPermission('customers.detail.survey.view')
+            || $user->hasPermission('customers.detail.survey.update')
+            || $user->hasPermission('customers.view')
+            || $user->hasPermission('*');
+        abort_unless($hasPermission, 403);
+
+        if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+            $isAssigned = Task::where('customer_id', $customer->id)
+                ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
+                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id))
+                ->exists();
+
+            abort_unless($isAssigned, 403, 'Anda bukan anggota tim yang ditugaskan untuk pelanggan ini.');
+        }
+
+        // Pelanggan sudah keluar dari cakupan antrean (mis. baru diaktifkan
+        // atau ditolak) — kosong berarti "hapus baris ini", bukan error.
+        $queueStatuses = [
+            'waiting_acc', 'surveyed', 'waiting_installation', 'installation_in_progress',
+            'revision_installation', 'installed', 'verification_admin',
+        ];
+        if (! in_array($customer->status, $queueStatuses, true)) {
+            return response('', 204);
+        }
+
+        $customer->load([
+            'latestInstallation',
+            'tasks' => function ($q) {
+                $q->where('task_type', TaskType::SURVEY->value)
+                    ->where('status', TaskStatus::SELESAI->value)
+                    ->orderByDesc('completed_at')
+                    ->limit(1);
+            },
+        ]);
+
+        return view('verifications.partials.queue-status-cells', ['customer' => $customer]);
+    }
+
     public function showAdmin(Customer $customer)
     {
         $user = auth()->user();

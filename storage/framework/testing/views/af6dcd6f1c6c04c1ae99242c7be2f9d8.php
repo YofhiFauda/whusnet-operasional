@@ -237,7 +237,7 @@
                             </div>
                         </a>
                     <?php else: ?>
-                        <button type="button" onclick="alert('Belum ada riwayat pembayaran terdaftar untuk mencetak struk kasir.'); closePrintDropdown();" class="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left opacity-75">
+                        <button type="button" onclick="window.Toast.warning('Belum Ada Struk', 'Belum ada riwayat pembayaran terdaftar untuk mencetak struk kasir.'); closePrintDropdown();" class="w-full px-3.5 py-2.5 flex items-center gap-2.5 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left opacity-75">
                             <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                             <div>
                                 <p class="font-semibold leading-tight">Cetak Struk Thermal (80mm)</p>
@@ -647,7 +647,7 @@
             document.execCommand('copy');
             document.body.removeChild(input);
         }
-        alert(`${label} (${text}) berhasil disalin!`);
+        window.Toast.success('Disalin', `${label} (${text}) berhasil disalin`);
     }
 </script>
 <?php $__env->stopSection(); ?>

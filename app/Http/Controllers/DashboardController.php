@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Pop;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
@@ -61,31 +62,51 @@ class DashboardController extends Controller
         $periodPaymentQuery = (clone $paymentQuery)
             ->whereBetween('payment_date', [$periodStartDate->toDateString(), $periodEndDate->toDateString()]);
 
-        $stats = [
-            'total_customers' => (clone $customerQuery)->count(),
-            'active_customers' => (clone $customerQuery)->where('status', 'active')->count(),
-            'incomplete_customers' => (clone $customerQuery)
-                ->whereIn('data_completeness_status', ['draft', 'perlu_dilengkapi'])
-                ->count(),
-            'ready_billing_customers' => (clone $customerQuery)
-                ->where('data_completeness_status', 'siap_billing')
-                ->count(),
-            'total_invoices_amount' => (float) (clone $periodInvoiceQuery)->sum('total_amount'),
-            'total_payments_amount' => (float) (clone $periodPaymentQuery)
-                ->where('payment_status', PaymentStatus::VALID->value)
-                ->sum('amount'),
-            'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
-                ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
-                ->sum('remaining_amount'),
-            'due_invoices_count' => (clone $invoiceQuery)
-                ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
-                // whereDate() membungkus kolom jadi DATE(due_date) dan mematikan
-                // index. endOfDay() wajib: sqlite menyimpan kolom date sebagai
-                // '2026-07-22 00:00:00', jadi `<= '2026-07-22'` membuang tagihan
-                // yang jatuh tempo hari ini.
-                ->where('due_date', '<=', now()->endOfDay())
-                ->count(),
-        ];
+        // Cache 60 detik per user+filter — HANYA angka stat cards (nilai
+        // skalar, aman diserialize cache store apa pun). Koleksi model
+        // (customersByPop/dueInvoices/incompleteCustomers/pops) SENGAJA tidak
+        // ikut di-cache: round-trip Eloquent Collection lewat cache store
+        // (file/redis) di environment ini korup jadi __PHP_Incomplete_Class
+        // (kena reproduksi juga di luar app, langsung lewat Cache::put pada
+        // collect([1,2,3]) polos — bukan spesifik ke query dashboard ini).
+        // Jangan cache object/Collection sampai bug itu ditelusuri terpisah.
+        $cacheKey = sprintf(
+            'dashboard:main:stats:%d:%s:%s:%s',
+            auth()->id(),
+            $popId === null ? '' : $popId,
+            $periodFrom,
+            $periodTo
+        );
+
+        $stats = Cache::remember(
+            $cacheKey,
+            60,
+            fn () => [
+                'total_customers' => (clone $customerQuery)->count(),
+                'active_customers' => (clone $customerQuery)->where('status', 'active')->count(),
+                'incomplete_customers' => (clone $customerQuery)
+                    ->whereIn('data_completeness_status', ['draft', 'perlu_dilengkapi'])
+                    ->count(),
+                'ready_billing_customers' => (clone $customerQuery)
+                    ->where('data_completeness_status', 'siap_billing')
+                    ->count(),
+                'total_invoices_amount' => (float) (clone $periodInvoiceQuery)->sum('total_amount'),
+                'total_payments_amount' => (float) (clone $periodPaymentQuery)
+                    ->where('payment_status', PaymentStatus::VALID->value)
+                    ->sum('amount'),
+                'total_unpaid_amount' => (float) (clone $periodInvoiceQuery)
+                    ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
+                    ->sum('remaining_amount'),
+                'due_invoices_count' => (clone $invoiceQuery)
+                    ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
+                    // whereDate() membungkus kolom jadi DATE(due_date) dan mematikan
+                    // index. endOfDay() wajib: sqlite menyimpan kolom date sebagai
+                    // '2026-07-22 00:00:00', jadi `<= '2026-07-22'` membuang tagihan
+                    // yang jatuh tempo hari ini.
+                    ->where('due_date', '<=', now()->endOfDay())
+                    ->count(),
+            ]
+        );
 
         $customersByPop = (clone $customerQuery)
             ->with('pop')

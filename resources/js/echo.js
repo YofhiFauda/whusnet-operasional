@@ -32,6 +32,11 @@ window.Echo = new Echo({
     withCredentials: true,
 });
 
+// Sinyal untuk kode yang butuh window.Echo tapi bisa jalan lebih dulu
+// (mis. Alpine init() di halaman dashboard) — dengarkan event ini alih-alih
+// polling/menunggu dengan setTimeout.
+window.dispatchEvent(new CustomEvent('echo:ready'));
+
 // Handle modern browser Back-Forward Cache (bfcache) to prevent websocket errors and keep connection alive
 window.addEventListener('pageshow', (event) => {
     if (event.persisted && window.Echo && window.Echo.connector && window.Echo.connector.pusher) {

@@ -21,21 +21,7 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <!-- NProgress -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof NProgress !== 'undefined') {
-                NProgress.configure({ showSpinner: false, minimum: 0.1 });
-                NProgress.done();
-            }
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if (typeof NProgress !== 'undefined') NProgress.start();
-        });
-    </script>
+    <!-- NProgress: dibundel lewat Vite (resources/js/app.js), bukan CDN sinkron -->
 
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])

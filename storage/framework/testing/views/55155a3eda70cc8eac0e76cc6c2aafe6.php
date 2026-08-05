@@ -496,13 +496,6 @@
     <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Status Teknisi</p>
-            <button onclick="window.location.reload();" 
-                    class="group inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary-hover transition-colors cursor-pointer bg-primary-soft px-3 py-1 rounded-full border border-primary-border shadow-xs">
-                <svg class="h-3 w-3 transition-transform duration-300 group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
-                </svg>
-                <span>Refresh Data</span>
-            </button>
         </div>
         <div id="status-teknisi-container" class="bg-surface border border-border rounded-xl shadow-sm overflow-hidden">
             <?php if($teknisiList->count() > 0): ?>

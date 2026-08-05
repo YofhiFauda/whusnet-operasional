@@ -1470,6 +1470,7 @@
 
 @endsection
 
+
 @section('scripts')
 <script>
     /* ── Kerapatan tabel ── */

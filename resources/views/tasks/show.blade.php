@@ -120,7 +120,7 @@
             <div class="p-3 flex flex-col justify-between col-span-2 sm:col-span-1">
                 <p class="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-0.5 font-ui">Foto Bukti</p>
                 <div>
-                    <p class="text-xs font-semibold font-mono text-text-main">{{ $task->evidences->count() }} Foto</p>
+                    <p class="text-xs font-semibold font-mono text-text-main" id="evidence-count-badge">{{ $task->evidences->count() }} Foto</p>
                     <p class="text-[10px] text-text-muted font-ui">Terupload</p>
                 </div>
             </div>
@@ -488,41 +488,30 @@
                 {{-- ══ Foto Bukti (Non-Survey/PSB) ══════════════════ --}}
                 @if(!in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value]))
                 <div class="pt-4 border-t border-border"
-                     x-data="evidenceSection({{ $task->id }}, {{ $task->canComplete() ? 'true' : 'false' }}, {{ $task->evidences->count() }})">
+                     x-data="evidenceSection({{ $task->id }}, {{ $task->canComplete() ? 'true' : 'false' }}, @js($task->evidences->map(fn($e) => ['id' => $e->id, 'url' => asset('storage/'.$e->file_path), 'caption' => $e->caption])), {{ auth()->user()->can('edit', $task) ? 'true' : 'false' }})">
                     <div class="flex items-center justify-between mb-2">
                         <p class="text-[10px] font-semibold uppercase tracking-widest text-text-muted font-ui">Foto Bukti</p>
                         <span class="text-[10px] font-semibold font-mono text-text-secondary bg-background px-1.5 py-0.5 rounded border border-border" x-text="`${evidenceCount} foto`"></span>
                     </div>
-                    
+
                     {{-- Grid foto --}}
-                    @if($task->evidences->count() > 0)
-                    <div class="grid grid-cols-3 gap-2 mb-3">
-                        @foreach($task->evidences as $evidence)
-                        <div class="relative group rounded-md overflow-hidden aspect-square bg-surface-muted border border-border">
-                            <img src="{{ asset('storage/' . $evidence->file_path) }}"
-                                 alt="{{ $evidence->caption ?? 'Bukti' }}"
-                                 class="h-full w-full object-cover">
-                            @if($evidence->caption)
-                            <div class="absolute bottom-0 left-0 right-0 px-1.5 py-0.5 text-[9px] text-white truncate"
-                                 style="background: rgba(15,23,42,0.7)">
-                                {{ $evidence->caption }}
+                    <div class="grid grid-cols-3 gap-2 mb-3" x-show="evidences.length > 0" style="display: none">
+                        <template x-for="ev in evidences" :key="ev.id">
+                            <div class="relative group rounded-md overflow-hidden aspect-square bg-surface-muted border border-border">
+                                <img :src="ev.url" :alt="ev.caption || 'Bukti'" class="h-full w-full object-cover">
+                                <div x-show="ev.caption" class="absolute bottom-0 left-0 right-0 px-1.5 py-0.5 text-[9px] text-white truncate"
+                                     style="background: rgba(15,23,42,0.7)" x-text="ev.caption"></div>
+                                <button x-show="canEdit" @click="deleteEvidence(ev.id)"
+                                        class="absolute top-1 right-1 h-5 w-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
+                                        style="background:var(--color-error)">
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             </div>
-                            @endif
-                            @can('edit', $task)
-                            <button @click="deleteEvidence({{ $evidence->id }})"
-                                    class="absolute top-1 right-1 h-5 w-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white cursor-pointer"
-                                    style="background:var(--color-error)">
-                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                            @endcan
-                        </div>
-                        @endforeach
+                        </template>
                     </div>
-                    @else
-                    <p class="text-xs text-text-muted mb-3 font-ui">Belum ada foto bukti.</p>
-                    @endif
+                    <p class="text-xs text-text-muted mb-3 font-ui" x-show="evidences.length === 0">Belum ada foto bukti.</p>
 
                     {{-- Upload --}}
                     @can('uploadEvidence', $task)
@@ -1009,12 +998,22 @@ $taskData = [
 
 @push('scripts')
 <script>
-function evidenceSection(taskId, initialCanComplete, initialCount) {
+function evidenceSection(taskId, initialCanComplete, initialEvidences, canEdit) {
     return {
         taskId,
         canComplete:   initialCanComplete,
-        evidenceCount: initialCount,
+        evidences:     initialEvidences,
+        canEdit,
         uploadError:   null,
+
+        get evidenceCount() {
+            return this.evidences.length;
+        },
+
+        updateCountBadge() {
+            const badge = document.getElementById('evidence-count-badge');
+            if (badge) badge.textContent = `${this.evidenceCount} Foto`;
+        },
 
         async uploadEvidence(input) {
             const file = input.files[0];
@@ -1028,9 +1027,9 @@ function evidenceSection(taskId, initialCanComplete, initialCount) {
             });
             const data = await res.json();
             if (data.success) {
-                this.evidenceCount = data.evidence_count;
-                this.canComplete   = data.can_complete;
-                window.location.reload();
+                this.evidences.push(data.evidence);
+                this.canComplete = data.can_complete;
+                this.updateCountBadge();
             } else {
                 this.uploadError = 'Gagal upload. Coba lagi.';
             }
@@ -1048,7 +1047,10 @@ function evidenceSection(taskId, initialCanComplete, initialCount) {
                         headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
                     });
                     const data = await res.json();
-                    if (data.success) { this.evidenceCount = data.evidence_count; window.location.reload(); }
+                    if (data.success) {
+                        this.evidences = this.evidences.filter(ev => ev.id !== id);
+                        this.updateCountBadge();
+                    }
                 }
             );
         },

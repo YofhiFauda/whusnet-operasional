@@ -72,7 +72,7 @@
                                 <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{{ $invoice->customer->cid ?? $invoice->customer->customer_code ?? '-' }}</div>
                             </td>
                             <td class="px-6 py-3.5 font-mono whitespace-nowrap">{{ $invoice->invoice_number }}</td>
-                            <td class="px-6 py-3.5 text-right font-mono">Rp {{ number_format((float) $invoice->remaining_amount, 0, ',', '.') }}</td>
+                            <td class="px-6 py-3.5 text-right font-mono cb-sisa">Rp {{ number_format((float) $invoice->remaining_amount, 0, ',', '.') }}</td>
                             <td class="px-6 py-3.5">
                                 <input type="number" step="0.01" min="1" max="{{ (float) $invoice->remaining_amount }}" value="{{ (float) $invoice->remaining_amount }}" class="cb-amount w-32 font-sans text-sm px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-sky-500">
                             </td>
@@ -183,7 +183,10 @@
                 .then((data) => {
                     cbShowAlert(data.message, false);
                     document.getElementById('batch-alert').classList.remove('hidden');
-                    setTimeout(() => window.location.reload(), 1200);
+                    // Worklist cuma nampilin tagihan yang masih ada sisa —
+                    // patch/hapus baris pakai data.results (per-invoice, dari
+                    // Invoice::recalculateFromPayments()) daripada reload.
+                    cbApplyResults(data.results || []);
                 })
                 .catch((err) => {
                     cbShowAlert(err.message, true);
@@ -193,6 +196,58 @@
                         submittingBtn.textContent = restoreLabel;
                     }
                 });
+        }
+
+        // Patch/hapus baris worklist per hasil payment — tanpa reload.
+        // Lunas/batal → baris hilang dari worklist (bukan tujuannya lagi di
+        // sini). Masih ada sisa (cicilan sebagian) → sisa & input nominal
+        // disegarkan biar kolektor bisa lanjut bayar sisanya tanpa reload.
+        function cbApplyResults(results) {
+            results.forEach(function (result) {
+                const tr = document.querySelector('tr[data-invoice-row="' + result.invoice_id + '"]');
+                if (!tr) return;
+
+                if (result.invoice_status === 'lunas' || result.invoice_status === 'batal') {
+                    tr.remove();
+                    return;
+                }
+
+                const sisaCell = tr.querySelector('.cb-sisa');
+                if (sisaCell) {
+                    sisaCell.textContent = 'Rp ' + Math.round(result.remaining_amount).toLocaleString('id-ID');
+                }
+
+                const amountInput = tr.querySelector('.cb-amount');
+                if (amountInput) {
+                    amountInput.max = result.remaining_amount;
+                    amountInput.value = result.remaining_amount;
+                }
+
+                const btn = tr.querySelector('button');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Bayar';
+                }
+
+                const checkbox = tr.querySelector('.cb-row-checkbox');
+                if (checkbox) {
+                    checkbox.checked = false;
+                }
+            });
+
+            cbUpdateCount();
+
+            const batchBtn = document.getElementById('cb-submit');
+            if (batchBtn) {
+                batchBtn.textContent = 'Bayar Massal (Baris Terpilih)';
+            }
+
+            if (document.querySelectorAll('tbody tr[data-invoice-row]').length === 0) {
+                const tbody = document.querySelector('table tbody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Kolektor ini tidak punya pelanggan dengan tunggakan.</td></tr>';
+                }
+            }
         }
 
         // Bayar 1-by-1 — langsung submit satu baris, tanpa perlu centang.

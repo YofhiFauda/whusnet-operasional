@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Permission;
 use App\Models\Task;
+use App\Observers\CustomerObserver;
 use App\Observers\FopTaskObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
@@ -59,6 +60,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Task 9 — sync status Task eksekusi teknisi ke FopTask (status realtime).
         Task::observe(TaskObserver::class);
+
+        // Broadcast realtime antrean verifikasi — nutup dua admin yang bisa
+        // verifikasi pelanggan sama tanpa saling tahu (docs/plan/analisa-
+        // realtime-spa-operasional.md §2.1 no. 10).
+        Customer::observe(CustomerObserver::class);
 
         // Fase 5.2 — isi kolom nyata notifications.notification_type dari data['type']
         // saat notifikasi dibuat, dari SEMUA jalur (Notification::send, dsb),

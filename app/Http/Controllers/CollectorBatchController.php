@@ -68,13 +68,15 @@ class CollectorBatchController extends Controller
         }
 
         try {
-            $paymentCount = DB::transaction(function () use ($collector, $rows, $validated) {
+            [$paymentCount, $results] = DB::transaction(function () use ($collector, $rows, $validated) {
                 $batch = PaymentBatch::create([
                     'idempotency_key' => $validated['idempotency_key'],
                     'submitted_by' => auth()->id(),
                     'collector_id' => $collector->id,
                     'submitted_at' => now(),
                 ]);
+
+                $results = [];
 
                 foreach ($rows as $row) {
                     // Rekunci & re-validasi di dalam transaksi — pengecekan di
@@ -109,9 +111,15 @@ class CollectorBatchController extends Controller
                     ]);
 
                     $lockedInvoice->recalculateFromPayments();
+
+                    $results[] = [
+                        'invoice_id' => $lockedInvoice->id,
+                        'invoice_status' => $lockedInvoice->invoice_status->value,
+                        'remaining_amount' => (float) $lockedInvoice->remaining_amount,
+                    ];
                 }
 
-                return count($rows);
+                return [count($rows), $results];
             });
         } catch (\Throwable $e) {
             return response()->json([
@@ -125,6 +133,7 @@ class CollectorBatchController extends Controller
             'success' => true,
             'message' => "{$paymentCount} pembayaran berhasil dicatat untuk kolektor {$collector->name}.",
             'processed' => $paymentCount,
+            'results' => $results,
         ]);
     }
 

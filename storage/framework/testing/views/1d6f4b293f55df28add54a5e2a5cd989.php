@@ -393,8 +393,10 @@
  * Listen ke Laravel Reverb channel private-teknisi.{userId} untuk event TaskScheduled.
  * Saat event diterima:
  *   1. Tampilkan banner notifikasi di atas list task.
- *   2. Fetch HTML card parsial dari /tasks-saya/partial/{taskId} lalu inject ke DOM.
- *   3. Klik banner → smooth-scroll ke card yang baru diinject.
+ *   2. event_type 'created'     → fetch card parsial dari /tasks-saya/partial/{taskId}, inject ke DOM.
+ *      event_type 'rescheduled' → fetch ulang & ganti card yang udah ada di tempat (jadwal lama jangan
+ *      nyangkut di layar) — kalau card belum ada di DOM, treat sama kayak 'created'.
+ *   3. Klik banner → smooth-scroll ke card.
  *   4. Auto-dismiss banner setelah 10 detik.
  */
 function technicianNotifier() {
@@ -459,9 +461,12 @@ function technicianNotifier() {
             clearTimeout(this.dismissTimer);
             this.dismissTimer = setTimeout(() => this.dismissBanner(), 10000);
 
-            // Inject card task baru ke DOM — hanya untuk event 'created'
-            // Untuk reschedule, card sudah ada di DOM (perlu reload untuk update jadwal)
-            if (!isRescheduled) {
+            // 'created' → card belum ada, inject baru. 'rescheduled' → card
+            // biasanya udah ada di DOM tapi jadwalnya basi, refetch & ganti di
+            // tempat (refreshTaskCard nangani juga kalau ternyata belum ada).
+            if (isRescheduled) {
+                this.refreshTaskCard(event.id);
+            } else {
                 this.injectTaskCard(event.id);
             }
         },
@@ -488,6 +493,61 @@ function technicianNotifier() {
             // Cek apakah card sudah ada (mencegah duplikasi jika event diterima dua kali)
             if (document.getElementById(`task-card-${taskId}`)) return;
 
+            const freshCard = await this.fetchCard(taskId);
+            if (!freshCard) return;
+
+            // Dapatkan container task list hari ini
+            let container = document.getElementById('today-task-list');
+
+            if (!container) {
+                // Jika container belum ada (halaman kosong / tidak ada task hari ini),
+                // cari parent wrapper dan buat container baru
+                const emptyState = document.querySelector('[data-empty-tasks]');
+                if (emptyState) {
+                    // Sembunyikan empty state
+                    emptyState.style.display = 'none';
+                }
+                // Buat container baru dan inject sebelum section Mendatang atau di akhir content
+                container = document.createElement('div');
+                container.id = 'today-task-list';
+                container.className = 'space-y-3';
+                // Cari titik sisip di atas section Mendatang
+                const mendatangSection = document.querySelector('[data-section="mendatang"]');
+                const contentWrapper = document.querySelector('.max-w-2xl');
+                if (mendatangSection && contentWrapper) {
+                    contentWrapper.insertBefore(container, mendatangSection);
+                } else if (contentWrapper) {
+                    contentWrapper.appendChild(container);
+                }
+            }
+
+            // Inject card di awal list (task baru tampil di atas)
+            container.insertBefore(freshCard, container.firstChild);
+            this.initAlpineOn(freshCard);
+        },
+
+        // Jadwal task berubah (event_type 'rescheduled') — card yang udah
+        // kelihatan di layar masih nampilin jadwal lama, jadi diganti di
+        // tempat pakai HTML terbaru dari server (satu sumber kebenaran,
+        // gak ngoprek tampilan jadwal di JS). Kalau card belum ada di DOM
+        // (task-nya baru masuk ke "hari ini" gara-gara reschedule), inject
+        // baru — sama kayak event 'created'.
+        async refreshTaskCard(taskId) {
+            const existing = document.getElementById(`task-card-${taskId}`);
+
+            if (!existing) {
+                this.injectTaskCard(taskId);
+                return;
+            }
+
+            const freshCard = await this.fetchCard(taskId);
+            if (!freshCard) return;
+
+            existing.replaceWith(freshCard);
+            this.initAlpineOn(freshCard);
+        },
+
+        async fetchCard(taskId) {
             try {
                 const res = await fetch(`/tasks-saya/partial/${taskId}`, {
                     headers: {
@@ -499,51 +559,24 @@ function technicianNotifier() {
 
                 if (!res.ok) {
                     console.warn(`[technicianNotifier] Gagal fetch card task #${taskId}: HTTP ${res.status}`);
-                    return;
+                    return null;
                 }
 
                 const html = await res.text();
-
-                // Dapatkan container task list hari ini
-                let container = document.getElementById('today-task-list');
-
-                if (!container) {
-                    // Jika container belum ada (halaman kosong / tidak ada task hari ini),
-                    // cari parent wrapper dan buat container baru
-                    const emptyState = document.querySelector('[data-empty-tasks]');
-                    if (emptyState) {
-                        // Sembunyikan empty state
-                        emptyState.style.display = 'none';
-                    }
-                    // Buat container baru dan inject sebelum section Mendatang atau di akhir content
-                    container = document.createElement('div');
-                    container.id = 'today-task-list';
-                    container.className = 'space-y-3';
-                    // Cari titik sisip di atas section Mendatang
-                    const mendatangSection = document.querySelector('[data-section="mendatang"]');
-                    const contentWrapper = document.querySelector('.max-w-2xl');
-                    if (mendatangSection && contentWrapper) {
-                        contentWrapper.insertBefore(container, mendatangSection);
-                    } else if (contentWrapper) {
-                        contentWrapper.appendChild(container);
-                    }
-                }
-
-                // Inject card di awal list (task baru tampil di atas)
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = html.trim();
-                const newCard = wrapper.firstElementChild;
-                if (newCard) {
-                    container.insertBefore(newCard, container.firstChild);
-                    // Card partial bisa berisi komponen Alpine (mis. dialog laporan) —
-                    // Alpine gak auto-scan DOM yang di-inject manual lewat innerHTML.
-                    if (window.Alpine && typeof window.Alpine.initTree === 'function') {
-                        window.Alpine.initTree(newCard);
-                    }
-                }
-
+                return wrapper.firstElementChild;
             } catch (err) {
-                console.error('[technicianNotifier] Error saat inject task card:', err);
+                console.error('[technicianNotifier] Error saat fetch task card:', err);
+                return null;
+            }
+        },
+
+        initAlpineOn(card) {
+            // Card partial bisa berisi komponen Alpine (mis. dialog laporan) —
+            // Alpine gak auto-scan DOM yang di-inject manual lewat innerHTML.
+            if (card && window.Alpine && typeof window.Alpine.initTree === 'function') {
+                window.Alpine.initTree(card);
             }
         },
     };

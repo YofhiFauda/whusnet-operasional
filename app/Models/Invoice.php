@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\PaymentStatus;
+use App\Events\InvoiceStatusUpdated;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
@@ -191,6 +192,10 @@ class Invoice extends Model
             'remaining_amount' => $remainingAmount,
             'invoice_status' => $status->value,
         ]);
+
+        // Satu titik broadcast buat semua jalur payment (single, bulk,
+        // batch kolektor, reject) — lihat InvoiceStatusUpdated.
+        InvoiceStatusUpdated::dispatch($this);
     }
 
     /**
