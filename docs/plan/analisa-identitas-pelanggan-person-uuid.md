@@ -1,3 +1,5 @@
+# PENDING
+
 # Analisa: Identitas Pelanggan Permanen (Person + UUIDv7)
 
 **Status: USULAN. Belum diimplementasi, belum disetujui.** Tidak ada kode yang

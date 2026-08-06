@@ -1,3 +1,5 @@
+# BELUM DI IMPLEMENTASIKAN
+
 # Analisa Kekurangan Dashboard NOC
 
 Analisa per 2026-07-31 terhadap `NocDashboardController.php` + `resources/views/noc/dashboard.blade.php`. Tujuan: jadi basis pengembangan lanjutan Dashboard NOC agar layak dipakai analisa oleh Tim NOC, bukan cuma monitoring snapshot.

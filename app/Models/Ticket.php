@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Ticket — tiket internal PERUSAHAAN (helpdesk/NOC/sales/admin), beda dari
@@ -49,6 +50,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'handler',
     'status',
     'resolved_at',
+    'sla_hours',
+    'sla_deadline_at',
 ])]
 class Ticket extends Model
 {
@@ -64,6 +67,7 @@ class Ticket extends Model
             'handler' => TicketHandler::class,
             'status' => TicketHandlingStatus::class,
             'resolved_at' => 'datetime',
+            'sla_deadline_at' => 'datetime',
         ];
     }
 
@@ -122,6 +126,95 @@ class Ticket extends Model
         $seconds = (int) $this->created_at->diffInSeconds($this->resolved_at);
 
         return sprintf('%d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
+    }
+
+    /**
+     * Handling SLA — batas waktu wajib mulai ditangani, dihitung dari
+     * `created_at` tiket (anchor tunggal, karena Ticketing cuma bikin tipe
+     * MTN & C-REQ — lihat TaskType::ticketValues() — dan Master Timeline
+     * SLA buat dua tipe itu anchor-nya `created_at` sendiri, bukan tanggal
+     * lain kayak SURVEY/PEMASANGAN). `sla_deadline_at` di-snapshot sekali
+     * saat tiket dibuat (TicketService::create()) — null buat tiket lama
+     * sebelum kolom ini ada.
+     *
+     * SATU-SATUNYA sumber deadline dipakai baik selama tiket di Ticketing
+     * MAUPUN setelah dieskalasi ke FOP — `TicketService::syncToFopTask()`
+     * mewariskan `sla_hours` yang sama ke `fop_tasks.handling_sla_hours`,
+     * jadi clock-nya gak reset di titik handoff. Lihat
+     * docs/plan/analisa-target-sla-ticketing.md.
+     */
+    public function slaDeadline(): ?Carbon
+    {
+        return $this->sla_deadline_at;
+    }
+
+    public function slaTotalSeconds(): ?int
+    {
+        return $this->sla_hours ? $this->sla_hours * 3600 : null;
+    }
+
+    /**
+     * Telat atau enggak, dihitung sampai `resolved_at` (tiket udah lepas
+     * dari Ticketing, baik ditutup maupun diserahkan ke FOP) — atau `now()`
+     * kalau masih berjalan. null kalau tiket ini gak punya SLA (data lama).
+     */
+    public function isSlaBreached(): bool
+    {
+        if (! $this->sla_deadline_at) {
+            return false;
+        }
+
+        return ($this->resolved_at ?? now())->greaterThan($this->sla_deadline_at);
+    }
+
+    /**
+     * Label badge SLA — dipakai worksheet (server-precomputed, refresh
+     * ngikut reload/broadcast, BUKAN countdown detik-per-detik kayak
+     * `<x-countdown-timer>` di halaman Detail Tiket) dan halaman arsip
+     * (Selesai/Dibatalkan/History) buat tiket yang udah resolved.
+     */
+    public function slaBadgeLabel(): ?string
+    {
+        if (! $this->sla_deadline_at) {
+            return null;
+        }
+
+        $reference = $this->resolved_at ?? now();
+        $diffMinutes = (int) $reference->diffInMinutes($this->sla_deadline_at, false);
+
+        if ($diffMinutes >= 0) {
+            $verb = $this->resolved_at ? 'Selesai' : 'Sisa';
+
+            return sprintf('%s %dj %02dm', $verb, intdiv($diffMinutes, 60), $diffMinutes % 60);
+        }
+
+        $late = abs($diffMinutes);
+
+        return sprintf('%s %dj %02dm', $this->resolved_at ? 'Lewat SLA' : 'TERLAMBAT', intdiv($late, 60), $late % 60);
+    }
+
+    public function slaBadgeClasses(): string
+    {
+        if ($this->isSlaBreached()) {
+            return 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-400';
+        }
+
+        if (! $this->sla_deadline_at || ! $this->sla_hours) {
+            return 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400';
+        }
+
+        // Sama ambang warna dengan `<x-countdown-timer>` (>50% hijau, 25-50%
+        // kuning, <25% merah) — biar badge statis di worksheet/arsip gak
+        // pernah nampilin narasi beda dari countdown live di halaman Detail.
+        $reference = $this->resolved_at ?? now();
+        $remainSeconds = (int) $reference->diffInSeconds($this->sla_deadline_at, false);
+        $percentage = ($remainSeconds / ($this->sla_hours * 3600)) * 100;
+
+        return match (true) {
+            $percentage > 50 => 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400',
+            $percentage > 25 => 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400',
+            default => 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-400',
+        };
     }
 
     /**
@@ -308,8 +401,8 @@ class Ticket extends Model
     public function holderRoles(): array
     {
         return match ($this->handler) {
-            TicketHandler::HELPDESK => ['helpdesk'],
-            TicketHandler::NOC => ['helpdesk', 'noc'],
+            TicketHandler::HELPDESK => ['helpdesk', 'admin', 'admin_pop', 'atasan', 'owner'],
+            TicketHandler::NOC => ['helpdesk', 'noc', 'admin', 'admin_pop', 'atasan', 'owner'],
             TicketHandler::FOP => [],
         };
     }
@@ -457,7 +550,7 @@ class Ticket extends Model
 
         $canAct = $this->handler !== TicketHandler::FOP
             && $this->status === TicketHandlingStatus::OPEN
-            && $user->hasPermission('tickets.update')
+            && ($user->hasPermission('tickets.update') || $user->hasFullAccess())
             && $isHolder;
 
         // `can_oncheck_noc` dihapus bareng aksi Oncheck NOC (ADHOC-06) —
@@ -469,7 +562,7 @@ class Ticket extends Model
             'can_escalate_noc' => $canAct && $this->handler === TicketHandler::HELPDESK,
             'can_escalate_fop' => $canAct,
             'can_return_to_helpdesk' => $canAct && $this->handler === TicketHandler::NOC,
-            'can_cancel' => $canAct && $user->hasPermission('tickets.cancel'),
+            'can_cancel' => $canAct && ($user->hasPermission('tickets.cancel') || $user->hasFullAccess()),
         ];
     }
 }

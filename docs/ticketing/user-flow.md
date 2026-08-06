@@ -43,6 +43,8 @@ Panel auto-refresh lewat Reverb saat ada perubahan dari user lain. Tombol **Refr
 
 Tombol **Batalkan** sengaja **hanya ada di drawer**, bukan di baris tabel/kartu — aksi destruktif jangan sampai kepencet sambil scroll.
 
+Tiap baris nampilin badge **Target SLA** (mis. "Sisa 3j 12m" / "TERLAMBAT 1j 05m") kalau tiketnya punya snapshot SLA — lihat business-logic.md § 16. Badge ini statis (ngikut refresh/broadcast), bukan countdown detik-per-detik.
+
 ### Skenario A — Helpdesk selesaikan sendiri
 
 1. Di tab **Ticket**, klik **Selesai** pada baris tiket.
@@ -60,6 +62,22 @@ Tombol **Batalkan** sengaja **hanya ada di drawer**, bukan di baris tabel/kartu 
 1. Klik **Ke FOP** → isi catatan (opsional) → konfirmasi.
 2. Task FOP baru (`TFOP-…`) otomatis dibuat berstatus Draft, tanpa teknisi.
 3. Tiket pindah ke tab **Assign FOP**. Sejak titik ini **semua aksi Ticketing tertutup** — kendali sepenuhnya di modul FOP.
+
+### Sort Kolom & Navigasi Keyboard (mode tabel & kartu)
+
+Klik header **Ticket ID & Time**, **Status / Issue**, atau **Lokasi / POP / ODP** buat sort ASC/DESC (klik lagi = toggle arah, klik header lain = pindah kolom). Kolom **Pelanggan** sengaja gak sortable.
+
+Navigasi tanpa mouse (nonaktif kalau lagi ngetik di field manapun, atau drawer detail kebuka):
+
+| Tombol | Aksi |
+|---|---|
+| `↑` / `↓` | Pindah baris yang "fokus" (ring biru di baris) |
+| `←` / `→` | Pindah tab Ticket / Assign NOC / Assign FOP — fokus reset ke baris pertama |
+| `Enter` | Buka drawer detail baris yang fokus |
+| `C` / `V` / `B` | Selesai / Ke NOC / Ke FOP baris yang fokus — dialog konfirmasi (Skenario A/B/C di atas) **tetap muncul**, cuma langkah pilih tombolnya yang dipercepat |
+| `N` | Buka/lipat panel form New Ticket |
+
+Detail lengkap: business-logic.md § 17.
 
 ---
 
@@ -145,7 +163,8 @@ Butuh permission `tickets.cancel` dan harus jadi pemegang tiket saat itu.
 
 **Dari sisi Ticketing** (`/tickets/{id}`):
 
-- Header: nomor tiket, tipe, status (mis. *Diproses NOC*, *Selesai (NOC)*), prioritas, nama pelanggan, POP, **Assigned by**, **Created**.
+- Header: nomor tiket, tipe, **Kategori Issue**, status (mis. *Diproses NOC*, *Selesai (NOC)*), prioritas, nama pelanggan, POP, **Assigned by**, **Created**.
+- **Target SLA** — countdown live (jam:menit:detik) selama tiket masih jalan & belum di FOP; badge statis on-time/lewat-SLA begitu tiket resolved atau sudah diserahkan ke FOP (business-logic.md § 16).
 - Panel **Aksi Tiket** — tombol yang muncul mengikuti state & role (lihat flowchart.md § 7). Semua tombol membuka dialog konfirmasi + kolom alasan.
 - Info box link ke Task FOP terkait (kalau ada).
 - Panel snapshot data pelanggan (kondisi saat tiket dibuat).
@@ -155,7 +174,7 @@ Butuh permission `tickets.cancel` dan harus jadi pemegang tiket saat itu.
 
 **Dari sisi Task FOP** (`/fop-tasks/history/{id}`, khusus MTN/C-REQ yang nyambung ke tiket):
 
-- Section "Detail Ticket": CID, data pelanggan, keluhan, catatan teknis, lampiran, Assigned by/Created.
+- Section "Detail Ticket": CID, **Kategori Issue**, data pelanggan, keluhan, catatan teknis, lampiran, Assigned by/Created.
 - Section "Riwayat Ticketing" berdampingan dengan "Histori Status".
 - Link "Buka di Ticketing →" balik ke `/tickets/{id}`.
 - Kategori lain (SURVEY, PSB, O-REQ, dll) atau MTN/C-REQ yang dibuat manual **tidak** menampilkan section ini.
@@ -189,4 +208,4 @@ Tiket dari jalur ini langsung `handler=FOP` — tidak pernah mampir ke antrean H
 
 ---
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-08-05

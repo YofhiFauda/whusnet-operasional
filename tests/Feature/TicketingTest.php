@@ -331,6 +331,23 @@ class TicketingTest extends TestCase
         $this->assertStringContainsString('-7.8681,111.4619', $payload[0]['maps_url']);
     }
 
+    public function test_customer_lookup_supports_search_by_phone_number(): void
+    {
+        $this->customer->update([
+            'primary_phone' => '089876543210',
+        ]);
+
+        $response = $this->actingAs($this->helpdeskUser)
+            ->getJson(route('tickets.lookup-customer', ['q' => '089876543210']))
+            ->assertOk();
+
+        $payload = $response->json();
+
+        $this->assertCount(1, $payload);
+        $this->assertSame('Budi Santoso', $payload[0]['nama']);
+        $this->assertSame('089876543210', $payload[0]['no_hp']);
+    }
+
     public function test_ticket_survives_fop_task_deletion_and_reports_terputus(): void
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());

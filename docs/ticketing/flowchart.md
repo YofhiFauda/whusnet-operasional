@@ -62,7 +62,10 @@ TicketService::create($data, $actor, $attachments, $assignment, $fopOrigin)
 ├─ 2. Simpan Ticket
 │      ├─ snapshotCustomer(): 8 kolom customer_* dibekukan
 │      ├─ handler = HELPDESK
-│      └─ status  = OPEN
+│      ├─ status  = OPEN
+│      └─ resolveSlaHours(): sla_hours + sla_deadline_at (anchor created_at,
+│          lihat § 11) — sla_source kategori 'prioritas'/'paket' menentukan
+│          jalurnya
 │
 ├─ 3. $fopOrigin?
 │      │
@@ -330,6 +333,40 @@ Kalau Reverb gak jalan (BROADCAST_CONNECTION ≠ reverb): sistem tetap normal,
 auto-refresh diam-diam mati, fallback ke tombol "Refresh" manual.
 ```
 
+## 11. SLA Clock — Satu Deadline Lintas Modul
+
+Detail bisnis: business-logic.md § 16. Diagram ini fokus TITIK hitung & warisan-nya.
+
+```
+TicketService::create()
+│
+├─ issueCategory.sla_source === 'prioritas' ?
+│     YES → sla_hours = FopTaskPriority::slaHours()   (Urgent=4j..Low=48j)
+│     NO  → sla_hours = InternetPackage::getHandlingSla($type)
+│           ?? TaskType::defaultHandlingSlaHours()
+│
+├─ sla_deadline_at = created_at + sla_hours
+│  [SNAPSHOT SEKALI — gak ikut geser kalau paket/Master Timeline
+│   diubah admin belakangan]
+│
+▼
+Ticket.sla_hours / sla_deadline_at tersimpan
+│
+├─ Tiket close()/cancel() TANPA pernah ke FOP
+│     → SLA tetap terukur (Ticket::isSlaBreached() baca resolved_at vs
+│       sla_deadline_at) — TIDAK butuh FopTask sama sekali
+│
+└─ escalateToFop() → syncToFopTask()
+      └─ FopTask.handling_sla_hours = Ticket.sla_hours   [WARISAN, BUKAN
+         hitung ulang — FopTask::booted() skip resolve sendiri karena
+         kolom udah gak null]
+            │
+            ▼
+      FopTask::slaDeadline() dipakai FOP Dashboard/Antrean Survey/
+      Verif Pemasangan — deadline-nya SAMA PERSIS jam yang di-snapshot
+      di Ticket, bukan clock baru yang reset di titik handoff.
+```
+
 ---
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-08-05

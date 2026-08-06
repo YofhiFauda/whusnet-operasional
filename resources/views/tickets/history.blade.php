@@ -317,6 +317,7 @@
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Yang menyelesaikan / membatalkan / mengirim ke FOP">Oleh</th>
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Tiket selesai, atau diserahkan ke FOP">Selesai / Diserahkan</th>
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider text-right" title="Lama tiket berada di meja Ticketing">Durasi Ticketing</th>
+                        <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Target Handling SLA — tepat waktu atau lewat, dihitung dari created_at s.d. resolved_at">SLA</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -352,10 +353,19 @@
                             <td class="px-3 py-2.5 font-mono text-right {{ $ticket->resolved_at ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-text-muted' }}">
                                 {{ $ticket->solvingTimeLabel() ?? '—' }}
                             </td>
+                            <td class="px-3 py-2.5">
+                                @if($ticket->slaBadgeLabel())
+                                    <span class="inline-block px-2 py-0.5 rounded border text-[10px] font-bold {{ $ticket->slaBadgeClasses() }}">
+                                        {{ $ticket->slaBadgeLabel() }}
+                                    </span>
+                                @else
+                                    <span class="text-text-muted">—</span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="14" class="px-3 py-10 text-center text-text-muted">
+                            <td colspan="15" class="px-3 py-10 text-center text-text-muted">
                                 Tidak ada tiket yang cocok dengan filter ini.
                             </td>
                         </tr>

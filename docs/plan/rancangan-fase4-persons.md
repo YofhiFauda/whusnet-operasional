@@ -1,3 +1,5 @@
+# PENDING
+
 # Rancangan: Fase 4 (Bersihkan Skema) + Layer Identitas `persons`
 
 **Status: RANCANGAN. Belum ada kode. Menunggu keputusan produk di §7.**

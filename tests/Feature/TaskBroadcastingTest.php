@@ -149,4 +149,77 @@ class TaskBroadcastingTest extends TestCase
                 && $channels[0]->name === 'private-teknisi.'.$this->technician->id;
         });
     }
+
+    public function test_task_update_team_change_without_reschedule_broadcasts_task_scheduled(): void
+    {
+        Event::fake([TaskScheduled::class]);
+
+        $newTechnician = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id]);
+
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0003',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance Ganti Tim',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now()->addDay(),
+            'fop_id' => $this->fopUser->id,
+            'sla_minutes' => 120,
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->technician->id, 'role_in_task' => 'lead']);
+
+        // Ganti tim doang, scheduled_at TIDAK ikut dikirim — ini jalur yang sebelumnya
+        // silent (guard $rescheduled gak kesentuh sama sekali).
+        app(TaskService::class)->update($task, [
+            'team_member_ids' => [$newTechnician->id],
+        ], $this->fopUser);
+
+        Event::assertDispatched(TaskScheduled::class, function ($event) use ($newTechnician) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'team_changed'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$newTechnician->id;
+        });
+
+        Event::assertDispatched(TaskScheduled::class, function ($event) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'removed'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$this->technician->id;
+        });
+    }
+
+    public function test_task_cancel_before_start_broadcasts_task_scheduled_cancelled(): void
+    {
+        Event::fake([TaskScheduled::class]);
+
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0004',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance Dibatalkan Sebelum Mulai',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now()->addDay(),
+            'fop_id' => $this->fopUser->id,
+            'sla_minutes' => 120,
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->technician->id, 'role_in_task' => 'lead']);
+
+        // Task belum in_progress — sebelumnya guard $wasInProgress bikin ini silent.
+        app(TaskService::class)->cancel($task, $this->fopUser, 'Pelanggan batal');
+
+        Event::assertDispatched(TaskScheduled::class, function ($event) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'cancelled'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$this->technician->id;
+        });
+    }
 }

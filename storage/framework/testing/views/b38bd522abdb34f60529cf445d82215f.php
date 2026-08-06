@@ -309,6 +309,7 @@
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Yang menyelesaikan / membatalkan / mengirim ke FOP">Oleh</th>
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Tiket selesai, atau diserahkan ke FOP">Selesai / Diserahkan</th>
                         <th class="px-3 py-2.5 font-bold uppercase tracking-wider text-right" title="Lama tiket berada di meja Ticketing">Durasi Ticketing</th>
+                        <th class="px-3 py-2.5 font-bold uppercase tracking-wider" title="Target Handling SLA — tepat waktu atau lewat, dihitung dari created_at s.d. resolved_at">SLA</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -348,10 +349,20 @@
                                 <?php echo e($ticket->solvingTimeLabel() ?? '—'); ?>
 
                             </td>
+                            <td class="px-3 py-2.5">
+                                <?php if($ticket->slaBadgeLabel()): ?>
+                                    <span class="inline-block px-2 py-0.5 rounded border text-[10px] font-bold <?php echo e($ticket->slaBadgeClasses()); ?>">
+                                        <?php echo e($ticket->slaBadgeLabel()); ?>
+
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="14" class="px-3 py-10 text-center text-text-muted">
+                            <td colspan="15" class="px-3 py-10 text-center text-text-muted">
                                 Tidak ada tiket yang cocok dengan filter ini.
                             </td>
                         </tr>

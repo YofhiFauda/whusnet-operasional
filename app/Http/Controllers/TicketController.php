@@ -164,6 +164,12 @@ class TicketController extends Controller
             'address' => $ticket->customer_address ?: ($customer?->address ?: '—'),
             'issue_category' => $ticket->issueCategory?->name,
             'status_label' => $ticket->statusLabel(),
+            // Target SLA — worksheet cuma butuh label statis (precomputed,
+            // ngikut refresh halaman/broadcast), bukan countdown live per
+            // detik kayak <x-countdown-timer> di halaman Detail Tiket. Lihat
+            // docs/plan/analisa-target-sla-ticketing.md.
+            'sla_label' => $ticket->slaBadgeLabel(),
+            'sla_badge_class' => $ticket->slaBadgeLabel() ? $ticket->slaBadgeClasses() : null,
             'bucket' => $ticket->bucket()->value,
             'handler' => $ticket->handler->value,
             'actions' => $ticket->actionFlagsFor(auth()->user()),
@@ -222,6 +228,15 @@ class TicketController extends Controller
             'created_at' => IndonesianDate::dateTime($ticket->created_at),
             'resolved_at' => $ticket->resolved_at ? IndonesianDate::dateTime($ticket->resolved_at) : null,
             'solving_time' => $ticket->solvingTimeLabel(),
+            // Target SLA (docs/plan/analisa-target-sla-ticketing.md) — drawer
+            // detail worksheet cuma butuh angka mentah, live-ticking-nya
+            // ditangani JS drawer sendiri (bukan <x-countdown-timer>, itu
+            // Blade component gak bisa ditembak dari JSON fetch).
+            'sla_deadline_at' => $ticket->slaDeadline()?->toIso8601String(),
+            'sla_total_seconds' => $ticket->slaTotalSeconds(),
+            'sla_label' => $ticket->slaBadgeLabel(),
+            'sla_badge_class' => $ticket->slaBadgeLabel() ? $ticket->slaBadgeClasses() : null,
+            'sla_is_live' => ! $ticket->resolved_at && $ticket->handler !== TicketHandler::FOP,
             'fop_task_number' => $ticket->fopTask?->task_number,
             // Tiket "Terputus" — pernah dieskalasi ke FOP tapi FopTask-nya udah
             // dihapus (fop_task_id nullOnDelete). WAJIB flag sendiri: begitu
@@ -289,6 +304,10 @@ class TicketController extends Controller
             'fopTask.statusHistories.changedByUser',
             'attachments.uploader',
             'histories.actor',
+            // Kategori Issue (Master Issue) — sama kayak fop_tasks.history_detail,
+            // belum pernah dieager-load/ditampilkan di halaman Detail Ticket ini
+            // sama sekali sebelumnya.
+            'issueCategory:id,name',
         ]);
 
         return view('tickets.show', ['ticket' => $ticket]);
@@ -556,7 +575,9 @@ class TicketController extends Controller
             ->where(function ($query) use ($q) {
                 $query->where('full_name', 'like', "%{$q}%")
                     ->orWhere('cid', 'like', "%{$q}%")
-                    ->orWhere('customer_code', 'like', "%{$q}%");
+                    ->orWhere('customer_code', 'like', "%{$q}%")
+                    ->orWhere('primary_phone', 'like', "%{$q}%")
+                    ->orWhere('alternative_phone', 'like', "%{$q}%");
             })
             ->limit(10)
             ->get();

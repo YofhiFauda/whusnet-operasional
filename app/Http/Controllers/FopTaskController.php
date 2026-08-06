@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Events\FopTaskUpdated;
+use App\Events\TaskScheduled;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
@@ -826,7 +827,7 @@ class FopTaskController extends Controller
             );
         }
 
-        return DB::transaction(function () use ($validated, $fromTask, $toTask, $request) {
+        $conflicts = DB::transaction(function () use ($validated, $fromTask, $toTask) {
             $oldFromValues = $fromTask->toArray();
             $oldToValues = $toTask->toArray();
 
@@ -864,41 +865,55 @@ class FopTaskController extends Controller
                 AuditLog::log($toTask, 'switch_technician_in', $oldToValues, $toTask->fresh('technicians')->toArray());
             }
 
-            $this->notifySwitchedTechnician(
-                (int) $validated['technician_id'],
-                "Anda dipindahkan dari task \"{$fromTask->tugas}\" ke task \"{$toTask->tugas}\".",
-            );
-            $this->notifySwitchedTechnician(
-                (int) $validated['replacement_technician_id'],
-                "Anda ditugaskan sebagai pengganti pada task \"{$fromTask->tugas}\".",
-            );
-
             // from/to task_date SELALU sama (udah divalidasi intra-hari di atas) — cukup
             // rebuild SEKALI. Manggil rebuildTeamsForDate() 2x buat tanggal yang sama bikin
             // pass ke-2 gak nemu lagi konflik/team yang udah kehapus sama cleanup di pass
             // pertama (lihat analisa-sync-execution-task.md), teknisi jadi ke-merge salah.
             $teamResult = app(FopTaskTeamService::class)->rebuildTeamsForDate($fromTask->task_date->copy());
-            $conflicts = $teamResult['conflicts'];
 
-            FopTaskUpdated::dispatch($fromTask->fresh());
-            FopTaskUpdated::dispatch($toTask->fresh());
+            return $teamResult['conflicts'];
+        });
 
-            if ($request->wantsJson()) {
-                if (! empty($conflicts)) {
-                    session()->flash('fop_team_conflicts', $conflicts);
-                }
+        $this->notifySwitchedTechnician(
+            (int) $validated['technician_id'],
+            "Anda dipindahkan dari task \"{$fromTask->tugas}\" ke task \"{$toTask->tugas}\".",
+        );
+        $this->notifySwitchedTechnician(
+            (int) $validated['replacement_technician_id'],
+            "Anda ditugaskan sebagai pengganti pada task \"{$fromTask->tugas}\".",
+        );
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Switch teknisi berhasil.',
-                    'team_conflicts' => $conflicts,
-                ]);
+        // Broadcast SETELAH transaction commit (sama pola dengan TaskService::create/
+        // update()) — Reverb push nyaris instan, dan listener frontend langsung fetch()
+        // partial task via request HTTP baru (koneksi DB terpisah). Kalau broadcast masih
+        // di dalam transaction yang belum commit, request itu gak nemu row-nya (404 diam-
+        // diam, cuma console.warn) — kartu gak pernah muncul tanpa reload manual.
+        // switchTechnician() sengaja bypass TaskService::update()/notifyTeam() (lihat
+        // komentar syncSwitchedExecutionTask()), jadi broadcast realtime-nya manual:
+        //   - technician_id keluar dari fromTask, masuk ke toTask
+        //   - replacement_technician_id masuk gantiin di fromTask
+        $this->broadcastSwitchedExecutionTask($fromTask, 'removed', [(int) $validated['technician_id']]);
+        $this->broadcastSwitchedExecutionTask($fromTask, 'created', [(int) $validated['replacement_technician_id']]);
+        $this->broadcastSwitchedExecutionTask($toTask, 'created', [(int) $validated['technician_id']]);
+
+        FopTaskUpdated::dispatch($fromTask->fresh());
+        FopTaskUpdated::dispatch($toTask->fresh());
+
+        if ($request->wantsJson()) {
+            if (! empty($conflicts)) {
+                session()->flash('fop_team_conflicts', $conflicts);
             }
 
-            return redirect()->route('fop-tasks.index')
-                ->with('success', 'Switch teknisi berhasil.')
-                ->with('fop_team_conflicts', $conflicts);
-        });
+            return response()->json([
+                'success' => true,
+                'message' => 'Switch teknisi berhasil.',
+                'team_conflicts' => $conflicts,
+            ]);
+        }
+
+        return redirect()->route('fop-tasks.index')
+            ->with('success', 'Switch teknisi berhasil.')
+            ->with('fop_team_conflicts', $conflicts);
     }
 
     /**
@@ -925,6 +940,26 @@ class FopTaskController extends Controller
                 'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
             ]);
         }
+    }
+
+    /**
+     * Broadcast TaskScheduled ke Task eksekusi punya $fopTask, target user id eksplisit
+     * (bukan $task->teamMembers) — dipakai oleh switchTechnician() yang gak lewat
+     * TaskService::update() sama sekali. Guard null sama seperti syncSwitchedExecutionTask().
+     *
+     * @param  array<int>  $targetUserIds
+     */
+    private function broadcastSwitchedExecutionTask(FopTask $fopTask, string $eventType, array $targetUserIds): void
+    {
+        if (! $fopTask->task_id || ! $fopTask->task) {
+            return;
+        }
+
+        // afterCommit() — pola sama kayak TaskService::notifyTeam(), jaga-jaga kalau
+        // method ini suatu saat dipanggil dari dalam transaction lain. Aman juga
+        // dipanggil di luar transaction (jalan langsung).
+        $task = $fopTask->task;
+        DB::afterCommit(fn () => broadcast(new TaskScheduled($task, $eventType, $targetUserIds)));
     }
 
     /**

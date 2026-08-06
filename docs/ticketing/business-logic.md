@@ -239,6 +239,56 @@ Listener me-*refetch* sendiri lewat endpoint yang sudah lolos scope & permission
 
 MTN/C-REQ yang dibuat manual langsung di `/fop-tasks` (tanpa `ticket`) tetap boleh dihapus.
 
+## 16. Target SLA Ticketing
+
+Sebelum `2026_08_05`, Ticketing gak punya SLA sama sekali — `handling_sla_hours` cuma ada di `FopTask`, jadi selama tiket masih di tangan Helpdesk/NOC (`handler` ≠ FOP) gak ada deadline terukur, dan tiket yang gak pernah dieskalasi ke FOP gak pernah dapet SLA. Analisa lengkap: `docs/plan/analisa-target-sla-ticketing.md`.
+
+**Sekarang: satu clock SLA, dua panggung.**
+
+1. **Snapshot di titik tiket lahir** — `TicketService::create()` isi `tickets.sla_hours` + `tickets.sla_deadline_at` lewat `resolveSlaHours()`, ANCHOR-nya selalu `created_at` tiket (Ticketing cuma bikin MTN & C-REQ, dua-duanya anchor `created_at` per Master Timeline SLA — lihat `docs/master/sla-timeline/business-logic.md` § 2).
+2. **Dua jalur resolusi**, dipilih lewat `ticket_issue_categories.sla_source`:
+   - `'paket'` (default) → `InternetPackage::getHandlingSla($type)`, fallback `TaskType::defaultHandlingSlaHours()`.
+   - `'prioritas'` → `FopTaskPriority::slaHours()` (matrix: Urgent=4j, High=8j, Medium=24j, Low=48j). Sebelum ini `sla_source='prioritas'` adalah **dead config** — ada di DB/UI tapi gak pernah dibaca backend.
+3. **Eskalasi ke FOP mewarisi, gak hitung ulang** — `TicketService::syncToFopTask()` isi `fop_tasks.handling_sla_hours` langsung dari `$ticket->sla_hours`. `FopTask::booted()` skip resolve sendiri karena kolomnya udah gak `null`. Deadline gak reset di titik handoff Ticketing → FOP.
+4. **Tiket yang gak pernah ke FOP tetap punya SLA** — karena snapshot-nya nempel di `Ticket` sendiri (bukan nunggu `FopTask` lahir), tiket yang ditutup langsung Helpdesk/NOC tetap bisa dicek breach lewat `Ticket::isSlaBreached()`.
+
+**Tampilan** — dua rezim, beda level "kehidupan":
+- **Detail Tiket** (`tickets/show.blade.php`) — countdown LIVE (`<x-countdown-timer>`) selama tiket masih jalan & belum di FOP; badge statis on-time/lewat-SLA begitu resolved atau sudah diserahkan ke FOP.
+- **Worksheet, Arsip, History** (`create.blade.php`, `archive.blade.php`, `history.blade.php`) — badge statis (`Ticket::slaBadgeLabel()`/`slaBadgeClasses()`), precomputed server-side, ngikut refresh/broadcast — BUKAN countdown detik-per-detik. Worksheet-nya JS-driven (Alpine `x-for` atas payload JSON), Blade component `<x-countdown-timer>` gak bisa ditembak per-baris dari situ.
+
+**Belum ada:** notifikasi/eskalasi otomatis saat breach (cuma indikator visual pasif, sengaja di luar scope — sama kayak SLA FopTask), dan auto-naikin `priority` tiket berdasar sisa waktu (beda dari `FopTaskController::autoSyncAndCalculatePriority()` yang cuma jalan buat SURVEY/PEMASANGAN di sisi FopTask).
+
+## 17. Worksheet Helpdesk — Sort Kolom & Keyboard Shortcut
+
+Panel kanan Worksheet Helpdesk (`tickets/create.blade.php`) punya sort & navigasi keyboard di atas array `filteredTasks`/`sortedTasks` (clientside, cap 30 baris). Spec lengkap & histori keputusan: `docs/plan/analisa-percepatan-alur-helpdesk-noc.md` § 6–8.
+
+**Sort kolom** — klik header toggle ASC/DESC:
+
+| Kolom | Field | Catatan |
+|---|---|---|
+| Ticket ID & Time | `code` (nomor tiket) | Bukan `created_at` |
+| Status / Issue | `issue_category` | Bukan `status_label` |
+| Pelanggan (CID & Contact) | — | Sengaja gak sortable |
+| Lokasi / POP / ODP | `odp` | Bukan nama POP |
+
+Sort manual override urutan default server (`latest('created_at')`) sampai user reload halaman.
+
+**Navigasi keyboard** (semua nonaktif kalau fokus lagi di input/textarea/select, atau drawer detail kebuka):
+
+| Tombol | Aksi |
+|---|---|
+| `N` | Toggle panel Create New Ticket (existing, gak diubah) |
+| `↑` / `↓` | Pindah fokus antar row (state `focusedTicketId`) |
+| `←` / `→` | Pindah tab Ticket/Assign NOC/Assign FOP, reset fokus ke row pertama |
+| `Enter` | Buka drawer detail row yang fokus |
+| `C` / `V` / `B` | Close / Ke NOC / Ke FOP row yang fokus — digerbangi `task.actions` (sumber sama kayak tombol Quick Dispatch), modal konfirmasi § 12 **tetap muncul** (sengaja gak di-skip) |
+
+Shortcut ini jalur TAMBAHAN — manggil fungsi JS yang sama persis (`closeTicket()`, `escalateTicket()`, `openTicketDetail()`) dengan tombol Quick Dispatch yang udah ada di baris tabel/kartu dan tombol aksi di drawer detail. Gak ada tombol yang dihapus/diganti.
+
+**Batalkan & Kembalikan ke Helpdesk sengaja gak dikasih hotkey** — Batalkan butuh alasan wajib (gak cocok jadi aksi 1-tombol), Kembalikan cuma relevan buat NOC.
+
+**Sinkronisasi state drawer** — `detail-drawer.blade.php` dispatch `ticket-drawer-shown`/`ticket-drawer-hidden` tiap `shown` beneran berubah (nangkep SEMUA jalur tutup: tombol X, klik backdrop, Escape, atau `close-ticket-drawer` dari luar). Worksheet dengerin event itu buat nonaktifin navigasi keyboard selama drawer kebuka — **bukan** `open-ticket-drawer`/`close-ticket-drawer` (itu event permintaan, bukan notifikasi state, gak reliable buat tutup manual).
+
 ---
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-08-05

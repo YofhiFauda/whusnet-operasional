@@ -15,6 +15,7 @@
 | `2026_07_29_000001_add_resolved_at_to_tickets_table.php` | **`resolved_at`** — waktu keluhan benar-benar beres (History Ticketing) |
 | `2026_07_29_000002_add_customer_village_to_tickets_table.php` | **`customer_village`** — snapshot desa saat tiket dibuat |
 | `2026_07_29_000003_drop_noc_checked_at_from_tickets_table.php` | **DROP `noc_checked_at`** — window Pending NOC dihapus (ADHOC-06) |
+| `2026_08_05_091143_add_sla_fields_to_tickets_table.php` | **`sla_hours` + `sla_deadline_at`** — snapshot Handling SLA di titik tiket lahir (lihat `docs/plan/analisa-target-sla-ticketing.md`) |
 
 ### Catatan migrasi `2026_07_25_000003`
 
@@ -29,6 +30,12 @@ Destruktif dan disetujui eksplisit: jam Oncheck yang tersimpan hilang permanen. 
 ### Catatan migrasi `2026_07_29_000001` & `000002`
 
 `resolved_at` dan `customer_village` sama-sama **di-backfill**: `resolved_at` dari `ticket_histories` (jalur internal) dan `tasks.completed_at` (jalur FOP); `customer_village` dari `customers.village_id` saat migrasi jalan — nilai perkiraan terbaik, bukan desa pelanggan pada saat tiket dulu dibuat.
+
+### Catatan migrasi `2026_08_05_091143` (`sla_hours` + `sla_deadline_at`)
+
+Nullable, tanpa backfill — tiket lama (dibuat sebelum kolom ini ada) tetap `NULL` selamanya, bukan error. `Ticket::slaBadgeLabel()`/`slaDeadline()` menangani `NULL` dengan mengembalikan tampilan kosong, bukan exception.
+
+Snapshot dihitung SEKALI di `TicketService::create()` (bukan live-recalculate) — prinsip sama seperti `fop_tasks.handling_sla_hours`. `TicketService::syncToFopTask()` mewariskan `sla_hours` yang sama ke `fop_tasks.handling_sla_hours` saat eskalasi — satu clock SLA dipakai lintas Ticketing → FOP, gak reset di titik handoff. Detail lengkap: `docs/plan/analisa-target-sla-ticketing.md`.
 
 ## Tabel `tickets`
 
@@ -55,6 +62,8 @@ Destruktif dan disetujui eksplisit: jam Oncheck yang tersimpan hilang permanen. 
 | **`status`** | string(20), default `open` | `TicketHandlingStatus` — `open`/`closed`/`cancelled`. Cuma bermakna selama `handler` ≠ `fop` |
 | **`resolved_at`** | timestamp, nullable | Waktu keluhan beres. Jalur internal diisi `TicketService::close()`; jalur FOP diisi `FopTaskObserver` dari `tasks.completed_at` |
 | **`customer_village`** | string(150), nullable | Snapshot nama desa saat tiket dibuat (bukan join relasi — pelanggan bisa pindah desa) |
+| **`sla_hours`** | unsignedSmallInteger, nullable | Snapshot Handling SLA (jam) — dihitung sekali saat tiket dibuat, lihat `TicketService::resolveSlaHours()` |
+| **`sla_deadline_at`** | timestamp, nullable | `created_at` + `sla_hours` — deadline SLA tunggal, diwariskan ke `fop_tasks.handling_sla_hours` saat eskalasi, gak dihitung ulang |
 | `created_by` | FK → `users` | `restrictOnDelete` — "Assigned by" |
 | `fop_task_id` | FK → `fop_tasks`, nullable | `nullOnDelete` — kalau FOP hapus `FopTask`, tiket TETAP ada (jadi "Terputus") |
 | `created_at`, `updated_at` | timestamp | |
@@ -84,7 +93,7 @@ Destruktif dan disetujui eksplisit: jam Oncheck yang tersimpan hilang permanen. 
 | `id` | bigint PK | |
 | `name` | string | Nama kategori (mis. "LOS", "Lemot", "Backbone CUT") |
 | `default_priority` | string(20) | `FopTaskPriority` — auto-isi prioritas saat kategori dipilih |
-| `sla_source` | string, nullable | Sumber SLA (paket vs prioritas) |
+| `sla_source` | string, nullable | Sumber SLA — `'paket'` (default) pakai `InternetPackage::getHandlingSla()`, `'prioritas'` pakai `FopTaskPriority::slaHours()`. Sebelum `2026_08_05_091143` field ini dead config (cuma teks info di form, gak dibaca backend) — sekarang eksplisit dicabangkan di `TicketService::resolveSlaHours()` |
 | `is_active` | boolean | Soft-toggle; kategori lama gak dihapus keras biar tiket lama gak kehilangan jejak |
 | `created_at`, `updated_at` | timestamp | |
 
@@ -157,9 +166,10 @@ TicketHistory
 ## Cast & Helper di `Ticket`
 
 ```php
-'handler'        => TicketHandler::class,
-'status'         => TicketHandlingStatus::class,
-'resolved_at' => 'datetime',
+'handler'         => TicketHandler::class,
+'status'          => TicketHandlingStatus::class,
+'resolved_at'     => 'datetime',
+'sla_deadline_at' => 'datetime',
 ```
 
 | Helper | Kembalian |
@@ -169,6 +179,9 @@ TicketHistory
 | `holderRoles()` | Role yang sah bertindak sekarang — dipakai Service (otorisasi) & `actionFlagsFor()` (UI) |
 | `bucket()` / `scopeInBucket()` | Klasifikasi bucket, dua rezim (internal vs FopTask) |
 | `checkedBy()` | **Usang** — user yang dulu Oncheck NOC; cuma relevan buat tiket lama (butuh `histories.actor` eager-loaded) |
+| `slaDeadline()` / `slaTotalSeconds()` | `sla_deadline_at` / `sla_hours * 3600` — null kalau tiket gak punya snapshot SLA (data lama) |
+| `isSlaBreached()` | `(resolved_at ?? now()) > sla_deadline_at` |
+| `slaBadgeLabel()` / `slaBadgeClasses()` | Label & warna badge SLA statis, dipakai worksheet/arsip/history (bukan countdown live) |
 
 ## Kolom yang Butuh Diperhatikan Saat Eager-Load
 
@@ -182,4 +195,4 @@ Tanpa salah satunya, `display_id` diam-diam jatuh ke fallback yang salah (busine
 
 ---
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-08-05

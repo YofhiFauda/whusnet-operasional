@@ -52,6 +52,19 @@
                         {{ $ticket->type->value }} — {{ $ticket->type->label() }}
                     </span>
 
+                    {{--
+                        Kategori Issue (Master Issue) — belum pernah tampil di
+                        halaman ini sama sekali sebelumnya, padahal field-nya
+                        udah ada sejak Master Issue ditambah. Samain gaya badge
+                        sama fop_tasks/history_detail.blade.php biar Detail
+                        Ticket & Detail Task FOP konsisten.
+                    --}}
+                    @if($ticket->issueCategory)
+                        <span class="text-xs font-bold px-2.5 py-0.5 rounded border border-sky-200 dark:border-sky-900 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/50">
+                            {{ $ticket->issueCategory->name }}
+                        </span>
+                    @endif
+
                     <span class="text-xs font-bold px-2.5 py-0.5 rounded border {{ $ticket->statusBadgeClasses() }}">
                         {{ $ticket->statusLabel() }}
                     </span>
@@ -68,6 +81,34 @@
                     <span>•</span>
                     <span class="font-medium text-text-secondary">{{ $ticket->pop->name ?? '—' }}</span>
                 </div>
+
+                {{--
+                    Target SLA — countdown LIVE selama tiket masih berjalan di
+                    Ticketing (belum resolved, belum diserahkan ke FOP); begitu
+                    resolved atau sudah di FOP, badge statis on-time/lewat SLA
+                    (angka gak lagi bergerak, gak ada gunanya di-tick per detik).
+                    `sla_deadline_at` null = tiket lama sebelum kolom ini ada,
+                    gak nampilin apa-apa — bukan error.
+                    Lihat docs/plan/analisa-target-sla-ticketing.md.
+                --}}
+                @if($ticket->slaDeadline())
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="font-semibold text-text-secondary">Target SLA:</span>
+                        @if(! $ticket->resolved_at && $ticket->handler !== \App\Enums\TicketHandler::FOP)
+                            <x-countdown-timer
+                                :deadline="$ticket->slaDeadline()->toIso8601String()"
+                                :total-seconds="$ticket->slaTotalSeconds()"
+                                label="Sisa Handling SLA" />
+                        @else
+                            <span class="text-xs font-bold px-2 py-0.5 rounded border {{ $ticket->slaBadgeClasses() }}">
+                                {{ $ticket->slaBadgeLabel() }}
+                            </span>
+                            @if($ticket->handler === \App\Enums\TicketHandler::FOP)
+                                <span class="text-[10px] text-text-muted">(diteruskan ke FOP — SLA lanjut di Task FOP)</span>
+                            @endif
+                        @endif
+                    </div>
+                @endif
             </div>
 
             {{-- Creator & Timestamp Info --}}

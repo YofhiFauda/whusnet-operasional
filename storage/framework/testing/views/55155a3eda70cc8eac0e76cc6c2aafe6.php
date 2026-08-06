@@ -97,7 +97,7 @@
     </div>
 
     
-    <div class="flex flex-col gap-3">
+    <div id="fop-teams-board" class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
             <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted font-sans">Team FOP Aktif</p>
             <a href="<?php echo e(route('fop-tasks.index')); ?>" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover transition-colors cursor-pointer">
@@ -200,6 +200,8 @@
         </div>
         <?php endif; ?>
     </div>
+    
+    <script type="application/json" id="fop-teams-json"><?php echo json_encode($activeFopTeams, 15, 512) ?></script>
 
     
     <div x-show="teamDetail.open"
@@ -682,7 +684,7 @@ function fopDashboardHandler() {
                 if (data.success) {
                     this.showToast('success', data.message);
                     this.switchTeamModal.open = false;
-                    setTimeout(() => window.location.reload(), 1000);
+                    this.refreshTeamsBoard();
                 } else {
                     this.showToast('error', data.message || 'Gagal memindahkan task.');
                 }
@@ -710,13 +712,7 @@ function fopDashboardHandler() {
 
         initEchoListeners() {
             const popIds = <?php echo json_encode($pops->pluck('id'), 15, 512) ?>;
-            let attempts = 0;
-            const setup = () => {
-                if (typeof window.Echo === 'undefined' || !window.Echo) {
-                    attempts++;
-                    if (attempts < 20) setTimeout(setup, 100);
-                    return;
-                }
+            const bind = () => {
                 popIds.forEach(popId => {
                     window.Echo.private(`fop.${popId}`)
                         .listen('TaskStarted', (e) => {
@@ -731,7 +727,17 @@ function fopDashboardHandler() {
                         .listen('InstallationCompleted',  () => this.refreshDashboardContainers());
                 });
             };
-            setup();
+
+            // window.Echo dipasang oleh resources/js/echo.js — script module itu
+            // dieksekusi setelah script Alpine (defer, urut dokumen), jadi normalnya
+            // sudah siap begitu Alpine init() jalan. echo.js menembak event
+            // 'echo:ready' tepat setelah window.Echo di-assign; dengarkan event itu
+            // sebagai jaring pengaman kalau ternyata belum siap — bukan busy-poll.
+            if (window.Echo) {
+                bind();
+            } else {
+                window.addEventListener('echo:ready', bind, { once: true });
+            }
         },
 
         async refreshTaskStats() {
@@ -764,6 +770,39 @@ function fopDashboardHandler() {
                 });
             } catch (e) {
                 console.error('Auto-refresh error:', e);
+            }
+        },
+
+        // Ganti full page reload sehabis switch-team: swap board #fop-teams-board
+        // (outerHTML, bukan innerHTML — elemen di dalamnya pakai binding Alpine
+        // @dragover/@click yang harus di-scan ulang) + sinkronkan teamsData dari
+        // payload JSON yang ikut ke-refresh (#fop-teams-json), lalu re-init Alpine
+        // di subtree baru lewat Alpine.initTree().
+        async refreshTeamsBoard() {
+            try {
+                const res = await fetch(window.location.href);
+                const html = await res.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                const newBoard = doc.getElementById('fop-teams-board');
+                const currentBoard = document.getElementById('fop-teams-board');
+                const newTeamsJson = doc.getElementById('fop-teams-json');
+
+                if (newTeamsJson) {
+                    this.teamsData = JSON.parse(newTeamsJson.textContent);
+                }
+
+                if (newBoard && currentBoard && window.Alpine) {
+                    currentBoard.outerHTML = newBoard.outerHTML;
+                    window.Alpine.initTree(document.getElementById('fop-teams-board'));
+                } else {
+                    // Fallback kalau Alpine global belum siap — reload penuh
+                    // tetap lebih aman daripada board nyangkut stale.
+                    window.location.reload();
+                }
+            } catch (e) {
+                console.error('Auto-refresh error:', e);
+                window.location.reload();
             }
         },
 

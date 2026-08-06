@@ -148,8 +148,12 @@ class FopTaskCancelTest extends TestCase
         NotificationFacade::assertSentTo($this->tech, AppNotification::class);
     }
 
-    public function test_cancelling_terjadwal_task_does_not_notify_technician(): void
+    public function test_cancelling_terjadwal_task_notifies_technician(): void
     {
+        // Sebelumnya task terjadwal (belum in_progress) yang dibatalkan gak
+        // pernah notify teknisi — kartunya diam-diam ilang dari /tasks-saya
+        // tanpa sinyal apa pun (gap realtime, lihat TaskService::cancel()).
+        // Sekarang notifyTeam() selalu dipanggil di semua path cancel.
         $fopTask = $this->createFopTask();
 
         // fake() dipasang SETELAH creation — bikin Task baru juga notifyTeam()
@@ -163,7 +167,7 @@ class FopTaskCancelTest extends TestCase
             ])
             ->assertOk();
 
-        NotificationFacade::assertNothingSent();
+        NotificationFacade::assertSentTo($this->tech, AppNotification::class);
     }
 
     public function test_cancelling_only_active_task_in_team_deletes_the_team(): void

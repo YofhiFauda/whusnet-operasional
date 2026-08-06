@@ -1,3 +1,5 @@
+# DONE PARTIAL
+
 # Analisa Billing: Tagihan → Pembayaran → Kolektor & Setoran
 
 **Tanggal:** 2026-07-24

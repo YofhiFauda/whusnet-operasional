@@ -19,18 +19,35 @@ class TaskScheduled implements ShouldBroadcast
     public Task $task;
 
     /**
-     * Konteks event: 'created' (task baru) atau 'rescheduled' (jadwal diubah).
-     * Digunakan frontend untuk menampilkan teks notifikasi yang tepat.
+     * Konteks event: 'created' (task baru), 'rescheduled' (jadwal diubah),
+     * 'team_changed' (tim berubah tanpa ganti jadwal), 'removed'/'cancelled'
+     * (teknisi dilepas dari task / task dibatalkan — kartu harus hilang dari layar).
+     * Digunakan frontend untuk menampilkan teks notifikasi yang tepat dan
+     * memutuskan render (inject/replace) vs hapus kartu.
      */
     public string $eventType;
 
     /**
-     * Create a new event instance.
+     * Target user_id eksplisit buat broadcastOn(), dipakai saat penerima BUKAN
+     * anggota tim task saat ini — mis. teknisi yang baru saja di-drop dari tim
+     * (sudah tidak ada di $task->teamMembers begitu event ini dibuat, jadi fallback
+     * ke teamMembers gak akan pernah sampai ke dia). Null = pakai teamMembers task
+     * seperti biasa (perilaku lama, tidak berubah).
+     *
+     * @var array<int>|null
      */
-    public function __construct(Task $task, string $eventType = 'created')
+    public ?array $targetUserIds;
+
+    /**
+     * Create a new event instance.
+     *
+     * @param  array<int>|null  $targetUserIds
+     */
+    public function __construct(Task $task, string $eventType = 'created', ?array $targetUserIds = null)
     {
         $this->task = $task;
         $this->eventType = $eventType;
+        $this->targetUserIds = $targetUserIds;
     }
 
     /**
@@ -40,6 +57,10 @@ class TaskScheduled implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
+        if ($this->targetUserIds !== null) {
+            return collect($this->targetUserIds)->map(fn ($userId) => new PrivateChannel('teknisi.'.$userId))->all();
+        }
+
         $this->task->loadMissing('teamMembers');
 
         return $this->task->teamMembers->map(fn ($member) => new PrivateChannel('teknisi.'.$member->user_id))->all();

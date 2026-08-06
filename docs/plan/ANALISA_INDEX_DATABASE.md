@@ -1,3 +1,5 @@
+# DONE 
+
 # Analisa Index, N+1 & Beban Database
 
 **Tanggal:** 2026-07-22

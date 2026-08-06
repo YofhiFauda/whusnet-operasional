@@ -142,6 +142,14 @@
                                     </span>
                                 <?php endif; ?>
 
+                                
+                                <?php if($ticket->slaBadgeLabel()): ?>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border <?php echo e($ticket->slaBadgeClasses()); ?>">
+                                        SLA: <?php echo e($ticket->slaBadgeLabel()); ?>
+
+                                    </span>
+                                <?php endif; ?>
+
                                 <?php if($ticket->attachments_count > 0): ?>
                                     <span class="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-sky-600 bg-sky-50 dark:bg-sky-950/50 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-900">
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

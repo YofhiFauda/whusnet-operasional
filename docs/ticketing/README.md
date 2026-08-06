@@ -39,6 +39,7 @@ Prinsip yang dijaga:
 - **`handler=FOP` itu terminal buat sisi Ticketing.** Semua aksi Ticketing (Selesai/Assign/Kembalikan/Batalkan) ditolak `assertTicketStillOpen()`. Pembatalan setelah titik ini wajib lewat `/fop-tasks`.
 - **Data pelanggan di-snapshot (dibekukan), bukan dibaca live** — lihat [business-logic.md § Snapshot Data Pelanggan](business-logic.md#5-snapshot-data-pelanggan).
 - **Dua riwayat per pembatalan pasca-FOP** — `fop_task_status_history` (sisi FOP) dan `ticket_histories` (sisi pengirim) ditulis bareng oleh `FopTaskObserver`. Pembatalan **pra-FOP** cuma nulis `ticket_histories` (belum ada FopTask buat dicatat).
+- **Target SLA (sejak `2026_08_05`)** — `tickets.sla_hours`/`sla_deadline_at` di-snapshot saat tiket lahir, diwarisi `fop_tasks.handling_sla_hours` saat eskalasi (satu clock, gak reset di handoff). Detail: [business-logic.md § 16](business-logic.md#16-target-sla-ticketing).
 
 ## Dokumen
 
@@ -76,13 +77,13 @@ Lima halaman, **permission masing-masing** — dulu semuanya numpang `tickets.vi
 
 ## Views
 
-- `resources/views/tickets/create.blade.php` — **New Ticket**: form submit (CID lookup + auto-fill + Detail Keluhan + Catatan Teknis + Lampiran) di kiri, panel **List Task Ticketing** di kanan dengan 3 tab: **Ticket** / **Assign NOC** / **Assign FOP** (filter per `handler`, bukan per bucket)
+- `resources/views/tickets/create.blade.php` — **New Ticket**: form submit (CID lookup + auto-fill + Detail Keluhan + Catatan Teknis + Lampiran) di kiri, panel **List Task Ticketing** di kanan dengan 3 tab: **Ticket** / **Assign NOC** / **Assign FOP** (filter per `handler`, bukan per bucket). Panel kanan sortable per kolom (Ticket ID & Time / Status-Issue / Lokasi-POP-ODP) + navigasi keyboard penuh (Arrow/Enter/C/V/B/N) — lihat [business-logic.md § 17](business-logic.md#17-worksheet-helpdesk--sort-kolom--keyboard-shortcut).
 - `resources/views/noc/worksheet.blade.php` — **Worksheet NOC**: tabel padat (satu baris = satu tiket) + pencarian + filter (POP, kategori, prioritas, tipe, pengirim, rentang tanggal) + dua tab bercounter **Tiket Masuk** / **Assign FOP**. Aksi diambil dari baris terpilih lewat drawer (`components/ui/drawer.blade.php`), bukan kolom tombol
 - `resources/views/noc/dashboard.blade.php` — **Dashboard NOC**: stat counter, list tiket aktif + aging, feed aktivitas, statistik per Issue, statistik per Daerah
 - `resources/views/tickets/selesai.blade.php`, `dibatalkan.blade.php` — halaman arsip, masing-masing file sendiri; isi list-nya share `tickets/partials/archive.blade.php`
-- `resources/views/tickets/show.blade.php` — detail tiket: snapshot pelanggan, keluhan, panel Aksi Tiket, dua kolom riwayat, lampiran
+- `resources/views/tickets/show.blade.php` — detail tiket: badge Kategori Issue + Target SLA (countdown live), snapshot pelanggan, keluhan, panel Aksi Tiket, dua kolom riwayat, lampiran
 - `resources/views/tickets/partials/action-dialog.blade.php` — **satu-satunya** dialog konfirmasi + input alasan buat semua aksi tiket di semua halaman (numpang `window.Dialog` global). Lihat [business-logic.md § Dialog Konfirmasi](business-logic.md#12-dialog-konfirmasi--input-alasan)
-- `resources/views/tickets/partials/detail-drawer.blade.php` — **drawer detail kanan**, dipakai BERSAMA oleh Worksheet Helpdesk & Worksheet NOC (ADHOC-10). Isi di-fetch dari `tickets.detail-json` dan setara halaman detail penuh: Status & atribusi, Task FOP terkait (teknisi + tombol Buka Task FOP), Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan, Lampiran (ukuran + pengunggah), Riwayat Ticketing, Riwayat Task FOP. Tombol aksinya cuma men-dispatch event `ticket-drawer-action`, konfirmasi + POST tetap di halaman pemanggil (satu sumber per halaman). Kontrak event: `open-ticket-drawer` / `close-ticket-drawer` / `ticket-drawer-action`.
+- `resources/views/tickets/partials/detail-drawer.blade.php` — **drawer detail kanan**, dipakai BERSAMA oleh Worksheet Helpdesk & Worksheet NOC (ADHOC-10). Isi di-fetch dari `tickets.detail-json` dan setara halaman detail penuh: Status & atribusi, Task FOP terkait (teknisi + tombol Buka Task FOP), Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan, Lampiran (ukuran + pengunggah), Riwayat Ticketing, Riwayat Task FOP. Tombol aksinya cuma men-dispatch event `ticket-drawer-action`, konfirmasi + POST tetap di halaman pemanggil (satu sumber per halaman). Kontrak event: `open-ticket-drawer` / `close-ticket-drawer` (permintaan buka/tutup, dari pemanggil) dan `ticket-drawer-action` (aksi dari dalam drawer) — plus **`ticket-drawer-shown`/`ticket-drawer-hidden`** (sejak `2026_08_05`, notifikasi state SEBENARNYA, dispatch tiap `shown` berubah lewat cara APAPUN termasuk tombol X/backdrop/Escape — dipakai Worksheet Helpdesk buat nonaktifin navigasi keyboard selagi drawer kebuka, lihat business-logic.md § 17).
   → Panel dimulai di bawah navbar (`top-16`) dan pakai **z-index literal `z-[60]`**. Jangan diganti balik ke `z-drawer`/`z-dropdown`/`z-modal`/`z-sticky`: token `--z-*` cuma ada di `:root` (di luar `@theme`) dan z-index bukan namespace yang di-generate Tailwind v4, jadi class itu tidak pernah muncul di CSS hasil build dan elemennya jatuh ke `z-index:auto`.
 
 ## Routes
@@ -131,7 +132,7 @@ Lima halaman, **permission masing-masing** — dulu semuanya numpang `tickets.vi
 | Policy | `app/Policies/TaskPolicy.php::cancelViaFopTask()` |
 | Event | `app/Events/TicketQueueUpdated.php` |
 | Seeder | `database/seeders/TicketFeatureSeeder.php` — semua Feature/permission modul ini |
-| Migration | `2026_07_23_000001..000003`, `2026_07_24_000001`, `2026_07_25_000001..000003`, `2026_07_28_000001` (lihat [database-schema.md](database-schema.md)) |
+| Migration | `2026_07_23_000001..000003`, `2026_07_24_000001`, `2026_07_25_000001..000003`, `2026_07_28_000001`, `2026_07_29_000001..000003`, `2026_08_05_091143` (lihat [database-schema.md](database-schema.md)) |
 
 ## Pola Redirect (PRG)
 
@@ -139,4 +140,4 @@ Submit dari worksheet pakai `fetch()` JSON (stay-on-page, form auto-reset). Aksi
 
 ---
 
-**Last updated:** 2026-07-30 (ADHOC-10: detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** bersama (`tickets/partials/detail-drawer.blade.php` + endpoint `tickets.detail-json`), navigasi `/tickets/{id}` disisakan buat halaman arsip; sebelumnya ADHOC-09: Worksheet NOC jadi tabel padat + pencarian + filter + dua tab **Tiket Masuk**/**Assign FOP**, aksi lewat drawer baris terpilih — tab kedua turunan data, BUKAN pengembalian Pending NOC; sebelumnya 2026-07-29 ADHOC-06: window Pending NOC + aksi Oncheck NOC dihapus, Worksheet NOC jadi satu halaman tanpa tab, kolom `noc_checked_at` di-drop; sebelumnya 2026-07-28 restrukturisasi Worksheet/Dashboard NOC, arsip jadi halaman sendiri, RBAC per-halaman)
+**Last updated:** 2026-08-05 (Target SLA Ticketing: `tickets.sla_hours`/`sla_deadline_at`, warisan ke `fop_tasks.handling_sla_hours` saat eskalasi — [analisa-target-sla-ticketing.md](../plan/analisa-target-sla-ticketing.md); Worksheet Helpdesk dapet sort kolom + navigasi keyboard penuh (Arrow/Enter/C/V/B/N) — [analisa-percepatan-alur-helpdesk-noc.md](../plan/analisa-percepatan-alur-helpdesk-noc.md); bugfix drawer detail (`ticket-drawer-shown`/`hidden`); Kategori Issue sekarang tampil di Detail Ticket. Sebelumnya ADHOC-10: detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** bersama (`tickets/partials/detail-drawer.blade.php` + endpoint `tickets.detail-json`), navigasi `/tickets/{id}` disisakan buat halaman arsip; sebelumnya ADHOC-09: Worksheet NOC jadi tabel padat + pencarian + filter + dua tab **Tiket Masuk**/**Assign FOP**, aksi lewat drawer baris terpilih — tab kedua turunan data, BUKAN pengembalian Pending NOC; sebelumnya 2026-07-29 ADHOC-06: window Pending NOC + aksi Oncheck NOC dihapus, Worksheet NOC jadi satu halaman tanpa tab, kolom `noc_checked_at` di-drop; sebelumnya 2026-07-28 restrukturisasi Worksheet/Dashboard NOC, arsip jadi halaman sendiri, RBAC per-halaman)

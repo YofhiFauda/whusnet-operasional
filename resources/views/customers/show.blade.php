@@ -345,7 +345,6 @@
                                                 <div class="w-6 h-6 shrink-0 rounded-full {{ $accent }} flex items-center justify-center font-bold text-[10px]">{{ $initials }}</div>
                                                 <div>
                                                     <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $stage['pic'] }}</span>
-                                                    <span class="block text-[9px] text-slate-400">Role: {{ $stage['pic_role'] ?: '-' }}</span>
                                                 </div>
                                             </div>
                                         @else

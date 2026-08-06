@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
+use App\Events\TaskScheduled;
 use App\Models\City;
 use App\Models\District;
 use App\Models\FopTask;
@@ -17,6 +18,7 @@ use Database\Seeders\FeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class FopTaskSwitchTechnicianTest extends TestCase
@@ -245,5 +247,51 @@ class FopTaskSwitchTechnicianTest extends TestCase
             'auditable_id' => $taskE->id,
             'action' => 'switch_technician_in',
         ]);
+    }
+
+    public function test_switch_technician_broadcasts_task_scheduled_to_both_sides(): void
+    {
+        // switchTechnician() sengaja bypass TaskService::update()/notifyTeam() (lihat
+        // komentar syncSwitchedExecutionTask()) — pastikan broadcast manual yang
+        // ditambahkan tetap mengirim TaskScheduled ke channel teknisi yang benar,
+        // bukan cuma nulis DB diam-diam.
+        $taskA = $this->createFopTask('Task A', [$this->abdul->id, $this->karim->id]);
+        $taskE = $this->createFopTask('Task E', [$this->yanto->id, $this->wito->id]);
+
+        Event::fake([TaskScheduled::class]);
+
+        $this->actingAs($this->fopUser)->postJson('/fop-tasks/switch-technician', [
+            'technician_id' => $this->abdul->id,
+            'from_task_id' => $taskA->id,
+            'to_task_id' => $taskE->id,
+            'replacement_technician_id' => $this->karim->id,
+        ])->assertOk();
+
+        // Abdul keluar dari Task A → 'removed'.
+        Event::assertDispatched(TaskScheduled::class, function ($event) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'removed'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$this->abdul->id;
+        });
+
+        // Karim gantiin di Task A → 'created'.
+        Event::assertDispatched(TaskScheduled::class, function ($event) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'created'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$this->karim->id;
+        });
+
+        // Abdul masuk ke Task E → 'created'.
+        Event::assertDispatched(TaskScheduled::class, function ($event) {
+            $channels = $event->broadcastOn();
+
+            return $event->eventType === 'created'
+                && count($channels) === 1
+                && $channels[0]->name === 'private-teknisi.'.$this->abdul->id;
+        });
     }
 }

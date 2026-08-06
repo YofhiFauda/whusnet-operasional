@@ -90,7 +90,7 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php endif; ?>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('4092ae01-90a2-41a6-9365-c17848563fd8')): $__env->markAsRenderedOnce('4092ae01-90a2-41a6-9365-c17848563fd8'); ?>
+<?php if (! $__env->hasRenderedOnce('3e5e147a-23b4-4d7d-8b1a-a7ee4b9f90be')): $__env->markAsRenderedOnce('3e5e147a-23b4-4d7d-8b1a-a7ee4b9f90be'); ?>
 <?php $__env->startPush('scripts'); ?>
 <script>
 function countdownTimer(deadlineIso, totalSeconds) {
@@ -152,7 +152,7 @@ function countdownTimer(deadlineIso, totalSeconds) {
 <?php endif; ?>
 
 
-<?php if (! $__env->hasRenderedOnce('fda3bb2c-1458-4bac-bf06-78bf03fdd088')): $__env->markAsRenderedOnce('fda3bb2c-1458-4bac-bf06-78bf03fdd088'); ?>
+<?php if (! $__env->hasRenderedOnce('88e6e88e-ba6d-4c5a-9ccf-c6181ded316f')): $__env->markAsRenderedOnce('88e6e88e-ba6d-4c5a-9ccf-c6181ded316f'); ?>
 <style>
 .countdown-green {
     background: var(--color-success-bg);

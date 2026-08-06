@@ -6,6 +6,9 @@
 
 <div x-data="ticketPage()" @keydown.window="handleShortcut($event)"
      @ticket-drawer-action.window="handleDrawerAction($event.detail)"
+     
+     @open-ticket-drawer.window="drawerOpen = true"
+     @close-ticket-drawer.window="drawerOpen = false"
      class="relative -m-4 sm:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex overflow-hidden bg-background">
 
     
@@ -57,15 +60,15 @@
          class="absolute inset-0 z-10 bg-slate-900/40 dark:bg-slate-950/60 xl:hidden"></div>
 
     
-    <div class="absolute inset-y-0 left-0 z-20 w-full max-w-[440px] xl:static xl:z-auto xl:max-w-none shrink-0 overflow-hidden flex panel-motion"
+    <div class="absolute inset-y-0 left-0 z-20 w-full max-w-[440px] sm:max-w-[400px] lg:static lg:z-auto lg:max-w-none shrink-0 overflow-hidden flex panel-motion"
          :inert="!formOpen"
          :class="[
              formOpen
-                 ? 'translate-x-0 opacity-100 xl:w-[360px] 2xl:w-[400px]'
-                 : '-translate-x-full opacity-0 xl:translate-x-0 xl:w-0',
+                 ? 'translate-x-0 opacity-100 lg:w-[380px] xl:w-[400px] 2xl:w-[440px]'
+                 : '-translate-x-full opacity-0 lg:translate-x-0 lg:w-0',
              animReady ? '' : 'panel-motion-off',
          ]">
-    <div class="w-full xl:w-[360px] 2xl:w-[400px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-xl z-10">
+    <div class="w-full lg:w-[380px] xl:w-[400px] 2xl:w-[440px] shrink-0 flex flex-col min-w-0 bg-surface border-r border-border shadow-xl z-10">
 
         
         <div class="shrink-0 px-4 sm:px-5 py-3.5 border-b border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-3">
@@ -96,14 +99,13 @@
                 <section class="border border-border bg-surface-muted/40 dark:bg-slate-900/30 p-4 space-y-3.5 transition-colors">
                     <h2 class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SECTION 01: CLASSIFICATION</h2>
 
-                    
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div class="space-y-1.5">
                             <label class="block text-[11px] font-bold text-text-secondary uppercase tracking-wider">
                                 Ticket Type <span class="text-rose-500">*</span>
                             </label>
                             <div class="relative">
-                                <select x-model="ticketType" required class="w-full text-sm rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
+                                <select x-model="ticketType" required class="w-full text-[13px] rounded-lg border border-border bg-background px-3 py-2.5 text-text-main appearance-none focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 transition-all font-mono">
                                     <option value="" disabled>-- SELECT CLASSIFICATION --</option>
                                     <?php $__currentLoopData = $typeOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $opt): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                         <option value="<?php echo e($opt['value']); ?>"><?php echo e($opt['value']); ?> — <?php echo e($opt['label']); ?></option>
@@ -354,21 +356,21 @@
             </div>
 
             
-            <div class="shrink-0 px-4 py-3 border-t border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-3">
-                <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-text-muted hover:text-text-main hover:bg-surface border border-transparent hover:border-border active:scale-95 transition-all duration-200 cursor-pointer">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="shrink-0 px-3 sm:px-4 py-3 border-t border-border bg-surface-muted/60 dark:bg-slate-900/40 flex items-center justify-between gap-2">
+                <button type="button" @click="resetForm()" class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold text-text-muted hover:text-text-main hover:bg-surface border border-transparent hover:border-border active:scale-95 transition-all duration-200 cursor-pointer">
+                    <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    DISCARD <span class="opacity-60 normal-case font-normal">(Esc)</span>
+                    <span>DISCARD</span> <span class="hidden sm:inline opacity-60 normal-case font-normal">(Esc)</span>
                 </button>
 
-                <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-lg shadow-sky-600/25 hover:shadow-sky-600/40 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
-                    <span x-show="!submitting">CREATE TICKET <span class="opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
+                <button type="submit" :disabled="!selected || submitting" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-sky-700 shadow-lg shadow-sky-600/25 hover:shadow-sky-600/40 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100">
+                    <span x-show="!submitting">CREATE TICKET <span class="hidden sm:inline opacity-70 normal-case font-normal">(Ctrl+Enter)</span></span>
                     <span x-show="submitting" x-cloak>MENYIMPAN...</span>
-                    <svg x-show="!submitting" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg x-show="!submitting" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
-                    <svg x-show="submitting" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg x-show="submitting" x-cloak class="h-4 w-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
@@ -378,14 +380,14 @@
     </div>
 
     
-    <div class="flex-1 flex min-w-0 overflow-hidden bg-background">
-    <div class="flex-1 flex flex-col min-w-[320px] overflow-hidden">
+    <div class="flex-1 flex min-w-0 overflow-hidden bg-background ticket-queue-container">
+    <div class="flex-1 flex flex-col min-w-[280px] overflow-hidden">
 
-        <div class="shrink-0 p-3 border-b border-border bg-surface flex items-center gap-2 flex-wrap">
+        <div class="shrink-0 p-3 border-b border-border bg-surface flex items-center gap-2 flex-wrap queue-toolbar">
             
-            <div class="flex-1 basis-full sm:basis-0 min-w-[200px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted">
+            <div class="flex-1 basis-full sm:basis-auto min-w-[180px] flex items-center gap-1 bg-surface-muted dark:bg-slate-900 p-1 rounded-lg text-xs font-medium text-text-muted queue-toolbar-tabs">
                 <template x-for="tab in tabs" :key="tab.value">
-                    <button type="button" @click="taskFilter = tab.value"
+                    <button type="button" @click="setTab(tab.value)"
                             :class="taskFilter === tab.value ? 'bg-surface text-text-main font-bold shadow-sm' : 'hover:text-text-main'"
                             class="flex-1 min-w-0 py-1.5 px-1.5 sm:px-2 rounded-md transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer">
                         
@@ -396,7 +398,7 @@
                 </template>
             </div>
 
-            <div class="shrink-0 flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap">
+            <div class="shrink-0 flex items-center gap-2 ml-auto flex-wrap sm:flex-nowrap queue-toolbar-controls">
                 
                 <div class="relative min-w-[130px] max-w-[180px]">
                     <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
@@ -467,17 +469,41 @@
                     <table class="w-full min-w-[660px] 2xl:min-w-0 table-fixed text-left text-xs border-collapse">
                         <thead>
                             <tr class="bg-surface-muted/60 dark:bg-slate-900/40 text-text-muted border-b border-border uppercase tracking-wider text-[10px] font-bold">
-                                <th class="py-2.5 px-3 w-[16%] 2xl:w-[14%] whitespace-nowrap">Ticket ID &amp; Time</th>
-                                <th class="py-2.5 px-3 w-[14%] 2xl:w-[12%] whitespace-nowrap">Status / Issue</th>
+                                
+                                <th class="py-2.5 px-3 w-[16%] 2xl:w-[14%] whitespace-nowrap">
+                                    <button type="button" @click="sortBy('code')" class="inline-flex items-center gap-1 cursor-pointer hover:text-text-main">
+                                        Ticket ID &amp; Time
+                                        <svg class="h-3 w-3 shrink-0 transition-transform" :class="sortField === 'code' && sortDir === 'desc' ? 'rotate-180' : ''" :style="sortField === 'code' ? '' : 'opacity:.35'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </button>
+                                </th>
+                                <th class="py-2.5 px-3 w-[14%] 2xl:w-[12%] whitespace-nowrap">
+                                    <button type="button" @click="sortBy('issue_category')" class="inline-flex items-center gap-1 cursor-pointer hover:text-text-main">
+                                        Status / Issue
+                                        <svg class="h-3 w-3 shrink-0 transition-transform" :class="sortField === 'issue_category' && sortDir === 'desc' ? 'rotate-180' : ''" :style="sortField === 'issue_category' ? '' : 'opacity:.35'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </button>
+                                </th>
                                 <th class="py-2.5 px-3 w-[20%] 2xl:w-[18%]">Pelanggan (CID &amp; Contact)</th>
-                                <th class="py-2.5 px-3 hidden 2xl:table-cell 2xl:w-[15%]">Lokasi / POP / ODP</th>
+                                <th class="py-2.5 px-3 hidden 2xl:table-cell 2xl:w-[15%]">
+                                    <button type="button" @click="sortBy('odp')" class="inline-flex items-center gap-1 cursor-pointer hover:text-text-main">
+                                        Lokasi / POP / ODP
+                                        <svg class="h-3 w-3 shrink-0 transition-transform" :class="sortField === 'odp' && sortDir === 'desc' ? 'rotate-180' : ''" :style="sortField === 'odp' ? '' : 'opacity:.35'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </button>
+                                </th>
                                 <th class="py-2.5 px-3 w-[24%] 2xl:w-[22%]">Keluhan (Detail)</th>
                                 <th class="py-2.5 px-3 text-right w-[26%] 2xl:w-[19%] whitespace-nowrap">Quick Dispatch Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-border">
-                            <template x-for="task in filteredTasks" :key="task.id">
-                                <tr class="hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors align-top group">
+                            <template x-for="task in sortedTasks" :key="task.id">
+                                <tr class="hover:bg-surface-muted/60 dark:hover:bg-slate-800/40 transition-colors align-top group"
+                                    :data-ticket-row="task.id"
+                                    :class="task.id === focusedTicketId ? 'bg-sky-50/60 dark:bg-sky-950/30 ring-1 ring-inset ring-sky-400/60' : ''">
 
                                     
                                     <td class="py-2.5 px-3">
@@ -486,6 +512,10 @@
                                             <button type="button" @click="openTicketDetail(task.id)"
                                                     class="font-mono font-extrabold text-sky-600 dark:text-sky-400 hover:underline truncate cursor-pointer text-left" x-text="task.code"></button>
                                             <span class="shrink-0 px-1.5 py-px rounded text-[9px] font-extrabold uppercase" :class="priorityBadgeClass(task.priority)" x-text="task.priority"></span>
+                                        </div>
+                                        
+                                        <div class="mt-0.5" x-show="task.sla_label">
+                                            <span class="inline-block px-1.5 py-px rounded text-[9px] font-bold border" :class="task.sla_badge_class" x-text="task.sla_label"></span>
                                         </div>
                                         <div class="mt-0.5 flex items-center gap-1 text-[10px] text-text-muted font-mono min-w-0">
                                             <svg class="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -573,13 +603,15 @@
 
             
             <div x-show="activeViewMode === 'cards'" class="space-y-2">
-                <template x-for="(task, index) in filteredTasks" :key="task.id">
+                <template x-for="(task, index) in sortedTasks" :key="task.id">
                     
                     <div class="ticket-card flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2.5 p-3 2xl:py-2.5 rounded-xl border border-l-2 border-border bg-surface hover:border-sky-500/60 hover:shadow-md transition-[transform,box-shadow,border-color,background-color] duration-200 group"
+                         :data-ticket-row="task.id"
                          :class="{
                              'border-l-rose-500': task.priority === 'Urgent',
                              'border-l-amber-500': task.priority === 'High',
                              'border-l-border': task.priority !== 'Urgent' && task.priority !== 'High',
+                             'ring-1 ring-sky-400/60 bg-sky-50/60 dark:bg-sky-950/30': task.id === focusedTicketId,
                          }"
                          :style="`animation-delay:${Math.min(index, 8) * 30}ms`">
                         
@@ -588,11 +620,11 @@
                         
                         <div @click="openTicketDetail(task.id)" role="button" tabindex="0"
                              @keydown.enter="openTicketDetail(task.id)"
-                             class="flex-1 min-w-0 cursor-pointer grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 2xl:flex 2xl:flex-row 2xl:items-center 2xl:gap-2.5">
+                             class="flex-1 min-w-0 cursor-pointer ticket-card-inner grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 2xl:flex 2xl:flex-row 2xl:items-center 2xl:gap-2.5">
 
                             
                             
-                            <div class="flex items-center gap-1.5 flex-wrap min-w-0 md:col-span-2 md:pb-2 md:border-b md:border-border/70 2xl:col-span-1 2xl:pb-0 2xl:border-b-0 2xl:shrink-0 2xl:min-w-[210px]">
+                            <div class="ticket-card-col1 flex items-center gap-1.5 flex-wrap min-w-0 md:col-span-2 md:pb-2 md:border-b md:border-border/70 2xl:col-span-1 2xl:pb-0 2xl:border-b-0 2xl:shrink-0 2xl:min-w-[210px]">
                                 <span class="text-xs font-bold font-mono text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/60 px-2 py-0.5 rounded shadow-2xs" x-text="task.code"></span>
                                 
                                 <span class="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase shrink-0"
@@ -603,6 +635,9 @@
                                     }"
                                     x-text="task.priority">
                                 </span>
+
+                                
+                                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded border shrink-0" x-show="task.sla_label" :class="task.sla_badge_class" x-text="task.sla_label"></span>
 
                                 <span class="font-semibold text-[10px] flex items-center gap-1 shrink-0 px-2 py-0.5 rounded border"
                                     :class="{
@@ -656,7 +691,7 @@
 
                             
                             
-                            <div class="min-w-0 pr-1 md:border-l md:border-border/70 md:pl-4 2xl:w-auto 2xl:flex-1 2xl:border-l-0 2xl:pl-0">
+                            <div class="ticket-card-col3 min-w-0 pr-1 md:border-l md:border-border/70 md:pl-4 2xl:w-auto 2xl:flex-1 2xl:border-l-0 2xl:pl-0">
                                 
                                 <div class="flex items-center gap-2 min-w-0">
                                     <template x-if="task.issue_category">
@@ -765,6 +800,24 @@
             actionLoadingId: null,
             refreshing: false,
 
+            // Sort kolom panel kanan (docs/plan/analisa-percepatan-alur-helpdesk-noc.md
+            // §6.1) — clientside di atas `filteredTasks`, null = urutan asli dari
+            // server (priority/SLA dulu, lihat worksheetTasks()). 'code' = Ticket ID
+            // & Time, 'issue_category' = Status/Issue, 'odp' = Lokasi/POP/ODP.
+            // Pelanggan sengaja gak sortable (keputusan user).
+            sortField: null,
+            sortDir: 'asc',
+
+            // Row yang lagi "fokus" keyboard (§6.3/§6.4) — disimpan sebagai id,
+            // BUKAN index array, biar gak "loncat" kalau ada tiket baru nyempil
+            // lewat broadcast realtime di tengah user navigasi Arrow Up/Down.
+            focusedTicketId: null,
+
+            // Arrow/C/V/B row-navigasi WAJIB nonaktif selagi drawer detail kebuka
+            // (lihat komentar di listener open-ticket-drawer/close-ticket-drawer
+            // di root elemen) — di-toggle lewat event, bukan baca DOM drawer.
+            drawerOpen: false,
+
             // Panel kanan: tabel (default) atau kartu. Disimpan di localStorage
             // sama kayak formOpen — dibaca sebelum render pertama biar gak
             // kedip ganti mode pas halaman dimuat.
@@ -827,10 +880,10 @@
 
             init() {
                 this.initEchoListeners();
-                // matchMedia, bukan listener 'resize': cuma nyala pas breakpoint
-                // beneran kelewat, gak tiap piksel geseran.
                 const narrow = window.matchMedia('(max-width: 1023px)');
-                narrow.addEventListener('change', (e) => { this.narrowViewport = e.matches; });
+                const updateNarrow = () => { this.narrowViewport = narrow.matches; };
+                narrow.addEventListener('change', updateNarrow);
+                window.addEventListener('resize', updateNarrow);
                 // Dua rAF: satu buat nunggu Alpine selesai render class awal,
                 // satu lagi buat memastikan browser sudah melukisnya sebelum
                 // properti transition dipasang.
@@ -954,6 +1007,10 @@
              * tickets.detail-json; halaman ini cuma ngasih id.
              */
             openTicketDetail(id) {
+                // Klik mouse & Enter (row focus keyboard) sama-sama lewat sini —
+                // sinkronin focusedTicketId biar highlight row selalu ngikutin
+                // detail yang lagi dibuka, gak peduli dibuka lewat mouse atau keyboard.
+                this.focusedTicketId = id;
                 window.dispatchEvent(new CustomEvent('open-ticket-drawer', { detail: { id } }));
             },
 
@@ -1105,17 +1162,113 @@
 
                     if (q) {
                         const code = (t.code || '').toLowerCase();
-                        const name = (t.customer?.name || '').toLowerCase();
-                        const cid = (t.customer?.cid || '').toLowerCase();
-                        const village = (t.customer?.village || '').toLowerCase();
+                        const name = (t.customer_name || t.customer?.name || '').toLowerCase();
+                        const cid = (t.cid || t.customer?.cid || '').toLowerCase();
+                        const phone = (t.customer_phone || t.phone || '').toLowerCase();
+                        const address = (t.address || t.customer?.village || '').toLowerCase();
+                        const pop = (t.pop || '').toLowerCase();
+                        const odp = (t.odp || '').toLowerCase();
                         const title = (t.title || '').toLowerCase();
                         const desc = (t.desc || '').toLowerCase();
 
-                        return code.includes(q) || name.includes(q) || cid.includes(q) || village.includes(q) || title.includes(q) || desc.includes(q);
+                        return code.includes(q) || name.includes(q) || cid.includes(q) || phone.includes(q) || address.includes(q) || pop.includes(q) || odp.includes(q) || title.includes(q) || desc.includes(q);
                     }
 
                     return true;
                 });
+            },
+
+            /**
+             * `filteredTasks` + sort manual (§6.1) — dipisah dari filteredTasks
+             * biar count/empty-state di tempat lain (gak peduli urutan) tetap
+             * baca filteredTasks apa adanya, cuma dua x-for (tabel & kartu) yang
+             * pakai getter ini.
+             */
+            get sortedTasks() {
+                if (! this.sortField) {
+                    return this.filteredTasks;
+                }
+
+                const field = this.sortField;
+                const dir = this.sortDir === 'desc' ? -1 : 1;
+
+                return [...this.filteredTasks].sort((a, b) => {
+                    const av = (a[field] || '').toString().toLowerCase();
+                    const bv = (b[field] || '').toString().toLowerCase();
+
+                    if (av < bv) return -1 * dir;
+                    if (av > bv) return 1 * dir;
+
+                    return 0;
+                });
+            },
+
+            /**
+             * Klik header kolom — sama kolom kepencet lagi → toggle ASC/DESC,
+             * kolom lain → pindah sort, mulai dari ASC. Manual sort OVERRIDE
+             * default urutan priority/SLA dari server sampai user ganti tab
+             * atau reload halaman (§6.1).
+             */
+            sortBy(field) {
+                if (this.sortField === field) {
+                    this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.sortField = field;
+                    this.sortDir = 'asc';
+                }
+            },
+
+            /**
+             * Index row yang lagi fokus di `sortedTasks` (BUKAN filteredTasks —
+             * navigasi jalan di urutan yang KELIATAN user, ngikut sort manual
+             * kalau lagi aktif). -1 kalau gak ada yang fokus / tiketnya udah
+             * hilang dari daftar (mis. abis di-close).
+             */
+            get focusedRowIndex() {
+                return this.sortedTasks.findIndex(t => t.id === this.focusedTicketId);
+            },
+
+            /**
+             * Arrow Up/Down (§6.3) — gerak fokus antar row, clamp di ujung
+             * (gak wrap-around), scroll row ke viewport kalau kegeser keluar.
+             */
+            moveRowFocus(delta) {
+                const list = this.sortedTasks;
+                if (list.length === 0) return;
+
+                const current = this.focusedRowIndex;
+                const next = current === -1 ? 0 : Math.min(Math.max(current + delta, 0), list.length - 1);
+
+                this.focusedTicketId = list[next].id;
+
+                this.$nextTick(() => {
+                    document.querySelector(`[data-ticket-row="${this.focusedTicketId}"]`)
+                        ?.scrollIntoView({ block: 'nearest' });
+                });
+            },
+
+            focusFirstRow() {
+                this.focusedTicketId = this.sortedTasks[0]?.id ?? null;
+            },
+
+            /**
+             * Ganti tab Ticket/Assign NOC/Assign FOP — dipakai klik tombol tab
+             * MAUPUN Arrow Left/Right (switchTabByDelta di bawah). Ganti tab
+             * = isi `filteredTasks` beda total, jadi fokus row WAJIB direset ke
+             * baris pertama (dikonfirmasi user, §6.3) — index lama gak nyambung
+             * ke tiket yang sama di tab baru.
+             */
+            setTab(value) {
+                this.taskFilter = value;
+                this.focusFirstRow();
+            },
+
+            switchTabByDelta(delta) {
+                const values = this.tabs.map(t => t.value);
+                const current = values.indexOf(this.taskFilter);
+                const next = Math.min(Math.max(current + delta, 0), values.length - 1);
+
+                this.setTab(values[next]);
             },
 
             // Tiket open milik customer terpilih (masuk/diproses) — bantu Helpdesk
@@ -1214,11 +1367,86 @@
                 // "N" buka/lipat panel form — cuma waktu fokus TIDAK di field
                 // input, biar gak ketelan waktu user lagi ngetik keluhan.
                 if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                    const tag = (e.target.tagName || '').toLowerCase();
-                    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+                    if (this.isTypingTarget(e)) return;
                     e.preventDefault();
                     this.setFormOpen(!this.formOpen);
+                    return;
                 }
+
+                // Row-navigasi panel kanan (docs/plan/analisa-percepatan-alur-helpdesk-noc.md
+                // §6.3/§6.4) — Arrow Up/Down gerak fokus antar row, Arrow Left/Right
+                // ganti tab (reset fokus ke row pertama), Enter buka drawer,
+                // C/V/B dispatch aksi row yang fokus (modal konfirmasi TETAP
+                // muncul, tombol Quick Dispatch existing gak disentuh/dihapus —
+                // ini jalur TAMBAHAN, bukan pengganti). Semua nonaktif kalau
+                // fokus lagi di input/textarea/select ATAU drawer detail kebuka
+                // (drawer punya navigasi/scroll sendiri).
+                if (this.isTypingTarget(e) || this.drawerOpen || e.ctrlKey || e.metaKey || e.altKey) {
+                    return;
+                }
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.moveRowFocus(1);
+                    return;
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.moveRowFocus(-1);
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    this.switchTabByDelta(1);
+                    return;
+                }
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    this.switchTabByDelta(-1);
+                    return;
+                }
+
+                const focusedTask = this.sortedTasks.find(t => t.id === this.focusedTicketId);
+                if (! focusedTask) return;
+
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.openTicketDetail(focusedTask.id);
+                    return;
+                }
+                // C/V/B cuma nembak kalau aksinya emang kebuka buat tiket ini
+                // (`task.actions` — sumber yang sama persis dipakai gerbang
+                // tombol Quick Dispatch, lihat Ticket::actionFlagsFor()) — biar
+                // gak ada jalur belakang yang lolosin aksi yang mestinya
+                // ke-disable.
+                if (e.key === 'c' || e.key === 'C') {
+                    if (!focusedTask.actions?.can_close) return;
+                    e.preventDefault();
+                    this.closeTicket(focusedTask);
+                    return;
+                }
+                if (e.key === 'v' || e.key === 'V') {
+                    if (!focusedTask.actions?.can_escalate_noc) return;
+                    e.preventDefault();
+                    this.escalateTicket(focusedTask, 'noc');
+                    return;
+                }
+                if (e.key === 'b' || e.key === 'B') {
+                    if (!focusedTask.actions?.can_escalate_fop) return;
+                    e.preventDefault();
+                    this.escalateTicket(focusedTask, 'fop');
+                }
+            },
+
+            /**
+             * True kalau target event ini field yang nerima ketikan —
+             * dipakai SEMUA shortcut (N, Arrow, C/V/B) biar gak ke-hijack
+             * waktu user lagi ngetik di search box / textarea keluhan / dsb.
+             */
+            isTypingTarget(e) {
+                const tag = (e.target.tagName || '').toLowerCase();
+
+                return tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
             },
 
             async submitForm() {

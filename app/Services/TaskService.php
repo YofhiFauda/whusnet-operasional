@@ -34,7 +34,7 @@ class TaskService
      */
     public function create(array $data, User $actor): Task
     {
-        return DB::transaction(function () use ($data, $actor) {
+        $task = DB::transaction(function () use ($data, $actor) {
             $taskType = TaskType::from($data['task_type']);
 
             $memberIds = $data['team_member_ids'] ?? [];
@@ -68,15 +68,21 @@ class TaskService
                 ]);
             }
 
-            // Kirim notifikasi async ke semua anggota tim
-            if (! empty($memberIds)) {
-                $this->notifyTeam($task, 'Task baru dijadwalkan untuk Anda', 'created');
-            }
-
             AuditLog::log($task, 'created', null, $task->toArray());
 
             return $task->refresh();
         });
+
+        // Broadcast SETELAH transaction commit — TaskScheduled dipicu Reverb hampir
+        // instan, dan listener frontend langsung fetch() partial task lewat request
+        // HTTP baru (koneksi DB terpisah). Kalau broadcast masih di dalam transaction
+        // yang belum commit, request itu gak akan pernah nemu row-nya (404 diam-diam,
+        // fetchCard() cuma console.warn) — kartu gak pernah muncul tanpa reload manual.
+        if (! empty($data['team_member_ids'])) {
+            $this->notifyTeam($task, 'Task baru dijadwalkan untuk Anda', 'created');
+        }
+
+        return $task;
     }
 
     /**
@@ -84,18 +90,33 @@ class TaskService
      */
     public function update(Task $task, array $data, User $actor): Task
     {
-        return DB::transaction(function () use ($task, $data, $actor) {
+        $rescheduled = false;
+        $teamChanged = false;
+        $droppedIds = [];
+
+        $task = DB::transaction(function () use ($task, $data, $actor, &$rescheduled, &$teamChanged, &$droppedIds) {
             $oldValues = $task->toArray();
 
             $rescheduled = isset($data['scheduled_at'])
                 && $task->scheduled_at?->ne(Carbon::parse($data['scheduled_at']));
 
+            // Ambil roster lama SEBELUM disync ulang — dipakai buat deteksi
+            // teknisi yang di-drop, yang gak akan pernah ke-notify lewat
+            // notifyTeam() karena method itu iterasi tim BARU.
+            $oldMemberIds = isset($data['team_member_ids'])
+                ? $task->teamMembers()->pluck('user_id')->all()
+                : [];
+
             $task->update(array_merge($data, ['updated_by' => $actor->id]));
 
             // Update tim jika dikirim
             if (isset($data['team_member_ids'])) {
+                $newMemberIds = $data['team_member_ids'];
+                $droppedIds = array_values(array_diff($oldMemberIds, $newMemberIds));
+                $teamChanged = count($droppedIds) > 0 || count(array_diff($newMemberIds, $oldMemberIds)) > 0;
+
                 $task->teamMembers()->delete();
-                foreach ($data['team_member_ids'] as $index => $userId) {
+                foreach ($newMemberIds as $index => $userId) {
                     TaskTeam::create([
                         'task_id' => $task->id,
                         'user_id' => $userId,
@@ -104,16 +125,27 @@ class TaskService
                 }
             }
 
-            if ($rescheduled) {
-                $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled');
-            }
-
             AuditLog::log($task, 'updated', $oldValues, $task->toArray());
 
             $this->syncToFopTask($task);
 
             return $task->refresh();
         });
+
+        // Broadcast SETELAH transaction commit — lihat komentar sama di create().
+        // Kalau masih di dalam closure, listener frontend bisa fetch partial
+        // sebelum row ke-commit dan kartu gak pernah muncul tanpa reload.
+        if ($rescheduled) {
+            $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled');
+        } elseif ($teamChanged) {
+            $this->notifyTeam($task, 'Tim task Anda diperbarui.', 'team_changed');
+        }
+
+        if (! empty($droppedIds)) {
+            $this->notifyDroppedMembers($task, $droppedIds);
+        }
+
+        return $task;
     }
 
     // ─── Transisi Status ─────────────────────────────────────────
@@ -289,8 +321,6 @@ class TaskService
             'Task yang sudah selesai atau dibatalkan tidak bisa dibatalkan lagi.'
         );
 
-        $wasInProgress = $task->status === TaskStatus::IN_PROGRESS;
-
         $task->update([
             'status' => TaskStatus::DIBATALKAN->value,
             'cancelled_at' => now(),
@@ -300,12 +330,11 @@ class TaskService
 
         AuditLog::log($task, 'cancelled', ['status' => $task->getOriginal('status')], ['status' => TaskStatus::DIBATALKAN->value, 'cancel_reason' => $reason]);
 
-        // Task 12 — teknisi yang lagi ngerjain (in_progress) harus tau begitu
-        // task-nya dibatalkan dari atas, gak cukup cuma keliatan diam-diam ilang
-        // dari /tasks-saya.
-        if ($wasInProgress) {
-            $this->notifyTeam($task, "Task dibatalkan: {$reason}", 'cancelled');
-        }
+        // Teknisi harus tau begitu task-nya dibatalkan dari atas — baik yang lagi
+        // in_progress maupun yang masih terjadwal belum mulai, gak cukup cuma
+        // keliatan diam-diam ilang dari /tasks-saya (sebelumnya cuma di-notify
+        // kalau in_progress, task terjadwal yang dibatalkan jadi kartu basi).
+        $this->notifyTeam($task, "Task dibatalkan: {$reason}", 'cancelled');
 
         return $task->refresh();
     }
@@ -505,25 +534,62 @@ class TaskService
 
     private function notifyTeam(Task $task, string $message, string $eventType = 'created'): void
     {
-        $members = $task->teamMembers()->with('user')->get();
-        $url = route('tasks.show', $task->id);
+        // afterCommit(), bukan langsung — caller di controller (mis. FopTaskController::
+        // store()/update()/assignToTeam()) sering manggil method ini dari DALAM
+        // transaction milik MEREKA sendiri (nested/savepoint). broadcast(TaskScheduled)
+        // yang lolos sebelum COMMIT terluar bikin race: Reverb push ke frontend nyaris
+        // instan, listener langsung fetch() partial task via request HTTP baru (koneksi
+        // DB lain) yang belum bisa lihat row-nya — kartu gak pernah muncul tanpa reload
+        // manual. afterCommit() aman dipanggil di luar transaction juga (jalan langsung).
+        DB::afterCommit(function () use ($task, $message, $eventType) {
+            $members = $task->teamMembers()->with('user')->get();
+            $url = route('tasks.show', $task->id);
 
-        foreach ($members as $member) {
-            if ($member->user) {
-                // Send in-app notification + broadcast
-                $member->user->notify(new AppNotification(
-                    title: 'Update Task: '.$task->task_number,
-                    message: $message,
-                    actionUrl: $url,
-                    type: $eventType === 'cancelled' || $eventType === 'rejected' ? NotificationType::ERROR : NotificationType::INFO
-                ));
+            foreach ($members as $member) {
+                if ($member->user) {
+                    // Send in-app notification + broadcast
+                    $member->user->notify(new AppNotification(
+                        title: 'Update Task: '.$task->task_number,
+                        message: $message,
+                        actionUrl: $url,
+                        type: $eventType === 'cancelled' || $eventType === 'rejected' ? NotificationType::ERROR : NotificationType::INFO
+                    ));
 
-                // Optional: keep Telegram if already setup
-                SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+                    // Optional: keep Telegram if already setup
+                    SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+                }
             }
-        }
 
-        broadcast(new TaskScheduled($task, $eventType));
+            broadcast(new TaskScheduled($task, $eventType));
+        });
+    }
+
+    /**
+     * Broadcast 'removed' ke teknisi yang baru saja di-drop dari tim task.
+     * Gak bisa lewat notifyTeam() biasa — method itu iterasi $task->teamMembers
+     * (tim BARU), sedangkan dropped user udah gak ada di situ begitu dipanggil.
+     * TaskScheduled::broadcastOn() jadi butuh target user id eksplisit di sini.
+     *
+     * @param  array<int>  $droppedUserIds
+     */
+    private function notifyDroppedMembers(Task $task, array $droppedUserIds): void
+    {
+        // Sama alasan afterCommit() seperti notifyTeam() di atas.
+        DB::afterCommit(function () use ($task, $droppedUserIds) {
+            $users = User::whereIn('id', $droppedUserIds)->get();
+            $url = route('tasks.show', $task->id);
+
+            foreach ($users as $user) {
+                $user->notify(new AppNotification(
+                    title: 'Task Dilepas: '.$task->task_number,
+                    message: 'Anda tidak lagi ditugaskan pada task ini.',
+                    actionUrl: $url,
+                    type: NotificationType::INFO
+                ));
+            }
+
+            broadcast(new TaskScheduled($task, 'removed', $droppedUserIds));
+        });
     }
 
     /**

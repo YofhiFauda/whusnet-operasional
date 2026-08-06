@@ -14,6 +14,7 @@ use App\Models\Customer;
 use App\Models\CustomerDevice;
 use App\Models\FopTask;
 use App\Models\Ticket;
+use App\Models\TicketIssueCategory;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -77,13 +78,26 @@ class TicketService
             $ticket->customer_id = $customer->id;
             $ticket->pop_id = $customer->pop_id;
             $this->snapshotCustomer($ticket, $customer);
-            $ticket->issue_category_id = $data['issue_category_id'] ?? null;
+            $issueCategory = ! empty($data['issue_category_id'])
+                ? TicketIssueCategory::find($data['issue_category_id'])
+                : null;
+
+            $ticket->issue_category_id = $issueCategory?->id;
             $ticket->detail_keluhan = $data['detail_keluhan'];
             $ticket->catatan_teknis = $data['catatan_teknis'] ?? null;
             $ticket->priority = $data['priority'];
             $ticket->created_by = $actor->id;
             $ticket->handler = TicketHandler::HELPDESK;
             $ticket->status = TicketHandlingStatus::OPEN;
+
+            // Handling SLA — snapshot SEKALI di titik tiket lahir, anchor
+            // created_at (lihat Ticket::slaDeadline()). Dihitung di sini
+            // (bukan nunggu FopTask kebentuk) supaya tiket yang gak pernah
+            // dieskalasi ke FOP (ditutup langsung Helpdesk/NOC) tetap punya
+            // target SLA — lihat docs/plan/analisa-target-sla-ticketing.md.
+            $ticket->sla_hours = $this->resolveSlaHours($type, $ticket->priority, $customer, $issueCategory);
+            $ticket->sla_deadline_at = now()->addHours($ticket->sla_hours);
+
             $ticket->save();
 
             $conflicts = [];
@@ -474,6 +488,27 @@ class TicketService
     }
 
     /**
+     * Resolusi Handling SLA (jam) buat tiket — dua jalur, dipilih lewat
+     * `TicketIssueCategory::sla_source` (mengaktifkan opsi "Prioritas" yang
+     * sebelumnya cuma teks info di form, gak pernah dibaca backend, lihat
+     * docs/plan/analisa-target-sla-ticketing.md §3):
+     *   - 'prioritas' → FopTaskPriority::slaHours(), matrix tetap per level.
+     *   - 'paket' (atau kategori kosong/legacy) → InternetPackage::getHandlingSla(),
+     *     fallback TaskType::defaultHandlingSlaHours() kalau pelanggan gak
+     *     punya paket / paket belum diatur di Master Timeline SLA.
+     * Sengaja mirror persis logic `FopTask::booted()` buat jalur paket, biar
+     * dua tempat itu gak diam-diam menyimpang.
+     */
+    private function resolveSlaHours(TaskType $type, FopTaskPriority $priority, Customer $customer, ?TicketIssueCategory $issueCategory): int
+    {
+        if ($issueCategory?->sla_source === 'prioritas') {
+            return $priority->slaHours();
+        }
+
+        return $customer->internetPackage?->getHandlingSla($type) ?? $type->defaultHandlingSlaHours();
+    }
+
+    /**
      * Bekukan data pelanggan ke kolom ticket saat itu juga (lihat rationale
      * di migration 2026_07_24_000001). ODP: prioritaskan denormalisasi di
      * customers.odp_code, fallback ke customer_devices.odp kalau kosong —
@@ -539,6 +574,13 @@ class TicketService
         $fopTask->notes = $this->composeFopNotes($ticket, $actor);
         $fopTask->status = TaskStatus::DRAFT;
         $fopTask->priority = $ticket->priority;
+        // Warisi SLA yang udah disnapshot di titik tiket lahir (TicketService::
+        // create()) — BUKAN biarin FopTask::booted() hitung ulang dari paket.
+        // Clock-nya satu, gak reset di titik handoff Ticketing → FOP. Fallback
+        // ke logic lama cuma buat tiket peninggalan sebelum kolom ini ada
+        // (sla_hours null).
+        $fopTask->handling_sla_hours = $ticket->sla_hours
+            ?? ($customer->internetPackage?->getHandlingSla($ticket->type) ?? $ticket->type->defaultHandlingSlaHours());
         $fopTask->save();
 
         if (class_exists(AuditLog::class)) {

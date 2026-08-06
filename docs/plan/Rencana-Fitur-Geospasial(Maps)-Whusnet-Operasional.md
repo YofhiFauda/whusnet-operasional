@@ -1,3 +1,5 @@
+# BELUM DI IMPLEMENTASIKAN
+
 # Rencana: Fitur Geospasial (Maps) Whusnet Operasional
 
 ## Context
@@ -159,6 +161,69 @@ Yang **dipakai ulang**, bukan dibuat baru: `EffectiveAccessService::getAllowedPo
 6. Mobile: buka `/tasks/own` di HP lewat tunnel HTTPS, tekan Mulai Task tanpa memberi izin lokasi → task **harus tetap bisa dimulai**.
 7. Regresi: `php artisan test --compact` penuh setelah Fase 0.2 (menyentuh 7 view + accessor yang dipakai lintas modul).
 8. `vendor/bin/pint` sebelum commit.
+
+## Optimasi Performa Peta
+
+Analisa terpisah — **belum ada kode peta sama sekali** (Fase 0-5 di atas masih rencana), jadi ini bukan optimasi peta yang sudah jalan, melainkan **batasan wajib** yang harus masuk ke desain Fase 2-4 sejak awal. Optimasi peta yang ditempel belakangan selalu lebih mahal daripada dirancang sejak awal — terutama untuk load kartu SIM 3G/4G pedesaan yang dipakai teknisi.
+
+Definisi "ringan" dipakukan jadi angka, supaya tidak subjektif:
+
+| Metrik | Target |
+|---|---|
+| Time-to-interactive peta pertama kali dibuka | < 2 detik di koneksi 4G pedesaan (~1.5 Mbps) |
+| Payload GeoJSON per request | < 200 KB, hard cap **500 titik/respons** |
+| JS tambahan (Leaflet + plugin), gzip | ~70-90 KB, **hanya** di halaman berpeta |
+| Request tile per aksi pan/zoom | dibatasi `minZoom`/`maxZoom`/`maxBounds`, bukan tak terbatas |
+| Instance `L.map()` hidup bersamaan per halaman | tepat 1 — tidak boleh re-init diam-diam |
+
+### Risiko baru yang ditemukan — bentrok dengan pola realtime yang sudah ada
+
+`resources/views/fop/dashboard.blade.php:709-719` mendengar 6 event Echo lalu memanggil `refreshDashboardContainers()` — **full HTML replace** pada container. Fase 4 rencananya menaruh panel peta *di dalam* papan yang sama. Kalau container itu ikut ter-replace tiap broadcast (`TaskStarted`, `TaskCompleted`, dst — bisa beberapa kali/menit saat jam sibuk), Leaflet akan **re-init di atas DOM node yang sama** → error "Map container is already initialized", atau paling ringan: peta kedip, posisi pan/zoom user hilang tiap ada teknisi lain menyelesaikan task. Ini bukan risiko teoretis — pola `refreshDashboardContainers()` sudah ada dan sudah dipakai untuk container non-peta.
+
+**Wajib:** panel peta ditaruh di container yang **dikecualikan** dari `refreshDashboardContainers()`. Update data peta lewat event listener terpisah yang mem-patch marker (tambah/gerak/hapus titik), bukan re-render container.
+
+### Teknik, per lapisan
+
+**Data & network**
+
+| Teknik | Dampak | Risiko | Efektif? |
+|---|---|---|---|
+| Fetch berbasis viewport (bbox), bukan "semua titik" | Terbesar — payload turun dari puluhan ribu ke ratusan baris | Query bbox lewat `moveend`, harus di-debounce (lihat bawah) | Ya, wajib — sudah tercantum di Fase 3 sebagai bbox param, sekarang dikunci sebagai keharusan bukan opsi |
+| Debounce `moveend`/`zoomend` 300-500ms sebelum fetch | Mencegah request beruntun saat user drag/scroll peta | Terlalu lama (>800ms) terasa lag saat cari lokasi | Ya |
+| Cap keras 500 titik/respons; di atas itu server kembalikan **agregat grid**, bukan potong data diam-diam | Payload & waktu render marker terkendali di zoom rendah (lihat POP/kota) | Butuh 1 query tambahan `GROUP BY ROUND(lat,2), ROUND(lng,2)` — murah, tanpa index spasial | Ya |
+| Cache Redis per (bbox dibulatkan + zoom + scope POP), TTL 30-60 detik | Banyak user melihat area sama (mis. semua Helpdesk lihat Jetis) berbagi 1 query DB | Kalau data berubah (pin baru), user lain lihat data 30-60 detik basi — dapat diterima untuk peta operasional, **tidak** untuk map picker (harus selalu real-time) | Ya, khusus peta agregat (Fase 3/4). Redis sudah aktif (`CACHE_STORE=redis`), tinggal pakai |
+| Index komposit `(latitude, longitude)`, **bukan** tipe `POINT`/`SPATIAL INDEX` MySQL asli | Cukup untuk query `BETWEEN` bbox di skala ≤20.000 baris | Tipe geometry asli mempercepat query radius sungguhan, tapi **sqlite test suite tidak mendukungnya** — pecah paritas test (`RefreshDatabase` + sqlite `:memory:` di CLAUDE.md) | Ya untuk skala sekarang. Kalau nanti >100rb baris atau query radius jadi sering, baru pertimbangkan spatial index (perlu keputusan test-strategy terpisah) |
+| `Cache-Control`/`ETag` di endpoint GeoJSON | Pan balik ke area yang sama (umum — user geser lalu geser balik) tak perlu transfer ulang | Minor — perlu invalidasi saat data POP/customer berubah | Ya, murah dipasang |
+
+**Render**
+
+| Teknik | Dampak | Risiko | Efektif? |
+|---|---|---|---|
+| Marker clustering (`Leaflet.markercluster`, client-side, dari subset hasil bbox) | Ratusan marker jadi belasan cluster bubble — DOM node turun drastis, krusial di HP kelas bawah | +~30KB gzip; clustering ulang tiap pan bisa berat kalau data besar — batasi karena input sudah dibatasi 500 titik oleh cap di atas | Ya |
+| `preferCanvas: true` di Leaflet (render marker via canvas, bukan DOM/SVG per marker) | DOM node untuk peta turun dari O(n) jadi O(1) — dampak besar di WebView Android murah | Popup/interaksi custom sedikit lebih rumit dari mode SVG default | Ya, terutama untuk peta task FOP yang dilihat teknisi |
+| `divIcon`/SVG inline untuk marker, bukan PNG bawaan Leaflet | Hilangkan 2 HTTP request per halaman (`marker-icon.png`, `shadow.png`), dan mudah ganti warna sesuai status/tim/dark-mode tanpa asset terpisah | Perlu sedikit CSS tambahan | Ya, dan sekalian memenuhi syarat dark-mode Fase 2.1 yang sudah direncanakan |
+| Lazy-init: `L.map()` dibuat saat panel peta **dibuka** (mis. `x-init` saat `x-show` pertama true di panel FOP), bukan saat halaman dimuat | Mayoritas kunjungan ke `/fop-tasks` mungkin tak pernah buka panel peta — kalau begitu, biaya peta = nol | Sedikit kompleksitas state Alpine (`mapInitialized` flag) | Ya, murah dan besar dampaknya karena panel Fase 4 memang direncanakan collapsible |
+| `maxBounds` dikunci ke wilayah operasional (mis. Jawa Timur), `minZoom` dinaikkan | Mencegah user tak sengaja zoom-out ke peta dunia → ratusan tile OSM diminta sekaligus | Perlu ditentukan bounding box per instalasi (beda kalau ekspansi ke provinsi lain) | Ya |
+
+**Bundle & load**
+
+| Teknik | Dampak | Risiko | Efektif? |
+|---|---|---|---|
+| Leaflet di entry point terpisah (`resources/js/map.js`), **bukan** `app.js` global | Halaman yang tak berpeta (mayoritas — billing, RBAC, dll) tak menanggung ~90KB tambahan | Sudah diputuskan di Fase 2.1, dikonfirmasi ulang di sini sebagai syarat performa, bukan cuma kerapian kode | Ya — sudah di plan, tetap dicatat karena ini fondasi semua optimasi render di atas |
+| Import Leaflet dari npm (bukan CDN) supaya CSS ikut pipeline Tailwind `@source` | Satu request lebih sedikit (tak nunggu CDN terpisah), cache busting otomatis ikut Vite manifest | Tidak ada | Ya — sudah di plan |
+
+### Yang sengaja TIDAK dikerjakan (dan kenapa)
+
+- **Self-hosted tile server/proxy cache** — solusi nyata untuk beban tile tinggi, tapi infrastruktur tambahan (tile cache server, storage) tidak sepadan untuk ~10 user internal. OSM tile langsung masih dalam batas wajar policy mereka di skala ini. Revisit kalau jumlah user berpeta jadi puluhan/​ratusan bersamaan.
+- **PostGIS / MySQL SPATIAL INDEX sungguhan** — lihat baris index komposit di atas: ditunda karena memecah paritas sqlite-test, dan komposit btree sudah cukup di skala data proyek ini (~2rb sekarang, target 20rb).
+- **Server-side clustering pakai library berat (mis. Turf.js di Node/queue)** — grid-bucket `GROUP BY ROUND()` di query yang sama jauh lebih murah dan tak butuh infrastruktur baru, cukup untuk kebutuhan "banyak titik jadi sedikit cluster di zoom rendah".
+- **Service worker / cache offline peta** — di luar scope rencana utama (lihat "Di luar scope rencana ini" di atas); kalau nanti dikerjakan, baru relevan menyusun strategi cache tile offline.
+
+### Yang ditambahkan ke tiap fase (bukan fase baru)
+
+- **Fase 2.1** (komponen `<x-map>`): tambah prop `clustered`, `preferCanvas`, `maxBounds`/`minZoom`, gunakan `divIcon`. Lazy-init lewat `x-init`+flag saat dipakai di panel collapsible.
+- **Fase 3** (endpoint GeoJSON): bbox **wajib** (bukan opsional), cap 500 + fallback agregat grid, cache Redis TTL 30-60s dengan key termasuk hash scope POP, header cache HTTP.
+- **Fase 4** (peta task FOP): panel map **di luar** container yang di-refresh `refreshDashboardContainers()`; listener Echo untuk peta mem-patch marker per event, bukan re-render.
 
 ## Catatan proses
 

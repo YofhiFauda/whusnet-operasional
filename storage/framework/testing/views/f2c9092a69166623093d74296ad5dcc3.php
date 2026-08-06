@@ -70,6 +70,43 @@
                     <span>•</span>
                     <span class="font-medium text-text-secondary"><?php echo e($ticket->pop->name ?? '—'); ?></span>
                 </div>
+
+                
+                <?php if($ticket->slaDeadline()): ?>
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="font-semibold text-text-secondary">Target SLA:</span>
+                        <?php if(! $ticket->resolved_at && $ticket->handler !== \App\Enums\TicketHandler::FOP): ?>
+                            <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => $ticket->slaDeadline()->toIso8601String(),'totalSeconds' => $ticket->slaTotalSeconds(),'label' => 'Sisa Handling SLA']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('countdown-timer'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['deadline' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($ticket->slaDeadline()->toIso8601String()),'total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($ticket->slaTotalSeconds()),'label' => 'Sisa Handling SLA']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $attributes = $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
+<?php $component = $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5; ?>
+<?php unset($__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5); ?>
+<?php endif; ?>
+                        <?php else: ?>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded border <?php echo e($ticket->slaBadgeClasses()); ?>">
+                                <?php echo e($ticket->slaBadgeLabel()); ?>
+
+                            </span>
+                            <?php if($ticket->handler === \App\Enums\TicketHandler::FOP): ?>
+                                <span class="text-[10px] text-text-muted">(diteruskan ke FOP — SLA lanjut di Task FOP)</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
             

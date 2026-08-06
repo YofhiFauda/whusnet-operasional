@@ -1,3 +1,5 @@
+# BELUM DI IMPLEMENTASIKAN
+
 # Analisa Dashboard Owner — Statistik Pelanggan, Ticketing, FOP Task, Pembayaran, Penagihan
 
 Status: **Analisa awal, belum eksekusi.** Belum masuk sprint aktif — perlu entry task baru di `docs/TASKS.md` sebelum dikerjakan.

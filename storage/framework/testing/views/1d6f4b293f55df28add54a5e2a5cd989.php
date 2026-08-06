@@ -1,7 +1,7 @@
 <?php $__env->startSection('title', 'Task Saya'); ?>
 
 <?php $__env->startSection('content'); ?>
-<div x-data="{}" class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+<div x-data="technicianNotifier()" class="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
     
     <div class="flex items-center justify-between">
@@ -21,47 +21,6 @@
             <p class="text-2xl font-bold font-mono text-text-main leading-none"><?php echo e($tasks->count()); ?></p>
             <p class="text-[11px] text-text-muted">task hari ini</p>
         </div>
-    </div>
-
-    
-    
-    <div x-data="technicianNotifier()"
-         x-show="banner.visible"
-         x-cloak
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 -translate-y-3"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 -translate-y-3"
-         class="flex items-start gap-3 px-4 py-3 rounded-lg border shadow-md cursor-pointer"
-         style="background:var(--color-primary-soft,#eff6ff); border-color:var(--color-primary-border,#93c5fd); color:var(--color-primary,#2563eb)"
-         @click="scrollToCard()"
-         id="task-notification-banner"
-         role="alert"
-         aria-live="polite">
-
-        
-        <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-
-        <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold leading-tight" x-text="banner.title"></p>
-            <p class="text-xs mt-0.5 opacity-80" x-text="banner.subtitle"></p>
-            <p class="text-[11px] mt-1 opacity-60">Klik banner ini untuk melihat task baru &darr;</p>
-        </div>
-
-        
-        <button @click.stop="dismissBanner()"
-                class="shrink-0 p-1 rounded hover:opacity-70 transition-opacity"
-                title="Tutup notifikasi"
-                aria-label="Tutup notifikasi">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
     </div>
 
     
@@ -401,14 +360,6 @@
  */
 function technicianNotifier() {
     return {
-        banner: {
-            visible: false,
-            title: '',
-            subtitle: '',
-            taskId: null,
-        },
-        dismissTimer: null,
-
         init() {
             const userId = <?php echo e(auth()->id()); ?>;
 
@@ -439,54 +390,49 @@ function technicianNotifier() {
         },
 
         handleTaskScheduled(event) {
-            // Hitung jadwal yang tampil di banner
             let jadwalLabel = '';
             if (event.scheduled_at) {
                 const dt = new Date(event.scheduled_at);
-                // Format: YYYY-MM-DD HH:mm (sederhana, tanpa dependency locale)
                 const pad = (n) => String(n).padStart(2, '0');
                 jadwalLabel = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
             }
 
-            // Teks banner berbeda berdasarkan konteks event
-            const isRescheduled = event.event_type === 'rescheduled';
-            this.banner.title    = isRescheduled
-                ? `Jadwal diperbarui: ${event.title}`
-                : `Task baru ditugaskan: ${event.title}`;
-            this.banner.subtitle = jadwalLabel ? `Jadwal: ${jadwalLabel}` : '';
-            this.banner.taskId   = event.id;
-            this.banner.visible  = true;
+            const isRefresh = event.event_type === 'rescheduled' || event.event_type === 'team_changed';
+            const isRemoval = event.event_type === 'removed' || event.event_type === 'cancelled';
 
-            // Auto-dismiss setelah 10 detik
-            clearTimeout(this.dismissTimer);
-            this.dismissTimer = setTimeout(() => this.dismissBanner(), 10000);
+            const toastType = isRemoval ? 'warning' : (isRefresh ? 'info' : 'success');
+            const toastTitle = isRemoval
+                ? 'Task Dibatalkan / Dipindahkan'
+                : (isRefresh ? 'Jadwal Task Diperbarui' : 'Task Baru Ditugaskan');
+            const toastDesc = `${event.title}` + (!isRemoval && jadwalLabel ? ` • Jadwal: ${jadwalLabel}` : '');
 
-            // 'created' → card belum ada, inject baru. 'rescheduled' → card
-            // biasanya udah ada di DOM tapi jadwalnya basi, refetch & ganti di
-            // tempat (refreshTaskCard nangani juga kalau ternyata belum ada).
-            if (isRescheduled) {
+            // Tampilkan notifikasi melayang menggunakan Komponen Toast Global
+            if (window.Toast) {
+                window.Toast.show(toastType, toastTitle, toastDesc, 8000);
+            }
+
+            if (isRemoval) {
+                this.removeTaskCard(event.id);
+            } else if (isRefresh) {
                 this.refreshTaskCard(event.id);
+                this.scrollToCard(event.id);
             } else {
                 this.injectTaskCard(event.id);
+                this.scrollToCard(event.id);
             }
         },
 
-        dismissBanner() {
-            this.banner.visible = false;
-            clearTimeout(this.dismissTimer);
-        },
-
-        scrollToCard() {
-            if (!this.banner.taskId) return;
-            const card = document.getElementById(`task-card-${this.banner.taskId}`);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Highlight card sebentar
-                card.style.transition = 'box-shadow 0.3s';
-                card.style.boxShadow = '0 0 0 3px var(--color-primary, #2563eb)';
-                setTimeout(() => { card.style.boxShadow = ''; }, 2000);
-            }
-            this.dismissBanner();
+        scrollToCard(taskId) {
+            if (!taskId) return;
+            setTimeout(() => {
+                const card = document.getElementById(`task-card-${taskId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.transition = 'box-shadow 0.3s, border-color 0.3s';
+                    card.style.boxShadow = '0 0 0 3px var(--color-primary, #2563eb)';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 2500);
+                }
+            }, 300);
         },
 
         async injectTaskCard(taskId) {
@@ -545,6 +491,26 @@ function technicianNotifier() {
 
             existing.replaceWith(freshCard);
             this.initAlpineOn(freshCard);
+        },
+
+        // Teknisi dilepas dari tim / task dibatalkan (event_type 'removed'/'cancelled')
+        // — kartu basi harus hilang dari layar, gak ada yang perlu di-fetch dari server.
+        removeTaskCard(taskId) {
+            const card = document.getElementById(`task-card-${taskId}`);
+            if (!card) return;
+
+            const container = card.parentElement;
+            card.remove();
+
+            // Kalau container jadi kosong, munculin lagi empty state (mirror
+            // injectTaskCard yang nyembuniinnya waktu card pertama masuk).
+            if (container && container.id === 'today-task-list' && container.children.length === 0) {
+                const emptyState = document.querySelector('[data-empty-tasks]');
+                if (emptyState) {
+                    emptyState.style.display = '';
+                }
+                container.remove();
+            }
         },
 
         async fetchCard(taskId) {

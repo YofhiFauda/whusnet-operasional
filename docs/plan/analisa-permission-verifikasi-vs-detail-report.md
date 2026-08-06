@@ -1,3 +1,5 @@
+# DONE
+
 # Analisa Pemisahan Permission Verifikasi Admin vs Detail Laporan (Survey & Pemasangan)
 
 **Tanggal:** 31 Juli 2026  

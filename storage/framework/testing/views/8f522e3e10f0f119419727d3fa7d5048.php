@@ -64,18 +64,39 @@ function notificationDropdown() {
         unreadCount: <?php echo e(auth()->user()->unreadNotifications()->count()); ?>,
         
         init() {
-            if (window.Echo) {
-                window.Echo.private('App.Models.User.' + <?php echo e(auth()->id()); ?>)
-                    .notification((notification) => {
-                        this.notifications.unshift({
-                            id: notification.id,
-                            data: notification,
-                            created_at: new Date().toISOString(),
-                            read_at: null
+            // Komponen ini mount di layout global (tiap halaman) — kalau Alpine
+            // init() jalan sebelum bundle Vite selesai load echo.js, window.Echo
+            // masih undefined dan listener gak pernah nempel sekali pun ke
+            // channel-nya. Badge jadi keliatan realtime tapi sebenernya statis
+            // (cuma reflect state saat page load), sampai reload manual. Retry
+            // pattern sama kayak technicianNotifier() di tasks/own.blade.php.
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            const attach = () => {
+                if (typeof window.Echo !== 'undefined') {
+                    window.Echo.private('App.Models.User.' + <?php echo e(auth()->id()); ?>)
+                        .notification((notification) => {
+                            this.notifications.unshift({
+                                id: notification.id,
+                                data: notification,
+                                created_at: new Date().toISOString(),
+                                read_at: null
+                            });
+                            this.unreadCount++;
                         });
-                        this.unreadCount++;
-                    });
-            }
+                    return;
+                }
+
+                attempts++;
+                if (attempts < maxAttempts) {
+                    setTimeout(attach, 300);
+                } else {
+                    console.warn('[notificationDropdown] window.Echo tidak tersedia setelah 3 detik. Notifikasi real-time tidak aktif.');
+                }
+            };
+
+            attach();
         },
         
         async markAsRead(id) {

@@ -26,11 +26,22 @@
     x-effect: kunci scroll halaman selama drawer kebuka — tanpa ini, scroll di
     atas backdrop malah menggeser tabel di belakangnya, dan waktu drawer ditutup
     posisi baris yang tadi diklik udah pindah. Pola sama dengan components/ui/drawer.
+
+    Sekalian dispatch 'ticket-drawer-shown'/'ticket-drawer-hidden' tiap `shown`
+    beneran berubah — SATU-SATUNYA sinyal yang bisa dipercaya halaman pemanggil
+    buat tahu drawer lagi kebuka/ketutup. `close-ticket-drawer` (event di bawah)
+    itu PERMINTAAN tutup dari luar, BUKAN notifikasi state — close() yang
+    dipicu dari dalam sini sendiri (tombol X, klik backdrop, Escape) cuma
+    nyetel `shown = false` langsung, gak pernah lewat event itu. Halaman
+    pemanggil yang nebak status drawer dari `open-ticket-drawer`/
+    `close-ticket-drawer` doang bakal salah tiap kali drawer ditutup manual —
+    lihat docs/plan/analisa-percepatan-alur-helpdesk-noc.md (bug row-navigasi
+    kececer abis Escape).
 --}}
 <div x-data="ticketDetailDrawer()" x-on:open-ticket-drawer.window="open($event.detail.id)"
      x-on:close-ticket-drawer.window="close()"
      x-on:keydown.escape.window="close()"
-     x-effect="document.body.classList.toggle('overflow-hidden', shown)">
+     x-effect="document.body.classList.toggle('overflow-hidden', shown); window.dispatchEvent(new CustomEvent(shown ? 'ticket-drawer-shown' : 'ticket-drawer-hidden'))">
 
     {{--
         Backdrop mulai di bawah navbar (top-16 = tinggi header layout) supaya

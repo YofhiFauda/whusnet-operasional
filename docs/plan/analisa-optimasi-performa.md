@@ -1,3 +1,12 @@
+# DONE PARTIAL
+### FASE 5 BELUM DI IMPLEMENTASIKAN
+
+## Yang Perlu di Tambahkan
+Untuk 2 Controler ini sepertinya harus di pecah karena terlalu banyak baris di dalamnya:
+# File terlalu kompleks sehingga bisa di pecah
+CustomerController.php
+FopTaskController.php
+
 # Analisa Optimasi Performa — Whusnet Operasional
 
 Tanggal analisa: 2026-08-04

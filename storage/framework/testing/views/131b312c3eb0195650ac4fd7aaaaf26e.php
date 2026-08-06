@@ -69,7 +69,7 @@
                     </a>
                     <?php endif; ?>
 
-                    <?php if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.create') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view')): ?>
+                    <?php if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view')): ?>
                     
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
@@ -146,7 +146,7 @@
                             </a>
                             <?php endif; ?>
 
-                            <?php if(auth()->user()->hasPermission('customers.import.import')): ?>
+                            <?php if(auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.import')): ?>
                             <a href="/customers/import"
                                class="block py-2 px-3 rounded-md transition-colors
                                       <?php echo e(Request::is('customers/import') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
@@ -188,6 +188,12 @@
                                class="block py-2 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('invoices.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
                                 Semua Tagihan
                             </a>
+                            <?php if(auth()->user()->hasPermission('payments.view')): ?>
+                            <a href="<?php echo e(route('payments.overpay')); ?>"
+                               class="block py-2 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('payments.overpay') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
+                                Pembayaran Lebih (Overpay)
+                            </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -195,9 +201,9 @@
                     <?php if(auth()->user()->hasPermission('payments.view')): ?>
                     <a href="<?php echo e(route('payments.index')); ?>" title="Pembayaran"
                        class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                              <?php echo e(Request::is('payments*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                              <?php echo e(Request::is('payments*') && !Request::is('payments/overpay') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
                         <div class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('payments*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('payments*') && !Request::is('payments/overpay') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
                             </svg>
                             <span class="sidebar-text">Pembayaran</span>
@@ -297,7 +303,7 @@
                     <?php endif; ?>
                     <?php endif; ?>
 
-                    <?php if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view')): ?>
+                    <?php if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view')): ?>
                     <div class="space-y-1">
                         <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')"
                                 class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
@@ -316,10 +322,10 @@
                         </button>
                         <div id="submenu-ticketing"
                              class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs <?php echo e((Request::is('tickets*') || Request::is('noc/*')) ? '' : 'hidden'); ?>">
-                            <?php if(auth()->user()->hasPermission('tickets.create')): ?>
+                            <?php if(auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.update')): ?>
                             <a href="<?php echo e(route('tickets.create')); ?>"
                                class="block py-2 px-3 rounded-md transition-colors <?php echo e(Request::routeIs('tickets.create') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">
-                                New Ticket
+                                Worksheet Helpdesk
                             </a>
                             <?php endif; ?>
 

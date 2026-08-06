@@ -24,4 +24,21 @@ enum FopTaskPriority: string
             self::LOW => 4,
         };
     }
+
+    /**
+     * Batas waktu wajib mulai ditangani (jam) buat kategori tiket yang
+     * `sla_source`-nya `'prioritas'` (bukan paket internet pelanggan) —
+     * lihat `TicketIssueCategory::sla_source` & docs/plan/analisa-target-sla-ticketing.md.
+     * Dipakai TicketService saat resolve `Ticket::sla_hours` di titik tiket
+     * dibuat, sejajar `InternetPackage::getHandlingSla()` buat jalur paket.
+     */
+    public function slaHours(): int
+    {
+        return match ($this) {
+            self::URGENT => 4,
+            self::HIGH => 8,
+            self::MEDIUM => 24,
+            self::LOW => 48,
+        };
+    }
 }
