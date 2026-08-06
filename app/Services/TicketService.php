@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\FopTaskPriority;
+use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TicketHandler;
@@ -16,8 +18,10 @@ use App\Models\FopTask;
 use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
+use App\Notifications\AppNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -188,6 +192,14 @@ class TicketService
 
         broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
 
+        // Notif ke pembuat tiket kalau yang menutup BUKAN dia sendiri (mis.
+        // NOC yang nutup tiket yang tadinya dikirim Helpdesk). Helpdesk yang
+        // nutup tiket bikinan sendiri gak perlu dikasih tau — dia yang aksi.
+        $this->notifyCreatorIfDifferentActor($ticket, $actor, 'Tiket Diselesaikan: '.$ticket->ticket_number,
+            "Tiket {$ticket->ticket_number} telah diselesaikan oleh {$actor->name}.".($reason ? " Catatan: {$reason}" : ''),
+            NotificationType::SUCCESS
+        );
+
         return $ticket;
     }
 
@@ -226,6 +238,11 @@ class TicketService
         });
 
         broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        $this->notifyCreatorIfDifferentActor($ticket, $actor, 'Tiket Dibatalkan: '.$ticket->ticket_number,
+            "Tiket {$ticket->ticket_number} dibatalkan oleh {$actor->name}.".($reason ? " Alasan: {$reason}" : ''),
+            NotificationType::ERROR
+        );
 
         return $ticket;
     }
@@ -271,6 +288,16 @@ class TicketService
         });
 
         broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        // Tiket baru masuk antrean NOC — gak ada langkah "terima" (ADHOC-06),
+        // jadi lonceng ini SATU-SATUNYA sinyal personal yang NOC dapat di luar
+        // buka Worksheet manual. Broadcast TicketQueueUpdated di atas cuma
+        // nyala kalau NOC pas lagi buka halaman Worksheet-nya juga.
+        $this->notifyRoleUsersInPop('noc', $ticket->pop_id,
+            'Tiket Masuk NOC: '.$ticket->ticket_number,
+            "Tiket {$ticket->ticket_number} ({$ticket->customer_name}) dikirim {$actor->name} ke NOC.".($reason ? " Catatan: {$reason}" : ''),
+            route('tickets.show', $ticket->id)
+        );
 
         return $ticket;
     }
@@ -320,6 +347,15 @@ class TicketService
 
         broadcast(new TicketQueueUpdated($fopTask->pop_id))->toOthers();
 
+        // Titik ini terminal buat sisi Ticketing (handler=FOP) — FOP baru tau
+        // ada kerjaan lewat lonceng ini atau buka /fop-tasks manual, gak ada
+        // jalur lain lagi dari Ticketing.
+        $this->notifyRoleUsersInPop('fop', $fopTask->pop_id,
+            'FopTask Baru dari Tiket: '.$fopTask->task_number,
+            "Tiket {$ticket->ticket_number} dikirim {$actor->name} ke FOP, jadi {$fopTask->task_number}. Perlu ditugaskan teknisi.",
+            route('fop-tasks.index')
+        );
+
         return $fopTask;
     }
 
@@ -362,6 +398,15 @@ class TicketService
         });
 
         broadcast(new TicketQueueUpdated($ticket->pop_id))->toOthers();
+
+        // Balik ke Helpdesk = salah kirim yang perlu ditindaklanjuti pengirim
+        // aslinya secepatnya — notif personal ke created_by, bukan broadcast
+        // role-wide (beda dari escalateToNoc/escalateToFop yang emang antrean
+        // baru buat semua orang di role itu).
+        $this->notifyCreatorIfDifferentActor($ticket, $actor, 'Tiket Dikembalikan ke Anda: '.$ticket->ticket_number,
+            "Tiket {$ticket->ticket_number} dikembalikan NOC ke Helpdesk oleh {$actor->name}.".($reason ? " Alasan: {$reason}" : ''),
+            NotificationType::WARNING
+        );
 
         return $ticket;
     }
@@ -646,5 +691,62 @@ class TicketService
             ->max() ?? 0;
 
         return sprintf('TFOP-%s-%04d', $year, $lastNum + 1);
+    }
+
+    /**
+     * Notif ke pembuat tiket asli (created_by), tapi cuma kalau BUKAN dia
+     * sendiri yang barusan aksi — orang gak perlu dikasih tau soal aksinya
+     * sendiri. Dipakai buat close/cancel/returnToHelpdesk, yang sifatnya
+     * "kabar balik ke satu orang", beda dari escalateToNoc/escalateToFop
+     * yang "antrean baru buat satu role" (lihat notifyRoleUsersInPop()).
+     */
+    private function notifyCreatorIfDifferentActor(Ticket $ticket, User $actor, string $title, string $message, NotificationType $type): void
+    {
+        $creator = $ticket->creator ?? User::find($ticket->created_by);
+
+        if (! $creator || $creator->id === $actor->id) {
+            return;
+        }
+
+        $creator->notify(new AppNotification(
+            title: $title,
+            message: $message,
+            actionUrl: route('tickets.show', $ticket->id),
+            type: $type
+        ));
+    }
+
+    /**
+     * Semua user berrole $roleCode yang punya akses ke POP $popId (lewat
+     * EffectiveAccessService scope: all_pop, atau selected_pop/pop_tree yang
+     * nyakup POP ini) — pola sama persis query "notify FOP users" di
+     * TaskService::complete(), disalin bukan diekstrak jadi shared service
+     * karena cuma dipakai internal 2 titik di kelas ini (lihat CLAUDE.md:
+     * hindari abstraksi sebelum dibutuhkan).
+     *
+     * @return Collection<int, User>
+     */
+    private function usersWithRoleInPop(string $roleCode, int $popId): Collection
+    {
+        return User::whereHas('role', fn ($q) => $q->where('code', $roleCode))
+            ->where(function ($query) use ($popId) {
+                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
+                        ->whereHas('targets', fn ($t) => $t->where('pop_id', $popId))
+                    );
+            })
+            ->get();
+    }
+
+    private function notifyRoleUsersInPop(string $roleCode, int $popId, string $title, string $message, string $actionUrl): void
+    {
+        foreach ($this->usersWithRoleInPop($roleCode, $popId) as $user) {
+            $user->notify(new AppNotification(
+                title: $title,
+                message: $message,
+                actionUrl: $actionUrl,
+                type: NotificationType::INFO
+            ));
+        }
     }
 }

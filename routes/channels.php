@@ -86,15 +86,26 @@ Broadcast::channel('fop-tasks.{popId}', function ($user, $popId) {
     return in_array((int) $popId, $access->getAllowedPopIds($user), true);
 });
 
+/**
+ * Status teknisi realtime /fop/dashboard. Sebelumnya pakai $user->pops()
+ * legacy (pivot user_pops langsung) — gak paham scope pop_tree, jadi user
+ * dengan scope itu bisa lolos permission tapi gak captured di sini dan diam-
+ * diam gak dapet broadcast walau tetap punya akses lewat EffectiveAccessService
+ * (lihat CLAUDE.md § POP Scope, docs/plan/analisa-status-implementasi-notifikasi.md §6.4).
+ * Diseragamkan ke pola yang sama dengan channel lain di file ini.
+ */
 Broadcast::channel('fop.{pop_id}', function ($user, $popId) {
     if (! $user->hasPermission('fop.dashboard')) {
         return false;
     }
-    if ($user->hasFullAccess()) {
+
+    $access = app(EffectiveAccessService::class);
+
+    if ($access->hasAllPopAccess($user)) {
         return true;
     }
 
-    return $user->pops()->where('pops.id', $popId)->exists();
+    return in_array((int) $popId, $access->getAllowedPopIds($user), true);
 });
 
 Broadcast::channel('teknisi.{user_id}', function ($user, $userId) {

@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\InvoiceStatus;
+use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
+use App\Models\User;
+use App\Notifications\AppNotification;
 use App\Services\FileUploadService;
 use App\Support\ReasonValidationRule;
 use Illuminate\Http\JsonResponse;
@@ -439,9 +442,32 @@ class PaymentController extends Controller
             $lockedInvoice->recalculateFromPayments();
         });
 
+        // Notif ke yang mencatat setoran (kolektor lapangan kalau ada, kalau
+        // gak staf yang input langsung) — sebelumnya penolakan gak ngasih tau
+        // siapa pun, kolektor baru sadar pas ngecek worklist-nya sendiri
+        // (docs/plan/analisa-status-implementasi-notifikasi.md §5).
+        $this->notifyPaymentRecorderIfDifferentActor($payment, auth()->user(), $validated['reject_reason']);
+
         return redirect()
             ->route('payments.show', $payment->id)
             ->with('success', "Pembayaran {$payment->payment_number} berhasil ditolak/dibatalkan.");
+    }
+
+    private function notifyPaymentRecorderIfDifferentActor(Payment $payment, User $actor, string $reason): void
+    {
+        $recorderId = $payment->collected_by ?? $payment->received_by;
+        $recorder = $recorderId ? User::find($recorderId) : null;
+
+        if (! $recorder || $recorder->id === $actor->id) {
+            return;
+        }
+
+        $recorder->notify(new AppNotification(
+            title: 'Pembayaran Ditolak: '.$payment->payment_number,
+            message: "Pembayaran {$payment->payment_number} yang Anda catat ditolak {$actor->name}. Alasan: {$reason}",
+            actionUrl: route('payments.show', $payment->id),
+            type: NotificationType::ERROR
+        ));
     }
 
     private function authorizeInvoiceAccess(Invoice $invoice): void

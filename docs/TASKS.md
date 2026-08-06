@@ -20,6 +20,7 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-10 | Detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** (partial bersama + endpoint detail JSON); navigasi halaman penuh disisakan buat Ticket Selesai / Dibatalkan / History (lihat detail di bawah) | Done — 2026-07-30 |
 | ADHOC-09 | Redesign Worksheet NOC (`noc.worksheet`) — tabel padat 1 baris/tiket + pencarian + filter + dua tab bercounter (Tiket Masuk / Assign FOP) + aksi lewat drawer baris terpilih (lihat detail di bawah) | Done — 2026-07-30 |
 | ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
+| ADHOC-14 | Redesign Halaman Pembayaran (`payments.index`, `payments.create`, `payments.show`, `payments.overpay`) dengan dukungan penuh Dark/Light Theme & Stat Cards | Done — 2026-08-06 |
 
 #### ADHOC-13 — Master Alat Kerja + Material di Laporan Maintenance (2026-07-31)
 

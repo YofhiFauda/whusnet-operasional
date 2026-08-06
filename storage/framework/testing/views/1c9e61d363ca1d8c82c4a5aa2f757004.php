@@ -351,7 +351,6 @@
                                                 <div class="w-6 h-6 shrink-0 rounded-full <?php echo e($accent); ?> flex items-center justify-center font-bold text-[10px]"><?php echo e($initials); ?></div>
                                                 <div>
                                                     <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text"><?php echo e($stage['pic']); ?></span>
-                                                    <span class="block text-[9px] text-slate-400">Role: <?php echo e($stage['pic_role'] ?: '-'); ?></span>
                                                 </div>
                                             </div>
                                         <?php else: ?>

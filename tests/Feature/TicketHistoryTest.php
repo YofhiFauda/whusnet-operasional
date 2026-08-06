@@ -189,10 +189,18 @@ class TicketHistoryTest extends TestCase
         $this->actingAs($this->helpdeskUser)->postJson(route('tickets.escalate', $ticket), ['target' => 'noc'])->assertOk();
         $this->actingAs($this->nocUser)->postJson(route('tickets.return-to-helpdesk', $ticket))->assertOk();
 
-        $this->actingAs($this->helpdeskUser)
-            ->get(route('tickets.history'))
-            ->assertOk()
-            ->assertDontSee($ticket->ticket_number);
+        $response = $this->actingAs($this->helpdeskUser)->get(route('tickets.history'));
+        $response->assertOk();
+
+        // assertDontSee() polos gak cukup di sini: helpdeskUser (pembuat
+        // tiket) dapet lonceng notifikasi "Tiket Dikembalikan ke Anda" dari
+        // TicketService::returnToHelpdesk() (docs/plan/analisa-status-
+        // implementasi-notifikasi.md §5) yang JSON-nya ikut ke-embed di
+        // <script> dropdown navbar tiap halaman — bukan berarti tiketnya
+        // nyangkut di tabel History. Strip <script> dulu biar assert cuma
+        // nyentuh konten tabel yang sebenarnya diuji.
+        $bodyWithoutScripts = preg_replace('#<script\b[^>]*>.*?</script>#is', '', $response->getContent());
+        $this->assertStringNotContainsString($ticket->ticket_number, $bodyWithoutScripts);
     }
 
     // ── Status: jalur FOP berhenti di "Assign FOP" ──────────────

@@ -190,10 +190,18 @@ class NocWorksheetTest extends TestCase
             ->postJson(route('tickets.close', $ticket))
             ->assertOk();
 
-        $this->actingAs($this->nocUser)
-            ->get(route('noc.worksheet'))
-            ->assertOk()
-            ->assertDontSee($ticket->ticket_number);
+        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet'));
+        $response->assertOk();
+
+        // assertDontSee() polos gak cukup: submitTicketToNoc() eskalasi lewat
+        // TicketService::escalateToNoc(), yang notif SEMUA user role NOC
+        // (termasuk nocUser sendiri) begitu tiket masuk (docs/plan/analisa-
+        // status-implementasi-notifikasi.md §5). JSON notif itu ikut nge-
+        // embed di <script> dropdown navbar tiap halaman — bukan berarti
+        // tiketnya nyangkut di worksheet. Strip <script> dulu biar assert
+        // cuma nyentuh konten tabel yang sebenarnya diuji.
+        $bodyWithoutScripts = preg_replace('#<script\b[^>]*>.*?</script>#is', '', $response->getContent());
+        $this->assertStringNotContainsString($ticket->ticket_number, $bodyWithoutScripts);
     }
 
     // =========================================================================

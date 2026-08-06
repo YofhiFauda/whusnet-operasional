@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -12,6 +13,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\AppNotification;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
@@ -241,6 +243,13 @@ class CustomerVerificationController extends Controller
 
             DB::commit();
 
+            if ($surveyTask) {
+                $this->notifyTaskTeam($surveyTask, 'Survey Disetujui: '.$surveyTask->task_number,
+                    "Laporan survey Anda untuk {$customer->full_name} disetujui admin, diproses ke tim pemasangan.",
+                    NotificationType::SUCCESS
+                );
+            }
+
             return redirect()->back()->with('success', 'Survey berhasil disetujui. Pelanggan beralih ke status Menunggu Pemasangan.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -432,6 +441,13 @@ class CustomerVerificationController extends Controller
 
             DB::commit();
 
+            if ($installTask) {
+                $this->notifyTaskTeam($installTask, 'Pelanggan Diaktifkan: '.$installTask->task_number,
+                    "Pemasangan {$customer->full_name} disetujui admin, pelanggan resmi aktif (CID {$cid}).",
+                    NotificationType::SUCCESS
+                );
+            }
+
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
@@ -479,6 +495,13 @@ class CustomerVerificationController extends Controller
             }
 
             DB::commit();
+
+            if ($rejectedTask) {
+                $this->notifyTaskTeam($rejectedTask, 'Laporan Ditolak: '.$rejectedTask->task_number,
+                    "Laporan {$rejectedTaskType->label()} Anda untuk {$customer->full_name} ditolak admin. Alasan: {$request->reason}",
+                    NotificationType::ERROR
+                );
+            }
 
             return redirect()->back()->with('success', 'Pelanggan berhasil ditolak.');
         } catch (\Exception $e) {
@@ -528,11 +551,43 @@ class CustomerVerificationController extends Controller
 
             DB::commit();
 
+            if ($installTask) {
+                $this->notifyTaskTeam($installTask, 'Pemasangan Perlu Revisi: '.$installTask->task_number,
+                    "Pemasangan {$customer->full_name} diminta admin buat direvisi. Alasan: {$request->reason}",
+                    NotificationType::WARNING
+                );
+            }
+
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan dikembalikan ke antrean pemasangan untuk revisi.');
         } catch (\Exception $e) {
             DB::rollBack();
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Notif hasil verifikasi ke teknisi yang laporannya diperiksa — sebelumnya
+     * approve/reject/revisi di sini gak ngasih tau siapa pun sama sekali
+     * (docs/plan/analisa-status-implementasi-notifikasi.md §5). Pola sama
+     * dengan TaskController::notifyTeamMembers().
+     */
+    private function notifyTaskTeam(Task $task, string $title, string $message, NotificationType $type): void
+    {
+        $task->loadMissing('teamMembers.user');
+        $url = route('tasks.show', $task->id);
+
+        foreach ($task->teamMembers as $member) {
+            if ($member->user) {
+                /** @var User $user */
+                $user = $member->user;
+                $user->notify(new AppNotification(
+                    title: $title,
+                    message: $message,
+                    actionUrl: $url,
+                    type: $type
+                ));
+            }
         }
     }
 }

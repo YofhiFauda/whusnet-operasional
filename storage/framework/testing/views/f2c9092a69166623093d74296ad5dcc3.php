@@ -52,6 +52,14 @@
 
                     </span>
 
+                    
+                    <?php if($ticket->issueCategory): ?>
+                        <span class="text-xs font-bold px-2.5 py-0.5 rounded border border-sky-200 dark:border-sky-900 text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/50">
+                            <?php echo e($ticket->issueCategory->name); ?>
+
+                        </span>
+                    <?php endif; ?>
+
                     <span class="text-xs font-bold px-2.5 py-0.5 rounded border <?php echo e($ticket->statusBadgeClasses()); ?>">
                         <?php echo e($ticket->statusLabel()); ?>
 

@@ -406,9 +406,9 @@ function technicianNotifier() {
                 : (isRefresh ? 'Jadwal Task Diperbarui' : 'Task Baru Ditugaskan');
             const toastDesc = `${event.title}` + (!isRemoval && jadwalLabel ? ` • Jadwal: ${jadwalLabel}` : '');
 
-            // Tampilkan notifikasi melayang menggunakan Komponen Toast Global
+            // Tampilkan notifikasi melayang menggunakan Komponen Toast Global (tampil 15 detik agar teknisi sempat membaca)
             if (window.Toast) {
-                window.Toast.show(toastType, toastTitle, toastDesc, 8000);
+                window.Toast.show(toastType, toastTitle, toastDesc, 15000);
             }
 
             if (isRemoval) {

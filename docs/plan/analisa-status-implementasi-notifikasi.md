@@ -1,9 +1,9 @@
-# BELUM DI IMPLEMENTASIKAN
-
 # Analisa Status Implementasi In-App Notification (Audit Kondisi Aktual)
 
-**Tanggal audit:** 2026-08-05
+**Tanggal audit:** 2026-08-05 · **Update implementasi:** 2026-08-06
 **Konteks:** Audit kode aktual — bukan rencana. Untuk kebutuhan/rencana ke depan lihat [`analisa-in-app-dan-push-notifikasi.md`](analisa-in-app-dan-push-notifikasi.md); dokumen ini memotret apa yang **sudah** jalan di kode saat ini, supaya rencana di dokumen itu bisa dicek progress-nya terhadap kondisi riil.
+
+> **Status per 2026-08-06:** Sebagian besar temuan §5 dan §6 di bawah **SUDAH digarap** — Ticketing (5 transisi), Verifikasi Pelanggan (reject/revisi), Payment reject, retensi `database_notifications`, dan channel `fop.{pop_id}` legacy. Lihat §8 buat detail & yang masih tersisa.
 
 ---
 
@@ -58,22 +58,95 @@ Berdasarkan sudah adanya rencana lengkap di `analisa-in-app-dan-push-notifikasi.
 
 | Modul | Method/Titik | Kondisi Sekarang |
 |---|---|---|
-| **Ticketing** | `TicketService::escalateToNoc()`, `escalateToFop()`, `close()`, `cancel()`, `returnToHelpdesk()` | Nol pemanggilan `AppNotification`. NOC/Helpdesk cuma tau tiket baru lewat buka Worksheet manual. |
-| **Verifikasi Pelanggan** | `CustomerVerificationController` (approve/reject) | Tidak ada notif balik ke pengaju (installer/CS/sales) soal hasil verifikasi. |
-| **Billing & Pembayaran** | Generate tagihan batch, terima pembayaran, setoran kolektor, overpay/rekonsiliasi (modul baru dari commit `e9c592d`) | Tidak ada notif ke Finance/Admin POP/Collector — matriks lengkap sudah dirancang di §3 dokumen rencana tapi belum ada satupun call site di `CollectorBatchController`/`Invoice`/`Payment`. |
-| **NOC Dashboard / SLA Breach** | Handling SLA FOP (`handling_sla_hours`) kelewat | Tidak ada cron/alert in-app; dashboard NOC murni pull, bukan push. |
-| **Customer Lifecycle** | Transisi besar `WorkflowTransition` (mis. jadi `active`, `suspended`, `terminated`) | Tidak ada notif ke CS/Sales saat status berubah. |
-| **Import Data Massal** | `CustomersImport`/batch import selesai | Tidak ada notif hasil (sukses/gagal) — user harus cek halaman import-batches manual. |
+| Modul | Method/Titik | Kondisi Sekarang |
+|---|---|---|
+| **Ticketing** | `TicketService::escalateToNoc()`, `escalateToFop()`, `close()`, `cancel()`, `returnToHelpdesk()` | ✅ **Selesai 2026-08-06** — lihat §8.1. |
+| **Verifikasi Pelanggan** | `CustomerVerificationController` (`reject()`, `revisi()`) | ✅ **Selesai 2026-08-06** — lihat §8.2. `processToTeam()`/`finalVerify()` juga sudah kebagian notif SUCCESS (bukan dari §5 asli, ekstra sekalian). |
+| **Billing & Pembayaran** | `PaymentController::reject()` | ✅ **Selesai (sebagian) 2026-08-06** — lihat §8.3. Batch kolektor (`CollectorBatchController::store()`) & "Finance Pusat"-wide notif **BELUM** — gak ada role/permission yang jelas mewakili "Finance Pusat" di RBAC saat ini (§8.3 penjelasan kenapa sengaja gak ditebak). |
+| **NOC Dashboard / SLA Breach** | Handling SLA FOP (`handling_sla_hours`) kelewat | Belum — butuh scheduled command baru (cron), beda kelas kerja dari notif "reaktif ke aksi user" yang lain di sini. |
+| **Customer Lifecycle** | Transisi besar `WorkflowTransition` (mis. jadi `active`, `suspended`, `terminated`) | Belum. |
+| **Import Data Massal** | `CustomersImport`/batch import selesai | Belum. |
 
-**Prioritas realistis kalau dikerjakan:** Ticketing eskalasi (paling rawan miss-komunikasi, sesuai constraint sinkronisasi Ticket↔FopTask di `CLAUDE.md`) → Billing (setoran kolektor & konfirmasi pembayaran, sudah ada modulnya sejak commit terakhir) → sisanya post-MVP sesuai catatan scope di dokumen rencana §5.
+**Sisa kalau dilanjutkan:** setoran kolektor batch (perlu keputusan RBAC dulu — role/permission mana yang mewakili "Finance Pusat") → SLA breach cron (kerja baru, bukan nambah notify ke aksi yang sudah ada) → Customer Lifecycle & Import massal (post-MVP sesuai catatan scope di dokumen rencana §5).
 
 ---
 
-## 6. Referensi
+## 6. Temuan Tambahan (Analisa Lanjutan)
+
+Penelusuran lanjutan nemu nuansa yang bikin gambaran §5 kurang lengkap kalau dibaca "modul X = nol realtime sama sekali". Beberapa modul justru **sudah** punya infrastruktur realtime — cuma bukan lewat `AppNotification`/lonceng, jadi gampang keliru dianggap gak ada sama sekali.
+
+1. **Broadcast pasif (auto-refresh) vs notifikasi aktif (lonceng) — dua mekanisme beda, jangan disamakan.**
+   Ticketing, Verifikasi, Invoice, dan papan FOP Task **sudah** broadcast realtime via `ShouldBroadcast` event murni (bukan Laravel Notification): `TicketQueueUpdated` (`tickets.{popId}`), `CustomerVerificationStatusChanged` (`customers.{popId}`), `InvoiceStatusUpdated` (`invoices.{popId}`), `FopTaskUpdated` (`fop-tasks.{popId}`) — didaftarkan di `routes/channels.php`. Sengaja gak bawa payload lengkap, cuma sinyal "refetch", dikonsumsi Alpine state di halaman yang lagi kebuka (lihat `docs/plan/analisa-realtime-spa-operasional.md`).
+   **Bedanya krusial dari lonceng notifikasi:** event ini cuma nyala kalau user **lagi buka halaman itu juga** — gak ada unread badge, gak masuk riwayat `/notifications`, gak nyusul kalau user pindah halaman/belum login. Jadi klaim "Ticketing/Billing/Verifikasi belum ada realtime" di §5 perlu diperhalus: yang belum ada itu **notifikasi personal yang persisten & actionable** (lonceng + histori), bukan realtime sama sekali. Worth dibedain di rencana implementasi biar gak dikerjain dua kali dari nol.
+
+2. ✅ **DONE 2026-08-06 — Retensi `database_notifications`.** `app/Console/Commands/PruneReadNotifications.php` (`notifications:prune-read {--days=90}`) hapus notif yang `read_at` udah lewat N hari — notif BELUM dibaca sengaja gak disentuh seberapa pun lamanya. Dijadwalkan `dailyAt('00:30')` di `routes/console.php`.
+
+3. **Ketergantungan diam-diam ke queue worker.** (belum digarap)
+   `AppNotification implements ShouldQueue` — dikirim lewat queue (`QUEUE_CONNECTION`), bukan sync. Kalau Horizon down/nge-hang, notifikasi ketunda **tanpa ada alert ke siapa pun** (gak ada dead-letter monitoring khusus notifikasi) — beda dari kegagalan yang kelihatan di Horizon dashboard by design tapi gak ada yang mantau proaktif. Worth cek apakah `horizon:snapshot` + alert LongWaitDetected (skill `configuring-horizon`) sudah nyakup queue notifikasi ini juga.
+
+4. ✅ **DONE 2026-08-06 — Channel `fop.{pop_id}` diseragamkan ke `EffectiveAccessService`.** `routes/channels.php` — otorisasi channel `fop.{pop_id}` (dipakai `/fop/dashboard`) sekarang pakai `hasAllPopAccess()`/`getAllowedPopIds()`, sama pola dengan 4 channel lain di file yang sama. Sebelumnya `$user->pops()->where(...)->exists()` (jalur legacy, gak paham `pop_tree` — CLAUDE.md § POP Scope).
+
+---
+
+## 8. Detail Implementasi (2026-08-06)
+
+Realisasi dari §5/§6 di atas, atas permintaan lanjutan user. Semua diverifikasi test baru + regresi suite terkait (`Ticket*`, `*Verification*`, `Payment*`, `*Broadcast*`, `NocWorksheetTest` — 562 passed, 4 gagal pre-existing tak terkait, lihat catatan di bawah §8.5).
+
+### 8.1 Ticketing — `app/Services/TicketService.php`
+
+| Method | Penerima | Type | Catatan |
+|---|---|---|---|
+| `escalateToNoc()` | Semua user role `noc` di POP tiket | INFO | Role-wide — gak ada langkah "terima" (ADHOC-06), lonceng ini satu-satunya sinyal personal NOC. |
+| `escalateToFop()` | Semua user role `fop` di POP FopTask | INFO | Titik terminal Ticketing — FOP baru tau ada kerjaan lewat sini. |
+| `close()` | Pembuat tiket (`created_by`), skip kalau sama dgn actor | SUCCESS | |
+| `cancel()` | Pembuat tiket, skip kalau sama dgn actor | ERROR | |
+| `returnToHelpdesk()` | Pembuat tiket, skip kalau sama dgn actor | WARNING | |
+
+Helper baru: `notifyCreatorIfDifferentActor()` (notif personal, skip self-notify) dan `usersWithRoleInPop()`/`notifyRoleUsersInPop()` (notif role-wide per POP, pola disalin dari `TaskService::complete()`). Test: `tests/Feature/TicketNotificationTest.php` (6 test).
+
+**Efek samping yang ketahuan pas implementasi:** notifikasi baru ini bikin 2 test lama (`NocWorksheetTest::test_closed_ticket_leaves_the_worksheet`, `TicketHistoryTest::test_ticket_returned_to_helpdesk_leaves_history`) gagal — bukan karena state tiket salah, tapi karena teks notifikasi (berisi `ticket_number`) ikut ke-embed di `<script>` dropdown navbar (`notification-dropdown.blade.php`, tampil di **semua** halaman), dan `assertDontSee($ticket->ticket_number)` polos menangkap itu juga. Diperbaiki dengan strip `<script>` sebelum assert (test sekarang beneran cuma ngecek tabel worksheet/history, bukan seluruh halaman) — regresi test, bukan regresi behavior.
+
+### 8.2 Verifikasi Pelanggan — `app/Http/Controllers/CustomerVerificationController.php`
+
+Helper baru `notifyTaskTeam()` (pola sama `TaskController::notifyTeamMembers()`), notif ke tim task (survey/pemasangan) yang laporannya diperiksa:
+
+| Method | Notif ke tim task | Type |
+|---|---|---|
+| `processToTeam()` | Survey disetujui | SUCCESS |
+| `finalVerify()` | Pemasangan disetujui + pelanggan aktif | SUCCESS |
+| `reject()` | Laporan ditolak | ERROR |
+| `revisi()` | Perlu revisi | WARNING |
+
+Test: `tests/Feature/CustomerVerificationNotificationTest.php` (2 test, reject + revisi — dua yang eksplisit diminta di §5 asli).
+
+### 8.3 Billing — `app/Http/Controllers/PaymentController.php`
+
+`reject()` notif ke pencatat pembayaran (`collected_by` kalau ada / fallback `received_by`), skip kalau actor = pencatat sendiri. Type ERROR. Test: `tests/Feature/PaymentRejectNotificationTest.php` (2 test).
+
+**Sengaja TIDAK dikerjakan:** notif "setoran kolektor" (`CollectorBatchController::store()`) ke "Finance Pusat" — RBAC repo ini (`owner`, `atasan`, `admin`, `noc`, `helpdesk`, `fop`, `teknisi`, `sales`, `pop_admin`, `kolektor`) **gak punya role/permission yang jelas mewakili "Finance Pusat"**, beda dari Ticketing (role `noc`/`fop` jelas) atau Verifikasi (tim task jelas dari `teamMembers`). Nebak role sembarangan (mis. asumsi `admin`+`owner`+ALL_POP scope) berisiko nyasar notif ke orang yang salah atau bikin asumsi keliru soal siapa yang "harusnya" jadi Finance — lihat CLAUDE.md "Berhenti & Tanya Kalau requirement ambigu". Butuh keputusan eksplisit dulu soal role/permission mana yang dipakai sebelum dikerjakan.
+
+### 8.4 Quick-fix (§6.2, §6.4)
+
+- `app/Console/Commands/PruneReadNotifications.php` + jadwal `dailyAt('00:30')` di `routes/console.php`. Test: `tests/Feature/PruneReadNotificationsTest.php` (2 test).
+- `routes/channels.php` channel `fop.{pop_id}` diseragamkan ke `EffectiveAccessService`. Diverifikasi lewat `tests/Feature/TaskBroadcastingTest.php` (regresi, masih hijau).
+
+### 8.5 Yang belum, dan kenapa
+
+- **NOC Dashboard / SLA Breach**, **Customer Lifecycle**, **Import Data Massal** (§5) — belum digarap, di luar batch permintaan ini.
+- **Setoran kolektor batch** (§8.3) — butuh keputusan RBAC dulu.
+- **Ketergantungan queue worker** (§6.3), **query dropdown tiap page load**, **sinkron antar tab**, **`NotificationController::index()` scope logic** (§4) — belum digarap, sifatnya optimasi bukan gap fungsional.
+- 4 test gagal di suite penuh (`FopTaskCreateFollowsTicketingTest`, `FopTaskHistoryFollowsTicketDetailTest`, `TicketingTest` ×2) — **pre-existing**, `FilesystemIterator::__construct(...tickets): Permission denied` saat teardown disk attachment. Dikonfirmasi ada juga di kode SEBELUM perubahan sesi ini (`git stash` + run ulang) — masalah lingkungan Windows/WSL bridge, bukan regresi dari kerjaan ini.
+
+---
+
+## 9. Referensi
 
 - `app/Notifications/AppNotification.php`, `app/Enums/NotificationType.php`
 - `app/Http/Controllers/NotificationController.php`
 - `resources/views/components/notification-dropdown.blade.php`
 - `app/Services/TaskService.php`, `app/Http/Controllers/TaskController.php`, `app/Http/Controllers/FopTaskController.php`
+- `app/Services/TicketService.php`, `app/Http/Controllers/CustomerVerificationController.php`, `app/Http/Controllers/PaymentController.php` (§8)
+- `app/Console/Commands/PruneReadNotifications.php`, `routes/channels.php`, `routes/console.php` (§8.4)
+- `tests/Feature/TicketNotificationTest.php`, `tests/Feature/CustomerVerificationNotificationTest.php`, `tests/Feature/PaymentRejectNotificationTest.php`, `tests/Feature/PruneReadNotificationsTest.php`
 - `ANALISA_REDUNDANSI_LOGIC.md` §9 (histori fix enum `NotificationType`)
 - [`analisa-in-app-dan-push-notifikasi.md`](analisa-in-app-dan-push-notifikasi.md) — rencana lengkap & matriks event

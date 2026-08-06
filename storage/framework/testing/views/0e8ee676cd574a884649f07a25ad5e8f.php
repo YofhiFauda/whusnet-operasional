@@ -7,8 +7,8 @@
 <div x-data="ticketPage()" @keydown.window="handleShortcut($event)"
      @ticket-drawer-action.window="handleDrawerAction($event.detail)"
      
-     @open-ticket-drawer.window="drawerOpen = true"
-     @close-ticket-drawer.window="drawerOpen = false"
+     @ticket-drawer-shown.window="drawerOpen = true"
+     @ticket-drawer-hidden.window="drawerOpen = false"
      class="relative -m-4 sm:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex overflow-hidden bg-background">
 
     
@@ -1361,6 +1361,16 @@
                     return;
                 }
                 if (e.key === 'Escape') {
+                    // Drawer detail punya listener Escape SENDIRI (lihat
+                    // x-on:keydown.escape.window="close()" di
+                    // detail-drawer.blade.php) — kalau drawer lagi kebuka,
+                    // biarin drawer itu doang yang nanganin, JANGAN ikut
+                    // resetForm() di sini. Sebelumnya dua-duanya nembak
+                    // bareng: drawer ketutup TAPI form ikut kereset dan
+                    // fokus kepaksa pindah ke search box, jadi row-navigasi
+                    // (Arrow/C/V/B) kececer gak bisa dipake abis nutup
+                    // drawer pakai Escape.
+                    if (this.drawerOpen) return;
                     this.resetForm();
                     return;
                 }
