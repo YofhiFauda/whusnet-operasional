@@ -14,6 +14,8 @@ Tagihan (`Invoice`) dan pembayaran (`Payment`) pelanggan ISP. Tagihan lahir dari
 
 **Payment status**: `valid` (default saat dicatat, semua jalur insert langsung valid — TAK ADA alur verifikasi bertahap), `ditolak` (via `POST /payments/{id}/reject`, wajib alasan). **`pending` sudah dihapus dari enum (2026-08-03)** — kalau menemukan referensi ke `pending` di kode lama, itu bug/sisa, bukan status yang valid.
 
+**Notifikasi in-app (2026-08-06/07)** — `PaymentController::reject()` notif ke pencatat pembayaran (`collected_by` kalau ada / fallback `received_by`), skip kalau yang reject = pencatat sendiri. `CollectorBatchController::store()` sukses notif role `pop_admin` di POP invoice yang kena (pengganti "Finance Pusat" — role itu gak ada di RBAC sistem ini, `pop_admin` dipilih karena pegang `payments.validate`/`reject` per POP). **Pesannya sengaja murni informatif** ("dicatat"), bukan "perlu direkonsiliasi" — selaras sama keputusan produk di atas (`PaymentBatch` BUKAN rekonsiliasi kas, fitur Setoran Kolektor formal di-drop dari scope). Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.3.
+
 **Lebih bayar** (`payments.overpay_amount`, 2026-08-04): admin ketik SATU nominal total diterima, sistem otomatis pisah bagian yang menutup tagihan (`amount`, tetap tak pernah melebihi sisa tagihan) dari kelebihannya (`overpay_amount`). **Bukan saldo kredit** — tak punya sisi debit, tak pernah dipakai otomatis untuk tagihan berikutnya. Tab khusus read-only di `/payments/overpay`.
 
 ## Dokumen

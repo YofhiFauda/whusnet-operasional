@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
     'cancel_reason',
     'team_id',
     'handling_sla_hours',
+    'sla_breach_notified_at',
 ])]
 class FopTask extends Model
 {
@@ -44,6 +45,7 @@ class FopTask extends Model
             'task_date' => 'datetime',
             'client_request_date' => 'date',
             'cancelled_at' => 'datetime',
+            'sla_breach_notified_at' => 'datetime',
             'status' => TaskStatus::class,
             'priority' => FopTaskPriority::class,
             'category' => TaskType::class,
@@ -62,6 +64,16 @@ class FopTask extends Model
             $fopTask->handling_sla_hours = $package
                 ? $package->getHandlingSla($fopTask->category)
                 : $fopTask->category->defaultHandlingSlaHours();
+        });
+
+        // task_date berubah (reschedule) → deadline SLA ikut geser
+        // (slaDeadline()), jadi flag dedup CheckFopTaskSlaBreach wajib reset
+        // biar breach di jadwal BARU tetap kena-notif, bukan diam-diam
+        // ke-skip gara-gara udah pernah notif buat jadwal lama.
+        static::updating(function (self $fopTask) {
+            if ($fopTask->isDirty('task_date') && $fopTask->sla_breach_notified_at !== null) {
+                $fopTask->sla_breach_notified_at = null;
+            }
         });
     }
 

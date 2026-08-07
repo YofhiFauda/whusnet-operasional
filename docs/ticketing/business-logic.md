@@ -97,13 +97,19 @@ Helpdesk yang nge-craft request manual lewat devtools TETAP diabaikan diam-diam 
 
 Semua aksi lewat `TicketService`, semuanya dibuka dengan `lockForUpdate()` di dalam transaksi **sebelum** guard dicek — dua request nyaris bersamaan wajib antre, bukan dua-duanya lolos sebelum salah satu commit (TOCTOU).
 
-| Aksi | Method | Guard tambahan | Efek |
-|---|---|---|---|
-| Selesai | `close()` | `assertNocCheckedBeforeClose()` | `status=CLOSED` |
-| Ke NOC | `escalateToNoc()` | wajib `handler=HELPDESK` | `handler=NOC` (langsung Diproses NOC) |
-| Ke FOP | `escalateToFop()` | — (boleh dari Helpdesk maupun NOC) | `handler=FOP`, `FopTask` DRAFT kebentuk |
-| Kembalikan | `returnToHelpdesk()` | wajib `handler=NOC` | `handler=HELPDESK` |
-| Batalkan | `cancel()` | `reason` **wajib** (validasi controller) | `status=CANCELLED` |
+| Aksi | Method | Guard tambahan | Efek | Notifikasi in-app |
+|---|---|---|---|---|
+| Selesai | `close()` | `assertNocCheckedBeforeClose()` | `status=CLOSED` | Pembuat tiket (skip kalau actor = pembuat) — SUCCESS |
+| Ke NOC | `escalateToNoc()` | wajib `handler=HELPDESK` | `handler=NOC` (langsung Diproses NOC) | Semua user role `noc` di POP tiket — INFO |
+| Ke FOP | `escalateToFop()` | — (boleh dari Helpdesk maupun NOC) | `handler=FOP`, `FopTask` DRAFT kebentuk | Semua user role `fop` di POP FopTask — INFO |
+| Kembalikan | `returnToHelpdesk()` | wajib `handler=NOC` | `handler=HELPDESK` | Pembuat tiket (skip kalau actor = pembuat) — WARNING |
+| Batalkan | `cancel()` | `reason` **wajib** (validasi controller) | `status=CANCELLED` | Pembuat tiket (skip kalau actor = pembuat) — ERROR |
+
+**Notifikasi (`AppNotification`, ditambahkan 2026-08-06 — `docs/plan/analisa-status-implementasi-notifikasi.md` §8.1) jalan lewat 2 pola:**
+- **Role-wide** (`escalateToNoc`/`escalateToFop`) — semua user berrole terkait yang scope POP-nya nyakup tiket ini kena notif, gak ada skip-self. Ini "antrean baru masuk", bukan aksi personal — begitu tiket masuk NOC gak ada langkah "terima" (ADHOC-06, § 3), jadi lonceng notifikasi ini SATU-SATUNYA sinyal personal yang NOC dapat di luar buka Worksheet manual.
+- **Personal ke pembuat** (`close`/`cancel`/`returnToHelpdesk`) — notif ke `created_by`, **di-skip kalau yang aksi = pembuat tiket sendiri** (mis. Helpdesk yang nutup tiket bikinannya sendiri gak perlu dikasih tau — dia yang ngelakuin). Berguna terutama saat NOC yang menyelesaikan/membatalkan/mengembalikan tiket yang tadinya dikirim Helpdesk.
+
+Broadcast realtime (`TicketQueueUpdated`, § 13) TETAP ada di semua 5 aksi — dua mekanisme ini independen: broadcast cuma nyala kalau Worksheet-nya lagi kebuka (auto-refresh tabel), notifikasi lonceng persisten & masuk `/notifications` walau user lagi di halaman lain. Lihat `docs/plan/analisa-status-implementasi-notifikasi.md` §6.1 buat penjelasan lengkap bedanya.
 
 Dua guard yang berlaku ke hampir semua aksi:
 
@@ -218,7 +224,7 @@ Halaman detail memakai POST native (form dirakit on-the-fly, diberi class `no-co
 
 `TicketQueueUpdated` di-broadcast **setelah** `DB::transaction()` commit (bukan di dalam closure — gak boleh nembak kalau rollback), dengan `toOthers()` supaya tab aktor sendiri gak refetch dobel.
 
-Channel `tickets.{popId}` diotorisasi lewat `EffectiveAccessService::hasAllPopAccess()`/`getAllowedPopIds()` — jalur POP-scope yang benar, **bukan** `$user->pops()` legacy yang dipakai channel `fop.{pop_id}` lama.
+Channel `tickets.{popId}` diotorisasi lewat `EffectiveAccessService::hasAllPopAccess()`/`getAllowedPopIds()` — jalur POP-scope yang benar. Channel `fop.{pop_id}` (dashboard FOP) dulu masih pakai `$user->pops()` legacy yang gak paham `pop_tree`; sudah diseragamkan ke pola yang sama per 2026-08-07 (`docs/plan/analisa-status-implementasi-notifikasi.md` §8, `routes/channels.php`).
 
 Listener me-*refetch* sendiri lewat endpoint yang sudah lolos scope & permission user, bukan mempercayai payload broadcast mentah. Panel worksheet menarik `/api/tickets/worksheet-tasks`; Dashboard NOC me-refetch halamannya sendiri lalu menukar `innerHTML` per container.
 

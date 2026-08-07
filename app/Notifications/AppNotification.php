@@ -3,15 +3,20 @@
 namespace App\Notifications;
 
 use App\Enums\NotificationType;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
-class AppNotification extends Notification implements ShouldQueue
+/**
+ * SENGAJA bukan ShouldQueue (`docs/plan/analisa-status-implementasi-
+ * notifikasi.md` §6.3/§8) — sebelumnya lewat queue, kalau Horizon down/
+ * nge-hang notifikasi ketunda diam-diam tanpa alert ke siapa pun. Volume
+ * per panggilan kecil (database insert + 1 broadcast event per penerima,
+ * bukan API eksternal), jadi kirim sinkron di request/command yang manggil
+ * lebih murah ketimbang ketergantungan availability queue worker buat fitur
+ * yang butuh sampai SEKARANG (lonceng notifikasi), bukan nanti.
+ */
+class AppNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public readonly string $title,
         public readonly string $message,

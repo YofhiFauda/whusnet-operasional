@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -22,6 +23,7 @@ use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CustomerVerificationController extends Controller
@@ -233,6 +235,16 @@ class CustomerVerificationController extends Controller
             // Ini secara otomatis membuat Task Pemasangan dengan status 'pending' di CustomerWorkflowService
             $workflowService->transition($customer, WorkflowTransition::WAITING_INSTALLATION, 'Survey disetujui. Diproses ke TIM Pemasangan');
 
+            // Task Pemasangan yang baru (atau yang udah ada) dari transition di
+            // atas — dipakai buat notif FOP di bawah, BUKAN dibuat di sini
+            // (CustomerWorkflowService::transition() yang bikin, idempotent
+            // kalau task PENDING/TERJADWAL/IN_PROGRESS udah ada).
+            $installTaskForNotif = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->whereIn('status', [TaskStatus::PENDING->value, TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
+                ->latest()
+                ->first();
+
             // C. Otomatis setujui (approve) Task Survey yang terkait
             $surveyTask = Task::where('customer_id', $customer->id)
                 ->where('task_type', TaskType::SURVEY->value)
@@ -253,6 +265,22 @@ class CustomerVerificationController extends Controller
                 $this->notifyTaskTeam($surveyTask, 'Survey Disetujui: '.$surveyTask->task_number,
                     "Laporan survey Anda untuk {$customer->full_name} disetujui admin, diproses ke tim pemasangan.",
                     NotificationType::SUCCESS
+                );
+            }
+
+            // FOP yang assign tim buat Task Pemasangan, BUKAN admin verifikasi
+            // yang barusan aksi di sini — tanpa ini FOP cuma tau ada kerjaan
+            // baru lewat cek dashboard manual (docs/plan/analisa-status-
+            // implementasi-notifikasi.md §8.2 & §8.5, gap dilaporkan user
+            // 2026-08-06). Cuma notif kalau task-nya BENERAN baru dibuat di
+            // transition ini (belum pernah punya tim) — kalau udah ada tim
+            // (mis. task lama dipakai ulang lewat jalur revisi), FOP udah
+            // pernah kebagian notif assignment sebelumnya, jangan spam ulang.
+            if ($installTaskForNotif && $customer->pop_id && ! $installTaskForNotif->teamMembers()->exists()) {
+                $this->notifyRoleUsersInPop('fop', $customer->pop_id,
+                    'Task Pemasangan Baru: '.$installTaskForNotif->task_number,
+                    "Survey {$customer->full_name} disetujui, Task Pemasangan menunggu tim ditugaskan.",
+                    route('tasks.show', $installTaskForNotif->id)
                 );
             }
 
@@ -454,6 +482,15 @@ class CustomerVerificationController extends Controller
                 );
             }
 
+            // Customer Lifecycle: pendaftar asli (Sales/CS yang mendaftarkan,
+            // `customers.created_by`) dikasih tau pelanggannya resmi aktif —
+            // sebelumnya nol notif buat transisi besar status pelanggan
+            // (docs/plan/analisa-status-implementasi-notifikasi.md §5).
+            $this->notifyCustomerCreatorIfDifferentActor($customer, 'Pelanggan Aktif: '.$customer->full_name,
+                "Pelanggan {$customer->full_name} (CID {$cid}) resmi aktif, tagihan awal sudah terbit.",
+                NotificationType::SUCCESS
+            );
+
             return redirect()->route('verifications.queue')->with('success', 'Pelanggan berhasil diaktifkan dan tagihan pertama dibuat.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
@@ -617,5 +654,60 @@ class CustomerVerificationController extends Controller
                 ));
             }
         }
+    }
+
+    /**
+     * Semua user berrole $roleCode yang punya akses ke POP $popId (lewat
+     * EffectiveAccessService scope: all_pop, atau selected_pop/pop_tree yang
+     * nyakup POP ini) — pola sama persis `TicketService::usersWithRoleInPop()`
+     * / query "notify FOP users" di `TaskService::complete()`, disalin bukan
+     * diekstrak jadi shared service karena cuma dipakai 1 titik di kelas ini
+     * (lihat CLAUDE.md: hindari abstraksi sebelum dibutuhkan).
+     *
+     * @return Collection<int, User>
+     */
+    private function usersWithRoleInPop(string $roleCode, int $popId): Collection
+    {
+        return User::whereHas('role', fn ($q) => $q->where('code', $roleCode))
+            ->where(function ($query) use ($popId) {
+                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
+                        ->whereHas('targets', fn ($t) => $t->where('pop_id', $popId))
+                    );
+            })
+            ->get();
+    }
+
+    private function notifyRoleUsersInPop(string $roleCode, int $popId, string $title, string $message, string $actionUrl): void
+    {
+        foreach ($this->usersWithRoleInPop($roleCode, $popId) as $user) {
+            $user->notify(new AppNotification(
+                title: $title,
+                message: $message,
+                actionUrl: $actionUrl,
+                type: NotificationType::INFO
+            ));
+        }
+    }
+
+    /**
+     * Notif ke pendaftar asli pelanggan (`customers.created_by`), skip kalau
+     * yang aksi sekarang orangnya sendiri — pola sama
+     * `TicketService::notifyCreatorIfDifferentActor()`.
+     */
+    private function notifyCustomerCreatorIfDifferentActor(Customer $customer, string $title, string $message, NotificationType $type): void
+    {
+        $creator = $customer->creator ?? ($customer->created_by ? User::find($customer->created_by) : null);
+
+        if (! $creator || $creator->id === auth()->id()) {
+            return;
+        }
+
+        $creator->notify(new AppNotification(
+            title: $title,
+            message: $message,
+            actionUrl: route('customers.show', $customer->id),
+            type: $type
+        ));
     }
 }

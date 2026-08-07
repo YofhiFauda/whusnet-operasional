@@ -61,7 +61,7 @@ function notificationDropdown() {
     return {
         open: false,
         notifications: <?php echo json_encode(auth()->user()->notifications()->take(10)->get(), 15, 512) ?>,
-        unreadCount: <?php echo e(auth()->user()->unreadNotifications()->count()); ?>,
+        unreadCount: <?php echo e(auth()->user()->unreadNotificationsCountCached()); ?>,
         
         init() {
             // Komponen ini mount di layout global (tiap halaman) — kalau Alpine
@@ -84,6 +84,26 @@ function notificationDropdown() {
                                 read_at: null
                             });
                             this.unreadCount++;
+
+                            // Sebelumnya notif baru cuma nambah angka badge
+                            // diam-diam — gak ada yang nyadar ada kejadian baru
+                            // kalau dropdown-nya gak lagi dibuka (mis. tiket
+                            // masuk NOC, task selesai buat FOP, laporan disetujui
+                            // buat teknisi). Toast pop-up biar kelihatan LANGSUNG
+                            // tanpa harus klik lonceng dulu.
+                            if (window.Toast) {
+                                const type = notification.type || 'info';
+                                (window.Toast[type] || window.Toast.info)(notification.title, notification.message);
+                            }
+                        })
+                        // Sinkron lintas tab — mark-read di tab lain (device sama,
+                        // login sama) langsung nurunin badge di sini juga, gak
+                        // nunggu reload manual. toOthers() di controller udah
+                        // nyaring biar tab yang barusan aksi gak dapet balik
+                        // event punya sendiri (state lokalnya udah di-update
+                        // optimistically di markAsRead()/markAllAsRead()).
+                        .listen('.NotificationsMarkedRead', (e) => {
+                            this.unreadCount = e.unread_count;
                         });
                     return;
                 }
@@ -99,32 +119,43 @@ function notificationDropdown() {
             attach();
         },
         
+        // fetch() gak otomatis nempelin header X-Socket-ID kayak axios global
+        // (beda dari yang dipakai Echo internal) — tanpa ini toOthers() di
+        // NotificationController gak bisa nyaring tab pengirim, jadi tab yang
+        // barusan aksi ikut nerima balik event NotificationsMarkedRead punya
+        // sendiri (harmless — cuma nimpa unreadCount dgn nilai yang sama —
+        // tapi lebih bersih kalau dicegah dari sononya).
+        socketHeaders() {
+            const headers = {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            };
+            if (window.Echo && window.Echo.socketId()) {
+                headers['X-Socket-ID'] = window.Echo.socketId();
+            }
+            return headers;
+        },
+
         async markAsRead(id) {
             const notif = this.notifications.find(n => n.id === id);
             if (notif && !notif.read_at) {
                 notif.read_at = new Date().toISOString();
                 this.unreadCount = Math.max(0, this.unreadCount - 1);
-                
+
                 await fetch(`/notifications/${id}/read`, {
                     method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    }
+                    headers: this.socketHeaders()
                 });
             }
         },
-        
+
         async markAllAsRead() {
             this.notifications.forEach(n => n.read_at = new Date().toISOString());
             this.unreadCount = 0;
-            
+
             await fetch('/notifications/mark-all-read', {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                }
+                headers: this.socketHeaders()
             });
         },
         

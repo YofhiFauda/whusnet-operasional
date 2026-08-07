@@ -90,6 +90,7 @@ Daftar material terstruktur (baris berulang: barang, tipe, jumlah, satuan, catat
 - Bikin/pakai record `CustomerInstallation` (status `scheduled`) kalau belum ada yang `scheduled`/`in_progress`.
 - Transition ke `waiting_installation` (efek samping: auto-create Task Pemasangan).
 - **Auto-approve** Task Survey terkait yang statusnya `fop_review_status = pending` → langsung `approved` (FOP yang klik "Proses ke TIM" dianggap sekaligus meng-approve laporan survey teknisi — 1 aksi, 2 efek).
+- **Notifikasi in-app (2026-08-06/07):** tim survey (teknisi yang laporannya baru disetujui) dapet notif SUCCESS. **Terpisah**, role `fop` di POP pelanggan ini JUGA dapet notif INFO soal Task Pemasangan baru yang perlu di-assign tim — gap yang sempat kelewat (admin verifikasi yang aksi di sini, tapi FOP-lah yang bakal assign tim ke Task Pemasangan baru itu, bukan admin). Notif FOP di-skip kalau Task Pemasangan yang dipakai BUKAN baru (udah ada `teamMembers`, mis. reuse dari jalur revisi) — biar gak double-notif tiap `processToTeam()` kepanggil ulang. Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.2.
 
 ## 6. Tahap 4 — Pemasangan (`CustomerInstallationController`)
 
@@ -146,11 +147,13 @@ Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan �
 - Set `customer.status=active`, `customer_status=aktif`, `data_completeness_status=siap_billing`; `customer_service.service_status=aktif`, `billing_status=active`, catat siapa & kapan aktivasi (`activated_by_name`, `activated_by_user_id`, `activation_time`).
 - **Auto-approve** Task Pemasangan terkait yang `fop_review_status=pending`.
 - Ini **satu-satunya jalur normal** yang mengubah status ke `active` — gak ada jalur otomatis lain.
+- **Notifikasi in-app (2026-08-06/07):** tim pemasangan dapet notif SUCCESS ("pelanggan resmi aktif"). **Terpisah**, pendaftar asli pelanggan (`customers.created_by` — Sales/CS yang mendaftarkan, relasi `Customer::creator()`) juga dapet notif SUCCESS Customer Lifecycle, di-skip kalau yang eksekusi `finalVerify()` = pendaftar itu sendiri. Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.2 (tim) & §8.5 (pendaftar).
 
 ### Reject (`reject`)
 
 - Transition ke `rejected` — dipakai kalau pelanggan dibatalkan total di titik verifikasi manapun. Pelanggan yang ditolak otomatis masuk list **Pelanggan Gagal** (`CustomerController` statusGroup `failed`, `whereIn('status', ['failed','rejected','gagal'])`) — no-op, gak ada kode tambahan buat ini.
 - **Stage-aware sejak fix reject-sync gap (2026-07-14):** tahap ditentukan dari `$customer->status` SEBELUM `transition()` dipanggil (transition-nya sendiri ngubah status jadi `rejected`, jadi harus direkam duluan) — `installation_in_progress|revision_installation|installed|verification_admin` = tahap install → target **Task Pemasangan**; selain itu (`waiting_acc|survey_in_progress|surveyed|waiting_installation`) = tahap survey → target **Task Survey** (behavior lama). SEBELUM fix ini, `reject()` SELALU nyentuh Task Survey — kalau ditolak di tahap install, Task Pemasangan gak pernah ke-update, nyangkut permanen di antrian FOP aktif. Detail: `docs/project_verifikasi_reject_gap.md`.
+- **Notifikasi in-app (2026-08-06):** tim task (Survey/Pemasangan sesuai tahap) yang laporannya ditolak dapet notif ERROR. Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.2.
 - Auto-reject Task (Survey atau Pemasangan, sesuai tahap) yang masih `fop_review_status=pending` → `fop_review_status=rejected` + `reject_reason`. `Task.status` **TETAP `selesai`** (beda dari Revisi di bawah yang revert ke `in_progress`) — downstream `TaskObserver` TETAP sync `FopTask` ke `Selesai` (bukan `Cancel` — kerjaan lapangan teknisi sukses, yang ditolak keputusan bisnis customer-nya, 2 hal beda sengaja gak dicampur), cuma label histori granularnya jadi `selesai_ditolak_verifikasi`. Di Riwayat FOP, badge "Verifikasi: Ditolak" muncul sebagai kolom/badge KEDUA (overlay dari `FopTask::verificationStatus()`), terpisah dari badge status utama "Selesai" (lihat [docs/fop-task/flowchart.md § 9](../fop-task/flowchart.md#9-status-realtime--sync-task-eksekusi--foptask-task-9)).
 - UI: tombol "Tolak" tersedia di halaman queue (tahap survey, sudah lama ada) DAN di halaman Verif & Pemasangan `verifications/admin.blade.php` (tahap install). Modal Tolak eksplisit warning "final, gak bisa dibuka lagi, harus registrasi ulang dari awal" — **catatan: warning ini sekarang gak 100% akurat**, lihat "Kembalikan" di bawah (ditambahkan belakangan sebagai jalur darurat, `allowedNextTransitions()` enum `REJECTED` sendiri tetap kosong/terminal, gak diubah).
 - **Tombol Delete pelanggan dihapus dari `/verifications/queue` (2026-07-20)**: sebelumnya tiap baris antrean punya icon Delete (`customers.destroy`, hard-delete permanen, permission `customers.delete`) tanpa peduli status — berbahaya karena SRV/PSB pada dasarnya gak boleh dihapus (bisa juga crash FK karena `tasks.customer_id` `onDelete('restrict')` kalau customer punya Task terkait). Diganti icon "Batal / Gagal" yang manggil modal reject yang sama (`openRejectModal()`, POST ke `customers.verification.reject`) — sekarang berlaku SERAGAM di semua status queue (`waiting_acc`, `surveyed`, `waiting_installation`, `installation_in_progress`, `revision_installation`, `installed`, `verification_admin`), bukan cuma `surveyed` seperti sebelumnya. Gate permission `customers.detail.installation.validate` (sama kayak permission route reject).
@@ -182,6 +185,7 @@ Kalau salah satu gak kepenuhi (termasuk pelanggan migrasi yang di sistem lama JU
 - Transition ke `revision_installation` — **bukan final**, pelanggan bisa lanjut lagi (lihat tabel transisi §1: `revision_installation` bisa balik ke `verification_admin`/`installed`/`waiting_installation`).
 - Update `CustomerInstallation.installation_status` balik ke `in_progress` (supaya teknisi bisa submit ulang laporan) + prepend catatan revisi ke `installation_note`.
 - Auto-revert Task Pemasangan terkait: status Task balik ke `in_progress`, `fop_review_status=rejected`.
+- **Notifikasi in-app (2026-08-06):** tim pemasangan dapet notif WARNING ("perlu revisi"). Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.2.
 
 ## 8. Teknisi Fieldwork Page — Data Teknis Terpisah dari Detail Pelanggan (2026-07-28)
 
@@ -256,6 +260,7 @@ Jika di futur ada kebutuhan teknisi lihat identitas/alamat *saat di lokasi* (mis
 - Endpoint tunggal `__invoke()` — set `customer.status=terminated`, `customer_service.service_status=berhenti`.
 - **Tidak lewat `CustomerWorkflowService::transition()`** — update status langsung tanpa validasi state machine (beda dari semua transisi lain di atas). Implikasi: terminasi bisa terjadi dari status manapun (termasuk yang secara teori gak valid menurut tabel `WorkflowTransition`), dan **tidak** tercatat di `customer_status_logs` (cuma di `AuditLog` biasa, module `customers`, action `terminate`).
 - Alasan `required` di form — disimpan cuma di `AuditLog.new_values`, gak ada kolom dedicated buat alasan terminasi di tabel manapun.
+- **Notifikasi in-app (2026-08-07):** pendaftar asli pelanggan (`customers.created_by`, relasi `Customer::creator()`) dapet notif ERROR, di-skip kalau yang eksekusi terminasi = pendaftar itu sendiri. **`suspended` SENGAJA gak dapet notif serupa** — beda dari `active`/`terminated` yang masing-masing punya SATU action controller khusus, `suspended` cuma keset lewat form edit generik (`CustomerController::update()`), risiko false-positive kalau dipaksa. Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.5.
 
 ### List Putus Langganan + Ambil Alat + Langganan Lagi (2026-07-20)
 
@@ -291,6 +296,10 @@ List Pelanggan Gagal & Putus Langganan baca alasan/tanggal dari `AuditLog` (liha
 **Catatan batas**: `old_values.status` di AuditLog sintetis ini di-default `'registered'` (buat rejected) / `'active'` (buat terminated) — data legacy gak selalu jelas tahap PERSIS sebelum gagal/putus, jadi tombol **Kembalikan** (§7)/**Langganan Lagi** (§8) buat pelanggan migrasi yang gagal bakal balikin ke `registered`, bukan ke tahap SRV/PSB terakhir yang sebenarnya.
 
 Lihat juga §7 "Aktivasi Manual" — jalur aktivasi khusus buat pelanggan migrasi yang TERBUKTI `request_status=ACTIVE` di data lama tapi belum kesentuh alur normal di sistem baru.
+
+### Notifikasi hasil import (2026-08-07)
+
+`confirmImport()` (dipanggil baik dari UI `/customers/import` maupun internal `php artisan app:import-legacy-sql`) sekarang notif `auth()->user()` (uploader) sendiri — SUCCESS + jumlah baris ter-import kalau sukses, ERROR + pesan exception kalau gagal (`catch` block, `$batch->status='failed'`). **Koreksi asumsi lama:** gak ada class `CustomersImport` terpisah — importnya inline lewat `Spatie\SimpleExcel\SimpleExcelReader`, dan prosesnya **sinkron** dalam satu request HTTP, bukan queued job. Notif tetap berguna buat ninggalin jejak `batch_number` di `/notifications` walau hasilnya udah keliatan langsung di response. Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.6.
 
 ## 10. Kaitan dengan Modul Lain
 

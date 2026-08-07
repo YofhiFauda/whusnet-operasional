@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\NotificationType;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\User;
+use App\Notifications\AppNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -54,6 +57,19 @@ class CustomerTerminationController extends Controller
                 'created_at' => now(),
             ]);
         });
+
+        // Customer Lifecycle: pendaftar asli dikasih tau pelanggannya
+        // diterminasi — sebelumnya nol notif buat transisi besar status
+        // pelanggan (docs/plan/analisa-status-implementasi-notifikasi.md §5).
+        $creator = $customer->creator ?? ($customer->created_by ? User::find($customer->created_by) : null);
+        if ($creator && $creator->id !== auth()->id()) {
+            $creator->notify(new AppNotification(
+                title: 'Pelanggan Diterminasi: '.$customer->full_name,
+                message: "Layanan pelanggan {$customer->full_name} dihentikan oleh ".auth()->user()->name.". Alasan: {$request->reason}",
+                actionUrl: route('customers.show', $customer->id),
+                type: NotificationType::ERROR
+            ));
+        }
 
         return redirect()->back()->with('success', 'Layanan pelanggan berhasil dihentikan (terminasi).');
     }

@@ -75,6 +75,8 @@ Customer::whereIn('status', ['waiting_installation', 'installation_in_progress',
 
 Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` seperti versi dokumen lama) — samain sama logic di `FopTask::slaDeadline()` ([database-schema.md](database-schema.md)).
 
+**Alert SLA breach (baru, 2026-08-07) — bukan cuma indikator visual pasif lagi.** Sebelumnya angka/badge SLA di dashboard ini murni pull (dashboard harus dibuka buat kelihatan). Command scheduled `fop-tasks:check-sla-breach` (`everyThirtyMinutes()`, `routes/console.php`) sekarang notif in-app (lonceng + toast) ke semua user role `fop` di POP terkait begitu `FopTask::slaDeadline()` kelewat, pakai deadline yang SAMA PERSIS dipakai badge di dashboard ini — gak ada logic kedua yang bisa menyimpang. Dedup lewat kolom `fop_tasks.sla_breach_notified_at` (lihat [database-schema.md](database-schema.md)). Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.4.
+
 > ⚠️ **Known issue (ketemu gak sengaja pas verifikasi Task 1/2, belum difix):** `DATE_ADD(...)`/`NOW()` di atas MySQL-only, error kalau `index()` dijalanin di atas SQLite. Gak berdampak ke production (asumsi DB production MySQL), tapi bikin dashboard ini gak bisa diikutkan test otomatis di atas SQLite. Detail di [analisa-sync-execution-task.md](analisa-sync-execution-task.md#10-isu-lain-yang-ketemu-terpisah-belum-difix).
 
 ## Access Control

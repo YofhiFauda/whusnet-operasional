@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\DocumentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -36,6 +37,7 @@ use App\Models\SubscriptionStatus;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
+use App\Notifications\AppNotification;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
@@ -2992,8 +2994,27 @@ class CustomerController extends Controller
             $batch->update(['status' => 'failed']);
             Log::error('Multi-sheet Import Error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
+            // Import massal sebelumnya nol notif hasil sama sekali (docs/plan/
+            // analisa-status-implementasi-notifikasi.md §5) — meski proses ini
+            // sinkron (uploader langsung lihat hasil di response), notif tetap
+            // ninggalin jejak di /notifications biar batch_number gak ilang
+            // kalau lupa dicatat manual.
+            auth()->user()?->notify(new AppNotification(
+                title: 'Import Pelanggan Gagal: '.$batch->batch_number,
+                message: "Import gagal — {$e->getMessage()}",
+                actionUrl: route('customers.import.batch-detail', $batch->id),
+                type: NotificationType::ERROR
+            ));
+
             return redirect()->route('customers.import')->withErrors('Gagal meng-import data: '.$e->getMessage());
         }
+
+        auth()->user()?->notify(new AppNotification(
+            title: 'Import Pelanggan Selesai: '.$batch->batch_number,
+            message: "Berhasil meng-import {$insertedCount} baris data dari sheet migrasi.",
+            actionUrl: route('customers.import.batch-detail', $batch->id),
+            type: NotificationType::SUCCESS
+        ));
 
         return redirect()->route('customers.index')->with('success', "Berhasil meng-import {$insertedCount} baris data dari sheet migrasi! (Batch: {$batch->batch_number})");
     }

@@ -12,3 +12,4 @@ Schedule::command('check:countdown --minutes=60')->everyFiveMinutes();
 Schedule::command('fop:reset-cancelled-tasks')->dailyAt('00:01');
 Schedule::command('billing:generate-monthly-invoices')->monthlyOn(1, '01:00');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
+Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();

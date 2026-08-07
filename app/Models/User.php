@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 
 #[Fillable(['name', 'email', 'password', 'phone', 'status', 'role_id'])]
 #[Hidden(['password', 'remember_token'])]
@@ -122,5 +123,34 @@ class User extends Authenticatable
     public function assignedCustomers()
     {
         return $this->hasMany(Customer::class, 'collector_id');
+    }
+
+    /**
+     * Unread notification count buat badge lonceng navbar — di-cache TTL
+     * pendek karena query ini jalan di SETIAP page load (dropdown komponen
+     * dipasang di layout utama, docs/plan/analisa-status-implementasi-
+     * notifikasi.md §4 no. 1). TTL sengaja pendek (bukan di-invalidate manual
+     * tiap ada notif baru masuk) — badge di klien udah nambah realtime lewat
+     * Echo begitu notif baru nyampe (notification-dropdown.blade.php), jadi
+     * angka cache di sini cuma dipakai buat initial render pas page load,
+     * beda user/tab, gak perlu presisi ke-detik.
+     */
+    public function unreadNotificationsCountCached(): int
+    {
+        return Cache::remember(
+            "user.{$this->id}.unread_notifications_count",
+            20,
+            fn () => $this->unreadNotifications()->count()
+        );
+    }
+
+    /**
+     * Dipanggil dari NotificationController::markAsRead/markAsUnread/
+     * markAllAsRead — mark-read HARUS langsung kelihatan turun di badge tab
+     * yang sama tanpa nunggu TTL 20 detik habis.
+     */
+    public function clearUnreadNotificationsCountCache(): void
+    {
+        Cache::forget("user.{$this->id}.unread_notifications_count");
     }
 }

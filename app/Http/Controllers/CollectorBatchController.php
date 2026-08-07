@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
+use App\Enums\ScopeType;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PaymentBatch;
 use App\Models\User;
+use App\Notifications\AppNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -116,6 +120,8 @@ class CollectorBatchController extends Controller
                         'invoice_id' => $lockedInvoice->id,
                         'invoice_status' => $lockedInvoice->invoice_status->value,
                         'remaining_amount' => (float) $lockedInvoice->remaining_amount,
+                        'pop_id' => $lockedInvoice->pop_id,
+                        'amount' => $amount,
                     ];
                 }
 
@@ -128,6 +134,35 @@ class CollectorBatchController extends Controller
                 'failures' => [['reason' => $e->getMessage()]],
             ], 422);
         }
+
+        // Notif ke pop_admin per POP yang kena setoran ini — sistem ini gak
+        // punya role "Finance Pusat" (RBAC: owner/atasan/admin/noc/helpdesk/
+        // fop/teknisi/sales/pop_admin/kolektor), jadi penerima paling pas
+        // adalah pop_admin: dialah yang pegang payments.validate/reject buat
+        // POP-nya (docs/plan/analisa-status-implementasi-notifikasi.md §8.3).
+        // Di-grup per pop_id karena satu batch kolektor secara teknis bisa
+        // nyentuh invoice lintas POP walau jarang terjadi di praktik.
+        //
+        // Pesan SENGAJA murni informatif ("dicatat"), BUKAN "perlu
+        // direkonsiliasi" — fitur rekonsiliasi kas Setoran Kolektor eksplisit
+        // di-drop dari scope produk (docs/billing-pembayaran/README.md §
+        // Konsep Inti: "PaymentBatch BUKAN rekonsiliasi kas"). Notif ini cuma
+        // kabar "ada setoran baru", bukan nyiratin ada langkah approve/proses
+        // lanjutan yang harus dikerjakan pop_admin — kalau nominalnya salah,
+        // koreksi lewat PaymentController::reject() per payment (udah ada
+        // notifnya sendiri, § 8.3), bukan lewat batch ini.
+        collect($results)->groupBy('pop_id')->each(function (Collection $rowsInPop, $popId) use ($collector) {
+            if (! $popId) {
+                return;
+            }
+
+            $total = $rowsInPop->sum('amount');
+            $this->notifyRoleUsersInPop((int) $popId, 'pop_admin',
+                'Setoran Kolektor: '.$collector->name,
+                $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat kolektor {$collector->name}.",
+                route('collectors.show', $collector->id)
+            );
+        });
 
         return response()->json([
             'success' => true,
@@ -207,5 +242,31 @@ class CollectorBatchController extends Controller
     private function authorizeCollector(User $collector): void
     {
         abort_unless($collector->hasRole('kolektor'), 404, 'User ini bukan kolektor.');
+    }
+
+    /**
+     * Semua user berrole $roleCode yang punya akses ke POP $popId — pola sama
+     * persis `TicketService::usersWithRoleInPop()`, disalin bukan diekstrak
+     * jadi shared service karena cuma dipakai 1 titik di kelas ini.
+     */
+    private function notifyRoleUsersInPop(int $popId, string $roleCode, string $title, string $message, string $actionUrl): void
+    {
+        $users = User::whereHas('role', fn ($q) => $q->where('code', $roleCode))
+            ->where(function ($query) use ($popId) {
+                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
+                        ->whereHas('targets', fn ($t) => $t->where('pop_id', $popId))
+                    );
+            })
+            ->get();
+
+        foreach ($users as $user) {
+            $user->notify(new AppNotification(
+                title: $title,
+                message: $message,
+                actionUrl: $actionUrl,
+                type: NotificationType::INFO
+            ));
+        }
     }
 }

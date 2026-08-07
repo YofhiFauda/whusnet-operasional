@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
@@ -34,6 +35,8 @@ class CustomerVerificationNotificationTest extends TestCase
 
     protected User $teknisi;
 
+    protected User $fopUser;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,6 +59,21 @@ class CustomerVerificationNotificationTest extends TestCase
 
         $teknisiRole = Role::where('code', 'teknisi')->first();
         $this->teknisi = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
+
+        $this->fopUser = $this->makeUserWithAllPopScope('fop');
+    }
+
+    private function makeUserWithAllPopScope(string $roleCode): User
+    {
+        $role = Role::where('code', $roleCode)->first();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+
+        $user->roleScopes()->create([
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::ALL_POP->value,
+        ]);
+
+        return $user;
     }
 
     private function makeTaskWithTeam(Customer $customer, TaskType $taskType, string $taskNumber): Task
@@ -146,5 +164,89 @@ class CustomerVerificationNotificationTest extends TestCase
             fn ($notification) => $notification->type === NotificationType::WARNING
                 && str_contains($notification->title, $installTask->task_number)
         );
+    }
+
+    /**
+     * Gap dilaporkan user 2026-08-06 (docs/plan/analisa-status-implementasi-
+     * notifikasi.md §8.2/§8.5): Task PSB "Menunggu ACC", Admin klik "Setujui
+     * & Proses ke Tim Pemasangan" — FOP (yang bakal assign tim ke Task
+     * Pemasangan barunya) harus dapet notif, bukan cuma tim survey.
+     */
+    public function test_process_to_team_notifies_fop_role_about_new_install_task(): void
+    {
+        $this->loginAsAdmin();
+
+        $customer = Customer::create([
+            'customer_code' => 'CUST-PSB-101',
+            'full_name' => 'PSB Menunggu ACC Customer',
+            'primary_phone' => '081200000201',
+            'status' => 'waiting_acc',
+            'pop_id' => $this->pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+
+        Notification::fake();
+
+        $this->post(route('customers.verification.process-to-team', $customer->id))
+            ->assertRedirect();
+
+        $customer->refresh();
+        $this->assertSame('waiting_installation', $customer->status);
+
+        $installTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->firstOrFail();
+
+        Notification::assertSentTo(
+            $this->fopUser,
+            AppNotification::class,
+            fn ($notification) => $notification->type === NotificationType::INFO
+                && str_contains($notification->title, $installTask->task_number)
+        );
+
+        // Teknisi (bukan role fop) gak ikut kebagian notif ini — beda
+        // penerima dari notifyTaskTeam() di atas.
+        Notification::assertNotSentTo($this->teknisi, AppNotification::class);
+    }
+
+    /**
+     * Task Pemasangan yang UDAH punya tim (dipakai ulang lewat jalur
+     * revisi/reuse) gak notif FOP lagi — FOP udah pernah kebagian notif
+     * assignment sebelumnya, jangan spam ulang tiap kali processToTeam()
+     * kepanggil.
+     */
+    public function test_process_to_team_does_not_renotify_fop_for_task_with_existing_team(): void
+    {
+        $this->loginAsAdmin();
+
+        $customer = Customer::create([
+            'customer_code' => 'CUST-PSB-102',
+            'full_name' => 'PSB Reuse Task Customer',
+            'primary_phone' => '081200000202',
+            'status' => 'waiting_acc',
+            'pop_id' => $this->pop->id,
+            'data_completeness_status' => 'draft',
+            'registration_date' => now(),
+        ]);
+
+        $existingInstallTask = Task::create([
+            'task_number' => 'TASK-INST-0202',
+            'pop_id' => $this->pop->id,
+            'customer_id' => $customer->id,
+            'task_type' => TaskType::PEMASANGAN->value,
+            'title' => 'Pemasangan '.$customer->full_name,
+            'status' => TaskStatus::PENDING->value,
+            'created_by' => 1,
+            'updated_by' => 1,
+        ]);
+        $existingInstallTask->teamMembers()->create(['user_id' => $this->teknisi->id, 'role_in_task' => 'lead']);
+
+        Notification::fake();
+
+        $this->post(route('customers.verification.process-to-team', $customer->id))
+            ->assertRedirect();
+
+        Notification::assertNotSentTo($this->fopUser, AppNotification::class);
     }
 }
