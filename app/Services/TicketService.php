@@ -512,12 +512,17 @@ class TicketService
         $fopTask->status = TaskStatus::TERJADWAL;
         $fopTask->save();
 
+        // description CUMA dari detail_keluhan — JANGAN digabung sama
+        // catatan_teknis. catatan_teknis udah punya rumah sendiri (tampil
+        // proper di section "Detail Ticket", lihat history_detail.blade.php),
+        // gabungin ke sini bikin dua sumber kebenaran + box "Issue / Keluhan"
+        // teknisi kecampur asesmen NOC (sama alasan di FopTaskController::store()).
         $taskData = [
             'customer_id' => $fopTask->customer_id,
             'pop_id' => $fopTask->pop_id,
             'task_type' => $fopTask->category->value,
             'title' => 'FOP: '.$fopTask->tugas,
-            'description' => trim($ticket->detail_keluhan."\n".($ticket->catatan_teknis ?? '')),
+            'description' => $ticket->detail_keluhan,
             'team_member_ids' => $technicianIds,
             'scheduled_at' => $fopTask->task_date,
             'conflict_override' => true,

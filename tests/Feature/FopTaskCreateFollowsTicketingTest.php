@@ -10,6 +10,7 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
 use App\Models\FopTask;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -18,11 +19,15 @@ use App\Models\User;
 use App\Models\Village;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
 use Database\Seeders\TicketFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -56,7 +61,22 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
         $this->seed(ActionSeeder::class);
         $this->seed(TicketFeatureSeeder::class);
         $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
+
+        // TaskFeatureSeeder bikin permission BARU ('task.view.own' dkk) setelah
+        // AppServiceProvider::boot() sempat register Gate dari Permission::all()
+        // yang masih kosong (boot jalan sebelum seeding test ini). Tanpa
+        // register ulang di sini, $user->can('task.view.own') di TaskPolicy
+        // selalu false walau hasPermission() sendiri udah true — lihat pola
+        // sama di TaskShowMaintenanceReportTest::setUp().
+        foreach (Permission::all() as $permission) {
+            if ($permission->code) {
+                Gate::define($permission->code, fn ($user) => $user->hasPermission($permission->code));
+            }
+        }
 
         $this->fopUser = $this->makeUserWithAllPopScope('fop');
         $this->helpdeskUser = $this->makeUserWithAllPopScope('helpdesk');
@@ -145,6 +165,35 @@ class FopTaskCreateFollowsTicketingTest extends TestCase
 
         // Deskripsi Task eksekusi harus dari keluhan pelanggan, bukan issue generik.
         $this->assertStringContainsString('Internet mati total', $linkedTask->description);
+    }
+
+    /**
+     * Regresi: description Task eksekusi CUMA dari detail_keluhan (bukan
+     * digabung catatan_teknis lagi — lihat TicketService::assignTechnicians()).
+     * catatan_teknis tetap harus kebaca teknisi, tapi di box "Catatan Teknis
+     * (NOC)" sendiri di halaman /tasks/{id} — bukan hilang, bukan nyampur ke
+     * box "Issue / Keluhan".
+     */
+    public function test_task_show_separates_catatan_teknis_from_description_for_teknisi(): void
+    {
+        $response = $this->actingAs($this->fopUser)->post(route('tickets.store'), $this->basePayload([
+            'technicians' => [$this->tech->id],
+            'task_date' => now()->addDay()->format('Y-m-d').' 09:00:00',
+        ]));
+
+        $ticket = Ticket::first();
+        $linkedTask = Task::find($ticket->fopTask->refresh()->task_id);
+
+        // description gak lagi kebawa 'Redaman -27 dBm.' dari catatan_teknis.
+        $this->assertStringNotContainsString('Redaman -27 dBm', $linkedTask->description);
+        $this->assertStringContainsString('Internet mati total', $linkedTask->description);
+
+        $page = $this->actingAs($this->tech)->get(route('tasks.show', $linkedTask));
+        $page->assertOk();
+        $page->assertSee('Issue / Keluhan');
+        $page->assertSee('Internet mati total, sudah dicek dari sisi pelanggan.');
+        $page->assertSee('Catatan Teknis (NOC)');
+        $page->assertSee('Redaman -27 dBm.');
     }
 
     public function test_creq_also_supported_via_fop_tasks_page(): void

@@ -291,12 +291,18 @@ class FopTaskController extends Controller
                 // Title dibuat polos dulu — prefix "[Nama Team]" diisi oleh
                 // FopTaskTeamService::rebuildTeamsForDate() begitu team-nya kebentuk
                 // (dipanggil beberapa baris di bawah), bukan ditebak di sini.
+                //
+                // description CUMA dari issue, JANGAN digabung sama fop_task->notes —
+                // notes itu pointer sistem pendek (mis. "Ticket TKT-… — dikirim oleh
+                // …", lihat TicketService::composeFopNotes()), bukan konten buat
+                // dibaca teknisi. Digabung bikin box "Issue / Keluhan" di halaman
+                // Task teknisi (tasks/show.blade.php) kecampur metadata sistem.
                 $taskData = [
                     'customer_id' => $fopTask->customer_id,
                     'pop_id' => $fopTask->pop_id,
                     'task_type' => $fopTask->category->value,
                     'title' => 'FOP: '.$fopTask->tugas,
-                    'description' => trim($fopTask->issue."\n".$fopTask->notes),
+                    'description' => $fopTask->issue,
                     'team_member_ids' => $technicians,
                     'scheduled_at' => $fopTask->task_date,
                     'conflict_override' => true,
@@ -562,12 +568,15 @@ class FopTaskController extends Controller
                 if (! empty($technicians) || $fopTask->task_id) {
                     // Title dibuat polos — prefix "[Nama Team]" diisi oleh
                     // FopTaskTeamService::rebuildTeamsForDate() setelah ini (bukan ditebak di sini).
+                    //
+                    // description CUMA dari issue — lihat komentar senada di store()
+                    // di atas soal kenapa fop_task->notes gak boleh ikut digabung.
                     $taskData = [
                         'customer_id' => $fopTask->customer_id,
                         'pop_id' => $fopTask->pop_id,
                         'task_type' => $fopTask->category->value,
                         'title' => 'FOP: '.$fopTask->tugas,
-                        'description' => trim($fopTask->issue."\n".$fopTask->notes),
+                        'description' => $fopTask->issue,
                         'team_member_ids' => $technicians,
                         'scheduled_at' => $fopTask->task_date,
                         'conflict_override' => true,

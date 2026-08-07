@@ -22,6 +22,21 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
 | ADHOC-14 | Redesign Halaman Pembayaran (`payments.index`, `payments.create`, `payments.show`, `payments.overpay`) dengan dukungan penuh Dark/Light Theme & Stat Cards | Done — 2026-08-06 |
 | ADHOC-15 | Detail Task teknisi: blok Laporan Pekerjaan Teknisi + Riwayat Task Saya + hapus fitur Foto Bukti + fix redirect `return_to` Laporan Survey/Pemasangan (lihat detail di bawah) | Done — 2026-08-06 |
+| ADHOC-16 | Pisah "catatan" yang tumpang tindih di Task eksekusi (`Issue/Keluhan` kecampur `catatan_teknis`/`notes`) — 3 sumber, 3 box terpisah (lihat detail di bawah) | Done — 2026-08-07 |
+
+#### ADHOC-16 — Pemisahan Catatan Issue/Keluhan, Catatan Teknis (NOC) & Catatan FOP (2026-08-07)
+
+Bug: `Task.description` dibangun dari `trim($fopTask->issue."\n".$fopTask->notes)`
+(`FopTaskController::store()`/`update()`) atau
+`trim($ticket->detail_keluhan."\n".$ticket->catatan_teknis)`
+(`TicketService::assignTechnicians()`) — pointer sistem/asesmen NOC numpang
+keliatan seolah bagian keluhan pelanggan di box "Issue / Keluhan"
+(`tasks/show.blade.php`). Fix: `description` cuma dari 1 sumber issue;
+`catatan_teknis`/`notes` ditampilkan di 2 box baru terpisah ("Catatan Teknis
+(NOC)", "Catatan FOP") — `TaskController::show()` eager-load `fopTask.ticket`.
+Detail lengkap: `docs/task-teknisi/business-logic.md § 9`,
+`docs/ticketing/business-logic.md § 14`. Test regresi:
+`FopTaskCreateFollowsTicketingTest::test_task_show_separates_catatan_teknis_from_description_for_teknisi`.
 
 #### ADHOC-15 — Laporan Pekerjaan Teknisi + Riwayat Task Saya + Hapus Foto Bukti + Fix Redirect Laporan (2026-08-06)
 

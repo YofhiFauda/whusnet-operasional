@@ -234,6 +234,8 @@ Listener me-*refetch* sendiri lewat endpoint yang sudah lolos scope & permission
 
 `composeFopNotes()` (isi `fop_tasks.notes`) SENGAJA cuma pointer pendek (`"Ticket TKT-xxx — dikirim oleh yyy."`), **BUKAN** menyalin ulang `catatan_teknis` — menyalin bikin dua sumber kebenaran yang menyimpang begitu salah satu diedit.
 
+Prinsip yang sama berlaku waktu `Task` eksekusi teknisi kebentuk (`TicketService::assignTechnicians()` / `FopTaskController::store()`/`update()`): `task->description` cuma diisi dari `detail_keluhan`/`issue` — **BUKAN** digabung sama `catatan_teknis`/`notes`. Dua field itu tetap harus kebaca teknisi, tapi lewat box terpisah di `tasks/show.blade.php`, bukan digabung jadi satu string (fix 2026-08-07, detail: [docs/task-teknisi/business-logic.md § 9](../task-teknisi/business-logic.md#9-pemisahan-catatan--issue-teknis-catatan-fop-catatan-teknis-noc)).
+
 ## 15. Restriksi Hapus Task FOP
 
 `FopTaskController::destroy()` menolak (422):

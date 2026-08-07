@@ -189,6 +189,12 @@ class TaskController extends Controller
             'teamMembers.user',
             'auditLogs.user',
             'maintenanceReport',
+            // fopTask.notes (pointer/catatan FOP) & fopTask.ticket->catatan_teknis
+            // (asesmen NOC) SENGAJA gak pernah digabung ke task->description
+            // (lihat FopTaskController::store()/update() & TicketService::
+            // assignTechnicians()) — ditampilkan di sini di box terpisah sendiri
+            // biar teknisi tetap bisa baca, bukan hilang gara-gara dipisah.
+            'fopTask.ticket',
         ]);
 
         $recentMaintenanceTasks = collect();

@@ -103,3 +103,21 @@ FOP review (approve/reject/pending) via TaskController::review()
 ## 8. Audit
 
 - `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` di titik-titik kunci (`created`, `completed`, `cancelled`, `approved`, `rejected`, `reassigned`) — jadi ada kemungkinan create Task tercatat 2x (event otomatis + manual call di `TaskService::create()`), perlu diperhatikan kalau baca riwayat audit.
+
+## 9. Pemisahan Catatan — Issue/Teknis, Catatan FOP, Catatan Teknis (NOC)
+
+**Bug lama (ditutup 2026-08-07):** `Task.description` dibangun dengan `trim($fopTask->issue."\n".$fopTask->notes)` (`FopTaskController::store()`/`update()`) atau `trim($ticket->detail_keluhan."\n".$ticket->catatan_teknis)` (`TicketService::assignTechnicians()`) — dua sumber beda digabung jadi satu string, lalu ditampilkan di `tasks/show.blade.php` di bawah label **"Issue / Keluhan"**. Efeknya: pointer sistem (`fop_task->notes`, mis. `"Ticket TKT-2026-0123 — dikirim oleh Budi."`) atau asesmen teknis NOC (`ticket->catatan_teknis`, mis. `"Redaman -27 dBm."`) numpang keliatan seolah bagian dari keluhan pelanggan.
+
+**Sekarang — 3 field, 3 tempat, gak ada yang digabung atau dihapus:**
+
+| Field | Sumber | Ditampilkan di `tasks/show.blade.php` |
+|---|---|---|
+| `task->description` | `fop_task->issue` **saja**, atau `ticket->detail_keluhan` **saja** buat ticket-origin (MTN/C-REQ) | Box **"Issue / Keluhan"** (amber) |
+| `task->fopTask->ticket->catatan_teknis` | `ticket->catatan_teknis` — asesmen teknis NOC, opsional | Box **"Catatan Teknis (NOC)"** (biru), tampil kalau ada `fopTask->ticket` & kolomnya keisi |
+| `task->fopTask->notes` | `fop_task->notes` — pointer sistem pendek (`composeFopNotes()`) atau catatan bebas FOP kalau `FopTask` dibuat manual | Box **"Catatan FOP"**, tampil kalau kolomnya keisi |
+
+`TaskController::show()` eager-load `fopTask.ticket` buat nyuplai dua box tambahan itu — sebelumnya relasi ini gak pernah di-load sama sekali di halaman Task teknisi, jadi `fop_task->notes` & `ticket->catatan_teknis` invisible total dari sana walau isinya ada di DB.
+
+**Kenapa gak boleh digabung balik ke `description`:** dua sumber beda gampang menyimpang begitu salah satunya diedit belakangan (prinsip sama kayak `composeFopNotes()` di [ticketing/business-logic.md § 14](../ticketing/business-logic.md#14-format-tugas-cidnama)) — dan secara UX, teknisi gak bisa bedain mana keluhan asli pelanggan vs metadata sistem/asesmen NOC kalau nyampur di 1 box.
+
+Test regresi: `FopTaskCreateFollowsTicketingTest::test_task_show_separates_catatan_teknis_from_description_for_teknisi`.

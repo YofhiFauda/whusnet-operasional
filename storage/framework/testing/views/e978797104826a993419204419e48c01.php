@@ -194,6 +194,21 @@
                         </div>
                         <?php endif; ?>
 
+                        
+                        <?php if($task->fopTask?->ticket?->catatan_teknis): ?>
+                        <div class="flex flex-col sm:flex-row sm:items-start py-2.5 border-b border-border gap-1 sm:gap-4">
+                            <span class="text-sky-700 dark:text-sky-400 sm:w-36 shrink-0 font-bold font-ui">Catatan Teknis (NOC)</span>
+                            <span class="text-text-main font-semibold leading-relaxed bg-sky-50/70 dark:bg-sky-900/20 border border-sky-200/80 dark:border-sky-800/40 rounded-lg p-2.5 flex-1 font-ui whitespace-pre-line"><?php echo e($task->fopTask->ticket->catatan_teknis); ?></span>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if($task->fopTask?->notes): ?>
+                        <div class="flex flex-col sm:flex-row sm:items-start py-2.5 border-b border-border gap-1 sm:gap-4">
+                            <span class="text-text-muted sm:w-36 shrink-0 font-ui font-medium">Catatan FOP</span>
+                            <span class="text-text-main leading-relaxed bg-surface-muted border border-border rounded-lg p-2.5 flex-1 font-ui whitespace-pre-line"><?php echo e($task->fopTask->notes); ?></span>
+                        </div>
+                        <?php endif; ?>
+
                         <?php if($task->customer || $task->pop): ?>
                         <div class="flex flex-col sm:flex-row sm:items-start py-2.5 gap-1 sm:gap-4">
                             <span class="text-text-muted sm:w-36 shrink-0 font-ui font-medium">Alamat & Lokasi</span>

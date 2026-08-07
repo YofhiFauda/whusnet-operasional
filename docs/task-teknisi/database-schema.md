@@ -24,7 +24,7 @@ Migrasi: `2026_06_24_000001_create`.
 | `pop_id` | FK → `pops.id`, restrict delete | | |
 | `task_type` | string(30) | | Enum `App\Enums\TaskType` (sama dengan yang dipakai `FopTask`, lihat [docs/fop-task/database-schema.md](../fop-task/database-schema.md)) |
 | `title` | string | | |
-| `description` | text | ✔ | |
+| `description` | text | ✔ | **Konten CUMA dari sumber issue tunggal** — `fop_task->issue` (jalur `FopTaskController::store()`/`update()`) atau `ticket->detail_keluhan` (jalur `TicketService::assignTechnicians()`, ticket-origin MTN/C-REQ). **JANGAN digabung** sama `fop_task->notes` atau `ticket->catatan_teknis` (fix 2026-08-07, lihat [business-logic.md § 9](business-logic.md#9-pemisahan-catatan--issue-teknis-catatan-fop-catatan-teknis-noc)) — dua sumber itu tetap harus kebaca teknisi, tapi lewat box terpisah di `tasks/show.blade.php`, bukan digabung string di sini. |
 | `status` | string(30), default `draft` | | Enum `App\Enums\TaskStatus` |
 | `scheduled_at`, `started_at`, `completed_at`, `cancelled_at` | timestamp | ✔ | |
 | `cancel_reason`, `pending_reason`, `reject_reason` | string | ✔ | |
