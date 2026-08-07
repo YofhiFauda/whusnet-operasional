@@ -44,6 +44,7 @@ class FopTaskHistoryDetailPageTest extends TestCase
         $salesRole = Role::where('code', 'sales')->first();
 
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->unauthorizedUser = User::factory()->create(['role_id' => $salesRole->id]);
 
         $city = City::create(['name' => 'Ponorogo']);

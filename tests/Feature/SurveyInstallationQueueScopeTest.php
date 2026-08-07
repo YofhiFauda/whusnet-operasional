@@ -55,8 +55,15 @@ class SurveyInstallationQueueScopeTest extends TestCase
     private function makeUser(string $roleCode): User
     {
         $role = Role::where('code', $roleCode)->first();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        // all_pop — testfile ini menguji pembatasan per-assignment (teknisi),
+        // bukan pembatasan POP scope. Tanpa ini applyUserScope() bakal deny-
+        // by-default (scope belum di-setup ≠ akses penuh, lihat CLAUDE.md
+        // § POP Scope) dan bikin assertion "sees all" salah sebab, bukan
+        // salah baca.
+        $this->giveAllPopScope($user);
 
-        return User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        return $user;
     }
 
     private function makeCustomer(string $status, string $name): Customer

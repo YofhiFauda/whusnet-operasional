@@ -38,6 +38,7 @@ class CustomerSurveyController extends Controller
         // survey_in_progress, bukan waiting_survey). Sekalian jadi tempat aman
         // buat nambah scope teknisi di bawah tanpa kena bug presedensi yang sama.
         $query = Customer::with(['pop', 'village.district', 'latestSurvey.technician'])
+            ->applyUserScope()
             ->where(function ($q) {
                 $q->where('status', 'waiting_survey')->orWhere('status', 'survey_in_progress');
             });

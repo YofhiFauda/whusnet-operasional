@@ -262,6 +262,7 @@ class CustomerSurveyTest extends TestCase
         $teknisiRole = Role::where('name', 'Teknisi')->first();
         $technician->role_id = $teknisiRole->id;
         $technician->save();
+        $this->giveAllPopScope($technician);
 
         $customer = Customer::create([
             'customer_code' => 'TEST-004',

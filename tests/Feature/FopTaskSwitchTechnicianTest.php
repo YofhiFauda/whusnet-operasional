@@ -52,6 +52,7 @@ class FopTaskSwitchTechnicianTest extends TestCase
         $teknisiRole = Role::where('code', 'teknisi')->first();
 
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->abdul = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Abdul']);
         $this->karim = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Karim']);
         $this->yanto = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Yanto']);

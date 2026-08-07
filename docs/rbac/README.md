@@ -59,9 +59,10 @@ User ──belongsTo──▶ Role ──belongsToMany──▶ Permission ─�
 | `GET /users` | `users.view` | `UserController@index` |
 | `GET,POST /users(/create,/store)` | `users.create\|users.update` | `UserController@create,store` |
 | `GET,PUT /users/{user}/edit,/update` | `users.create\|users.update` | `UserController@edit,update` |
-| `GET,PUT /users/{user}/pops` | `users.create\|users.update` | `UserController@editPops,updatePops` |
 | `POST /users/preview-access` | `users.create\|users.update` | `UserController@previewAccess` |
 
 ---
 
-**Last updated:** 2026-07-28 — added customer permission hierarchy segregation (4 independent routes/permissions + fieldwork page)
+**Last updated:** 2026-08-07 — removed `/users/{user}/pops` (`editPops`/`updatePops`, halaman "Atur Cabang"): cuma nulis ke pivot `user_pops` legacy, gak pernah ke `user_role_scopes` yang beneran dibaca `EffectiveAccessService` — no-op yang menyesatkan. Assign scope POP user sekarang cuma lewat `/users/{user}/edit` (field "Scope Wilayah Data", jalur `UserScopeManagementService`). Lihat `docs/plan/analisa-celah-scope-pop.md` temuan #6.
+
+Sebelumnya, 2026-07-28 — added customer permission hierarchy segregation (4 independent routes/permissions + fieldwork page)

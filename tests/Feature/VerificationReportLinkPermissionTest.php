@@ -45,8 +45,10 @@ class VerificationReportLinkPermissionTest extends TestCase
     private function makeUser(string $roleCode): User
     {
         $role = Role::where('code', $roleCode)->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $this->giveAllPopScope($user);
 
-        return User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        return $user;
     }
 
     private function makeCustomer(string $status, string $name): Customer

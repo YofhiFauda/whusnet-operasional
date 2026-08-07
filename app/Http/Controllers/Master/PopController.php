@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pop;
+use App\Services\EffectiveAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -144,6 +145,8 @@ class PopController extends Controller
      */
     public function show(Pop $pop): View
     {
+        $this->authorizePopScope($pop);
+
         $pop->load(['parent', 'children' => function ($q) {
             $q->orderBy('name');
         }]);
@@ -156,6 +159,8 @@ class PopController extends Controller
      */
     public function edit(Pop $pop): View
     {
+        $this->authorizePopScope($pop);
+
         // Get all descendant IDs to exclude from parent options (prevent circular ref)
         $excludeIds = array_merge([$pop->id], $this->getDescendantIds($pop));
 
@@ -172,6 +177,7 @@ class PopController extends Controller
      */
     public function update(Request $request, Pop $pop): RedirectResponse
     {
+        $this->authorizePopScope($pop);
         $this->normalizeIdentifierInput($request);
 
         $cidPrefixRules = ['required', 'string', 'max:10', 'regex:/^[A-Z0-9]+$/'];
@@ -218,6 +224,8 @@ class PopController extends Controller
      */
     public function toggleStatus(Pop $pop): RedirectResponse
     {
+        $this->authorizePopScope($pop);
+
         $pop->status = $pop->status === 'active' ? 'inactive' : 'active';
         $pop->save();
 
@@ -238,6 +246,29 @@ class PopController extends Controller
         }
 
         return $ids;
+    }
+
+    /**
+     * Guard per-record — index() sudah pakai Pop::forUser(), tapi
+     * show/edit/update/toggleStatus diakses langsung lewat ID. Tanpa ini user
+     * ber-scope selected_pop/pop_tree bisa lihat/ubah/nonaktifkan POP manapun
+     * di luar cabangnya lewat URL langsung (lihat
+     * docs/plan/analisa-celah-scope-pop.md temuan #11).
+     */
+    private function authorizePopScope(Pop $pop): void
+    {
+        $access = app(EffectiveAccessService::class);
+        $user = auth()->user();
+
+        if ($access->hasAllPopAccess($user)) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $pop->id, $access->getAllowedPopIds($user), true),
+            403,
+            'Anda tidak memiliki akses ke POP/Cabang ini.'
+        );
     }
 
     private function normalizeIdentifierInput(Request $request): void

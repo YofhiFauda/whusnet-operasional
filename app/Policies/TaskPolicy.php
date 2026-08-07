@@ -7,6 +7,7 @@ use App\Enums\TaskType;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowTransitionPermission;
+use App\Services\EffectiveAccessService;
 
 /**
  * TaskPolicy — semua pengecekan via $user->can() / permission dinamis.
@@ -59,7 +60,7 @@ class TaskPolicy
     public function view(User $user, Task $task): bool
     {
         if ($user->can('task.view.all')) {
-            return true;
+            return $this->withinPopScope($user, $task);
         }
 
         if ($user->can('task.view.own') && $task->isMember($user->id)) {
@@ -88,8 +89,29 @@ class TaskPolicy
             return false;
         }
 
+        if (! $this->withinPopScope($user, $task)) {
+            return false;
+        }
+
         // Hanya bisa edit jika status masih bisa diedit
         return $task->status->isEditable();
+    }
+
+    /**
+     * Guard scope POP — `task.view.all`/`task.manage` cuma permission, gak
+     * pernah cek `pop_id`. Tanpa ini, role apapun yang pegang permission itu
+     * (lumayan umum, mis. FOP/Admin) bisa lihat/edit task dari POP manapun
+     * lewat URL langsung (IDOR, lihat docs/plan/analisa-celah-scope-pop.md).
+     */
+    private function withinPopScope(User $user, Task $task): bool
+    {
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($user)) {
+            return true;
+        }
+
+        return in_array((int) $task->pop_id, $access->getAllowedPopIds($user), true);
     }
 
     /**

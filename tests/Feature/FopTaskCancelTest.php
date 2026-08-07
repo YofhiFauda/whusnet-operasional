@@ -52,6 +52,7 @@ class FopTaskCancelTest extends TestCase
         $salesRole = Role::where('code', 'sales')->first();
 
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->noPermUser = User::factory()->create(['role_id' => $salesRole->id]);
         $this->tech = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Budi']);
 

@@ -78,6 +78,7 @@ class PopCRUDTest extends TestCase
             'role_id' => $csRole->id,
             'status' => 'active',
         ]);
+        $this->giveAllPopScope($user);
 
         $this->actingAs($user);
 

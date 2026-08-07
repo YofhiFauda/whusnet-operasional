@@ -130,6 +130,7 @@ class CustomerVerificationStatusChangedBroadcastTest extends TestCase
     {
         $teknisiRole = Role::where('code', 'teknisi')->firstOrFail();
         $teknisi = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
+        $this->giveAllPopScope($teknisi);
         $customer = $this->makeCustomer('installed');
 
         $task = Task::create([

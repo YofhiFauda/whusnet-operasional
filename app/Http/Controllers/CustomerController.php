@@ -38,6 +38,7 @@ use App\Models\User;
 use App\Models\Village;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
+use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\TelegramBotService;
 use App\Services\TicketService;
@@ -734,6 +735,8 @@ class CustomerController extends Controller
             $customer = Customer::findOrFail(request()->route('customer'));
         }
 
+        $this->authorizeCustomerPopScope($customer);
+
         // Fase 5.4 — $districts dead weight (form edit pakai cascade async). Buang.
         $packages = InternetPackage::orderBy('name')->get();
         $cities = City::orderBy('name')->get();
@@ -752,6 +755,8 @@ class CustomerController extends Controller
         if (! $customer->exists) {
             $customer = Customer::findOrFail($request->route('customer'));
         }
+
+        $this->authorizeCustomerPopScope($customer);
 
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
@@ -982,6 +987,7 @@ class CustomerController extends Controller
     public function destroy(Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.delete'), 403);
+        $this->authorizeCustomerPopScope($customer);
 
         DB::transaction(function () use ($customer) {
             $customer->delete();
@@ -995,6 +1001,8 @@ class CustomerController extends Controller
         if (! $customer->exists) {
             $customer = Customer::findOrFail(request()->route('customer'));
         }
+
+        $this->authorizeCustomerPopScope($customer);
 
         $customer->load([
             'city',
@@ -1286,12 +1294,42 @@ class CustomerController extends Controller
     }
 
     /**
+     * Guard per-record — renderCustomerList()/index() sudah di-scope
+     * applyUserScope(), tapi show/edit/update/destroy diakses LANGSUNG lewat
+     * ID lewat route model binding, gak pernah lewat query index() itu.
+     * Tanpa ini, user ber-scope selected_pop/pop_tree tinggal tebak/iterasi ID
+     * pelanggan buat baca/ubah/hapus data pelanggan POP lain manapun — IDOR
+     * penuh di model paling sensitif (lihat docs/plan/analisa-celah-scope-pop.md
+     * temuan #8).
+     */
+    private function authorizeCustomerPopScope(Customer $customer): void
+    {
+        $access = app(EffectiveAccessService::class);
+        $user = auth()->user();
+
+        if ($access->hasAllPopAccess($user)) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $customer->pop_id, $access->getAllowedPopIds($user), true),
+            403,
+            'Anda tidak memiliki akses ke pelanggan di POP ini.'
+        );
+    }
+
+    /**
      * Get payment info & quick hub details for the customer action modal.
      */
     public function paymentInfo(Customer $customer)
     {
-        // Pastikan user punya akses ke POP pelanggan
-        if (! auth()->user()->hasFullAccess() && ! in_array($customer->pop_id, auth()->user()->pops()->pluck('pops.id')->toArray())) {
+        // Pastikan user punya akses ke POP pelanggan. Pakai EffectiveAccessService
+        // (jalur benar, paham pop_tree) — BUKAN $user->pops() pivot legacy yang
+        // dipakai sebelumnya, yang gak paham hierarki pop_tree (lihat CLAUDE.md
+        // § POP Scope, docs/plan/analisa-celah-scope-pop.md temuan #7).
+        $access = app(EffectiveAccessService::class);
+        if (! $access->hasAllPopAccess(auth()->user())
+            && ! in_array((int) $customer->pop_id, $access->getAllowedPopIds(auth()->user()), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 

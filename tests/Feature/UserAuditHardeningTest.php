@@ -105,23 +105,6 @@ class UserAuditHardeningTest extends TestCase
 
         $this->assertSame('User Audit', $updateLog->old_values['name']);
         $this->assertSame('User Audit Updated', $updateLog->new_values['name']);
-
-        $popResponse = $this->put(route('users.pops.update', $user), [
-            'pop_ids' => [$popA->id, $popB->id],
-        ]);
-
-        $popResponse->assertRedirect(route('users.index'));
-
-        $assignLog = AuditLog::query()
-            ->where('module', 'User Management')
-            ->where('action', 'assign_pop')
-            ->where('auditable_type', User::class)
-            ->where('auditable_id', $user->id)
-            ->latest('id')
-            ->firstOrFail();
-
-        $this->assertSame([$popB->id], $assignLog->old_values['pop_ids']);
-        $this->assertSame([$popA->id, $popB->id], $assignLog->new_values['pop_ids']);
     }
 
     public function test_user_form_validation_messages_are_clear(): void

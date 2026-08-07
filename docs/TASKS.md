@@ -2764,7 +2764,7 @@ Menjadikan POP assignment sebagai bagian dari manajemen user dan memastikan scop
 
 Hasil Implementasi:
 - [x] User create/edit mendukung assign satu atau banyak POP.
-- [x] User assignment POP tetap tersedia di halaman khusus `users.pops.edit`.
+- [x] ~~User assignment POP tetap tersedia di halaman khusus `users.pops.edit`.~~ **Superseded 2026-08-07**: halaman ini dihapus — cuma nulis ke pivot `user_pops` legacy, gak pernah nyambung ke `user_role_scopes` yang beneran dipakai `EffectiveAccessService` (no-op yang menyesatkan). Assign scope sekarang cuma lewat `/users/{user}/edit`. Lihat `docs/plan/analisa-celah-scope-pop.md` temuan #6.
 - [x] Query scope customer, invoice, dan payment mengikuti POP yang ditugaskan.
 - [x] Owner/Admin tetap full-access.
 - [x] Admin Cabang tetap dibatasi ke POP assignment.

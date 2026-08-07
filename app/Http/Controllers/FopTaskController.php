@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
 use App\Services\CustomerWorkflowService;
+use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
 use App\Support\ReasonValidationRule;
@@ -61,6 +62,7 @@ class FopTaskController extends Controller
             'ticket.customer:id,cid,customer_code,pop_id,status,distribution_id',
             'ticket.customer.pop:id,name,cid_prefix',
         ])
+            ->applyUserScope()
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
             ->orderByRaw(
@@ -186,7 +188,8 @@ class FopTaskController extends Controller
         // punya task_date: switchTeam() menolak task tanpa task_date (team tujuan
         // wajib se-tanggal), jadi task tanpa tanggal tidak pernah bisa jadi target
         // dan cuma membebani JSON yang di-render ke halaman.
-        $switchTargetTasks = FopTask::whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
+        $switchTargetTasks = FopTask::applyUserScope()
+            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->whereNotNull('task_date')
             ->with('technicians:id,name')
             ->get(['id', 'task_number', 'tugas', 'task_date'])
@@ -213,6 +216,7 @@ class FopTaskController extends Controller
     public function row(FopTask $fopTask)
     {
         $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
 
         if (in_array($fopTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN], true)) {
             return response('', 204);
@@ -327,6 +331,7 @@ class FopTaskController extends Controller
     public function update(Request $request, FopTask $fopTask)
     {
         $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
 
         // Task 14 — record existing Survey/Pemasangan cuma dibolehin submit balik
         // category yang sama (hidden input di form tetap ngirim nilai existing biar
@@ -629,6 +634,7 @@ class FopTaskController extends Controller
     public function destroy(FopTask $fopTask)
     {
         $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
 
         // SRV/PSB gak boleh dihapus dari sini SAMA SEKALI — di bawah ini,
         // destroy() beneran mentransisikan customer ke status 'rejected' (efek
@@ -689,6 +695,7 @@ class FopTaskController extends Controller
     public function assignToTeam(Request $request, FopTask $fopTask)
     {
         $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
 
         $validated = $request->validate([
             'team_id' => ['nullable', 'integer', 'exists:fop_task_teams,id'],
@@ -796,6 +803,8 @@ class FopTaskController extends Controller
 
         $fromTask = FopTask::with('technicians')->findOrFail($validated['from_task_id']);
         $toTask = FopTask::with('technicians')->findOrFail($validated['to_task_id']);
+        $this->authorizeFopTaskScope($fromTask);
+        $this->authorizeFopTaskScope($toTask);
 
         if (! $fromTask->technicians->contains('id', $validated['technician_id'])) {
             return $this->switchTechnicianError($request, 'technician_id', 'Teknisi yang dipilih bukan anggota Task asal.');
@@ -1041,6 +1050,31 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Guard per-record — authorizeAccess() di atas cuma cek permission generik
+     * (fop_tasks.*), gak pernah cek pop_id. Tanpa ini, index()/history() yang
+     * sudah di-scope applyUserScope() bisa ditembus lewat URL langsung
+     * (/fop-tasks/{id}, update/destroy/showHistory/assignToTeam) — user tinggal
+     * tebak/iterasi ID buat baca/ubah task FOP di POP lain (IDOR, lihat
+     * docs/plan/analisa-celah-scope-pop.md temuan #12).
+     */
+    protected function authorizeFopTaskScope(FopTask $fopTask): void
+    {
+        $user = Auth::user();
+        if ($user->hasRole('owner', 'atasan') || $user->hasFullAccess()) {
+            return;
+        }
+
+        $access = app(EffectiveAccessService::class);
+        if ($access->hasAllPopAccess($user)) {
+            return;
+        }
+
+        if (! in_array((int) $fopTask->pop_id, $access->getAllowedPopIds($user), true)) {
+            abort(403, 'Anda tidak memiliki akses ke Task FOP di POP ini.');
+        }
+    }
+
+    /**
      * Display a listing of completed and cancelled FOP tasks.
      */
     public function history(Request $request)
@@ -1048,6 +1082,7 @@ class FopTaskController extends Controller
         $this->authorizeAccess();
 
         $query = FopTask::with(['village', 'technicians', 'task:id,status,report_deferred'])
+            ->applyUserScope()
             ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
             ->orderBy('updated_at', 'desc');
 
@@ -1152,6 +1187,7 @@ class FopTaskController extends Controller
     public function showHistory(FopTask $fopTask)
     {
         $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
 
         $fopTask->load([
             'village',

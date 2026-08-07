@@ -52,7 +52,9 @@ class CustomerVerificationController extends Controller
                     ->orderByDesc('completed_at')
                     ->limit(1);
             },
-        ])->whereIn('status', $statuses);
+        ])
+            ->applyUserScope()
+            ->whereIn('status', $statuses);
 
         // Teknisi cuma boleh liat pelanggan yang Task Pemasangan-nya PERNAH
         // dijadwalkan buat dirinya — bukan seluruh antrean verifikasi/pemasangan.
@@ -109,6 +111,8 @@ class CustomerVerificationController extends Controller
             || $user->hasPermission('*');
         abort_unless($hasPermission, 403);
 
+        $this->authorizeCustomerPopScope($user, $customer);
+
         if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
             $isAssigned = Task::where('customer_id', $customer->id)
                 ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
@@ -151,6 +155,8 @@ class CustomerVerificationController extends Controller
             || $user->hasPermission('customers.view')
             || $user->hasPermission('*');
         abort_unless($hasPermission, 403);
+
+        $this->authorizeCustomerPopScope($user, $customer);
 
         // Guard assignment — halaman ini diakses LANGSUNG lewat URL
         // /verifications/{customer}/admin, gak lewat query index() yang udah
@@ -564,6 +570,28 @@ class CustomerVerificationController extends Controller
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Guard per-record — index() sudah di-scope applyUserScope(), tapi row()/
+     * showAdmin() diakses LANGSUNG lewat ID (bukan lewat query index()), jadi
+     * scope-nya wajib dicek ulang di sini. Tanpa ini, user ber-scope
+     * selected_pop/pop_tree tinggal tebak/iterasi ID pelanggan buat baca
+     * antrean verifikasi POP lain (IDOR, lihat docs/plan/analisa-celah-scope-pop.md).
+     */
+    private function authorizeCustomerPopScope(User $user, Customer $customer): void
+    {
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($user)) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $customer->pop_id, $access->getAllowedPopIds($user), true),
+            403,
+            'Anda tidak memiliki akses ke pelanggan di POP ini.'
+        );
     }
 
     /**

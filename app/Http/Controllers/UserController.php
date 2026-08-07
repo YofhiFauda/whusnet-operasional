@@ -9,7 +9,6 @@ use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
-use App\Services\EffectiveAccessService;
 use App\Services\UserScopeManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -289,49 +288,6 @@ class UserController extends Controller
         ]);
 
         return redirect()->route('users.index')->with('success', 'User berhasil diperbarui.');
-    }
-
-    public function editPops(User $user)
-    {
-        $popTree = $this->buildPopTree();
-
-        return view('users.edit_pops', compact('user', 'popTree'));
-    }
-
-    public function updatePops(Request $request, User $user)
-    {
-        $validated = $request->validate([
-            'pop_ids' => 'nullable|array',
-            'pop_ids.*' => 'exists:pops,id',
-        ], [
-            'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
-            'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
-        ]);
-
-        $oldPopIds = $user->pops()->pluck('pops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-        $newPopIds = collect($validated['pop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
-
-        $user->pops()->sync($validated['pop_ids'] ?? []);
-
-        // Clear access cache
-        app(EffectiveAccessService::class)->clearCache($user);
-
-        if ($oldPopIds !== $newPopIds) {
-            AuditLog::create([
-                'user_id' => auth()->id(),
-                'module' => 'User Management',
-                'action' => 'assign_pop',
-                'auditable_type' => User::class,
-                'auditable_id' => $user->id,
-                'old_values' => ['pop_ids' => $oldPopIds],
-                'new_values' => ['pop_ids' => $newPopIds],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
-        }
-
-        return redirect()->route('users.index')->with('success', 'POP assignment updated successfully.');
     }
 
     public function previewAccess(Request $request)

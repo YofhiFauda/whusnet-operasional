@@ -1,9 +1,9 @@
-# BELUM DI IMPLEMENTASIKAN
+# SUDAH DIIMPLEMENTASIKAN (2026-08-07)
 
 # Analisa Celah Scope POP
 
-**Tanggal:** 2026-08-05
-**Status:** Belum dikerjakan — hasil audit, belum ada fix.
+**Tanggal:** 2026-08-05 (audit), diimplementasikan 2026-08-07.
+**Status:** Selesai — 11 dari 12 temuan di-fix (item #5 sudah ke-fix duluan lewat commit `5df4ab3` sebelum audit ini jalan; item #6 dihapus sesuai keputusan user, bukan disambungkan). Regresi baru: `tests/Feature/PopScopeGapFixesTest.php`. Full test suite: 1003 passed.
 **Konteks:** User curiga fitur Scope POP belum optimal di beberapa tempat. Diverifikasi lewat audit kode (grep + baca langsung), bukan asumsi.
 
 ## Ringkasan
@@ -114,21 +114,18 @@ Murni cek permission (`fop_tasks.*`), gak ada cek `pop_id`. IDOR per-record terp
 - `Pop::scopeForUser()` dan `HasPopScope::scopeApplyUserScope()` — implementasi trait yang benar, jadi acuan pola yang harus diikuti di titik-titik yang bocor.
 - `routes/channels.php` untuk channel `tickets.{popId}`, `invoices.{popId}`, `customers.{popId}`, `fop-tasks.{popId}` — sudah pakai `EffectiveAccessService` dengan benar.
 
-## Rencana Perbaikan (belum dieksekusi)
+## Status Perbaikan (dieksekusi 2026-08-07)
 
-Prioritas:
-1. `FopTaskController::index()`/`history()` — tambah `applyUserScope()` atau filter manual `whereIn('pop_id', $allowedPopIds)` gerbang `hasAllPopAccess()`.
-2. `CustomerSurveyController::index()` dan `CustomerVerificationController::index()` — tambah cabang scope POP untuk role non-teknisi, ikuti pola `CollectorController`.
-3. `TaskController::getTeknisiForUser()` — ganti kondisi `! empty($allowedPopIds)` jadi eksplisit cek `hasAllPopAccess()`.
-4. `routes/channels.php` channel `fop.{pop_id}` — ganti ke `EffectiveAccessService::getAllowedPopIds()`/`hasAllPopAccess()`, samakan pola dengan channel lain di file yang sama.
-5. `UserController::updatePops()` — tentukan apakah fitur ini mau dipertahankan (lalu disambungkan ke `UserRoleScope`) atau dihapus karena sudah digantikan matrix role scope. **Perlu keputusan user**, jangan diputuskan sepihak.
-6. `CustomerController::paymentInfo()` — ganti ke `EffectiveAccessService`.
-7. `CustomerController::show()/edit()/update()/destroy()` — tambah guard `applyUserScope()->whereKey($id)->exists()` sebelum serve, pola sama kayak `Invoice`/`Payment`. **Prioritas tertinggi** — model paling sensitif, IDOR penuh.
-8. `TaskPolicy::view()/edit()` — tambah cek `$task->pop_id` masuk `getAllowedPopIds()`, gak cukup permission doang.
-9. `Master\DistributionController::index()` + dropdown filter — tambah scope, ganti `Pop::where('status','active')` jadi `Pop::forUser()`.
-10. `Master\PopController::show()/edit()/update()/toggleStatus()` — re-check scope pada `Pop` yang di-resolve dari route.
-11. `FopTaskController::authorizeAccess()` — tambah cek `pop_id`, dipakai `update()`/`destroy()`/`showHistory()`.
+1. ✅ `FopTaskController::index()`/`history()` — `applyUserScope()` ditambah (trait `HasPopScope` baru di-attach ke model `FopTask`). Query `$switchTargetTasks` (dropdown "Task Tujuan" modal Switch Teknisi) ikut di-scope — kebocoran tambahan yang ketauan pas nulis test.
+2. ✅ `CustomerSurveyController::index()` dan `CustomerVerificationController::index()` — `applyUserScope()` ditambah ke query utama. `CustomerVerificationController::row()`/`showAdmin()` (per-record, diakses langsung lewat ID) juga dapet guard `authorizeCustomerPopScope()` — gak ada di rencana awal, ketauan pas nulis skenario per-record.
+3. ✅ `TaskController::getTeknisiForUser()` — kondisi diganti jadi `hasAllPopAccess()` eksplisit.
+4. ✅ Sudah beres duluan lewat commit `5df4ab3` (2026-08-06, sebelum audit ini jalan) — `routes/channels.php` channel `fop.{pop_id}` sudah pakai `EffectiveAccessService`.
+5. ✅ **Dihapus** (keputusan user) — `UserController::editPops()`/`updatePops()`, route `users.pops.edit`/`users.pops.update`, view `edit_pops.blade.php`, tombol "Atur Cabang" di `users/index.blade.php`. Fitur "Edit" user (lewat `UserScopeManagementService::syncUserRoleScope()`) sudah menutupi fungsi yang sama dengan jalur yang benar.
+6. ✅ `CustomerController::paymentInfo()` — ganti ke `EffectiveAccessService`.
+7. ✅ `CustomerController::show()/edit()/update()/destroy()` — guard `authorizeCustomerPopScope()` ditambah di keempatnya.
+8. ✅ `TaskPolicy::view()/edit()` — cek `$task->pop_id` via `withinPopScope()`.
+9. ✅ `Master\DistributionController` — `applyUserScope()` di `index()` (trait baru di model `Distribution`), dropdown `create()`/`edit()`/filter ganti ke `Pop::forUser()`, plus guard per-record `edit()/update()/destroy()` — di luar rencana awal yang cuma nyebut `index()`.
+10. ✅ `Master\PopController::show()/edit()/update()/toggleStatus()` — guard `authorizePopScope()` ditambah di keempatnya.
+11. ✅ `FopTaskController` — `authorizeFopTaskScope()` ditambah, dipasang di `update()`, `destroy()`, `showHistory()`, `assignToTeam()`, `switchTechnician()` (dua task sekaligus), dan `row()` (fragment endpoint diakses langsung lewat ID) — lebih luas dari rencana awal yang cuma nyebut update/destroy/showHistory.
 
-Setiap fix wajib disertai test regresi (nama sesuai gejala, bukan sesuai kelas — ikuti konvensi `docs/TASKS.md`/`CLAUDE.md`), dan `EffectiveAccessService::clearCache()` dipanggil di tempat yang relevan kalau ada perubahan scope terkait.
-
-Belum dieksekusi — tunggu keputusan prioritas & konfirmasi item #5 dari user.
+Regresi baru: `tests/Feature/PopScopeGapFixesTest.php` (12 skenario, satu per temuan yang exploitable lewat HTTP). Test lama yang actor-nya `User::factory()->create()` tanpa `UserRoleScope` disesuaikan — helper `TestCase::giveAllPopScope()` ditambah buat fixture yang butuh akses lintas-POP penuh (bukan buat test yang justru menguji pembatasannya sendiri). Full suite: 1003 passed.

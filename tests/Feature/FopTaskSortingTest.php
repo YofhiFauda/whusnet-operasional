@@ -43,6 +43,7 @@ class FopTaskSortingTest extends TestCase
 
         $fopRole = Role::where('code', 'fop')->first();
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
 
         $city = City::create(['name' => 'Ponorogo']);
         $district = District::create(['city_id' => $city->id, 'name' => 'Babadan']);

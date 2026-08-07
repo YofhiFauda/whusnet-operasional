@@ -93,8 +93,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/users', [UserController::class, 'store'])->name('users.store');
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-        Route::get('/users/{user}/pops', [UserController::class, 'editPops'])->name('users.pops.edit');
-        Route::put('/users/{user}/pops', [UserController::class, 'updatePops'])->name('users.pops.update');
         Route::post('/users/preview-access', [UserController::class, 'previewAccess'])->name('users.preview-access');
     });
 

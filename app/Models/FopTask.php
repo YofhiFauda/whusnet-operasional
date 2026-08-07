@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\FopTaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,6 +36,8 @@ use Illuminate\Support\Carbon;
 ])]
 class FopTask extends Model
 {
+    use HasPopScope;
+
     protected function casts(): array
     {
         return [

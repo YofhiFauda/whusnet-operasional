@@ -620,14 +620,18 @@ class TaskController extends Controller
     {
         /** @var EffectiveAccessService $accessService */
         $accessService = app(EffectiveAccessService::class);
-        $allowedPopIds = $accessService->getAllowedPopIds($user);
 
         $query = User::with('role')
             ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
             ->orderBy('name');
 
-        if (! empty($allowedPopIds)) {
-            // Filter teknisi berdasarkan POP yang boleh diakses FOP
+        // Pakai hasAllPopAccess(), bukan `! empty($allowedPopIds)`: getAllowedPopIds()
+        // mengembalikan array kosong untuk ALL_POP *dan* untuk user yang scope-nya
+        // belum di-setup. Menafsirkan kosong = "jangan filter" bikin user tanpa
+        // scope malah lihat SEMUA teknisi lintas cabang di dropdown assign task
+        // (lihat CLAUDE.md § POP Scope, docs/plan/analisa-celah-scope-pop.md).
+        if (! $accessService->hasAllPopAccess($user)) {
+            $allowedPopIds = $accessService->getAllowedPopIds($user);
             $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
         }
 

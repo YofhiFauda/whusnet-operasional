@@ -54,7 +54,6 @@ class UserManagementTest extends TestCase
         $response->assertOk();
         $response->assertSee('Manajemen User & POP');
         $response->assertSee('A User Operasional', false);
-        $response->assertSee('Atur Cabang', false);
         $response->assertSee($pop->name, false);
     }
 
@@ -114,36 +113,5 @@ class UserManagementTest extends TestCase
         $response->assertSee('Filter User', false);
         $response->assertSee('POP User Alpha', false);
         $response->assertDontSee('Other User', false);
-    }
-
-    public function test_user_pop_assignment_page_loads(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-        $this->loginAsAdmin();
-
-        $user = User::factory()->create([
-            'name' => 'Petugas POP',
-            'email' => 'petugas.pop@example.com',
-            'status' => 'active',
-            'role_id' => Role::firstOrFail()->id,
-        ]);
-
-        $user->pops()->sync([
-            Pop::create([
-                'code' => 'POP-USER-02',
-                'pop_code' => 'UP2',
-                'registration_prefix' => 'C',
-                'cid_prefix' => 'D',
-                'name' => 'POP User Test 2',
-                'type' => 'cabang',
-                'status' => 'active',
-            ])->id,
-        ]);
-
-        $response = $this->get(route('users.pops.edit', $user));
-
-        $response->assertOk();
-        $response->assertSee('Assign POP');
-        $response->assertSee('Petugas POP', false);
     }
 }

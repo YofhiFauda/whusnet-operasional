@@ -147,9 +147,6 @@
                             <a href="<?php echo e(route('users.edit', $user)); ?>" class="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:bg-slate-800/50">
                                 Edit
                             </a>
-                            <a href="<?php echo e(route('users.pops.edit', $user)); ?>" class="inline-flex items-center rounded-md border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-400 hover:bg-sky-100 dark:hover:bg-sky-900/40 dark:bg-sky-900/40">
-                                Atur Cabang
-                            </a>
                         </div>
                         <?php else: ?>
                         <span class="text-xs text-slate-400 dark:text-slate-500">-</span>

@@ -47,7 +47,9 @@ class FopTaskCancelCascadeAuthTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
 
         $this->fopUser = User::factory()->create(['role_id' => Role::where('code', 'fop')->first()->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->adminUser = User::factory()->create(['role_id' => Role::where('code', 'admin')->first()->id]);
+        $this->giveAllPopScope($this->adminUser);
         $this->tech = User::factory()->create([
             'role_id' => Role::where('code', 'teknisi')->first()->id,
             'status' => 'active',

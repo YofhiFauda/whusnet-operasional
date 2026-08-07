@@ -297,6 +297,7 @@ class CustomerDeviceTest extends TestCase
         $role = Role::where('name', $roleName)->firstOrFail();
         $user->role_id = $role->id;
         $user->save();
+        $this->giveAllPopScope($user);
 
         return $user;
     }

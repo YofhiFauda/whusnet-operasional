@@ -65,6 +65,7 @@ class FopTaskStatusSyncTest extends TestCase
 
         $fopRole = Role::where('code', 'fop')->first();
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
     }
 
     protected function makeLinkedTask(string $taskNumber, string $status = 'terjadwal'): array

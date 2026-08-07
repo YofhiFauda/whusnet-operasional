@@ -1,0 +1,134 @@
+<svg width="900" height="1480" viewBox="0 0 900 1480" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#444444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="1480" fill="#ffffff"/>
+
+  <text x="450" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="#111111">Alur Sistem Koleksi / Penagihan</text>
+
+  <!-- ===== JALUR A: Admin bayar langsung ===== -->
+  <g>
+    <rect x="40" y="70" width="230" height="60" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+    <text x="155" y="94" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Menu Tagihan</text>
+    <text x="155" y="112" text-anchor="middle" font-size="11" fill="#475569">Admin bayar langsung</text>
+  </g>
+  <text x="155" y="150" text-anchor="middle" font-size="11" fill="#64748b" font-style="italic">(Jalur terpisah, tidak lewat kolektor - sudah benar, tidak berubah)</text>
+
+  <!-- ===== JALUR B: Worksheet Admin ===== -->
+  <rect x="330" y="70" width="540" height="90" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+  <text x="600" y="92" text-anchor="middle" font-size="14" font-weight="bold" fill="#111111">Worksheet Admin</text>
+
+  <rect x="345" y="102" width="245" height="46" rx="8" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+  <text x="467" y="120" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e293b">Panel Kiri</text>
+  <text x="467" y="136" text-anchor="middle" font-size="11" fill="#334155">List Kolektor</text>
+
+  <rect x="610" y="102" width="245" height="46" rx="8" fill="#e2e8f0" stroke="#475569" stroke-width="1"/>
+  <text x="732" y="120" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e293b">Panel Kanan</text>
+  <text x="732" y="136" text-anchor="middle" font-size="11" fill="#334155">Pelanggan belum di-assign</text>
+
+  <line x1="600" y1="160" x2="600" y2="200" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="200" width="360" height="60" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="600" y="224" text-anchor="middle" font-size="13" font-weight="bold" fill="#4c1d95">Check / Multi-check pelanggan</text>
+  <text x="600" y="242" text-anchor="middle" font-size="11" fill="#5b21b6">Pilih kolektor tujuan &#8594; Assign</text>
+
+  <line x1="600" y1="260" x2="600" y2="300" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Submenu Kolektor -->
+  <rect x="330" y="300" width="540" height="70" rx="12" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="600" y="322" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e3a8a">Submenu: Kolektor</text>
+  <text x="600" y="340" text-anchor="middle" font-size="11" fill="#1e40af">(di bawah menu Worksheet Admin)</text>
+  <text x="600" y="358" text-anchor="middle" font-size="11" fill="#1e40af">collectors/{id}?tab=worklist</text>
+
+  <line x1="600" y1="370" x2="600" y2="410" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="410" width="360" height="60" rx="10" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+  <text x="600" y="434" text-anchor="middle" font-size="13" font-weight="bold" fill="#111111">Worklist Kolektor</text>
+  <text x="600" y="452" text-anchor="middle" font-size="11" fill="#334155">Pelanggan yang sudah jatuh tempo</text>
+
+  <line x1="600" y1="470" x2="600" y2="510" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="510" width="360" height="60" rx="10" fill="#f8fafc" stroke="#334155" stroke-width="1.5"/>
+  <text x="600" y="534" text-anchor="middle" font-size="13" font-weight="bold" fill="#111111">Klik "Selesai / Pembayaran"</text>
+  <text x="600" y="552" text-anchor="middle" font-size="11" fill="#334155">Bisa 1 by 1 atau bayar massal</text>
+
+  <!-- Percabangan Lunas / Pending -->
+  <path d="M600 570 L440 610" fill="none" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M600 570 L760 610" fill="none" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="300" y="610" width="280" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="440" y="634" text-anchor="middle" font-size="13" font-weight="bold" fill="#14532d">LUNAS (selesai)</text>
+  <text x="440" y="652" text-anchor="middle" font-size="11" fill="#166534">Saldo kolektor bertambah</text>
+  <text x="440" y="668" text-anchor="middle" font-size="11" fill="#166534">Pindah ke tab worklist "selesai"</text>
+
+  <rect x="620" y="610" width="280" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="760" y="634" text-anchor="middle" font-size="13" font-weight="bold" fill="#78350f">PENDING</text>
+  <text x="760" y="652" text-anchor="middle" font-size="11" fill="#92400e">Pelanggan blm ada uang / luar kota</text>
+  <text x="760" y="668" text-anchor="middle" font-size="11" fill="#92400e">Saldo TIDAK berubah, tetap di worksheet</text>
+
+  <!-- Pending kembali ke worklist -->
+  <path d="M760 680 C 900 730, 900 430, 780 425" fill="none" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text x="905" y="560" text-anchor="middle" font-size="10" fill="#92400e" transform="rotate(90 905,560)">tetap tampil di worklist untuk ditagih ulang</text>
+
+  <!-- Lunas lanjut ke setor -->
+  <line x1="440" y1="680" x2="440" y2="720" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="440" y1="720" x2="600" y2="750" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="750" width="360" height="60" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="600" y="774" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e3a8a">Kolektor setor uang ke Admin</text>
+  <text x="600" y="792" text-anchor="middle" font-size="11" fill="#1e40af">Saldo kolektor berkurang</text>
+
+  <line x1="600" y1="810" x2="600" y2="850" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="390" y="850" width="420" height="70" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="600" y="874" text-anchor="middle" font-size="13" font-weight="bold" fill="#7f1d1d">Modal / Alert muncul</text>
+  <text x="600" y="892" text-anchor="middle" font-size="11" fill="#991b1b">"Menunggu Verifikasi Admin"</text>
+  <text x="600" y="908" text-anchor="middle" font-size="11" fill="#991b1b">Admin sedang cross check</text>
+
+  <line x1="600" y1="920" x2="600" y2="960" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="960" width="360" height="70" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="600" y="984" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e293b">Admin cross check</text>
+  <text x="600" y="1002" text-anchor="middle" font-size="11" fill="#475569">Memeriksa kecocokan setoran</text>
+
+  <line x1="600" y1="1030" x2="600" y2="1060" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ===== TAMBAHAN: Invoice + OCR ===== -->
+  <rect x="420" y="1060" width="360" height="60" rx="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="600" y="1084" text-anchor="middle" font-size="13" font-weight="bold" fill="#0c4a6e">Tandai pelanggan untuk cetak invoice</text>
+  <text x="600" y="1102" text-anchor="middle" font-size="11" fill="#075985">Dilakukan setelah cross check</text>
+
+  <line x1="600" y1="1120" x2="600" y2="1150" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="1150" width="360" height="60" rx="10" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="600" y="1174" text-anchor="middle" font-size="13" font-weight="bold" fill="#0c4a6e">Invoice dibuat, lalu diupload</text>
+  <text x="600" y="1192" text-anchor="middle" font-size="11" fill="#075985">Semua invoice diupload secara bersamaan</text>
+
+  <line x1="600" y1="1210" x2="600" y2="1240" stroke="#444444" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="390" y="1240" width="420" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="600" y="1264" text-anchor="middle" font-size="13" font-weight="bold" fill="#4c1d95">OCR scanning &amp; validasi</text>
+  <text x="600" y="1282" text-anchor="middle" font-size="11" fill="#5b21b6">Integrasi dengan Gemini OCR</text>
+  <text x="600" y="1298" text-anchor="middle" font-size="11" fill="#5b21b6">Cocokkan invoice vs pelanggan yang dibayarkan</text>
+
+  <line x1="600" y1="1320" x2="600" y2="1350" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="390" y="1350" width="420" height="60" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="600" y="1374" text-anchor="middle" font-size="13" font-weight="bold" fill="#14532d">Status Verifikasi Kolektor: Berhasil</text>
+  <text x="600" y="1392" text-anchor="middle" font-size="11" fill="#166534">Setelah OCR selesai memvalidasi</text>
+
+  <!-- Legend -->
+  <g font-size="11">
+    <rect x="280" y="1430" width="14" height="14" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="300" y="1441" fill="#334155">Status positif / selesai</text>
+    <rect x="450" y="1430" width="14" height="14" fill="#fef3c7" stroke="#d97706"/>
+    <text x="470" y="1441" fill="#334155">Status pending</text>
+    <rect x="590" y="1430" width="14" height="14" fill="#dbeafe" stroke="#1d4ed8"/>
+    <text x="610" y="1441" fill="#334155">Proses finansial</text>
+    <rect x="740" y="1430" width="14" height="14" fill="#e0f2fe" stroke="#0284c7"/>
+    <text x="760" y="1441" fill="#334155">Invoice</text>
+  </g>
+</svg>

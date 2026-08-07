@@ -148,21 +148,6 @@ class AuditLogGeneralTest extends TestCase
             'auditable_id' => $invoice->id,
         ]);
 
-        $user = User::factory()->create(['status' => 'active']);
-
-        $response = $this->put(route('users.pops.update', $user->id), [
-            'pop_ids' => [$pop->id],
-        ]);
-
-        $response->assertRedirect(route('users.index'));
-
-        $this->assertDatabaseHas('audit_logs', [
-            'module' => 'User Management',
-            'action' => 'assign_pop',
-            'auditable_type' => User::class,
-            'auditable_id' => $user->id,
-        ]);
-
         $device = CustomerDevice::create([
             'customer_id' => $customer->id,
             'device_type' => 'ONT',

@@ -58,6 +58,7 @@ class FopTaskUpdatedBroadcastTest extends TestCase
         $teknisiRole = Role::where('code', 'teknisi')->first();
 
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->tech = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Budi']);
         $this->tech2 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Wati']);
 

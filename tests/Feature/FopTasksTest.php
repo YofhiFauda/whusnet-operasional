@@ -54,6 +54,7 @@ class FopTasksTest extends TestCase
         // Create Users
         $this->ownerUser = User::factory()->create(['role_id' => $ownerRole->id]);
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->unauthorizedUser = User::factory()->create(['role_id' => $salesRole->id]);
 
         $this->technician1 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
