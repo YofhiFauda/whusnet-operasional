@@ -23,8 +23,23 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-14 | Redesign Halaman Pembayaran (`payments.index`, `payments.create`, `payments.show`, `payments.overpay`) dengan dukungan penuh Dark/Light Theme & Stat Cards | Done — 2026-08-06 |
 | ADHOC-15 | Detail Task teknisi: blok Laporan Pekerjaan Teknisi + Riwayat Task Saya + hapus fitur Foto Bukti + fix redirect `return_to` Laporan Survey/Pemasangan (lihat detail di bawah) | Done — 2026-08-06 |
 | ADHOC-16 | Pisah "catatan" yang tumpang tindih di Task eksekusi (`Issue/Keluhan` kecampur `catatan_teknis`/`notes`) — 3 sumber, 3 box terpisah (lihat detail di bawah) | Done — 2026-08-07 |
+| ADHOC-17 | Task teknisi: catat `completed_by` (siapa yang menyelesaikan & lapor) + tampilkan di detail task, gak lagi cuma keliatan admin/fop (lihat detail di bawah) | Done — 2026-08-07 |
 
-#### ADHOC-16 — Pemisahan Catatan Issue/Keluhan, Catatan Teknis (NOC) & Catatan FOP (2026-08-07)
+#### ADHOC-17 — Kolom `completed_by` di Task + Riwayat Terbuka buat Anggota Tim (2026-08-07)
+
+Gap: `TaskService::complete()` cuma nulis `updated_by` (kolom generic, ke-overwrite
+tiap update apapun setelahnya — start/pending/cancel/reassign), jadi jejak
+"siapa teknisi yang nyelesaiin & lapor" gak eksplisit tersimpan. Data
+sebenarnya ada di `audit_logs` (action `completed`), tapi blok "Riwayat Status
+(Audit Log)" di `tasks.show` cuma keliatan buat role `owner`/`admin`/`fop` —
+anggota tim sendiri gak bisa liat. Fix: tambah kolom `tasks.completed_by`
+(FK `users`, diisi sekali & immutable) + tampilkan "Diselesaikan & dilaporkan
+oleh: {nama}" di blok Waktu Pengerjaan (semua yang bisa akses detail task
+lihat) + buka gate audit log buat anggota tim (`$task->isMember(auth()->id())`).
+Kasus 1 tim 2 orang berebut klik "Selesai": sudah aman dari sononya — guard
+status `IN_PROGRESS`/`PENDING` di `TaskService::complete()` nolak request
+kedua begitu status udah `SELESAI` (422), jadi `completed_by` gak ketiban.
+Test regresi: `TaskCompletedByTest`.
 
 Bug: `Task.description` dibangun dari `trim($fopTask->issue."\n".$fopTask->notes)`
 (`FopTaskController::store()`/`update()`) atau

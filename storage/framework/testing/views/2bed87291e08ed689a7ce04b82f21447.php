@@ -250,7 +250,7 @@
 
     
     <div class="rounded-xl border border-border bg-surface overflow-hidden">
-        <div class="overflow-x-auto custom-scrollbar">
+        <div class="overflow-x-auto custom-scrollbar min-h-[300px]">
             <table class="w-full text-xs whitespace-nowrap">
                 <thead class="bg-surface-muted dark:bg-slate-900/60 text-text-muted">
                     <tr class="text-left">
@@ -271,6 +271,7 @@
                             
                             <th class="px-3 py-2.5 font-bold uppercase tracking-wider text-right" title="Lama tiket menunggu di meja NOC">Umur</th>
                         <?php endif; ?>
+                        <th class="px-3 py-2.5 font-bold uppercase tracking-wider text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
@@ -345,10 +346,80 @@
                             <?php else: ?>
                                 <td class="px-3 py-2.5 font-mono text-right <?php echo e($ageClass); ?>"><?php echo e($ageLabel); ?></td>
                             <?php endif; ?>
+
+                            
+                            <td class="px-3 py-2.5 text-center shrink-0" @click.stop>
+                                <?php
+                                    $hasActions = $actions['can_close'] || $actions['can_escalate_fop'] || $actions['can_return_to_helpdesk'] || $actions['can_cancel'];
+                                ?>
+                                <?php if($hasActions): ?>
+                                    <div class="relative inline-block text-left" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
+                                        <button type="button"
+                                                @click.stop="open = !open"
+                                                class="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer">
+                                            <span>Aksi</span>
+                                            <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+
+                                        <div x-show="open"
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="transform opacity-0 scale-95"
+                                             x-transition:enter-end="transform opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="transform opacity-100 scale-100"
+                                             x-transition:leave-end="transform opacity-0 scale-95"
+                                             class="absolute right-0 z-50 mt-1 w-44 rounded-xl border border-border bg-surface shadow-lg py-1 divide-y divide-border text-left"
+                                             style="display: none;">
+                                            <div class="py-1">
+                                                <?php if($actions['can_close']): ?>
+                                                    <button type="button"
+                                                            @click.stop="open = false; $dispatch('ticket-drawer-action', { id: <?php echo e($ticket->id); ?>, action: 'close' })"
+                                                            class="w-full text-left px-3 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 flex items-center gap-2 transition-colors cursor-pointer">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        <span>Selesai</span>
+                                                    </button>
+                                                <?php endif; ?>
+                                                <?php if($actions['can_escalate_fop']): ?>
+                                                    <button type="button"
+                                                            @click.stop="open = false; $dispatch('ticket-drawer-action', { id: <?php echo e($ticket->id); ?>, action: 'fop' })"
+                                                            class="w-full text-left px-3 py-1.5 text-xs font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 flex items-center gap-2 transition-colors cursor-pointer">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                                                        <span>Assign FOP</span>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if($actions['can_return_to_helpdesk'] || $actions['can_cancel']): ?>
+                                                <div class="py-1">
+                                                    <?php if($actions['can_return_to_helpdesk']): ?>
+                                                        <button type="button"
+                                                                @click.stop="open = false; $dispatch('ticket-drawer-action', { id: <?php echo e($ticket->id); ?>, action: 'return' })"
+                                                                class="w-full text-left px-3 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-2 transition-colors cursor-pointer">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"/></svg>
+                                                            <span>Kembalikan</span>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    <?php if($actions['can_cancel']): ?>
+                                                        <button type="button"
+                                                                @click.stop="open = false; $dispatch('ticket-drawer-action', { id: <?php echo e($ticket->id); ?>, action: 'cancel' })"
+                                                                class="w-full text-left px-3 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 transition-colors cursor-pointer">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                            <span>Batalkan</span>
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="text-text-muted text-[11px]">—</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="<?php echo e($tab === 'assign_fop' ? 12 : 10); ?>" class="px-3 py-10 text-center text-text-muted">
+                            <td colspan="<?php echo e($tab === 'assign_fop' ? 13 : 11); ?>" class="px-3 py-10 text-center text-text-muted">
                                 <?php if($tab === 'assign_fop'): ?>
                                     Belum ada tiket yang diteruskan NOC ke FOP.
                                 <?php else: ?>

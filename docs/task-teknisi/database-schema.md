@@ -5,7 +5,7 @@
 ```
 tasks ──belongsTo──▶ customers (nullable)
       ──belongsTo──▶ pops
-      ──belongsTo──▶ users (fop_id, created_by, updated_by)
+      ──belongsTo──▶ users (fop_id, created_by, updated_by, completed_by)
       ──hasMany───▶ task_teams ──belongsTo──▶ users
       ──hasOne────▶ task_maintenances
 ```
@@ -32,7 +32,8 @@ Migrasi: `2026_06_24_000001_create`.
 | `fop_id` | FK → `users.id`, null on delete | ✔ | FOP yang bikin/kelola task |
 | `sla_minutes` | unsignedSmallInteger | ✔ | Dari `TaskType::slaMinutes()` saat create |
 | `conflict_override` | boolean, default false | | Apakah konflik jadwal di-override saat create/edit |
-| `created_by`, `updated_by` | FK → `users.id`, null on delete | ✔ | |
+| `created_by`, `updated_by` | FK → `users.id`, null on delete | ✔ | `updated_by` generic — ke-overwrite tiap update apapun (start/pending/cancel/reassign), **bukan** sumber kebenaran siapa yang nyelesaikan task |
+| `completed_by` | FK → `users.id`, null on delete | ✔ | Migrasi `2026_08_07_144209_add_completed_by_to_tasks_table`. Teknisi yang menekan "Selesai" & kirim laporan — diisi **sekali** di `TaskService::complete()`, immutable setelahnya (beda dari `updated_by`). Lihat [business-logic.md § 10](business-logic.md#10-completed_by--siapa-yang-menyelesaikan-task) |
 | `created_at`/`updated_at` | timestamp | | |
 
 Index: `pop_id`, `customer_id`, `status`, `task_type`, `scheduled_at`, `fop_id`.

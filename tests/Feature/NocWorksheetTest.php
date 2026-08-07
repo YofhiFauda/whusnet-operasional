@@ -445,6 +445,20 @@ class NocWorksheetTest extends TestCase
         return $ticket->fresh();
     }
 
+    public function test_worksheet_renders_row_action_dropdown(): void
+    {
+        $ticket = $this->submitTicketToNoc();
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.worksheet'));
+
+        $response->assertOk();
+        $response->assertSee('Aksi');
+        $response->assertSee('Selesai');
+        $response->assertSee('Assign FOP');
+        $response->assertSee('Kembalikan');
+        $response->assertSee('Batalkan');
+    }
+
     private function submitTicketDirectToFopByHelpdesk(): Ticket
     {
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), [

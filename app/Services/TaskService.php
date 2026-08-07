@@ -217,6 +217,7 @@ class TaskService
             'status' => TaskStatus::SELESAI->value,
             'fop_review_status' => 'pending',
             'completed_at' => now(),
+            'completed_by' => $actor->id,
             'updated_by' => $actor->id,
         ]);
 

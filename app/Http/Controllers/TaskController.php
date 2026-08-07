@@ -187,6 +187,7 @@ class TaskController extends Controller
             'pop',
             'fop',
             'teamMembers.user',
+            'completedBy',
             'auditLogs.user',
             'maintenanceReport',
             // fopTask.notes (pointer/catatan FOP) & fopTask.ticket->catatan_teknis

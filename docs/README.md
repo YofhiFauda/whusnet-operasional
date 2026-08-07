@@ -19,6 +19,7 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | `docs/customer-lifecycle/` | Dokumentasi Customer Verifikasi & Onboarding Lifecycle (registrasi→survey→pemasangan→aktivasi). |
 | `docs/task-teknisi/` | Dokumentasi Task Teknisi (eksekusi lapangan: checklist, evidence, review FOP). |
 | `docs/master/sla-timeline/` | Dokumentasi Master Timeline SLA (batas waktu wajib ditangani per jenis tiket, per paket internet). |
+| `docs/plan/qr-code/` | **RANCANGAN (belum diimplementasi)** — QR Code pelanggan untuk pembayaran, absen teknisi, ticketing, dan login pelanggan (+ PIN). |
 
 ## Fitur Utama
 
@@ -60,6 +61,7 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | Customer Verifikasi & Onboarding Lifecycle | [docs/customer-lifecycle/README.md](customer-lifecycle/README.md) |
 | Task Teknisi (eksekusi lapangan) | [docs/task-teknisi/README.md](task-teknisi/README.md) |
 | Master Timeline SLA (batas waktu wajib ditangani per paket) | [docs/master/sla-timeline/README.md](master/sla-timeline/README.md) |
+| QR Code Pelanggan + PIN — **RANCANGAN, belum ada kodenya** | [docs/plan/qr-code/rancangan-qr-pelanggan.md](plan/qr-code/rancangan-qr-pelanggan.md) |
 
 ---
 

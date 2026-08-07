@@ -31,6 +31,7 @@ class Task extends Model
         'scheduled_at',
         'started_at',
         'completed_at',
+        'completed_by',
         'cancelled_at',
         'cancel_reason',
         'pending_reason',
@@ -85,6 +86,11 @@ class Task extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
     }
 
     public function teamMembers(): HasMany

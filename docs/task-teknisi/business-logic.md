@@ -121,3 +121,18 @@ FOP review (approve/reject/pending) via TaskController::review()
 **Kenapa gak boleh digabung balik ke `description`:** dua sumber beda gampang menyimpang begitu salah satunya diedit belakangan (prinsip sama kayak `composeFopNotes()` di [ticketing/business-logic.md § 14](../ticketing/business-logic.md#14-format-tugas-cidnama)) — dan secara UX, teknisi gak bisa bedain mana keluhan asli pelanggan vs metadata sistem/asesmen NOC kalau nyampur di 1 box.
 
 Test regresi: `FopTaskCreateFollowsTicketingTest::test_task_show_separates_catatan_teknis_from_description_for_teknisi`.
+
+## 10. `completed_by` — Siapa yang Menyelesaikan Task
+
+**Gap lama (ditutup 2026-08-07):** `TaskService::complete()` cuma nulis `updated_by` — kolom generic yang ke-overwrite tiap update apapun setelahnya (start/pending/cancel/reassign), jadi begitu ada aksi lain pasca-selesai, jejak "siapa teknisi yang lapor" hilang. Data sebenernya ada di `audit_logs` (`action='completed'`), tapi blok "Riwayat Status (Audit Log)" di `tasks/show.blade.php` cuma keliatan buat role `owner`/`admin`/`fop` — anggota tim sendiri gak bisa liat siapa yang nyelesaiin task-nya sendiri.
+
+**Sekarang:**
+
+- Kolom `tasks.completed_by` (FK `users`, migrasi `2026_08_07_144209_add_completed_by_to_tasks_table`) diisi **sekali** di `TaskService::complete()`, barengan `completed_at` — gak pernah ditimpa lagi walau ada update lain setelahnya.
+- Relasi `Task::completedBy()`, di-eager-load di `TaskController::show()`.
+- `tasks/show.blade.php` blok "Waktu Pengerjaan" nampilin baris **"Diselesaikan & dilaporkan oleh: {nama}"** — keliatan buat semua yang bisa akses detail task, gak digated role.
+- Gate "Riwayat Status (Audit Log)" dibuka: sebelumnya `hasRole(['owner','admin','fop'])` doang, sekarang `|| $task->isMember(auth()->id())` — anggota tim task itu sendiri juga bisa liat riwayat lengkapnya.
+
+**Kasus 1 tim isi 2+ teknisi, dua-duanya klik "Selesai" barengan:** aman dari sononya — `TaskService::complete()` cuma nerima transisi dari status `IN_PROGRESS`/`PENDING`. Siapa pun yang requestnya nyampe DB duluan set status jadi `SELESAI`; request kedua otomatis abort 422 ("Task hanya bisa diselesaikan dari status In Progress atau Pending") karena status udah bukan itu lagi. Gak ada kondisi `completed_by` ketiban 2 kali.
+
+Test regresi: `TaskCompletedByTest`.
