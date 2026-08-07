@@ -313,6 +313,14 @@
                                 <p class="font-mono font-bold text-text-secondary"><?php echo e($task->sla_minutes); ?> menit</p>
                             </div>
                         </div>
+                        <?php if($task->completedBy): ?>
+                        <div class="pt-2.5 border-t border-border flex items-center gap-2 text-[11px]">
+                            <svg class="h-3.5 w-3.5 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <p class="text-[10px] text-text-muted font-ui">Diselesaikan &amp; dilaporkan oleh: <span class="font-bold text-text-main"><?php echo e($task->completedBy->name); ?></span></p>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -346,7 +354,7 @@
                 </div>
 
                 
-                <?php if(auth()->user()->hasRole(['owner', 'admin', 'fop'])): ?>
+                <?php if(auth()->user()->hasRole(['owner', 'admin', 'fop']) || $task->isMember(auth()->id())): ?>
                 <div class="pt-4 border-t border-border">
                     <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2 font-ui">Riwayat Status (Audit Log)</p>
                     <?php if($task->auditLogs && $task->auditLogs->count() > 0): ?>

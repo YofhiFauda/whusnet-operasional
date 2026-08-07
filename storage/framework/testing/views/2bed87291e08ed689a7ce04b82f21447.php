@@ -357,7 +357,7 @@
                                         <button type="button"
                                                 @click.stop="open = !open"
                                                 class="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer">
-                                            <span>Aksi</span>
+                                            <span>Tindakan</span>
                                             <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                             </svg>

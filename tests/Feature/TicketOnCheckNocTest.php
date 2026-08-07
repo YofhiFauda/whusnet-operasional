@@ -160,7 +160,7 @@ class TicketOnCheckNocTest extends TestCase
     {
         $ticket = $this->escalatedToNocTicket();
 
-        $this->assertSame(['helpdesk', 'noc', 'admin', 'admin_pop', 'atasan', 'owner'], $ticket->holderRoles());
+        $this->assertSame(['helpdesk', 'noc'], $ticket->holderRoles());
 
         $this->actingAs($this->helpdeskUser)
             ->postJson(route('tickets.close', $ticket), ['reason' => 'Ternyata bisa dibenerin sendiri.'])

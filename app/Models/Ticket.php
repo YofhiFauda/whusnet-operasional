@@ -396,13 +396,31 @@ class Ticket extends Model
      * permanen — Helpdesk yang mengirim tiket tetap boleh menutup/membatalkan
      * tiketnya sendiri walau NOC sedang memprosesnya.
      *
+     * SENGAJA cuma role operasional pemegang tiket (helpdesk/noc). Role
+     * full-access (owner) sudah lolos lewat `hasFullAccess()` di pemanggil
+     * (assertActorOwnsTicket()/actionFlagsFor()) — jangan ditaruh di sini
+     * juga, dobel jalur otorisasi buat hal yang sama.
+     *
+     * Role lain (admin, atasan, pop_admin, dst) TIDAK didaftar hardcode di
+     * sini walau mereka punya permission `tickets.*` — permission cuma
+     * gerbang FITUR ("boleh akses modul Ticketing"), bukan gerbang
+     * KEPEMILIKAN tiket tertentu. Kalau suatu saat role di luar
+     * helpdesk/noc/owner memang perlu bisa act di tiket siapa pun (bukan
+     * cuma yang dia pegang), itu keputusan produk yang harus lewat
+     * permission baru yang eksplisit (mis. `tickets.act_any`) dan dicek di
+     * pemanggil — BUKAN nambah nama role di array ini. Nambah role di sini
+     * = keputusan otorisasi nyelip di luar matrix permission dinamis
+     * (`features` × `actions`), dan riskan salah ketik role code (pernah
+     * kejadian: `admin_pop` di sini padahal role code aslinya `pop_admin`,
+     * jadi gak pernah match — mati diam-diam).
+     *
      * @return string[]
      */
     public function holderRoles(): array
     {
         return match ($this->handler) {
-            TicketHandler::HELPDESK => ['helpdesk', 'admin', 'admin_pop', 'atasan', 'owner'],
-            TicketHandler::NOC => ['helpdesk', 'noc', 'admin', 'admin_pop', 'atasan', 'owner'],
+            TicketHandler::HELPDESK => ['helpdesk'],
+            TicketHandler::NOC => ['helpdesk', 'noc'],
             TicketHandler::FOP => [],
         };
     }
