@@ -25,8 +25,8 @@
     $canValidate = auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess();
     $detailUrl = match(true) {
         $canValidate => route('customers.verification.admin', $customer),
-        in_array($customer->status, ['installation_in_progress', 'revision_installation', 'installed', 'verification_admin']) => route('customers.installation.report', $customer),
-        in_array($customer->status, ['waiting_acc', 'surveyed', 'waiting_installation']) => route('customers.survey.report', $customer),
+        in_array($customer->status, ['installation_in_progress', 'revision_installation', 'installed', 'verification_admin']) => route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
+        in_array($customer->status, ['waiting_acc', 'surveyed', 'waiting_installation']) => route('customers.survey.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
         auth()->user()->hasPermission('customers.detail.view') => route('customers.show', $customer),
         default => route('customers.fieldwork', $customer),
     };
@@ -125,11 +125,11 @@
                     </button>
                 </form>
             <?php elseif($customer->status === 'installation_in_progress'): ?>
-                <a href="<?php echo e(route('customers.installation.report', $customer)); ?>" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
+                <a href="<?php echo e(route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')])); ?>" class="bg-success hover:bg-success/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
                     Lapor Pemasangan
                 </a>
             <?php elseif($customer->status === 'revision_installation'): ?>
-                <a href="<?php echo e(route('customers.installation.report', $customer)); ?>" class="bg-error hover:bg-error/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
+                <a href="<?php echo e(route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')])); ?>" class="bg-error hover:bg-error/90 text-white text-[11px] font-bold uppercase tracking-wider py-1.5 px-3 rounded shadow-sm transition-colors cursor-pointer text-center">
                     Revisi
                 </a>
             <?php endif; ?>

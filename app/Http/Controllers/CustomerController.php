@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
+use App\Http\Controllers\Concerns\RedirectsToCustomer;
 use App\Http\Requests\CustomerRegistrationRequest;
 use App\Models\AuditLog;
 use App\Models\City;
@@ -54,6 +55,8 @@ use Spatie\SimpleExcel\SimpleExcelWriter;
 
 class CustomerController extends Controller
 {
+    use RedirectsToCustomer;
+
     /**
      * Display a listing of the customers with search and filters.
      *
@@ -414,7 +417,7 @@ class CustomerController extends Controller
         // jelas ke mana dia pindah (dan di tab mana bisa dicari lagi).
         $statusLabel = SubscriptionStatus::where('code', $previousStatus)->value('name') ?? $previousStatus;
 
-        return redirect()->route('customers.show', $customer->id)
+        return $this->redirectToCustomer($customer)
             ->with('success', "Pelanggan dikembalikan ke tahap \"{$statusLabel}\" dan bisa dilanjutkan prosesnya.");
     }
 
@@ -424,7 +427,7 @@ class CustomerController extends Controller
      * FOP assign teknisi lewat /fop-tasks seperti biasa; `device_retrieved_at`
      * baru keisi otomatis setelah teknisi menyelesaikan task itu (lihat
      * TaskService::complete()). Alurnya sengaja disamakan dengan MTN/C-REQ
-     * (detail + pelaporan/evidence lewat pipeline Task FOP yang sama).
+     * (detail + pelaporan lewat pipeline Task FOP yang sama).
      */
     public function retrieveDevice(Customer $customer, TicketService $ticketService)
     {
@@ -681,7 +684,14 @@ class CustomerController extends Controller
         // workflow pelanggan (draft → survey → verifikasi), jadi user biasanya
         // lanjut kerja di record yang baru dibuat (lengkapi data, assign survey).
         // Sekalian menyeragamkan dengan update/ticket/task yang sudah ke detail.
-        return redirect()->route('customers.show', $customer->id)->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
+        //
+        // TAPI cuma kalau actor punya customers.detail.view — permission itu
+        // independen dari customers.create (mis. Sales input-only lewat Role
+        // Matrix). Tanpa cek ini, submit sukses tapi langsung ke-403 karena
+        // redirect buta ke customers.show (dead end, data padahal tersimpan).
+        // Fallback: balik ke form registrasi kosong, siap input berikutnya.
+        return $this->redirectToCustomer($customer, 'customers.create')
+            ->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
     }
 
     /**
@@ -963,7 +973,7 @@ class CustomerController extends Controller
             }
         }
 
-        return redirect()->route('customers.show', $customer->id)->with('success', "Data pelanggan {$customer->full_name} berhasil diperbarui!");
+        return $this->redirectToCustomer($customer)->with('success', "Data pelanggan {$customer->full_name} berhasil diperbarui!");
     }
 
     /**
@@ -1240,7 +1250,6 @@ class CustomerController extends Controller
         $customerTasks = $customer->tasks()
             ->with([
                 'teamMembers.user',
-                'evidences',
                 'creator',
                 'fop',
                 'auditLogs.user.role',
@@ -3370,7 +3379,7 @@ class CustomerController extends Controller
             ->whereIn('task_type', [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])
             ->exists();
         if ($hasWorkflowTask) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Aktivasi manual hanya untuk data migrasi lama. Pelanggan ini punya riwayat Task Survey/Pemasangan, harus diaktifkan lewat alur verifikasi normal.');
         }
 
@@ -3380,40 +3389,40 @@ class CustomerController extends Controller
         // alur SRV/PSB normal di sistem baru, bukan di-bypass di sini.
         $legacyRequestStatus = $customer->customerService?->request_status;
         if (! $customer->old_customer_id || $legacyRequestStatus !== 'ACTIVE') {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Aktivasi manual hanya untuk pelanggan migrasi yang terbukti sudah aktif di sistem lama.');
         }
 
         $completeness = $customer->dataCompleteness();
         if (! $completeness['is_ready_billing']) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Pelanggan tidak bisa diaktifkan karena data wajib belum lengkap.');
         }
 
         if (! $customer->internet_package_id) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Pelanggan tidak memiliki paket internet aktif.');
         }
 
         $service = $customer->customerService;
         if (! $service) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Data layanan pelanggan tidak ditemukan.');
         }
 
         if ($service->total_monthly_bill <= 0) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Total tagihan bulanan tidak valid (harus lebih besar dari 0).');
         }
 
         $pop = $customer->pop;
         if (! $pop) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'POP/Cabang pelanggan tidak ditemukan.');
         }
 
         if (! $pop->cid_prefix) {
-            return redirect()->route('customers.show', $customer->id)
+            return $this->redirectToCustomer($customer)
                 ->with('error', 'Konfigurasi prefix CID pada POP asal pelanggan belum lengkap. Pastikan field cid_prefix terisi.');
         }
 
@@ -3485,7 +3494,7 @@ class CustomerController extends Controller
         // Reload untuk mendapatkan CID yang baru disimpan
         $customer->refresh();
 
-        return redirect()->route('customers.show', $customer->id)
+        return $this->redirectToCustomer($customer)
             ->with('success', "Layanan pelanggan berhasil diaktifkan! CID: {$customer->cid}");
     }
 
@@ -3630,7 +3639,7 @@ class CustomerController extends Controller
             return $newInvoice;
         });
 
-        return redirect()->route('customers.show', $customer->id)
+        return $this->redirectToCustomer($customer)
             ->with('success', "Tagihan manual dengan nomor {$invoice->invoice_number} berhasil dibuat!");
     }
 }

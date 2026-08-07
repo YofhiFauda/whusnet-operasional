@@ -2,7 +2,7 @@
     ══ Partial: Satu Task Card untuk Dashboard Teknisi ══════════════════
     Digunakan oleh TaskController::cardPartial() → GET /tasks-saya/partial/{task}
     Diambil via fetch() dari Echo listener saat TaskScheduled event diterima.
-    $task : App\Models\Task (loaded dengan customer, pop, evidences)
+    $task : App\Models\Task (loaded dengan customer, pop)
 --}}
 @php
     $barColor = match(true) {
@@ -113,8 +113,8 @@
             @if(in_array($task->status->value, ['in_progress', 'pending']))
                 @php
                     $reportUrl = match(true) {
-                        $task->task_type->value === 'SURVEY' => route('customers.survey.report', $task->customer_id),
-                        $task->task_type->value === 'PSB' => route('customers.installation.report', $task->customer_id),
+                        $task->task_type->value === 'SURVEY' => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
+                        $task->task_type->value === 'PSB' => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
                         default => route('tasks.maintenance.report', $task),
                     };
                 @endphp

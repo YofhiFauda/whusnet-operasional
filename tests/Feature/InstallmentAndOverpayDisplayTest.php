@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Providers\AppServiceProvider;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -392,7 +393,7 @@ class InstallmentAndOverpayDisplayTest extends TestCase
         // Middleware route `permission:` tak kena masalah ini — dia panggil
         // hasPermission() langsung, bukan lewat Gate. Re-boot manual di sini
         // supaya assertSee terhadap markup yang digerbangi @can() valid.
-        (new \App\Providers\AppServiceProvider($this->app))->boot();
+        (new AppServiceProvider($this->app))->boot();
 
         $response = $this->actingAs($owner)->get(route('invoices.index'));
 

@@ -7,9 +7,10 @@ tasks ──belongsTo──▶ customers (nullable)
       ──belongsTo──▶ pops
       ──belongsTo──▶ users (fop_id, created_by, updated_by)
       ──hasMany───▶ task_teams ──belongsTo──▶ users
-      ──hasMany───▶ task_evidences ──belongsTo──▶ users (uploaded_by)
       ──hasOne────▶ task_maintenances
 ```
+
+> **`task_evidences` dihapus (2026-08-06)** — fitur Foto Bukti generik dibuang total (model, controller, route, tabel). Migration `2026_08_06_140732_drop_task_evidences_table.php` (`down()` reversible kalau perlu rollback). Alasan & pengganti: lihat [business-logic.md § 5](business-logic.md#5-syarat-complete--laporan-pekerjaan-teknisi).
 
 ## Tabel `tasks`
 
@@ -49,21 +50,6 @@ Migrasi: `2026_06_24_000002_create`. Pivot anggota tim per Task (beda dari `fop_
 
 Unique: (`task_id`, `user_id`). Index: `user_id`.
 
-## Tabel `task_evidences`
-
-Migrasi: `2026_06_24_000005_create`.
-
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| `id` | bigint PK | |
-| `task_id` | FK → `tasks.id`, cascade delete | |
-| `uploaded_by` | FK → `users.id`, null on delete | |
-| `file_path` | string | |
-| `caption` | string | ✔ |
-| `created_at`/`updated_at` | timestamp | |
-
-Index: `task_id`.
-
 ## Tabel `task_maintenances`
 
 Migrasi: `2026_07_01_152851_create`. 1:1 dengan `tasks` (khusus task tipe non-Survey/Pemasangan).
@@ -93,19 +79,14 @@ customer(): BelongsTo(Customer::class)
 pop(): BelongsTo(Pop::class)
 fop(): BelongsTo(User::class, 'fop_id')
 teamMembers(): HasMany(TaskTeam::class)
-evidences(): HasMany(TaskEvidence::class)
 maintenanceReport(): HasOne(TaskMaintenance::class)
 auditLogs(): MorphMany(AuditLog::class, 'auditable')
 
 // TaskTeam
 task(): BelongsTo(Task::class)
 user(): BelongsTo(User::class)
-
-// TaskEvidence
-task(): BelongsTo(Task::class)
-uploader(): BelongsTo(User::class, 'uploaded_by')
 ```
 
 ## Audit
 
-`Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` otomatis. Ditambah manual `AuditLog::log()` di `TaskService` untuk aksi domain-specific: `completed`, `cancelled`, `reassigned`, dan di `TaskController` untuk `approved`/`rejected` (hasil review FOP). `task_teams`, `task_evidences`, `task_maintenances` **tidak** py audit trait sendiri — perubahan di tabel ini cuma keliatan lewat perubahan `tasks` punya (kalau di-log manual) atau tidak sama sekali.
+`Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` otomatis. Ditambah manual `AuditLog::log()` di `TaskService` untuk aksi domain-specific: `completed`, `cancelled`, `reassigned`, dan di `TaskController` untuk `approved`/`rejected` (hasil review FOP). `task_teams`, `task_maintenances` **tidak** py audit trait sendiri — perubahan di tabel ini cuma keliatan lewat perubahan `tasks` punya (kalau di-log manual) atau tidak sama sekali.

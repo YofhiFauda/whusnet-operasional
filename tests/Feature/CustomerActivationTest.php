@@ -194,8 +194,8 @@ class CustomerActivationTest extends TestCase
         $this->assertEquals('siap_billing', $customer->data_completeness_status);
         $this->assertNotNull($customer->cid);
         // CID format: {cid_prefix}{mini_pop_or_olt}{dist_code}{request_id}_{DESA}_{NAMA}
-        // POP ini belum mini POP, jadi memakai fallback olt='0' dan dist='XX'
-        // Contoh: D0XXC000001_BABADAN_BUDISANTOSO
+        // POP ini belum di-assign mini POP maupun distribusi, jadi keduanya default '0'
+        // Contoh: D00C000001_BABADAN_BUDISANTOSO
         $this->assertStringStartsWith('D', $customer->cid);
         $this->assertStringContainsString('C000001', $customer->cid);
 

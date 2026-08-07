@@ -21,6 +21,51 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-09 | Redesign Worksheet NOC (`noc.worksheet`) — tabel padat 1 baris/tiket + pencarian + filter + dua tab bercounter (Tiket Masuk / Assign FOP) + aksi lewat drawer baris terpilih (lihat detail di bawah) | Done — 2026-07-30 |
 | ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
 | ADHOC-14 | Redesign Halaman Pembayaran (`payments.index`, `payments.create`, `payments.show`, `payments.overpay`) dengan dukungan penuh Dark/Light Theme & Stat Cards | Done — 2026-08-06 |
+| ADHOC-15 | Detail Task teknisi: blok Laporan Pekerjaan Teknisi + Riwayat Task Saya + hapus fitur Foto Bukti + fix redirect `return_to` Laporan Survey/Pemasangan (lihat detail di bawah) | Done — 2026-08-06 |
+
+#### ADHOC-15 — Laporan Pekerjaan Teknisi + Riwayat Task Saya + Hapus Foto Bukti + Fix Redirect Laporan (2026-08-06)
+
+Rangkaian perbaikan Detail Task teknisi, diminta bertahap dalam satu sesi.
+
+**Bagian 1 — Blok "Laporan Pekerjaan Teknisi" di Detail Task**
+
+Data yang teknisi isi lewat form Laporan Maintenance (kendala teknis, material
+terpakai, foto OPM/Speedtest) sebelumnya cuma tersimpan di DB tanpa pernah
+tampil lagi di `/tasks/{id}`. `TaskController::show()` sekarang eager-load
+`maintenanceReport`, view nampilin section baru — berlaku task non-Survey/
+Pemasangan (Survey/Pemasangan sudah punya halaman laporan sendiri).
+
+**Bagian 2 — Riwayat Task Saya (`/tasks-saya/riwayat`)**
+
+Arsip task `selesai` milik teknisi login, beda dari `/tasks-saya` yang cuma
+papan kerja aktif (buang task selesai lama dari daftar). `TaskController::
+historyOwn()`, guard `task.view.own` sama seperti dashboard.
+
+**Bagian 3 — Hapus fitur Foto Bukti (`TaskEvidence`) total**
+
+Investigasi menemukan fitur ini gak pernah men-gate completion
+(`Task::canComplete()` udah lama hardcoded `true`) dan tumpang tindih sama
+foto wajib yang sudah ada di tiap Laporan per tipe task. Dihapus: model,
+controller, route, policy ability `uploadEvidence`, method
+`FileUploadService::uploadTaskEvidence()`, section "Foto Bukti" di beberapa
+view (`tasks/show.blade.php`, tab Riwayat Ticketing pelanggan), dan **tabel
+`task_evidences`** (migration baru
+`2026_08_06_140732_drop_task_evidences_table.php`, `down()` reversible).
+Tile ringkasan "Foto Bukti" di atas Detail Task diganti **Durasi Aktual**.
+
+**Bagian 4 — Fix redirect Laporan Survey/Pemasangan (`return_to`)**
+
+Halaman `/customers/{id}/survey/report` & `/installation/report` diakses dari
+banyak entry point (Detail Task, Dashboard Task Saya, Antrean Survey,
+Verifikasi Queue, Detail Pelanggan) — tombol "Kembali" & redirect sukses
+sebelumnya **hardcoded** ke satu tujuan tetap, gak peduli asal. Sekarang
+pemanggil kirim `return_to` (query/hidden field), divalidasi
+`App\Support\SafeUrl::resolveReturnTo()` (same-origin only, cegah open
+redirect), fallback ke route lama kalau kosong/invalid.
+
+**Dokumentasi terkait:** `docs/task-teknisi/{README,business-logic,database-schema,flowchart,user-flow}.md`, `docs/customer-lifecycle/{README,business-logic}.md`.
+
+**Test baru:** `TaskShowMaintenanceReportTest`, `TaskOwnHistoryTest`, `SurveyInstallationReportReturnToTest`. Full suite 989 passed, 0 failed setelah semua perubahan.
 
 #### ADHOC-13 — Master Alat Kerja + Material di Laporan Maintenance (2026-07-31)
 

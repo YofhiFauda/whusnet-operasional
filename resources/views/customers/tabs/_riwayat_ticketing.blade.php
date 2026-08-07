@@ -124,27 +124,6 @@
                             </div>
                         </div>
 
-                        <!-- Evidences -->
-                        @if($task->evidences->count() > 0)
-                            <div class="grid grid-cols-1 gap-4">
-                                @if($task->evidences->count() > 0)
-                                    <div class="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
-                                        <h5 class="text-xs font-bold text-slate-900 dark:text-slate-100 mb-2.5 flex items-center gap-1.5">
-                                            <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>
-                                            Bukti Foto Pekerjaan (Evidence)
-                                        </h5>
-                                        <div class="grid grid-cols-3 gap-2">
-                                            @foreach($task->evidences as $ev)
-                                                <a href="{{ Storage::url($ev->file_path) }}" target="_blank" class="block aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700 hover:opacity-90">
-                                                    <img src="{{ Storage::url($ev->file_path) }}" alt="Evidence" class="w-full h-full object-cover">
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
-
                         <!-- Step-by-Step Ticket Audit History -->
                         <div class="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700">
                             <h5 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 pb-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">

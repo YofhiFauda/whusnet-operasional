@@ -4,22 +4,41 @@
 <div x-data="technicianNotifier()" class="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
     
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            <div>
-                <h1 class="text-base font-semibold text-text-main leading-tight">Task Saya Hari Ini</h1>
-                <p class="text-xs text-text-muted">
-                    Halo, <?php echo e(auth()->user()->name); ?> 👋 &mdash; <?php echo e(now()->translatedFormat('l, d F Y')); ?>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-surface border border-border sm:border-0 rounded-xl sm:rounded-none p-3.5 sm:p-0 shadow-sm sm:shadow-none">
+        <div class="flex items-start sm:items-center gap-3">
+            <div class="p-2 sm:p-0 rounded-lg bg-primary/10 sm:bg-transparent text-primary shrink-0">
+                <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between sm:justify-start gap-2">
+                    <h1 class="text-base sm:text-lg font-semibold text-text-main leading-tight truncate">Task Saya Hari Ini</h1>
+                    <div class="sm:hidden text-right shrink-0">
+                        <span class="font-mono text-lg font-bold text-text-main"><?php echo e($tasks->count()); ?></span>
+                        <span class="text-[10px] text-text-muted block -mt-1">task</span>
+                    </div>
+                </div>
+                <p class="text-xs text-text-muted mt-0.5 truncate">
+                    Halo, <span class="font-medium text-text-main"><?php echo e(auth()->user()->name); ?></span> 👋 &mdash; <?php echo e(now()->translatedFormat('l, d F Y')); ?>
 
                 </p>
             </div>
         </div>
-        <div class="text-right">
-            <p class="text-2xl font-bold font-mono text-text-main leading-none"><?php echo e($tasks->count()); ?></p>
-            <p class="text-[11px] text-text-muted">task hari ini</p>
+
+        <div class="flex items-center justify-between sm:justify-end gap-3 pt-2.5 sm:pt-0 border-t border-border/60 sm:border-0">
+            <a href="<?php echo e(route('tasks.own.history')); ?>"
+               class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main transition-colors shadow-sm w-full sm:w-auto text-center"
+               title="Riwayat Task Saya">
+                <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Lihat Riwayat</span>
+            </a>
+            <div class="hidden sm:block text-right shrink-0">
+                <p class="text-2xl font-bold font-mono text-text-main leading-none"><?php echo e($tasks->count()); ?></p>
+                <p class="text-[11px] text-text-muted">task hari ini</p>
+            </div>
         </div>
     </div>
 
@@ -258,8 +277,8 @@
                     <?php if(in_array($task->status->value, ['in_progress', 'pending'])): ?>
                         <?php
                             $reportUrl = match(true) {
-                                $task->task_type->value === 'SURVEY' => route('customers.survey.report', $task->customer_id),
-                                $task->task_type->value === 'PSB' => route('customers.installation.report', $task->customer_id),
+                                $task->task_type->value === 'SURVEY' => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
+                                $task->task_type->value === 'PSB' => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
                                 default => route('tasks.maintenance.report', $task),
                             };
                         ?>

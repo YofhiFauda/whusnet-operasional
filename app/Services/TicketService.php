@@ -462,7 +462,7 @@ class TicketService
      * Ticket sama sekali (DEAC bukan tipe yang boleh diajukan lewat Ticketing —
      * lihat TaskType::ticketValues()), tapi tetap dibikin Draft-unassigned
      * kayak syncToFopTask() supaya alur eksekusinya (assign teknisi → Task →
-     * evidence/report → review) SAMA PERSIS dengan MTN/C-REQ, bukan lagi
+     * report → review) SAMA PERSIS dengan MTN/C-REQ, bukan lagi
      * langsung tandai device_retrieved_at sekali klik. Nomor TFOP- tetap
      * lewat generateFopTaskNumber() yang sama biar gak nyimpang dari deret
      * yang dipakai FopTaskController::generateTaskNumber() (lihat CLAUDE.md

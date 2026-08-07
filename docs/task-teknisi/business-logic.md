@@ -31,7 +31,7 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 `TaskPolicy` pakai **dua mekanisme guard sekaligus**, tergantung ability:
 
 ### A. Permission string statis
-`statusPending`, `uploadEvidence`, `editType`, `assignTeam` — cek `$user->hasPermission('task.xxx')` biasa + kadang syarat status tertentu.
+`statusPending`, `editType`, `assignTeam` — cek `$user->hasPermission('task.xxx')` biasa + kadang syarat status tertentu.
 
 ### B. `WorkflowTransitionPermission` dinamis (`canTransitionTo()`)
 `schedule`, `cancel`, `fopPending`(sebagiannya), `review`, `statusStart`, `statusComplete` — cek 3 lapis:
@@ -51,10 +51,19 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 - Anggota pertama otomatis `role_in_task=lead`, sisanya `teknisi` (`TaskTeam` pivot) — ditentukan urutan array, bukan pilihan eksplisit user.
 - **Ganti anggota tim biasa** (`TaskController::update()` dengan `team_member_ids` baru) — hapus semua `TaskTeam` lama, insert ulang total. **Reassign 1 orang** (`TaskTeamController::update()` via `TaskService::reassignTeam()`) — beda mekanisme, update `user_id` di 1 row pivot tanpa hapus-insert semua, plus cek konflik dan kirim notifikasi personal ke yang lama & baru.
 
-## 5. Syarat Complete (Evidence)
+## 5. Syarat Complete & Laporan Pekerjaan Teknisi
 
-- `Task::canComplete()` saat ini **selalu return `true`** — placeholder, belum ada validasi hard-requirement jumlah evidence minimum di level model (komentar di code/dokumentasi lama menyebut "checklist wajib + min 1 bukti" tapi implementasi aktual permisif).
-- `TaskEvidenceController::store()` cuma nyimpen foto — gak ada blocking logic yang connect ke `canComplete()`. Jangan asumsikan sistem menolak complete tanpa evidence — saat ini tidak.
+- `Task::canComplete()` **selalu return `true`** — tidak ada hard-requirement generik di level model. Komentar/dokumentasi lama pernah menyebut "checklist wajib + min 1 bukti foto" (jalur `TaskEvidence`), tapi fitur itu **dihapus total (2026-08-06)** — model, controller, route, tabel `task_evidences` sudah dibuang (lihat [database-schema.md](database-schema.md)). Alasannya: fitur itu gak pernah benar-benar men-gate completion, dan tumpang tindih sama foto wajib yang sudah ada di tiap Laporan per tipe task.
+- **Syarat foto yang beneran mengikat ada di form Laporan masing-masing tipe task**, bukan di `canComplete()`:
+  - Survey (`CustomerSurveyController::store()`) — `survey_photo` + `house_photo` wajib saat `survey_status=completed`.
+  - Pemasangan (`CustomerInstallationController::store()`) — `installation_photo`, `contract_photo`, `signature_photo`, `speedtest_photo` wajib saat `installation_status=completed`.
+  - Maintenance/lainnya (`TaskMaintenanceController::store()`) — `opm_photo` + `speedtest_photo` wajib, langsung memicu `TaskService::complete()`.
+- **Blok "Laporan Pekerjaan Teknisi" di Detail Task (2026-08-06):** apa yang teknisi kerjakan (kendala teknis, material terpakai dari `FopTask::materials()->terpakai()`, foto OPM/Speedtest) sebelumnya cuma tersimpan di DB tanpa pernah tampil lagi di `/tasks/{id}`. Sekarang `TaskController::show()` eager-load `maintenanceReport`, dan view nampilinnya di section baru — berlaku untuk task non-Survey/Pemasangan (MTN, C-REQ, O-REQ, INFR, Ambil Modem), karena Survey/Pemasangan sudah punya halaman laporan lengkap sendiri (link "Lihat/Lanjutkan Laporan").
+- **Tile ringkasan "Foto Bukti" diganti "Durasi Aktual"** (`actualDurationMinutes()`, format jam/menit, merah kalau `isOverSla()`) di ringkasan atas Detail Task — bekas tempat count foto yang sekarang gak ada lagi.
+
+## 5b. Riwayat Task Saya (`/tasks-saya/riwayat`, 2026-08-06)
+
+Arsip task **status `selesai`** milik teknisi login, `TaskController::historyOwn()`. Beda dari `/tasks-saya` (`indexOwn()`): itu papan kerja aktif (task hari ini + `in_progress`/`pending` + `terjadwal` overdue, **buang** task selesai lama dari daftar), ini arsip lintas waktu — tiap kartu klik langsung ke `/tasks/{id}` yang sekarang sudah lengkap sama blok Laporan Pekerjaan (lihat §5). Guard sama dengan dashboard: `task.view.own` + `whereHas('teamMembers', user)`.
 
 ## 6. Efek Complete → Review FOP → Transisi Customer
 

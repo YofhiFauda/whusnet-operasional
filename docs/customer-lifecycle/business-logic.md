@@ -56,6 +56,7 @@
 - Kalau `survey_status = completed` **dan** status customer masih `survey_in_progress` → complete Task Survey, transition ke `waiting_acc`, broadcast `SurveyCompleted`, kirim notifikasi Telegram.
 - **Kalau `survey_status = failed` (✅ ditambahkan 2026-07-08 — sebelumnya gap, lihat [bug.md](bug.md)):** `survey_note` jadi **wajib** (alasan tidak layak pasang, ditombolkan lewat tombol "Tidak Layak Pasang" terpisah di UI — bukan dropdown, biar teknisi gak salah pencet). Task Survey terkait di-**cancel** (`TaskService::cancel()`, status `DIBATALKAN` + `cancel_reason`), customer di-**transition ke `rejected`** (state final, sama mekanisme dengan reject di tahap verifikasi — lihat §7). Tiket Pemasangan otomatis **tidak akan pernah terbentuk** karena workflow tidak pernah sampai `waiting_acc`.
 - Kalau `survey_status = pending` (laporan draf/belum final) → data tersimpan, status customer/task tidak berubah, technician bisa submit ulang nanti.
+- **Navigasi "Kembali" & redirect sukses ikut halaman asal (`return_to`, 2026-08-06):** halaman `/customers/{id}/survey/report` diakses dari beberapa entry point (Detail Task teknisi, Dashboard Task Saya, Antrean Survey, Verifikasi Queue, Detail Pelanggan) — sebelumnya tombol "Kembali" dan redirect setelah submit sukses **hardcoded** ke `surveys.queue`/`verifications.queue`, jadi teknisi yang masuk dari Detail Task malah dilempar ke halaman admin yang gak relevan. Sekarang tiap pemanggil kirim `return_to` (query saat GET, hidden field saat POST), divalidasi `App\Support\SafeUrl::resolveReturnTo()` (cuma terima same-origin URL, cegah open redirect), fallback ke `surveys.queue` kalau kosong/invalid — `report()` & `store()` di `CustomerSurveyController`.
 
 #### Tanggal Request Pemasangan (`requested_installation_date`, 2026-07-31)
 
@@ -109,6 +110,7 @@ Daftar material terstruktur (baris berulang: barang, tipe, jumlah, satuan, catat
   - `completed` → complete Task Pemasangan, transition 2x berturutan: `installed` lalu langsung `verification_admin` (skip berhenti di `installed`), broadcast `InstallationCompleted`, notifikasi Telegram.
   - `failed` → transition balik ke `waiting_installation` ("Instalasi gagal/butuh revisi. Menunggu penjadwalan ulang").
   - lainnya (progress belum selesai) → data tersimpan, status customer/task tidak berubah.
+- **Navigasi "Kembali" & redirect sukses ikut halaman asal (`return_to`, 2026-08-06)** — sama mekanismenya dengan Lapor Survey (lihat §4): `return_to` divalidasi `App\Support\SafeUrl::resolveReturnTo()`, fallback ke `verifications.queue`. Fix ini juga membetulkan link "Lapor Pemasangan"/"Revisi" survey dari Verifikasi Queue yang sebelumnya salah fallback ke Antrean Survey kalau customer masih tahap survey.
 
 #### Perangkat Pasif Terpakai (`task_materials`, kind `terpakai`, 2026-07-31)
 

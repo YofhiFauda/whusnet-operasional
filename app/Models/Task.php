@@ -72,6 +72,11 @@ class Task extends Model
         return $this->belongsTo(User::class, 'fop_id');
     }
 
+    public function fopTask(): HasOne
+    {
+        return $this->hasOne(FopTask::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -85,11 +90,6 @@ class Task extends Model
     public function teamMembers(): HasMany
     {
         return $this->hasMany(TaskTeam::class);
-    }
-
-    public function evidences(): HasMany
-    {
-        return $this->hasMany(TaskEvidence::class);
     }
 
     public function auditLogs(): MorphMany

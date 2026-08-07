@@ -121,4 +121,32 @@ class CustomerRegistrationTest extends TestCase
             'full_address' => 'Jl. Test No. 1',
         ]);
     }
+
+    public function test_registration_cleans_formatted_nik()
+    {
+        Storage::fake('public');
+        $file = UploadedFile::fake()->image('ktp.jpg');
+
+        $response = $this->actingAs($this->admin)->post('/customers', [
+            'full_name' => 'Jane Doe',
+            'identity_number' => '3502-1820-3920-0001 ', // Formatted with hyphens and space
+            'gender' => 'Perempuan',
+            'primary_phone' => '081234567891',
+            'registration_date' => now()->format('Y-m-d'),
+            'pop_id' => $this->pop->id,
+            'address' => 'Jl. Test No. 2',
+            'city_id' => $this->city->id,
+            'district_id' => $this->district->id,
+            'village_id' => $this->village->id,
+            'internet_package_id' => $this->package->id,
+            'contract_period_months' => 12,
+            'foto_ktp' => $file,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('customers', [
+            'full_name' => 'Jane Doe',
+            'identity_number' => '3502182039200001',
+        ]);
+    }
 }

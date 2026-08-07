@@ -301,7 +301,12 @@ class Pop extends Model
         $prefix = $this->cid_prefix;
         $tech = $customer->customerTechnicalDetail;
         $oltNumber = $this->resolveMiniPopSegment($customer, $tech?->olt_number);
-        $distCode = $distribution ? $distribution->code : 'XX';
+        // Default distribusi = "0" (belum di-assign distribusi manapun),
+        // sesuai skema Skema 2/3 di ID_NUMBERING_RULES.md. Dulu "XX" —
+        // diganti karena "XX" bukan bagian dari skema penomoran resmi,
+        // cuma placeholder ad-hoc yang bikin CID default kelihatan seperti
+        // segmen distribusi asli padahal belum pernah di-assign.
+        $distCode = $distribution ? $distribution->code : '0';
 
         // Use the permanent registration identifier part only, e.g. "RQ000001".
         $reqId = $this->extractBareRegistrationId($customer->customer_code);
@@ -363,7 +368,12 @@ class Pop extends Model
             }
         }
 
-        return '1';
+        // Default mini POP = "0" (belum di-assign mini POP manapun), sesuai
+        // skema Skema 3 di ID_NUMBERING_RULES.md. Dulu "1" — salah, karena
+        // "1" itu kode mini POP SUNGGUHAN di Master POP (mis. "C1"/"D1"),
+        // bukan default. Memakainya sebagai fallback bikin pelanggan yang
+        // belum di-assign kelihatan seperti sudah masuk mini POP 1.
+        return '0';
     }
 
     /**

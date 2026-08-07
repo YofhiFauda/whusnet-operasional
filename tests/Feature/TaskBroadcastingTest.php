@@ -10,7 +10,6 @@ use App\Events\TaskStarted;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
-use App\Models\TaskEvidence;
 use App\Models\User;
 use App\Services\TaskService;
 use Database\Seeders\ActionSeeder;
@@ -109,13 +108,6 @@ class TaskBroadcastingTest extends TestCase
             'sla_minutes' => 120,
             'created_by' => $this->fopUser->id,
             'updated_by' => $this->fopUser->id,
-        ]);
-
-        TaskEvidence::create([
-            'task_id' => $task->id,
-            'file_path' => 'evidences/test.jpg',
-            'caption' => 'Bukti foto',
-            'uploaded_by' => $this->technician->id,
         ]);
 
         app(TaskService::class)->complete($task, $this->technician);

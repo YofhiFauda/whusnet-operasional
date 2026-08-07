@@ -56,6 +56,7 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 | Validasi input | `app/Http/Requests/CustomerRegistrationRequest.php`, `app/Services/CustomerValidationService.php` |
 | Event | `app/Events/SurveyStarted.php`, `SurveyCompleted.php`, `InstallationStarted.php`, `InstallationCompleted.php` |
 | CID generator | `app/Models/Pop.php@generateComplexCid()` |
+| Redirect `return_to` (NEW 2026-08-06) | `app/Support/SafeUrl.php@resolveReturnTo()` — dipakai form Laporan Survey/Pemasangan biar "Kembali" & redirect sukses ikut halaman asal, bukan hardcoded |
 
 ## Terhubung dengan Modul Lain
 
@@ -65,4 +66,10 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 
 ---
 
-**Last updated:** 2026-07-28 — added fieldwork page for technician device/installation data (separate from Detail Pelanggan per RBAC segregation)
+**Last updated:** 2026-08-06 — fix redirect Laporan Survey/Pemasangan (`return_to`) biar "Kembali" & redirect sukses ikut halaman asal, bukan hardcoded ke Antrean Survey/Verifikasi Queue
+
+<details><summary>Riwayat update sebelumnya</summary>
+
+**2026-07-28** — added fieldwork page for technician device/installation data (separate from Detail Pelanggan per RBAC segregation)
+
+</details>

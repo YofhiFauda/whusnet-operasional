@@ -17,6 +17,18 @@ class CustomerRegistrationRequest extends FormRequest
     }
 
     /**
+     * Prepare data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('identity_number')) {
+            $this->merge([
+                'identity_number' => preg_replace('/[^0-9]/', '', (string) $this->identity_number),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      */
     public function rules(): array
@@ -70,6 +82,7 @@ class CustomerRegistrationRequest extends FormRequest
         return [
             'identity_number.required' => 'NIK wajib diisi.',
             'identity_number.size' => 'NIK harus berjumlah 16 digit angka.',
+            'identity_number.digits' => 'NIK harus berjumlah 16 digit angka.',
             'identity_number.regex' => 'NIK hanya boleh berisi angka.',
             'primary_phone.regex' => 'Format nomor HP tidak valid (harus format Indonesia, misal: 0812...).',
             'foto_ktp.required' => 'Foto KTP wajib dilampirkan.',

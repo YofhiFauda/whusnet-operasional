@@ -160,7 +160,7 @@
 
                             <div>
                                 <label for="identity_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nomor Identitas (NIK KTP) <span class="text-rose-500">*</span></label>
-                                <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number') }}" maxlength="16" class="w-full text-xs font-mono px-3 py-2.5 border @error('identity_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="3502182039200001">
+                                <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number') }}" maxlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 16);" class="w-full text-xs font-mono px-3 py-2.5 border @error('identity_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="3502182039200001">
                                 @error('identity_number')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror

@@ -135,7 +135,7 @@
 
                         <div>
                             <label for="identity_number" class="block mb-2 uppercase tracking-wide">NOMOR IDENTITAS (NIK) <span class="text-red-500">*</span></label>
-                            <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number', $customer->identity_number) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 3502182039200001">
+                            <input type="text" name="identity_number" id="identity_number" value="{{ old('identity_number', $customer->identity_number) }}" maxlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 16);" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 3502182039200001">
                         </div>
 
                         <div>

@@ -20,6 +20,7 @@ use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
+use App\Support\SafeUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -192,9 +193,14 @@ class CustomerSurveyController extends Controller
         return redirect()->back()->with('success', 'Survey pelanggan berhasil dibatalkan: tidak layak pasang.');
     }
 
-    public function report(Customer $customer)
+    public function report(Customer $customer, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.survey.update'), 403);
+
+        // Halaman ini diakses dari beberapa entry point (Detail Task teknisi,
+        // Dashboard Task Saya, Antrean Survey, Detail Pelanggan) — lihat
+        // SafeUrl::resolveReturnTo() kenapa gak pakai url()->previous().
+        $returnTo = SafeUrl::resolveReturnTo($request->query('return_to'), 'surveys.queue');
 
         if ($customer->status !== 'survey_in_progress') {
             return redirect()->route('surveys.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan survey.');
@@ -248,7 +254,7 @@ class CustomerSurveyController extends Controller
             $workToolService->resolveTaskForCustomer($customer, TaskType::SURVEY)
         );
 
-        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows'));
+        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -502,9 +508,11 @@ class CustomerSurveyController extends Controller
         });
 
         if ($validated['survey_status'] === 'failed') {
-            return redirect()->route('surveys.queue')->with('success', 'Survey selesai dilaporkan: pelanggan tidak layak pasang.');
+            return redirect(SafeUrl::resolveReturnTo($request->input('return_to'), 'surveys.queue'))
+                ->with('success', 'Survey selesai dilaporkan: pelanggan tidak layak pasang.');
         }
 
-        return redirect()->route('verifications.queue')->with('success', 'Data survey berhasil disimpan.');
+        return redirect(SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue'))
+            ->with('success', 'Data survey berhasil disimpan.');
     }
 }

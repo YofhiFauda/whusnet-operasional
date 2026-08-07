@@ -20,6 +20,7 @@ use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
+use App\Support\SafeUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -148,9 +149,14 @@ class CustomerInstallationController extends Controller
         return redirect()->back()->with('success', 'Pemasangan pelanggan berhasil dibatalkan: tidak layak lanjut.');
     }
 
-    public function report(Customer $customer)
+    public function report(Customer $customer, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
+
+        // Halaman ini diakses dari beberapa entry point (Detail Task teknisi,
+        // Dashboard Task Saya, Verifikasi Queue, Detail Pelanggan) — lihat
+        // SafeUrl::resolveReturnTo() kenapa gak pakai url()->previous().
+        $returnTo = SafeUrl::resolveReturnTo($request->query('return_to'), 'verifications.queue');
 
         if (! in_array($customer->status, ['installation_in_progress', 'revision_installation'])) {
             return redirect()->route('verifications.queue')->with('error', 'Status pelanggan tidak valid untuk pelaporan pemasangan.');
@@ -216,7 +222,7 @@ class CustomerInstallationController extends Controller
             ? $installWorkTools
             : $workToolService->surveyRowsForCustomer($customer);
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -522,7 +528,8 @@ class CustomerInstallationController extends Controller
 
             DB::commit();
 
-            return redirect()->route('verifications.queue')->with('success', $successMessage);
+            return redirect(SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue'))
+                ->with('success', $successMessage);
 
         } catch (\Exception $e) {
             DB::rollBack();

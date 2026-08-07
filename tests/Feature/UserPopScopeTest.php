@@ -80,7 +80,6 @@ class UserPopScopeTest extends TestCase
         DB::table('fop_tasks')->delete();
         DB::table('task_maintenances')->delete();
         DB::table('task_checklists')->delete();
-        DB::table('task_evidences')->delete();
         DB::table('tasks')->delete();
         DB::table('payments')->delete();
         DB::table('invoices')->delete();

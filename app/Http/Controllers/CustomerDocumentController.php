@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DocumentType;
+use App\Http\Controllers\Concerns\RedirectsToCustomer;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
@@ -14,6 +15,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerDocumentController extends Controller
 {
+    use RedirectsToCustomer;
+
     public function store(Request $request, Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.documents.upload'), 403);
@@ -61,7 +64,7 @@ class CustomerDocumentController extends Controller
             'created_at' => now(),
         ]);
 
-        return redirect()->route('customers.show', $customer->id)
+        return $this->redirectToCustomer($customer)
             ->with('success', 'Dokumen pelanggan berhasil diupload.');
     }
 

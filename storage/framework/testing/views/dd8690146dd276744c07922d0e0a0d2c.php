@@ -47,14 +47,14 @@
 
     <!-- Info Pelanggan & Transaksi Grid -->
     <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">DITERIMA DARI PELANGGAN</p>
             <p class="font-bold text-sm text-slate-900"><?php echo e($payment->customer->full_name ?? '-'); ?></p>
             <p class="font-mono text-xs text-slate-700">CID: <?php echo e($payment->customer->cid ?? $payment->customer->customer_code ?? '-'); ?></p>
             <p class="text-slate-600 font-mono">No. HP: <?php echo e($payment->customer->primary_phone ?? $payment->customer->phone ?? '-'); ?></p>
             <p class="text-slate-600 mt-1">Alamat: <?php echo e($payment->customer->address ?? '-'); ?></p>
         </div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-right space-y-1">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-right space-y-1">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">RINCIAN TRANSAKSI</p>
             <p><span class="text-slate-500">Tanggal Bayar:</span> <span class="font-semibold"><?php echo e(optional($payment->payment_date)->format('d/m/Y')); ?></span></p>
             <p><span class="text-slate-500">Metode Bayar:</span> <span class="font-semibold uppercase font-mono"><?php echo e(strtoupper($payment->payment_method)); ?></span></p>
@@ -128,16 +128,16 @@
     </div>
 </div>
 
-<!-- SCREEN ONLY ENTERPRISE VIEW (RECORD DETAIL TYPE B) -->
-<div class="screen-only space-y-5">
+<!-- SCREEN ONLY ENTERPRISE VIEW -->
+<div class="screen-only space-y-6">
 
     <!-- TOP NOTICE BANNER -->
     <?php echo $__env->make('payments.partials.riwayat-banner', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <?php if($payment->payment_status->value === 'ditolak'): ?>
-        <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-lg p-4 text-xs text-rose-700 dark:text-rose-300 shadow-2xs">
+        <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl p-4 text-xs text-rose-700 dark:text-rose-300 shadow-2xs">
             <div class="flex items-center gap-3">
-                <div class="p-2 rounded-lg bg-rose-600 text-white shrink-0">
+                <div class="p-2 rounded-xl bg-rose-600 text-white shrink-0">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                     </svg>
@@ -155,23 +155,23 @@
         </div>
     <?php endif; ?>
 
-    <!-- NAKED PAGE HEADER (UNIVERSAL RULE: PAGE HEADER SLWAYA NAKED, TANPA CARD WRAPPER) -->
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 py-1">
+    <!-- PAGE TITLE BAR & ACTION BUTTONS -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs">
         <div>
             <!-- Title & ID Badge -->
             <div class="flex items-center gap-2.5 flex-wrap">
-                <a href="<?php echo e(route('payments.index')); ?>" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors" title="Kembali ke Daftar">
+                <a href="<?php echo e(route('payments.index')); ?>" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors" title="Kembali ke Daftar">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
                 </a>
                 
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                     Detail Pembayaran
                 </h1>
 
                 <!-- Payment Code Badge -->
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-xs font-bold text-slate-800 dark:text-slate-200 shadow-2xs">
                     <span><?php echo e($payment->payment_number); ?></span>
                     <button onclick="copyText('<?php echo e($payment->payment_number); ?>', 'No. Pembayaran')" title="Salin Kode Pembayaran" class="text-slate-400 hover:text-sky-600 transition-colors cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -206,10 +206,10 @@
             </p>
         </div>
 
-        <!-- Right Action Bar (Naked toolbar) -->
+        <!-- Right Action Bar -->
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <?php if($payment->invoice_id): ?>
-            <a href="<?php echo e(route('invoices.show', $payment->invoice_id)); ?>" class="inline-flex items-center gap-2 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold transition-all shadow-2xs active:scale-95">
+            <a href="<?php echo e(route('invoices.show', $payment->invoice_id)); ?>" class="inline-flex items-center gap-2 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
@@ -219,7 +219,7 @@
 
             <!-- Print Struk Button & Dropdown Menu -->
             <div class="relative inline-block text-left">
-                <button onclick="togglePrintDropdown(event)" id="printDropdownBtn" class="inline-flex items-center gap-2 px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all border border-slate-200 dark:border-slate-700 active:scale-95 cursor-pointer shadow-2xs">
+                <button onclick="togglePrintDropdown(event)" id="printDropdownBtn" class="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-600 active:scale-95 cursor-pointer">
                     <svg class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                     </svg>
@@ -229,7 +229,7 @@
                     </svg>
                 </button>
 
-                <div id="printDropdownMenu" class="hidden absolute right-0 mt-2 w-60 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1.5 z-30 text-xs">
+                <div id="printDropdownMenu" class="hidden absolute right-0 mt-2 w-60 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl py-1.5 z-30 text-xs">
                     <button type="button" onclick="window.print(); closePrintDropdown();" class="w-full px-4 py-2.5 flex items-center gap-3 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left cursor-pointer">
                         <div class="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -255,7 +255,7 @@
             <!-- Reject Button -->
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.reject')): ?>
                 <?php if($payment->payment_status->value === 'valid'): ?>
-                <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer">
+                <button type="button" onclick="openRejectModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -266,30 +266,30 @@
         </div>
     </div>
 
-    <!-- HERO METRIC SUMMARY CARDS GRID (UNIFIED ROUNDED-LG 8PX CARD RADIUS) -->
+    <!-- HERO METRIC SUMMARY CARDS GRID -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Card 1: Nominal Bayar -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-emerald-500/50 transition-all duration-200">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-emerald-500/50 transition-all duration-300">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Nominal Diterima</span>
-                <div class="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Nominal Diterima</span>
+                <div class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/50">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="mt-2">
-                <div class="font-mono text-2xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
+            <div class="mt-3">
+                <div class="font-mono text-2xl lg:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
                     Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?>
 
                 </div>
                 <?php if((float) $payment->overpay_amount > 0): ?>
-                <div class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 mt-1 flex items-center gap-1">
+                <div class="text-[11px] font-bold text-sky-600 dark:text-sky-400 mt-1 flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                     <span>Rp <?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?> Tercatat Overpay</span>
                 </div>
                 <?php else: ?>
-                <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                <div class="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1">
                     Terverifikasi Sistem
                 </div>
                 <?php endif; ?>
@@ -297,22 +297,22 @@
         </div>
 
         <!-- Card 2: Tanggal & Metode -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-sky-500/50 transition-all duration-200">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-sky-500/50 transition-all duration-300">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tanggal & Metode</span>
-                <div class="p-2 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tanggal & Metode</span>
+                <div class="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="mt-2">
-                <div class="font-mono text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <div class="mt-3">
+                <div class="font-mono text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                     <?php echo e(optional($payment->payment_date)->format('d/m/Y')); ?>
 
                 </div>
                 <div class="mt-1">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 uppercase">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 uppercase">
                         <?php echo e(strtoupper($payment->payment_method)); ?>
 
                     </span>
@@ -321,16 +321,16 @@
         </div>
 
         <!-- Card 3: Operator Kasir -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-200">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-indigo-500/50 transition-all duration-300">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Operator Kasir</span>
-                <div class="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Operator Kasir</span>
+                <div class="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="mt-2">
+            <div class="mt-3">
                 <div class="font-bold text-slate-900 dark:text-white text-base truncate">
                     <?php echo e($payment->receiver->name ?? '-'); ?>
 
@@ -342,22 +342,22 @@
         </div>
 
         <!-- Card 4: Kolektor Lapangan -->
-        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-5 shadow-2xs relative overflow-hidden group hover:border-amber-500/50 transition-all duration-200">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs relative overflow-hidden group hover:border-amber-500/50 transition-all duration-300">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Kolektor</span>
-                <div class="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kolektor</span>
+                <div class="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="mt-2">
+            <div class="mt-3">
                 <div class="font-bold text-slate-900 dark:text-white text-base truncate">
                     <?php echo e($payment->collector ? $payment->collector->name : 'Direct / Kasir POP'); ?>
 
                 </div>
                 <div class="mt-1">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                         <?php echo e($payment->collector ? 'Kolektor Lapangan' : 'Tanpa Kolektor Lapangan'); ?>
 
                     </span>
@@ -367,25 +367,25 @@
     </div>
 
     <!-- MAIN ENTERPRISE 2-COLUMN GRID -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         <!-- LEFT MAIN TABBED CONTENT (8 cols on lg/xl) -->
-        <div class="lg:col-span-8 space-y-5">
+        <div class="lg:col-span-8 space-y-6">
             
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-2xs">
+            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-2xs">
                 
                 <!-- Tab Bar Header -->
-                <div class="border-b border-slate-200 dark:border-slate-700 px-5 flex items-center gap-5 text-xs bg-slate-50/50 dark:bg-slate-900/40 custom-scrollbar overflow-x-auto">
-                    <button onclick="switchTab('info')" id="tab-info" class="py-3.5 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                <div class="border-b border-slate-100 dark:border-slate-700/60 px-6 flex items-center gap-6 text-xs bg-slate-50/50 dark:bg-slate-900/40 custom-scrollbar overflow-x-auto">
+                    <button onclick="switchTab('info')" id="tab-info" class="py-4 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>Informasi & Catatan</span>
                     </button>
-                    <button onclick="switchTab('proof')" id="tab-proof" class="py-3.5 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                    <button onclick="switchTab('proof')" id="tab-proof" class="py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span>Bukti Pembayaran</span>
                     </button>
                     <?php if(auth()->user()->hasPermission('audit_logs.view')): ?>
-                    <button onclick="switchTab('audit')" id="tab-audit" class="py-3.5 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
+                    <button onclick="switchTab('audit')" id="tab-audit" class="py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         <span>Timeline & Audit Log</span>
                     </button>
@@ -393,12 +393,12 @@
                 </div>
 
                 <!-- TAB PANE 1: Informasi & Catatan -->
-                <div id="pane-info" class="p-5 sm:p-6 space-y-6">
+                <div id="pane-info" class="p-6 space-y-6">
                     
                     <!-- Financial Breakdown Itemization -->
                     <div>
-                        <h3 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">Rincian Pembagian Alokasi Dana</h3>
-                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3">Rincian Pembagian Alokasi Dana</h3>
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
                                     <tr>
@@ -453,8 +453,8 @@
 
                     <!-- Remarks / Notes Box -->
                     <div class="space-y-2">
-                        <h3 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Catatan Petugas</h3>
-                        <div class="p-4 bg-slate-50/70 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Catatan Petugas</h3>
+                        <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
                             <?php echo e($payment->note ?: 'Tidak ada catatan khusus untuk transaksi ini.'); ?>
 
                         </div>
@@ -462,8 +462,8 @@
 
                     <?php if($payment->old_payment_id || $payment->old_transaction_id || $payment->old_request_id): ?>
                     <div class="space-y-2">
-                        <h3 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Audit Visibilitas Data Migrasi Legacy</h3>
-                        <div class="p-4 bg-slate-50/70 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Audit Visibilitas Data Migrasi Legacy</h3>
+                        <div class="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
                             <?php if($payment->old_payment_id): ?>
                             <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-700/60">
                                 <span class="text-slate-500">ID Bayar Lama:</span>
@@ -489,11 +489,11 @@
                 </div>
 
                 <!-- TAB PANE 2: Bukti Pembayaran -->
-                <div id="pane-proof" class="hidden p-5 sm:p-6 space-y-4">
-                    <h3 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Lampiran Bukti Pembayaran / Struk Transfer</h3>
+                <div id="pane-proof" class="hidden p-6 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Lampiran Bukti Pembayaran / Struk Transfer</h3>
                     
                     <?php if($payment->proof_file): ?>
-                        <div class="p-6 bg-slate-50/50 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-center space-y-3">
+                        <div class="p-6 bg-slate-50 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center space-y-3">
                             <div class="w-12 h-12 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -503,14 +503,14 @@
                                 <p class="font-bold text-sm text-slate-800 dark:text-slate-200">Lampiran Bukti Terdaftar</p>
                                 <p class="text-xs font-mono text-slate-400 max-w-sm mx-auto mt-0.5 truncate"><?php echo e($payment->proof_file); ?></p>
                             </div>
-                            <a href="<?php echo e(asset('storage/' . $payment->proof_file)); ?>" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold transition-all shadow-2xs">
+                            <a href="<?php echo e(asset('storage/' . $payment->proof_file)); ?>" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
                                 <span>Lihat Bukti Pembayaran</span>
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                             </a>
                         </div>
                     <?php else: ?>
                         <!-- Proof Placeholder Box -->
-                        <div class="p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-center bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
+                        <div class="p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl text-center bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
                             <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -531,11 +531,11 @@
 
                 <!-- TAB PANE 3: Timeline & Audit Log -->
                 <?php if(auth()->user()->hasPermission('audit_logs.view')): ?>
-                <div id="pane-audit" class="hidden p-5 sm:p-6 space-y-4">
-                    <h3 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Riwayat Audit Pembayaran</h3>
+                <div id="pane-audit" class="hidden p-6 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Riwayat Audit Pembayaran</h3>
                     
                     <?php if($payment->relationLoaded('auditLogs') && $payment->auditLogs->count() > 0): ?>
-                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr class="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase tracking-wider text-[10px]">
@@ -566,7 +566,7 @@
                                             <button onclick="toggleJsonView('json-<?php echo e($index); ?>')" class="text-sky-600 dark:text-sky-400 hover:underline font-mono text-[11px] cursor-pointer">
                                                 [+] Lihat JSON Payload
                                             </button>
-                                            <pre id="json-<?php echo e($index); ?>" class="hidden mt-2 p-3 bg-slate-900 text-emerald-400 font-mono text-[10px] rounded-lg overflow-x-auto custom-scrollbar"><?php echo e(json_encode([
+                                            <pre id="json-<?php echo e($index); ?>" class="hidden mt-2 p-3 bg-slate-900 text-emerald-400 font-mono text-[10px] rounded-xl overflow-x-auto custom-scrollbar"><?php echo e(json_encode([
                                                 'old_values' => $auditLog->old_values,
                                                 'new_values' => $auditLog->new_values,
                                             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?></pre>
@@ -577,7 +577,7 @@
                             </table>
                         </div>
                     <?php else: ?>
-                        <div class="p-4 bg-slate-50/70 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700 text-xs text-slate-500 text-center">
+                        <div class="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 text-center">
                             Belum ada entri audit log untuk transaksi pembayaran ini.
                         </div>
                     <?php endif; ?>
@@ -588,14 +588,14 @@
         </div>
 
         <!-- RIGHT STICKY SIDEBAR DETAILS (4 cols on lg/xl) -->
-        <div class="lg:col-span-4 space-y-5 lg:sticky lg:top-20">
+        <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
             
             <!-- INVOICE CONTEXT CARD -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-2xs space-y-4">
+            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
-                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Tagihan Terkait</span>
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tagihan Terkait</span>
                     <?php if($payment->invoice_id): ?>
-                    <a href="<?php echo e(route('invoices.show', $payment->invoice_id)); ?>" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                    <a href="<?php echo e(route('invoices.show', $payment->invoice_id)); ?>" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
                         <span>Lihat Tagihan</span>
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </a>
@@ -633,11 +633,11 @@
             </div>
 
             <!-- CUSTOMER PROFILE CARD -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-2xs space-y-4">
+            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 shadow-2xs space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
-                    <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Identitas Pelanggan</span>
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Identitas Pelanggan</span>
                     <?php if($payment->customer_id): ?>
-                    <a href="<?php echo e(route('customers.show', $payment->customer_id)); ?>" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                    <a href="<?php echo e(route('customers.show', $payment->customer_id)); ?>" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
                         <span>Profil Full</span>
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </a>
@@ -645,11 +645,11 @@
                 </div>
 
                 <div class="flex items-start gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-bold text-sm flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800">
+                    <div class="w-11 h-11 rounded-2xl bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-extrabold text-base flex items-center justify-center shrink-0 border border-sky-200 dark:border-sky-800">
                         <?php echo e(strtoupper(substr($payment->customer->full_name ?? 'P', 0, 2))); ?>
 
                     </div>
-                    <div class="space-y-0.5 text-xs">
+                    <div class="space-y-1 text-xs">
                         <?php if($payment->customer_id): ?>
                         <a href="<?php echo e(route('customers.show', $payment->customer_id)); ?>" class="font-bold text-slate-900 dark:text-white text-sm hover:text-sky-600 transition-colors block">
                             <?php echo e($payment->customer->full_name ?? '-'); ?>
@@ -687,51 +687,25 @@
                     </div>
                     <div class="pt-1">
                         <span class="text-slate-500 dark:text-slate-400 block mb-1">Alamat Pemasangan:</span>
-                        <p class="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed bg-slate-50/70 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                        <p class="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
                             <?php echo e($payment->customer->address ?? '-'); ?>
 
                         </p>
                     </div>
                 </div>
             </div>
-
-            <!-- QUICK PRINT CARD -->
-            <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 shadow-2xs space-y-3">
-                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block pb-2 border-b border-slate-100 dark:border-slate-700/60">Opsi Cetak Struk</span>
-                
-                <div class="space-y-2">
-                    <button type="button" onclick="window.print()" class="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <svg class="h-4 w-4 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span>Cetak Kwitansi A4 (PDF)</span>
-                        </div>
-                        <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                    </button>
-
-                    <button type="button" onclick="openThermalPreview()" class="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                        <div class="flex items-center gap-2">
-                            <svg class="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                            <span>Struk Thermal (80mm)</span>
-                        </div>
-                        <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </button>
-                </div>
-            </div>
-
         </div>
-
     </div>
-
 </div>
 
 <!-- MODAL: TOLAK PEMBAYARAN -->
 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.reject')): ?>
     <?php if($payment->payment_status->value === 'valid'): ?>
     <div id="rejectModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs hidden flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between bg-rose-50/60 dark:bg-rose-950/40">
                 <div class="flex items-center gap-2.5">
-                    <div class="p-2 rounded-lg bg-rose-600 text-white shrink-0">
+                    <div class="p-2 rounded-xl bg-rose-600 text-white shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                         </svg>
@@ -754,7 +728,7 @@
 
                 <div>
                     <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Alasan Penolakan *</label>
-                    <textarea name="reject_reason" id="rejectReasonInput" rows="4" required class="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20" placeholder="Contoh: Bukti transfer tidak sah / Duplikasi input kasir / Rekonsiliasi kas tidak sesuai"><?php echo e(old('reject_reason')); ?></textarea>
+                    <textarea name="reject_reason" id="rejectReasonInput" rows="4" required class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20" placeholder="Contoh: Bukti transfer tidak sah / Duplikasi input kasir / Rekonsiliasi kas tidak sesuai"><?php echo e(old('reject_reason')); ?></textarea>
                     <?php $__errorArgs = ['reject_reason'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -769,10 +743,10 @@ unset($__errorArgs, $__bag); ?>
 
                 <!-- Modal Action Buttons -->
                 <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-end gap-2">
-                    <button type="button" onclick="closeRejectModal()" class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                    <button type="button" onclick="closeRejectModal()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
                         Batal
                     </button>
-                    <button type="submit" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-2xs active:scale-95 cursor-pointer">
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer">
                         Ya, Tolak Pembayaran
                     </button>
                 </div>
@@ -784,7 +758,7 @@ unset($__errorArgs, $__bag); ?>
 
 <!-- MODAL: PRATINJAU STRUK THERMAL 80MM -->
 <div id="thermalModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-lg max-w-sm w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
         <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
             <h3 class="font-bold text-slate-900 dark:text-white text-xs">Simulasi Struk Thermal 80mm</h3>
             <button type="button" onclick="closeThermalModal()" class="p-1 text-slate-400 hover:text-slate-600 text-lg leading-none cursor-pointer">&times;</button>
@@ -837,8 +811,8 @@ unset($__errorArgs, $__bag); ?>
         </div>
 
         <div class="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
-            <button type="button" onclick="closeThermalModal()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">Tutup</button>
-            <a href="<?php echo e(route('payments.receipt', $payment->id)); ?>" target="_blank" onclick="closeThermalModal()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-all">Cetak Thermal</a>
+            <button type="button" onclick="closeThermalModal()" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">Tutup</button>
+            <a href="<?php echo e(route('payments.receipt', $payment->id)); ?>" target="_blank" onclick="closeThermalModal()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all">Cetak Thermal</a>
         </div>
     </div>
 </div>
@@ -852,10 +826,10 @@ unset($__errorArgs, $__bag); ?>
             if (!btn || !pane) return;
 
             if (key === tabKey) {
-                btn.className = 'py-3.5 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
+                btn.className = 'py-4 border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
                 pane.classList.remove('hidden');
             } else {
-                btn.className = 'py-3.5 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
+                btn.className = 'py-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-semibold flex items-center gap-2 transition-all shrink-0 cursor-pointer';
                 pane.classList.add('hidden');
             }
         });

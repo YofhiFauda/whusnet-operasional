@@ -1,15 +1,15 @@
 # Modul Task Teknisi (Eksekusi Lapangan)
 
-`Task` = unit kerja yang benar-benar dikerjakan teknisi di lapangan (checklist, timer mulai/selesai, evidence foto, laporan). Beda dari `FopTask` (tiket administratif FOP, lihat [docs/fop-task](../fop-task/README.md)) — 1 `FopTask` biasanya generate 1 `Task` begitu teknisi di-assign, tapi `Task` juga bisa lahir langsung dari transisi status pelanggan (survey/pemasangan, lihat [docs/customer-lifecycle](../customer-lifecycle/README.md)).
+`Task` = unit kerja yang benar-benar dikerjakan teknisi di lapangan (checklist, timer mulai/selesai, laporan). Beda dari `FopTask` (tiket administratif FOP, lihat [docs/fop-task](../fop-task/README.md)) — 1 `FopTask` biasanya generate 1 `Task` begitu teknisi di-assign, tapi `Task` juga bisa lahir langsung dari transisi status pelanggan (survey/pemasangan, lihat [docs/customer-lifecycle](../customer-lifecycle/README.md)).
 
 ## Dokumen
 
 | Dokumen | Isi |
 |---------|-----|
-| [business-logic.md](business-logic.md) | State machine Task, aturan konflik jadwal, guard tiap transisi, integrasi review FOP |
+| [business-logic.md](business-logic.md) | State machine Task, aturan konflik jadwal, guard tiap transisi, integrasi review FOP, laporan pekerjaan di Detail Task |
 | [flowchart.md](flowchart.md) | Alur create→jadwal→start→complete/pending/cancel, alur reassign tim, alur review FOP |
-| [user-flow.md](user-flow.md) | Langkah Teknisi & FOP di dashboard `/tasks-saya`, `/tasks/{id}` |
-| [database-schema.md](database-schema.md) | Tabel `tasks`, `task_teams`, `task_evidences`, `task_maintenances` |
+| [user-flow.md](user-flow.md) | Langkah Teknisi & FOP di dashboard `/tasks-saya`, `/tasks-saya/riwayat`, `/tasks/{id}` |
+| [database-schema.md](database-schema.md) | Tabel `tasks`, `task_teams`, `task_maintenances` |
 | [bug.md](bug.md) | ⚠️ Bug ditemukan: 2 jalur aktivasi pelanggan yang gak konsisten (approve via Task vs via Verifikasi Admin) |
 
 ## Konsep Inti
@@ -17,10 +17,11 @@
 ```
 Task (1 pekerjaan lapangan)
   ├── teamMembers (1-3 teknisi, task_teams pivot, role: lead/teknisi)
-  ├── evidences (task_evidences, foto bukti, min syarat sebelum complete)
-  ├── maintenanceReport (task_maintenances, khusus task_type=MAINTENANCE)
+  ├── maintenanceReport (task_maintenances, khusus task_type non-Survey/Pemasangan)
   └── fop_review_status (pending/approved/rejected — FOP review laporan setelah Selesai)
 ```
+
+**Foto Bukti (`TaskEvidence`/`task_evidences`) dihapus total (2026-08-06)** — upload foto generik ini gak pernah gate completion (`canComplete()` udah lama hardcoded `true`) dan tumpang tindih sama foto WAJIB yang sudah ada di tiap Laporan per tipe task (Survey: `survey_photo`/`house_photo`; Pemasangan: `installation_photo`/`contract_photo`/`signature_photo`/`speedtest_photo`; Maintenance/lainnya: `opm_photo`/`speedtest_photo`). Model, controller, route, tabel `task_evidences`, dan section "Foto Bukti" di `/tasks/{id}` sudah dibuang — tile ringkasan yang dulu nampilin jumlah foto sekarang jadi **Durasi Aktual**. Detail apa yang teknisi kerjakan (kendala teknis + material terpakai + foto wajib) sekarang tampil balik di Detail Task lewat blok **"Laporan Pekerjaan Teknisi"** — lihat [business-logic.md § 5](business-logic.md#5-syarat-complete--laporan-pekerjaan-teknisi).
 
 - **Status**: `draft` → `terjadwal` → `in_progress` → `selesai` (+ `pending`, `dibatalkan` sebagai cabang). Lihat `App\Enums\TaskStatus`.
 - **1 teknisi cuma boleh pegang 1 Task `in_progress` di waktu bersamaan** — guard ini dicek di 3 tempat berbeda (start Task biasa, start Survey, start Pemasangan) karena Task teknisi dan proses Customer survey/install saling terhubung lewat `task_type`.
@@ -35,7 +36,7 @@ Task (1 pekerjaan lapangan)
 | Edit judul/jadwal/tim | FOP | `task.edit`, `task.schedule`, `task.assign.team` |
 | Ubah tipe task | FOP (khusus) | `task.edit.type` |
 | Mulai/Selesai/Pending task | Teknisi (anggota tim) | `task.status.start/.complete/.pending` |
-| Upload bukti foto | Teknisi (anggota tim) | `task.evidence.upload` |
+| Lihat riwayat task selesai sendiri (`/tasks-saya/riwayat`) | Teknisi | `task.view.own` |
 | Cancel task | FOP | via `WorkflowTransitionPermission` (`task.cancel`, dst) |
 | Review laporan (approve/reject/pending) | FOP | dinamis via `WorkflowTransitionPermission` |
 | Reassign teknisi | FOP | (route tanpa middleware permission eksplisit — cek [business-logic.md](business-logic.md)) |
@@ -44,17 +45,16 @@ Task (1 pekerjaan lapangan)
 
 | Area | File |
 |------|------|
-| Model | `app/Models/Task.php`, `TaskTeam.php`, `TaskEvidence.php`, `TaskMaintenance.php` |
+| Model | `app/Models/Task.php`, `TaskTeam.php`, `TaskMaintenance.php` |
 | Service (state machine + konflik) | `app/Services/TaskService.php` |
 | Policy | `app/Policies/TaskPolicy.php` |
-| Controller utama | `app/Http/Controllers/TaskController.php` |
+| Controller utama | `app/Http/Controllers/TaskController.php` (termasuk `historyOwn()` → `/tasks-saya/riwayat`) |
 | Controller status (start/complete/pending) | `app/Http/Controllers/TaskStatusController.php` |
 | Controller reassign tim | `app/Http/Controllers/TaskTeamController.php` |
-| Controller evidence | `app/Http/Controllers/TaskEvidenceController.php` |
 | Controller laporan maintenance | `app/Http/Controllers/TaskMaintenanceController.php` |
 | Enum | `app/Enums/TaskStatus.php`, `TaskType.php` |
 | Workflow transition dinamis | `app/Models/WorkflowTransitionPermission.php` (lihat [docs/rbac](../rbac/README.md)) |
-| View | `resources/views/tasks/{own,show,edit,maintenance-report}.blade.php` |
+| View | `resources/views/tasks/{own,own-history,show,edit,maintenance-report}.blade.php` |
 
 ## Routes
 
@@ -62,6 +62,7 @@ Task (1 pekerjaan lapangan)
 |-------|--------|-------|------------|
 | `/tasks-saya` | GET | `viewOwn` policy | `TaskController@indexOwn` |
 | `/tasks-saya/partial/{task}` | GET | `viewOwn` + member check | `TaskController@cardPartial` |
+| `/tasks-saya/riwayat` | GET | `viewOwn` policy | `TaskController@historyOwn` |
 | `/tasks/{task}` | GET | `view` policy | `TaskController@show` |
 | `/tasks/{task}/edit`, `PUT /tasks/{task}` | GET/PUT | `edit` policy | `TaskController@edit,update` |
 | `PATCH /tasks/{task}/team` | PATCH | — | `TaskTeamController@update` |
@@ -72,7 +73,6 @@ Task (1 pekerjaan lapangan)
 | `POST /tasks/{task}/complete` | POST | `statusComplete` policy | `TaskStatusController@complete` |
 | `POST /tasks/{task}/pending` | POST | `statusPending` policy | `TaskStatusController@pending` |
 | `GET,POST /tasks/{task}/maintenance-report` | GET/POST | `statusComplete` policy | `TaskMaintenanceController@report,store` |
-| `POST /tasks/{task}/evidences`, `DELETE .../{evidence}` | POST/DELETE | `uploadEvidence`/`edit` policy | `TaskEvidenceController@store,destroy` |
 | `GET /api/tasks/check-conflict`, `/api/tasks/search-customers` | GET/POST | `lookup` policy | `TaskController@checkConflict,searchCustomers` |
 
 ## Terhubung dengan Modul Lain
@@ -90,4 +90,4 @@ pengecualian sadar). Aturan lengkap + kenapa: **[`docs/PRG_REDIRECT_CONVENTION.m
 
 ---
 
-**Last updated:** 2026-07-14 (cross-reference `TaskObserver`/Task 10 SLA dual-cycle + klarifikasi 2 jalur reject beda efek)
+**Last updated:** 2026-08-06 (hapus fitur Foto Bukti/`TaskEvidence`, tambah blok Laporan Pekerjaan Teknisi + tile Durasi Aktual di Detail Task, tambah halaman Riwayat Task Saya `/tasks-saya/riwayat`, fix redirect `return_to` Laporan Survey/Pemasangan)

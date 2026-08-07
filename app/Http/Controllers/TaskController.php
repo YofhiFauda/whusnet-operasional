@@ -45,7 +45,7 @@ class TaskController extends Controller
 
         // village/district/city untuk `clean_address` yang dirender per kartu
         // (tasks/own.blade.php:133 & partials/own-card.blade.php:61).
-        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'evidences', 'fop', 'teamMembers'])
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'fop', 'teamMembers', 'fopTask'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('status', '!=', TaskStatus::DIBATALKAN->value)
             // scheduled_at bertipe timestamp, jadi perbandingan tanggal ditulis
@@ -60,17 +60,69 @@ class TaskController extends Controller
                             ->where('scheduled_at', '<', $startOfToday);
                     });
             })
-            ->orderBy('scheduled_at')
-            ->get();
+            ->get()
+            ->sort(function (Task $a, Task $b) {
+                // 1. Group weight: In Progress (1) > Lapor Nanti (2) > Terjadwal/Other (3)
+                $weightA = match (true) {
+                    $a->status === TaskStatus::IN_PROGRESS => 1,
+                    $a->status === TaskStatus::PENDING && $a->report_deferred => 2,
+                    default => 3,
+                };
+                $weightB = match (true) {
+                    $b->status === TaskStatus::IN_PROGRESS => 1,
+                    $b->status === TaskStatus::PENDING && $b->report_deferred => 2,
+                    default => 3,
+                };
 
-        $upcomingTasks = Task::with(['customer.customerAddress', 'pop'])
+                if ($weightA !== $weightB) {
+                    return $weightA <=> $weightB;
+                }
+
+                // 2. Priority: Urgent (1) > High (2) > Medium (3) > Low (4) > null (5)
+                $priorityA = $a->fopTask?->priority?->sortOrder() ?? 5;
+                $priorityB = $b->fopTask?->priority?->sortOrder() ?? 5;
+
+                if ($priorityA !== $priorityB) {
+                    return $priorityA <=> $priorityB;
+                }
+
+                // 3. SLA / Scheduled at ASC (earlier scheduled_at comes first)
+                $timeA = $a->scheduled_at?->timestamp ?? 0;
+                $timeB = $b->scheduled_at?->timestamp ?? 0;
+
+                if ($timeA !== $timeB) {
+                    return $timeA <=> $timeB;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->values();
+
+        $upcomingTasks = Task::with(['customer.customerAddress', 'pop', 'fopTask'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
             ->where('scheduled_at', '>', $endOfToday)
             ->whereIn('status', [TaskStatus::TERJADWAL->value])
             ->whereNotIn('id', $tasks->pluck('id'))
-            ->orderBy('scheduled_at')
-            ->limit(5)
-            ->get();
+            ->get()
+            ->sort(function (Task $a, Task $b) {
+                $priorityA = $a->fopTask?->priority?->sortOrder() ?? 5;
+                $priorityB = $b->fopTask?->priority?->sortOrder() ?? 5;
+
+                if ($priorityA !== $priorityB) {
+                    return $priorityA <=> $priorityB;
+                }
+
+                $timeA = $a->scheduled_at?->timestamp ?? 0;
+                $timeB = $b->scheduled_at?->timestamp ?? 0;
+
+                if ($timeA !== $timeB) {
+                    return $timeA <=> $timeB;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->take(5)
+            ->values();
 
         return view('tasks.own', compact('tasks', 'upcomingTasks'));
     }
@@ -91,9 +143,29 @@ class TaskController extends Controller
 
         abort_if(! $isMember, 403, 'Anda bukan anggota task ini.');
 
-        $task->load(['customer.customerAddress', 'pop', 'evidences', 'teamMembers']);
+        $task->load(['customer.customerAddress', 'pop', 'teamMembers']);
 
         return view('tasks.partials.own-card', compact('task'));
+    }
+
+    /**
+     * Riwayat Task Saya — arsip task yang SUDAH diselesaikan teknisi login.
+     * Beda dari indexOwn(): itu papan kerja hari ini (difilter tanggal +
+     * status aktif), ini arsip lintas waktu, cuma status Selesai.
+     * Guard: task.view.own
+     */
+    public function historyOwn(Request $request): View
+    {
+        $this->authorize('viewOwn', Task::class);
+
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop'])
+            ->whereHas('teamMembers', fn ($q) => $q->where('user_id', auth()->id()))
+            ->where('status', TaskStatus::SELESAI->value)
+            ->latest('completed_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('tasks.own-history', compact('tasks'));
     }
 
     /**
@@ -115,8 +187,8 @@ class TaskController extends Controller
             'pop',
             'fop',
             'teamMembers.user',
-            'evidences.uploader',
             'auditLogs.user',
+            'maintenanceReport',
         ]);
 
         $recentMaintenanceTasks = collect();

@@ -286,7 +286,7 @@ unset($__errorArgs, $__bag); ?>
 
                             <div>
                                 <label for="identity_number" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Nomor Identitas (NIK KTP) <span class="text-rose-500">*</span></label>
-                                <input type="text" name="identity_number" id="identity_number" value="<?php echo e(old('identity_number')); ?>" maxlength="16" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['identity_number'];
+                                <input type="text" name="identity_number" id="identity_number" value="<?php echo e(old('identity_number')); ?>" maxlength="16" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 16);" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['identity_number'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }

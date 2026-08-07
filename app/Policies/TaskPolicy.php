@@ -260,14 +260,6 @@ class TaskPolicy
             && in_array($task->status->value, ['terjadwal', 'in_progress']);
     }
 
-    /**
-     * Upload foto bukti.
-     */
-    public function uploadEvidence(User $user, Task $task): bool
-    {
-        return $user->hasPermission('task.execute') && $task->isMember($user->id);
-    }
-
     // ─── Dynamic Workflow Transitions Helper ──────────────────────────
 
     /**

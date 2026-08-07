@@ -163,7 +163,7 @@ class Payment extends Model
      * yang ditolak).
      *
      * @return array{number: int, settles: bool}|null null kalau payment ini
-     *                                                 sendiri bukan VALID atau tak terhubung invoice.
+     *                                                sendiri bukan VALID atau tak terhubung invoice.
      */
     public function installmentContext(): ?array
     {

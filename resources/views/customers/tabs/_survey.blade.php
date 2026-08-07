@@ -14,7 +14,7 @@
     <div class="flex items-center gap-2 shrink-0">
         @can('customers.detail.survey.update')
             @if($customer->status === 'survey_in_progress')
-                <a href="{{ route('customers.survey.report', $customer) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                <a href="{{ route('customers.survey.report', ['customer' => $customer, 'return_to' => route('customers.show', $customer)]) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
                     <i class="fa-solid fa-pen-to-square"></i>
                     Lapor Hasil Survey
                 </a>

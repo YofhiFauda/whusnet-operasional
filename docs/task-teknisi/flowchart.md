@@ -100,7 +100,7 @@ isMember(user)? ──tidak──▶ TOLAK
 status in [in_progress, pending]? ──tidak──▶ TOLAK 422
         │ ya
         ▼
-canComplete()? (saat ini SELALU true — placeholder, gak ada hard check evidence)
+canComplete()? (SELALU true — gak ada hard check di sini; foto wajib ada di form Laporan tipe masing-masing, lihat business-logic.md §5)
         │ ya
         ▼
 status=selesai, fop_review_status=pending, completed_at=now()

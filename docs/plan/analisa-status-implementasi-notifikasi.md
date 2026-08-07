@@ -58,8 +58,6 @@ Berdasarkan sudah adanya rencana lengkap di `analisa-in-app-dan-push-notifikasi.
 
 | Modul | Method/Titik | Kondisi Sekarang |
 |---|---|---|
-| Modul | Method/Titik | Kondisi Sekarang |
-|---|---|---|
 | **Ticketing** | `TicketService::escalateToNoc()`, `escalateToFop()`, `close()`, `cancel()`, `returnToHelpdesk()` | ✅ **Selesai 2026-08-06** — lihat §8.1. |
 | **Verifikasi Pelanggan** | `CustomerVerificationController` (`reject()`, `revisi()`) | ✅ **Selesai 2026-08-06** — lihat §8.2. `processToTeam()`/`finalVerify()` juga sudah kebagian notif SUCCESS (bukan dari §5 asli, ekstra sekalian). |
 | **Billing & Pembayaran** | `PaymentController::reject()` | ✅ **Selesai (sebagian) 2026-08-06** — lihat §8.3. Batch kolektor (`CollectorBatchController::store()`) & "Finance Pusat"-wide notif **BELUM** — gak ada role/permission yang jelas mewakili "Finance Pusat" di RBAC saat ini (§8.3 penjelasan kenapa sengaja gak ditebak). |
@@ -119,6 +117,14 @@ Helper baru `notifyTaskTeam()` (pola sama `TaskController::notifyTeamMembers()`)
 
 Test: `tests/Feature/CustomerVerificationNotificationTest.php` (2 test, reject + revisi — dua yang eksplisit diminta di §5 asli).
 
+**GAP ketauan 2026-08-06 (belum difix) — `processToTeam()` gak notif FOP.**
+Skenario: Task PSB status "Menunggu ACC" (`waiting_acc`), Admin klik "Setujui & Proses ke Tim Pemasangan". Yang kejadian:
+1. `CustomerWorkflowService::transition()` ke `waiting_installation` → auto-`Task::create()` Task Pemasangan baru, status `PENDING`, **tanpa tim** (`app/Services/CustomerWorkflowService.php:96-110` — polos `Task::create()`, gak ada `->notify()` di titik ini).
+2. `processToTeam()` cuma notif tim **survey** yang laporannya baru disetujui (`notifyTaskTeam($surveyTask, ...)`, SUCCESS) — itu notif "laporan Anda oke", BUKAN notif "ada kerjaan baru masuk antrean pemasangan".
+3. Task Pemasangan yang baru itu **nunggu FOP assign tim** — FOP-lah yang bakal buka Task Pemasangan ini dan nentuin teknisi, BUKAN admin verifikasi. Tapi gak ada satu pun notif ke role `fop` yang bilang "ada Task Pemasangan baru nunggu di-assign".
+
+Beda karakter dari gap lain di §5/§6: ini bukan "modul X belum disentuh sama sekali" — `CustomerVerificationController` UDAH punya notif (ke tim survey), tapi **penerimanya salah target** buat langkah selanjutnya. Pola yang bener harusnya niru `TicketService::escalateToFop()` (§8.1): `notifyRoleUsersInPop('fop', $customer->pop_id, ...)` dipanggil abis `$workflowService->transition(...)`, ngasih tau semua user role `fop` di POP itu ada Task Pemasangan baru (`task_number`-nya) yang perlu di-assign. Titik pemanggilan paling pas: di `processToTeam()` sendiri (controller udah punya `$customer` + akses ke Task Pemasangan yang baru dibuat), bukan di `CustomerWorkflowService::transition()` (service generik, dipakai banyak transisi lain yang gak semuanya butuh notif FOP).
+
 ### 8.3 Billing — `app/Http/Controllers/PaymentController.php`
 
 `reject()` notif ke pencatat pembayaran (`collected_by` kalau ada / fallback `received_by`), skip kalau actor = pencatat sendiri. Type ERROR. Test: `tests/Feature/PaymentRejectNotificationTest.php` (2 test).
@@ -132,6 +138,7 @@ Test: `tests/Feature/CustomerVerificationNotificationTest.php` (2 test, reject +
 
 ### 8.5 Yang belum, dan kenapa
 
+- **`processToTeam()` gak notif FOP soal Task Pemasangan baru** (§8.2) — ketauan 2026-08-06 dari laporan user, belum difix. Prioritas tinggi: FOP-lah yang assign tim buat Task Pemasangan, bukan admin verifikasi — tanpa notif ini FOP cuma bisa tau lewat cek dashboard manual.
 - **NOC Dashboard / SLA Breach**, **Customer Lifecycle**, **Import Data Massal** (§5) — belum digarap, di luar batch permintaan ini.
 - **Setoran kolektor batch** (§8.3) — butuh keputusan RBAC dulu.
 - **Ketergantungan queue worker** (§6.3), **query dropdown tiap page load**, **sinkron antar tab**, **`NotificationController::index()` scope logic** (§4) — belum digarap, sifatnya optimasi bukan gap fungsional.

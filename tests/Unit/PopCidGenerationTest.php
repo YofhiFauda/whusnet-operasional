@@ -59,6 +59,31 @@ class PopCidGenerationTest extends TestCase
         $this->assertEquals('C1X1ARQ000001_MANGKUJAYAN_DYAHPURBA', $pppoe);
     }
 
+    public function test_generates_default_zero_segments_when_unassigned()
+    {
+        // Skema 3 (ID_NUMBERING_RULES.md): belum di-assign mini POP maupun
+        // distribusi → kedua segmen default "0", bukan "XX"/"1" (bug lama).
+        $pop = Pop::factory()->create(['cid_prefix' => 'C', 'registration_prefix' => 'RQ', 'pop_code' => 'C', 'type' => 'cabang']);
+
+        $city = City::create(['name' => 'PONOROGO']);
+        $district = District::create(['city_id' => $city->id, 'name' => 'PONOROGO']);
+        $village = Village::create(['district_id' => $district->id, 'name' => 'MANGKUJAYAN']);
+
+        $customer = Customer::create([
+            'pop_id' => $pop->id,
+            'customer_code' => 'C00RQ000004',
+            'full_name' => 'BUDI SANTOSO',
+            'primary_phone' => '08123456789',
+            'registration_date' => now(),
+            'village_id' => $village->id,
+            'status' => 'registered',
+        ]);
+
+        $cid = $pop->generateComplexCid($customer, null);
+
+        $this->assertEquals('C00RQ000004', $cid);
+    }
+
     public function test_extract_bare_registration_id_from_customer_code()
     {
         $pop = Pop::factory()->create(['cid_prefix' => 'C', 'registration_prefix' => 'RQ', 'pop_code' => 'JTS']);

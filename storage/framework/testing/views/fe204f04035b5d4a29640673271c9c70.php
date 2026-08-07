@@ -8,7 +8,7 @@
     <div class="flex items-center gap-2 shrink-0">
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.survey.update')): ?>
             <?php if($customer->status === 'survey_in_progress'): ?>
-                <a href="<?php echo e(route('customers.survey.report', $customer)); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                <a href="<?php echo e(route('customers.survey.report', ['customer' => $customer, 'return_to' => route('customers.show', $customer)])); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
                     <i class="fa-solid fa-pen-to-square"></i>
                     Lapor Hasil Survey
                 </a>

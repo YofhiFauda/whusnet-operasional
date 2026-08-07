@@ -483,9 +483,9 @@
         <?php elseif($fopTask->category === \App\Enums\TaskType::MAINTENANCE): ?>
             <?php if($maintenance): ?>
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
-                <div class="col-span-2">
+                <div class="col-span-2 min-w-0 max-w-full overflow-hidden">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kendala Teknis</p>
-                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line"><?php echo e($maintenance->kendala_teknis); ?></p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200 whitespace-pre-line break-words [word-break:break-word]"><?php echo e($maintenance->kendala_teknis); ?></p>
                 </div>
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Alat Dipakai</p>

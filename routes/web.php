@@ -41,7 +41,6 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\TaskController;
-use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\TaskMaintenanceController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskTeamController;
@@ -489,6 +488,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/tasks-saya', [TaskController::class, 'indexOwn'])->name('tasks.own');
         // Endpoint partial HTML — digunakan Echo listener untuk inject task card baru tanpa reload
         Route::get('/tasks-saya/partial/{task}', [TaskController::class, 'cardPartial'])->name('tasks.own.card-partial');
+        // Arsip task yang sudah diselesaikan teknisi login — static path, taruh
+        // sebelum {task} dinamis di route lain biar gak ketelan.
+        Route::get('/tasks-saya/riwayat', [TaskController::class, 'historyOwn'])->name('tasks.own.history');
     });
 
     // Teknisi: Transisi status (Authorisasi ditangani di Controller menggunakan TaskPolicy)
@@ -504,15 +506,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/tasks/{task}/pending', [TaskStatusController::class, 'pending'])->name('tasks.pending');
         // Pending top-level (reschedule penuh) — beda dari tasks.pending (Lapor Nanti) & tasks.fop-pending (FOP-side).
         Route::post('/tasks/{task}/reschedule', [TaskController::class, 'reschedule'])->name('tasks.reschedule');
-    });
-
-    // Teknisi: Upload bukti
-    Route::middleware('permission:task.execute')->group(function () {
-        Route::post('/tasks/{task}/evidences', [TaskEvidenceController::class, 'store'])->name('tasks.evidences.store');
-    });
-
-    Route::middleware('permission:task.manage')->group(function () {
-        Route::delete('/tasks/{task}/evidences/{evidence}', [TaskEvidenceController::class, 'destroy'])->name('tasks.evidences.destroy');
     });
 
     // FOP: Task FOP (Custom)
