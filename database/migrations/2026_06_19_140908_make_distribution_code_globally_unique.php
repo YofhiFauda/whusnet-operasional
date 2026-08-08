@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Mengubah constraint uniqueness kode distribusi dari per-POP menjadi global.
@@ -27,9 +27,9 @@ return new class extends Migration
 
         if ($duplicates->isNotEmpty()) {
             $codes = $duplicates->pluck('code')->implode(', ');
-            throw new \RuntimeException(
-                "Tidak dapat mengubah ke global unique: kode distribusi berikut duplikat di POP berbeda: {$codes}. " .
-                "Perbaiki data terlebih dahulu sebelum menjalankan migration ini."
+            throw new RuntimeException(
+                "Tidak dapat mengubah ke global unique: kode distribusi berikut duplikat di POP berbeda: {$codes}. ".
+                'Perbaiki data terlebih dahulu sebelum menjalankan migration ini.'
             );
         }
 
@@ -47,7 +47,7 @@ return new class extends Migration
             } else {
                 DB::statement('ALTER TABLE distributions DROP INDEX distributions_pop_id_code_unique');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Index mungkin sudah tidak ada atau bernama berbeda, lanjutkan saja
         }
 
@@ -58,7 +58,7 @@ return new class extends Migration
             } else {
                 DB::statement('ALTER TABLE distributions ADD UNIQUE INDEX distributions_code_unique (code)');
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Jika index sudah ada, lanjutkan
         }
 
@@ -76,7 +76,7 @@ return new class extends Migration
             // Kembalikan ke composite unique per POP
             try {
                 $table->dropUnique('distributions_code_unique');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // ignore
             }
 

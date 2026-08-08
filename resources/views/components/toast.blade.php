@@ -39,7 +39,7 @@
 
             // Create toast wrapper
             const toast = document.createElement('div');
-            toast.className = 'absolute top-0 right-0 w-full pointer-events-auto transition-all duration-400 ease-out flex items-start gap-3 p-4 rounded-xl shadow-lg border bg-white overflow-hidden';
+            toast.className = 'absolute top-0 right-0 w-full pointer-events-auto transition-all duration-400 ease-out flex items-start gap-3 p-4 rounded-xl shadow-lg border border-border bg-surface overflow-hidden';
             
             // Initial state for entrance animation (slides in from slightly above and scaled down)
             toast.style.transform = 'translateY(-20px) scale(0.9)';
@@ -52,28 +52,28 @@
 
             switch (type) {
                 case 'success':
-                    borderClass = 'border-emerald-100';
-                    iconClass = 'text-emerald-500 bg-emerald-50';
-                    progressClass = 'bg-emerald-500';
+                    borderClass = 'border-success-border';
+                    iconClass = 'text-success bg-success-bg';
+                    progressClass = 'bg-success';
                     iconHtml = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
                     break;
                 case 'error':
-                    borderClass = 'border-rose-100';
-                    iconClass = 'text-rose-500 bg-rose-50';
-                    progressClass = 'bg-rose-500';
+                    borderClass = 'border-error-border';
+                    iconClass = 'text-error bg-error-bg';
+                    progressClass = 'bg-error';
                     iconHtml = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
                     break;
                 case 'warning':
-                    borderClass = 'border-amber-100';
-                    iconClass = 'text-amber-500 bg-amber-50';
-                    progressClass = 'bg-amber-500';
+                    borderClass = 'border-warning-border';
+                    iconClass = 'text-warning bg-warning-bg';
+                    progressClass = 'bg-warning';
                     iconHtml = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`;
                     break;
                 case 'info':
                 default:
-                    borderClass = 'border-sky-100';
-                    iconClass = 'text-sky-500 bg-sky-50';
-                    progressClass = 'bg-sky-500';
+                    borderClass = 'border-info-border';
+                    iconClass = 'text-info bg-info-bg';
+                    progressClass = 'bg-info';
                     iconHtml = `<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
                     break;
             }
@@ -85,10 +85,10 @@
                     ${iconHtml}
                 </div>
                 <div class="flex-1 pt-0.5 min-w-0">
-                    <h4 class="text-sm font-semibold text-slate-800 leading-tight">${title}</h4>
-                    ${description ? `<div class="mt-1 text-xs text-slate-500 break-words leading-relaxed">${description}</div>` : ''}
+                    <h4 class="text-sm font-semibold text-text-main leading-tight">${title}</h4>
+                    ${description ? `<div class="mt-1 text-xs text-text-secondary break-words leading-relaxed">${description}</div>` : ''}
                 </div>
-                <button type="button" class="flex-shrink-0 ml-4 inline-flex text-slate-400 hover:text-slate-600 focus:outline-none transition-colors">
+                <button type="button" class="flex-shrink-0 ml-4 inline-flex text-text-disabled hover:text-text-main focus:outline-none transition-colors">
                     <span class="sr-only">Close</span>
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>

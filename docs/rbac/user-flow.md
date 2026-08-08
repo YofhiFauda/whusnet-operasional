@@ -83,6 +83,36 @@ $this->authorize('viewAll', Task::class); // dipakai FopDashboardController, lih
 3. Jalankan proses generate (`PermissionGeneratorService::generate()`, biasanya dipanggil dari command/seeder) — permission baru otomatis muncul di Permission Matrix, siap dicentang Owner/Admin.
 4. **Jangan** insert manual ke tabel `permissions` — bakal ketimpa/gak konsisten waktu generator jalan ulang.
 
+## 5. Customer List Pages — Role-specific Access (2026-07-28)
+
+### Admin / NOC / FOP / POP Admin / Atasan
+- Akses **List Data Pelanggan** (`/customers`, status Aktif/Isolir/Semua) via permission `customers.view`
+- Akses **List Pelanggan Putus** (`/customers/terminated`) via `customers.terminated.view`
+- Akses **List Pelanggan Gagal** (`/customers/failed`) via `customers.failed.view`
+- Akses **Detail Pelanggan** (`/customers/{id}`, semua tab: identitas/alamat/paket/billing/dokumen/riwayat) via `customers.detail.view`
+- Sidebar item semua halaman di atas ditampilkan sesuai permission yang dimiliki
+
+### Teknisi
+- **TIDAK punya** `customers.view` → List Data Pelanggan disembunyikan sidebar + URL return 403
+- **TIDAK punya** `customers.terminated.view` → List Pelanggan Putus disembunyikan sidebar + URL return 403
+- **TIDAK punya** `customers.failed.view` → List Pelanggan Gagal disembunyikan sidebar + URL return 403
+- **TIDAK punya** `customers.detail.view` → Detail Pelanggan disembunyikan sidebar + URL return 403
+- **PUNYA** `customers.detail.devices.view` + `customers.detail.installation.view` → Akses **Perangkat & Pemasangan** (`/customers/{id}/perangkat-pemasangan`) — halaman fieldwork khusus teknisi, HANYA buat isi/lihat data teknis device & installation, bukan data identitas/billing/dokumen
+
+**Note:** Queue halaman Survey & Verif (di tab lain, bukan bagian customer list/detail) tetap diakses teknisi via `customers.detail.survey.view` / `customers.detail.installation.view` — itu queue task, bukan data pelanggan umum.
+
+### Sales
+- Akses **List Data Pelanggan** via `customers.view`
+- Akses **Detail Pelanggan** via `customers.detail.view` (buat view identitas/alamat pelanggan yang bersangkutan)
+- **TIDAK punya** `customers.terminated.view` / `customers.failed.view` — list putus/gagal gak relevan buat sales
+- **TIDAK punya** `customers.detail.devices.view` / `customers.detail.installation.view` — data teknis gak perlu sales lihat
+
+### Helpdesk
+- Akses **List Data Pelanggan** via `customers.view`
+- Akses **Detail Pelanggan** via `customers.detail.view`
+- **TIDAK punya** `customers.terminated.view` / `customers.failed.view` — cuma kelola pelanggan aktif/dalam survey/pemasangan
+- **TIDAK punya** `customers.detail.devices.view` / `customers.detail.installation.view` — data teknis adalah kewenangan teknisi/admin
+
 ## Guard / Permission Ringkas
 
 | Aksi | Siapa boleh |
@@ -94,3 +124,9 @@ $this->authorize('viewAll', Task::class); // dipakai FopDashboardController, lih
 | Kelola User & Scope | `users.create`/`users.update` |
 | Bypass semua permission & scope POP | Owner saja (`hasPermission('*')`) |
 | Bypass scope POP saja (bukan permission) | Owner + Atasan |
+| Lihat List Pelanggan | `customers.view` |
+| Lihat List Pelanggan Putus | `customers.terminated.view` |
+| Lihat List Pelanggan Gagal | `customers.failed.view` |
+| Lihat Detail Pelanggan (identitas/billing/dokumen) | `customers.detail.view` |
+| Isi data Perangkat & Pemasangan (fieldwork page) | `customers.detail.devices.view` OR `customers.detail.installation.view` |
+| Teknisi kerja lapangan tanpa lihat data pelanggan umum | Punya `customers.detail.devices.*` + `customers.detail.installation.*`, TANPA `customers.view`/`customers.detail.view` |

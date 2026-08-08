@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerService;
+use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
-use App\Models\InternetPackage;
-use App\Models\CustomerService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -30,7 +30,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG001',
             'name' => 'Test Package',
@@ -42,7 +42,6 @@ class LegacyBillingSearchTest extends TestCase
             'customer_code' => 'C-NEW-001',
             'old_customer_id' => 'OLD-CUST-999',
             'full_name' => 'Legacy Customer',
-            'phone' => '08123456789',
             'primary_phone' => '08123456789',
             'registration_date' => now(),
             'pop_id' => $pop->id,
@@ -60,6 +59,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-2025-001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
@@ -95,7 +95,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG002',
             'name' => 'Test Package 2',
@@ -107,7 +107,6 @@ class LegacyBillingSearchTest extends TestCase
             'customer_code' => 'C-NEW-002',
             'old_customer_id' => 'OLD-CUST-888',
             'full_name' => 'Legacy Customer 2',
-            'phone' => '08123456788',
             'primary_phone' => '08123456788',
             'registration_date' => now(),
             'pop_id' => $pop->id,
@@ -125,6 +124,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-NEW-002',
+            'invoice_type' => 'bulanan',
             'old_invoice_id' => 'OLD-INV-777',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
@@ -161,7 +161,7 @@ class LegacyBillingSearchTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
+
         $package = InternetPackage::first() ?? InternetPackage::create([
             'package_code' => 'PKG003',
             'name' => 'Test Package 3',
@@ -173,7 +173,6 @@ class LegacyBillingSearchTest extends TestCase
             'customer_code' => 'C-NEW-003',
             'old_customer_id' => 'OLD-CUST-777',
             'full_name' => 'Legacy Customer 3',
-            'phone' => '08123456787',
             'primary_phone' => '08123456787',
             'registration_date' => now(),
             'pop_id' => $pop->id,
@@ -191,6 +190,7 @@ class LegacyBillingSearchTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-NEW-003',
+            'invoice_type' => 'bulanan',
             'old_invoice_id' => 'OLD-INV-666',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,

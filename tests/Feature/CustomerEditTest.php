@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CustomerEditTest extends TestCase
@@ -23,7 +26,7 @@ class CustomerEditTest extends TestCase
     {
         parent::setUp();
         // Laravel 11 specific CSRF bypass for tests if actingAs doesn't cover it
-        $this->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class]);
+        $this->withoutMiddleware([ValidateCsrfToken::class]);
     }
 
     public function test_customer_edit_view_loads_successfully(): void
@@ -44,7 +47,6 @@ class CustomerEditTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000001',
             'full_name' => 'Budi Santoso',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -77,7 +79,6 @@ class CustomerEditTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
             'full_name' => 'Original Name',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -139,7 +140,7 @@ class CustomerEditTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
         $pop = Pop::create([
             'code' => 'SMN2',
@@ -154,7 +155,6 @@ class CustomerEditTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
             'full_name' => 'Original Name',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -167,8 +167,8 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => \Illuminate\Http\UploadedFile::fake()->image('ktp.jpg'),
-            'foto_rumah' => \Illuminate\Http\UploadedFile::fake()->image('rumah.jpg'),
+            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
+            'foto_rumah' => UploadedFile::fake()->image('rumah.jpg'),
         ];
 
         $response = $this->put("/customers/{$customer->id}", $updatedData);
@@ -185,7 +185,7 @@ class CustomerEditTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
         $pop = Pop::create([
             'code' => 'SMN3',
@@ -198,12 +198,11 @@ class CustomerEditTest extends TestCase
         ]);
 
         $oldKtpPath = 'documents/old_ktp.jpg';
-        \Illuminate\Support\Facades\Storage::disk('public')->put($oldKtpPath, 'old ktp');
+        Storage::disk('public')->put($oldKtpPath, 'old ktp');
 
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
             'full_name' => 'Replace File Name',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -217,9 +216,9 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => \Illuminate\Http\UploadedFile::fake()->image('new_ktp_2.jpg'),
+            'foto_ktp' => UploadedFile::fake()->image('new_ktp_2.jpg'),
         ];
-        
+
         $response = $this->put("/customers/{$customer->id}", $replaceData);
 
         $response->assertRedirect("/customers/{$customer->id}");
@@ -232,7 +231,7 @@ class CustomerEditTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
         $this->loginAsAdmin();
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
         $pop = Pop::create([
             'code' => 'SMN4',
@@ -244,13 +243,12 @@ class CustomerEditTest extends TestCase
             'status' => 'active',
         ]);
 
-        $oldKtpPath = \Illuminate\Http\UploadedFile::fake()->image('ktp_to_del.jpg')->store('documents', 'public');
-        $oldRumahPath = \Illuminate\Http\UploadedFile::fake()->image('rumah_to_del.jpg')->store('documents', 'public');
+        $oldKtpPath = UploadedFile::fake()->image('ktp_to_del.jpg')->store('documents', 'public');
+        $oldRumahPath = UploadedFile::fake()->image('rumah_to_del.jpg')->store('documents', 'public');
 
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
             'full_name' => 'Delete File Name',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -270,7 +268,7 @@ class CustomerEditTest extends TestCase
             'foto_ktp' => null,
             'foto_rumah' => null,
         ];
-        
+
         $response = $this->put("/customers/{$customer->id}", $deleteData);
 
         $response->assertRedirect("/customers/{$customer->id}");

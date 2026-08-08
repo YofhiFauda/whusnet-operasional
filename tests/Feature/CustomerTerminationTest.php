@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerService;
+use App\Models\InternetPackage;
+use App\Models\Pop;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,10 +24,10 @@ class CustomerTerminationTest extends TestCase
 
     public function test_user_can_terminate_customer_and_service()
     {
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
         $user = $this->loginAsAdmin();
 
-        $pop = \App\Models\Pop::first() ?? \App\Models\Pop::create([
+        $pop = Pop::first() ?? Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
             'registration_prefix' => 'C',
@@ -36,16 +40,15 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000001',
             'full_name' => 'Test Customer',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'active',
         ]);
-        
+
         $service = CustomerService::create([
             'customer_id' => $customer->id,
-            'internet_package_id' => \App\Models\InternetPackage::first()->id ?? 1,
+            'internet_package_id' => InternetPackage::first()->id ?? 1,
             'service_status' => 'aktif',
             'billing_cycle' => 'monthly',
             'package_name_snapshot' => 'Paket Test',
@@ -77,20 +80,20 @@ class CustomerTerminationTest extends TestCase
             'user_id' => $user->id,
             'action' => 'terminate',
         ]);
-        
-        $activity = \App\Models\AuditLog::where('action', 'terminate')
+
+        $activity = AuditLog::where('action', 'terminate')
             ->where('auditable_id', $customer->id)
             ->first();
-            
+
         $this->assertEquals('Pelanggan pindah rumah', $activity->new_values['reason']);
     }
 
     public function test_terminate_requires_reason()
     {
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
         $user = $this->loginAsAdmin();
 
-        $pop = \App\Models\Pop::first() ?? \App\Models\Pop::create([
+        $pop = Pop::first() ?? Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
             'registration_prefix' => 'C',
@@ -103,7 +106,6 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000002',
             'full_name' => 'Test Customer 2',
-            'phone' => '081234567891',
             'primary_phone' => '081234567891',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
@@ -117,10 +119,10 @@ class CustomerTerminationTest extends TestCase
 
     public function test_user_without_permission_cannot_terminate()
     {
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
         $user = User::factory()->create();
 
-        $pop = \App\Models\Pop::first() ?? \App\Models\Pop::create([
+        $pop = Pop::first() ?? Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
             'registration_prefix' => 'C',
@@ -133,7 +135,6 @@ class CustomerTerminationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'C-TST-000003',
             'full_name' => 'Test Customer 3',
-            'phone' => '081234567892',
             'primary_phone' => '081234567892',
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,

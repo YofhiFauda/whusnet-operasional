@@ -1,28 +1,35 @@
-<div class="flex items-center justify-between pb-4 border-b border-border">
+{{--
+    Tab Survey — mengikuti redesign_detail_pelanggan_whusnet.html (TAB 5).
+    Palet sengaja pakai slate/sky/emerald eksplisit + varian dark:, BUKAN token
+    legacy (text-text-main / bg-surface / var(--color-*)). Halaman induk
+    (customers/show.blade.php) sudah dimigrasi ke palet ini; partial yang masih
+    pakai token lama bikin tab-nya kelihatan "nyempil" beda tema.
+--}}
+
+<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
     <div>
-        <h3 class="text-sm font-bold text-text-main uppercase tracking-wider">Data Survey Teknis Pelanggan</h3>
-        <p class="text-xs text-text-muted mt-0.5">Informasi hasil survey lapangan untuk persiapan instalasi.</p>
+        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Hasil Laporan Survey Lapangan (Data FOP &amp; Survey)</h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">Waktu penugasan, tim surveyor, kelayakan lokasi, estimasi material &amp; alat kerja, serta foto dokumentasi.</p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 shrink-0">
         @can('customers.detail.survey.update')
             @if($customer->status === 'survey_in_progress')
-                <a href="{{ route('customers.survey.report', $customer) }}" class="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold shadow-sm">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+                <a href="{{ route('customers.survey.report', ['customer' => $customer, 'return_to' => route('customers.show', $customer)]) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                    <i class="fa-solid fa-pen-to-square"></i>
                     Lapor Hasil Survey
                 </a>
             @elseif($customer->status === 'waiting_survey')
-                <span class="text-[10px] italic px-2 py-1 rounded border" style="background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)">Mulai survey dari menu Antrean Survey terlebih dahulu.</span>
+                <span class="text-[10px] italic px-2.5 py-1 rounded border bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                    Mulai survey dari menu Antrean Survey terlebih dahulu.
+                </span>
             @endif
         @endcan
 
         @can('customers.detail.survey.reject')
             @if(in_array($customer->status, ['waiting_survey', 'survey_in_progress']))
-                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.remove('hidden')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border" style="color:var(--color-error); border-color:var(--color-error-border); background:var(--color-error-bg);">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.remove('hidden')"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-colors cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
                     Batalkan Survey
                 </button>
             @endif
@@ -32,17 +39,20 @@
 
 @can('customers.detail.survey.reject')
 @if(in_array($customer->status, ['waiting_survey', 'survey_in_progress']))
-<div id="cancel-survey-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="bg-surface border border-border rounded-lg shadow-lg w-full max-w-md p-5">
-        <h4 class="text-sm font-bold text-text-main mb-1">Batalkan Survey — Tidak Layak Pasang</h4>
-        <p class="text-xs text-text-muted mb-4">Pelanggan akan diubah statusnya menjadi <strong>ditolak</strong> dan tidak bisa lanjut ke tahap pemasangan. Tindakan ini tidak bisa dibatalkan.</p>
+<div id="cancel-survey-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl w-full max-w-md p-5">
+        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-1">Batalkan Survey — Tidak Layak Pasang</h4>
+        <p class="text-[11px] text-slate-500 mb-4">Pelanggan akan diubah statusnya menjadi <strong>ditolak</strong> dan tidak bisa lanjut ke tahap pemasangan. Tindakan ini tidak bisa dibatalkan.</p>
         <form action="{{ route('customers.survey.cancel', $customer) }}" method="POST">
             @csrf
-            <label class="block text-xs font-semibold text-text-secondary mb-1">Alasan <span class="text-error">*</span></label>
-            <textarea name="reason" rows="3" required class="w-full text-xs border border-border rounded-md px-3 py-2 mb-4" placeholder="Contoh: Alamat tidak ditemukan, lokasi di luar jangkauan ODP, pelanggan menolak, dll."></textarea>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Alasan <span class="text-rose-600">*</span></label>
+            <textarea name="reason" rows="3" required
+                      class="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-4 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                      placeholder="Contoh: Alamat tidak ditemukan, lokasi di luar jangkauan ODP, pelanggan menolak, dll."></textarea>
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.add('hidden')" class="btn-secondary text-xs px-3 py-1.5">Batal</button>
-                <button type="submit" class="text-xs px-3 py-1.5 rounded-md font-semibold text-white" style="background:var(--color-error);">Ya, Batalkan Survey</button>
+                <button type="button" onclick="document.getElementById('cancel-survey-modal').classList.add('hidden')"
+                        class="px-4 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold rounded-lg text-white bg-rose-600 hover:bg-rose-700 shadow-sm cursor-pointer">Ya, Batalkan Survey</button>
             </div>
         </form>
     </div>
@@ -51,154 +61,240 @@
 @endcan
 
 @if($customer->surveys->count() > 0)
+    @php
+        // Material estimasi & alat kerja dicari lewat customer_id: barisnya menempel
+        // di FopTask (lihat migration task_materials / task_work_tools), sementara
+        // halaman ini bicara soal pelanggan. Alat kerja difilter ke FopTask SURVEY
+        // supaya tidak tercampur dengan alat pemasangan — tabel task_work_tools
+        // memang TIDAK punya kolom kind (estimasi/terpakai).
+        $estimasiMaterial = \App\Models\TaskMaterial::where('customer_id', $customer->id)
+            ->estimasi()->orderBy('id')->get();
+
+        $alatSurvey = \App\Models\TaskWorkTool::where('customer_id', $customer->id)
+            ->whereHas('fopTask', fn ($q) => $q->where('category', \App\Enums\TaskType::SURVEY->value))
+            ->orderBy('id')->get();
+    @endphp
+
     <div class="space-y-6">
         @foreach($customer->surveys()->latest()->get() as $survey)
-            <div class="border border-border rounded-lg overflow-hidden">
-                <div class="px-5 py-3 bg-surface-muted border-b border-border flex items-center justify-between">
-                    <span class="text-xs font-bold text-text-main">Survey - {{ \App\Support\IndonesianDate::date($survey->survey_date) }}</span>
-                    @php
-                        $statusLabel = match($survey->survey_status) {
-                            'completed' => 'Selesai',
-                            'failed' => 'Tidak Layak',
-                            'pending' => 'Menunggu',
-                            default => $survey->survey_status,
-                        };
-                        $statusStyle = match($survey->survey_status) {
-                            'completed' => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border);',
-                            'failed' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border);',
-                            'pending' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border);',
-                            default => 'background:var(--color-surface-muted); color:var(--color-text-main); border-color:var(--color-border);',
-                        };
-                    @endphp
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider" style="{{ $statusStyle }}">
+            @php
+                $statusLabel = match($survey->survey_status) {
+                    'completed' => 'Selesai & Layak',
+                    'failed' => 'Tidak Layak',
+                    'pending' => 'Menunggu',
+                    default => $survey->survey_status,
+                };
+                $statusBadge = match($survey->survey_status) {
+                    'completed' => 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+                    'failed' => 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+                    'pending' => 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+                    default => 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600',
+                };
+
+                // Nomor petugas mengikuti penomoran yang tercatat di kolom surveyors
+                // (laporan lapangan menuliskan "Petugas Survey N"), bukan urutan kolom DB.
+                $currentSurveyorNum = 1;
+                if ($survey->surveyors && preg_match('/Petugas Survey (\d+)/i', $survey->surveyors, $matches)) {
+                    $currentSurveyorNum = (int) $matches[1];
+                }
+                $timSurvey = collect([
+                    $survey->technician->name ?? $survey->surveyors,
+                    $survey->surveyor2->name ?? null,
+                    $survey->surveyor3->name ?? null,
+                ])->filter()->implode(', ');
+
+                $odpPort = $customer->customerDevice->odp_port ?? $customer->customerTechnicalDetail?->odp_port;
+                $tglMulai = $survey->survey_date ? \App\Support\IndonesianDate::date($survey->survey_date) : '-';
+                $tglSelesai = $survey->end_date ? \App\Support\IndonesianDate::date($survey->end_date) : $tglMulai;
+            @endphp
+
+            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 justify-between items-center">
+                    <span class="text-xs font-bold text-slate-900 dark:text-slate-100">
+                        Survey — {{ $tglMulai }}
+                    </span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $statusBadge }}">
                         {{ $statusLabel }}
                     </span>
                 </div>
-                <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                    <div class="space-y-3">
-                        @php
-                            $currentSurveyorNum = 1;
-                            if ($survey->surveyors && preg_match('/Petugas Survey (\d+)/i', $survey->surveyors, $matches)) {
-                                $currentSurveyorNum = (int)$matches[1];
-                            }
-                        @endphp
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey {{ $currentSurveyorNum }} (Submitter)</span>
-                            <span class="font-semibold text-text-main">{{ $survey->technician->name ?? $survey->surveyors ?? '-' }}</span>
+
+                <div class="p-5 space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                        <div class="space-y-2.5">
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">ID FOP Penugasan Survey</span>
+                                <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">{{ $survey->fop_id ?: '-' }}</span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Waktu Penugasan FOP Survey</span>
+                                <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
+                                    {{ $survey->assigned_at ? \App\Support\IndonesianDate::dateTime($survey->assigned_at) . ' WIB' : '-' }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Tanggal &amp; Waktu Mulai Survey</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
+                                    {{ $tglMulai }} — {{ $survey->start_time ? substr($survey->start_time, 0, 5) . ' WIB' : '-' }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Tanggal &amp; Waktu Selesai Survey</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
+                                    {{ $tglSelesai }} — {{ $survey->end_time ? substr($survey->end_time, 0, 5) . ' WIB' : '-' }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Durasi Pelaksanaan Survey</span>
+                                <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 searchable-text">
+                                    {{ $survey->duration_minutes ? $survey->duration_minutes . ' Menit' : '-' }}
+                                </span>
+                            </div>
+                            @if($survey->requested_installation_date)
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Tanggal Minta Pasang (Pelanggan)</span>
+                                <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}</span>
+                            </div>
+                            @endif
                         </div>
-                        @if($survey->surveyor2 || $survey->surveyor_2_id)
-                        @php
-                            $s2Num = $currentSurveyorNum == 1 ? 2 : 1;
-                            if ($currentSurveyorNum == 3) {
-                                $s2Num = 1;
-                            }
-                        @endphp
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey {{ $s2Num }}</span>
-                            <span class="font-semibold text-text-main">{{ $survey->surveyor2->name ?? '-' }}</span>
-                        </div>
-                        @endif
-                        @if($survey->surveyor3 || $survey->surveyor_3_id)
-                        @php
-                            $s3Num = 3;
-                            if ($currentSurveyorNum == 3) {
-                                $s3Num = 2;
-                            } elseif ($currentSurveyorNum == 2) {
-                                $s3Num = 3;
-                            }
-                        @endphp
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Petugas Survey {{ $s3Num }}</span>
-                            <span class="font-semibold text-text-main">{{ $survey->surveyor3->name ?? '-' }}</span>
-                        </div>
-                        @endif
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Waktu Survey</span>
-                            <span class="font-semibold text-text-main">{{ $survey->start_time ? substr($survey->start_time, 0, 5) : '-' }} - {{ $survey->end_time ? substr($survey->end_time, 0, 5) : '-' }}</span>
-                        </div>
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Estimasi Kabel</span>
-                            <span class="font-semibold text-text-main">{{ $survey->cable_estimation_meter ?? 0 }} Meter</span>
-                        </div>
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">ODP Terdekat</span>
-                            <span class="font-semibold text-text-main">{{ $survey->nearest_odp ?? '-' }}</span>
-                        </div>
-                        @if($survey->assigned_at)
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Tanggal Penugasan FOP</span>
-                            <span class="font-semibold text-text-main font-mono">{{ \App\Support\IndonesianDate::date($survey->assigned_at) }}</span>
-                        </div>
-                        @endif
-                        @if($survey->fop_id)
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">ID FOP / Penugasan</span>
-                            <span class="font-mono font-semibold text-text-main">{{ $survey->fop_id }}</span>
-                        </div>
-                        @endif
-                        @if($survey->end_date)
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Tanggal Selesai Survey</span>
-                            <span class="font-semibold text-text-main font-mono">{{ \App\Support\IndonesianDate::date($survey->end_date) }}</span>
-                        </div>
-                        @endif
-                        @if($survey->duration_minutes)
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Durasi Survey</span>
-                            <span class="font-semibold text-text-main">{{ $survey->duration_minutes }} Menit</span>
-                        </div>
-                        @endif
-                        @if($survey->surveyors)
-                        <div class="flex justify-between border-b border-border py-1">
-                            <span class="text-text-muted">Tim Survey (Surveyors)</span>
-                            <span class="font-semibold text-text-main">{{ $survey->surveyors }}</span>
-                        </div>
-                        @endif
-                        <div class="pt-2">
-                            <span class="block text-text-muted mb-1">Kebutuhan Alat:</span>
-                            <p class="p-3 bg-surface-muted rounded border border-border italic">{{ $survey->required_tools ?? 'Tidak ada catatan' }}</p>
-                        </div>
-                        <div class="pt-2">
-                            <span class="block text-text-muted mb-1">Catatan Survey:</span>
-                            <p class="p-3 bg-surface-muted rounded border border-border italic">{{ $survey->survey_note ?? 'Tidak ada catatan' }}</p>
+
+                        <div class="space-y-2.5">
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Petugas Survey {{ $currentSurveyorNum }} (Submitter)</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $survey->technician->name ?? $survey->surveyors ?? '-' }}</span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Tim Survey (Petugas Lapangan)</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">{{ $timSurvey ?: '-' }}</span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">ODP Terdekat &amp; Port</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
+                                    {{ $survey->nearest_odp ?: '-' }}{{ $odpPort ? ' (Port ' . $odpPort . ')' : '' }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Estimasi Jarak Kabel Dropcore</span>
+                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $survey->cable_estimation_meter ?? 0 }} Meter</span>
+                            </div>
+                            <div class="flex justify-between gap-3 py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                <span class="text-slate-400">Status Kelayakan Lokasi</span>
+                                <span class="font-bold searchable-text {{ $survey->survey_status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : ($survey->survey_status === 'failed' ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400') }}">
+                                    {{ $survey->survey_status === 'completed' ? 'LAYAK (Siap Pasang)' : ($survey->survey_status === 'failed' ? 'TIDAK LAYAK' : 'BELUM DINILAI') }}
+                                </span>
+                            </div>
                         </div>
                     </div>
+
+                    {{-- 1. TABEL ESTIMASI KEBUTUHAN MATERIAL / BARANG --}}
                     <div>
-                        <span class="block text-text-muted mb-2 font-bold uppercase text-[9px] tracking-wider">Foto ODP / Survey Lapangan</span>
-                        @if($survey->survey_photo)
-                            <div class="border border-border rounded overflow-hidden shadow-sm">
-                                <img src="{{ asset('storage/' . $survey->survey_photo) }}" alt="Foto Survey" class="w-full object-cover max-h-64">
-                                <div class="p-2 bg-surface-muted text-center">
-                                    <a href="{{ asset('storage/' . $survey->survey_photo) }}" target="_blank" class="text-[10px] font-bold" style="color:var(--color-info)">LIHAT FULL RESOLUSI</a>
-                                </div>
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-boxes-stacked text-sky-600 mr-1"></i> 1. TABEL ESTIMASI KEBUTUHAN MATERIAL / BARANG
+                        </span>
+                        @if($estimasiMaterial->isNotEmpty())
+                            <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                            <th class="px-4 py-2">Nama Barang / Material Pasif</th>
+                                            <th class="px-4 py-2 text-center">Jumlah (Qty)</th>
+                                            <th class="px-4 py-2">Satuan</th>
+                                            <th class="px-4 py-2">Keterangan Tambahan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                        @foreach($estimasiMaterial as $material)
+                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                                                <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $material->item_name }}</td>
+                                                <td class="px-4 py-2 text-center font-bold text-slate-900 dark:text-slate-100">{{ rtrim(rtrim(number_format($material->qty, 2, ',', '.'), '0'), ',') }}</td>
+                                                <td class="px-4 py-2 font-sans text-slate-700 dark:text-slate-300">{{ $material->unit }}</td>
+                                                <td class="px-4 py-2 font-sans text-slate-500">{{ $material->note ?: $material->category_label }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             </div>
                         @else
-                            <div class="h-48 bg-surface-muted border border-dashed border-border rounded flex flex-col items-center justify-center text-text-muted">
-                                <svg class="h-10 w-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span class="text-[10px] font-bold uppercase tracking-wider">Tidak Ada Foto ODP/Survey</span>
+                            <div class="py-5 text-center text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                                Belum ada estimasi material yang dicatat surveyor.
                             </div>
                         @endif
+                    </div>
 
-                        {{-- Foto Rumah Pelanggan --}}
-                        <div class="mt-4">
-                            <span class="block text-text-muted mb-2 font-bold uppercase text-[9px] tracking-wider">Foto Rumah Pelanggan</span>
-                            @if($survey->house_photo)
-                                <div class="border border-border rounded overflow-hidden shadow-sm">
-                                    <img src="{{ asset('storage/' . $survey->house_photo) }}" alt="Foto Rumah" class="w-full object-cover max-h-48">
-                                    <div class="p-2 bg-surface-muted text-center">
-                                        <a href="{{ asset('storage/' . $survey->house_photo) }}" target="_blank" class="text-[10px] font-bold" style="color:var(--color-info)">LIHAT FULL RESOLUSI</a>
-                                    </div>
+                    {{-- 2. TABEL ESTIMASI ALAT KERJA (TOOLS SURVEY) --}}
+                    <div>
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ESTIMASI ALAT KERJA YANG PERLU DIBAWA (TOOLS SURVEY)
+                        </span>
+                        @if($alatSurvey->isNotEmpty())
+                            <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                            <th class="px-4 py-2">Nama Alat Kerja (Tools)</th>
+                                            <th class="px-4 py-2">Keterangan / Fungsi Utama</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                                        @foreach($alatSurvey as $alat)
+                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
+                                                <td class="px-4 py-2 font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $alat->tool_name }}</td>
+                                                <td class="px-4 py-2 text-slate-500">{{ $alat->note ?: ($alat->workTool->note ?? '-') }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="py-5 text-center text-[11px] text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                                Belum ada checklist alat kerja pada FOP Task Survey pelanggan ini.
+                            </div>
+                        @endif
+                        {{-- Tabel di atas tidak punya kolom Qty/Satuan: task_work_tools memang
+                             cuma checklist per task (alat dibawa lalu dibawa pulang), tidak
+                             menyimpan jumlah. Jangan tambahkan kolom kosong biar tidak
+                             kelihatan seperti data yang hilang. --}}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                        <div>
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Alat Khusus / Kendala Peralatan</span>
+                            <p class="p-3 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-700 italic text-slate-600 dark:text-slate-300 searchable-text">
+                                {{ $survey->required_tools ?: 'Tidak ada catatan' }}
+                            </p>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan Survey</span>
+                            <p class="p-3 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-700 italic text-slate-600 dark:text-slate-300 searchable-text">
+                                {{ $survey->survey_note ?: 'Tidak ada catatan' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- FOTO DOKUMENTASI HASIL SURVEY --}}
+                    <div>
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">FOTO DOKUMENTASI HASIL SURVEY LAPANGAN</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            @foreach ([
+                                ['path' => $survey->survey_photo, 'title' => 'Foto ODP (Survey)', 'icon' => 'fa-network-wired'],
+                                ['path' => $survey->house_photo, 'title' => 'Foto Rumah Pelanggan', 'icon' => 'fa-house-user'],
+                            ] as $photo)
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                    @if($photo['path'])
+                                        <div class="h-32 rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-700">
+                                            <img src="{{ asset('storage/' . $photo['path']) }}" alt="{{ $photo['title'] }}" class="w-full h-32 object-cover">
+                                        </div>
+                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['title'] }}</span>
+                                        <a href="{{ asset('storage/' . $photo['path']) }}" target="_blank" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                    @else
+                                        <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                            <i class="fa-solid {{ $photo['icon'] }} text-3xl mb-1 text-slate-400"></i>
+                                            <span class="text-[10px] font-mono">TIDAK ADA FILE</span>
+                                        </div>
+                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['title'] }}</span>
+                                        <span class="text-[10px] text-slate-400 font-semibold">Belum diunggah</span>
+                                    @endif
                                 </div>
-                            @else
-                                <div class="h-32 bg-surface-muted border border-dashed border-border rounded flex flex-col items-center justify-center text-text-muted">
-                                    <svg class="h-8 w-8 mb-1 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                    </svg>
-                                    <span class="text-[10px] font-bold uppercase tracking-wider">Belum Ada Foto Rumah</span>
-                                </div>
-                            @endif
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -206,14 +302,9 @@
         @endforeach
     </div>
 @else
-    <div class="py-12 text-center text-text-muted bg-surface-muted/20 border border-dashed border-border rounded-lg">
-        <svg class="mx-auto h-12 w-12 text-text-muted mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A2 2 0 013 15.447V5.553a2 2 0 011.553-1.944L9 2 15 5l5.447-2.724A2 2 0 0123 4.224v9.894a2 2 0 01-1.553 1.944L15 19l-6 1z" />
-        </svg>
-        <h4 class="text-sm font-semibold text-text-main">Belum ada data survey</h4>
-        <p class="text-xs text-text-muted mt-1">Silakan isi hasil survey lapangan melalui tombol di atas.</p>
+    <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+        <i class="fa-solid fa-map-location-dot text-3xl mb-2 text-slate-300 dark:text-slate-600"></i>
+        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Data Survey</h4>
+        <p class="text-[11px] text-slate-500 mt-1">Silakan isi hasil survey lapangan melalui tombol di atas.</p>
     </div>
 @endif
-
-
-

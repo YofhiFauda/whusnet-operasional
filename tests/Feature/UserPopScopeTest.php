@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Enums\InvoiceType;
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -11,8 +13,11 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class UserPopScopeTest extends TestCase
@@ -38,14 +43,14 @@ class UserPopScopeTest extends TestCase
 
         $popA = $this->createPop('POP-SCOPE-A', 'SCA', 'POP Scope A');
         $popB = $this->createPop('POP-SCOPE-B', 'SCB', 'POP Scope B');
-        
-        $scope = \App\Models\UserRoleScope::create([
+
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        
-        \App\Models\UserRoleScopeTarget::create([
+
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $popA->id,
         ]);
@@ -70,22 +75,21 @@ class UserPopScopeTest extends TestCase
         $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
 
         // Clear existing data to isolate the count assertions and avoid SQLite FK constraints
-        \Illuminate\Support\Facades\DB::table('fop_task_team_user')->delete();
-        \Illuminate\Support\Facades\DB::table('fop_task_user')->delete();
-        \Illuminate\Support\Facades\DB::table('fop_tasks')->delete();
-        \Illuminate\Support\Facades\DB::table('task_maintenances')->delete();
-        \Illuminate\Support\Facades\DB::table('task_checklists')->delete();
-        \Illuminate\Support\Facades\DB::table('task_evidences')->delete();
-        \Illuminate\Support\Facades\DB::table('tasks')->delete();
-        \Illuminate\Support\Facades\DB::table('payments')->delete();
-        \Illuminate\Support\Facades\DB::table('invoices')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_services')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_addresses')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_surveys')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_installations')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_devices')->delete();
-        \Illuminate\Support\Facades\DB::table('customer_documents')->delete();
-        \Illuminate\Support\Facades\DB::table('customers')->delete();
+        DB::table('fop_task_team_user')->delete();
+        DB::table('fop_task_user')->delete();
+        DB::table('fop_tasks')->delete();
+        DB::table('task_maintenances')->delete();
+        DB::table('task_checklists')->delete();
+        DB::table('tasks')->delete();
+        DB::table('payments')->delete();
+        DB::table('invoices')->delete();
+        DB::table('customer_services')->delete();
+        DB::table('customer_addresses')->delete();
+        DB::table('customer_surveys')->delete();
+        DB::table('customer_installations')->delete();
+        DB::table('customer_devices')->delete();
+        DB::table('customer_documents')->delete();
+        DB::table('customers')->delete();
 
         $popA = $this->createPop('POP-SCOPE-OWN-A', 'OSA', 'POP Owner A');
         $popB = $this->createPop('POP-SCOPE-OWN-B', 'OSB', 'POP Owner B');
@@ -116,11 +120,9 @@ class UserPopScopeTest extends TestCase
         $customer = Customer::create([
             'customer_code' => $customerCode,
             'full_name' => $customerName,
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'internet_package_id' => $this->package->id,
@@ -158,7 +160,7 @@ class UserPopScopeTest extends TestCase
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
             'internet_package_id' => $this->package->id,
-            'invoice_type' => \App\Enums\InvoiceType::BULANAN->value,
+            'invoice_type' => InvoiceType::BULANAN->value,
             'billing_period' => '2026-06',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',

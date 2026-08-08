@@ -14,10 +14,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customer_technical_details', function (Blueprint $table) {
-            if (!Schema::hasColumn('customer_technical_details', 'olt_number')) {
+            if (! Schema::hasColumn('customer_technical_details', 'olt_number')) {
                 $table->string('olt_number', 50)->nullable()->after('olt_port');
             }
-            if (!Schema::hasColumn('customer_technical_details', 'olt_slot')) {
+            if (! Schema::hasColumn('customer_technical_details', 'olt_slot')) {
                 $table->string('olt_slot', 20)->nullable()->after('olt_number');
             }
         });

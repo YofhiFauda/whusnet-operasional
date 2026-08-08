@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'signal_rx_power',
     'connection_mode',
     'technical_note',
+    'device_retrieved_at',
 ])]
 class CustomerDevice extends Model
 {
@@ -43,6 +44,7 @@ class CustomerDevice extends Model
     {
         return [
             'signal_rx_power' => 'decimal:2',
+            'device_retrieved_at' => 'datetime',
         ];
     }
 

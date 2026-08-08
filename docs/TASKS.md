@@ -1,7 +1,483 @@
 ## Status Project Saat Ini
 Current Sprint: **Sprint 8.10** (Audit Trail + Notification System)
-Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1 & BATCH 2)
-Current Task: MIGRASI-T002 — Perbaikan Tagihan Legacy BATCH 2 (Done)
+Current Module: Perbaikan Gap Migrasi & Tagihan Legacy (Selesai BATCH 1, BATCH 2 & BATCH 3)
+Current Task: S8.10-T003 (FOP Notification Dashboard)
+
+### Ad-Hoc Improvements
+
+| Task | Deskripsi | Status |
+|---|---|---|
+| ADHOC-01 | Desain Ulang List Pelanggan & Dark Theme Toggle | Done |
+| ADHOC-02 | Perbaikan Halaman Dashboard, Registrasi Pelanggan, Pelanggan Gagal, Import Pelanggan, Riwayat/Batch Detail, Antrean/Detail Verifikasi, Detail Pelanggan & Sub-Tabs Dark/Light Theme Support | Done |
+| ADHOC-03 | Restrukturisasi Modul Ticketing (lihat detail di bawah) | Done — 2026-07-28 |
+| ADHOC-04 | Layout Worksheet Helpdesk — panel form lipat + motion & responsif | Done — 2026-07-29 |
+| ADHOC-05 | Halaman History Ticketing (lihat detail di bawah) | Done — 2026-07-29 |
+| ADHOC-06 | Hapus window Pending NOC + aksi Oncheck NOC (lihat detail di bawah) | Done — 2026-07-29 |
+| ADHOC-07 | Support Dark & Light Theme untuk Halaman Report Survey (`surveys.report`) dan Report Pemasangan (`installations.report`) | Done — 2026-07-30 |
+| ADHOC-13 | Master Alat Kerja (`work_tools`) + material terstruktur di Laporan Maintenance (lihat detail di bawah) | Done — 2026-07-31 |
+| ADHOC-12 | Kategori material jadi Master (`item_categories`) — enum `MaterialType` turun peran (lihat detail di bawah) | Done — 2026-07-31 |
+| ADHOC-11 | Tanggal Request Pemasangan (Laporan Survey) + Pencatatan Material Estimasi vs Terpakai + Master Barang (lihat detail di bawah) | Done — 2026-07-31 |
+| ADHOC-10 | Detail tiket di Worksheet Helpdesk & Worksheet NOC pindah ke **drawer kanan** (partial bersama + endpoint detail JSON); navigasi halaman penuh disisakan buat Ticket Selesai / Dibatalkan / History (lihat detail di bawah) | Done — 2026-07-30 |
+| ADHOC-09 | Redesign Worksheet NOC (`noc.worksheet`) — tabel padat 1 baris/tiket + pencarian + filter + dua tab bercounter (Tiket Masuk / Assign FOP) + aksi lewat drawer baris terpilih (lihat detail di bawah) | Done — 2026-07-30 |
+| ADHOC-08 | Redesign Worksheet Helpdesk (`tickets.create`) — panel antrean jadi tabel padat 6 kolom + tab per-handler bercounter + filter prioritas + toggle tabel/kartu; kartu identitas pelanggan diringkas (acuan `helpdesk_redesign.html` + Frame 139) | Done — 2026-07-30 |
+| ADHOC-14 | Redesign Halaman Pembayaran (`payments.index`, `payments.create`, `payments.show`, `payments.overpay`) dengan dukungan penuh Dark/Light Theme & Stat Cards | Done — 2026-08-06 |
+| ADHOC-15 | Detail Task teknisi: blok Laporan Pekerjaan Teknisi + Riwayat Task Saya + hapus fitur Foto Bukti + fix redirect `return_to` Laporan Survey/Pemasangan (lihat detail di bawah) | Done — 2026-08-06 |
+| ADHOC-16 | Pisah "catatan" yang tumpang tindih di Task eksekusi (`Issue/Keluhan` kecampur `catatan_teknis`/`notes`) — 3 sumber, 3 box terpisah (lihat detail di bawah) | Done — 2026-08-07 |
+| ADHOC-17 | Task teknisi: catat `completed_by` (siapa yang menyelesaikan & lapor) + tampilkan di detail task, gak lagi cuma keliatan admin/fop (lihat detail di bawah) | Done — 2026-08-07 |
+
+#### ADHOC-17 — Kolom `completed_by` di Task + Riwayat Terbuka buat Anggota Tim (2026-08-07)
+
+Gap: `TaskService::complete()` cuma nulis `updated_by` (kolom generic, ke-overwrite
+tiap update apapun setelahnya — start/pending/cancel/reassign), jadi jejak
+"siapa teknisi yang nyelesaiin & lapor" gak eksplisit tersimpan. Data
+sebenarnya ada di `audit_logs` (action `completed`), tapi blok "Riwayat Status
+(Audit Log)" di `tasks.show` cuma keliatan buat role `owner`/`admin`/`fop` —
+anggota tim sendiri gak bisa liat. Fix: tambah kolom `tasks.completed_by`
+(FK `users`, diisi sekali & immutable) + tampilkan "Diselesaikan & dilaporkan
+oleh: {nama}" di blok Waktu Pengerjaan (semua yang bisa akses detail task
+lihat) + buka gate audit log buat anggota tim (`$task->isMember(auth()->id())`).
+Kasus 1 tim 2 orang berebut klik "Selesai": sudah aman dari sononya — guard
+status `IN_PROGRESS`/`PENDING` di `TaskService::complete()` nolak request
+kedua begitu status udah `SELESAI` (422), jadi `completed_by` gak ketiban.
+Test regresi: `TaskCompletedByTest`.
+
+Bug: `Task.description` dibangun dari `trim($fopTask->issue."\n".$fopTask->notes)`
+(`FopTaskController::store()`/`update()`) atau
+`trim($ticket->detail_keluhan."\n".$ticket->catatan_teknis)`
+(`TicketService::assignTechnicians()`) — pointer sistem/asesmen NOC numpang
+keliatan seolah bagian keluhan pelanggan di box "Issue / Keluhan"
+(`tasks/show.blade.php`). Fix: `description` cuma dari 1 sumber issue;
+`catatan_teknis`/`notes` ditampilkan di 2 box baru terpisah ("Catatan Teknis
+(NOC)", "Catatan FOP") — `TaskController::show()` eager-load `fopTask.ticket`.
+Detail lengkap: `docs/task-teknisi/business-logic.md § 9`,
+`docs/ticketing/business-logic.md § 14`. Test regresi:
+`FopTaskCreateFollowsTicketingTest::test_task_show_separates_catatan_teknis_from_description_for_teknisi`.
+
+#### ADHOC-15 — Laporan Pekerjaan Teknisi + Riwayat Task Saya + Hapus Foto Bukti + Fix Redirect Laporan (2026-08-06)
+
+Rangkaian perbaikan Detail Task teknisi, diminta bertahap dalam satu sesi.
+
+**Bagian 1 — Blok "Laporan Pekerjaan Teknisi" di Detail Task**
+
+Data yang teknisi isi lewat form Laporan Maintenance (kendala teknis, material
+terpakai, foto OPM/Speedtest) sebelumnya cuma tersimpan di DB tanpa pernah
+tampil lagi di `/tasks/{id}`. `TaskController::show()` sekarang eager-load
+`maintenanceReport`, view nampilin section baru — berlaku task non-Survey/
+Pemasangan (Survey/Pemasangan sudah punya halaman laporan sendiri).
+
+**Bagian 2 — Riwayat Task Saya (`/tasks-saya/riwayat`)**
+
+Arsip task `selesai` milik teknisi login, beda dari `/tasks-saya` yang cuma
+papan kerja aktif (buang task selesai lama dari daftar). `TaskController::
+historyOwn()`, guard `task.view.own` sama seperti dashboard.
+
+**Bagian 3 — Hapus fitur Foto Bukti (`TaskEvidence`) total**
+
+Investigasi menemukan fitur ini gak pernah men-gate completion
+(`Task::canComplete()` udah lama hardcoded `true`) dan tumpang tindih sama
+foto wajib yang sudah ada di tiap Laporan per tipe task. Dihapus: model,
+controller, route, policy ability `uploadEvidence`, method
+`FileUploadService::uploadTaskEvidence()`, section "Foto Bukti" di beberapa
+view (`tasks/show.blade.php`, tab Riwayat Ticketing pelanggan), dan **tabel
+`task_evidences`** (migration baru
+`2026_08_06_140732_drop_task_evidences_table.php`, `down()` reversible).
+Tile ringkasan "Foto Bukti" di atas Detail Task diganti **Durasi Aktual**.
+
+**Bagian 4 — Fix redirect Laporan Survey/Pemasangan (`return_to`)**
+
+Halaman `/customers/{id}/survey/report` & `/installation/report` diakses dari
+banyak entry point (Detail Task, Dashboard Task Saya, Antrean Survey,
+Verifikasi Queue, Detail Pelanggan) — tombol "Kembali" & redirect sukses
+sebelumnya **hardcoded** ke satu tujuan tetap, gak peduli asal. Sekarang
+pemanggil kirim `return_to` (query/hidden field), divalidasi
+`App\Support\SafeUrl::resolveReturnTo()` (same-origin only, cegah open
+redirect), fallback ke route lama kalau kosong/invalid.
+
+**Dokumentasi terkait:** `docs/task-teknisi/{README,business-logic,database-schema,flowchart,user-flow}.md`, `docs/customer-lifecycle/{README,business-logic}.md`.
+
+**Test baru:** `TaskShowMaintenanceReportTest`, `TaskOwnHistoryTest`, `SurveyInstallationReportReturnToTest`. Full suite 989 passed, 0 failed setelah semua perubahan.
+
+#### ADHOC-13 — Master Alat Kerja + Material di Laporan Maintenance (2026-07-31)
+
+Batch B dari rangkaian yang diminta, digabung dengan satu lubang yang ketahuan
+saat mengeceknya.
+
+**Bagian 1 — Master Alat Kerja**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Master `work_tools` + halaman Master Alat Kerja | Peralatan yang DIBAWA dan DIBAWA PULANG. Tabel terpisah dari `items` karena cara hitungnya beda — alat tidak habis dipakai dan **tidak punya qty** |
+| 2 | `task_work_tools` **anchor ke `fop_task_id`** | Rancangan pivot-ke-`customer_surveys` ditolak: MTN/C-REQ tidak pernah lewat survey, padahal perbaikan gangguan paling sering butuh tangga & splicer. FopTask satu-satunya entitas milik SEMUA jenis pekerjaan — alasan yang sama dengan `task_materials` |
+| 3 | **TANPA fase estimasi/terpakai** | Beda disengaja dari material. Untuk material selisihnya uang; untuk alat, mencentang ulang "benar saya bawa tangga" cuma menambah isian lapangan tanpa angka yang dipakai siapa pun |
+| 4 | Checklist di TIGA form laporan | Survey (isi dari nol), Pemasangan (prefill dari survey, boleh disunting), Maintenance (isi dari nol). Satu komponen `x-work-tool-checklist` |
+| 5 | Tampil di `tasks/show` **di luar percabangan tipe task** | Ini alasan utama fitur ada — dibaca teknisi sebelum berangkat. Task PSB yang belum punya daftar sendiri jatuh ke daftar survey lewat `displayRowsForTask()`; kolom kosong justru muncul tepat saat teknisi paling butuh |
+| 6 | `required_tools` turun peran lagi | Dari "Alat Khusus / Kendala Peralatan" jadi **"Catatan Kendala Peralatan"** — keterangan yang tidak masuk checklist (akses lokasi, spesifikasi tak biasa). Tidak di-drop, ada data survey lama |
+| 7 | Alat di luar master lewat baris manual | Tersimpan `work_tool_id` null + `tool_name` snapshot. Duplikat dibuang (case-insensitive) karena tanpa qty, dua baris "Tangga" cuma bikin daftar berulang |
+
+**Bagian 2 — Material terstruktur di Laporan Maintenance**
+
+Lubang warisan ADHOC-11 yang ketahuan saat mengecek Batch B: `x-material-rows`
+cuma dipakai Survey & Pemasangan. Material maintenance selama ini dicatat di
+lima kolom teks bebas `maintenance_reports.{kabel,modem,patchcord,sleeve,lainnya}`
+— satu kolom per jenis barang, hardcode, tak bisa dijumlah, tak tersambung master.
+Patch cord yang diganti saat perbaikan gangguan tidak pernah masuk agregasi mana pun.
+
+Sekarang Laporan Maintenance memakai `x-material-rows` yang sama (kind `TERPAKAI`,
+anchor FopTask). Lima kolom lama **tidak di-drop dan tetap divalidasi** — ada
+laporan lama yang memakainya — tapi sudah tidak ditampilkan di form. Jangan
+hidupkan sebagian.
+
+Anchor maintenance dicari lewat `fop_tasks.task_id` (`TaskWorkToolService::resolveTaskFor(Task)`),
+**bukan** `TaskMaterialService::resolveTaskFor(Customer, kategori)` yang mengambil
+`latest('id')` — satu pelanggan bisa punya banyak task MTN sepanjang tahun, dan
+"MTN terakhir milik pelanggan ini" akan menempel ke task yang salah.
+
+Seeder `WorkToolSeeder` berisi 10 alat, diambil dari isi `required_tools` nyata
+dikurangi "Dropcore" — itu material yang nyasar ke kolom alat.
+
+**Bagian 3 — Bug RBAC warisan ADHOC-11 (ketahuan saat melengkapi sidebar & RBAC)**
+
+`PermissionGeneratorService::generate()` melakukan loop atas `config/rbac.php` →
+`allowed_actions`, **BUKAN** atas tabel `features`. Feature yang punya seeder tapi
+tidak terdaftar di config dilewati **diam-diam, tanpa error apa pun**.
+
+`items` persis begitu sejak ADHOC-11: `ItemFeatureSeeder` membuat feature-nya,
+tapi `items` tidak pernah didaftarkan di `config/rbac.php`, jadi permission
+`items.view/create/update/delete` **tidak pernah lahir**. Akibatnya Master Barang
+cuma bisa dibuka Owner (yang lolos lewat wildcard `*`) dan tidak akan pernah
+muncul di Role Matrix untuk role lain. Tidak terdeteksi karena test memakai Owner.
+
+`items`, `item_categories`, dan `work_tools` sekarang terdaftar. **Tiap
+FeatureSeeder baru WAJIB menambah entri di `config/rbac.php` juga** — seeder saja
+tidak cukup.
+
+Sidebar: tiga entri Master Data (`Barang / Material`, `Kategori Barang`,
+`Alat Kerja`), masing-masing digerbangi permission sendiri, dan gerbang seksi
+Master Data ikut menyertakan ketiganya.
+
+Test: `WorkToolChecklistTest` (10 test), `MasterBarangPermissionGeneratedTest`
+(4 test — menjaga supaya feature master berikutnya tidak mengulang bug yang sama).
+
+**Belum dijalankan:** `php artisan migrate` — DB MySQL masih tak terjangkau.
+Seeder yang perlu dijalankan setelahnya: `WorkToolFeatureSeeder`, `WorkToolSeeder`,
+lalu `RolePermissionSeeder`.
+
+#### ADHOC-12 — Kategori Material jadi Master (2026-07-31)
+
+Batch A dari tiga batch yang diminta ("item survey & pemasangan masih hardcode").
+Master Barang (`items`) sebenarnya sudah ada sejak ADHOC-11; yang benar-benar masih
+hardcode adalah **kategorinya** — enum `MaterialType`, plus dua salinan literal
+daftar yang sama di `CustomerDeviceController` dan `_device.blade.php` (salinan
+ketiga bahkan sudah menyimpang: "Kabel Dropcore / FO" vs "Kabel Dropcore").
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Tabel `item_categories` + halaman Master Kategori Barang | `code` (bukan `id`) yang jadi kunci pemakaian — `task_materials.item_type` & `passive_device_type` menyimpannya sebagai snapshot string. Tanpa delete, sama seperti Master Barang |
+| 2 | Tujuh kategori bawaan ditanam **di migrasi**, bukan seeder | Migrasi berikutnya mem-backfill dengan mencocokkan code; seeder jalan setelah semua migrasi selesai, jadi kalau ditaruh di seeder backfill-nya no-op dan data lama kehilangan kategori. `is_system` mengunci code-nya |
+| 3 | `items.type` → `item_category_id` (kolom lama di-drop); `task_materials.item_type` **dipertahankan** + FK ditambah | Perlakuan sengaja dibalik: master menunjuk relasi (ubah nama kategori harus ikut berubah), riwayat menyimpan snapshot (laporan tahun lalu harus terbaca apa adanya) |
+| 4 | Cast enum `item_type` **dilepas** dari `TaskMaterial` | Kategori buatan admin tidak punya case enum; cast akan melempar `ValueError` saat baris itu sekadar ditampilkan. Bacanya lewat `category_label` (fallback ke code mentah) |
+| 5 | Enum `MaterialType` turun peran, TIDAK dihapus | Jadi dokumentasi kontrak tujuh code bawaan. **Jangan tambah case baru** — kategori baru lewat Master, kalau tidak dua daftar itu hidup lagi |
+| 6 | Validasi `in:` → `Rule::exists('item_categories','code')` di tiga tempat | Survey, Pemasangan, dan `CustomerDeviceController` (yang dulu menyalin daftar enum literal). Kategori baru langsung terpakai tanpa deploy |
+| 7 | Dropdown kategori nonaktif tetap muncul **untuk baris yang memakainya** | Tanpa ini, `<select>` tanpa option cocok jatuh ke option pertama saat render — membuka laporan lama lalu menyimpannya diam-diam memindahkan kategorinya |
+| 8 | `defaultUnit()` match() → kolom `default_unit` | JS form juga: `row.item_type === 'kabel_dropcore' ? 'meter' : 'pcs'` diganti lookup master |
+
+Satu bug ditemukan lewat test: `whereIn('id', ...)` jadi ambigu begitu join
+`item_categories` ikut (dua tabel sama-sama punya `id`) — di-prefix jadi `items.id`.
+
+Permission `item_categories.*` lewat `ItemCategoryFeatureSeeder` — feature terpisah
+dari `items` karena mengubah kategori berefek ke seluruh data material lintas modul,
+sedangkan menambah barang cuma menambah pilihan.
+
+Test: `ItemCategoryMasterTest` (10 test). `TaskMaterialTest` & `MaterialReportFlowTest`
+disesuaikan ke bentuk baru (`item_category_id`, `item_type` string).
+
+**Belum dijalankan:** `php artisan migrate` — DB MySQL masih tak terjangkau, sama
+seperti catatan ADHOC-11. Migrasi teruji lewat sqlite `:memory:` di test suite.
+Seeder yang perlu dijalankan: `ItemCategoryFeatureSeeder`, lalu `RolePermissionSeeder`.
+
+**Batch B — SELESAI, dikerjakan sebagai ADHOC-13 di atas.**
+
+Tanpa qty dan tanpa kepemilikan alat per-teknisi/per-POP; itu pelacakan aset,
+wilayah Inventory (lihat Batch C).
+
+**Batch C — TIDAK dikerjakan sekarang (keputusan user, 2026-07-31).** Harga/stok/gudang
+di master barang = pembukaan modul Inventory (`docs/post-mvp/inventory-fop.md`), bukan
+perluasan master. Keputusan ADHOC-11 poin 6 (master minimum, TANPA stok/harga/gudang)
+**tetap berlaku** — jangan tambah kolom itu ke `items` sebagai perbaikan sambil lalu.
+Kalau nanti dibuka, prasyaratnya: (a) keputusan stok per-POP atau global, (b) siapa
+yang berwenang mengurangi stok — teknisi saat submit laporan atau admin gudang, dan
+(c) **wajib** ikut `harga_saat_pakai` snapshot di `task_materials`; tanpa itu laporan
+biaya lama berubah nilainya tiap harga master naik. Kolom `unit_price_snapshot` di
+`task_materials` sudah disiapkan ADHOC-11 dan masih kosong — itu tempatnya.
+
+#### ADHOC-11 — Tanggal Request Pemasangan & Material Task (2026-07-31)
+
+Rancangan lengkap + keputusan: [docs/plan/rancangan-request-pemasangan-dan-material-task.md](plan/rancangan-request-pemasangan-dan-material-task.md).
+
+**Bagian 1 — Tanggal Request Pemasangan**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | `customer_surveys.requested_installation_date` (opsional) | **Satu-satunya sumber kebenaran.** `fop_tasks.client_request_date` kategori PSB cuma turunan, di-refresh tiap auto-sync — `update()` me-null-kannya tiap status keluar dari Pending, jadi tanpa refresh tanggalnya hilang begitu FOP menjadwalkan task |
+| 2 | Task PSB dengan tanggal masa depan **tidak kena SLA** | Prioritas dipaksa `LOW`, sorting existing (`FopTaskController::index()` baris 63) sudah menenggelamkannya ke dasar papan — tidak diubah |
+| 3 | Deadline = **akhir hari** tanggal request | Bukan `tanggal + handlingSlaHours()`. Yang dijanjikan ke pelanggan "dipasang tanggal 20", jadi lewat tengah malam = telat. Kolom SLA nampilin badge "Dijadwalkan {tgl}" sebelum hari-H, countdown normal di hari-H, `−HH:MM:SS` merah setelah lewat (komponen `x-countdown-timer` existing, tidak diubah) |
+| 4 | Gerbang tunggal `FopTask::usesClientRequestDeadline()` / `isScheduledForFutureClientDate()` | Dipakai bareng `slaDeadline()`, `slaTotalSeconds()`, papan FOP, DAN `autoSyncAndCalculatePriority()`. **Jangan tulis ulang kondisinya di tempat keempat** — timer & badge prioritas harus dari syarat yang sama |
+
+**Bagian 2 — Material (Estimasi vs Terpakai)**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 5 | Tabel `task_materials` (satu tabel, dua fase `kind`) | Anchor ke `fop_task_id` (bukan `customer_installations`) — FopTask satu-satunya entitas milik SEMUA jenis pekerjaan. Ini **adalah** `fop_task_materials` di `docs/post-mvp/inventory-fop.md`, dibangun lebih awal dengan bentuk final |
+| 6 | Master `items` + halaman Master Barang | Minimum by design: TANPA stok/harga/gudang. Tujuannya cuma penamaan seragam sejak baris pertama; Inventory nanti menambah di atasnya. Tanpa hapus — barang lama dinonaktifkan |
+| 7 | Estimasi di Laporan Survey; `required_tools` turun peran | `required_tools` jadi "Alat Khusus / Kendala Peralatan" (peralatan kerja, bukan material). Tidak di-drop — ada data survey lama. `cable_estimation_meter` otomatis jadi baris dropcore |
+| 8 | Perangkat Pasif Terpakai di Laporan Pemasangan | Prefill dari estimasi; wajib ≥1 baris saat `completed`. **Tidak menggantikan** `customer_technical_details.passive_device*` — itu aset terpasang, ini konsumsi material |
+| 9 | Tabel Estimasi vs Terpakai + selisih di Verifikasi Admin | Sengaja tanpa ambang otomatis — menilai wajar/tidaknya itu keputusan admin |
+
+Tiga bug ditemukan lewat test & diperbaiki: satuan form menang atas master di
+`TaskMaterialService`; dedup baris dropcore tak mendeteksi barang master; `pluck()`
+Eloquent tetap menerapkan cast sehingga banding enum-vs-string selalu false.
+
+Test: `SurveyRequestedInstallationDateTest`, `FopTaskClientRequestDateTest`,
+`TaskMaterialTest`, `MaterialReportFlowTest`. `FopTaskSortingTest` dijalankan sebagai
+regresi (lolos).
+
+Halaman lain yang ikut diperbarui supaya data baru tidak "hilang" setelah disimpan:
+tab Survey & tab Pemasangan detail pelanggan, halaman Task teknisi (`tasks/show`),
+Riwayat Detail FOP (`fop_tasks/history_detail`), ringkasan survey di form Pemasangan.
+
+**Belum dijalankan:** `php artisan migrate` (DB MySQL tidak terjangkau saat implementasi)
+dan seeder `ItemFeatureSeeder` + `ItemSeeder`. Migrasi sudah teruji lewat sqlite
+`:memory:` di test suite.
+
+#### ADHOC-10 — Detail tiket lewat drawer kanan (2026-07-30)
+
+Acuan layout: `worksheet_helpdesk_noc_v2.html` (`#ticketDrawer`).
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Partial bersama `tickets/partials/detail-drawer.blade.php` | Dipakai Worksheet Helpdesk (`tickets/create.blade.php`) DAN Worksheet NOC. Isi: Status & atribusi, Aksi Ticket, Snapshot Pelanggan, Keluhan & Catatan, Lampiran, Riwayat Ticket & Audit |
+| 2 | Endpoint `GET /api/tickets/{ticket}/detail` (`tickets.detail-json`) | `TicketController@detailJson`, gerbang sama dengan `show()`: `tickets.view` + `authorizeTicketScope()`. SENGAJA bukan memperbesar `worksheetCardPayload()` — riwayat & lampiran cuma perlu buat satu tiket yang dibuka, bukan 30–50 baris daftar |
+| 3 | Kontrak event, bukan duplikasi logic | Drawer men-dispatch `ticket-drawer-action`; konfirmasi + POST tetap di halaman pemanggil, jadi update array `tasks`/baris tabel & riwayat tetap satu jalur. `open-ticket-drawer` / `close-ticket-drawer` buat buka-tutup |
+| 4 | Link `/tickets/{id}` dicabut dari dua halaman kerja | Nomor tiket (tabel) & kartu sekarang buka drawer. Halaman penuh disisakan buat **Ticket Selesai**, **Ticket Dibatalkan**, **History Ticketing** + link notifikasi |
+| 5 | Tombol **Batalkan** di Worksheet Helpdesk | Sebelumnya gak ada di panel; sekarang ada, tapi **cuma di drawer** — aksi destruktif jangan gampang kepencet dari baris daftar |
+
+| 6 | **Isi drawer disamakan dengan `/tickets/{id}`** (2026-07-31) | Tambahan payload `detailJson()`: `type_label` (`MTN — Maintenance`), `fop_task{number, technicians, histories, can_view, url}`, `fop_task_orphan`, lampiran `size`+`uploader`. Drawer dapat blok **Task FOP Lapangan Terkait** (teknisi + tombol Buka Task FOP, digerbangi `fop_tasks.view`) & **Riwayat Task FOP** |
+| 7 | **Drawer di BAWAH navbar** (`top-16` + `h-[calc(100dvh-4rem)]`) | Navbar (`glass-header`, `backdrop-blur`) gak lagi ketiban panel setengah transparan. `dvh` bukan `vh` — address bar mobile bikin footer drawer kepotong |
+| 8 | **Fix class z-index mati** | `z-drawer`/`z-dropdown`/`z-modal`/`z-sticky` **tidak pernah ada** di CSS hasil build: tokennya (`--z-drawer` dst.) cuma di `:root`, DI LUAR `@theme`, dan z-index bukan namespace yang di-generate Tailwind v4. Semua elemen itu jatuh ke `z-index:auto`. Diganti literal `z-[60]`/`z-[40]`/`z-[80]`/`z-[20]` di `detail-drawer`, `components/ui/{drawer,dropdown,modal}`, `components/layout/topbar`. **Wajib `npm run build`** — kalau enggak, `top-16` & `z-[60]` gak ada di asset dan drawer balik nabrak navbar |
+| 9 | Scroll halaman dikunci saat drawer kebuka | `x-effect` toggle `overflow-hidden` di body — tanpa ini scroll di atas backdrop malah menggeser tabel di belakangnya |
+
+Test: `TicketDetailDrawerTest` (payload + flag aksi, terminal pasca-FOP, 403 tanpa
+`tickets.view`, 403 luar POP scope, dua worksheet buka drawer & barisnya gak nge-link,
+`type_label`, teknisi + riwayat Task FOP, flag orphan, metadata lampiran).
+`TicketCloseEscalateTest::test_worksheet_action_buttons_are_not_native_forms()` disesuaikan
+ke mekanisme baru — intinya tetap sama: JANGAN `<form method="POST">`.
+
+> **Catatan `fop_task_orphan`:** tiket "Terputus" bikin `fop_task` DAN `fop_task_number`
+> dua-duanya null (turunan relasi yang sama), jadi kondisi
+> `!fop_task && fop_task_number` gak akan pernah nyala. Bedanya wajib dibaca dari
+> `Ticket::isOrphan()` (`handler=FOP` + `fop_task_id` null), bukan dari nomor task.
+
+#### ADHOC-09 — Redesign Worksheet NOC (2026-07-30)
+
+Daftar kartu vertikal (~120px/tiket, tanpa pencarian sama sekali) diganti tabel padat
+bergaya History Ticketing supaya NOC bisa membaca puluhan tiket sekaligus dan menemukan
+tiket tertentu tanpa scroll.
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | **Tabel padat**, 1 baris = 1 tiket | Kolom: Masuk · Tiket · Nama/CID · HP · Desa · POP · Aduan · Kategori · Prioritas · **Umur** (≥8 jam kuning, ≥24 jam merah). Tab Assign FOP menukar Umur dengan Status / Diserahkan / Dikirim Oleh |
+| 2 | **Dua tab bercounter** via `?tab=` | `masuk` (default) = `handler=noc & status=open`; `assign_fop` = `handler=fop` **AND** ada `ticket_histories(action=dieskalasi, to_status=noc)`. Tab asing jatuh ke `masuk` |
+| 3 | **Pencarian + filter** GET | `q` (nomor tiket, nama, CID, desa, keluhan), `pop_id`, `issue_category_id`, `type`, `priority`, `created_by`, `date_from`/`date_to`. Filter dipakai SAMA di tabel & kedua counter tab |
+| 4 | **Aksi lewat drawer baris terpilih** | Klik baris → `components/ui/drawer.blade.php` (komponen lama yang belum terpakai) berisi detail + tombol Selesai/Assign FOP/Kembalikan/Batalkan. URL endpoint ditaruh di `data-*` baris & cuma dirender kalau flag `actionFlagsFor()` nyala → tab Assign FOP read-only total |
+| 5 | Tanpa migrasi, tanpa route/permission baru | Gerbang tetap `noc_worksheet.view`; `TicketService`/`TicketController` tidak disentuh |
+
+> **BUKAN pembalikan ADHOC-06.** Tab **Assign FOP** murni turunan data tiket yang sudah
+> lepas ke FOP — bukan window "Pending NOC", tidak ada aksi Oncheck/"ambil tiket", dan
+> tiket yang diassign ke NOC tetap langsung berstatus diproses. Test
+> `test_worksheet_has_no_pending_noc_window()` menjaga itu.
+
+Test: `NocWorksheetTest` 24 test (tab per-isi, exclude tiket yang Helpdesk kirim langsung ke
+FOP, tab read-only, tab asing, pencarian `#[DataProvider]`, filter POP/prioritas/kategori/
+tanggal, counter ikut filter, POP scope di kedua tab).
+
+#### ADHOC-06 — Hapus Pending NOC & Oncheck NOC (2026-07-29)
+
+Membalik ADHOC-03 #1. Assign ke NOC = **langsung diproses**; langkah "terima
+dulu" ternyata tidak mencerminkan cara kerja sebenarnya dan hanya membuat tiket
+menggantung.
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Status **Pending NOC** & **OnCheck NOC** dihapus → satu label **Diproses NOC** | `Ticket::statusLabel()`; `isPendingNoc()`/`isOnCheckNoc()` dihapus |
+| 2 | Tombol + endpoint **Oncheck NOC** dihapus | `TicketService::onCheckNoc()`, `TicketController::onCheckNoc()`, route `tickets.oncheck-noc`, flag `can_oncheck_noc`, guard `assertNocCheckedBeforeClose()` |
+| 3 | Kolom **`tickets.noc_checked_at` di-DROP** | migrasi `2026_07_29_000003` — destruktif, disetujui eksplisit |
+| 4 | **Kepemilikan bersama permanen**: tiket di tangan NOC dipegang `['helpdesk','noc']` | Keputusan pemilik produk: Helpdesk yang mengirim tetap boleh menyelesaikan/membatalkan |
+| 5 | **Worksheet NOC jadi SATU halaman tanpa tab** | Gerbang `noc_worksheet.view`; URL tab lama di-redirect ke `/noc/worksheet` |
+| 6 | Permission `noc_worksheet.masuk.view` & `.diproses.view` **dipensiunkan** | Feature di-set `is_active=false`, barisnya **tidak** dihapus dari DB biar role yang terlanjur punya tidak error |
+| 7 | Counter Dashboard NOC "Pending NOC" + "OnCheck NOC" dilebur jadi "Diproses NOC" | `NocDashboardController` |
+
+**Enum `TicketHistoryAction::DICEK_NOC` SENGAJA dipertahankan** — baris
+`ticket_histories` lama masih menyimpan `dicek_noc` dan kolomnya di-cast ke enum
+itu; menghapus case-nya bikin riwayat tiket lama meledak saat dibaca.
+
+**Test:** `TicketOnCheckNocTest` ditulis ulang jadi penjaga regresi (nama file
+dipertahankan supaya jejak fitur lama tidak hilang) — memastikan endpoint,
+kolom, flag, dan label benar-benar tidak balik lagi. `NocWorksheetTest`,
+`TicketingRbacTest`, `TicketCloseEscalateTest`, `TicketingTest`,
+`NocDashboardTest`, `TicketHistoryTest` menyesuaikan perilaku baru.
+
+Setelah pull:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+#### ADHOC-05 — Halaman History Ticketing (2026-07-29)
+
+Analisa lengkap: **`docs/plan/analisa-halaman-history-ticketing.md`**.
+
+Satu halaman arsip yang menampung **seluruh** tiket (semua handler & status,
+termasuk tiket orphan `handler=fop` + `fop_task_id` NULL), menggantikan sheet
+Google Sheets "Helpdesk Task Manager" yang dipakai Helpdesk sebelum sistem ini.
+
+Keputusan yang sudah dikunci:
+
+| # | Keputusan |
+|---|---|
+| 1 | FopTask yang tidak lahir dari tiket **tidak** masuk — Ticketing khusus keluhan pelanggan, Task FOP tetap di modulnya sendiri |
+| 2 | ~~Waktu selesai jalur FOP dari `tasks.completed_at`~~ → **direvisi 2026-07-30**: dari **waktu penyerahan ke FOP** |
+| 3 | Permission halaman sendiri `tickets.history.view` + `.export`; default Owner, NOC, Helpdesk |
+| 4 | Kolom DESA **di-snapshot saat tiket dibuat** (`tickets.customer_village`), bukan join relasi — supaya laporan lama tidak berubah saat pelanggan pindah desa |
+| 5 | **Revisi 2026-07-30:** History **hanya** menampung tiket yang sudah lepas dari meja Ticketing — Selesai, Dibatalkan, Assign FOP. Tiket `open` di Helpdesk/NOC adalah pekerjaan berjalan, rumahnya Worksheet Helpdesk / Worksheet NOC |
+| 6 | **Revisi 2026-07-30:** tiket jalur FOP berlabel **"Assign FOP"** saja — progres lapangan (Terjadwal/In Progress/Selesai/Dibatalkan/orphan) tidak dicerminkan di History, dibaca di `/fop-tasks` |
+
+Tiga migrasi: `resolved_at` + `customer_village` (keduanya dengan backfill), dan
+`2026_07_29_000004` yang **memperbaiki** `resolved_at` jalur FOP ke waktu
+penyerahan setelah revisi keputusan #2. Penulis `resolved_at`:
+`TicketService::close()` (selesai internal) dan `TicketService::escalateToFop()`
+(penyerahan) — `FopTaskObserver` sengaja TIDAK menyentuhnya, sempat begitu lalu
+dibatalkan.
+
+Test baru: `TicketHistoryTest` — **25 test lulus** (cakupan: yang masuk vs yang
+tidak, tiket yang dikembalikan keluar lagi, label "Assign FOP" untuk semua status
+FopTask, kolom "Oleh" per hasil akhir, kolom Tim sudah hilang, POP scope, RBAC,
+`resolved_at` tiga arti, snapshot desa tidak ikut berubah, durasi sub-menit,
+filter, ekspor).
+
+Penyesuaian 2026-07-30 (lanjutan): kolom **TIM dihapus** (teknisi = data
+pengerjaan lapangan, dibaca di `/fop-tasks`), dan **SOLVED BY → "Oleh"** yang
+menyesuaikan hasil akhir — yang menyelesaikan / membatalkan / **mengirim ke FOP**.
+
+Route baru: `/tickets/history` + `/tickets/history/export` (didaftarkan SEBELUM
+`/tickets/{ticket}`). Permission baru: `tickets.history.view`,
+`tickets.history.export`. `RolePermissionSeeder` **tidak** diubah — Owner (`*`)
+serta NOC/Helpdesk/Admin (`tickets.*`) sudah tercakup wildcard; Atasan sengaja
+tidak, bisa dinyalakan lewat Role Matrix.
+
+Setelah pull, jalankan:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+#### ADHOC-04 — Layout Worksheet Helpdesk (2026-07-29)
+
+`tickets/create.blade.php` diubah ke layout dua panel full-bleed sesuai rancangan:
+panel form kiri yang bisa dilipat (state persist di `localStorage`, shortcut `N`)
++ strip vertikal "Ticketing" saat terlipat, panel antrean kanan melebar otomatis.
+
+Motion sengaja hanya menganimasikan `width` + `opacity` dengan durasi & easing
+identik untuk strip dan panel form (`.panel-motion` di `resources/css/app.css`) —
+`x-show` sempat dipakai dan `display:none` membuat lebar hilang seketika sehingga
+panel kanan menyentak (terbaca sebagai "bounce"). Jumlah kolom kartu diatur
+`auto-fill/minmax` (`.ticket-grid`), bukan swap class `grid-cols-*`, supaya kolom
+tidak melompat di tengah animasi. `prefers-reduced-motion` mematikan semuanya.
+
+Butuh `npm run build` setelah pull (ada class & CSS baru).
+
+#### ADHOC-03 — Restrukturisasi Modul Ticketing (2026-07-28)
+
+Menyesuaikan modul Ticketing ke alur kerja Helpdesk/NOC yang sebenarnya. Dokumentasi
+lengkap sudah disinkronkan di `docs/ticketing/`.
+
+| # | Perubahan | Kenapa |
+|---|---|---|
+| 1 | Window **"Pending NOC"** + aksi **Oncheck NOC** (kolom `noc_checked_at`) | Dulu Helpdesk langsung kehilangan akses begitu kirim ke NOC — tiket menggantung tanpa pemilik selama NOC belum buka worksheet. Sekarang dua-duanya boleh act sampai NOC resmi ambil alih |
+| 2 | **Batalkan tiket pra-FOP** (`tickets.cancel`, alasan wajib) | Tiket yang masih di meja Helpdesk sebelumnya gak bisa dibatalkan sama sekali tanpa dieskalasi ke FOP dulu hanya untuk dibatalkan di sana |
+| 3 | Panel **List Task Ticketing** → 3 tab: Ticket / Assign NOC / Assign FOP (filter per `handler`) | Tab lama (Semua/Masuk/Diproses) menjawab "sudah sampai tahap mana", bukan "lagi di tangan siapa" — yang justru dibutuhkan pengirim tiket |
+| 4 | Halaman baru **Worksheet NOC** (`/noc/worksheet`, 1 halaman 2 tab) | NOC sebelumnya numpang halaman bucket yang sama dengan semua role |
+| 5 | Halaman baru **Dashboard NOC** (`/noc/dashboard`) | Stat counter, tiket aktif + aging, feed aktivitas, statistik Issue & Daerah |
+| 6 | **Ticket Selesai / Dibatalkan** jadi halaman sendiri (controller + view + permission masing-masing) | Route bucket generik `/tickets/{bucket}` bikin semuanya numpang `tickets.view` — gak bisa di-toggle per-halaman di Role Matrix |
+| 7 | RBAC per-halaman: `tickets.selesai.view`, `tickets.dibatalkan.view`, `noc_worksheet.masuk.view`, `noc_worksheet.diproses.view`, `noc_dashboard.view`, `tickets.cancel` | idem #6 |
+| 8 | **Dialog konfirmasi terpusat** `window.confirmTicketAction()` | Sebelumnya 4 implementasi berbeda (confirm() native + 3 modal hand-rolled). `confirm()` native gak bisa nampung alasan, jadi `ticket_histories.reason` selalu kosong dari panel worksheet |
+
+**Route yang dihapus:** `tickets.index` (`/tickets`) dan `tickets.bucket` (`/tickets/{bucket}`).
+
+**Migrasi:** `2026_07_28_000001_add_noc_checked_at_to_tickets_table.php`.
+
+**Seeder:** `TicketFeatureSeeder` sekarang menanam seluruh Feature modul (tickets +
+sub-feature arsip + noc_worksheet + noc_dashboard). Setelah pull, jalankan:
+`php artisan migrate && php artisan db:seed --class=TicketFeatureSeeder && php artisan db:seed --class=RolePermissionSeeder`
+
+**Test baru:** `TicketOnCheckNocTest`, `TicketPreFopCancelTest`, `TicketingRbacTest`,
+`NocWorksheetTest`, `NocDashboardTest`.
+
+**Test lama yang assertion-nya sengaja diubah** (perilaku memang berubah, bukan regresi):
+`TicketCloseEscalateTest` (lockout Helpdesk sekarang setelah Oncheck, bukan saat escalate),
+`TicketingTest` (label status `Pending NOC`, bucket Masuk/Diproses gak punya halaman list lagi),
+`TicketCancellationTest` (endpoint cancel Ticketing sekarang ada, tapi menolak tiket pasca-FOP).
+
+### PERF — Index, N+1 & Beban Database (`docs/plan/ANALISA_INDEX_DATABASE.md`)
+
+| Task | Fase | Status |
+|---|---|---|
+| PERF-T001 | Fase 0 — Detektor `preventLazyLoading` + baseline | Done |
+| PERF-T002 | Fase 1 — N+1 (1.1–1.7) + `DashboardFopQueryCountTest` | Done |
+| PERF-T003 | Fase 2 — Sargability (28 `whereDate()` + cache DISTINCT) | Done |
+| PERF-T004 | Fase 3 — 34 index P0/P1/P2 + hapus 4 index redundan `tasks` | Done |
+| PERF-T005 | Fase 4 — Bersihkan skema (destruktif, `migrate:fresh`) | **Belum** — di luar scope yang disetujui |
+| PERF-T006 | Fase 5 — Perbaikan struktural | **Belum** — di luar scope yang disetujui |
+
+**Baseline terukur (2026-07-22):**
+- Dashboard FOP: **21 query, konstan** — tidak lagi tumbuh mengikuti jumlah teknisi/task.
+  Dijaga `tests/Feature/DashboardFopQueryCountTest.php`.
+- Guard `InvoiceObserver::creating()`: full scan → `type=ref`, `rows=1`
+  (`invoices_customer_period_type_idx`). Ini akar masalah D, yang kuadratik.
+- Riwayat audit per entitas: full scan 9.701 baris → `rows=1`, covering index.
+- Lookup legacy saat import (`old_customer_id`): full scan → `rows=1`.
+
+**Verifikasi volume (§15) — SELESAI 2026-07-22:**
+Command `php artisan benchmark:seed-volume` dibuat
+(`app/Console/Commands/SeedVolumeForBenchmark.php`). Dijalankan di DB throwaway
+`whusnet_perf` (bukan DB legacy) dengan 20.000 pelanggan / 240.000 invoice /
+199.740 pembayaran / 100.000 audit_logs. Hasil `EXPLAIN` membuktikan akar
+masalah kuadratik pada skala nyata:
+- A (lookup legacy): full scan 19.885 baris → `rows=1`
+- B (riwayat audit): full scan 99.701 + filesort → `rows=5` covering
+- D (guard InvoiceObserver): saring 12 baris in-memory → `rows=1`
+- invoice status+due: full scan 237.150 → `range` covering
+Tabel lengkap di §16 Penutup `docs/plan/ANALISA_INDEX_DATABASE.md`. Perf DB
+sudah di-drop; DB legacy tetap utuh (1.957 pelanggan).
+
+**Verifikasi index terpakai (§15 poin 5) — SELESAI 2026-07-22:**
+27 query bentuk-controller dieksekusi nyata di atas volume, `count_star` per
+index dibaca dari `performance_schema`. **25/26 index `_idx` di tabel berisi
+data terpakai** — nol dead weight. `internet_packages_old_package_id_idx`
+tak terpilih (tabel ±68 baris, full-scan lebih murah — dipertahankan untuk dedup
+import). 8 index operasional (`tasks`/`fop_tasks`/`notifications`/
+`customer_status_logs`) belum teruji karena tabel kosong saat benchmark.
+
+**Catatan / Blocked:**
+- **Benchmark belum men-seed tabel operasional** (`tasks`, `fop_tasks`, dll),
+  jadi 8 index P2 di situ belum divalidasi lewat `performance_schema` — baru
+  divalidasi struktural. Perlu perpanjang `SeedVolumeForBenchmark` kalau mau
+  bukti runtime.
+- **Fase 2.3 (batasi rentang tanggal papan FOP) sengaja TIDAK dikerjakan.**
+  Bertentangan dengan keputusan produk 2026-07-22: task Survey/Pemasangan yang
+  dipesan pelanggan untuk tanggal ke depan HARUS tetap tampil di papan FOP.
+  Membatasi `task_date` akan menyembunyikannya. `orderByRaw` bertingkat di
+  `FopTaskController::index()` karenanya masih memaksa filesort.
+- **Aturan bisnis baru yang belum dikodekan** (muncul dari keputusan 1.4):
+  task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP
+  besok, dan SLA tidak berjalan untuk task terjadwal ke depan. Butuh task sendiri.
+- Migration index ditulis sebagai file tambahan
+  (`2026_07_22_164035_add_performance_indexes_phase3.php`), bukan diedit ke
+  migration `create_*` asalnya seperti saran §14 — supaya tidak mewajibkan
+  `migrate:fresh` atas data legacy hasil import.
 
 > **S8.10-T003 (FOP Notification Dashboard):** ⏸️ PAUSED — Siap dilanjutkan setelah BATCH 1 & BATCH 2 selesai
 > **Sprint 8.9 Tasks:** T001–T006 (Done)
@@ -2032,6 +2508,65 @@ Sprint 11 sampai Sprint 15 adalah sprint lanjutan setelah fitur MVP utama selesa
 
 ## Done
 
+### MIGRASI-T003 — Duplikasi Tagihan & Pembayaran Hasil Migrasi Legacy (BATCH 3)
+Status: Done (kode & test). Remediasi data produksi BELUM dijalankan.
+
+Dipicu laporan: Ardiyanto Cahyo Nugroho paket Rp 165.000 tapi tagihan Rp 330.000 dengan
+dua pembayaran awal, dan Wiyono Wonoketro punya dua invoice AWAL (Rp 120.032 + Rp 11.000).
+
+Analisa lengkap: `docs/billing-pembayaran/analisa-duplikasi-tagihan-pembayaran-migrasi-legacy.md`
+
+Enam cacat yang diperbaiki:
+- [x] Bug 1 — `costPaymentMap` menjumlahkan semua pembayaran bulanan jadi total tagihan awal
+      (`IDBIAYA` konstan seumur hidup pelanggan). Sekarang di-key `costId|BULANTAGIHAN`.
+- [x] Bug 2 — semua pembayaran dirutekan ke satu invoice AWAL. Sekarang satu invoice per
+      periode, dirutekan lewat `$invoiceKeyByCostPeriod`.
+- [x] Bug 3 — `TGLINSERT` (kolom `ON UPDATE`) dipakai sebagai tanggal terbit & periode.
+      Sekarang periode dari `BULANTAGIHAN`, anchor dari riwayat "Berhasil Active".
+- [x] Bug 4 — materai `BIAYALAINLAIN` dianggap penanda registrasi. Sekarang hanya
+      `BIAYAPASANG > 0`.
+- [x] Bug 5 — baris log aktivasi (`BIAYAPASANG=0` & `BIAYABULANAN=0`) tetap jadi invoice.
+      Sekarang dilewati; guard-nya simetris dengan sisi pembayaran.
+- [x] Bug 6 — `subtotal` dobel hitung materai. Sekarang `subtotal = total - ppn + discount`.
+- [x] Dedup lapis kedua bukti bayar per `(IDTRANSAKSI, BULANTAGIHAN)`; nominal berbeda
+      dilaporkan untuk tinjauan manual, tidak dibuang diam-diam.
+- [x] Bug 7 (ketahuan saat verifikasi) — bukti `BAYAR=0` ikut dibuang dari peta periode,
+      padahal `BULANTAGIHAN`-nya penanda periode satu-satunya untuk tagihan belum
+      dibayar. Invoice reaktivasi jatuh ke periode aktivasi pertama & menabrak tagihan
+      lama. Dipisah jadi `$periodsByCost` (semua periode) vs `$paidByCostPeriod`
+      (nominal, `BAYAR>0`). Tabrakan periode 8 → 4.
+- [x] Bug 8 (hasil sapuan pola serupa) — `lunasByTransaction` di-key `IDTRANSAKSI` saja,
+      jadi metode/penerima/catatan satu baris dicap ke semua pembayaran cost id itu
+      (13 cost id punya >1 baris lunas, 2 beda bulan, 5 beda metode). Ditambah peta
+      per periode dari bulan `TGLBAYAR`, baris tertua jadi cadangan.
+- [x] Import ulang dari nol dijalankan 2026-07-22 (DB 100% data migrasi, nol data
+      sistem baru — jadi tidak perlu command remediasi). Hasil di §9 dokumen analisa.
+- [x] Sapuan pola serupa di seluruh jalur migrasi — hasil di §10 dokumen analisa.
+
+File diubah:
+- `app/Console/Commands/MigrateLegacyDataCommand.php`
+- `app/Http/Controllers/CustomerController.php` (blok import invoices)
+- `tests/fixtures/legacy/duplikasi-tagihan-migrasi.sql` (baru)
+- `tests/Feature/MigrasiLegacyTagihanDobelPerPeriodeTest.php` (baru, 8 test)
+
+Perintah import ulang (butuh memory 2G & Redis mati → pakai driver array):
+```bash
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan migrate:fresh --seed --force
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan app:import-legacy-sql jetis_db_aplikasi_jetis.sql --branch-code=C --branch-name=Jetis
+CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync php -d memory_limit=2G \
+  artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=J --branch-name=Sandya
+```
+
+Belum dikerjakan (keputusan bisnis, bukan bug):
+- [ ] Tim billing memutuskan 3 grup pembayaran nominal berbeda (IN000119, IN000168,
+      IN000214) — selisihnya tepat materai, command mencetaknya tiap import
+- [ ] Tim billing memutuskan 4 tabrakan periode nyata (RQ000289, RQ000306, RQ000308,
+      RQ000311) — dua pembayaran nyata di bulan yang sama, bukan duplikat migrasi
+
+---
+
 ### Sprint 5 — Modul Import Excel/CSV Data Pelanggan Lama
 Status: Done
 
@@ -2259,7 +2794,7 @@ Menjadikan POP assignment sebagai bagian dari manajemen user dan memastikan scop
 
 Hasil Implementasi:
 - [x] User create/edit mendukung assign satu atau banyak POP.
-- [x] User assignment POP tetap tersedia di halaman khusus `users.pops.edit`.
+- [x] ~~User assignment POP tetap tersedia di halaman khusus `users.pops.edit`.~~ **Superseded 2026-08-07**: halaman ini dihapus — cuma nulis ke pivot `user_pops` legacy, gak pernah nyambung ke `user_role_scopes` yang beneran dipakai `EffectiveAccessService` (no-op yang menyesatkan). Assign scope sekarang cuma lewat `/users/{user}/edit`. Lihat `docs/plan/analisa-celah-scope-pop.md` temuan #6.
 - [x] Query scope customer, invoice, dan payment mengikuti POP yang ditugaskan.
 - [x] Owner/Admin tetap full-access.
 - [x] Admin Cabang tetap dibatasi ke POP assignment.
@@ -5298,7 +5833,112 @@ Acceptance Criteria:
 ---
 
 ## Blocked
-Belum ada.
+
+> **Analisa induk:** `docs/billing-pembayaran/analisa-pencegahan-tagihan-dobel.md`
+> — lima lapis pencegahan tagihan dobel, mana yang bolong, urutan pengerjaan.
+> B0c sudah selesai (entri di bawah dipertahankan sebagai catatan). Sisanya:
+> B0d bisa langsung dikerjakan, B0b sudah dapat keputusan sumber tanggal, B0e
+> masih perlu keputusan per kasus.
+
+### BILLING-B0c — Penjaga dobel lintas-jenis invoice
+**Status**: **Done** (2026-07-21)
+
+**Hasil**: `GenerateMonthlyInvoicesCommand` dan `InvoiceObserver::creating()`
+sekarang bertanya "sudah ada tagihan langganan untuk periode ini?"
+(`whereIn([AWAL, BULANAN])`, kecuali `BATAL`), bukan lagi per `invoice_type`.
+`REAKTIVASI` dan invoice ber-`old_invoice_id` (replay legacy) dikecualikan.
+Aturan burst-dedup lama di observer tetap dipertahankan — beda gejala.
+
+**Test**: `tests/Feature/SatuTagihanLanggananPerPeriodeTest.php` (6 kasus).
+Terbukti gagal tanpa guard: 2 dari 6 gagal waktu perubahan di-stash. Suite penuh
+519 test, 7 error + 12 failure — identik dengan baseline, tidak ada regresi.
+
+**Efek**: `activation_date` yang salah isi tidak lagi bisa memproduksi tagihan
+dobel baru. BILLING-B0b turun dari "darurat" jadi "rapikan data".
+
+**Masalah**: `alreadyExists` di `GenerateMonthlyInvoicesCommand` dan
+`InvoiceObserver::creating()` sama-sama di-scope `invoice_type`, jadi AWAL dan
+BULANAN pada periode yang sama dianggap bukan duplikat. Akibatnya seluruh
+pencegahan tagihan dobel bertumpu pada satu kolom, `activation_date`.
+
+**Rencana**: ubah pertanyaannya dari "sudah ada tagihan BULANAN?" jadi "sudah ada
+tagihan langganan untuk periode ini?" — `whereIn([AWAL, BULANAN])`, kecualikan
+`REAKTIVASI` (suspend lalu aktif lagi di bulan sama itu sah) dan invoice
+berstatus `BATAL` (kalau tidak, tagihan yang dibatalkan memblokir penggantinya).
+
+**Kenapa penting**: setelah ini, `activation_date` yang salah tidak lagi bisa
+memproduksi tagihan dobel baru — B0b turun dari "darurat" jadi "rapikan data".
+
+**Test**: pelanggan punya invoice AWAL Juli + `activation_date` sengaja diisi
+bulan lain → cron Juli tetap tidak menerbitkan BULANAN.
+
+### BILLING-B0d — Command audit tagihan dobel
+**Status**: **Done** (2026-07-21)
+
+`php artisan billing:audit-duplicate-invoices [--period=YYYY-MM] [--strict]` —
+read-only, melaporkan pelanggan dengan >1 tagihan langganan pada periode sama.
+Temuan dipisah `legacy` (semua baris punya `old_invoice_id`) vs `PERLU CEK`
+(ada jalur berjalan yang lolos guard). Ikut menghitung nominal yang sudah
+terbayar di grup dobel. Tidak ada `--fix` — keputusan pembatalan & nasib uang
+yang terlanjur dibayar adalah keputusan bisnis per kasus.
+
+**Test**: `tests/Feature/AuditTagihanDobelTest.php` (8 kasus). Suite penuh 527
+test, 7 error + 12 failure — identik baseline.
+
+**Hasil eksekusi di DB development**: 5 grup dobel, semuanya legacy,
+`perlu dicek: 0`, nominal terbayar Rp 1.153.291. Rinciannya di
+`docs/billing-pembayaran/analisa-pencegahan-tagihan-dobel.md` bagian 7.
+
+### BILLING-B0e — Bersihkan dobel legacy + unique index `invoices`
+**Status**: Blocked
+**Pemblokir**: butuh keputusan per kasus untuk 5 grup dobel warisan migrasi.
+
+Unique index `(customer_id, billing_period)` untuk jenis langganan belum bisa
+dipasang selama pelanggaran historis masih ada. Urutannya: bersihkan dulu, baru
+pasang index. Index parsial (`WHERE ...`) tidak portabel ke MySQL, jadi tidak ada
+jalan pintas.
+
+Aturan penanganan: invoice yang salah di-set `InvoiceStatus::BATAL` + alasan +
+audit log — **jangan dihapus**. Kalau yang dobel sudah dibayar, uangnya harus
+jadi kredit atau dikembalikan; sistem belum punya konsep kredit pelanggan.
+
+### BILLING-B0b — Backfill `activation_date` data lama
+**Status**: **Done** (2026-07-21) — command siap, eksekusi produksi menunggu owner
+**Keputusan bisnis 2026-07-21**: urutan sumber tanggal disetujui — nota/invoice
+`AWAL` lebih dulu, lalu catatan pemasangan, lalu data sistem lama. Kalau
+ketiganya kosong: **jangan menebak**, laporkan untuk review manual.
+
+**Kenapa perlu**: fix BILLING-B0 (`CustomerVerificationController::finalVerify` menimpa `activation_date` dengan `issue_date`) hanya menutup pelanggan yang diaktivasi **mulai sekarang**. Baris lama yang `activation_date`-nya masih berisi `registration_date` tetap rawan dobel tagih di bulan aktivasinya — `GenerateMonthlyInvoicesCommand` membandingkan bulan yang salah, dan dua lapis penjaga lain di-scope per `invoice_type` sehingga AWAL + BULANAN periode sama tetap lolos.
+
+**Rencana**: `php artisan billing:backfill-activation-date`, default dry-run, menulis hanya dengan `--force`. Output tabel `customer_code | activation_date sekarang | usulan | sumber`.
+
+**Urutan sumber (disetujui 2026-07-21)**:
+1. `issue_date` invoice `AWAL` milik pelanggan tersebut
+2. `customer_installations.installation_date`
+3. `finished_at` legacy
+4. lewati + laporkan sebagai butuh review manual (jangan tebak)
+
+**Hasil**: `php artisan billing:backfill-activation-date [--force] [--limit=N]`.
+Default hanya mencetak daftar usulan; `--force` menulis dan mencatat setiap
+perubahan ke audit log (`action = backfill_activation_date`, berikut sumbernya).
+
+**Penyesuaian dari rencana awal**: sumber ketiga (`finished_at` legacy) ternyata
+tidak ada sebagai kolom tersendiri — waktu import, nilainya langsung masuk ke
+`activation_date` (`CustomerController::importCustomerServices`). Jadi baris
+legacy (`old_request_id`/`old_cost_id` terisi) **dilewati seluruhnya**: nilainya
+memang sudah tanggal aktivasi, bukan placeholder pendaftaran. Menimpanya justru
+merusak data yang benar. Sumber efektif tinggal dua: invoice AWAL → pemasangan →
+lapor manual.
+
+**Test**: `tests/Feature/BackfillActivationDateTest.php` (11 kasus), termasuk
+integrasi: setelah backfill, cron bulan aktivasi tidak lagi menerbitkan tagihan
+kedua. Suite penuh 538 test, 7 error + 12 failure — identik baseline.
+
+**Menunggu owner**: eksekusi di produksi. DB development tidak punya pelanggan
+aktif, jadi jumlah baris terdampak belum diketahui — jalankan tanpa `--force`
+dulu, baca daftarnya, baru putuskan.
+
+**Catatan data**: di DB development jumlah `customer_services` `service_status = aktif` adalah 0, jadi dampaknya belum bisa diukur di sini — angka sebenarnya harus diambil dari produksi lewat dry-run. 5 grup customer+periode dobel yang ada semuanya produk migrasi legacy (2022-12, 2023-01, 2025-07), bukan produk bug ini, dan **tidak** boleh dibereskan oleh command ini.
 
 ## Notes
 AI hanya boleh mengerjakan task dengan status `In Progress`.
@@ -5323,6 +5963,32 @@ Catatan hardening legacy mapping:
 - Legacy request ID sekarang ikut disimpan di `customers.old_request_id`, dan migrasi legacy memakai prefix `RQ`/`C` agar data REQ/CID tetap konsisten dengan histori operasional.
 - Hierarki legacy sekarang juga dipetakan ke cabang POP, mini POP, dan distribusi: `KODEAPP`/cabang legacy menjadi POP induk, `kategori_perangkat_jaringan` menjadi mini POP child, dan `kode_kontrol_distribusi` disimpan sebagai distribusi untuk mendukung format CID operasional.
 - Verifikasi terbaru lulus: `php artisan test tests/Feature/RealDataMigrationTest.php` dan `php artisan test tests/Feature/CustomerImportTest.php`.
+
+Catatan fix di luar sprint — BILLING-B0 (activation_date stale), 2026-07-21:
+- Gejala: pelanggan daftar Juni lalu aktif 21 Juli menerima dua tagihan periode Juli (AWAL prorata + BULANAN penuh).
+- Sebab: `customer_services.activation_date` diisi `registration_date` saat pendaftaran (`CustomerController::store`) dan tidak pernah ditimpa saat aktivasi, sehingga penjaga "lewati bulan aktivasi" di `GenerateMonthlyInvoicesCommand` tidak pernah kena. Dua lapis penjaga lain di-scope per `invoice_type` (AWAL vs BULANAN dianggap bukan duplikat) dan tabel `invoices` tidak punya unique index.
+- Fix: `CustomerVerificationController::finalVerify()` menimpa `activation_date` dengan `issue_date` (tanggal yang sama dengan basis prorata) dan mencatatnya di audit log.
+- Test: `tests/Feature/AktivasiTertagihDobelKarenaActivationDateStaleTest.php` (3 passed). Terbukti gagal tanpa fix (2 invoice untuk periode Juli).
+- Belum dikerjakan: backfill `activation_date` untuk data lama, dan 5 grup customer+periode dobel yang semuanya berasal dari migrasi legacy (2022–2023, 2025-07) — perlu keputusan terpisah.
+
+Catatan fix di luar sprint — BILLING-B2 (periode/tempo diturunkan server + materai), 2026-07-21:
+- `finalVerify()` tidak lagi menerima `billing_period` & `due_date` dari form; keduanya diturunkan dari `issue_date` (periode = bulan aktivasi, tempo = tanggal aktivasi, karena tagihan awal dibayar di tempat).
+- `InitialInvoiceService::calculate()` menerima `other_fee` (materai) ke subtotal dan mengembalikan `next_month_amount` untuk baris "mulai bulan depan" di kwitansi.
+- Form verifikasi: input periode & jatuh tempo dihapus, field materai ditambah, biaya pemasangan prefill dari `internet_packages.installation_fee` dengan fallback 0.
+- Test: `tests/Feature/TagihanAwalPeriodeIkutTanggalAktivasiTest.php` (5) + 4 kasus baru di `tests/Unit/InitialInvoiceProrateFormulaTest.php`. Semua lulus.
+- Suite penuh: 503 test, 7 error + 12 failure — jumlah dan daftarnya identik dengan baseline sebelum perubahan (491 test), jadi tidak ada regresi baru. Kegagalan itu milik modul lain (RolePermissionMatrix, RealDataMigration, ReportCustomer, dll).
+Catatan fix di luar sprint — BILLING-B3 (panel hitungan jadi kwitansi), 2026-07-21:
+- Input nominal `readonly` (`subtotal`, `prorate_amount`, `discount`, `ppn`, `total_amount`) dihapus dari `verifications/admin.blade.php`, diganti kwitansi read-only. Server memang sudah mengabaikan field-field itu sejak `InitialInvoiceService` dipakai, jadi menghapusnya tidak menyentuh backend.
+- Form tersisa 5 input: tanggal aktivasi, biaya pemasangan, materai, kabel, tiang.
+- Parameter layanan (harga paket, diskon, PPN) dipindah ke `data-*` pada `#billing_params`, bukan `<input type="hidden">` — supaya tidak ikut ter-POST dan tidak bisa disalahartikan sebagai kiriman admin.
+- Baris diskon & PPN hanya dirender kalau nilainya > 0. Untuk semua paket saat ini PPN sudah termasuk harga, jadi barisnya tidak pernah tampil.
+- Baris "Mulai <bulan depan>: Rp X/bulan, jatuh tempo tanggal 10" memakai rumus yang sama dengan `next_month_amount` dan `GenerateMonthlyInvoicesCommand`.
+- Test: 4 kasus baru di `TagihanAwalPeriodeIkutTanggalAktivasiTest` (total 9). Suite penuh 510 test, 7 error + 12 failure — identik dengan baseline, tidak ada regresi baru.
+
+Catatan koreksi konvensi prorata, 2026-07-21:
+- Keputusan bisnis: konvensi hari **legacy** yang benar — hari aktivasi TIDAK ditagih (`hari_dalam_bulan - tanggal`), pembulatan `round`. Angka kanonik 21 Juli paket 110.000 = **35.484** (bukan 39.032, bukan 35.483).
+- Aktivasi di hari terakhir bulan ditagih **sebulan penuh** (cabang legacy "besok tanggal 1 → 1 hari" tidak direplikasi). Ada tebing disengaja: aktif 30 Juli bayar 3.548, aktif 31 Juli bayar 110.000.
+- `InitialInvoiceProrateIgnoresClientAmountTest` & `CustomerFinalVerificationTest` ikut disesuaikan karena mengasumsikan konvensi lama.
 
 Setelah task selesai:
 1. Pindahkan task ke Done.

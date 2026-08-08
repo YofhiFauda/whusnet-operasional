@@ -22,9 +22,9 @@ class SendCustomerActivationNotification implements ShouldQueue
         CustomerStatusLog::create([
             'customer_id' => $this->customer->id,
             'from_status' => 'verification_admin',
-            'to_status'   => 'active',
-            'changed_by'  => $this->adminId,
-            'note'        => '✓ Notifikasi aktivasi: ' . $this->customer->full_name . ' (Simulasi Telegram dikirim ke ' . $this->customer->phone_number . ')',
+            'to_status' => 'active',
+            'changed_by' => $this->adminId,
+            'note' => '✓ Notifikasi aktivasi: '.$this->customer->full_name.' (Simulasi Telegram dikirim ke '.$this->customer->phone_number.')',
         ]);
     }
 }

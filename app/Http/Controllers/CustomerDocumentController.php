@@ -2,22 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DocumentType;
+use App\Http\Controllers\Concerns\RedirectsToCustomer;
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
-use App\Models\AuditLog;
+use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerDocumentController extends Controller
 {
+    use RedirectsToCustomer;
+
     public function store(Request $request, Customer $customer)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.documents.upload'), 403);
         $this->authorizeCustomerAccess($customer);
 
         $validated = $request->validate([
-            'document_type' => 'required|string|in:ktp,rumah,kontrak,survey,pemasangan',
+            'document_type' => ['required', 'string', Rule::enum(DocumentType::class)],
             'document_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
         ]);
 
@@ -25,12 +31,12 @@ class CustomerDocumentController extends Controller
         $type = $validated['document_type'];
 
         $path = match ($type) {
-            'ktp' => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
-            'rumah' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
-            'survey' => \App\Services\FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
-            'kontrak' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),
-            'pemasangan' => \App\Services\FileUploadService::uploadInstallationPhoto($file, $customer, 'pemasangan'),
-            default => \App\Services\FileUploadService::uploadCustomerRegistrationDoc($file, $customer, $type),
+            'ktp' => FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
+            'rumah' => FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
+            'survey' => FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
+            'kontrak' => FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),
+            'pemasangan' => FileUploadService::uploadInstallationPhoto($file, $customer, 'pemasangan'),
+            default => FileUploadService::uploadCustomerRegistrationDoc($file, $customer, $type),
         };
 
         $document = CustomerDocument::create([
@@ -58,7 +64,7 @@ class CustomerDocumentController extends Controller
             'created_at' => now(),
         ]);
 
-        return redirect()->route('customers.show', $customer->id)
+        return $this->redirectToCustomer($customer)
             ->with('success', 'Dokumen pelanggan berhasil diupload.');
     }
 

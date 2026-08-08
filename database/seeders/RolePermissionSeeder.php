@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\PermissionGeneratorService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RolePermissionSeeder extends Seeder
@@ -12,10 +14,17 @@ class RolePermissionSeeder extends Seeder
     public function run(): void
     {
         // Dynamically generate permissions first from config/rbac.php
-        app(\App\Services\PermissionGeneratorService::class)->generate();
+        app(PermissionGeneratorService::class)->generate();
 
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
+
+            // Worklist read-only — SATU permission saja, sengaja tanpa
+            // payments.create/customers.view. docs/plan/analisa-billing-
+            // tagihan-pembayaran-kolektor.md §B-8 no. 4 & no. 5.
+            'kolektor' => [
+                'kolektor.view',
+            ],
 
             'atasan' => [
                 'dashboard.view',
@@ -25,6 +34,9 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.survey.view',
                 'customers.detail.installation.view',
                 'customers.detail.devices.view',
@@ -37,11 +49,15 @@ class RolePermissionSeeder extends Seeder
                 'audit_logs.view',
                 'audit_logs.export', // assuming audit_logs has export
                 'fop_tasks.view',
+                'tickets.view', // Atasan cuma memantau — gak ikut ngirim tiket
+                'tickets.selesai.view',
+                'tickets.dibatalkan.view',
+                'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
             ],
- 
+
             'admin' => [
                 'dashboard.view',
                 'pops.*',
@@ -53,27 +69,36 @@ class RolePermissionSeeder extends Seeder
                 'customers.create',
                 'customers.update',
                 'customers.delete',
+                'customers.deactivate', // Terminasi langganan — permission baru, terpisah dari customers.update
+                'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
+                'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
-                'customers.detail.*', // Access to all detail sections
+                'customers.detail.*', // Access to all detail sections (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.*', // Ex: view, create, update, delete, cancel, print
                 'payments.*', // Ex: view, create, update, validate, reject, print
                 'reports.*',
                 'audit_logs.view',
                 'audit_logs.export',
                 'fop_tasks.*',
+                'tickets.*',
+                'noc_worksheet.*',
+                'noc_dashboard.*',
                 'task.lookup', // dipakai modal /fop-tasks (autocomplete pelanggan + cek konflik)
                 'master_wilayah.*',
                 'master_distribusi.*',
                 'master_status_pelanggan.*',
                 'task.manage',
             ],
- 
+
             'noc' => [
                 'dashboard.view',
                 'pops.view',
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -85,26 +110,34 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.installation.update',
                 'customers.detail.installation.validate',
                 'customers.detail.installation.activate',
+                'customers.detail.installation.reject',
                 'customers.detail.devices.view',
                 'customers.detail.devices.update',
                 'customers.detail.devices.view_sensitive',
                 'customers.detail.devices.update_sensitive',
+                'customers.detail.devices.retrieve',
                 'customers.detail.documents.view',
                 'customers.detail.documents.download',
                 'invoices.view',
                 'invoices.print',
                 'payments.print', // Based on matrix
+                'tickets.*',
+                'noc_worksheet.*',
+                'noc_dashboard.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
             ],
- 
+
             'helpdesk' => [
                 'dashboard.view',
                 'pops.view',
                 'packages.view',
                 'sla_timeline.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.create',
                 'customers.update',
                 'customers.detail.identity.view',
@@ -127,14 +160,18 @@ class RolePermissionSeeder extends Seeder
                 'payments.print',
                 'reports.view',
                 'reports.export',
+                'tickets.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
             ],
- 
+
             'fop' => [
                 'dashboard.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -145,12 +182,15 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.installation.view',
                 'customers.detail.installation.update',
                 'customers.detail.installation.activate',
+                'customers.detail.installation.reject',
                 'customers.detail.devices.view',
                 'customers.detail.devices.update',
+                'customers.detail.devices.retrieve',
                 'customers.detail.documents.view',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
                 'fop_tasks.*',
+                'tickets.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -158,7 +198,15 @@ class RolePermissionSeeder extends Seeder
 
             'teknisi' => [
                 'dashboard.view',
-                'customers.view',
+                // customers.view / customers.detail.view / customers.terminated.view /
+                // customers.failed.view SENGAJA gak dikasih — teknisi cuma
+                // boleh kerjain Survey/Pemasangan (queue + form lapor lewat
+                // permission .survey.*/.installation.* di bawah), TAPI gak
+                // boleh buka List Data Pelanggan, List Pelanggan Putus, List
+                // Pelanggan Gagal, atau Detail Pelanggan (4 permission
+                // terpisah sejak refactor — lihat routes/web.php,
+                // CustomerController/CustomerTerminatedController/
+                // CustomerFailedController).
                 'customers.detail.identity.view',
                 'customers.detail.address.view',
                 'customers.detail.packages.view',
@@ -179,6 +227,9 @@ class RolePermissionSeeder extends Seeder
             'sales' => [
                 'dashboard.view',
                 'customers.view',
+                'customers.detail.view',
+                'customers.terminated.view',
+                'customers.failed.view',
                 'customers.create',
                 'customers.update',
                 'customers.detail.identity.view',
@@ -190,6 +241,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.view',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
+                'tickets.*',
             ],
 
             'pop_admin' => [
@@ -200,8 +252,11 @@ class RolePermissionSeeder extends Seeder
                 'customers.view',
                 'customers.create',
                 'customers.update',
+                'customers.deactivate', // Terminasi langganan dalam scope POP-nya
+                'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*
+                'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.*',
-                'customers.detail.*', // Except sensitive devices, we will subtract below
+                'customers.detail.*', // Except sensitive devices, we will subtract below (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.view',
                 'invoices.create',
                 'invoices.print',
@@ -212,6 +267,7 @@ class RolePermissionSeeder extends Seeder
                 'payments.print',
                 'reports.view',
                 'reports.export',
+                'tickets.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -224,7 +280,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissionsByRole as $roleCode => $wantedPermissions) {
             $role = Role::where('code', $roleCode)->first();
-            if (!$role) {
+            if (! $role) {
                 continue;
             }
 
@@ -254,27 +310,27 @@ class RolePermissionSeeder extends Seeder
 
             // Remove sensitive permissions for pop_admin based on matrix
             if ($roleCode === 'pop_admin') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
-                    return !in_array($code, [
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
+                    return ! in_array($code, [
                         'customers.detail.devices.view_sensitive',
-                        'customers.detail.devices.update_sensitive'
+                        'customers.detail.devices.update_sensitive',
                     ]);
                 });
             }
 
             // Also for admin, matrix says no sensitive access, except if specified.
             if ($roleCode === 'admin') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
-                    return !in_array($code, [
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
+                    return ! in_array($code, [
                         'customers.detail.devices.view_sensitive',
-                        'customers.detail.devices.update_sensitive'
+                        'customers.detail.devices.update_sensitive',
                     ]);
                 });
             }
 
             // FOP tidak boleh ubah Tipe Task lewat wildcard fop_tasks.* — harus di-grant eksplisit.
             if ($roleCode === 'fop') {
-                $finalPermissionCodes = array_filter($finalPermissionCodes, function($code) {
+                $finalPermissionCodes = array_filter($finalPermissionCodes, function ($code) {
                     return $code !== 'fop_tasks.update_sensitive';
                 });
             }
@@ -285,5 +341,12 @@ class RolePermissionSeeder extends Seeder
             // Sync efficiently
             $role->permissions()->sync($permissionIds);
         }
+
+        // EffectiveAccessService cache permission per-user 1 jam (Cache::remember
+        // "user.{id}.permissions") — kalau gak di-flush di sini, hasil sync di atas
+        // gak kepakai sampai cache lama expire sendiri (bisa nunggu 1 jam), bikin
+        // developer bingung tiap abis reset/reseed DB (permission "keliatan" gak
+        // berubah padahal DB udah bener).
+        Cache::flush();
     }
 }

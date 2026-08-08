@@ -18,7 +18,7 @@ class UserAuditHardeningTest extends TestCase
     {
         parent::setUp();
 
-        $compiledPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whusnet-test-views';
+        $compiledPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'whusnet-test-views';
         if (! is_dir($compiledPath)) {
             @mkdir($compiledPath, 0777, true);
         }
@@ -58,6 +58,7 @@ class UserAuditHardeningTest extends TestCase
             'phone' => '081200000010',
             'status' => 'active',
             'role_id' => $teknisiRole->id,
+            'scope_type' => 'selected_pop',
             'pop_ids' => [$popA->id],
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -77,7 +78,6 @@ class UserAuditHardeningTest extends TestCase
 
         $this->assertSame($owner->id, $createLog->user_id);
         $this->assertSame('User Audit', $createLog->new_values['name']);
-        $this->assertSame([$popA->id], $createLog->new_values['pop_ids']);
 
         $updateResponse = $this->put(route('users.update', $user), [
             'name' => 'User Audit Updated',
@@ -85,6 +85,7 @@ class UserAuditHardeningTest extends TestCase
             'phone' => '081200000011',
             'status' => 'inactive',
             'role_id' => $adminRole->id,
+            'scope_type' => 'selected_pop',
             'pop_ids' => [$popB->id],
             'password' => 'password456',
             'password_confirmation' => 'password456',
@@ -104,25 +105,6 @@ class UserAuditHardeningTest extends TestCase
 
         $this->assertSame('User Audit', $updateLog->old_values['name']);
         $this->assertSame('User Audit Updated', $updateLog->new_values['name']);
-        $this->assertSame([$popA->id], $updateLog->old_values['pop_ids']);
-        $this->assertSame([$popB->id], $updateLog->new_values['pop_ids']);
-
-        $popResponse = $this->put(route('users.pops.update', $user), [
-            'pop_ids' => [$popA->id, $popB->id],
-        ]);
-
-        $popResponse->assertRedirect(route('users.index'));
-
-        $assignLog = AuditLog::query()
-            ->where('module', 'User Management')
-            ->where('action', 'assign_pop')
-            ->where('auditable_type', User::class)
-            ->where('auditable_id', $user->id)
-            ->latest('id')
-            ->firstOrFail();
-
-        $this->assertSame([$popB->id], $assignLog->old_values['pop_ids']);
-        $this->assertSame([$popA->id, $popB->id], $assignLog->new_values['pop_ids']);
     }
 
     public function test_user_form_validation_messages_are_clear(): void

@@ -7,40 +7,40 @@
 
 <div class="grid gap-4 md:grid-cols-2">
     <div>
-        <label for="name" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Nama</label>
+        <label for="name" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nama</label>
         <input id="name" name="name" type="text" value="{{ old('name', $user->name ?? '') }}"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="email" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Email</label>
+        <label for="email" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Email</label>
         <input id="email" name="email" type="email" value="{{ old('email', $user->email ?? '') }}"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('email')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="phone" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Phone</label>
+        <label for="phone" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Phone</label>
         <input id="phone" name="phone" type="text" value="{{ old('phone', $user->phone ?? '') }}"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
+        <label for="status" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</label>
         <select id="status" name="status"
-                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
-            <option value="active"   @selected(old('status', $user->status ?? 'active') === 'active')>Aktif</option>
-            <option value="inactive" @selected(old('status', $user->status ?? 'active') === 'inactive')>Nonaktif</option>
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="active"   @selected(old('status', $user->status?->value ?? 'active') === 'active')>Aktif</option>
+            <option value="inactive" @selected(old('status', $user->status?->value ?? 'active') === 'inactive')>Nonaktif</option>
         </select>
         @error('status')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="role_id" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">Role</label>
+        <label for="role_id" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Role</label>
         <select id="role_id" name="role_id"
-                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
             <option value="">Pilih Role</option>
             @foreach($roles as $role)
                 <option value="{{ $role->id }}"
@@ -54,46 +54,46 @@
     </div>
 
     <div>
-        <label for="scope_type" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+        <label for="scope_type" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Wilayah Kerja (Scope)
         </label>
         <select id="scope_type" name="scope_type"
-                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
             <option value="all_pop"      @selected($currentScopeType === 'all_pop')>Seluruh POP</option>
             <option value="selected_pop" @selected($currentScopeType === 'selected_pop' || $currentScopeType === 'pop_tree')>Cabang POP</option>
         </select>
-        <p id="scope_description" class="mt-1 text-xs text-slate-400"></p>
+        <p id="scope_description" class="mt-1 text-xs text-slate-400 dark:text-slate-500"></p>
         @error('scope_type')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+        <label for="password" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ $isEdit ? 'Password Baru' : 'Password' }}
         </label>
         <input id="password" name="password" type="password"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('password')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500">
+        <label for="password_confirmation" class="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {{ $isEdit ? 'Konfirmasi Password Baru' : 'Konfirmasi Password' }}
         </label>
         <input id="password_confirmation" name="password_confirmation" type="password"
-               class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+               class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
     </div>
 </div>
 
 {{-- ============================================================ --}}
 {{-- POP TREE PICKER — Tampil hanya jika scope butuh pilih POP    --}}
 {{-- ============================================================ --}}
-<div id="pop_selection_container" class="border-t border-slate-200 pt-4">
+<div id="pop_selection_container" class="border-t border-slate-200 dark:border-slate-700 pt-4">
     <div class="mb-2 flex items-start justify-between gap-3">
         <div>
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Pilih Cabang / POP Target
             </label>
-            <p class="mt-1 text-xs text-slate-400" id="pop_selection_hint">
+            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500" id="pop_selection_hint">
                 Pilih cabang yang dapat diakses user ini.
             </p>
         </div>
@@ -123,24 +123,24 @@
 
     <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
         <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
-        <div class="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle relative z-10">
-            <div class="bg-white px-6 pb-4 pt-5">
-                <h3 class="text-lg font-semibold text-slate-900" id="preview-modal-title">Review Konfigurasi Akses</h3>
-                <p class="mt-1 text-sm text-slate-500">Periksa kembali tingkat akses dan wilayah data sebelum menyimpan.</p>
+        <div class="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-slate-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl sm:align-middle relative z-10">
+            <div class="bg-white dark:bg-slate-800 px-6 pb-4 pt-5">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100" id="preview-modal-title">Review Konfigurasi Akses</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Periksa kembali tingkat akses dan wilayah data sebelum menyimpan.</p>
 
-                <div class="mt-4 rounded-md bg-slate-50 p-4 border border-slate-200">
+                <div class="mt-4 rounded-md bg-slate-50 dark:bg-slate-800/50 p-4 border border-slate-200 dark:border-slate-700">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <span class="block text-xs font-semibold uppercase text-slate-500">Role</span>
-                            <span class="block text-sm font-medium text-slate-900" id="previewRoleName">—</span>
+                            <span class="block text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Role</span>
+                            <span class="block text-sm font-medium text-slate-900 dark:text-slate-100" id="previewRoleName">—</span>
                         </div>
                         <div>
-                            <span class="block text-xs font-semibold uppercase text-slate-500">Scope Data</span>
-                            <span class="block text-sm font-medium text-slate-900" id="previewScopeLabel">—</span>
+                            <span class="block text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Scope Data</span>
+                            <span class="block text-sm font-medium text-slate-900 dark:text-slate-100" id="previewScopeLabel">—</span>
                         </div>
                         <div class="col-span-2" id="previewPopContainer" style="display:none;">
-                            <span class="block text-xs font-semibold uppercase text-slate-500">Wilayah Cabang (POP)</span>
-                            <span class="block text-sm font-medium text-slate-900" id="previewPopNames">—</span>
+                            <span class="block text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Wilayah Cabang (POP)</span>
+                            <span class="block text-sm font-medium text-slate-900 dark:text-slate-100" id="previewPopNames">—</span>
                         </div>
                     </div>
                 </div>
@@ -151,23 +151,23 @@
                 </div>
 
                 <div class="mt-4">
-                    <h4 class="text-sm font-semibold text-slate-700 mb-2 border-b pb-1">Akses Modul</h4>
-                    <ul class="list-disc pl-5 text-sm text-slate-600 space-y-1 max-h-40 overflow-y-auto" id="previewFeaturesList"></ul>
+                    <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 border-b pb-1">Akses Modul</h4>
+                    <ul class="list-disc pl-5 text-sm text-slate-600 dark:text-slate-400 space-y-1 max-h-40 overflow-y-auto" id="previewFeaturesList"></ul>
                 </div>
 
                 <div id="previewSensitiveContainer" class="mt-3" style="display:none;">
-                    <h4 class="text-sm font-semibold text-amber-600 mb-2 border-b border-amber-200 pb-1">Akses Sensitif</h4>
-                    <ul class="list-disc pl-5 text-sm text-amber-700 space-y-1" id="previewSensitiveList"></ul>
+                    <h4 class="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-2 border-b border-amber-200 dark:border-amber-800/50 pb-1">Akses Sensitif</h4>
+                    <ul class="list-disc pl-5 text-sm text-amber-700 dark:text-amber-400 space-y-1" id="previewSensitiveList"></ul>
                 </div>
             </div>
 
-            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-2 border-t border-slate-200">
+            <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-3 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-700">
                 <button type="button" onclick="closePreviewModal()"
-                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        class="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:bg-slate-800/50">
                     Batal
                 </button>
                 <button type="button" onclick="submitForm()"
-                        class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                        class="rounded-md bg-sky-600 dark:bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 dark:hover:bg-sky-600">
                     Konfirmasi & Simpan
                 </button>
             </div>

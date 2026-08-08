@@ -2,13 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Customer;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\User;
 use App\Models\Task;
-use App\Enums\TaskType;
-use App\Enums\TaskStatus;
+use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,20 +26,22 @@ class TaskFopActionsTest extends TestCase
     use RefreshDatabase;
 
     protected User $fopUser;
+
     protected User $techUser;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -51,7 +62,7 @@ class TaskFopActionsTest extends TestCase
         // Assign pop scope tree/selected pop for FOP
         $this->fopUser->roleScopes()->create([
             'role_id' => $fopRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
         // Technician User
@@ -63,7 +74,7 @@ class TaskFopActionsTest extends TestCase
         // Assign pop scope tree/selected pop for Tech
         $this->techUser->roleScopes()->create([
             'role_id' => $techRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
     }
 
@@ -124,7 +135,7 @@ class TaskFopActionsTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-001',
             'full_name' => 'John Doe',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'waiting_acc',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',
@@ -163,7 +174,7 @@ class TaskFopActionsTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'CUST-001',
             'full_name' => 'John Doe',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'waiting_acc',
             'pop_id' => $this->pop->id,
             'data_completeness_status' => 'draft',
@@ -226,6 +237,56 @@ class TaskFopActionsTest extends TestCase
         $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
         $this->assertEquals('pending', $task->fop_review_status);
         $this->assertEquals('Menunggu data tambahan', $task->pending_reason);
+    }
+
+    /**
+     * Sejak 2026-07-15 (docs/project_status_label_unifikasi.md), "Pending"
+     * cuma 1 logic di sistem — siapapun yang trigger (teknisi top-level ATAU
+     * FOP manual), tim HARUS dilepas + jadwal ke-rebuild. Sebelumnya
+     * `fopPending` cuma ganti status doang, tim tetap nempel — itu yang
+     * bikin "2 kelakuan beda buat 1 nama status" dan sekarang disatuin.
+     */
+    public function test_fop_pending_releases_team_and_rebuilds_schedule(): void
+    {
+        $task = Task::create([
+            'task_number' => 'TASK-2026-0007',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance Rutin',
+            'status' => TaskStatus::TERJADWAL->value,
+            'scheduled_at' => now()->addDay(),
+            'created_by' => $this->fopUser->id,
+            'updated_by' => $this->fopUser->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $this->techUser->id, 'role_in_task' => 'lead']);
+
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-2026-0007',
+            'task_date' => $task->scheduled_at,
+            'category' => 'MTN',
+            'tugas' => 'Maintenance Rutin',
+            'issue' => 'Sinyal lemah',
+            'status' => 'terjadwal',
+            'priority' => 'Medium',
+            'task_id' => $task->id,
+        ]);
+        $fopTask->technicians()->attach($this->techUser->id);
+
+        $response = $this->actingAs($this->fopUser)
+            ->post(route('tasks.fop-pending', $task->id), [
+                'pending_reason' => 'Teknisi berhalangan',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $task->refresh();
+        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
+        $this->assertFalse($task->teamMembers()->where('user_id', $this->techUser->id)->exists());
+
+        $fopTask->refresh();
+        $this->assertNull($fopTask->team_id);
+        $this->assertCount(0, $fopTask->technicians);
     }
 
     public function test_unauthorized_user_cannot_perform_fop_actions(): void

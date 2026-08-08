@@ -16,16 +16,12 @@ trait HasPopScope
      * - all_pop      → tidak ada filter, lihat semua data
      * - selected_pop → Cabang POP terpilih beserta Mini POP + semua distribusi di bawahnya
      * - pop_tree     → Distribusi POP spesifik yang dipilih dari cabang
-     *
-     * @param Builder $query
-     * @param User|null $user
-     * @return Builder
      */
     public function scopeApplyUserScope(Builder $query, ?User $user = null): Builder
     {
         $user = $user ?? auth()->user();
 
-        if (!$user) {
+        if (! $user) {
             // Jika tidak ada user (misal guest), tolak semua data
             return $query->whereRaw('1 = 0');
         }
@@ -47,6 +43,7 @@ trait HasPopScope
         // Cabang POP atau legacy pop_tree — filter berdasarkan daftar POP yang diizinkan
         if (in_array($scopeType, [ScopeType::SELECTED_POP, ScopeType::POP_TREE], true)) {
             $allowedPopIds = $accessService->getAllowedPopIds($user);
+
             return $query->where(function ($q) use ($allowedPopIds) {
                 $q->whereIn('pop_id', $allowedPopIds);
             });

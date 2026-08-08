@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-background">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50 dark:bg-slate-900">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,600 +7,1179 @@
 
     <title>@yield('title', 'Whusnet Operasional')</title>
 
+    {{-- Tema dipasang SEBELUM body dirender supaya tidak ada kedipan putih saat dark mode --}}
+    <script>
+        (function () {
+            const saved = localStorage.getItem('whusnet-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (!saved && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-    <!-- NProgress -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof NProgress !== 'undefined') {
-                NProgress.configure({ showSpinner: false, minimum: 0.1 });
-                NProgress.done();
-            }
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if (typeof NProgress !== 'undefined') NProgress.start();
-        });
-    </script>
+    <!-- NProgress: dibundel lewat Vite (resources/js/app.js), bukan CDN sinkron -->
 
     <!-- Styles / Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full text-text-main font-sans antialiased">
-    <div class="min-h-full flex flex-col md:flex-row">
-        <!-- Sidebar Container -->
-        <aside id="sidebar" class="bg-slate-900 text-white w-64 shrink-0 transition-all duration-300 ease-in-out md:flex md:flex-col md:h-screen md:sticky md:top-0 hidden z-30">
-            <script>
-                if (localStorage.getItem('sidebar-collapsed') === 'true') {
-                    document.getElementById('sidebar').classList.add('collapsed');
-                }
-            </script>
-            <!-- Brand Section -->
-            <div class="h-16 flex items-center justify-between px-6 border-b border-slate-800 brand-container shrink-0">
-                <a href="/" class="flex items-center gap-2 font-bold text-lg tracking-wide hover:opacity-95 transition-opacity brand-link">
-                    <!-- Sky Blue SVG Dot/Logo -->
-                    <svg class="h-6 w-6 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span class="text-white sidebar-text">WHUS<span class="text-sky-500">NET</span></span>
-                </a>
-                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
+<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
-            <!-- Navigation Links -->
-            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
-                @if(auth()->user()->hasPermission('dashboard.view'))
-                <!-- Dashboard Link -->
-                <a href="/" title="Dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('/') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
-                    <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                    <span class="sidebar-text">Dashboard</span>
-                </a>
-                @endif
+<div class="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
 
-                @if(auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('users.create') || auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasPermission('roles.view'))
-                <!-- SETTINGS Dropdown -->
-                <div>
-                    <button onclick="toggleSubmenu('submenu-settings', 'chevron-settings')" title="Sistem" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="sidebar-text">SISTEM</span>
-                        </span>
-                        <svg id="chevron-settings" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('users*') || Request::is('audit-logs*') || Request::is('roles*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <!-- Submenu -->
-                    <div id="submenu-settings" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('users*') || Request::is('audit-logs*') || Request::is('roles*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('users.view'))
-                            <a href="/users" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('users*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Manajemen User & POP
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('roles.view'))
-                            <a href="{{ route('roles.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('roles*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Role & Permission
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('audit_logs.view'))
-                            <a href="{{ route('audit-logs.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('audit-logs*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Audit Log
-                            </a>
-                        @endif
-                    </div>
+    {{-- ═══════════════════════════════════════════════════════
+         SIDEBAR — Light mode (putih), sesuai Design.md §3.2
+    ═══════════════════════════════════════════════════════ --}}
+    <aside id="sidebar"
+           class="sidebar-light fixed inset-y-0 left-0 z-40 w-64 flex flex-col justify-between
+                  transition-transform duration-300 md:static md:translate-x-0 -translate-x-full">
+
+        {{-- Logo Header --}}
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-base tracking-wider shrink-0">
+                    W
                 </div>
-                @endif
+                <span class="font-bold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight sidebar-text">WHUSNET</span>
+            </div>
+            <button onclick="toggleSidebar()"
+                    class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-500 dark:hover:text-slate-300 rounded-lg">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
 
-                @if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.create'))
-                <!-- PELANGGAN Dropdown -->
-                <div>
-                    <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')" title="Pelanggan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                            <span class="sidebar-text">PELANGGAN</span>
-                        </span>
-                        <svg id="chevron-pelanggan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        {{-- Navigation Links --}}
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
+
+            {{-- ── Group: OPERASIONAL ── --}}
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Operasional</p>
+                <div class="space-y-1">
+
+                    @if(auth()->user()->hasPermission('dashboard.view'))
+                    <a href="/" title="Dashboard"
+                       class="sidebar-nav-item {{ Request::is('/') ? 'sidebar-nav-item-active' : '' }}">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500 {{ Request::is('/') ? 'text-sky-600 dark:text-sky-400' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
                         </svg>
-                    </button>
-                    <!-- Submenu -->
-                    <div id="submenu-pelanggan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('customers.create'))
-                            <a href="/customers/create" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/create') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                        <span class="sidebar-text">Dashboard</span>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.create') || auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.detail.survey.view') || auth()->user()->hasPermission('customers.detail.installation.view') || auth()->user()->hasPermission('customers.terminated.view') || auth()->user()->hasPermission('customers.failed.view'))
+                    {{-- Pelanggan collapsible submenu --}}
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-pelanggan', 'chevron-pelanggan')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*')
+                                           ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold'
+                                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                                <span class="sidebar-text">Pelanggan</span>
+                            </div>
+                            <svg id="chevron-pelanggan"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200
+                                        {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+
+                        <div id="submenu-pelanggan"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs
+                                    {{ Request::is('customers*') || Request::is('surveys*') || Request::is('verifications*') ? '' : 'hidden' }}">
+
+                            @if(auth()->user()->hasPermission('customers.create'))
+                            <a href="/customers/create"
+                               class="block py-2 px-3 rounded-md transition-colors
+                                      {{ Request::is('customers/create') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 Registrasi Pelanggan
                             </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('customers.view'))
-                            <div class="pt-2 pb-1">
-                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Onboarding</p>
-                            </div>
-                            <a href="{{ route('surveys.queue') }}" class="flex items-center justify-between py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('surveys.queue') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            @endif
+
+                            @if(auth()->user()->hasPermission('customers.detail.survey.view'))
+                            <a href="{{ route('surveys.queue') }}"
+                               class="flex items-center justify-between py-2 px-3 rounded-md transition-colors
+                                      {{ Request::routeIs('surveys.queue') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 <span>Antrean Survey</span>
                                 @if(isset($badge_survey_count) && $badge_survey_count > 0)
                                     <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
                                 @endif
                             </a>
-                            <a href="{{ route('verifications.queue') }}" class="flex items-center justify-between py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('verifications.queue') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                <span>Verif & Pemasangan</span>
+                            @endif
+                            @if(auth()->user()->hasPermission('customers.detail.installation.view'))
+                            <a href="{{ route('verifications.queue') }}"
+                               class="flex items-center justify-between py-2 px-3 rounded-md transition-colors
+                                      {{ Request::routeIs('verifications.queue') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                <span>Verif &amp; Pemasangan</span>
                                 @if(isset($badge_verification_count) && $badge_verification_count > 0)
                                     <span class="bg-sky-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
                                 @endif
                             </a>
-                            
-                            <div class="pt-2 pb-1">
-                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</p>
-                            </div>
-                            <a href="/customers" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            @endif
+                            @if(auth()->user()->hasPermission('customers.view'))
+                            <a href="/customers"
+                               aria-current="{{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'page' : '' }}"
+                               class="block py-2 px-3 rounded-md transition-colors
+                                      {{ Request::is('customers') && !Request::is('customers/create') && !Request::is('customers/import') && !request()->has('status_group') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 List Pelanggan
                             </a>
-                            <a href="/customers?status_group=failed" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'failed' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                List Pelanggan Gagal
+                            @endif
+                            @if(auth()->user()->hasPermission('customers.failed.view'))
+                            <a href="{{ route('customers.failed') }}"
+                               class="block py-2 px-3 rounded-md transition-colors
+                                      {{ Request::routeIs('customers.failed') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Pelanggan Gagal
                             </a>
-                            <a href="/customers?status_group=terminated" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ request('status_group') === 'terminated' ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                List Pelanggan Putus
+                            @endif
+                            @if(auth()->user()->hasPermission('customers.terminated.view'))
+                            <a href="{{ route('customers.terminated') }}"
+                               class="block py-2 px-3 rounded-md transition-colors
+                                      {{ Request::routeIs('customers.terminated') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Pelanggan Putus
                             </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('customers.import.import'))
-                            <div class="pt-2 pb-1">
-                                <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Data</p>
-                            </div>
-                            <a href="/customers/import" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('customers/import') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
+                            @endif
+
+                            @if(auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.import'))
+                            <a href="/customers/import"
+                               class="block py-2 px-3 rounded-md transition-colors
+                                      {{ Request::is('customers/import') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
                                 Import Pelanggan
                             </a>
-                        @endif
+                            @endif
+                        </div>
                     </div>
-                </div>
-                @endif
+                    @endif
 
-                @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own'))
-                {{-- TASK MANAGEMENT --}}
-                <div>
-                    @if(auth()->user()->hasPermission('task.view.all'))
-                    {{-- FOP / Admin: tampilkan sebagai dropdown collapsible --}}
-                    <button onclick="toggleSubmenu('submenu-tasks', 'chevron-tasks')" title="Task Management" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    @if(auth()->user()->hasPermission('invoices.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('invoices*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('invoices*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/>
+                                </svg>
+                                <span class="sidebar-text">Tagihan</span>
+                            </div>
+                            <svg id="chevron-tagihan"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('invoices*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
-                            <span class="sidebar-text">TASK</span>
-                        </span>
-                        <svg id="chevron-tasks" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('tasks*') || Request::is('fop*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <div id="submenu-tasks" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('tasks*') || Request::is('fop*') ? '' : 'hidden' }}">
-                        <a href="{{ route('fop.dashboard') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop.dashboard') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            FOP Dashboard
-                        </a>
-
-                        @if(auth()->user()->hasPermission('fop_tasks.view'))
-                        <a href="{{ route('fop-tasks.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Task FOP
-                        </a>
-                        <a href="{{ route('fop-tasks.history') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('fop-tasks.history') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Riwayat Task FOP
-                        </a>
-                        @endif
-
-                        @if(auth()->user()->hasPermission('task.view.own'))
-                        <a href="{{ route('tasks.own') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.own') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Task Saya
-                        </a>
-                        @endif
+                        </button>
+                        <div id="submenu-tagihan"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ Request::is('invoices*') ? '' : 'hidden' }}">
+                            <a href="{{ route('invoices.belum-lunas') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('invoices.belum-lunas') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Tagihan Belum Lunas
+                            </a>
+                            <a href="{{ route('invoices.lunas') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('invoices.lunas') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Tagihan Lunas
+                            </a>
+                            <a href="{{ route('invoices.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('invoices.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Semua Tagihan
+                            </a>
+                            @if(auth()->user()->hasPermission('payments.view'))
+                            <a href="{{ route('payments.overpay') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('payments.overpay') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Pembayaran Lebih (Overpay)
+                            </a>
+                            @endif
+                        </div>
                     </div>
-                    @else
-                    {{-- Teknisi: hanya punya task.view.own — tampilkan sebagai direct link tanpa dropdown --}}
-                    <a href="{{ route('tasks.own') }}"
-                       title="Task Saya"
-                       class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('tasks.own') || Request::routeIs('tasks.own.card-partial') ? 'bg-slate-800/50 text-sky-400' : 'text-slate-300' }}">
-                        <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    @endif
+
+                    @if(auth()->user()->hasPermission('payments.view'))
+                    <a href="{{ route('payments.index') }}" title="Pembayaran"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('payments*') && !Request::is('payments/overpay') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('payments*') && !Request::is('payments/overpay') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+                            </svg>
+                            <span class="sidebar-text">Pembayaran</span>
+                        </div>
+                        <svg class="chevron-icon h-3 w-3 shrink-0 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/>
                         </svg>
-                        <span class="sidebar-text">TASK SAYA</span>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create'))
+                    <a href="{{ route('collectors.index') }}" title="Kolektor"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('collectors*') || Request::is('collector-batch*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('collectors*') || Request::is('collector-batch*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-8.13a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm6 8a4 4 0 1 1 0-8"/>
+                            </svg>
+                            <span class="sidebar-text">Kolektor</span>
+                        </div>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('kolektor.view'))
+                    <a href="{{ route('collector-worklist.index') }}" title="Worklist Saya"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('collector-worklist*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('collector-worklist*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/>
+                            </svg>
+                            <span class="sidebar-text">Worklist Saya</span>
+                        </div>
                     </a>
                     @endif
                 </div>
-                @endif
+            </div>
 
-                @if(auth()->user()->hasPermission('invoices.view'))
-                <!-- TAGIHAN Dropdown -->
-                <div>
-                    <button onclick="toggleSubmenu('submenu-tagihan', 'chevron-tagihan')" title="Tagihan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 14h6m-6 4h6M5 3h14a2 2 0 012 2v16l-3-2-3 2-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />
+            {{-- ── Group: JARINGAN & LAPANGAN ── --}}
+            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view'))
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Jaringan &amp; Lapangan</p>
+                <div class="space-y-1">
+
+                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own'))
+                    @if(auth()->user()->hasPermission('task.view.all'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-tasks', 'chevron-tasks')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('tasks*') || Request::is('fop*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('tasks*') || Request::is('fop*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
+                                </svg>
+                                {{-- <span class="sidebar-text">Task Management</span> --}}
+                                <span class="sidebar-text">Penjadwalan Teknis</span>
+                            </div>
+                            <svg id="chevron-tasks"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('tasks*') || Request::is('fop*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
                             </svg>
-                            <span class="sidebar-text">TAGIHAN</span>
-                        </span>
-                        <svg id="chevron-tagihan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('invoices*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </button>
+                        <div id="submenu-tasks"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ Request::is('tasks*') || Request::is('fop*') ? '' : 'hidden' }}">
+                            <a href="{{ route('fop.dashboard') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('fop.dashboard') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                FOP Dashboard
+                            </a>
+                            @if(auth()->user()->hasPermission('fop_tasks.view'))
+                            <a href="{{ route('fop-tasks.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('fop-tasks.index') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Task FOP
+                            </a>
+                            <a href="{{ route('fop-tasks.history') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('fop-tasks.history') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Riwayat Task FOP
+                            </a>
+                            @endif
+                            @if(auth()->user()->hasPermission('task.view.own'))
+                            <a href="{{ route('tasks.own') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tasks.own') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Task Saya
+                            </a>
+                            @endif
+                        </div>
+                    </div>
+                    @else
+                    <a href="{{ route('tasks.own') }}" title="Task Saya"
+                       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::routeIs('tasks.own') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <svg class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                         </svg>
-                    </button>
-                    <!-- Submenu -->
-                    <div id="submenu-tagihan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('invoices*') ? '' : 'hidden' }}">
-                        <a href="{{ route('invoices.belum-lunas') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.belum-lunas') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Tagihan Belum Lunas
-                        </a>
-                        <a href="{{ route('invoices.lunas') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.lunas') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Tagihan Lunas
-                        </a>
-                        <a href="{{ route('invoices.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::routeIs('invoices.index') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Semua Tagihan
-                        </a>
+                        <span class="sidebar-text">Task Saya</span>
+                    </a>
+                    @endif
+                    @endif
+
+                    @if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-ticketing', 'chevron-ticketing')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ (Request::is('tickets*') || Request::is('noc/*')) ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ (Request::is('tickets*') || Request::is('noc/*')) ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 11h3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 11h-3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 11a9 9 0 1 1 18 0"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 16v2a4 4 0 0 1-4 4h-5"/>
+                                </svg>
+                                <span class="sidebar-text">Ticketing</span>
+                            </div>
+                            <svg id="chevron-ticketing"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ (Request::is('tickets*') || Request::is('noc/*')) ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-ticketing"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ (Request::is('tickets*') || Request::is('noc/*')) ? '' : 'hidden' }}">
+                            @if(auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.update'))
+                            <a href="{{ route('tickets.create') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.create') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Worksheet Helpdesk
+                            </a>
+                            @endif
+
+                            {{--
+                                Worksheet NOC — satu entry, satu halaman.
+                                Tab Masuk/Diproses dilebur (ADHOC-06) karena
+                                window Pending NOC dihapus.
+                            --}}
+                            @if(auth()->user()->hasPermission('noc_worksheet.view'))
+                            <a href="{{ route('noc.worksheet') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('noc.worksheet*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Worksheet NOC
+                            </a>
+                            @endif
+
+                            @if(auth()->user()->hasPermission('noc_dashboard.view'))
+                            <a href="{{ route('noc.dashboard') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('noc.dashboard') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Dashboard NOC
+                            </a>
+                            @endif
+
+                            @if(auth()->user()->hasPermission('tickets.selesai.view'))
+                            <a href="{{ route('tickets.selesai') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.selesai') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Ticket Selesai
+                            </a>
+                            @endif
+                            @if(auth()->user()->hasPermission('tickets.dibatalkan.view'))
+                            <a href="{{ route('tickets.dibatalkan') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.dibatalkan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Ticket Dibatalkan
+                            </a>
+                            @endif
+
+                            {{--
+                                History Ticketing — arsip semua tiket (pengganti
+                                sheet Excel Helpdesk). Superset Ticket Selesai/
+                                Dibatalkan, permission-nya sendiri.
+                            --}}
+                            @if(auth()->user()->hasPermission('tickets.history.view'))
+                            <a href="{{ route('tickets.history') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::routeIs('tickets.history') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                History Ticketing
+                            </a>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            {{-- ── Group: LAPORAN ── --}}
+            @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view'))
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Laporan</p>
+                <div class="space-y-1">
+
+                    @if(auth()->user()->hasPermission('reports.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('reports*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('reports*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v16a2 2 0 0 0 2 2h16"/><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-5 5-4-4-3 3"/>
+                                </svg>
+                                <span class="sidebar-text">Laporan Keuangan</span>
+                            </div>
+                            <svg id="chevron-laporan"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('reports*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-laporan"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ Request::is('reports*') ? '' : 'hidden' }}">
+                            <a href="{{ route('reports.customers.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::is('reports/customers*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Laporan Pelanggan
+                            </a>
+                            <a href="{{ route('reports.invoices.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::is('reports/invoices*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Laporan Tagihan
+                            </a>
+                            <a href="{{ route('reports.payments.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::is('reports/payments*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Laporan Pembayaran
+                            </a>
+                            <a href="{{ route('reports.imports.index') }}"
+                               class="block py-2 px-3 rounded-md transition-colors {{ Request::is('reports/imports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">
+                                Laporan Import Data
+                            </a>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('audit_logs.view'))
+                    <a href="{{ route('audit-logs.index') }}" title="Audit Log"
+                       class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              {{ Request::is('audit-logs*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                        <svg class="h-5 w-5 shrink-0 {{ Request::is('audit-logs*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <span class="sidebar-text">Audit Log</span>
+                    </a>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+            {{-- ── Group: MASTER & PENGATURAN ── --}}
+            @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view') || auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2 sidebar-text">Master &amp; Pengaturan</p>
+                <div class="space-y-1">
+
+                    @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view') || auth()->user()->hasPermission('ticket_issue_categories.view') || auth()->user()->hasPermission('items.view') || auth()->user()->hasPermission('item_categories.view') || auth()->user()->hasPermission('work_tools.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-master', 'chevron-master')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('master*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('master*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <ellipse cx="12" cy="5" rx="9" ry="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 5V19A9 3 0 0 0 21 19V5"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 12A9 3 0 0 0 21 12"/>
+                                </svg>
+                                <span class="sidebar-text">Master Data</span>
+                            </div>
+                            <svg id="chevron-master"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('master*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-master"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ Request::is('master*') ? '' : 'hidden' }}">
+                            @if(auth()->user()->hasPermission('master_wilayah.view'))
+                            <a href="/master/wilayah" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/wilayah') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Data Wilayah</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('pops.view'))
+                            <a href="/master/pop" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/pop*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master POP/Cabang</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('master_distribusi.view'))
+                            <a href="/master/distribusi" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/distribusi*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Distribusi</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('packages.view'))
+                            <a href="/master/paket" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/paket*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Paket Internet</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('master_status_pelanggan.view'))
+                            <a href="/master/status-langganan" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/status-langganan') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Status Pelanggan</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('sla_timeline.view'))
+                            <a href="/master/sla-timeline" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/sla-timeline*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Timeline SLA</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('ticket_issue_categories.view'))
+                            <a href="/master/issue-categories" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/issue-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Kategori Tiket</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('items.view'))
+                            <a href="/master/items" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/items*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Item (Barang)</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('item_categories.view'))
+                            <a href="/master/item-categories" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/item-categories*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Kategori Item</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('work_tools.view'))
+                            <a href="/master/work-tools" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('master/work-tools*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Master Alat Kerja</a>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('users.view') || auth()->user()->hasPermission('roles.view'))
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-settings', 'chevron-settings')"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       {{ Request::is('users*') || Request::is('roles*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50' }}">
+                            <div class="flex items-center gap-3">
+                                <svg class="h-5 w-5 shrink-0 {{ Request::is('users*') || Request::is('roles*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 15H6a4 4 0 0 0-4 4v2"/>
+                                </svg>
+                                <span class="sidebar-text">Pengguna &amp; RBAC</span>
+                            </div>
+                            <svg id="chevron-settings"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-200 {{ Request::is('users*') || Request::is('roles*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600' }}"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-settings"
+                             class="submenu-container mt-0.5 pl-9 pr-2 space-y-0.5 text-xs {{ Request::is('users*') || Request::is('roles*') ? '' : 'hidden' }}">
+                            @if(auth()->user()->hasPermission('users.view'))
+                            <a href="/users" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('users*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Manajemen User &amp; POP</a>
+                            @endif
+                            @if(auth()->user()->hasPermission('roles.view'))
+                            <a href="{{ route('roles.index') }}" class="block py-2 px-3 rounded-md transition-colors {{ Request::is('roles*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Role &amp; Permission</a>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
+        </nav>
+
+        {{-- Sidebar Footer — User Profile --}}
+        <div class="p-3 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/40 shrink-0">
+            <div class="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                    <div class="relative shrink-0">
+                        <div class="w-9 h-9 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center border border-sky-200 dark:border-sky-700">
+                            {{ strtoupper(substr(Auth::user()->name ?? 'AD', 0, 2)) }}
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-800"></span>
+                    </div>
+                    <div class="truncate sidebar-footer-info">
+                        <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{{ Auth::user()->name ?? 'Administrator' }}</p>
+                        <p class="text-[10px] text-slate-400 dark:text-slate-500 truncate">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
                     </div>
                 </div>
-                @endif
-
-                @if(auth()->user()->hasPermission('payments.view'))
-                <!-- Payment Link -->
-                <a href="{{ route('payments.index') }}" title="Pembayaran" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('payments*') ? 'bg-sky-600 text-white' : 'text-slate-300' }}">
-                    <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
+                <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                        class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors sidebar-footer-info"
+                        title="Keluar">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m16 17 5-5-5-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     </svg>
-                    <span class="sidebar-text">Pembayaran</span>
-                </a>
-                @endif
+                </button>
+            </div>
+        </div>
+    </aside>
 
-                @if(auth()->user()->hasPermission('reports.view'))
-                <!-- LAPORAN Dropdown -->
-                <div>
-                    <button onclick="toggleSubmenu('submenu-laporan', 'chevron-laporan')" title="Laporan" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span class="sidebar-text">LAPORAN</span>
-                        </span>
-                        <svg id="chevron-laporan" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('reports*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <!-- Submenu -->
-                    <div id="submenu-laporan" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('reports*') ? '' : 'hidden' }}">
-                        <a href="{{ route('reports.customers.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/customers*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Laporan Pelanggan
-                        </a>
-                        <a href="{{ route('reports.invoices.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/invoices*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Laporan Tagihan
-                        </a>
-                        <a href="{{ route('reports.payments.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/payments*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Laporan Pembayaran
-                        </a>
-                        <a href="{{ route('reports.imports.index') }}" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('reports/imports*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                            Laporan Import Data
-                        </a>
-                    </div>
-                </div>
-                @endif
+    {{-- Mobile overlay --}}
+    <div id="sidebar-backdrop"
+         onclick="toggleSidebar()"
+         class="fixed inset-0 z-30 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm hidden md:hidden"></div>
 
-                @if(auth()->user()->hasPermission('pops.view') || auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('master_wilayah.view') || auth()->user()->hasPermission('master_distribusi.view') || auth()->user()->hasPermission('master_status_pelanggan.view') || auth()->user()->hasPermission('sla_timeline.view'))
-                <!-- Master Data Dropdown -->
-                <div>
-                    <button onclick="toggleSubmenu('submenu-master', 'chevron-master')" title="Master Data" class="w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer focus:outline-none focus:bg-slate-800">
-                        <span class="flex items-center gap-3">
-                            <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                            </svg>
-                            <span class="sidebar-text">Master Data</span>
-                        </span>
-                        <svg id="chevron-master" class="chevron-icon h-4 w-4 transform transition-transform duration-200 {{ Request::is('master*') ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <!-- Submenu -->
-                    <div id="submenu-master" class="submenu-container mt-1 pl-11 pr-2 space-y-1 transition-all duration-300 ease-in-out {{ Request::is('master*') ? '' : 'hidden' }}">
-                        @if(auth()->user()->hasPermission('master_wilayah.view'))
-                            <a href="/master/wilayah" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/wilayah') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master Data Wilayah
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('pops.view'))
-                            <a href="/master/pop" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/pop*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master POP/Cabang
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('master_distribusi.view'))
-                            <a href="/master/distribusi" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/distribusi*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master Distribusi
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('packages.view'))
-                            <a href="/master/paket" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/paket*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master Paket Internet
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('master_status_pelanggan.view'))
-                            <a href="/master/status-langganan" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/status-langganan') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master Status Pelanggan
-                            </a>
-                        @endif
-                        @if(auth()->user()->hasPermission('sla_timeline.view'))
-                            <a href="/master/sla-timeline" class="block py-2 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer hover:bg-slate-800 hover:text-white {{ Request::is('master/sla-timeline*') ? 'text-sky-400 bg-slate-800/50' : 'text-slate-400' }}">
-                                Master Timeline SLA
-                            </a>
-                        @endif
-                    </div>
-                </div>
-                @endif
-            </nav>
+    {{-- ═══════════════════════════════════════════════════════
+         MAIN CONTENT AREA
+    ═══════════════════════════════════════════════════════ --}}
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-            <!-- Sidebar Footer -->
-            <div class="p-4 border-t border-slate-800 flex items-center gap-3 sidebar-footer shrink-0">
-                <div class="h-9 w-9 rounded-full bg-slate-800 flex items-center justify-center font-bold text-sky-400 border border-slate-700 shrink-0">
-                    {{ strtoupper(substr(Auth::user()->name ?? 'AD', 0, 2)) }}
-                </div>
-                <div class="flex-1 min-w-0 sidebar-footer-info">
-                    <p class="text-xs font-semibold text-white truncate">{{ Auth::user()->name ?? 'Administrator' }}</p>
-                    <p class="text-[10px] text-slate-400 truncate">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
-                </div>
-                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                    @csrf
-                </form>
-                <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();" 
-                        class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none sidebar-footer-info" 
-                        title="Logout">
+        {{-- ── Top Navbar (Glass Header) ── --}}
+        <header class="glass-header sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-700 px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+
+            {{-- Left: Toggle + Breadcrumb --}}
+            <div class="flex items-center gap-2 min-w-0">
+                {{-- Mobile menu toggle --}}
+                <button onclick="toggleSidebar()"
+                        class="md:hidden p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M4 6h16M4 18h16"/>
                     </svg>
                 </button>
-            </div>
-        </aside>
 
-        <!-- Mobile Header -->
-        <header class="md:hidden bg-slate-900 text-white h-16 flex items-center justify-between px-6 z-20 shadow-md">
-            <a href="/" class="flex items-center gap-2 font-bold text-lg tracking-wide">
-                <svg class="h-6 w-6 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span>WHUS<span class="text-sky-500">NET</span></span>
-            </a>
-            <div class="flex items-center gap-1">
-                <div class="text-slate-800">
-                    <x-notification-dropdown />
-                </div>
-                <button onclick="toggleSidebar()" class="p-2 rounded hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer">
-                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                </button>
-            </div>
-        </header>
-
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col min-w-0 bg-background">
-            <!-- Top Navbar -->
-            <header class="h-16 bg-surface border-b border-border hidden md:flex items-center justify-between px-8 shadow-sm">
-                <div class="flex items-center gap-4">
-                    <button onclick="toggleDesktopSidebar()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer focus:outline-none" title="Toggle Sidebar">
-                        <!-- Lucide Panel Left Icon -->
+                {{-- Breadcrumb — 3 ruas: Home › {menu} › {halaman} --}}
+                <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 min-w-0">
+                    {{-- Panel-left toggle (desktop) --}}
+                    <button onclick="toggleDesktopSidebar()"
+                            class="hidden md:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-400 dark:hover:text-slate-100 transition-colors"
+                            title="Toggle Sidebar">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect width="18" height="18" x="3" y="3" rx="2"/>
                             <path d="M9 3v18"/>
                         </svg>
                     </button>
-                    <h2 class="text-lg font-semibold text-text-main">@yield('page_title', 'Dashboard')</h2>
+
+                    <a href="/" class="hidden sm:flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0">
+                        <span>Home</span>
+                    </a>
+
+                    @hasSection('breadcrumb_parent')
+                    <svg class="hidden sm:block h-3 w-3 text-slate-300 dark:text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/>
+                    </svg>
+                    <a href="@yield('breadcrumb_parent_url', '#')" class="hover:text-slate-700 dark:hover:text-slate-200 transition-colors truncate shrink-0">
+                        @yield('breadcrumb_parent')
+                    </a>
+                    @endif
+
+                    <svg class="hidden sm:block h-3 w-3 text-slate-300 dark:text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/>
+                    </svg>
+                    <span aria-current="page" class="font-semibold text-sky-600 dark:text-sky-400 truncate">@yield('page_title', 'Dashboard')</span>
+                </nav>
+            </div>
+
+            {{-- Center: Global Search (desktop only) --}}
+            <div class="hidden md:block flex-1 max-w-sm lg:max-w-md">
+                <div class="relative">
+                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.3-4.3"/>
+                    </svg>
+                    <input type="search" id="globalSearch" onkeydown="handleGlobalSearch(event)"
+                           placeholder="Cari pelanggan, CID, invoice, tiket, IP…"
+                           class="w-full h-9 pl-10 pr-16 rounded-full border border-slate-200 dark:border-slate-700
+                                  bg-white/70 dark:bg-slate-800/70 text-xs text-slate-800 dark:text-slate-100
+                                  placeholder-slate-400 dark:placeholder-slate-500
+                                  focus:outline-none focus:bg-white dark:focus:bg-slate-800
+                                  focus:border-sky-600 dark:focus:border-sky-500
+                                  focus:ring-2 focus:ring-sky-600/12 transition-all">
+                    <kbd class="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 bg-slate-50 dark:bg-slate-900">/</kbd>
                 </div>
-                <div class="flex items-center gap-4">
-                    <x-notification-dropdown />
-                    <span class="text-xs text-text-muted data-text">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
-                    <div class="h-8 w-px bg-border"></div>
-                    <div class="flex items-center gap-2 text-sm text-text-secondary">
-                        <span class="font-medium">Admin Panel</span>
+            </div>
+
+            {{-- Right: Actions --}}
+            <div class="flex items-center gap-1 sm:gap-2">
+                {{-- Theme Toggle --}}
+                <button onclick="toggleTheme(event)" id="themeToggle" aria-label="Ganti tema" title="Ganti Tema (Ctrl+D / Alt+T)"
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                               hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all duration-200 active:scale-90 focus:outline-none focus:ring-2 focus:ring-sky-500/20">
+                    <svg id="themeIconMoon" class="h-5 w-5 theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/>
+                    </svg>
+                    <svg id="themeIconSun" class="h-5 w-5 hidden theme-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                    </svg>
+                </button>
+
+                {{-- Bantuan & Pintasan Keyboard --}}
+                <button onclick="openHelp()" aria-label="Bantuan dan pintasan keyboard" title="Bantuan (?)"
+                        class="p-2 text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400
+                               hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-colors">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
+                    </svg>
+                </button>
+
+                {{-- Notifications --}}
+                <x-notification-dropdown />
+
+                <div class="h-5 w-px bg-slate-200 dark:bg-slate-700"></div>
+
+                {{-- User Menu --}}
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" @click.outside="open = false"
+                            class="flex items-center gap-2 py-1 pl-1 pr-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <span class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300
+                                     border border-sky-200 dark:border-sky-700 font-bold text-[11px]
+                                     flex items-center justify-center">
+                            {{ strtoupper(substr(Auth::user()->name ?? 'AD', 0, 2)) }}
+                        </span>
+                        <span class="hidden lg:flex flex-col items-start leading-tight">
+                            <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ Auth::user()->name ?? 'Administrator' }}</span>
+                            <span class="text-[10px] text-slate-400 dark:text-slate-500">{{ \App\Support\IndonesianDate::dateTime(now()) }}</span>
+                        </span>
+                        <svg class="h-3 w-3 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                        </svg>
+                    </button>
+
+                    {{-- Dropdown --}}
+                    <div x-show="open" x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                         class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-lg py-1 text-xs z-50"
+                         style="display:none">
+                        <div class="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60">
+                            <p class="font-semibold text-slate-800 dark:text-slate-100">{{ Auth::user()->name ?? 'Administrator' }}</p>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
+                        </div>
+                        <button class="w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Profil Saya
+                        </button>
+                        <div class="my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
+                        <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                                class="w-full px-3 py-2 flex items-center gap-2.5 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m16 17 5-5-5-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                            Keluar
+                        </button>
                     </div>
                 </div>
-            </header>
+            </div>
+        </header>
 
-            <!-- Main Dynamic Page Content -->
-            <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        {{-- Main Dynamic Page Content --}}
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            @yield('content')
+        </main>
+    </div>
+</div>
 
-                @yield('content')
-            </main>
+{{-- ═══════════════════════════════════════════════
+     Scripts
+═══════════════════════════════════════════════ --}}
+<script>
+    /* ── Sidebar Toggle ── */
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const isHidden = sidebar.classList.contains('-translate-x-full');
+        if (isHidden) {
+            sidebar.classList.remove('-translate-x-full');
+            backdrop && backdrop.classList.remove('hidden');
+        } else {
+            sidebar.classList.add('-translate-x-full');
+            backdrop && backdrop.classList.add('hidden');
+        }
+    }
+
+    function toggleDesktopSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+        localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+    }
+
+    function toggleSubmenu(menuId, chevronId) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('collapsed')) {
+            sidebar.classList.remove('collapsed');
+            localStorage.setItem('sidebar-collapsed', 'false');
+        }
+        const menu = document.getElementById(menuId);
+        const chevron = document.getElementById(chevronId);
+        if (menu) {
+            menu.classList.toggle('hidden');
+            chevron && chevron.classList.toggle('rotate-180');
+        }
+    }
+
+    /* ── Restore sidebar collapse state ── */
+    (function () {
+        if (localStorage.getItem('sidebar-collapsed') === 'true') {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.add('collapsed');
+        }
+    })();
+
+    /* ── Theme Toggle with Circular Reveal Motion & View Transitions API ── */
+    function toggleTheme(event) {
+        const html = document.documentElement;
+        const isDarkNow = html.classList.contains('dark');
+        const willBeDark = !isDarkNow;
+
+        const performToggle = () => {
+            html.classList.toggle('dark', willBeDark);
+            localStorage.setItem('whusnet-theme', willBeDark ? 'dark' : 'light');
+            syncThemeIcon(willBeDark);
+        };
+
+        const prefersReducedMotion = window.matchMedia('(prefers-color-scheme: reduce)').matches ||
+                                     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (document.startViewTransition && !prefersReducedMotion) {
+            let x = window.innerWidth / 2;
+            let y = window.innerHeight / 2;
+
+            if (event && (event.clientX !== undefined || (event.touches && event.touches[0]))) {
+                x = event.clientX ?? event.touches[0].clientX;
+                y = event.clientY ?? event.touches[0].clientY;
+            } else {
+                const btn = document.getElementById('themeToggle');
+                if (btn) {
+                    const rect = btn.getBoundingClientRect();
+                    x = rect.left + rect.width / 2;
+                    y = rect.top + rect.height / 2;
+                }
+            }
+
+            const endRadius = Math.hypot(
+                Math.max(x, window.innerWidth - x),
+                Math.max(y, window.innerHeight - y)
+            );
+
+            html.classList.add('theme-transitioning');
+
+            const transition = document.startViewTransition(() => {
+                performToggle();
+            });
+
+            transition.ready.then(() => {
+                const clipPath = [
+                    `circle(0px at ${x}px ${y}px)`,
+                    `circle(${endRadius}px at ${x}px ${y}px)`
+                ];
+
+                const animation = html.animate(
+                    {
+                        clipPath: willBeDark ? clipPath : [...clipPath].reverse()
+                    },
+                    {
+                        duration: 450,
+                        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                        pseudoElement: willBeDark
+                            ? '::view-transition-new(root)'
+                            : '::view-transition-old(root)'
+                    }
+                );
+
+                animation.onfinish = () => {
+                    html.classList.remove('theme-transitioning');
+                };
+            }).catch(() => {
+                html.classList.remove('theme-transitioning');
+            });
+        } else {
+            html.classList.add('theme-transitioning-fallback');
+            performToggle();
+            setTimeout(() => {
+                html.classList.remove('theme-transitioning-fallback');
+            }, 300);
+        }
+    }
+
+    function syncThemeIcon(isDark) {
+        const moon = document.getElementById('themeIconMoon');
+        const sun = document.getElementById('themeIconSun');
+        if (!moon || !sun) return;
+
+        if (isDark) {
+            moon.classList.add('hidden', 'scale-0', '-rotate-90');
+            moon.classList.remove('scale-100', 'rotate-0');
+
+            sun.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                sun.classList.remove('scale-0', 'rotate-90', 'opacity-0');
+                sun.classList.add('scale-100', 'rotate-0', 'opacity-100');
+            });
+        } else {
+            sun.classList.add('hidden', 'scale-0', 'rotate-90');
+            sun.classList.remove('scale-100', 'rotate-0');
+
+            moon.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                moon.classList.remove('scale-0', '-rotate-90', 'opacity-0');
+                moon.classList.add('scale-100', 'rotate-0', 'opacity-100');
+            });
+        }
+    }
+
+    /* Init theme icons based on current mode */
+    (function () {
+        const isDark = document.documentElement.classList.contains('dark');
+        syncThemeIcon(isDark);
+    })();
+
+    /* Listen to OS changes if user has not set preference */
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (localStorage.getItem('whusnet-theme')) return;
+        document.documentElement.classList.toggle('dark', e.matches);
+        syncThemeIcon(e.matches);
+    });
+
+    /* ── Bantuan / Pintasan Keyboard ── */
+    function setHelpTab(tab) {
+        const on  = 'px-3 py-2 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 border-sky-600 dark:border-sky-400 text-sky-600 dark:text-sky-400';
+        const off = 'px-3 py-2 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100';
+        ['keys', 'actions'].forEach(t => {
+            const btn = document.getElementById('helptab-' + t);
+            const pane = document.getElementById('helppane-' + t);
+            if (btn) { btn.className = t === tab ? on : off; btn.setAttribute('aria-selected', t === tab); }
+            if (pane) pane.classList.toggle('hidden', t !== tab);
+        });
+    }
+
+    function openHelp(tab = 'keys') {
+        setHelpTab(tab);
+        const m = document.getElementById('shortcutsModal');
+        if (m) m.classList.remove('hidden');
+    }
+
+    function closeHelp() {
+        const m = document.getElementById('shortcutsModal');
+        if (m) m.classList.add('hidden');
+    }
+
+    /* Fokuskan pencarian global saat menekan "/" di mana saja */
+    function handleGlobalSearch(e) {
+        if (e.key === 'Escape') e.target.blur();
+    }
+
+    document.addEventListener('keydown', e => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
+                    || document.activeElement.isContentEditable;
+        const helpOpen = !document.getElementById('shortcutsModal')?.classList.contains('hidden');
+
+        if (e.key === 'Escape' && helpOpen) { closeHelp(); return; }
+        if (typing) return;
+
+        if ((e.ctrlKey && e.key.toLowerCase() === 'd') || (e.altKey && e.key.toLowerCase() === 't')) {
+            e.preventDefault();
+            toggleTheme(e);
+            return;
+        }
+
+        if (e.key === '/') {
+            const search = document.getElementById('globalSearch');
+            if (search) { e.preventDefault(); search.focus(); }
+            return;
+        }
+        if (e.key === '?') { e.preventDefault(); openHelp(); }
+    });
+</script>
+<script>
+    window.confirmAction = function(message, formElement) {
+        window.Dialog.show({
+            title: 'Konfirmasi',
+            message: message,
+            icon: 'warning',
+            buttons: [
+                { text: 'Batal', type: 'secondary' },
+                { text: 'Lanjutkan', type: 'primary', onClick: () => {
+                    window.Dialog.close();
+                    if (formElement && formElement.submit) {
+                        if (typeof NProgress !== 'undefined') NProgress.start();
+                        formElement.submit();
+                    }
+                }}
+            ]
+        });
+    };
+
+    window.confirmDelete = function(message, formElement) {
+        window.Dialog.show({
+            title: 'Konfirmasi Hapus',
+            message: message,
+            icon: 'error',
+            buttons: [
+                { text: 'Batal', type: 'secondary' },
+                { text: 'Ya, Hapus', type: 'danger', onClick: () => {
+                    window.Dialog.close();
+                    if (formElement && formElement.submit) {
+                        if (typeof NProgress !== 'undefined') NProgress.start();
+                        formElement.submit();
+                    }
+                }}
+            ]
+        });
+    };
+
+    window.Alert = function(title, message, icon = 'info') {
+        window.Dialog.show({
+            title: title,
+            message: message,
+            icon: icon,
+            buttons: [
+                { text: 'Tutup', type: 'secondary', onClick: () => window.Dialog.close() }
+            ]
+        });
+    };
+
+    window.Confirm = function(title, message, icon = 'warning', onConfirm = null, onCancel = null) {
+        window.Dialog.show({
+            title: title,
+            message: message,
+            icon: icon,
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => {
+                    window.Dialog.close();
+                    if (typeof onCancel === 'function') onCancel();
+                }},
+                { text: 'Ya, Lanjutkan', type: 'primary', onClick: () => {
+                    window.Dialog.close();
+                    if (typeof onConfirm === 'function') onConfirm();
+                }}
+            ]
+        });
+    };
+
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.method && form.method.toLowerCase() === 'get') return;
+        if (form.classList.contains('no-confirm') ||
+            form.id === 'logout-form' ||
+            (form.action && (form.action.includes('login') || form.action.includes('logout')))) {
+            return;
+        }
+        const onsubmitAttr = form.getAttribute('onsubmit');
+        if (onsubmitAttr && (onsubmitAttr.includes('confirmAction') || onsubmitAttr.includes('confirmDelete') || onsubmitAttr.includes('Confirm'))) {
+            return;
+        }
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+
+        let method = form.method.toUpperCase();
+        const methodInput = form.querySelector('input[name="_method"]');
+        if (methodInput) method = methodInput.value.toUpperCase();
+
+        let actionWord = 'menyimpan', title = 'Konfirmasi Simpan', icon = 'warning',
+            confirmText = 'Ya, Simpan', confirmType = 'primary';
+        if (method === 'DELETE') {
+            actionWord = 'menghapus'; title = 'Konfirmasi Hapus'; icon = 'error';
+            confirmText = 'Ya, Hapus'; confirmType = 'danger';
+        } else if (method === 'PUT' || method === 'PATCH') {
+            actionWord = 'mengubah'; title = 'Konfirmasi Ubah'; confirmText = 'Ya, Ubah';
+        } else {
+            title = 'Konfirmasi Tambah'; confirmText = 'Ya, Lanjutkan';
+        }
+
+        let customMessage = null;
+        if (e.submitter && e.submitter.getAttribute('data-confirm')) {
+            customMessage = e.submitter.getAttribute('data-confirm');
+        } else if (form.getAttribute('data-confirm')) {
+            customMessage = form.getAttribute('data-confirm');
+        }
+
+        window.Dialog.show({
+            title: title,
+            message: customMessage || `Apakah Anda yakin ingin ${actionWord} data ini?`,
+            icon: icon,
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => {
+                    window.Dialog.close();
+                    if (typeof NProgress !== 'undefined') NProgress.done();
+                }},
+                { text: confirmText, type: confirmType, onClick: () => {
+                    window.Dialog.close();
+                    form.submit();
+                }}
+            ]
+        });
+    });
+</script>
+
+{{-- ═══════════════════════════════════════════════
+     MODAL BANTUAN & PINTASAN KEYBOARD (global)
+═══════════════════════════════════════════════ --}}
+<style>
+    .kbd {
+        font-family: ui-monospace, 'JetBrains Mono', monospace;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #334155;
+        white-space: nowrap;
+    }
+    html.dark .kbd { border-color: #334155; background: #0f172a; color: #cbd5e1; }
+</style>
+<div id="shortcutsModal" onclick="closeHelp()" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle"
+     class="hidden fixed inset-0 z-50 bg-slate-900/50 dark:bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div onclick="event.stopPropagation()" class="bg-white dark:bg-slate-800 rounded-lg max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+        <div class="px-5 py-3 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between shrink-0">
+            <h2 id="shortcutsTitle" class="font-bold text-slate-900 dark:text-slate-50 text-sm flex items-center gap-2">
+                <svg class="h-4 w-4 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01"/>
+                </svg>
+                Bantuan
+            </h2>
+            <button onclick="closeHelp()" aria-label="Tutup" class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        {{-- Tab bar dalam panel yang sama (border-bottom, bukan card baru) --}}
+        <div class="flex border-b border-slate-100 dark:border-slate-700/60 px-2 shrink-0" role="tablist">
+            <button onclick="setHelpTab('keys')" id="helptab-keys" role="tab"
+                    class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>
+                Pintasan
+            </button>
+            <button onclick="setHelpTab('actions')" id="helptab-actions" role="tab"
+                    class="px-3 py-2 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>
+                Tombol Aksi
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-5 text-xs text-slate-600 dark:text-slate-300">
+
+            {{-- TAB: PINTASAN --}}
+            <div id="helppane-keys" role="tabpanel" aria-labelledby="helptab-keys" class="space-y-5">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Tabel (List Pelanggan)</p>
+                    <dl class="space-y-1.5">
+                        <div class="flex justify-between gap-4"><dt>Pindah baris</dt><dd><kbd class="kbd">&uarr;</kbd> <kbd class="kbd">&darr;</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Baris pertama / terakhir</dt><dd><kbd class="kbd">Home</kbd> <kbd class="kbd">End</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Halaman sebelum / sesudah</dt><dd><kbd class="kbd">PgUp</kbd> <kbd class="kbd">PgDn</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Buka menu aksi baris</dt><dd><kbd class="kbd">Enter</kbd></dd></div>
+                    </dl>
+                </div>
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Global</p>
+                    <dl class="space-y-1.5">
+                        <div class="flex justify-between gap-4"><dt>Fokus pencarian global</dt><dd><kbd class="kbd">/</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Ganti tema Light/Dark</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">D</kbd> / <kbd class="kbd">Alt</kbd>+<kbd class="kbd">T</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Tutup menu / modal</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
+                        <div class="flex justify-between gap-4"><dt>Buka bantuan ini</dt><dd><kbd class="kbd">?</kbd></dd></div>
+                    </dl>
+                </div>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/60 pt-3">
+                    Pintasan tabel tidak aktif saat kursor berada di kolom isian atau saat modal terbuka &mdash;
+                    kecuali <kbd class="kbd">Alt</kbd>+<kbd class="kbd">N</kbd> yang berlaku di mana saja.
+                </p>
+            </div>
+
+            {{-- TAB: TOMBOL AKSI --}}
+            <div id="helppane-actions" role="tabpanel" aria-labelledby="helptab-actions" class="hidden space-y-5">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Menu Aksi Baris &mdash; tombol [&hellip;] di kolom paling kanan</p>
+                    <dl class="space-y-2.5">
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Lihat Detail</dt>
+                                 <dd>Buka halaman pelanggan: layanan, riwayat tagihan, tiket, dan perangkat.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Edit Data</dt>
+                                 <dd>Ubah identitas, alamat, paket, dan harga. Perubahan masuk audit log.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14" rx="1"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Cetak Tagihan</dt>
+                                 <dd>Hasilkan PDF invoice periode berjalan. Tidak mengubah status bayar.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.08-.3-.15-1.26-.47-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.44-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.07c.15.2 2.1 3.2 5.08 4.49.7.3 1.26.49 1.7.63.7.22 1.36.19 1.87.11.57-.08 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.27-.2-.57-.35M12.05 21.8h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26C2.16 6.45 6.6 2.02 12.05 2.02a9.82 9.82 0 0 1 6.99 2.9 9.83 9.83 0 0 1 2.89 6.99c0 5.45-4.44 9.89-9.88 9.89"/></svg>
+                            <div><dt class="font-semibold text-slate-800 dark:text-slate-100">Kirim WhatsApp</dt>
+                                 <dd>Buka percakapan ke nomor pelanggan untuk pengingat tagihan.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="m4.9 4.9 14.2 14.2"/></svg>
+                            <div><dt class="font-semibold text-amber-700 dark:text-amber-300">Isolir Layanan &mdash; bisa dibatalkan</dt>
+                                 <dd>Blokir akses internet sementara. Pelanggan tetap terdaftar dan tagihan tetap berjalan. Butuh konfirmasi; untuk mengembalikan buka menu yang sama &rarr; <em>Buka Isolir</em>.</dd></div>
+                        </div>
+                        <div class="flex gap-3">
+                            <svg class="h-4 w-4 text-rose-600 dark:text-rose-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <div><dt class="font-semibold text-rose-700 dark:text-rose-300">Terminasi &mdash; permanen</dt>
+                                 <dd>Putus langganan dan keluarkan dari billing aktif. Butuh konfirmasi dan <strong>tidak bisa dibatalkan</strong> dari halaman ini.</dd></div>
+                        </div>
+                    </dl>
+                </div>
+                <div class="border-t border-slate-100 dark:border-slate-700/60 pt-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Aksi Massal</p>
+                    <p class="mb-2">Centang kotak di kiri baris &mdash; atau kotak di baris judul untuk memilih seluruh baris
+                       <em>di halaman yang sedang tampil</em> &mdash; lalu pakai bilah biru yang muncul di atas tabel.</p>
+                    <p class="text-[11px] text-slate-400 dark:text-slate-500">
+                       Centang di baris judul sengaja tidak menyapu seluruh hasil filter: memilih ribuan baris
+                       yang tidak terlihat terlalu berisiko untuk aksi seperti Isolir.
+                    </p>
+                </div>
+                <div class="border-t border-slate-100 dark:border-slate-700/60 pt-4">
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500 mb-2">Membaca Kolom Tagihan</p>
+                    <dl class="space-y-1.5">
+                        <div class="flex justify-between gap-4"><dt>Nominal hijau + &ldquo;Lunas&rdquo;</dt><dd class="text-emerald-600 dark:text-emerald-400">sudah dibayar</dd></div>
+                        <div class="flex justify-between gap-4"><dt>Nominal netral + &ldquo;Belum dibayar&rdquo;</dt><dd class="text-slate-500 dark:text-slate-400">belum jatuh tempo</dd></div>
+                        <div class="flex justify-between gap-4"><dt>Nominal &amp; tanggal merah</dt><dd class="text-rose-600 dark:text-rose-400">sudah lewat tempo</dd></div>
+                    </dl>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- Toggle Handlers Script -->
-    <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar.classList.contains('hidden')) {
-                sidebar.classList.remove('hidden');
-                sidebar.classList.add('flex');
-            } else {
-                sidebar.classList.remove('flex');
-                sidebar.classList.add('hidden');
-            }
-        }
-
-        function toggleDesktopSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('collapsed');
-            
-            // Save state to localStorage
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebar-collapsed', isCollapsed);
-        }
-
-        function toggleSubmenu(menuId, chevronId) {
-            const sidebar = document.getElementById('sidebar');
-            // If sidebar is collapsed, expand it first
-            if (sidebar.classList.contains('collapsed')) {
-                sidebar.classList.remove('collapsed');
-                localStorage.setItem('sidebar-collapsed', 'false');
-            }
-
-            const menu = document.getElementById(menuId);
-            const chevron = document.getElementById(chevronId);
-            
-            if (menu.classList.contains('hidden')) {
-                menu.classList.remove('hidden');
-                chevron.classList.add('rotate-180');
-            } else {
-                menu.classList.add('hidden');
-                chevron.classList.remove('rotate-180');
-            }
-        }
-    </script>
-    <script>
-        window.confirmAction = function(message, formElement) {
-            window.Dialog.show({
-                title: 'Konfirmasi',
-                message: message,
-                icon: 'warning',
-                buttons: [
-                    { text: 'Batal', type: 'secondary' },
-                    { text: 'Lanjutkan', type: 'primary', onClick: () => {
-                        window.Dialog.close();
-                        if (formElement && formElement.submit) {
-                            if (typeof NProgress !== 'undefined') NProgress.start();
-                            formElement.submit();
-                        }
-                    }}
-                ]
-            });
-        };
-
-        window.confirmDelete = function(message, formElement) {
-            window.Dialog.show({
-                title: 'Konfirmasi Hapus',
-                message: message,
-                icon: 'error',
-                buttons: [
-                    { text: 'Batal', type: 'secondary' },
-                    { text: 'Ya, Hapus', type: 'danger', onClick: () => {
-                        window.Dialog.close();
-                        if (formElement && formElement.submit) {
-                            if (typeof NProgress !== 'undefined') NProgress.start();
-                            formElement.submit();
-                        }
-                    }}
-                ]
-            });
-        };
-
-        // Global Alert Wrapper
-        window.Alert = function(title, message, icon = 'info') {
-            window.Dialog.show({
-                title: title,
-                message: message,
-                icon: icon,
-                buttons: [
-                    { text: 'Tutup', type: 'secondary', onClick: () => window.Dialog.close() }
-                ]
-            });
-        };
-
-        // Global Confirm Wrapper (Asynchronous)
-        window.Confirm = function(title, message, icon = 'warning', onConfirm = null, onCancel = null) {
-            window.Dialog.show({
-                title: title,
-                message: message,
-                icon: icon,
-                buttons: [
-                    { text: 'Batal', type: 'secondary', onClick: () => {
-                        window.Dialog.close();
-                        if (typeof onCancel === 'function') onCancel();
-                    }},
-                    { text: 'Ya, Lanjutkan', type: 'primary', onClick: () => {
-                        window.Dialog.close();
-                        if (typeof onConfirm === 'function') onConfirm();
-                    }}
-                ]
-            });
-        };
-
-        // Global Form Validation (Intersepsi semua submit form POST/PUT/DELETE)
-        document.addEventListener('submit', function(e) {
-            const form = e.target;
-            
-            // Jangan intercept form GET (seperti filter/pencarian)
-            if (form.method && form.method.toLowerCase() === 'get') return;
-            
-            // Abaikan form yang tidak perlu konfirmasi
-            if (form.classList.contains('no-confirm') || 
-                form.id === 'logout-form' || 
-                (form.action && (form.action.includes('login') || form.action.includes('logout')))) {
-                return;
-            }
-            
-            // Jika form sudah memiliki attribute onsubmit yang menggunakan custom confirm, lewati
-            const onsubmitAttr = form.getAttribute('onsubmit');
-            if (onsubmitAttr && (onsubmitAttr.includes('confirmAction') || onsubmitAttr.includes('confirmDelete') || onsubmitAttr.includes('Confirm'))) {
-                return;
-            }
-            
-            // Hindari intercept jika event default sudah dicegah sebelumnya
-            if (e.defaultPrevented) return;
-            
-            e.preventDefault();
-            
-            let method = form.method.toUpperCase();
-            const methodInput = form.querySelector('input[name="_method"]');
-            if (methodInput) {
-                method = methodInput.value.toUpperCase();
-            }
-            
-            let actionWord = 'menyimpan';
-            let title = 'Konfirmasi Simpan';
-            let icon = 'warning';
-            let confirmText = 'Ya, Simpan';
-            let confirmType = 'primary';
-            
-            if (method === 'DELETE') {
-                actionWord = 'menghapus';
-                title = 'Konfirmasi Hapus';
-                icon = 'error';
-                confirmText = 'Ya, Hapus';
-                confirmType = 'danger';
-            } else if (method === 'PUT' || method === 'PATCH') {
-                actionWord = 'mengubah';
-                title = 'Konfirmasi Ubah';
-                confirmText = 'Ya, Ubah';
-            } else {
-                title = 'Konfirmasi Tambah';
-                confirmText = 'Ya, Lanjutkan';
-            }
-
-            let customMessage = null;
-            if (e.submitter && e.submitter.getAttribute('data-confirm')) {
-                customMessage = e.submitter.getAttribute('data-confirm');
-            } else if (form.getAttribute('data-confirm')) {
-                customMessage = form.getAttribute('data-confirm');
-            }
-            
-            window.Dialog.show({
-                title: title,
-                message: customMessage || `Apakah Anda yakin ingin ${actionWord} data ini?`,
-                icon: icon,
-                buttons: [
-                    { text: 'Batal', type: 'secondary', onClick: () => {
-                        window.Dialog.close();
-                        if (typeof NProgress !== 'undefined') NProgress.done();
-                    }},
-                    { text: confirmText, type: confirmType, onClick: () => {
-                        window.Dialog.close();
-                        form.submit();
-                    }}
-                ]
-            });
-        });
-    </script>
-    
-    @yield('scripts')
-    @stack('scripts')
-    <x-toast />
-    <x-dialog />
+@yield('scripts')
+@stack('scripts')
+<x-toast />
+<x-dialog />
 </body>
 </html>

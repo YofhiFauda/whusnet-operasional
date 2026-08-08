@@ -9,9 +9,7 @@ class FormatHelper
     /**
      * Format a number to Indonesian Rupiah (Rp).
      *
-     * @param float|int|string|null $amount
-     * @param bool $showDecimal
-     * @return string
+     * @param  float|int|string|null  $amount
      */
     public static function rupiah($amount, bool $showDecimal = false): string
     {
@@ -20,15 +18,14 @@ class FormatHelper
         }
 
         $decimals = $showDecimal ? 2 : 0;
-        return 'Rp ' . number_format((float) $amount, $decimals, ',', '.');
+
+        return 'Rp '.number_format((float) $amount, $decimals, ',', '.');
     }
 
     /**
      * Format a date to Indonesian Format (e.g. 16 Juni 2026 or Selasa, 16 Juni 2026).
      *
-     * @param string|\DateTime|Carbon|null $date
-     * @param bool $withDay
-     * @return string
+     * @param  string|\DateTime|Carbon|null  $date
      */
     public static function tanggal($date, bool $withDay = false): string
     {
@@ -39,6 +36,7 @@ class FormatHelper
         try {
             $carbon = Carbon::parse($date)->locale('id');
             $format = $withDay ? 'l, d F Y' : 'd F Y';
+
             return $carbon->translatedFormat($format);
         } catch (\Exception $e) {
             return $date;
@@ -48,9 +46,7 @@ class FormatHelper
     /**
      * Format time to Indonesian Format (e.g. 09:55 WIB).
      *
-     * @param string|\DateTime|Carbon|null $time
-     * @param bool $withWib
-     * @return string
+     * @param  string|\DateTime|Carbon|null  $time
      */
     public static function jam($time, bool $withWib = true): string
     {
@@ -61,7 +57,8 @@ class FormatHelper
         try {
             $carbon = Carbon::parse($time)->locale('id');
             $formatted = $carbon->translatedFormat('H:i');
-            return $withWib ? $formatted . ' WIB' : $formatted;
+
+            return $withWib ? $formatted.' WIB' : $formatted;
         } catch (\Exception $e) {
             return $time;
         }
@@ -70,9 +67,7 @@ class FormatHelper
     /**
      * Format datetime to Indonesian Format (e.g. 16 Juni 2026 09:55 WIB).
      *
-     * @param string|\DateTime|Carbon|null $datetime
-     * @param bool $withDay
-     * @return string
+     * @param  string|\DateTime|Carbon|null  $datetime
      */
     public static function datetime($datetime, bool $withDay = false): string
     {
@@ -83,7 +78,8 @@ class FormatHelper
         try {
             $carbon = Carbon::parse($datetime)->locale('id');
             $dateFormat = $withDay ? 'l, d F Y' : 'd F Y';
-            return $carbon->translatedFormat($dateFormat . ' H:i') . ' WIB';
+
+            return $carbon->translatedFormat($dateFormat.' H:i').' WIB';
         } catch (\Exception $e) {
             return $datetime;
         }

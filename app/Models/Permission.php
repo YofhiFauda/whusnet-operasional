@@ -20,6 +20,7 @@ class Permission extends Model
     use RecordsAuditLogs;
 
     protected string $auditModule = 'Master Permission RBAC';
+
     protected array $auditEvents = ['created', 'updated', 'deleted'];
 
     /**

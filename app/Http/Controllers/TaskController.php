@@ -2,18 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
+use App\Enums\WorkflowTransition;
+use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\AppNotification;
+use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
+use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
+use App\Support\ReasonValidationRule;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class TaskController extends Controller
@@ -30,29 +40,89 @@ class TaskController extends Controller
 
         $user = auth()->user();
         $today = Carbon::today();
+        $startOfToday = $today->copy()->startOfDay();
+        $endOfToday = $today->copy()->endOfDay();
 
-        $tasks = Task::with(['customer', 'pop', 'evidences', 'fop', 'teamMembers'])
+        // village/district/city untuk `clean_address` yang dirender per kartu
+        // (tasks/own.blade.php:133 & partials/own-card.blade.php:61).
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop', 'fop', 'teamMembers', 'fopTask'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
-            ->where(function ($q) use ($today) {
-                $q->whereDate('scheduled_at', $today)
-                  ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->where('status', '!=', TaskStatus::DIBATALKAN->value)
+            // scheduled_at bertipe timestamp, jadi perbandingan tanggal ditulis
+            // sebagai rentang eksplisit. whereDate() membungkusnya jadi
+            // DATE(scheduled_at) sehingga index tanggal tidak pernah terpakai.
+            ->where(function ($q) use ($startOfToday, $endOfToday) {
+                $q->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                    ->orWhereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
                   // Overdue: terjadwal tapi scheduled_at udah lewat hari ini — jangan sampe ilang dari list
-                  ->orWhere(function ($q2) use ($today) {
-                      $q2->where('status', TaskStatus::TERJADWAL->value)
-                         ->whereDate('scheduled_at', '<', $today);
-                  });
+                    ->orWhere(function ($q2) use ($startOfToday) {
+                        $q2->where('status', TaskStatus::TERJADWAL->value)
+                            ->where('scheduled_at', '<', $startOfToday);
+                    });
             })
-            ->orderBy('scheduled_at')
-            ->get();
+            ->get()
+            ->sort(function (Task $a, Task $b) {
+                // 1. Group weight: In Progress (1) > Lapor Nanti (2) > Terjadwal/Other (3)
+                $weightA = match (true) {
+                    $a->status === TaskStatus::IN_PROGRESS => 1,
+                    $a->status === TaskStatus::PENDING && $a->report_deferred => 2,
+                    default => 3,
+                };
+                $weightB = match (true) {
+                    $b->status === TaskStatus::IN_PROGRESS => 1,
+                    $b->status === TaskStatus::PENDING && $b->report_deferred => 2,
+                    default => 3,
+                };
 
-        $upcomingTasks = Task::with(['customer', 'pop'])
+                if ($weightA !== $weightB) {
+                    return $weightA <=> $weightB;
+                }
+
+                // 2. Priority: Urgent (1) > High (2) > Medium (3) > Low (4) > null (5)
+                $priorityA = $a->fopTask?->priority?->sortOrder() ?? 5;
+                $priorityB = $b->fopTask?->priority?->sortOrder() ?? 5;
+
+                if ($priorityA !== $priorityB) {
+                    return $priorityA <=> $priorityB;
+                }
+
+                // 3. SLA / Scheduled at ASC (earlier scheduled_at comes first)
+                $timeA = $a->scheduled_at?->timestamp ?? 0;
+                $timeB = $b->scheduled_at?->timestamp ?? 0;
+
+                if ($timeA !== $timeB) {
+                    return $timeA <=> $timeB;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->values();
+
+        $upcomingTasks = Task::with(['customer.customerAddress', 'pop', 'fopTask'])
             ->whereHas('teamMembers', fn ($q) => $q->where('user_id', $user->id))
-            ->whereDate('scheduled_at', '>', $today)
+            ->where('scheduled_at', '>', $endOfToday)
             ->whereIn('status', [TaskStatus::TERJADWAL->value])
             ->whereNotIn('id', $tasks->pluck('id'))
-            ->orderBy('scheduled_at')
-            ->limit(5)
-            ->get();
+            ->get()
+            ->sort(function (Task $a, Task $b) {
+                $priorityA = $a->fopTask?->priority?->sortOrder() ?? 5;
+                $priorityB = $b->fopTask?->priority?->sortOrder() ?? 5;
+
+                if ($priorityA !== $priorityB) {
+                    return $priorityA <=> $priorityB;
+                }
+
+                $timeA = $a->scheduled_at?->timestamp ?? 0;
+                $timeB = $b->scheduled_at?->timestamp ?? 0;
+
+                if ($timeA !== $timeB) {
+                    return $timeA <=> $timeB;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->take(5)
+            ->values();
 
         return view('tasks.own', compact('tasks', 'upcomingTasks'));
     }
@@ -71,13 +141,32 @@ class TaskController extends Controller
             ->where('user_id', auth()->id())
             ->exists();
 
-        abort_if(!$isMember, 403, 'Anda bukan anggota task ini.');
+        abort_if(! $isMember, 403, 'Anda bukan anggota task ini.');
 
-        $task->load(['customer', 'pop', 'evidences', 'teamMembers']);
+        $task->load(['customer.customerAddress', 'pop', 'teamMembers']);
 
         return view('tasks.partials.own-card', compact('task'));
     }
 
+    /**
+     * Riwayat Task Saya — arsip task yang SUDAH diselesaikan teknisi login.
+     * Beda dari indexOwn(): itu papan kerja hari ini (difilter tanggal +
+     * status aktif), ini arsip lintas waktu, cuma status Selesai.
+     * Guard: task.view.own
+     */
+    public function historyOwn(Request $request): View
+    {
+        $this->authorize('viewOwn', Task::class);
+
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop'])
+            ->whereHas('teamMembers', fn ($q) => $q->where('user_id', auth()->id()))
+            ->where('status', TaskStatus::SELESAI->value)
+            ->latest('completed_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('tasks.own-history', compact('tasks'));
+    }
 
     /**
      * Detail task.
@@ -98,7 +187,15 @@ class TaskController extends Controller
             'pop',
             'fop',
             'teamMembers.user',
-            'evidences.uploader',
+            'completedBy',
+            'auditLogs.user',
+            'maintenanceReport',
+            // fopTask.notes (pointer/catatan FOP) & fopTask.ticket->catatan_teknis
+            // (asesmen NOC) SENGAJA gak pernah digabung ke task->description
+            // (lihat FopTaskController::store()/update() & TicketService::
+            // assignTechnicians()) — ditampilkan di sini di box terpisah sendiri
+            // biar teknisi tetap bisa baca, bukan hilang gara-gara dipisah.
+            'fopTask.ticket',
         ]);
 
         $recentMaintenanceTasks = collect();
@@ -122,10 +219,10 @@ class TaskController extends Controller
     {
         $this->authorize('edit', $task);
 
-        $user        = auth()->user();
-        $pops        = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
+        $user = auth()->user();
+        $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
         $teknisiList = $this->getTeknisiForUser($user);
-        $types       = TaskType::manualOptions();
+        $types = TaskType::manualOptions();
 
         $task->load(['customer', 'teamMembers.user']);
 
@@ -140,12 +237,21 @@ class TaskController extends Controller
     {
         $this->authorize('edit', $task);
 
+        // Tipe auto-only (Survey/Pemasangan/Ambil Modem) tetap dikirim balik oleh
+        // form lewat hidden input (lihat tasks/edit.blade.php) meski dropdown-nya
+        // disabled — kunci validasi harus honor nilai existing itu, sama pola-nya
+        // dengan FopTaskController::update().
+        $lockedExistingType = $task->task_type->value;
+        $typeAllowedValues = in_array($lockedExistingType, TaskType::autoOnlyValues(), true)
+            ? array_unique(array_merge(TaskType::manualValues(), [$lockedExistingType]))
+            : TaskType::manualValues();
+
         $validated = $request->validate([
-            'title'             => 'sometimes|required|string|max:255',
-            'description'       => 'nullable|string|max:2000',
-            'task_type'         => 'sometimes|required|in:' . implode(',', TaskType::manualValues()),
-            'scheduled_at'      => 'sometimes|required|date',
-            'team_member_ids'   => 'sometimes|array|min:1|max:3',
+            'title' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'task_type' => 'sometimes|required|in:'.implode(',', $typeAllowedValues),
+            'scheduled_at' => 'sometimes|required|date',
+            'team_member_ids' => 'sometimes|array|min:1',
             'team_member_ids.*' => 'exists:users,id',
             'conflict_override' => 'nullable|boolean',
         ]);
@@ -169,14 +275,15 @@ class TaskController extends Controller
                 $task->id
             );
 
-            if ($conflicts->isNotEmpty() && !($validated['conflict_override'] ?? false)) {
+            if ($conflicts->isNotEmpty() && ! ($validated['conflict_override'] ?? false)) {
                 $messages = $conflicts->map(function ($team) {
                     $endStr = Carbon::parse($team->task->scheduled_at)->addMinutes($team->task->sla_minutes)->format('H:i');
+
                     return "• {$team->user->name}: Task \"{$team->task->task_number} {$team->task->task_type->label()}\" jam {$team->task->scheduled_at->format('H:i')}-{$endStr}";
                 })->implode('<br>');
 
                 return back()->withInput()->withErrors([
-                    'conflict' => 'Konflik jadwal terdeteksi:<br>' . $messages . '<br><br>Tick "Override konflik" jika ingin lanjut.',
+                    'conflict' => 'Konflik jadwal terdeteksi:<br>'.$messages.'<br><br>Tick "Override konflik" jika ingin lanjut.',
                 ])->with('conflict_user_ids', $conflicts->pluck('user_id')->unique()->toArray());
             }
 
@@ -201,7 +308,8 @@ class TaskController extends Controller
         $this->authorize('cancel', $task);
 
         $validated = $request->validate([
-            'cancel_reason' => 'required|string|max:500',
+            // Task.cancel_reason varchar(255) — max harus samain kapasitas kolom.
+            'cancel_reason' => ReasonValidationRule::required(255),
         ]);
 
         $this->taskService->cancel($task, auth()->user(), $validated['cancel_reason']);
@@ -209,6 +317,76 @@ class TaskController extends Controller
         return redirect()
             ->route('fop.dashboard')
             ->with('success', "Task [{$task->task_number}] berhasil dibatalkan.");
+    }
+
+    /**
+     * Teknisi: Pending top-level — lepas assignment teknisi, balik task ke
+     * antrian Task FOP untuk dijadwalkan ulang. BEDA dari
+     * `TaskStatusController::pending()` (Lapor Nanti, assignment tetap).
+     * SAMA PERSIS perilakunya dengan `pending()` FOP di bawah — "Pending"
+     * cuma 1 logic di sistem ini, siapapun yang trigger (lihat
+     * `releaseTeamAndSetPending()` dan docs/project_status_label_unifikasi.md).
+     * Guard: task.status.reschedule — hanya anggota tim, status terjadwal/in_progress.
+     */
+    public function reschedule(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('statusReschedule', $task);
+
+        $validated = $request->validate([
+            // Task.pending_reason varchar(255) — max harus samain kapasitas kolom.
+            'pending_reason' => ReasonValidationRule::required(255),
+        ]);
+
+        $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'reschedule');
+
+        return redirect()
+            ->route('tasks.own')
+            ->with('success', "Task [{$task->task_number}] di-reschedule, kembali ke antrian FOP.");
+    }
+
+    /**
+     * Set Task ke `Pending` + lepas tim + rebuild jadwal — SATU-SATUNYA
+     * perilaku "pending" di sistem (2026-07-15). Dipanggil dari `reschedule()`
+     * (teknisi, top-level) dan `pending()` (FOP, manual) — beda cuma guard
+     * permission & pesan redirect, kelakuan intinya SAMA PERSIS. Lihat
+     * docs/project_status_label_unifikasi.md § DESAIN FINAL.
+     */
+    private function releaseTeamAndSetPending(Task $task, string $reason, string $auditAction): void
+    {
+        DB::transaction(function () use ($task, $reason, $auditAction) {
+            $oldValues = $task->toArray();
+
+            $task->update([
+                'status' => TaskStatus::PENDING,
+                'pending_reason' => $reason,
+                'updated_by' => auth()->id(),
+            ]);
+
+            $task->teamMembers()->delete();
+
+            AuditLog::log($task, $auditAction, $oldValues, $task->fresh()->toArray());
+
+            $fopTask = FopTask::where('task_id', $task->id)->first();
+
+            if ($fopTask) {
+                $fopOldValues = $fopTask->toArray();
+
+                $fopTask->technicians()->detach();
+                $fopTask->update([
+                    'status' => TaskStatus::PENDING,
+                    'pending_reason' => $reason,
+                    'team_id' => null,
+                ]);
+                $fopTask->manual_override_at = null;
+                $fopTask->save();
+
+                AuditLog::log($fopTask, $auditAction, $fopOldValues, $fopTask->fresh()->toArray());
+
+                if ($fopTask->task_date) {
+                    app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+                }
+            }
+        });
     }
 
     // ─── API Endpoints ───────────────────────────────────────────
@@ -221,29 +399,43 @@ class TaskController extends Controller
     {
         $this->authorize('lookup', Task::class);
 
-        $q    = $request->query('q', '');
+        $q = $request->query('q', '');
         $user = auth()->user();
 
-        $customers = Customer::with('village')->applyUserScope($user)
+        $customers = Customer::with(['village', 'pop'])->applyUserScope($user)
             ->where(function ($query) use ($q) {
                 $query->where('full_name', 'like', "%{$q}%")
-                      ->orWhere('cid', 'like', "%{$q}%")
-                      ->orWhere('customer_code', 'like', "%{$q}%");
+                    ->orWhere('cid', 'like', "%{$q}%")
+                    ->orWhere('customer_code', 'like', "%{$q}%");
             })
-            ->whereIn('status', ['active', 'siap_billing'])
-            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id', 'village_id')
+            ->whereIn('status', [
+                'active',
+                'siap_billing',
+                'registered',
+                'waiting_survey',
+                'survey_in_progress',
+                'surveyed',
+                'waiting_acc',
+                'waiting_installation',
+                'installation_in_progress',
+                'installed',
+                'verification_admin',
+                'revision_installation',
+            ])
+            ->select('id', 'full_name', 'cid', 'customer_code', 'pop_id', 'village_id', 'distribution_id', 'status')
             ->limit(10)
             ->get();
 
         return response()->json($customers->map(function ($c) {
             $desa = $c->village ? strtoupper($c->village->name) : 'NODESA';
-            $cid = $c->cid ?: $c->customer_code;
+            $cid = $c->display_id ?: ($c->cid ?: $c->customer_code);
             $nama = strtoupper($c->full_name);
-            
+
             return [
-                'id'       => $c->id,
-                'label'    => "{$cid}_{$desa}_{$nama}",
-                'pop_id'   => $c->pop_id,
+                'id' => $c->id,
+                'label' => "{$cid}_{$desa}_{$nama}",
+                'pop_id' => $c->pop_id,
+                'village_id' => $c->village_id,
             ];
         }));
     }
@@ -257,9 +449,9 @@ class TaskController extends Controller
         $this->authorize('lookup', Task::class);
 
         $validated = $request->validate([
-            'user_ids'     => 'required|array',
+            'user_ids' => 'required|array',
             'scheduled_at' => 'required|date',
-            'task_type'    => 'required',
+            'task_type' => 'required',
             'exclude_task_id' => 'nullable|integer',
         ]);
 
@@ -275,8 +467,8 @@ class TaskController extends Controller
         $conflictUsers = User::whereIn('id', $conflictIds)->select('id', 'name')->get();
 
         return response()->json([
-            'has_conflict'    => !empty($conflictIds),
-            'conflict_users'  => $conflictUsers,
+            'has_conflict' => ! empty($conflictIds),
+            'conflict_users' => $conflictUsers,
         ]);
     }
 
@@ -290,7 +482,8 @@ class TaskController extends Controller
         $this->authorize('fopReject', $task);
 
         $validated = $request->validate([
-            'reject_reason' => 'required|string|max:1000',
+            // Task.reject_reason varchar(1000).
+            'reject_reason' => ReasonValidationRule::required(1000),
         ]);
 
         $task->update([
@@ -300,49 +493,52 @@ class TaskController extends Controller
 
         $this->notifyTeamMembers(
             $task,
-            'Task Ditolak: ' . $task->task_number,
-            'Task pending ditolak oleh FOP: ' . $validated['reject_reason'],
-            'error'
+            'Task Ditolak: '.$task->task_number,
+            'Task pending ditolak oleh FOP: '.$validated['reject_reason'],
+            NotificationType::ERROR
         );
 
         return back()->with('success', "Task [{$task->task_number}] ditolak (reject).");
     }
 
     /**
-     * FOP: Pending scheduled/in_progress task
+     * FOP: Pending scheduled/in_progress task — lepas tim + rebuild jadwal,
+     * perilaku SAMA PERSIS kayak `reschedule()` teknisi di atas (lihat
+     * `releaseTeamAndSetPending()`). Notifikasi ke tim dikirim SEBELUM tim
+     * dilepas (`releaseTeamAndSetPending` men-detach pivot-nya, jadi query tim
+     * sesudahnya bakal kosong).
      */
     public function pending(Request $request, Task $task): RedirectResponse
     {
         $this->authorize('fopPending', $task);
 
         $validated = $request->validate([
-            'pending_reason' => 'required|string|max:1000',
-        ]);
-
-        $task->update([
-            'status' => TaskStatus::PENDING,
-            'pending_reason' => $validated['pending_reason'],
+            // Task.pending_reason varchar(255) — max harus samain kapasitas kolom.
+            'pending_reason' => ReasonValidationRule::required(255),
         ]);
 
         $this->notifyTeamMembers(
             $task,
-            'Task Di-pending: ' . $task->task_number,
-            'Task ditangguhkan oleh FOP: ' . $validated['pending_reason'],
-            'warning'
+            'Task Di-pending: '.$task->task_number,
+            'Task ditangguhkan oleh FOP: '.$validated['pending_reason'],
+            NotificationType::WARNING
         );
+
+        $this->releaseTeamAndSetPending($task, $validated['pending_reason'], 'pending');
 
         return back()->with('success', "Task [{$task->task_number}] di-pending.");
     }
 
-    /**
-     */
-    public function review(Request $request, Task $task, \App\Services\CustomerWorkflowService $workflowService): RedirectResponse
+    public function review(Request $request, Task $task, CustomerWorkflowService $workflowService): RedirectResponse
     {
         $this->authorize('review', $task);
 
         $validated = $request->validate([
             'action' => 'required|in:approve,reject,pending',
-            'reason' => 'required_if:action,reject,pending|nullable|string|max:1000',
+            // 'reason' ditulis ke reject_reason (varchar 1000) ATAU pending_reason
+            // (varchar 255) tergantung $action — dicap ke yg lebih kecil (255)
+            // biar gak pernah overflow kolom manapun tujuannya.
+            'reason' => 'required_if:action,reject,pending|nullable|string|max:255',
         ]);
 
         $action = $validated['action'];
@@ -360,19 +556,19 @@ class TaskController extends Controller
             }
 
             $task->update(['fop_review_status' => 'approved']);
-            \App\Models\AuditLog::log($task, 'approved', $oldValues, $task->toArray());
+            AuditLog::log($task, 'approved', $oldValues, $task->toArray());
 
             // Transition customer status
             if ($task->customer) {
                 if ($task->task_type === TaskType::SURVEY) {
-                    $workflowService->transition($task->customer, \App\Enums\WorkflowTransition::WAITING_INSTALLATION, 'Survey Approved by FOP');
+                    $workflowService->transition($task->customer, WorkflowTransition::WAITING_INSTALLATION, 'Survey Approved by FOP');
                 }
             }
             $this->notifyTeamMembers(
                 $task,
-                'Laporan Disetujui: ' . $task->task_number,
+                'Laporan Disetujui: '.$task->task_number,
                 'Laporan task Anda telah disetujui oleh FOP.',
-                'success'
+                NotificationType::SUCCESS
             );
             $msg = 'disetujui';
         } elseif ($action === 'reject') {
@@ -381,21 +577,21 @@ class TaskController extends Controller
                 'fop_review_status' => 'rejected',
                 'reject_reason' => $reason,
             ]);
-            \App\Models\AuditLog::log($task, 'rejected', $oldValues, $task->toArray());
+            AuditLog::log($task, 'rejected', $oldValues, $task->toArray());
 
             // Revert customer status
             if ($task->customer) {
                 if ($task->task_type === TaskType::SURVEY) {
-                    $workflowService->transition($task->customer, \App\Enums\WorkflowTransition::SURVEY_IN_PROGRESS, 'Survey Rejected by FOP: ' . $reason);
+                    $workflowService->transition($task->customer, WorkflowTransition::SURVEY_IN_PROGRESS, 'Survey Rejected by FOP: '.$reason);
                 } elseif ($task->task_type === TaskType::PEMASANGAN) {
-                    $workflowService->transition($task->customer, \App\Enums\WorkflowTransition::INSTALLATION_IN_PROGRESS, 'Installation Rejected by FOP: ' . $reason);
+                    $workflowService->transition($task->customer, WorkflowTransition::INSTALLATION_IN_PROGRESS, 'Installation Rejected by FOP: '.$reason);
                 }
             }
             $this->notifyTeamMembers(
                 $task,
-                'Laporan Ditolak: ' . $task->task_number,
-                'Laporan task Anda ditolak oleh FOP: ' . $reason,
-                'error'
+                'Laporan Ditolak: '.$task->task_number,
+                'Laporan task Anda ditolak oleh FOP: '.$reason,
+                NotificationType::ERROR
             );
             $msg = 'ditolak dan dikembalikan ke In Progress';
         } elseif ($action === 'pending') {
@@ -406,9 +602,9 @@ class TaskController extends Controller
             ]);
             $this->notifyTeamMembers(
                 $task,
-                'Task Di-pending: ' . $task->task_number,
-                'Task Anda di-pending kembali oleh FOP: ' . $reason,
-                'warning'
+                'Task Di-pending: '.$task->task_number,
+                'Task Anda di-pending kembali oleh FOP: '.$reason,
+                NotificationType::WARNING
             );
             $msg = 'di-pending';
         }
@@ -421,30 +617,35 @@ class TaskController extends Controller
     private function initials(string $name): string
     {
         $words = explode(' ', trim($name));
+
         return strtoupper(
             implode('', array_map(fn ($w) => substr($w, 0, 1), array_slice($words, 0, 2)))
         );
     }
 
-    private function getTeknisiForUser(User $user): \Illuminate\Database\Eloquent\Collection
+    private function getTeknisiForUser(User $user): Collection
     {
         /** @var EffectiveAccessService $accessService */
         $accessService = app(EffectiveAccessService::class);
-        $allowedPopIds = $accessService->getAllowedPopIds($user);
 
         $query = User::with('role')
             ->whereHas('role', fn ($q) => $q->where('code', 'teknisi'))
             ->orderBy('name');
 
-        if (!empty($allowedPopIds)) {
-            // Filter teknisi berdasarkan POP yang boleh diakses FOP
+        // Pakai hasAllPopAccess(), bukan `! empty($allowedPopIds)`: getAllowedPopIds()
+        // mengembalikan array kosong untuk ALL_POP *dan* untuk user yang scope-nya
+        // belum di-setup. Menafsirkan kosong = "jangan filter" bikin user tanpa
+        // scope malah lihat SEMUA teknisi lintas cabang di dropdown assign task
+        // (lihat CLAUDE.md § POP Scope, docs/plan/analisa-celah-scope-pop.md).
+        if (! $accessService->hasAllPopAccess($user)) {
+            $allowedPopIds = $accessService->getAllowedPopIds($user);
             $query->whereHas('roleScopes.targets', fn ($q) => $q->whereIn('pop_id', $allowedPopIds));
         }
 
         return $query->get();
     }
 
-    private function buildTeamStats(\Illuminate\Database\Eloquent\Collection $todayTasks): array
+    private function buildTeamStats(Collection $todayTasks): array
     {
         // Kumpulkan semua user unik dari semua task hari ini
         $teamsMap = [];
@@ -453,22 +654,24 @@ class TaskController extends Controller
             $members = $task->teamMembers ?? collect();
             // Buat key dari sorted user IDs untuk grouping
             $memberIds = $members->pluck('user_id')->sort()->values()->implode(',');
-            if (!$memberIds) continue;
+            if (! $memberIds) {
+                continue;
+            }
 
-            if (!isset($teamsMap[$memberIds])) {
+            if (! isset($teamsMap[$memberIds])) {
                 $teamsMap[$memberIds] = [
-                    'name'         => 'Tim ' . (count($teamsMap) + 1), // Will be replaced
-                    'members'      => [],
-                    'task_count'   => 0,
+                    'name' => 'Tim '.(count($teamsMap) + 1), // Will be replaced
+                    'members' => [],
+                    'task_count' => 0,
                     'selesai_count' => 0,
-                    'color'        => collect(['bg-sky-500', 'bg-green-500', 'bg-amber-500', 'bg-purple-500'])->get(count($teamsMap), 'bg-slate-500'),
-                    'extra_count'  => 0,
+                    'color' => collect(['bg-sky-500', 'bg-green-500', 'bg-amber-500', 'bg-purple-500'])->get(count($teamsMap), 'bg-slate-500'),
+                    'extra_count' => 0,
                 ];
 
                 $maxShow = 2;
                 foreach ($members->take($maxShow) as $member) {
                     $teamsMap[$memberIds]['members'][] = [
-                        'name'     => $member->user?->name ?? '?',
+                        'name' => $member->user?->name ?? '?',
                         'initials' => $this->initials($member->user?->name ?? '?'),
                     ];
                 }
@@ -486,15 +689,15 @@ class TaskController extends Controller
         return array_values($teamsMap);
     }
 
-    private function notifyTeamMembers(Task $task, string $title, string $message, string $type = 'info'): void
+    private function notifyTeamMembers(Task $task, string $title, string $message, NotificationType $type = NotificationType::INFO): void
     {
         $task->loadMissing('teamMembers.user');
         $url = route('tasks.show', $task->id);
         foreach ($task->teamMembers as $member) {
             if ($member->user) {
-                /** @var \App\Models\User $user */
+                /** @var User $user */
                 $user = $member->user;
-                $user->notify(new \App\Notifications\AppNotification(
+                $user->notify(new AppNotification(
                     title: $title,
                     message: $message,
                     actionUrl: $url,
@@ -504,6 +707,3 @@ class TaskController extends Controller
         }
     }
 }
-
-
-

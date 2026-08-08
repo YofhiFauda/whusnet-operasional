@@ -4,13 +4,13 @@ namespace Tests\Feature\Master;
 
 use App\Models\Distribution;
 use App\Models\Pop;
-use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Tests\TestCase;
+
 class DistributionTest extends TestCase
 {
     use RefreshDatabase, WithoutMiddleware;
@@ -34,13 +34,13 @@ class DistributionTest extends TestCase
         Distribution::create([
             'pop_id' => $pop1->id,
             'code' => 'D1',
-            'name' => 'Dist 1'
+            'name' => 'Dist 1',
         ]);
 
         // Attempt to create same code 'D1' in POP 2
         $response = $this->post(route('master.distribusi.store'), [
             'pop_id' => $pop2->id,
-            'code' => 'D1', 
+            'code' => 'D1',
             'name' => 'Dist 2',
         ]);
 

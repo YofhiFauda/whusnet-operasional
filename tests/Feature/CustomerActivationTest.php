@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -12,13 +13,14 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
-use App\Models\AuditLog;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
 use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
-use Database\Seeders\InternetPackageSeeder;
-use Database\Seeders\PonorogoRegionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,6 +32,8 @@ class CustomerActivationTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
@@ -45,14 +49,13 @@ class CustomerActivationTest extends TestCase
         $village = Village::query()->where('district_id', $district->id)->firstOrFail();
 
         $customer = Customer::create([
+            'old_customer_id' => 'OLD-001',
             'customer_code' => 'D00C000001',  // format baru: {cid_prefix}00{registration_prefix}{######}
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'installed',
-            'customer_status' => 'menunggu_pemasangan',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -86,6 +89,7 @@ class CustomerActivationTest extends TestCase
             'activation_date' => '2026-06-01',
             'due_date' => '2026-07-01',
             'service_status' => 'menunggu_pemasangan',
+            'request_status' => 'ACTIVE',
             'billing_status' => 'pending',
         ]);
 
@@ -100,7 +104,6 @@ class CustomerActivationTest extends TestCase
             'status' => 'active',
         ]);
         /** @var User $user */
-
         $pop = Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'TST',
@@ -119,7 +122,7 @@ class CustomerActivationTest extends TestCase
         $response = $this->post("/customers/{$customer->id}/activate");
 
         $response->assertStatus(403);
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
         $this->assertNull($customer->cid);
@@ -144,7 +147,6 @@ class CustomerActivationTest extends TestCase
             'customer_code' => 'WHUS-2026-0001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'installed',
@@ -155,7 +157,7 @@ class CustomerActivationTest extends TestCase
 
         $response->assertRedirect("/customers/{$customer->id}");
         $response->assertSessionHas('error');
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
         $this->assertNull($customer->cid);
@@ -187,12 +189,13 @@ class CustomerActivationTest extends TestCase
 
         // Customer assertions
         $this->assertEquals('active', $customer->status);
-        $this->assertEquals('aktif', $customer->customer_status);
+        // service_status kini sumber kebenaran (customers.customer_status di-drop)
+        $this->assertEquals('aktif', $customer->customerService()->value('service_status'));
         $this->assertEquals('siap_billing', $customer->data_completeness_status);
         $this->assertNotNull($customer->cid);
         // CID format: {cid_prefix}{mini_pop_or_olt}{dist_code}{request_id}_{DESA}_{NAMA}
-        // POP ini belum mini POP, jadi memakai fallback olt='0' dan dist='XX'
-        // Contoh: D0XXC000001_BABADAN_BUDISANTOSO
+        // POP ini belum di-assign mini POP maupun distribusi, jadi keduanya default '0'
+        // Contoh: D00C000001_BABADAN_BUDISANTOSO
         $this->assertStringStartsWith('D', $customer->cid);
         $this->assertStringContainsString('C000001', $customer->cid);
 
@@ -210,7 +213,7 @@ class CustomerActivationTest extends TestCase
             'auditable_id' => $customer->id,
         ]);
 
-        $log = AuditLog::where('auditable_id', $customer->id)->firstOrFail();
+        $log = AuditLog::where('auditable_id', $customer->id)->where('action', 'activate')->firstOrFail();
         $this->assertNotNull($log->old_values);
         $this->assertNotNull($log->new_values);
         $this->assertEquals('active', $log->new_values['status']);

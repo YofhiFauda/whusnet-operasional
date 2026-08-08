@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\Role;
-use App\Models\Permission;
-use App\Models\Feature;
 use App\Models\Action;
+use App\Models\Feature;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,7 +15,9 @@ class RolePermissionMatrixTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Role $targetRole;
+
     protected Permission $testPerm;
 
     protected function setUp(): void
@@ -23,33 +25,31 @@ class RolePermissionMatrixTest extends TestCase
         parent::setUp();
 
         // Create manage_roles permission
-        $feature = Feature::create(['code' => 'roles', 'name' => 'Roles', 'type' => 'root', 'is_active' => true]);
-        $action = Action::create(['code' => 'update', 'name' => 'Manage']);
-        $perm = Permission::create([
+        $feature = Feature::firstOrCreate(['code' => 'roles'], ['name' => 'Roles', 'type' => 'root', 'is_active' => true]);
+        $action = Action::firstOrCreate(['code' => 'update'], ['name' => 'Manage']);
+        $perm = Permission::firstOrCreate(['code' => 'manage_roles'], [
             'feature_id' => $feature->id,
             'action_id' => $action->id,
-            'code' => 'manage_roles',
             'name' => 'Manage Roles',
-            'module' => 'System'
+            'module' => 'System',
         ]);
 
-        $ownerRole = Role::create(['name' => 'Owner', 'code' => 'owner', 'is_system' => true]);
-        $ownerRole->permissions()->attach($perm);
+        $ownerRole = Role::firstOrCreate(['code' => 'owner'], ['name' => 'Owner', 'is_system' => true]);
+        $ownerRole->permissions()->syncWithoutDetaching([$perm->id]);
 
         $this->user = User::factory()->create([
-            'role_id' => $ownerRole->id
+            'role_id' => $ownerRole->id,
         ]);
-        
+
         // Target role to edit
         $this->targetRole = Role::create(['name' => 'Test Role', 'code' => 'test']);
-        
-        $action2 = Action::create(['code' => 'view', 'name' => 'View']);
-        $this->testPerm = Permission::create([
+
+        $action2 = Action::firstOrCreate(['code' => 'view'], ['name' => 'View']);
+        $this->testPerm = Permission::firstOrCreate(['code' => 'dummy_permission'], [
             'feature_id' => $feature->id,
             'action_id' => $action2->id,
-            'code' => 'dummy_permission',
             'name' => 'Dummy',
-            'module' => 'Test'
+            'module' => 'Test',
         ]);
     }
 
@@ -72,7 +72,7 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertCount(0, $this->targetRole->permissions);
 
         $response = $this->actingAs($this->user)->put(route('roles.update', $this->targetRole), [
-            'permissions' => [$this->testPerm->id]
+            'permissions' => [$this->testPerm->id],
         ]);
 
         $response->assertRedirect(route('roles.index'));
@@ -83,9 +83,9 @@ class RolePermissionMatrixTest extends TestCase
     public function test_cannot_update_owner_permissions()
     {
         $ownerRole = Role::where('name', 'Owner')->first();
-        
+
         $response = $this->actingAs($this->user)->put(route('roles.update', $ownerRole), [
-            'permissions' => []
+            'permissions' => [],
         ]);
 
         $response->assertRedirect();

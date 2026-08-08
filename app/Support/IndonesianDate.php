@@ -36,6 +36,20 @@ class IndonesianDate
         return self::carbon($date)->format('H.i').' WIB';
     }
 
+    /**
+     * Tanggal + jam sampai detik (format kolon HH:MM:SS), dipakai di tabel
+     * ringkasan workflow tempat presisi detik matter (perbandingan timestamp
+     * legacy antar tahap yang jaraknya cuma hitungan detik).
+     */
+    public static function dateTimeWithSeconds(CarbonInterface|string|null $date): string
+    {
+        if (! $date) {
+            return '-';
+        }
+
+        return self::carbon($date)->translatedFormat('d F Y, H:i:s').' WIB';
+    }
+
     private static function carbon(CarbonInterface|string $date): CarbonInterface
     {
         if ($date instanceof CarbonInterface) {

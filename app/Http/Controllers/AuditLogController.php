@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class AuditLogController extends Controller
@@ -39,8 +40,22 @@ class AuditLogController extends Controller
         }
 
         $auditLogs = $query->paginate(15)->withQueryString();
-        $modules = AuditLog::query()->select('module')->distinct()->orderBy('module')->pluck('module');
-        $actions = AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action');
+
+        // Dua DISTINCT ini cuma mengisi dropdown filter, tapi keduanya menyapu
+        // SELURUH audit_logs — tabel yang paling cepat tumbuh di sistem — setiap
+        // kali halaman dibuka. Bahkan dengan index, DISTINCT di tabel besar tetap
+        // mahal. Daftar modul & aksi praktis tidak pernah berubah (nilainya
+        // ditentukan kode, bukan input user), jadi cache 5 menit sudah cukup.
+        $modules = Cache::remember(
+            'audit_logs.distinct_modules',
+            now()->addMinutes(5),
+            fn () => AuditLog::query()->select('module')->distinct()->orderBy('module')->pluck('module')->toArray()
+        );
+        $actions = Cache::remember(
+            'audit_logs.distinct_actions',
+            now()->addMinutes(5),
+            fn () => AuditLog::query()->select('action')->distinct()->orderBy('action')->pluck('action')->toArray()
+        );
 
         return view('audit-logs.index', compact('auditLogs', 'modules', 'actions', 'module', 'action', 'search'));
     }

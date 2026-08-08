@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Http\Controllers\Master\SlaTimelineController;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -25,15 +24,24 @@ class DatabaseSeeder extends Seeder
         $this->call(PermissionSeeder::class);
         $this->call(SlaTimelineFeatureSeeder::class);
         $this->call(RolePermissionSeeder::class);
-        $this->call(CustomerSeeder::class);
-        $this->call(MasterPopSeeder::class);
-        $this->call(TechnicianSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(WorkflowTransitionPermissionSeeder::class);
-        $this->call(TaskFeatureSeeder::class); 
-        $this->call(PackageSlaSettingSeeder::class); //UNTUK MENGATUR DURASI SLA TIAP PACKAGE
-        $this->call(SlaTimelineFeatureSeeder::class); //UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
-        
+        $this->call(TaskFeatureSeeder::class);
+        $this->call(PackageSlaSettingSeeder::class); // UNTUK MENGATUR DURASI SLA TIAP PACKAGE
+        $this->call(SlaTimelineFeatureSeeder::class); // UNTUK MENGATUR Timeline SLA TIAP TUGAS / RBAC
+        $this->call(TicketFeatureSeeder::class); // Ticketing + Worksheet/Dashboard NOC
+        $this->call(TicketIssueCategoryFeatureSeeder::class);
+        $this->call(ItemFeatureSeeder::class); // Master Barang/Material
+        $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
+        $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.* ke-sync ke owner
+        $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
+        $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
+        $this->call(WorkToolSeeder::class); // Isi awal master alat kerja
+
+        // $this->call(CustomerSeeder::class);
+        // $this->call(MasterPopSeeder::class);
+        $this->call(TechnicianSeeder::class);
 
         // User::factory(10)->create();
 

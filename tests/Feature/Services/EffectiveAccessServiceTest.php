@@ -23,7 +23,7 @@ class EffectiveAccessServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new EffectiveAccessService();
+        $this->service = new EffectiveAccessService;
     }
 
     public function test_it_caches_and_returns_permissions()
@@ -67,7 +67,7 @@ class EffectiveAccessServiceTest extends TestCase
     public function test_user_can_resolves_wildcard()
     {
         $role = Role::create(['name' => 'Role3', 'code' => 'role_3']);
-        
+
         // Setup role with a global wildcard and a feature wildcard
         $perm1 = Permission::create(['code' => '*']);
         $perm2 = Permission::create(['code' => 'customers.*']);
@@ -111,7 +111,7 @@ class EffectiveAccessServiceTest extends TestCase
 
         $this->assertEquals(ScopeType::SELECTED_POP, $this->service->getScopeType($user));
         $allowed = $this->service->getAllowedPopIds($user);
-        
+
         $this->assertCount(2, $allowed);
         $this->assertTrue(in_array($pop1->id, $allowed));
         $this->assertTrue(in_array($pop2->id, $allowed));
@@ -121,7 +121,7 @@ class EffectiveAccessServiceTest extends TestCase
     {
         $role = Role::create(['name' => 'Atasan', 'code' => 'atasan']);
         $user = User::factory()->create(['role_id' => $role->id]);
-        
+
         $mainPop = Pop::factory()->create();
         $childPop1 = Pop::factory()->create(['parent_id' => $mainPop->id]);
         $childPop2 = Pop::factory()->create(['parent_id' => $mainPop->id]);
@@ -146,7 +146,7 @@ class EffectiveAccessServiceTest extends TestCase
         $this->assertTrue(in_array($childPop1->id, $allowed));
         $this->assertTrue(in_array($childPop2->id, $allowed));
         $this->assertTrue(in_array($grandchildPop->id, $allowed));
-        
+
         $this->assertFalse(in_array($otherPop->id, $allowed));
     }
 

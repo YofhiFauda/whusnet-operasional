@@ -59,7 +59,7 @@ class RoleSeeder extends Seeder
             [
                 'code' => 'admin',
                 'name' => 'Admin',
-                'description' => 'Admin Operasional (Akses Penuh)',
+                'description' => 'Admin Operasional',
                 'is_system' => true,
             ],
             [
@@ -98,6 +98,17 @@ class RoleSeeder extends Seeder
                 'description' => 'Administrator Cabang / POP',
                 'is_system' => true,
             ],
+            [
+                // Penagih lapangan — role RBAC global (bukan per-cabang,
+                // dibatasi lewat scope POP), berbeda dari Admin POP.
+                // Admin POP boleh merangkap kolektor, sebaliknya tidak.
+                // Kolektor TIDAK boleh input pembayaran sama sekali.
+                // docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §B-8 no. 4.
+                'code' => 'kolektor',
+                'name' => 'Kolektor',
+                'description' => 'Penagih Lapangan (Worklist Read-Only, Tidak Bisa Input Pembayaran)',
+                'is_system' => true,
+            ],
         ];
 
         foreach ($roles as $roleData) {
@@ -107,7 +118,7 @@ class RoleSeeder extends Seeder
                     'code' => $roleData['code'],
                     'guard_name' => 'web',
                     'description' => $roleData['description'],
-                    'is_system' => $roleData['is_system']
+                    'is_system' => $roleData['is_system'],
                 ]
             );
         }

@@ -25,7 +25,6 @@ class CustomerStatusLog extends Model
         'note',
     ];
 
-
     /**
      * Get the customer that owns this log.
      */

@@ -13,7 +13,9 @@ class UserRoleScope extends Model
     use RecordsAuditLogs;
 
     protected string $auditModule = 'User Role Scope';
+
     protected array $auditEvents = ['created', 'updated', 'deleted'];
+
     protected $fillable = [
         'user_id',
         'role_id',

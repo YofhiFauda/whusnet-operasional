@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
-use App\Models\FopTask;
-use App\Models\Village;
-use App\Models\District;
 use App\Models\City;
+use App\Models\District;
+use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\Permission;
 use App\Models\User;
+use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -19,11 +22,17 @@ class FopTasksTest extends TestCase
     use RefreshDatabase;
 
     private User $ownerUser;
+
     private User $fopUser;
+
     private User $unauthorizedUser;
+
     private Village $village;
+
     private Pop $pop;
+
     private User $technician1;
+
     private User $technician2;
 
     protected function setUp(): void
@@ -31,10 +40,10 @@ class FopTasksTest extends TestCase
         parent::setUp();
 
         // Generate features, actions, roles and permissions first
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         // Fetch populated roles
         $ownerRole = Role::where('code', 'owner')->first();
@@ -45,8 +54,9 @@ class FopTasksTest extends TestCase
         // Create Users
         $this->ownerUser = User::factory()->create(['role_id' => $ownerRole->id]);
         $this->fopUser = User::factory()->create(['role_id' => $fopRole->id]);
+        $this->giveAllPopScope($this->fopUser);
         $this->unauthorizedUser = User::factory()->create(['role_id' => $salesRole->id]);
-        
+
         $this->technician1 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
         $this->technician2 = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active']);
 
@@ -56,16 +66,16 @@ class FopTasksTest extends TestCase
         $this->village = Village::create([
             'district_id' => $district->id,
             'name' => 'Polorejo',
-            'postal_code' => '63491'
+            'postal_code' => '63491',
         ]);
-        
+
         $this->pop = Pop::create([
             'name' => 'POP Polorejo',
             'code' => 'POP-PLR',
             'type' => 'branch',
             'address' => 'Polorejo',
             'status' => 'active',
-            'city_id' => $city->id
+            'city_id' => $city->id,
         ]);
     }
 
@@ -91,8 +101,8 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'FO CUT di tiang 5',
-            'status' => 'Proses',
-            'priority' => 'High'
+            'status' => 'terjadwal',
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
@@ -111,16 +121,16 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Request khusus',
-            'status' => 'Proses',
+            'status' => 'terjadwal',
             'priority' => 'Medium',
-            'technicians' => [$this->technician1->id, $this->technician2->id]
+            'technicians' => [$this->technician1->id, $this->technician2->id],
         ]);
 
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseHas('fop_tasks', [
             'category' => 'C-REQ',
             'tugas' => 'Instalasi Jalur Baru Kantor',
-            'status' => 'Proses'
+            'status' => 'terjadwal',
         ]);
 
         $task = FopTask::where('tugas', 'Instalasi Jalur Baru Kantor')->first();
@@ -136,9 +146,9 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Backbone LOS',
-            'status' => 'Pending',
+            'status' => 'pending',
             'priority' => 'Urgent',
-            'technicians' => [$this->technician1->id]
+            'technicians' => [$this->technician1->id],
         ]);
 
         $response->assertSessionHasErrors(['pending_reason', 'client_request_date']);
@@ -154,18 +164,18 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Backbone LOS',
-            'status' => 'Pending',
+            'status' => 'pending',
             'priority' => 'Urgent',
             'pending_reason' => 'Menunggu perizinan warga',
             'client_request_date' => $reqDate,
-            'technicians' => [$this->technician1->id]
+            'technicians' => [$this->technician1->id],
         ]);
 
         $response->assertRedirect(route('fop-tasks.index'));
         $this->assertDatabaseHas('fop_tasks', [
-            'status' => 'Pending',
+            'status' => 'pending',
             'pending_reason' => 'Menunggu perizinan warga',
-            'client_request_date' => $reqDate . ' 00:00:00'
+            'client_request_date' => $reqDate.' 00:00:00',
         ]);
     }
 
@@ -179,16 +189,17 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Proses',
-            'priority' => 'High'
+            'status' => 'terjadwal',
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->put(route('fop-tasks.update', $task->id), [
-            'status' => 'Cancel'
+            'status' => 'dibatalkan',
+            'cancel_reason' => 'Test cancel',
         ]);
 
         $task->refresh();
-        $this->assertEquals('Cancel', $task->status->value);
+        $this->assertEquals('dibatalkan', $task->status->value);
         $this->assertNotNull($task->cancelled_at);
     }
 
@@ -203,9 +214,9 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Cancel',
+            'status' => 'dibatalkan',
             'priority' => 'High',
-            'cancelled_at' => Carbon::yesterday()
+            'cancelled_at' => Carbon::yesterday(),
         ]);
 
         // 2. Task cancelled today
@@ -217,9 +228,9 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Cancel',
+            'status' => 'dibatalkan',
             'priority' => 'High',
-            'cancelled_at' => Carbon::now()
+            'cancelled_at' => Carbon::now(),
         ]);
 
         $this->artisan('fop:reset-cancelled-tasks')->assertExitCode(0);
@@ -227,12 +238,12 @@ class FopTasksTest extends TestCase
         $yesterdayTask->refresh();
         $todayTask->refresh();
 
-        // Yesterday's cancelled task must be reset to Proses
-        $this->assertEquals('Proses', $yesterdayTask->status->value);
+        // Yesterday's cancelled task must be reset to in_progress
+        $this->assertEquals('in_progress', $yesterdayTask->status->value);
         $this->assertNull($yesterdayTask->cancelled_at);
 
-        // Today's cancelled task must remain Cancel
-        $this->assertEquals('Cancel', $todayTask->status->value);
+        // Today's cancelled task must remain dibatalkan
+        $this->assertEquals('dibatalkan', $todayTask->status->value);
         $this->assertNotNull($todayTask->cancelled_at);
     }
 
@@ -246,8 +257,8 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'LOS',
-            'status' => 'Proses',
-            'priority' => 'High'
+            'status' => 'terjadwal',
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->delete(route('fop-tasks.destroy', $task->id));
@@ -277,13 +288,15 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
-            'status' => 'Selesai',
-            'priority' => 'High'
+            'status' => 'selesai',
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.history'));
         $response->assertStatus(200);
-        $response->assertSee('TFOP-2026-9999');
+        // task_number gak dirender sebagai teks di tabel Riwayat (cuma tugas/kategori/dst) —
+        // dulu kebetulan lolos gara-gara json_encode($task) di tombol Edit yang sekarang
+        // udah dihapus (Riwayat gak boleh ada aksi edit/delete lagi).
         $response->assertSee('Perbaikan FO Selesai');
     }
 
@@ -297,8 +310,8 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Selesai',
-            'status' => 'Selesai',
-            'priority' => 'High'
+            'status' => 'selesai',
+            'priority' => 'High',
         ]);
 
         $cancelledTask = FopTask::create([
@@ -309,8 +322,8 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Cancelled',
-            'status' => 'Cancel',
-            'priority' => 'High'
+            'status' => 'dibatalkan',
+            'priority' => 'High',
         ]);
 
         $activeTask = FopTask::create([
@@ -321,8 +334,8 @@ class FopTasksTest extends TestCase
             'village_id' => $this->village->id,
             'pop_id' => $this->pop->id,
             'issue' => 'Proses',
-            'status' => 'Proses',
-            'priority' => 'High'
+            'status' => 'terjadwal',
+            'priority' => 'High',
         ]);
 
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
@@ -330,5 +343,83 @@ class FopTasksTest extends TestCase
         $response->assertDontSee('TFOP-2026-1000');
         $response->assertDontSee('TFOP-2026-2000');
         $response->assertSee('TFOP-2026-3000');
+    }
+
+    public function test_team_conflict_still_shows_after_modal_closed_and_page_reloaded(): void
+    {
+        $joko = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Joko']);
+        $cagak = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Cagak']);
+        $tri = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Tri']);
+        $suci = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->first()->id, 'status' => 'active', 'name' => 'Suci']);
+
+        $date = now()->format('Y-m-d').' 08:00:00';
+
+        $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
+            'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
+            'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
+            'status' => 'terjadwal', 'priority' => 'Medium', 'technicians' => $techs,
+        ]);
+
+        $post([$joko->id, $cagak->id], 'A');
+        $post([$tri->id, $suci->id], 'B');
+        $post([$cagak->id, $suci->id], 'C');
+
+        // Request pertama: session flash masih ada, modal muncul.
+        $first = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $first->assertStatus(200);
+        $first->assertSee('Konflik Team');
+
+        // Simulasikan user nge-close modal lalu refresh halaman lagi — session flash
+        // dari request pertama udah abis dibaca, tapi konfliknya harus tetap kedeteksi
+        // ulang dari state DB (task_id null + >=2 teknisi), bukan cuma dari flash sekali pakai.
+        $second = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
+        $second->assertStatus(200);
+        $second->assertSee('Konflik Team');
+
+        $taskC = FopTask::where('tugas', 'C')->firstOrFail();
+        $second->assertSee($taskC->task_number);
+    }
+
+    public function test_switch_technician_target_dropdown_includes_tasks_across_teams_and_filters(): void
+    {
+        $teknisiRole = Role::where('code', 'teknisi')->first();
+        $wito = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Wito']);
+        $yanto = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Yanto']);
+        $joko = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Joko']);
+        $karim = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Karim']);
+        $abdul = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Abdul']);
+        $ajis = User::factory()->create(['role_id' => $teknisiRole->id, 'status' => 'active', 'name' => 'Ajis']);
+
+        $date = now()->format('Y-m-d').' 08:00:00';
+
+        $post = fn (array $techs, string $num) => $this->actingAs($this->fopUser)->post(route('fop-tasks.store'), [
+            'category' => 'MTN', 'task_date' => $date, 'tugas' => $num,
+            'village_id' => $this->village->id, 'pop_id' => $this->pop->id, 'issue' => 'i',
+            'status' => 'terjadwal', 'priority' => 'Medium', 'technicians' => $techs,
+        ]);
+
+        // Task A & B => Tim 1 (Wito jembatan), Task C => Tim 2 — persis skenario yang dilaporkan.
+        $post([$wito->id, $yanto->id], 'Task A');
+        $post([$joko->id, $wito->id, $karim->id], 'Task B');
+        $post([$abdul->id, $ajis->id], 'Task C');
+
+        $taskA = FopTask::where('tugas', 'Task A')->firstOrFail();
+        $taskB = FopTask::where('tugas', 'Task B')->firstOrFail();
+        $taskC = FopTask::where('tugas', 'Task C')->firstOrFail();
+
+        $this->assertEquals($taskA->team_id, $taskB->team_id, 'Task A & B harus 1 tim (Wito jembatan).');
+        $this->assertNotEquals($taskA->team_id, $taskC->team_id, 'Task C harus tim beda.');
+
+        // FOP lagi buka halaman DENGAN FILTER team=Tim 1 aktif (cuma nampilin Task A & B di tabel) —
+        // dropdown "Task Tujuan" tetap harus nawarin Task C (tim lain), bukan cuma yang keliatan di tabel.
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index', ['team_id' => $taskA->team_id]));
+        $response->assertStatus(200);
+
+        // Task C sengaja gak match filter team_id ini, jadi gak nongol di baris TABEL —
+        // tapi tetap wajib ada di allTasksData (state Alpine) biar bisa dipilih di dropdown "Task Tujuan".
+        $content = $response->getContent();
+        $tableSection = substr($content, 0, strpos($content, 'allTasksData:'));
+        $this->assertStringNotContainsString($taskC->task_number, $tableSection, 'Task C seharusnya gak nongol di baris tabel karena kefilter team_id.');
+        $response->assertSee('"task_number":"'.$taskC->task_number.'"', false);
     }
 }

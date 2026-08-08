@@ -2,11 +2,11 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use App\Models\CustomerService;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\CustomerService;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class FixLegacyBillingBatch2Command extends Command
 {
@@ -38,7 +38,7 @@ class FixLegacyBillingBatch2Command extends Command
             foreach ($invoices as $inv) {
                 $newNumber = preg_replace('/^INV-LEGACY-/', 'INV-', $inv->invoice_number);
                 // Cek agar tidak duplikat dengan nomor yang sudah ada
-                if (!Invoice::where('invoice_number', $newNumber)->where('id', '!=', $inv->id)->exists()) {
+                if (! Invoice::where('invoice_number', $newNumber)->where('id', '!=', $inv->id)->exists()) {
                     $inv->updateQuietly(['invoice_number' => $newNumber]);
                     $invCount++;
                 }
@@ -50,7 +50,7 @@ class FixLegacyBillingBatch2Command extends Command
             $payCount = 0;
             foreach ($payments as $pay) {
                 $newNumber = preg_replace('/^PAY-LEGACY-/', 'PAY-', $pay->payment_number);
-                if (!Payment::where('payment_number', $newNumber)->where('id', '!=', $pay->id)->exists()) {
+                if (! Payment::where('payment_number', $newNumber)->where('id', '!=', $pay->id)->exists()) {
                     $pay->updateQuietly(['payment_number' => $newNumber]);
                     $payCount++;
                 }
@@ -62,14 +62,14 @@ class FixLegacyBillingBatch2Command extends Command
             $services = CustomerService::whereNotNull('other_fee')->where('other_fee', '>', 0)->get();
             $srvCount = 0;
             foreach ($services as $srv) {
-                $monthlyPrice = (float)$srv->monthly_price;
-                $discount = (float)($srv->discount ?? 0);
-                $ppnPercent = (float)($srv->ppn ?? 0);
+                $monthlyPrice = (float) $srv->monthly_price;
+                $discount = (float) ($srv->discount ?? 0);
+                $ppnPercent = (float) ($srv->ppn ?? 0);
 
                 $discountedPrice = max(0, $monthlyPrice - $discount);
                 $correctTotalMonthlyBill = round($discountedPrice * (1 + ($ppnPercent / 100)), 2);
 
-                if ((float)$srv->total_monthly_bill != $correctTotalMonthlyBill) {
+                if ((float) $srv->total_monthly_bill != $correctTotalMonthlyBill) {
                     $srv->updateQuietly(['total_monthly_bill' => $correctTotalMonthlyBill]);
                     $srvCount++;
                 }
@@ -78,6 +78,7 @@ class FixLegacyBillingBatch2Command extends Command
         });
 
         $this->info('Pembersihan data BATCH 2 selesai dengan sukses!');
+
         return 0;
     }
 }

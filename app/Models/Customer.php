@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\Gender;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Services\CustomerValidationService;
+use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
+    'person_id',
     'customer_code',
     'old_customer_id',
     'old_request_id',
@@ -22,18 +25,19 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_type',
     'company_name',
     'npwp',
-    'old_account_status',
     'email',
-    'phone',
     'primary_phone',
     'alternative_phone',
     'registration_date',
+    'registered_by_name',
     'data_completeness_status',
-    'customer_status',
     'pop_id',
     'distribution_id',
     'mini_pop_id',
+    'collector_id',
     'status',
+    'rejected_at',
+    'terminated_at',
     'address',
     'latitude',
     'longitude',
@@ -60,7 +64,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Customer extends Model
 {
-    use RecordsAuditLogs, HasFactory, \App\Traits\HasPopScope;
+    use HasFactory, HasPopScope, RecordsAuditLogs;
 
     protected string $auditModule = 'Data Pelanggan';
 
@@ -76,7 +80,10 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
-            'registration_date' => 'date',
+            'registration_date' => 'datetime',
+            'rejected_at' => 'datetime',
+            'terminated_at' => 'datetime',
+            'gender' => Gender::class,
         ];
     }
 
@@ -129,6 +136,18 @@ class Customer extends Model
     }
 
     /**
+     * Identitas orang di balik baris pelanggan ini. Satu person bisa punya
+     * banyak customer (daftar ulang, pindah kontrak) — lihat rancangan
+     * persons. Nullable selama backfill belum jalan.
+     *
+     * @return BelongsTo<Person, $this>
+     */
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class);
+    }
+
+    /**
      * The distribution area this customer belongs to.
      * Used as part of CID generation: {pop.cid_prefix}{olt_number}{distribution.code}...
      *
@@ -149,6 +168,18 @@ class Customer extends Model
     public function miniPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'mini_pop_id');
+    }
+
+    /**
+     * Kolektor yang rutin menagih pelanggan ini — rute permanen, nullable &
+     * reassignable (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md
+     * §B-3). Beda dari `payments.collected_by` (snapshot per transaksi).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function collector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collector_id');
     }
 
     /**
@@ -192,11 +223,27 @@ class Customer extends Model
     }
 
     /**
+     * @return HasOne<Invoice, $this>
+     */
+    public function latestInvoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class)->latestOfMany();
+    }
+
+    /**
      * @return HasMany<Payment, $this>
      */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * @return HasOne<Payment, $this>
+     */
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->latestOfMany('payment_date');
     }
 
     /**
@@ -230,7 +277,7 @@ class Customer extends Model
 
     /**
      * Get the latest survey.
-     * 
+     *
      * @return HasOne<CustomerSurvey, $this>
      */
     public function latestSurvey(): HasOne
@@ -317,6 +364,7 @@ class Customer extends Model
     {
         /** @var CustomerValidationService $service */
         $service = app(CustomerValidationService::class);
+
         return $service->validate($this);
     }
 
@@ -327,13 +375,11 @@ class Customer extends Model
      * - REQ ID murni (RQ######) saat: pending/survey/pemasangan/installed/terminated
      * - CID lengkap saat: aktif + punya distribusi
      * - C00RQ###### saat: aktif tanpa distribusi
-     *
-     * @return string
      */
     public function getDisplayIdAttribute(): string
     {
         $pop = $this->pop;
-        if (!$pop) {
+        if (! $pop) {
             return $this->customer_code;
         }
 
@@ -343,8 +389,6 @@ class Customer extends Model
     /**
      * Get the label type for the display ID.
      * Returns 'REQ ID', 'CID', or 'ID' depending on the customer's status.
-     *
-     * @return string
      */
     public function getDisplayIdLabelAttribute(): string
     {
@@ -356,9 +400,14 @@ class Customer extends Model
         }
 
         if (in_array($status, ['active', 'suspended'], true)) {
-            if ($this->distribution_id && $this->cid) {
+            // Sejajarkan dengan Pop::resolveDisplayId(): yang menentukan ini
+            // CID-nya sudah ada atau belum, BUKAN distribution_id. Pelanggan
+            // legacy ber-CID "XX" (distribusi tak diketahui) tetap menampilkan
+            // CID, jadi labelnya juga harus "CID" — bukan "ID".
+            if ($this->cid) {
                 return 'CID';
             }
+
             return 'ID';
         }
 
@@ -372,38 +421,59 @@ class Customer extends Model
     public function getCleanAddressAttribute(): string
     {
         $address = $this->address ?? '';
-        
-        $village = $this->village?->name;
-        $district = $this->district?->name;
-        $city = $this->city?->name;
+
+        // Pilihan B (rancangan §2.6): accessor TIDAK boleh memicu query tersembunyi.
+        // Dulu membaca $this->village/district/city langsung — kalau relasinya tak
+        // di-eager-load, itu 3 query per pemanggilan, dan accessor terlihat seperti
+        // properti biasa di Blade sehingga jebakan ini menyebar diam-diam.
+        //
+        // Sekarang hanya membaca relasi yang SUDAH dimuat. Di bawah
+        // preventLazyLoading (dev/test) ini tidak pernah melempar; di produksi
+        // tidak pernah jadi query siluman. Kalau pemanggil lupa eager-load, alamat
+        // mentah dikembalikan apa adanya — degradasi anggun, bukan N+1 senyap.
+        // customer_addresses menyimpan village/district/city sebagai STRING; itu
+        // dipakai sebagai sumber utama bila relasinya dimuat, relasi id→name jadi
+        // cadangan.
+        $addr = $this->relationLoaded('customerAddress') ? $this->customerAddress : null;
+
+        $village = ($addr?->village)
+            ?: ($this->relationLoaded('village') ? $this->village?->name : null);
+        $district = ($addr?->district)
+            ?: ($this->relationLoaded('district') ? $this->district?->name : null);
+        $city = ($addr?->city)
+            ?: ($this->relationLoaded('city') ? $this->city?->name : null);
 
         $parts = array_map('trim', explode(',', $address));
-        
+
         $removables = array_filter([
             strtolower($village ?? ''),
             strtolower($district ?? ''),
-            strtolower($city ?? '')
+            strtolower($city ?? ''),
         ]);
-        
-        while (!empty($parts)) {
+
+        while (! empty($parts)) {
             $lastPart = strtolower(end($parts));
             $cleanLastPart = trim(str_replace(['desa ', 'kec. ', 'kecamatan ', 'kab. ', 'kabupaten ', 'kota ', 'kelurahan '], '', $lastPart));
-            
+
             if (in_array($cleanLastPart, $removables, true) || in_array($lastPart, $removables, true)) {
                 array_pop($parts);
             } else {
                 break;
             }
         }
-        
-        if ($village) $parts[] = $village;
-        if ($district) $parts[] = $district;
-        if ($city) $parts[] = $city;
-        
+
+        if ($village) {
+            $parts[] = $village;
+        }
+        if ($district) {
+            $parts[] = $district;
+        }
+        if ($city) {
+            $parts[] = $city;
+        }
+
         return empty($parts) ? '—' : implode(', ', array_filter($parts));
     }
-
-
 
     /**
      * Determine workflow stages progress.
@@ -411,39 +481,39 @@ class Customer extends Model
     public function workflowProgress(): array
     {
         $status = strtolower($this->status);
-        
+
         $stages = [
-            'registrasi' => ['label' => 'R', 'name' => 'Registrasi', 'status' => 'completed', 'color' => 'bg-green-500'],
-            'survey' => ['label' => 'S', 'name' => 'Survey', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'pemasangan' => ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'uji' => ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400'],
-            'aktivasi' => ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'pending', 'color' => 'bg-slate-200 text-slate-400']
+            'registrasi' => ['label' => 'R', 'name' => 'Registrasi', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600'],
+            'survey' => ['label' => 'S', 'name' => 'Survey', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'pemasangan' => ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'uji' => ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
+            'aktivasi' => ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'pending', 'color' => 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'],
         ];
 
         $completedStatuses = ['active', 'suspended', 'terminated'];
 
         // Survey
         if (in_array($status, ['surveyed', 'waiting_installation', 'installed', ...$completedStatuses])) {
-            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
+            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'waiting_survey') {
-            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['survey'] = ['label' => 'S', 'name' => 'Survey', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
-        
+
         // Pemasangan (Instalasi) & Uji Layanan
         if (in_array($status, ['installed', ...$completedStatuses])) {
-            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
-            $stages['uji'] = ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'completed', 'color' => 'bg-green-500 text-white'];
+            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
+            $stages['uji'] = ['label' => 'U', 'name' => 'Uji Layanan', 'status' => 'completed', 'color' => 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'waiting_installation') {
-            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['pemasangan'] = ['label' => 'P', 'name' => 'Pemasangan', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
 
         // Aktivasi
         if (in_array($status, ['active', 'suspended'])) {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'completed', 'color' => $status === 'suspended' ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'completed', 'color' => $status === 'suspended' ? 'bg-amber-500 dark:bg-amber-600 text-white' : 'bg-green-500 dark:bg-green-600 text-white'];
         } elseif ($status === 'terminated') {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'terminated', 'color' => 'bg-red-500 text-white'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'terminated', 'color' => 'bg-red-500 dark:bg-red-600 text-white'];
         } elseif ($status === 'installed') {
-            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'in_progress', 'color' => 'bg-amber-500 text-white animate-pulse'];
+            $stages['aktivasi'] = ['label' => 'A', 'name' => 'Aktivasi', 'status' => 'in_progress', 'color' => 'bg-amber-500 dark:bg-amber-600 text-white animate-pulse'];
         }
 
         return $stages;

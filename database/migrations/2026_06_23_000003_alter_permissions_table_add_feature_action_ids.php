@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('feature_id')->nullable()->constrained('features')->cascadeOnDelete();
             $table->foreignId('action_id')->nullable()->constrained('actions')->cascadeOnDelete();
             $table->string('code')->nullable()->unique();
-            
+
             // Jadikan kolom lama nullable agar seeder/kode lama tidak error
             $table->string('name')->nullable()->change();
             $table->string('module')->nullable()->change();

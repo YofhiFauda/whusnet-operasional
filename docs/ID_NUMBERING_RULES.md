@@ -320,6 +320,8 @@ Import membuat registration_number.
 CID dibuat saat admin melakukan aktivasi layanan.
 ```
 
+**Migrasi multi-cabang (data legacy dari banyak instalasi/database berbeda):** `old_customer_id` dan `old_request_id` dari legacy TIDAK unik lintas cabang (tiap cabang punya counter sendiri mulai dari 1). Cek "sudah diimport belum" wajib di-scope per cabang (bandingkan lewat `pop_id`/relasi POP, bukan cek global ke seluruh tabel), begitu juga `customer_code` — lihat detail di 12.1.
+
 ---
 
 # 10. Aturan Pindah POP
@@ -370,13 +372,35 @@ Karena rawan duplikat.
 Wajib unique:
 
 ```txt
-customers.registration_number
+customers.registration_number  (kolom aktual: customer_code) — unique PER POP, bukan global. Lihat 12.1.
 customers.cid
 pops.pop_code
 pop_number_sequences.pop_id + pop_number_sequences.sequence_type
 ```
 
 Jika CID nullable, validasi unique hanya saat CID terisi.
+
+## 12.1 `customer_code` unique per POP, bukan global (sejak 2026-07-20)
+
+**Implementasi aktual berbeda dari desain awal dokumen ini.** Kolom `customers.customer_code` (nama kolom real untuk "registration_number" di atas) awalnya diberi `UNIQUE` constraint global satu kolom. Ini keliru dan sudah diperbaiki lewat migration `scope_customer_code_unique_to_pop`.
+
+**Kenapa salah:** ID request legacy (RQ dari `old_request_id`) sering dijadikan `customer_code` apa adanya saat migrasi. Tiap instalasi software cabang lama punya counter sendiri mulai dari 1 — jadi nomor yang sama (mis. `RQ000042`) bisa dipakai oleh 2 pelanggan berbeda di 2 cabang berbeda secara sah. Constraint unique GLOBAL pada `customer_code` memaksa salah satu pelanggan dapat nomor pengganti secara acak (tergantung urutan import), padahal `cid_prefix` sudah beda per cabang sehingga CID akhir (`{cid_prefix}{olt}{dist}{customer_code}...`) otomatis tetap unik walau `customer_code`-nya sama.
+
+**Kasus nyata**: pelanggan `Winda Ari Sulfia` (POP Jetis, `old_request_id=RQ000042`) dan `Endah Puji Rahayu` (POP Sandya, `old_request_id=RQ000042`) — dua pelanggan berbeda, kebetulan nomor request legacy sama. Sebelum fix, `customer_code` Winda dipaksa jadi `RQ002058` (bukan `RQ000042` aslinya) karena Endah "menang" duluan pas migrasi. Ini mempersulit audit — CID sistem baru gak cocok sama CID di sistem lama tanpa alasan yang jelas di permukaan.
+
+**Fix**: constraint diganti jadi composite `UNIQUE(pop_id, customer_code)`. Dua konsekuensi:
+
+1. `customer_code` sekarang boleh sama ANTAR cabang berbeda (`pop_id` beda) — RQ number legacy bisa dipertahankan apa adanya tanpa perlu diganti, sepanjang gak dobel DALAM cabang yang sama.
+2. `Pop::generateRegistrationNumber()` dan proses dedup di `MigrateLegacyDataCommand.php` (`candidateCode`) di-scope ke seluruh subtree cabang (cabang + semua mini-POP anaknya) — bukan cuma exact `pop_id` — karena mini-POP dalam 1 cabang mewarisi `cid_prefix` cabangnya, jadi harus dianggap 1 "namespace" yang sama untuk keperluan cek duplikat ini.
+3. **Syarat wajib**: `cid_prefix` HARUS unik antar POP bertipe `cabang` (divalidasi di `PopController::store()`/`update()`). Kalau 2 cabang punya `cid_prefix` sama, poin 1 di atas jadi gak aman lagi (CID akhir bisa collide beneran). Mini-POP boleh — memang harus — mewarisi `cid_prefix` cabang induknya.
+
+Lihat juga: `docs/PLAN_MIGRASI_PELANGGAN_BILLING.md` dan `docs/ANALISA_KELENGKAPAN_MIGRASI_jetis_db.MD` untuk konteks migrasi legacy multi-cabang.
+
+## 12.2 Konsekuensi ke tampilan REQ ID murni (List Pelanggan Putus/Gagal)
+
+`Pop::resolveDisplayId()` sengaja menampilkan REQ ID murni tanpa `cid_prefix` untuk status `terminated`/`failed`/`rejected`/`putus`/`gagal` (lihat `docs/master/pop/archive/spesifikasi-pop-distribusi-cid.md`). Setelah 12.1, `customer_code` (basis REQ ID) boleh sama antar cabang — jadi 2 pelanggan beda cabang, sama-sama status Putus/Gagal, bisa tampil dengan REQ ID identik (mis. `RQ000042`) di layar yang sama.
+
+**Fix**: `resources/views/customers/index.blade.php` — tabel "Pelanggan Gagal" dan "Pelanggan Putus" ditambah kolom **POP** (sama seperti tabel pelanggan aktif) supaya admin tetap bisa bedain walau REQ ID kebetulan sama. Format REQ ID sendiri TIDAK diubah — tetap sesuai spek asli.
 
 ---
 

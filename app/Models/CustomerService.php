@@ -35,6 +35,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'activation_time',
     'activated_by_name',
     'activated_by_user_id',
+    'admin_filter_at',
+    'admin_filter_by_name',
 ])]
 class CustomerService extends Model
 {
@@ -55,6 +57,7 @@ class CustomerService extends Model
             'total_monthly_bill' => 'decimal:2',
             'activation_date' => 'date',
             'due_date' => 'date',
+            'admin_filter_at' => 'datetime',
         ];
     }
 
@@ -79,7 +82,7 @@ class CustomerService extends Model
      */
     public function activatedBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'activated_by_user_id');
+        return $this->belongsTo(User::class, 'activated_by_user_id');
     }
 
     /**

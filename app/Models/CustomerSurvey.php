@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'required_tools',
     'cable_estimation_meter',
     'nearest_odp',
+    'requested_installation_date',
     'survey_photo',
     'house_photo',
     'survey_note',
@@ -45,10 +46,11 @@ class CustomerSurvey extends Model
     {
         return [
             'survey_date' => 'date',
-            'end_date'    => 'date',
+            'end_date' => 'date',
+            'requested_installation_date' => 'date',
             'assigned_at' => 'datetime',
-            'started_at'  => 'datetime',
-            'completed_at'=> 'datetime',
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -82,5 +84,13 @@ class CustomerSurvey extends Model
     public function surveyor3(): BelongsTo
     {
         return $this->belongsTo(User::class, 'surveyor_3_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function fop(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fop_id');
     }
 }

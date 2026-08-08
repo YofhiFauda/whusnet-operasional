@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Gender;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CustomerRegistrationRequest extends FormRequest
 {
@@ -15,6 +17,18 @@ class CustomerRegistrationRequest extends FormRequest
     }
 
     /**
+     * Prepare data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('identity_number')) {
+            $this->merge([
+                'identity_number' => preg_replace('/[^0-9]/', '', (string) $this->identity_number),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      */
     public function rules(): array
@@ -22,7 +36,7 @@ class CustomerRegistrationRequest extends FormRequest
         return [
             'full_name' => 'required|string|max:150',
             'identity_number' => 'required|string|size:16|regex:/^[0-9]+$/',
-            'gender' => 'required|string|in:Laki-laki,Perempuan',
+            'gender' => ['required', 'string', Rule::enum(Gender::class)],
             'primary_phone' => ['required', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
             'alternative_phone' => ['nullable', 'string', 'regex:/^(\+62|62|0)8[1-9][0-9]{6,11}$/'],
             'email' => 'nullable|email|max:100',
@@ -40,22 +54,22 @@ class CustomerRegistrationRequest extends FormRequest
             'discount_amount' => 'nullable|numeric|min:0',
             'tax_percent' => 'nullable|numeric|between:0,100',
             'other_fee' => 'nullable|numeric|min:0',
-            
+
             // Referrals
             'sales_code' => 'nullable|string|max:30',
             'agent_code' => 'nullable|string|max:30',
             'referral_customer_code' => 'nullable|string|max:30',
-            
+
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
             'ip_address' => 'nullable|string|max:45',
             'odp_code' => 'nullable|string|max:50',
             'olt_code' => 'nullable|string|max:50',
             'vlan_id' => 'nullable|string|max:20',
-            
+
             // Status is auto-assigned to registered in controller for creation
             'status' => 'nullable|string|max:50',
-            
+
             // Documents
             'foto_ktp' => 'required|file|image|mimes:jpeg,png,jpg|max:2048',
             'foto_rumah' => 'nullable|file|image|mimes:jpeg,png,jpg|max:2048',
@@ -68,6 +82,7 @@ class CustomerRegistrationRequest extends FormRequest
         return [
             'identity_number.required' => 'NIK wajib diisi.',
             'identity_number.size' => 'NIK harus berjumlah 16 digit angka.',
+            'identity_number.digits' => 'NIK harus berjumlah 16 digit angka.',
             'identity_number.regex' => 'NIK hanya boleh berisi angka.',
             'primary_phone.regex' => 'Format nomor HP tidak valid (harus format Indonesia, misal: 0812...).',
             'foto_ktp.required' => 'Foto KTP wajib dilampirkan.',

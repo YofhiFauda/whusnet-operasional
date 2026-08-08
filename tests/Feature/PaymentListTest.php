@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -11,6 +12,8 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -38,7 +41,7 @@ class PaymentListTest extends TestCase
         $invoiceA = $this->createInvoice($popA, 'Ahmad Payment Filter', 'INV-202606-7001');
         $invoiceB = $this->createInvoice($popB, 'Budi Payment Filter', 'INV-202607-7002');
         $paymentA = $this->createPayment($invoiceA, 'PAY-202606-7001', '2026-06-13', 'cash', 'valid');
-        $paymentB = $this->createPayment($invoiceB, 'PAY-202607-7002', '2026-07-13', 'transfer', 'pending');
+        $paymentB = $this->createPayment($invoiceB, 'PAY-202607-7002', '2026-07-13', 'transfer', 'ditolak');
 
         $response = $this->actingAs($owner)->get(route('payments.index', [
             'date_from' => '2026-06-01',
@@ -69,6 +72,15 @@ class PaymentListTest extends TestCase
         $popA = $this->createPop('POP-PAY-CABANG-A', 'PCA', 'POP Payment Cabang A');
         $popB = $this->createPop('POP-PAY-CABANG-B', 'PCB', 'POP Payment Cabang B');
         $adminCabang->pops()->attach($popA->id);
+        $scope = UserRoleScope::create([
+            'user_id' => $adminCabang->id,
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $popA->id,
+        ]);
 
         $invoiceA = $this->createInvoice($popA, 'Customer Payment Cabang Sendiri', 'INV-202606-7101');
         $invoiceB = $this->createInvoice($popB, 'Customer Payment Cabang Lain', 'INV-202606-7102');
@@ -141,11 +153,9 @@ class PaymentListTest extends TestCase
         $customer = Customer::create([
             'customer_code' => str_replace('INV', 'C', $invoiceNumber),
             'full_name' => $customerName,
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'internet_package_id' => $this->package->id,
@@ -179,6 +189,7 @@ class PaymentListTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

@@ -2,18 +2,29 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
-use App\Models\Pop;
 use App\Models\Invoice;
-use App\Models\AuditLog;
-use App\Models\User;
+use App\Models\Pop;
 use App\Models\Role;
+use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Models\Village;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\SubscriptionStatusSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -25,12 +36,14 @@ class InvoiceCreateTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\SubscriptionStatusSeeder::class);
-        $this->seed(\Database\Seeders\InternetPackageSeeder::class);
-        $this->seed(\Database\Seeders\PonorogoRegionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(SubscriptionStatusSeeder::class);
+        $this->seed(InternetPackageSeeder::class);
+        $this->seed(PonorogoRegionSeeder::class);
     }
 
     /**
@@ -46,11 +59,9 @@ class InvoiceCreateTest extends TestCase
             'customer_code' => 'WHUS-2026-0001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => $status,
-            'customer_status' => $status === 'active' ? 'aktif' : 'calon_pelanggan',
             'data_completeness_status' => $completeness,
             'pop_id' => $pop->id,
             'city_id' => $city->id,
@@ -111,6 +122,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -156,17 +168,15 @@ class InvoiceCreateTest extends TestCase
 
         $package = InternetPackage::query()->firstOrFail();
         $customer1 = $this->createTestCustomer($pop, $package);
-        
+
         // Create customer2
         $customer2 = Customer::create([
             'customer_code' => 'WHUS-2026-0002',
             'full_name' => 'Rudi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567891',
             'primary_phone' => '081234567891',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
         ]);
@@ -186,6 +196,7 @@ class InvoiceCreateTest extends TestCase
         // First invoice
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer1->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -193,6 +204,7 @@ class InvoiceCreateTest extends TestCase
         // Second invoice (same period, different customer)
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer2->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -229,6 +241,7 @@ class InvoiceCreateTest extends TestCase
         // First creation succeeds
         $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -236,6 +249,7 @@ class InvoiceCreateTest extends TestCase
         // Second creation fails
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -264,6 +278,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -292,6 +307,7 @@ class InvoiceCreateTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('customers.invoices.manual', $customer->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -310,19 +326,26 @@ class InvoiceCreateTest extends TestCase
 
         // Assign user to pop1 only
         $user->pops()->attach($pop1->id);
+        $scope = UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop1->id,
+        ]);
 
         $package = InternetPackage::query()->firstOrFail();
         $customerInPop1 = $this->createTestCustomer($pop1, $package);
-        
+
         $customerInPop2 = Customer::create([
             'customer_code' => 'WHUS-2026-0003',
             'full_name' => 'Siti Santoso',
             'gender' => 'Perempuan',
-            'phone' => '081234567895',
             'primary_phone' => '081234567895',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop2->id,
         ]);
@@ -342,6 +365,7 @@ class InvoiceCreateTest extends TestCase
         // Creating invoice for POP1 succeeds
         $response1 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop1->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);
@@ -351,6 +375,7 @@ class InvoiceCreateTest extends TestCase
         // Creating invoice for POP2 fails with 403
         $response2 = $this->actingAs($user)->post(route('customers.invoices.manual', $customerInPop2->id), [
             'billing_period' => '2026-06',
+            'invoice_type' => 'bulanan',
             'issue_date' => '2026-06-01',
             'due_date' => '2026-06-15',
         ]);

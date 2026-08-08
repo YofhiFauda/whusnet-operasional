@@ -1,18 +1,18 @@
 <!-- Global Dialog Container -->
 <div id="global-dialog-container" class="fixed inset-0 z-[100] flex items-center justify-center hidden bg-slate-900/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
     <!-- Dialog Box -->
-    <div id="global-dialog-box" class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 transform transition-all scale-95 opacity-0 flex flex-col max-h-[90vh]">
+    <div id="global-dialog-box" class="bg-surface border border-border rounded-xl shadow-xl w-full max-w-lg mx-4 transform transition-all scale-95 opacity-0 flex flex-col max-h-[90vh]">
         
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div class="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
                 <!-- Optional Icon Slot -->
                 <div id="global-dialog-icon-container" class="hidden flex-shrink-0 p-1.5 rounded-full">
                     <!-- Icon SVG injected here -->
                 </div>
-                <h3 id="global-dialog-title" class="text-lg font-bold text-slate-800">Dialog Title</h3>
+                <h3 id="global-dialog-title" class="text-lg font-bold text-text-main">Dialog Title</h3>
             </div>
-            <button type="button" onclick="window.Dialog.close()" class="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none rounded-md hover:bg-slate-100 p-1 cursor-pointer">
+            <button type="button" onclick="window.Dialog.close()" class="text-text-disabled hover:text-text-main transition-colors focus:outline-none rounded-md hover:bg-surface-muted p-1 cursor-pointer">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -20,12 +20,12 @@
         </div>
         
         <!-- Body (Scrollable) -->
-        <div id="global-dialog-body" class="px-6 py-5 overflow-y-auto text-sm text-slate-600 whitespace-pre-line">
+        <div id="global-dialog-body" class="px-6 py-5 overflow-y-auto text-sm text-text-secondary whitespace-pre-line">
             <!-- Message or Custom Form HTML gets injected here -->
         </div>
         
         <!-- Footer (Actions) -->
-        <div id="global-dialog-footer" class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 bg-slate-50 rounded-b-xl">
+        <div id="global-dialog-footer" class="px-6 py-4 border-t border-border flex items-center justify-end gap-3 shrink-0 bg-surface-muted rounded-b-xl">
             <!-- Buttons get injected here -->
         </div>
         
@@ -100,7 +100,7 @@
                         baseClasses += 'bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500 active:scale-95';
                     } else {
                         // Secondary
-                        baseClasses += 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-slate-500 active:scale-95';
+                        baseClasses += 'bg-surface border border-border text-text-secondary hover:bg-surface-muted focus:ring-primary/20 active:scale-95';
                     }
                     
                     btnEl.className = baseClasses;
@@ -116,7 +116,12 @@
                     }
                     
                     if (typeof btn.onClick === 'function') {
-                        btnEl.addEventListener('click', (e) => btn.onClick(e, this));
+                        btnEl.addEventListener('click', (e) => {
+                            if (btnEl.disabled) return;
+                            btnEl.disabled = true;
+                            btnEl.classList.add('opacity-50', 'cursor-not-allowed');
+                            btn.onClick(e, this);
+                        });
                     } else if (!btn.type || btn.type === 'secondary') {
                         // default close behavior for secondary if no onClick
                         btnEl.addEventListener('click', () => this.close());
@@ -128,7 +133,7 @@
                 // Default Close Button
                 const closeBtn = document.createElement('button');
                 closeBtn.type = 'button';
-                closeBtn.className = 'px-4 py-2 text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-all focus:outline-none active:scale-95 cursor-pointer';
+                closeBtn.className = 'px-4 py-2 text-sm font-semibold bg-surface border border-border text-text-secondary hover:bg-surface-muted rounded-lg shadow-sm transition-all focus:outline-none active:scale-95 cursor-pointer';
                 closeBtn.innerText = 'Tutup';
                 closeBtn.addEventListener('click', () => this.close());
                 footerEl.appendChild(closeBtn);

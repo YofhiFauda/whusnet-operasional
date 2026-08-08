@@ -13,11 +13,13 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | `docs/dashboard/` | Dokumentasi dashboard operasional. |
 | `docs/penunjang/` | Dokumentasi API dependent dropdown dan import pelanggan. |
 | `docs/fop-task/` | Dokumentasi modul FOP Task (tiket kerja lapangan, team harian, dashboard FOP). |
+| `docs/ticketing/` | Dokumentasi modul Ticketing (tiket internal perusahaan MTN/C-REQ, auto-sync ke FOP Task). |
 | `docs/billing-pembayaran/` | Dokumentasi modul tagihan (Invoice) dan pembayaran (Payment). |
 | `docs/rbac/` | Dokumentasi RBAC (Role, Permission, Feature/Action, Scope POP). |
 | `docs/customer-lifecycle/` | Dokumentasi Customer Verifikasi & Onboarding Lifecycle (registrasi→survey→pemasangan→aktivasi). |
 | `docs/task-teknisi/` | Dokumentasi Task Teknisi (eksekusi lapangan: checklist, evidence, review FOP). |
 | `docs/master/sla-timeline/` | Dokumentasi Master Timeline SLA (batas waktu wajib ditangani per jenis tiket, per paket internet). |
+| `docs/plan/qr-code/` | **RANCANGAN (belum diimplementasi)** — QR Code pelanggan untuk pembayaran, absen teknisi, ticketing, dan login pelanggan (+ PIN). |
 
 ## Fitur Utama
 
@@ -53,11 +55,13 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 | Modul | Dokumentasi |
 |-------|-------------|
 | FOP Task (tiket kerja, team harian, dashboard) | [docs/fop-task/README.md](fop-task/README.md) |
+| Ticketing (tiket internal perusahaan MTN/C-REQ, auto-sync ke FOP Task) | [docs/ticketing/README.md](ticketing/README.md) |
 | Billing & Pembayaran (invoice, payment) | [docs/billing-pembayaran/README.md](billing-pembayaran/README.md) |
 | RBAC (role, permission, scope POP) | [docs/rbac/README.md](rbac/README.md) |
 | Customer Verifikasi & Onboarding Lifecycle | [docs/customer-lifecycle/README.md](customer-lifecycle/README.md) |
 | Task Teknisi (eksekusi lapangan) | [docs/task-teknisi/README.md](task-teknisi/README.md) |
 | Master Timeline SLA (batas waktu wajib ditangani per paket) | [docs/master/sla-timeline/README.md](master/sla-timeline/README.md) |
+| QR Code Pelanggan + PIN — **RANCANGAN, belum ada kodenya** | [docs/plan/qr-code/rancangan-qr-pelanggan.md](plan/qr-code/rancangan-qr-pelanggan.md) |
 
 ---
 
@@ -65,4 +69,4 @@ Dokumentasi ini menjelaskan fitur yang sudah tersedia pada aplikasi WHUSNET Oper
 
 Aplikasi sudah menyediakan fondasi operasional ISP untuk registrasi dan monitoring pelanggan. Modul Onboarding (Survey, Verifikasi, Pemasangan, Aktivasi) sudah mengimplementasikan State Machine (`CustomerWorkflowService`) dengan menyimpan histori dan data teknis pada tabel transaksi terpisah seperti `customer_surveys`, `customer_installations`, dan `customer_technical_details`.
 
-Sprint 8 menambahkan modul Task Management untuk FOP dengan real-time updates, task scheduler dalam format kanban dan kalender, design system konsistensi UI, dan workflow approval gates yang memastikan tidak ada auto-transition customer status (hanya FOP approval yang trigger transition).
+Modul Task Management FOP (dulu Sprint 8, arsitektur kanban/kalender awal sudah diganti — lihat [docs/fop-task/README.md](fop-task/README.md#konsep-inti) & `archive/`) sekarang jalan dengan auto-team formation, status real-time ter-derive dari Task eksekusi (`TaskObserver`), Riwayat Lengkap + SLA dual-cycle per tiket (Task 10), dan workflow approval gates yang memastikan tidak ada auto-transition customer status tanpa aksi eksplisit FOP/Admin (approve/reject/revisi). Perubahan/fix terbaru per modul dicatat di README masing-masing folder — jangan cari "status sprint" di sini, cek `Last updated` di README tiap modul.

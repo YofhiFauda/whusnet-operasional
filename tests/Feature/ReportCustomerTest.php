@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
-use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\SubscriptionStatus;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -112,6 +111,11 @@ class ReportCustomerTest extends TestCase
 
         // Assign popA only
         $user->pops()->attach($popA->id);
+        $scope = $user->roleScopes()->create([
+            'role_id' => $user->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        $scope->targets()->create(['pop_id' => $popA->id]);
 
         Customer::query()->delete();
 
@@ -119,12 +123,10 @@ class ReportCustomerTest extends TestCase
         $customerA = Customer::create([
             'full_name' => 'Pelanggan SDA',
             'customer_code' => 'C-SDA-000001',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'gender' => 'Laki-laki',
             'pop_id' => $popA->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -133,12 +135,10 @@ class ReportCustomerTest extends TestCase
         $customerB = Customer::create([
             'full_name' => 'Pelanggan SBY',
             'customer_code' => 'C-SBY-000001',
-            'phone' => '081234567891',
             'primary_phone' => '081234567891',
             'gender' => 'Laki-laki',
             'pop_id' => $popB->id,
             'status' => 'registered',
-            'customer_status' => 'calon_pelanggan',
             'data_completeness_status' => 'draft',
             'registration_date' => '2026-06-01',
         ]);
@@ -178,7 +178,6 @@ class ReportCustomerTest extends TestCase
         Customer::create([
             'full_name' => 'Pelanggan Satu',
             'customer_code' => 'C-000001',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'gender' => 'Laki-laki',
             'pop_id' => $pop->id,
@@ -191,7 +190,6 @@ class ReportCustomerTest extends TestCase
         Customer::create([
             'full_name' => 'Pelanggan Dua',
             'customer_code' => 'C-000002',
-            'phone' => '081234567892',
             'primary_phone' => '081234567892',
             'gender' => 'Laki-laki',
             'pop_id' => $pop->id,
@@ -245,6 +243,11 @@ class ReportCustomerTest extends TestCase
         ]);
 
         $user->pops()->attach($popA->id);
+        $scope = $user->roleScopes()->create([
+            'role_id' => $user->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        $scope->targets()->create(['pop_id' => $popA->id]);
 
         Customer::query()->delete();
 
@@ -252,7 +255,6 @@ class ReportCustomerTest extends TestCase
         Customer::create([
             'full_name' => 'Export Pelanggan SDA',
             'customer_code' => 'C-SDA-000001',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'gender' => 'Laki-laki',
             'pop_id' => $popA->id,
@@ -265,7 +267,6 @@ class ReportCustomerTest extends TestCase
         Customer::create([
             'full_name' => 'Export Pelanggan SBY',
             'customer_code' => 'C-SBY-000001',
-            'phone' => '081234567891',
             'primary_phone' => '081234567891',
             'gender' => 'Laki-laki',
             'pop_id' => $popB->id,
@@ -278,13 +279,13 @@ class ReportCustomerTest extends TestCase
         $response = $this->actingAs($user)->get('/reports/customers/export');
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-        
+
         $content = $response->streamedContent();
         $this->assertStringContainsString('Export Pelanggan SDA', $content);
         $this->assertStringNotContainsString('Export Pelanggan SBY', $content);
 
         // Export specifically POP B (which they don't have access to) -> should return 403
-        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/customers/export?pop_id=' . $popB->id);
+        $responseUnauthorizedExport = $this->actingAs($user)->get('/reports/customers/export?pop_id='.$popB->id);
         $responseUnauthorizedExport->assertStatus(403);
     }
 }

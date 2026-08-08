@@ -44,10 +44,10 @@ class CustomerInstallation extends Model
     {
         return [
             'scheduled_date' => 'date',
-            'finished_date'  => 'date',
-            'assigned_at'    => 'datetime',
-            'started_at'     => 'datetime',
-            'completed_at'   => 'datetime',
+            'finished_date' => 'date',
+            'assigned_at' => 'datetime',
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -81,5 +81,13 @@ class CustomerInstallation extends Model
     public function technician3(): BelongsTo
     {
         return $this->belongsTo(User::class, 'technician_3_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function fop(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fop_id');
     }
 }

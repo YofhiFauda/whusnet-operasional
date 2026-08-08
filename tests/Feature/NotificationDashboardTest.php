@@ -2,12 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Task;
-use App\Enums\TaskType;
-use App\Enums\TaskStatus;
+use App\Notifications\AppNotification;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
+use Database\Seeders\WorkflowTransitionPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Tests\TestCase;
@@ -17,22 +24,26 @@ class NotificationDashboardTest extends TestCase
     use RefreshDatabase;
 
     protected User $fopUser;
+
     protected User $fopUser2;
+
     protected User $techUser;
+
     protected Pop $pop1;
+
     protected Pop $pop2;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
-        $this->seed(\Database\Seeders\WorkflowTransitionPermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
+        $this->seed(WorkflowTransitionPermissionSeeder::class);
 
         $this->pop1 = Pop::create([
             'code' => 'PON1',
@@ -63,7 +74,7 @@ class NotificationDashboardTest extends TestCase
         $this->fopUser->save();
         $scope1 = $this->fopUser->roleScopes()->create([
             'role_id' => $fopRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP->value,
+            'scope_type' => ScopeType::SELECTED_POP->value,
         ]);
         $scope1->targets()->create([
             'pop_id' => $this->pop1->id,
@@ -75,7 +86,7 @@ class NotificationDashboardTest extends TestCase
         $this->fopUser2->save();
         $scope2 = $this->fopUser2->roleScopes()->create([
             'role_id' => $fopRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP->value,
+            'scope_type' => ScopeType::SELECTED_POP->value,
         ]);
         $scope2->targets()->create([
             'pop_id' => $this->pop2->id,
@@ -87,7 +98,7 @@ class NotificationDashboardTest extends TestCase
         $this->techUser->save();
         $scopeTech = $this->techUser->roleScopes()->create([
             'role_id' => $techRole->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP->value,
+            'scope_type' => ScopeType::SELECTED_POP->value,
         ]);
         $scopeTech->targets()->create([
             'pop_id' => $this->pop1->id,
@@ -106,17 +117,17 @@ class NotificationDashboardTest extends TestCase
     public function test_fop_can_only_see_notifications_within_their_pop_scope(): void
     {
         // Notification 1: for tech in POP 1
-        $this->techUser->notify(new \App\Notifications\AppNotification(
+        $this->techUser->notify(new AppNotification(
             title: 'Notif POP 1',
             message: 'Ini Notif POP 1',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         // Notification 2: for FOP 2 in POP 2
-        $this->fopUser2->notify(new \App\Notifications\AppNotification(
+        $this->fopUser2->notify(new AppNotification(
             title: 'Notif POP 2',
             message: 'Ini Notif POP 2',
-            type: 'error'
+            type: NotificationType::ERROR
         ));
 
         // FOP User (POP 1) should see Notif POP 1 but NOT Notif POP 2
@@ -133,17 +144,17 @@ class NotificationDashboardTest extends TestCase
     public function test_notifications_can_be_filtered(): void
     {
         // Create an info notification
-        $this->fopUser->notify(new \App\Notifications\AppNotification(
+        $this->fopUser->notify(new AppNotification(
             title: 'Info Alert',
             message: 'Message 1',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         // Create a success notification
-        $this->fopUser->notify(new \App\Notifications\AppNotification(
+        $this->fopUser->notify(new AppNotification(
             title: 'Success Alert',
             message: 'Message 2',
-            type: 'success'
+            type: NotificationType::SUCCESS
         ));
 
         // Test filter by type = info
@@ -159,10 +170,10 @@ class NotificationDashboardTest extends TestCase
 
     public function test_can_toggle_notification_read_unread_status(): void
     {
-        $this->fopUser->notify(new \App\Notifications\AppNotification(
+        $this->fopUser->notify(new AppNotification(
             title: 'Unread Alert',
             message: 'Test Message',
-            type: 'info'
+            type: NotificationType::INFO
         ));
 
         $notification = DatabaseNotification::first();

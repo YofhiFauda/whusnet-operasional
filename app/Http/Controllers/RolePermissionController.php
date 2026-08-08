@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Feature;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\RoleManagementService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class RolePermissionController extends Controller
 {
@@ -18,15 +20,16 @@ class RolePermissionController extends Controller
     {
         /** @var User $user */
         $user = auth()->user();
+
         return $user;
     }
 
     /**
      * Daftar semua role beserta konteks akses user yang sedang login.
      */
-    public function index(): \Illuminate\View\View
+    public function index(): View
     {
-        $roles       = Role::withCount('permissions', 'users')->orderBy('id')->get();
+        $roles = Role::withCount('permissions', 'users')->orderBy('id')->get();
         $currentUser = $this->currentUser();
 
         return view('roles.index', compact('roles', 'currentUser'));
@@ -36,12 +39,12 @@ class RolePermissionController extends Controller
      * Tampilkan matrix permission untuk role tertentu.
      * Hanya bisa diakses jika user berhak mengelola role tersebut.
      */
-    public function matrix(Role $role): \Illuminate\View\View|\Illuminate\Http\RedirectResponse
+    public function matrix(Role $role): View|RedirectResponse
     {
         $currentUser = $this->currentUser();
 
         // Guard: cek apakah user berhak mengelola role ini
-        if (!$role->canBeManagedBy($currentUser)) {
+        if (! $role->canBeManagedBy($currentUser)) {
             abort(403, 'Anda tidak memiliki wewenang untuk mengatur permission role ini.');
         }
 
@@ -51,8 +54,8 @@ class RolePermissionController extends Controller
                 ->with('info', 'Role Owner memiliki akses penuh ke seluruh fitur sistem. Permission-nya tidak dapat diubah.');
         }
 
-        $features        = Feature::getTree();
-        $permissions     = Permission::with('action')->get()->groupBy('feature_id');
+        $features = Feature::getTree();
+        $permissions = Permission::with('action')->get()->groupBy('feature_id');
         $rolePermissions = $role->permissions->pluck('id')->toArray();
 
         return view('roles.matrix', compact('role', 'features', 'permissions', 'rolePermissions', 'currentUser'));
@@ -61,12 +64,12 @@ class RolePermissionController extends Controller
     /**
      * Simpan perubahan permission untuk role (dari halaman matrix).
      */
-    public function update(Request $request, Role $role, RoleManagementService $roleManagementService): \Illuminate\Http\RedirectResponse
+    public function update(Request $request, Role $role, RoleManagementService $roleManagementService): RedirectResponse
     {
         $currentUser = $this->currentUser();
 
         // Guard 1: cek apakah user berhak mengelola role ini
-        if (!$role->canBeManagedBy($currentUser)) {
+        if (! $role->canBeManagedBy($currentUser)) {
             abort(403, 'Anda tidak memiliki wewenang untuk mengubah permission role ini.');
         }
 
@@ -76,7 +79,7 @@ class RolePermissionController extends Controller
         }
 
         $request->validate([
-            'permissions'   => 'array',
+            'permissions' => 'array',
             'permissions.*' => 'exists:permissions,id',
         ]);
 
@@ -89,28 +92,28 @@ class RolePermissionController extends Controller
     /**
      * Buat role baru. Hanya Owner yang dapat menambah role baru.
      */
-    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $currentUser = $this->currentUser();
 
         // Hanya Owner yang boleh membuat role baru
-        if (!Role::canBeCreatedBy($currentUser)) {
+        if (! Role::canBeCreatedBy($currentUser)) {
             abort(403, 'Hanya Owner yang dapat membuat role baru.');
         }
 
         $request->validate([
-            'name'        => 'required|string|max:255|unique:roles,name',
-            'code'        => ['required', 'string', 'max:50', 'unique:roles,code', 'regex:/^[a-z0-9_]+$/'],
+            'name' => 'required|string|max:255|unique:roles,name',
+            'code' => ['required', 'string', 'max:50', 'unique:roles,code', 'regex:/^[a-z0-9_]+$/'],
             'description' => 'nullable|string|max:1000',
         ], [
             'code.regex' => 'Kode role hanya boleh menggunakan huruf kecil, angka, dan underscore.',
         ]);
 
         Role::create([
-            'name'        => $request->name,
-            'code'        => $request->code,
+            'name' => $request->name,
+            'code' => $request->code,
             'description' => $request->description,
-            'is_system'   => false,
+            'is_system' => false,
         ]);
 
         return redirect()->route('roles.index')
@@ -120,18 +123,18 @@ class RolePermissionController extends Controller
     /**
      * Update data role (nama, kode, deskripsi).
      */
-    public function updateRole(Request $request, Role $role): \Illuminate\Http\RedirectResponse
+    public function updateRole(Request $request, Role $role): RedirectResponse
     {
         $currentUser = $this->currentUser();
 
         // Guard: cek apakah user berhak mengelola role ini
-        if (!$role->canBeManagedBy($currentUser)) {
+        if (! $role->canBeManagedBy($currentUser)) {
             abort(403, 'Anda tidak memiliki wewenang untuk mengubah role ini.');
         }
 
         $request->validate([
-            'name'        => 'required|string|max:255|unique:roles,name,' . $role->id,
-            'code'        => ['required', 'string', 'max:50', 'unique:roles,code,' . $role->id, 'regex:/^[a-z0-9_]+$/'],
+            'name' => 'required|string|max:255|unique:roles,name,'.$role->id,
+            'code' => ['required', 'string', 'max:50', 'unique:roles,code,'.$role->id, 'regex:/^[a-z0-9_]+$/'],
             'description' => 'nullable|string|max:1000',
         ], [
             'code.regex' => 'Kode role hanya boleh menggunakan huruf kecil, angka, dan underscore.',
@@ -143,8 +146,8 @@ class RolePermissionController extends Controller
         }
 
         $role->update([
-            'name'        => $request->name,
-            'code'        => $role->is_system ? $role->code : $request->code,
+            'name' => $request->name,
+            'code' => $role->is_system ? $role->code : $request->code,
             'description' => $request->description,
         ]);
 
@@ -155,12 +158,12 @@ class RolePermissionController extends Controller
     /**
      * Hapus role.
      */
-    public function destroy(Role $role): \Illuminate\Http\RedirectResponse
+    public function destroy(Role $role): RedirectResponse
     {
         $currentUser = $this->currentUser();
 
         // Guard 1: cek apakah user berhak mengelola role ini
-        if (!$role->canBeManagedBy($currentUser)) {
+        if (! $role->canBeManagedBy($currentUser)) {
             abort(403, 'Anda tidak memiliki wewenang untuk menghapus role ini.');
         }
 

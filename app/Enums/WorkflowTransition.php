@@ -27,7 +27,7 @@ enum WorkflowTransition: string
      */
     public function allowedNextTransitions(): array
     {
-        return match($this) {
+        return match ($this) {
             self::REGISTERED => [self::WAITING_SURVEY, self::REJECTED],
             self::WAITING_SURVEY => [self::SURVEY_IN_PROGRESS, self::REJECTED],
             self::SURVEY_IN_PROGRESS => [self::WAITING_ACC, self::SURVEYED, self::REJECTED],

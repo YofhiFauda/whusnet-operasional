@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 #[Fillable([
     'name',
@@ -30,7 +32,7 @@ class FopTaskTeam extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'fop_task_team_user', 'fop_task_team_id', 'user_id')
-                    ->withTimestamps();
+            ->withTimestamps();
     }
 
     public function fopTasks(): HasMany
@@ -43,7 +45,7 @@ class FopTaskTeam extends Model
      */
     public function isActive(): bool
     {
-        return $this->fopTasks()->whereNotIn('status', ['Selesai', 'Cancel'])->exists();
+        return $this->fopTasks()->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value])->exists();
     }
 
     /**
@@ -68,7 +70,7 @@ class FopTaskTeam extends Model
      */
     public static function findMemberConflicts(array $memberIds, string $workDate, ?int $excludeTeamId = null): array
     {
-        $workDate = \Illuminate\Support\Carbon::parse($workDate)->toDateString();
+        $workDate = Carbon::parse($workDate)->toDateString();
 
         $teams = static::with('members:id,name')
             ->where('work_date', $workDate)

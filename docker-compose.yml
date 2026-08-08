@@ -27,12 +27,16 @@ services:
         condition: service_healthy
     environment:
       APP_NAME: Whusnet-Operasional
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: whusnet_operasional
-      DB_USERNAME: root
-      DB_PASSWORD: root
+      # DB_* SENGAJA tak diulang di sini (2026-08-03). Compose `environment:`
+      # jadi env var level-OS container — lapisan ini menang atas .env DAN
+      # atas .env.testing/phpunit.xml `force="true"` saat `php artisan test`
+      # dijalankan lewat `docker exec`, karena sudah ada di process env
+      # SEBELUM PHP/Dotenv jalan. Akibatnya semua test RefreshDatabase
+      # nyasar ke MySQL asli, bukan sqlite :memory: — ditemukan 2026-08-03.
+      # .env sudah punya DB_CONNECTION=mysql/DB_HOST=db yang identik untuk
+      # runtime normal, jadi menghapus baris ini di compose TIDAK mengubah
+      # perilaku container saat jalan biasa — cuma membuka jalan supaya
+      # .env.testing bisa menang saat testing.
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SESSION_DRIVER: file
@@ -278,21 +282,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - app_network
-
-  ngrok:
-    image: ngrok/ngrok:alpine
-    container_name: whusnet-ngrok
-    restart: unless-stopped
-    command: ["http", "nginx:80"]
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-    ports:
-      - "4040:4040"
-    depends_on:
-      nginx:
-        condition: service_started
     networks:
       - app_network
 

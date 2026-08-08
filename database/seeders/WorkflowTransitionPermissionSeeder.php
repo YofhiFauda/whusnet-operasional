@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\WorkflowTransitionPermission;
 use App\Models\Role;
-use Illuminate\Support\Facades\Schema;
+use App\Models\WorkflowTransitionPermission;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class WorkflowTransitionPermissionSeeder extends Seeder
 {
@@ -25,73 +25,73 @@ class WorkflowTransitionPermissionSeeder extends Seeder
                 'from_status' => 'pending',
                 'to_status' => 'terjadwal',
                 'permission_name' => 'task.manage',
-                'roles' => ['owner', 'admin', 'helpdesk', 'fop']
+                'roles' => ['owner', 'admin', 'helpdesk', 'fop'],
             ],
             [
                 'from_status' => 'pending',
                 'to_status' => 'dibatalkan',
                 'permission_name' => 'task.cancel',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
             [
                 'from_status' => 'pending',
                 'to_status' => 'rejected',
                 'permission_name' => 'task.reject',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
             [
                 'from_status' => 'pending',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi']
+                'roles' => ['owner', 'admin', 'teknisi'],
             ],
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'in_progress',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi']
+                'roles' => ['owner', 'admin', 'teknisi'],
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'selesai',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi']
+                'roles' => ['owner', 'admin', 'teknisi'],
             ],
             [
                 'from_status' => 'selesai',
                 'to_status' => 'approved',
                 'permission_name' => 'task.approve',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
             [
                 'from_status' => 'selesai',
                 'to_status' => 'rejected',
                 'permission_name' => 'task.reject',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi']
+                'roles' => ['owner', 'admin', 'teknisi'],
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi']
+                'roles' => ['owner', 'admin', 'teknisi'],
             ],
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'dibatalkan',
                 'permission_name' => 'task.cancel',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'dibatalkan',
                 'permission_name' => 'task.cancel',
-                'roles' => ['owner', 'admin', 'fop']
+                'roles' => ['owner', 'admin', 'fop'],
             ],
         ];
 

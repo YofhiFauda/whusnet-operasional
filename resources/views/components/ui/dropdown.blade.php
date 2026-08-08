@@ -42,7 +42,8 @@ switch ($width) {
             x-transition:leave="transition ease-in duration-fast"
             x-transition:leave-start="transform opacity-100 scale-100"
             x-transition:leave-end="transform opacity-0 scale-95"
-            class="absolute z-dropdown mt-2 {{ $width }} rounded-md shadow-sm border border-border bg-surface {{ $alignmentClasses }}"
+            {{-- z-[40] literal — lihat catatan `z-drawer` di components/ui/drawer.blade.php --}}
+            class="absolute z-[40] mt-2 {{ $width }} rounded-md shadow-sm border border-border bg-surface {{ $alignmentClasses }}"
             style="display: none;">
         <div class="py-1 ring-1 ring-black ring-opacity-5 rounded-md">
             {{ $content }}

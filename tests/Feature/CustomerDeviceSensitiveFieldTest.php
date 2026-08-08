@@ -2,13 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
+use App\Models\InternetPackage;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 class CustomerDeviceSensitiveFieldTest extends TestCase
@@ -16,18 +21,23 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
     use RefreshDatabase;
 
     protected $pop;
+
     protected $customer;
+
     protected $device;
+
     protected $financeRole;
+
     protected $helpdeskRole;
+
     protected $teknisiRole;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
-        
+
+        $this->seed(DatabaseSeeder::class);
+
         $this->pop = Pop::create([
             'code' => 'POP-TEST',
             'pop_code' => 'P-TEST',
@@ -37,8 +47,8 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'type' => 'cabang',
             'status' => 'active',
         ]);
-        
-        $package = \App\Models\InternetPackage::create([
+
+        $package = InternetPackage::create([
             'name' => 'Test Package',
             'package_code' => 'PKG-TEST',
             'category' => 'broadband',
@@ -47,14 +57,14 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'download_speed' => 10,
             'upload_speed' => 10,
             'monthly_price' => 150000,
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         // Setup Customer
         $this->customer = Customer::factory()->create([
             'pop_id' => $this->pop->id,
             'internet_package_id' => $package->id,
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         $this->device = CustomerDevice::create([
@@ -65,9 +75,9 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'wifi_ssid' => 'john_wifi',
             'wifi_password' => 'secret_wifi',
             'ip_address' => '192.168.1.100',
-            'vlan_id' => 100
+            'vlan_id' => 100,
         ]);
-        
+
         $this->financeRole = Role::where('name', 'Helpdesk')->firstOrFail();
         $this->attachPermission($this->financeRole, 'customers.view');
         $this->attachPermission($this->financeRole, 'customers.detail.devices.view');
@@ -89,21 +99,21 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
 
     private function attachPermission(Role $role, string $code)
     {
-        $permission = \App\Models\Permission::firstOrCreate(['code' => $code], ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']);
+        $permission = Permission::firstOrCreate(['code' => $code], ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']);
         $role->permissions()->syncWithoutDetaching([$permission->id]);
     }
 
     private function createUserWithRole($role)
     {
         $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
-        
-        $scope = \App\Models\UserRoleScope::create([
+
+        $scope = UserRoleScope::create([
             'user_id' => $user->id,
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::SELECTED_POP,
+            'scope_type' => ScopeType::SELECTED_POP,
         ]);
-        
-        \App\Models\UserRoleScopeTarget::create([
+
+        UserRoleScopeTarget::create([
             'user_role_scope_id' => $scope->id,
             'pop_id' => $this->pop->id,
         ]);
@@ -115,8 +125,8 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
     {
         $finance = $this->createUserWithRole($this->financeRole);
 
-        $response = $this->actingAs($finance)->get('/customers/' . $this->customer->id);
-        
+        $response = $this->actingAs($finance)->get('/customers/'.$this->customer->id);
+
         $response->assertStatus(200);
         // It should render ******** instead of secret_pppoe
         $response->assertSee('********');
@@ -129,15 +139,15 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
     {
         $helpdesk = $this->createUserWithRole($this->helpdeskRole);
 
-        $response = $this->actingAs($helpdesk)->post('/customers/' . $this->customer->id . '/device', [
+        $response = $this->actingAs($helpdesk)->post('/customers/'.$this->customer->id.'/device', [
             'device_type' => 'router',
             'pppoe_password' => 'hacked_password',
             'wifi_password' => 'hacked_wifi',
             'ip_address' => '10.0.0.1',
         ]);
-        
+
         $response->assertRedirect();
-        
+
         // Refresh and check DB, should not be changed
         $this->device->refresh();
         $this->assertEquals('secret_pppoe', $this->device->pppoe_password);
@@ -149,15 +159,17 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
     {
         $teknisi = $this->createUserWithRole($this->teknisiRole);
 
-        // Can see
-        $response = $this->actingAs($teknisi)->get('/customers/' . $this->customer->id);
+        // Can see — teknisi gak punya customers.detail.view (Detail Pelanggan
+        // diblok), tab Perangkat diakses lewat halaman terpisah
+        // customers.fieldwork (lihat CustomerFieldworkController).
+        $response = $this->actingAs($teknisi)->get(route('customers.fieldwork', $this->customer->id));
         $response->assertStatus(200);
         $response->assertSee('secret_pppoe');
         $response->assertSee('secret_wifi');
         $response->assertSee('192.168.1.100');
-        
+
         // Can update
-        $response = $this->actingAs($teknisi)->post('/customers/' . $this->customer->id . '/device', [
+        $response = $this->actingAs($teknisi)->post('/customers/'.$this->customer->id.'/device', [
             'device_type' => 'router',
             'pppoe_username' => 'new_pppoe',
             'pppoe_password' => 'new_secret_pppoe',
@@ -165,9 +177,9 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'wifi_password' => 'new_secret_wifi',
             'ip_address' => '10.10.10.10',
         ]);
-        
+
         $response->assertRedirect();
-        
+
         // Refresh and check DB
         $this->device->refresh();
         $this->assertEquals('new_secret_pppoe', $this->device->pppoe_password);

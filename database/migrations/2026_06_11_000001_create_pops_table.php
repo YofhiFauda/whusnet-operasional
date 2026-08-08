@@ -16,25 +16,25 @@ return new class extends Migration
             $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->string('type', 30); // pusat, cabang, mini_pop
-            
+
             // Self-referencing parent-child relationship
             $table->foreignId('parent_id')
                 ->nullable()
                 ->constrained('pops')
                 ->nullOnDelete();
-                
+
             $table->text('address')->nullable();
             $table->string('village', 100)->nullable();
             $table->string('district', 100)->nullable();
             $table->string('city', 100)->nullable();
-            
+
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
-            
+
             $table->string('pic_name', 150)->nullable();
             $table->string('pic_phone', 30)->nullable();
             $table->string('status', 30)->default('active'); // active, inactive
-            
+
             $table->timestamps();
         });
     }

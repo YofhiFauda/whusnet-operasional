@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50 dark:bg-slate-900">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Detail Pelanggan: Ardiyanto Cahyo Nugroho (C1X4ARQ000004) — WHUSNET ISP Billing</title>
+
+    <!-- Theme Initialization -->
+    <script>
+        (function () {
+            const saved = localStorage.getItem('whusnet-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (saved === 'dark' || (!saved && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        skybrand: {
+                            50: '#F0F9FF',
+                            100: '#E0F2FE',
+                            200: '#BAE6FD',
+                            500: '#0EA5E9',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            900: '#0C4A6E',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.4); }
+    </style>
+</head>
+<body class="h-full text-slate-800 dark:text-slate-100 antialiased font-sans bg-slate-50 dark:bg-slate-900">
+
+<div class="flex h-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700/60 fixed inset-y-0 left-0 z-40 w-64 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 -translate-x-full shrink-0">
+        <!-- Logo Header -->
+        <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-base tracking-wider shrink-0">
+                    W
+                </div>
+                <span class="font-bold text-slate-900 dark:text-slate-50 text-base leading-none tracking-tight">WHUSNET</span>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            <div>
+                <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Operasional</p>
+                <div class="space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                        <i class="fa-solid fa-chart-pie text-slate-400 w-5"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
+                        <i class="fa-solid fa-users text-sky-600 dark:text-sky-400 w-5"></i>
+                        <span>Pelanggan</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                        <i class="fa-solid fa-ticket text-slate-400 w-5"></i>
+                        <span>Ticketing NOC</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60">
+                        <i class="fa-solid fa-file-invoice-dollar text-slate-400 w-5"></i>
+                        <span>Billing & Tagihan</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-100 dark:border-slate-700/60 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 flex items-center justify-center font-bold text-xs">
+                    OW
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">Owner Admin</p>
+                    <p class="text-[10px] text-slate-400 truncate">Super Admin</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <!-- TOP BAR HEADER (Sticky, 64px) -->
+        <header class="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/60 flex items-center justify-between px-4 sm:px-6 shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="md:hidden p-2 text-slate-500 hover:text-slate-700 rounded-lg">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <a href="#" class="hover:text-slate-800 dark:hover:text-slate-200">Pelanggan</a>
+                    <span>/</span>
+                    <span class="text-slate-800 dark:text-slate-200 font-semibold">Detail Pelanggan</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="toggleTheme()" class="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg" title="Toggle Mode Terang/Gelap">
+                    <i class="fa-solid fa-moon dark:hidden"></i>
+                    <i class="fa-solid fa-sun hidden dark:inline"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN PAGE SCROLLABLE AREA -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+
+            <!-- LAYER 1: NAKED PAGE HEADER (Strict Design System Rule: No card wrapper) -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h1 class="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Ardiyanto Cahyo Nugroho</h1>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                            ● Status: Aktif (Siap Billing)
+                        </span>
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
+                            <span>CID: C1X4ARQ000004</span>
+                            <button onclick="copyText('C1X4ARQ000004', 'CID')" class="text-slate-400 hover:text-sky-600 ml-1" title="Salin CID">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Paket: <strong>PK000003 - Up to 5 Mbps</strong> (Rp 165.000/bln) — POP Jetis (Mini POP Jetis 01) — Terdaftar sejak 06 Jan 2022
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <a href="#" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        Edit Profil
+                    </a>
+                    <button onclick="openModal('manual-invoice-modal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        Buat Tagihan
+                    </button>
+                    <button onclick="openModal('network-assignment-modal')" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        Atur Mini POP
+                    </button>
+                    <a href="#" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                        Kembali
+                    </a>
+                </div>
+            </div>
+
+            <!-- LAYER 3: SINGLE UNIFIED DETAIL PANEL (Card Budget = 1) -->
+            <!-- All sub-sections sit inside 1 main outer container using 1px border dividers -->
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm overflow-hidden">
+
+                <!-- SECTION A: QUICK METRIC STRIP (Flat summary bar with dividers) -->
+                <div class="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-slate-200 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
+                    <div class="p-4 flex flex-col justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
+                        <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1">Up to 5 Mbps</span>
+                        <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp 165.000/bln (Nett)</span>
+                    </div>
+                    <div class="p-4 flex flex-col justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IP ADDRESS & PPPOE</span>
+                        <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            <span>10.13.14.10</span>
+                            <button onclick="copyText('10.13.14.10', 'IP Address')" class="text-slate-400 hover:text-sky-600" title="Salin IP">
+                                <i class="fa-regular fa-copy text-[10px]"></i>
+                            </button>
+                        </div>
+                        <span class="text-[11px] font-mono text-slate-500 truncate">PPPoE: ArdiyantoJetis</span>
+                    </div>
+                    <div class="p-4 flex flex-col justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
+                        <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1">ZTEGCC524A29 (ZTE F660)</span>
+                        <span class="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">Redaman: -22.2 dBm</span>
+                    </div>
+                    <div class="p-4 flex flex-col justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
+                        <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1">INV-202211-0001 (Lunas)</span>
+                        <span class="text-[11px] text-slate-500">Jatuh Tempo: Tgl 10 Per Bulan</span>
+                    </div>
+                    <div class="p-4 flex flex-col justify-center col-span-2 md:col-span-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
+                        <div class="flex items-center justify-between mt-1">
+                            <span class="text-xs font-bold text-emerald-600">100% Lengkap</span>
+                            <span class="text-[10px] font-mono text-slate-400">28/28 Parameter</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                            <div class="bg-emerald-500 h-full rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION C: SEARCH & EXACT 15-TAB NAV BAR -->
+                <div class="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                    <!-- Omni-Search Bar & Mode Toggle -->
+                    <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh 15 tab (contoh: 10.13, ZTE, PPPoE, Speedtest, KTP, Prorate, Tiang, Kontrak, FOP)..." 
+                                   class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                            <button onclick="clearSearch()" id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs shrink-0">
+                            <button onclick="setViewMode('tabs')" id="view-mode-tabs" class="px-3 py-1.5 rounded-md font-semibold bg-white dark:bg-slate-800 text-sky-600 shadow-sm transition-all">📑 Mode Tab (15 Tab)</button>
+                            <button onclick="setViewMode('all')" id="view-mode-all" class="px-3 py-1.5 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all">⚡ All-In-One (Scroll Semua)</button>
+                        </div>
+                    </div>
+
+                    <!-- 15 Tab Buttons Nav -->
+                    <div id="tab-nav-wrapper" class="overflow-x-auto flex border-b border-slate-200 dark:border-slate-700 scrollbar-none px-2 bg-slate-50/50 dark:bg-slate-900/30">
+                        <button onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap">Ringkasan (Overview)</button>
+                        <button onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Identitas</button>
+                        <button onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Alamat</button>
+                        <button onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">POP/Cabang</button>
+                        <button onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Survey</button>
+                        <button onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Pemasangan</button>
+                        <button onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Perangkat</button>
+                        <button onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Paket & Layanan</button>
+                        <button onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Billing</button>
+                        <button onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Tagihan</button>
+                        <button onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Pembayaran</button>
+                        <button onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Dokumen & Berkas</button>
+                        <button onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Riwayat Ticketing</button>
+                        <button onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Riwayat Perubahan</button>
+                        <button onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap">Detail Teknis Lama</button>
+                    </div>
+                </div>
+
+                <!-- SECTION D: UNIFIED DETAILS BODY (All 15 Data Tabs Included 100%) -->
+                <div class="p-6 text-xs" id="details-container">
+
+                    <!-- TAB 1: RINGKASAN (OVERVIEW) -->
+                    <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
+                        <!-- Completeness Overview Banner -->
+                        <div class="border border-emerald-200 dark:border-emerald-800 rounded-lg p-5 bg-emerald-50/40 dark:bg-emerald-950/20">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">STATUS KELENGKAPAN DATA PROFIL</span>
+                            <div class="flex items-center gap-3">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                    ● Siap Billing
+                                </span>
+                                <span class="text-xs text-slate-600 dark:text-slate-300">
+                                    Profil data terisi <strong class="text-emerald-600 font-bold">100%</strong> dari total 28 parameter evaluasi sistem.
+                                </span>
+                            </div>
+                        </div>
+
+                                               <!-- CARD TIMELINE PROSES PENGERJAAN (OVERVIEW) -->
+                        <div class="border border-amber-200 dark:border-amber-800 rounded-lg p-5 bg-white dark:bg-slate-800">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CARD TIMELINE PROSES ALUR PENGERJAAN (data migrasi legacy)</span>
+                                <span class="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Selesai & Aktif</span>
+                            </div>
+                            <p class="text-[10px] text-amber-600 dark:text-amber-400 mb-3 italic">Catatan: tanggal registrasi (10 Mei 2022) tercatat lebih akhir dari tanggal survey/pasang/aktivasi (Feb 2022) — anomali data hasil migrasi legacy, bukan kesalahan tampilan.</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                <div class="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">1. REGISTRASI</span>
+                                        <i class="fa-solid fa-circle-check text-emerald-500 text-xs"></i>
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">10 Mei 2022</span>
+                                    <span class="block text-[10px] text-slate-500 font-mono">RQ000004 / PE000002 (old)</span>
+                                </div>
+                                <div class="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">2. SURVEY</span>
+                                        <i class="fa-solid fa-circle-check text-emerald-500 text-xs"></i>
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">28 Feb 2022</span>
+                                    <span class="block text-[10px] text-slate-500 font-mono">Ditugaskan 07 Feb 2022</span>
+                                </div>
+                                <div class="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">3. PEMASANGAN</span>
+                                        <i class="fa-solid fa-circle-check text-emerald-500 text-xs"></i>
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">08 Feb 2022</span>
+                                    <span class="block text-[10px] text-slate-500 font-mono">Ditugaskan 07 Feb 2022</span>
+                                </div>
+                                <div class="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">4. AKTIVASI BILLING</span>
+                                        <i class="fa-solid fa-circle-check text-emerald-500 text-xs"></i>
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">08 Feb 2022, 20:46 WIB</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CARD RINGKASAN WAKTU & PENANGGUNG JAWAB PER TAHAP -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 shadow-sm">
+                            <div class="px-5 py-3.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                        <i class="fa-solid fa-clock-rotate-left text-sky-600 mr-1.5"></i> Ringkasan Waktu & Penanggung Jawab Per Tahap Workflow
+                                    </h3>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">Rekapitulasi timestamp eksekusi dan PIC penanggung jawab dari tahap pendaftaran hingga verifikasi aktivasi.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50/40 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <th class="px-5 py-3">Tahap Alur Workflow</th>
+                                            <th class="px-5 py-3">Waktu & Tanggal Eksekusi</th>
+                                            <th class="px-5 py-3">Penanggung Jawab (PIC)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60 font-sans">
+                                        <!-- Tahap 1: Registrasi -->
+                                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td class="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                                                <div class="flex items-center gap-2.5">
+                                                    <span class="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-[10px]">1</span>
+                                                    <div>
+                                                        <span class="block text-xs font-bold searchable-text">Registrasi & Input Pelanggan</span>
+                                                        <span class="block text-[10px] text-slate-400 font-mono">Pendaftaran Awal Data Pelanggan</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3 font-mono text-slate-700 dark:text-slate-300 searchable-text">
+                                                06 Jan 2022 <span class="text-slate-400 text-[11px]">(08:34:05 WIB)</span>
+                                            </td>
+                                            <td class="px-5 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center font-bold text-[10px]">AD</div>
+                                                    <div>
+                                                        <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">Admin Cabang Jetis</span>
+                                                        <span class="block text-[9px] text-slate-400">Role: Admin POP</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Tahap 2: Survey -->
+                                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td class="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                                                <div class="flex items-center gap-2.5">
+                                                    <span class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-[10px]">2</span>
+                                                    <div>
+                                                        <span class="block text-xs font-bold searchable-text">Survey Lokasi & Jalur Optik</span>
+                                                        <span class="block text-[10px] text-slate-400 font-mono">Pemeriksaan Jalur & ODP</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3 font-mono text-slate-700 dark:text-slate-300 searchable-text">
+                                                07 Feb 2022 <span class="text-slate-400 text-[11px]">(11:43:31 WIB)</span>
+                                            </td>
+                                            <td class="px-5 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px]">AR</div>
+                                                    <div>
+                                                        <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">arifqi</span>
+                                                        <span class="block text-[9px] text-slate-400">Role: Surveyor FOP</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Tahap 3: Review Admin -->
+                                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td class="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                                                <div class="flex items-center gap-2.5">
+                                                    <span class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-[10px]">3</span>
+                                                    <div>
+                                                        <span class="block text-xs font-bold searchable-text">Review & Approval Admin POP</span>
+                                                        <span class="block text-[10px] text-slate-400 font-mono">Verifikasi Hasil Survey</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3 font-mono text-slate-700 dark:text-slate-300 searchable-text">
+                                                07 Feb 2022 <span class="text-slate-400 text-[11px]">(14:00:00 WIB)</span>
+                                            </td>
+                                            <td class="px-5 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300 flex items-center justify-center font-bold text-[10px]">AP</div>
+                                                    <div>
+                                                        <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">Admin POP Jetis</span>
+                                                        <span class="block text-[9px] text-slate-400">Role: Admin Cabang</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Tahap 4: Pemasangan -->
+                                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td class="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                                                <div class="flex items-center gap-2.5">
+                                                    <span class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-[10px]">4</span>
+                                                    <div>
+                                                        <span class="block text-xs font-bold searchable-text">Proses Pemasangan Perangkat & FO</span>
+                                                        <span class="block text-[10px] text-slate-400 font-mono">Penarikan Dropcore & ONT</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3 font-mono text-slate-700 dark:text-slate-300 searchable-text">
+                                                07 Feb 2022 <span class="text-slate-400 text-[11px]">(12:13:50 WIB)</span>
+                                            </td>
+                                            <td class="px-5 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 flex items-center justify-center font-bold text-[10px]">AR</div>
+                                                    <div>
+                                                        <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">arifqi</span>
+                                                        <span class="block text-[9px] text-slate-400">Role: Teknisi FOP</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Tahap 5: Aktivasi & Verifikasi -->
+                                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/30 transition-colors">
+                                            <td class="px-5 py-3 font-semibold text-slate-900 dark:text-slate-100">
+                                                <div class="flex items-center gap-2.5">
+                                                    <span class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-[10px]">5</span>
+                                                    <div>
+                                                        <span class="block text-xs font-bold searchable-text">Aktivasi Layanan & Verifikasi Final</span>
+                                                        <span class="block text-[10px] text-slate-400 font-mono">Siap Billing & Dial-up PPPoE</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-5 py-3 font-mono text-slate-700 dark:text-slate-300 searchable-text">
+                                                08 Feb 2022 <span class="text-slate-400 text-[11px]">(20:46:45 WIB)</span>
+                                            </td>
+                                            <td class="px-5 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px]">AR</div>
+                                                    <div>
+                                                        <span class="block text-xs font-semibold text-slate-800 dark:text-slate-200 searchable-text">arifqi</span>
+                                                        <span class="block text-[9px] text-slate-400">Role: Verifikator NOC</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Active Subscription card -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">LANGGANAN AKTIF</span>
+                                <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100 searchable-text">PK000003 - Up to 5 Mbps</h4>
+                                <p class="text-xs text-slate-500 mt-1">Kategori: Home Broadband (5 Mbps Up / Down)</p>
+                                <div class="flex items-baseline mt-3">
+                                    <span class="text-lg font-bold text-slate-900 dark:text-slate-100 font-mono searchable-text">Rp 165.000</span>
+                                    <span class="text-[10px] text-slate-400 ml-1">/bulan (Nett)</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Address Card -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">ALAMAT INSTALASI</span>
+                                <p class="text-xs text-slate-800 dark:text-slate-200 font-semibold leading-relaxed searchable-text">Jl. Raya Jetis No. 14, RT 01 / RW 02</p>
+                                <p class="text-[10px] text-slate-500 mt-1.5 searchable-text">
+                                    Kel. Jetis, Kec. Jetis, Kota/Kab. Ponorogo, Jawa Timur
+                                </p>
+                                <div class="mt-2.5 flex items-center gap-1.5 font-mono text-[10px] text-slate-500 searchable-text">
+                                    <i class="fa-solid fa-location-dot text-sky-600"></i>
+                                    <span>Lat/Long: -7.934681, 111.476509</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Technical summary card -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5">
+                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-xs">
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">NOMOR CID / REQ ID</span>
+                                    <button type="button" onclick="openModal('network-assignment-modal')" class="font-mono font-bold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer searchable-text" title="Klik untuk atur Mini POP & Distribusi">
+                                        C1X4ARQ000004
+                                    </button>
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">POP CABANG</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">POP Jetis</span>
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">MINI POP (OLT)</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">Mini POP Jetis 01</span>
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">DISTRIBUSI ODP</span>
+                                    <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">Odp 13 JTWN</span>
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">IP ADDRESS</span>
+                                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">10.13.14.10</span>
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">ONT SERIAL NUMBER</span>
+                                    <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">ZTEGCC524A29</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: IDENTITAS -->
+                    <div id="tab-content-identitas" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Formulir Identitas Pelanggan</span>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">ID REGISTRASI (Permanen App)</span>
+                                    <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">REG-20220106-0004</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nama Lengkap Pelanggan</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Ardiyanto Cahyo Nugroho</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nomor Identitas (NIK KTP)</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">3502120601900004</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Jenis Kelamin</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Laki-laki</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nomor HP Utama (WhatsApp)</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">08563652226</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nomor HP Alternatif</span>
+                                    <span class="font-mono text-slate-400 searchable-text">- (Tidak Ada)</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Alamat Email</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">ardiyanto@gmail.com</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Tanggal Registrasi</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">06 Januari 2022 (08:34 WIB)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Informasi Referral & Sales</span>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES (DARI SALES)</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">SLS-JTS-003 (Rian Sales)</span>
+                                </div>
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">ID AGENT (DARI AGENT)</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">AGT-0012 (Mitra Agent Jetis)</span>
+                                </div>
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase">ID REFERRAL (DARI PELANGGAN)</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">REF-C1X4000001 (Direct)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: ALAMAT -->
+                    <div id="tab-content-alamat" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Alamat Instalasi Detail</span>
+                                <a href="https://maps.google.com/?q=-7.934681,111.476509" target="_blank" class="text-sky-600 font-semibold hover:underline">Buka di Google Maps ↗</a>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
+                                    <span class="text-slate-400">Alamat Lengkap</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">Jl. Raya Jetis No. 14, RT 01 / RW 02</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Desa / Kelurahan</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Jetis</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Kecamatan</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Jetis</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Kota / Kabupaten</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Ponorogo</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Provinsi</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Jawa Timur</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Garis Lintang (Latitude)</span>
+                                    <span class="font-mono text-slate-900 dark:text-slate-100 searchable-text">-7.934681</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Garis Bujur (Longitude)</span>
+                                    <span class="font-mono text-slate-900 dark:text-slate-100 searchable-text">111.476509</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: POP/CABANG -->
+                    <div id="tab-content-pop" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Data POP / Cabang Terkoneksi</span>
+                                <button onclick="openModal('network-assignment-modal')" class="text-xs text-sky-600 font-semibold hover:underline">Ubah Penugasan POP →</button>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nama POP / Cabang</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">POP Jetis</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Kode Cabang</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">JTS01</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Tipe Cabang</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase text-[10px] tracking-wider searchable-text">Mini POP</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Status POP</span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">Aktif</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
+                                    <span class="text-slate-400">Alamat Kantor POP</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">
+                                        Jl. Raya Ponorogo-Jetis No. 8, Kel. Jetis, Kec. Jetis, Kota Ponorogo
+                                    </span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Penanggung Jawab (PIC)</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Budi Santoso</span>
+                                </div>
+                                <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nomor HP PIC</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">081234567890</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 5: SURVEY -->
+                    <div id="tab-content-survey" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Hasil Laporan Survey Lapangan (Data FOP & Survey)</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Selesai & Layak</span>
+                            </div>
+                            <div class="p-5 space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-2.5">
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">ID FOP Penugasan Survey</span>
+                                            <span class="font-mono font-bold text-sky-600 searchable-text">FOP-20220207-0012</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Waktu Penugasan FOP Survey</span>
+                                            <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">06 Feb 2022 (16:30 WIB)</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Tanggal & Waktu Mulai Survey</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">07 Feb 2022 — 08:30 WIB</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Tanggal & Waktu Selesai Survey</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">07 Feb 2022 — 09:15 WIB</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Durasi Pelaksanaan Survey</span>
+                                            <span class="font-mono font-bold text-emerald-600 searchable-text">45 Menit (On-Time)</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2.5">
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Petugas Survey (3 Tim Field)</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Hendra S., Budi S., Eko Prasetyo</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">ODP Terdekat & Port</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Odp 13 JTWN (Port 2 / 3)</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Estimasi Jarak Kabel Dropcore</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">135 Meter (Jalur Udara 3 Tiang)</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Status Kelayakan Lokasi</span>
+                                            <span class="font-bold text-emerald-600 searchable-text">LAYAK (Siap Pasang)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 1. TABEL ESTIMASI KEBUTUHAN MATERIAL SURVEY -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        <i class="fa-solid fa-boxes-stacked text-sky-600 mr-1"></i> 1. TABEL ESTIMASI KEBUTUHAN MATERIAL / BARANG
+                                    </span>
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Nama Barang / Material Pasif</th>
+                                                    <th class="px-4 py-2 text-center">Jumlah (Qty)</th>
+                                                    <th class="px-4 py-2">Satuan</th>
+                                                    <th class="px-4 py-2">Keterangan Tambahan</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Dropcore Fiber Optic 1 Core</td><td class="px-4 py-2 text-center font-bold">135</td><td class="px-4 py-2 font-sans">Meter</td><td class="px-4 py-2 font-sans text-slate-500">Estimasi jalur udara 3 tiang</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Patchcore SC/UPC to SC/UPC</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Koneksi ODP ke Dropcore</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Precon Dropcore Set</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">Set penambat & konektor awal</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- 2. TABEL ESTIMASI ALAT KERJA YANG PERLU DIBAWA SURVEY -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ESTIMASI ALAT KERJA YANG PERLU DIBAWA (TOOLS SURVEY)
+                                    </span>
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Nama Alat Kerja (Tools)</th>
+                                                    <th class="px-4 py-2 text-center">Jumlah (Qty)</th>
+                                                    <th class="px-4 py-2">Satuan</th>
+                                                    <th class="px-4 py-2">Keterangan / Fungsi Utama</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Tangga Aluminium Lipat 6 Meter</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Akses inspeksi fisik Box ODP tiang</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Optical Power Meter (OPM) & VFL Pen</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Cek redaman awal port ODP & laser visual</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Optical Time Domain Reflectometer (OTDR)</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Pengukuran jarak fisik kabel optik</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Toolkit Fiber Optic & Stripper FO</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">Kupas & pemotong core fiber</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Helmet & Safety Harness Field</td><td class="px-4 py-2 text-center font-bold">3</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">APD keselamatan kerja 3 teknisi</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Photo Media Previews (Survey) -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">FOTO DOKUMENTASI HASIL SURVEY LAPANGAN</span>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                            <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                                <i class="fa-solid fa-network-wired text-3xl mb-1 text-sky-600"></i>
+                                                <span class="text-[10px] font-mono">ODP-13-JTWN.JPG</span>
+                                            </div>
+                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">Foto ODP (Survey) *</span>
+                                            <a href="#" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        </div>
+                                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                            <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                                <i class="fa-solid fa-house-user text-3xl mb-1 text-sky-600"></i>
+                                                <span class="text-[10px] font-mono">RUMAH-PELANGGAN.JPG</span>
+                                            </div>
+                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">Foto Rumah Pelanggan *</span>
+                                            <a href="#" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 6: PEMASANGAN -->
+                    <div id="tab-content-pemasangan" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Hasil Laporan Pemasangan Perangkat & Laporan Uji Speed Test</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Terpasang & Aktif</span>
+                            </div>
+                            <div class="p-5 space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-2.5">
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">ID FOP Penugasan Pemasangan</span>
+                                            <span class="font-mono font-bold text-sky-600 searchable-text">FOP-20220208-0045</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Waktu Penugasan FOP Pasang</span>
+                                            <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">07 Feb 2022 (14:00 WIB)</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Tanggal & Waktu Mulai Pasang</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">08 Feb 2022 — 09:00 WIB</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Tanggal & Waktu Selesai Pasang</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">08 Feb 2022 — 11:30 WIB</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Teknisi Bertugas (3 Orangnya)</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Hendra S., Budi S., Agus Supri</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2.5">
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Catatan Pemasangan</span>
+                                            <span class="italic text-slate-600 dark:text-slate-300 searchable-text">Modem ditaruh di meja ruang tamu, kabel rapih klem tiang.</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Status Pengujian Uji Coba</span>
+                                            <span class="font-bold text-emerald-600 searchable-text">Lolos Pengujian Uji Coba</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 1. TABEL PERANGKAT PASIF / MATERIAL TERPAKAI AKTUAL -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        <i class="fa-solid fa-boxes-stacked text-sky-600 mr-1"></i> 1. TABEL PERANGKAT PASIF & MATERIAL TERPAKAI AKTUAL
+                                    </span>
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Nama Barang / Perangkat Pasif</th>
+                                                    <th class="px-4 py-2 text-center">Jumlah (Qty)</th>
+                                                    <th class="px-4 py-2">Satuan</th>
+                                                    <th class="px-4 py-2">Keterangan Pemasangan</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Dropcore Fiber Optic 1 Core</td><td class="px-4 py-2 text-center font-bold">135</td><td class="px-4 py-2 font-sans">Meter</td><td class="px-4 py-2 font-sans text-slate-500">Terpasang di 3 tiang penambat</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Fast Connector SC/UPC</td><td class="px-4 py-2 text-center font-bold">2</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Penyambungan ODP & Modem ONT</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Protection Sleeve 60mm</td><td class="px-4 py-2 text-center font-bold">2</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Pelindung Splicing Optic</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Klem C-Hook Kabel Dropcore</td><td class="px-4 py-2 text-center font-bold">6</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Penambat tiang luar rumah</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- 2. TABEL ALAT KERJA YANG DIBAWA & DIGUNAKAN UNTUK PEMASANGAN -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                                        <i class="fa-solid fa-screwdriver-wrench text-indigo-600 mr-1"></i> 2. TABEL ALAT KERJA YANG DIBAWA & DIGUNAKAN (TOOLS PEMASANGAN)
+                                    </span>
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Nama Alat Kerja (Tools Lapangan)</th>
+                                                    <th class="px-4 py-2 text-center">Jumlah (Qty)</th>
+                                                    <th class="px-4 py-2">Satuan</th>
+                                                    <th class="px-4 py-2">Status / Penggunaan Field</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Fusion Splicer Optic (Fujikura 70S)</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Penyambungan core dropcore di ODP</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Optical Power Meter (OPM Redaman Test)</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Uji redaman akhir (-22.20 dBm)</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Tangga Aluminium Lipat 6 Meter</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Unit</td><td class="px-4 py-2 font-sans text-slate-500">Penambatan kabel tiang & ODP</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Toolkit Splicer (Cleaver, Stripper, Alcohol)</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">Pembersihan core & penyambungan</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Tang Kombinasi & Hammer Penambat</td><td class="px-4 py-2 text-center font-bold">1</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">Pemasangan klem C-Hook tiang</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Safety Helmet & Body Harness APD</td><td class="px-4 py-2 text-center font-bold">3</td><td class="px-4 py-2 font-sans">Set</td><td class="px-4 py-2 font-sans text-slate-500">Standard APD 3 teknisi bertugas</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <!-- Photo Attachments in Pemasangan Tab -->
+                                <div>
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">FOTO DOKUMENTASI PEMASANGAN, SPEED TEST & BERITA ACARA</span>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <!-- 1. Foto Pemasangan Lapangan -->
+                                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                            <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                                <i class="fa-solid fa-wifi text-3xl mb-1 text-sky-600"></i>
+                                                <span class="text-[10px] font-mono">PASANG-LAPANGAN.JPG</span>
+                                            </div>
+                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO PEMASANGAN LAPANGAN *</span>
+                                            <a href="#" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        </div>
+
+                                        <!-- 2. Foto TTD Pelanggan -->
+                                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                            <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                                <i class="fa-solid fa-signature text-3xl mb-1 text-emerald-600"></i>
+                                                <span class="text-[10px] font-mono">BERITA-ACARA-TTD.JPG</span>
+                                            </div>
+                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO TTD PELANGGAN *</span>
+                                            <a href="#" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        </div>
+
+                                        <!-- 3. Foto Speed Test -->
+                                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
+                                            <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                                <i class="fa-solid fa-gauge-high text-3xl mb-1 text-indigo-600"></i>
+                                                <span class="text-[10px] font-mono">SPEEDTEST-RESULT.PNG</span>
+                                            </div>
+                                            <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO BUKTI SPEED TEST *</span>
+                                            <a href="#" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Card Speedtest Report (LAPORAN UJI SPESIFIK) -->
+                                <div class="p-4 bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-lg space-y-3">
+                                    <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                                        <div>
+                                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">LAPORAN UJI HASIL SPEEDTEST (QUALITY REPORT)</span>
+                                            <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Waktu Uji: 08 Feb 2022 — 13:36 WIB</span>
+                                        </div>
+                                        <span class="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+                                            104% (Target Paket 5 Mbps — Hasil 5.20 Mbps)
+                                        </span>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                                        <div class="p-3 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                            <span class="text-[10px] text-slate-400 font-sans block">Speed Download</span>
+                                            <span class="text-base font-bold text-slate-900 dark:text-slate-100 searchable-text">5.20 Mbps</span>
+                                        </div>
+                                        <div class="p-3 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                            <span class="text-[10px] text-slate-400 font-sans block">Speed Upload</span>
+                                            <span class="text-base font-bold text-slate-900 dark:text-slate-100 searchable-text">5.10 Mbps</span>
+                                        </div>
+                                        <div class="p-3 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                            <span class="text-[10px] text-slate-400 font-sans block">Latency (Ping) / Jitter</span>
+                                            <span class="text-base font-bold text-slate-900 dark:text-slate-100 searchable-text">4.5ms / 0.8ms</span>
+                                        </div>
+                                        <div class="p-3 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                            <span class="text-[10px] text-slate-400 font-sans block">Packet Loss / Rating</span>
+                                            <span class="text-base font-bold text-emerald-600 searchable-text">0.00% (5/5 ★)</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center justify-between text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                        <span>Sinyal Redaman Awal Pemasangan: <strong class="font-mono text-slate-900 dark:text-slate-100">-19.50 dBm</strong></span>
+                                        <span>Redaman Terkini (Aktual): <strong class="font-mono text-emerald-600">-22.20 dBm</strong></span>
+                                        <span>Skor Kualitas Uji: <strong class="font-bold text-emerald-600">100/100 (Perfect)</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 7: PERANGKAT -->
+                    <div id="tab-content-perangkat" class="tab-content hidden space-y-6 searchable-section">
+                        <!-- Sub-header & Action button -->
+                        <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Spesifikasi Lengkap Perangkat & Infrastruktur Jaringan</h3>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Informasi perangkat aktif (ONT/Modem/Router), PPPoE, WiFi, OLT Node, ODP, VLAN, dan Perangkat Pasif Outdoor.</p>
+                            </div>
+                            <button onclick="openModal('device-modal')" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm shrink-0">
+                                <i class="fa-solid fa-pen-to-square mr-1"></i> Isi / Ubah Data Perangkat
+                            </button>
+                        </div>
+
+                        <!-- 1. SUB-SECTION: PERANGKAT AKTIF (ONT / MODEM UTAMA) -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3 bg-sky-50/50 dark:bg-sky-950/20 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <span class="text-xs font-bold text-sky-700 dark:text-sky-300 uppercase tracking-wider">
+                                    <i class="fa-solid fa-router mr-1.5"></i> 1. PERANGKAT AKTIF UTAMA (ONT / MODEM KLIEN)
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700 border border-sky-300">
+                                    ONT / ROUTER - TERPASANG
+                                </span>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3.5 text-xs">
+                                <div class="space-y-3">
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Jenis Perangkat</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase searchable-text">ONT (Optical Network Terminal)</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Merk / Model Tipe</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">ZTE F660 (Gigabit Dual Band)</span>
+                                    </div>
+                                    <div class="flex justify-between border-slate-100 dark:border-slate-700/50 py-1 border-b">
+                                        <span class="text-slate-400">Serial Number (SN)</span>
+                                        <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">ZTEGCC524A29</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">MAC Address</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">32:6C:51:90:F2:46</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">IP Address Dialed</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">10.13.14.10</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Mode Koneksi</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">PPPoE (Point-to-Point Protocol)</span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Username PPPoE</span>
+                                        <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">ArdiyantoJetis</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Password PPPoE</span>
+                                        <span class="font-mono text-slate-500">********</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Nama SSID WiFi</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">WHUSNET_Ardiyanto</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Password WiFi</span>
+                                        <span class="font-mono text-slate-500">********</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">VLAN ID Klien</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">100</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Redaman Optik (Rx Power)</span>
+                                        <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 searchable-text">-22.20 dBm (Optimum)</span>
+                                    </div>
+                                </div>
+
+                                <div class="md:col-span-2 pt-2">
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase mb-1">CATATAN TEKNIS PEMASANGAN PERANGKAT:</span>
+                                    <p class="p-3 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-700 italic text-slate-600 dark:text-slate-300 searchable-text">
+                                        Modem ONT ditaruh di atas meja ruang tamu, kabel fiber rapih diklem menyusuri tiang luar rumah.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. SUB-SECTION: INFRASTRUKTUR OLT NODE & DISTRIBUSI ODP -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3 bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <span class="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                                    <i class="fa-solid fa-diagram-project mr-1.5"></i> 2. INFRASTRUKTUR OLT NODE & DISTRIBUSI ODP
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-300">
+                                    TOPOLOGI OLT & ODP
+                                </span>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3.5 text-xs">
+                                <div class="space-y-3">
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">POP / Cabang Induk</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">POP Jetis (JTS01)</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Mini POP (OLT Location)</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Mini POP Jetis 01</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Nama Perangkat OLT</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">OLT-JTS-01 (ZTE C320)</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Nomor OLT [CID Generator]</span>
+                                        <span class="font-mono font-bold text-sky-600 searchable-text">C1X4ARQ000004</span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Slot OLT</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">Slot 0/1</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Nomor Port PON OLT</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">Port 1</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Kode Box ODP / Port</span>
+                                        <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">Odp 13 JTWN (Port 2 / 8)</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">VLAN Jaringan OLT</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">VLAN 100</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. SUB-SECTION: PERANGKAT PASIF OUTDOOR & AKSESORIS FO -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3 bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <span class="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+                                    <i class="fa-solid fa-toolbox mr-1.5"></i> 3. PERANGKAT PASIF OUTDOOR & KEBUTUHAN KABEL FO
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                    MATERIAL PASIF
+                                </span>
+                            </div>
+                            <div class="p-5 space-y-4 text-xs">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Perangkat Pasif Utama</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Dropcore Fiber Optic 1 Core</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Jenis Perangkat Pasif</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Kabel Dropcore / Precon FO</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Panjang Kabel Terpakai</span>
+                                        <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">135 Meter (Jalur Udara 3 Tiang)</span>
+                                    </div>
+                                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                                        <span class="text-slate-400">Redaman Awal vs Terkini</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">-19.50 dBm / -22.20 dBm</span>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2">
+                                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">RINCIAN AKSESORIS MATERIAL PASIF TERPAKAI</span>
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Material / Aksesoris</th>
+                                                    <th class="px-4 py-2 text-center">Jumlah</th>
+                                                    <th class="px-4 py-2">Satuan</th>
+                                                    <th class="px-4 py-2">Keterangan</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Dropcore Fiber Optic 1 Core</td><td class="px-4 py-2 text-center font-bold">135</td><td class="px-4 py-2 font-sans">Meter</td><td class="px-4 py-2 font-sans text-slate-500">Tipe Outdoor Wire-1C</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Fast Connector SC/UPC</td><td class="px-4 py-2 text-center font-bold">2</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Ujung ODP & Ujung ONT</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Protection Sleeve 60mm</td><td class="px-4 py-2 text-center font-bold">2</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Pelindung Splicing Optic</td></tr>
+                                                <tr><td class="px-4 py-2 font-sans font-semibold">Klem C-Hook Dropcore</td><td class="px-4 py-2 text-center font-bold">6</td><td class="px-4 py-2 font-sans">Pcs</td><td class="px-4 py-2 font-sans text-slate-500">Penambat Kabel Tiang Udara</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. SUB-SECTION: RECORD MIGRASI & NOMOR REGIONAL -->
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3 bg-slate-100/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                                    <i class="fa-solid fa-server mr-1.5"></i> 4. NOMOR REGIONAL & RECORD TEKNIS MIGRASI
+                                </span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                    SYSTEM LOG
+                                </span>
+                            </div>
+                            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-mono">
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase font-sans">NOMOR CABANG (IDCABANG)</span>
+                                    <span class="font-bold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">CB001</span>
+                                </div>
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase font-sans">NOMOR POP (IDWILAYAH)</span>
+                                    <span class="font-bold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">WL0001</span>
+                                </div>
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase font-sans">NOMOR ROUTER / MAC (MIGRASI)</span>
+                                    <span class="font-bold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">RTR-JTS-001</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 8: PAKET & LAYANAN -->
+                    <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Paket Internet & Status Layanan Jaringan</span>
+                            </div>
+                            <div class="p-5 space-y-5">
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE LAYANAN</span>
+                                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">PK000003 - Up to 5 Mbps</span>
+                                    </div>
+                                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KATEGORI LAYANAN</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">Home Broadband</span>
+                                    </div>
+                                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase">KECEPATAN (BANDWIDTH)</span>
+                                        <span class="font-mono font-semibold text-sky-600 dark:text-sky-400 mt-1 block searchable-text">
+                                            5.00 Mbps Down / 5.00 Mbps Up
+                                        </span>
+                                    </div>
+                                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                                        <span class="block text-[9px] font-bold text-slate-400 uppercase">JENIS KONTRAK</span>
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">Kontrak 12 Bulan (Rutin Bulanan)</span>
+                                    </div>
+                                </div>
+
+                                <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
+                                    <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 font-mono text-xs">
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">ONT Serial Number</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">ZTEGCC524A29</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">IP Address Dialed</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">10.13.14.10</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Nama Perangkat OLT</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">OLT-JTS-01</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Nomor OLT [CID Generator]</span>
+                                            <span class="font-bold text-sky-600 searchable-text">C1X4ARQ000004</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">Kode Kotak ODP</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Odp 13 JTWN</span>
+                                        </div>
+                                        <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                                            <span class="text-slate-400">VLAN ID Jaringan</span>
+                                            <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">100</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 9: BILLING -->
+                    <div id="tab-content-billing" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Rincian Biaya Bulanan, Biaya Pemasangan Awal & Billing Cycle</span>
+                            </div>
+                            <div class="p-5 space-y-6 text-xs">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div>
+                                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT BULANAN</span>
+                                        <div class="space-y-3 font-mono text-xs">
+                                            <div class="flex justify-between text-slate-400">
+                                                <span>Harga Paket Internet Master</span>
+                                                <span class="searchable-text">Rp 165.000,00</span>
+                                            </div>
+                                            <div class="flex justify-between text-emerald-600">
+                                                <span>Potongan Diskon Bulanan</span>
+                                                <span class="searchable-text">- Rp 0,00</span>
+                                            </div>
+                                            <div class="flex justify-between text-slate-400">
+                                                <span>PPN (0% Non-Tax PPN)</span>
+                                                <span class="searchable-text">Rp 0,00</span>
+                                            </div>
+                                            <hr class="border-dashed border-slate-200 dark:border-slate-700">
+                                            <div class="flex justify-between text-xs font-bold text-slate-900 dark:text-slate-100">
+                                                <span>Total Biaya Per Bulan (Nett)</span>
+                                                <span class="text-sky-600 searchable-text">Rp 165.000,00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">MASA AKTIF & PERIODE BILLING</span>
+                                        <div class="space-y-3 text-xs">
+                                            <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span class="text-slate-400">Tanggal Aktivasi Layanan</span>
+                                                <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">08 Februari 2022</span>
+                                            </div>
+                                            <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span class="text-slate-400">Waktu Aktivasi</span>
+                                                <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">13:46 WIB</span>
+                                            </div>
+                                            <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span class="text-slate-400">Petugas Aktivasi</span>
+                                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">System Migrasi Bot</span>
+                                            </div>
+                                            <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span class="text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
+                                                <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">Tanggal 10 Setiap Bulan</span>
+                                            </div>
+                                            <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span class="text-slate-400">Siklus Billing</span>
+                                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Monthly (Bulanan Rutin)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- LAPORAN PEMBAYARAN AWAL / REGISTRASI -->
+                                <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">RINCIAN TAGIHAN AWAL / REGISTRASI (INV-202202-0001)</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Lunas</span>
+                                    </div>
+                                    <!-- Kolom cocok 1:1 dengan tabel `invoices`: prorate_amount, extra_installation_fee,
+                                         extra_cable_fee, extra_pole_fee, other_fee, discount, ppn. Tidak ada kolom
+                                         "formula/qty" tersendiri di skema, jadi keterangan cuma label deskriptif. -->
+                                    <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <table class="w-full text-left border-collapse text-xs">
+                                            <thead>
+                                                <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                    <th class="px-4 py-2">Komponen Biaya Awal</th>
+                                                    <th class="px-4 py-2">Kolom di Sistem</th>
+                                                    <th class="px-4 py-2 text-right">Nominal Biaya</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono">
+                                                <tr>
+                                                    <td class="px-4 py-2 font-sans font-semibold">Tagihan Prorate Bulan Pertama (Feb 2022)</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">prorate_amount — aktif 08 Feb, hari aktivasi gratis (20 hari / 28 hari) x Rp 165.000</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">Rp 117.857,00</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-2 font-sans font-semibold">Jasa Instalasi & Pemasangan</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">extra_installation_fee — default Master Paket + tambahan setting perangkat</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">Rp 200.000,00</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-2 font-sans font-semibold">Biaya Kabel Tambahan</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">extra_cable_fee — kabel FO di luar jarak standar</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">Rp 70.000,00</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-2 font-sans font-semibold">Tambahan Tiang</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">extra_pole_fee — 1 tiang galvanis penambat udara</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">Rp 125.000,00</td>
+                                                </tr>
+                                                <tr class="bg-slate-50/30 dark:bg-slate-900/20">
+                                                    <td class="px-4 py-2 font-sans font-semibold">Subtotal</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">subtotal (jumlah baris di atas)</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">Rp 512.857,00</td>
+                                                </tr>
+                                                <tr class="text-emerald-600">
+                                                    <td class="px-4 py-2 font-sans font-semibold">Potongan Diskon</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">discount — tidak ada diskon layanan</td>
+                                                    <td class="px-4 py-2 text-right font-bold searchable-text">- Rp 0,00</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-2 font-sans font-semibold">PPN</td>
+                                                    <td class="px-4 py-2 font-sans text-slate-500">ppn — 0% (Non-Tax PPN)</td>
+                                                    <td class="px-4 py-2 text-right font-sans text-slate-400 searchable-text">Tidak dikenakan</td>
+                                                </tr>
+                                                <tr class="bg-slate-100/60 dark:bg-slate-700/60 font-bold">
+                                                    <td class="px-4 py-2 font-sans text-slate-900 dark:text-slate-100" colspan="2">TOTAL PEMBAYARAN REGISTRASI AWAL (total_amount)</td>
+                                                    <td class="px-4 py-2 text-right text-sky-600 dark:text-sky-400 text-sm searchable-text">Rp 512.857,00</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 10: TAGIHAN -->
+                    <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Invoice Pelanggan</h3>
+                            </div>
+                            <button onclick="openModal('manual-invoice-modal')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold">
+                                + Buat Tagihan Manual
+                            </button>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">TAGIHAN AWAL / REGISTRASI</span>
+                                <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                <th class="px-4 py-2.5">No. Tagihan</th>
+                                                <th class="px-4 py-2.5">Jenis</th>
+                                                <th class="px-4 py-2.5">Periode</th>
+                                                <th class="px-4 py-2.5">Tgl Terbit</th>
+                                                <th class="px-4 py-2.5">Jatuh Tempo</th>
+                                                <th class="px-4 py-2.5 text-right">Total Tagihan</th>
+                                                <th class="px-4 py-2.5 text-center">Status</th>
+                                                <th class="px-4 py-2.5">Dibuat Oleh</th>
+                                                <th class="px-4 py-2.5 text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-[11px]">
+                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                                <td class="px-4 py-3 font-bold text-sky-600 dark:text-sky-400 searchable-text">INV-202202-0001</td>
+                                                <td class="px-4 py-3 font-sans"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200">Awal (PSB)</span></td>
+                                                <td class="px-4 py-3 searchable-text">2022-02</td>
+                                                <td class="px-4 py-3 font-sans">08 Feb 2022</td>
+                                                <td class="px-4 py-3 font-sans">08 Feb 2022</td>
+                                                <td class="px-4 py-3 text-right font-bold searchable-text">Rp 512.857,00</td>
+                                                <td class="px-4 py-3 text-center font-sans">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Lunas</span>
+                                                </td>
+                                                <td class="px-4 py-3 font-sans text-slate-500 searchable-text">System Migrasi</td>
+                                                <td class="px-4 py-3 text-center font-sans">
+                                                    <span class="text-slate-400 text-[10px]">— (Lunas)</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">TAGIHAN BULANAN RUTIN</span>
+                                <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                                    <table class="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                                <th class="px-4 py-2.5">No. Tagihan</th>
+                                                <th class="px-4 py-2.5">Jenis</th>
+                                                <th class="px-4 py-2.5">Periode</th>
+                                                <th class="px-4 py-2.5">Tgl Terbit</th>
+                                                <th class="px-4 py-2.5">Jatuh Tempo</th>
+                                                <th class="px-4 py-2.5 text-right">Total Tagihan</th>
+                                                <th class="px-4 py-2.5 text-center">Status</th>
+                                                <th class="px-4 py-2.5">Dibuat Oleh</th>
+                                                <th class="px-4 py-2.5 text-center">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-[11px]">
+                                            <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                                <td class="px-4 py-3 font-bold text-sky-600 dark:text-sky-400 searchable-text">INV-202211-0001</td>
+                                                <td class="px-4 py-3 font-sans"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-600 border border-sky-200">Bulanan</span></td>
+                                                <td class="px-4 py-3 searchable-text">2022-11</td>
+                                                <td class="px-4 py-3 font-sans">01 Nov 2022</td>
+                                                <td class="px-4 py-3 font-sans">10 Nov 2022</td>
+                                                <td class="px-4 py-3 text-right font-bold searchable-text">Rp 165.000,00</td>
+                                                <td class="px-4 py-3 text-center font-sans">
+                                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Lunas</span>
+                                                </td>
+                                                <td class="px-4 py-3 font-sans text-slate-500 searchable-text">System Migrasi</td>
+                                                <td class="px-4 py-3 text-center font-sans">
+                                                    <span class="text-slate-400 text-[10px]">— (Lunas)</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 11: PEMBAYARAN -->
+                    <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="pb-3 border-b border-slate-200 dark:border-slate-700">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Transaksi Pembayaran Pelanggan</h3>
+                        </div>
+
+                        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                        <th class="px-4 py-2.5">No. Pembayaran</th>
+                                        <th class="px-4 py-2.5">Ref Invoice</th>
+                                        <th class="px-4 py-2.5">Waktu Transaksi</th>
+                                        <th class="px-4 py-2.5">Metode Bayar</th>
+                                        <th class="px-4 py-2.5 text-right">Nominal Bayar</th>
+                                        <th class="px-4 py-2.5 text-center">Status</th>
+                                        <th class="px-4 py-2.5">Bukti Transaksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-[11px]">
+                                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                        <td class="px-4 py-3 font-bold text-slate-900 dark:text-slate-100 searchable-text">PAY-6361F31B0FA</td>
+                                        <td class="px-4 py-3 font-bold text-sky-600 dark:text-sky-400 searchable-text">INV-IN000035-202211</td>
+                                        <td class="px-4 py-3 font-sans">02 Nov 2022 (14:12 WIB)</td>
+                                        <td class="px-4 py-3 font-sans"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">CASH (Kasir POP Jetis)</span></td>
+                                        <td class="px-4 py-3 text-right font-bold searchable-text">Rp 165.000,00</td>
+                                        <td class="px-4 py-3 text-center font-sans">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Berhasil</span>
+                                        </td>
+                                        <td class="px-4 py-3 font-sans">
+                                            <a href="#" class="text-sky-600 font-semibold hover:underline">Lihat Bukti ↗</a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TAB 12: DOKUMEN & BERKAS -->
+                    <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="pb-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Lampiran Dokumen & Berkas Resmi Pelanggan</h3>
+                            </div>
+                            <button onclick="openModal('document-upload-modal')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded text-xs font-semibold">+ Upload Dokumen Baru</button>
+                        </div>
+
+                        <!-- Grid Berkas Foto -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <!-- 1. KTP PELANGGAN -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between shadow-sm bg-white dark:bg-slate-800">
+                                <div class="p-3 bg-slate-50 dark:bg-slate-900/40 flex flex-col items-center justify-center h-32 border-b border-slate-200 dark:border-slate-700">
+                                    <i class="fa-solid fa-id-card text-3xl text-sky-600 mb-1"></i>
+                                    <span class="text-[9px] font-mono text-slate-400 truncate w-full text-center">KTP-ARDIYANTO.JPG</span>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate searchable-text">KTP PELANGGAN *</span>
+                                        <span class="block text-[9px] text-slate-400 font-mono">06/01/2022 08:34</span>
+                                        <span class="block text-[9px] text-emerald-600 font-semibold">Terverifikasi</span>
+                                    </div>
+                                    <a href="#" class="p-1 text-sky-600 hover:bg-slate-100 rounded" title="Buka Dokumen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                </div>
+                            </div>
+
+                            <!-- 2. FOTO PEMASANGAN LAPANGAN -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between shadow-sm bg-white dark:bg-slate-800">
+                                <div class="p-3 bg-slate-50 dark:bg-slate-900/40 flex flex-col items-center justify-center h-32 border-b border-slate-200 dark:border-slate-700">
+                                    <i class="fa-solid fa-wifi text-3xl text-sky-600 mb-1"></i>
+                                    <span class="text-[9px] font-mono text-slate-400 truncate w-full text-center">PASANG-MODEM.JPG</span>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate searchable-text">FOTO PEMASANGAN *</span>
+                                        <span class="block text-[9px] text-slate-400 font-mono">08/02/2022 11:30</span>
+                                        <span class="block text-[9px] text-slate-500">Hendra & Budi</span>
+                                    </div>
+                                    <a href="#" class="p-1 text-sky-600 hover:bg-slate-100 rounded" title="Buka Dokumen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                </div>
+                            </div>
+
+                            <!-- 3. FOTO KONTRAK -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between shadow-sm bg-white dark:bg-slate-800">
+                                <div class="p-3 bg-slate-50 dark:bg-slate-900/40 flex flex-col items-center justify-center h-32 border-b border-slate-200 dark:border-slate-700">
+                                    <i class="fa-solid fa-file-contract text-3xl text-indigo-600 mb-1"></i>
+                                    <span class="text-[9px] font-mono text-slate-400 truncate w-full text-center">KONTRAK-ISP.PDF</span>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate searchable-text">FOTO KONTRAK *</span>
+                                        <span class="block text-[9px] text-slate-400 font-mono">06/01/2022 09:00</span>
+                                        <span class="block text-[9px] text-indigo-600 font-semibold">Kontrak Resmi</span>
+                                    </div>
+                                    <a href="#" class="p-1 text-sky-600 hover:bg-slate-100 rounded" title="Buka Dokumen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                </div>
+                            </div>
+
+                            <!-- 4. FOTO TTD PELANGGAN -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between shadow-sm bg-white dark:bg-slate-800">
+                                <div class="p-3 bg-slate-50 dark:bg-slate-900/40 flex flex-col items-center justify-center h-32 border-b border-slate-200 dark:border-slate-700">
+                                    <i class="fa-solid fa-signature text-3xl text-emerald-600 mb-1"></i>
+                                    <span class="text-[9px] font-mono text-slate-400 truncate w-full text-center">TTD-BERITA-ACARA.JPG</span>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate searchable-text">FOTO TTD PELANGGAN *</span>
+                                        <span class="block text-[9px] text-slate-400 font-mono">08/02/2022 11:35</span>
+                                        <span class="block text-[9px] text-emerald-600 font-semibold">Tanda Tangan Sah</span>
+                                    </div>
+                                    <a href="#" class="p-1 text-sky-600 hover:bg-slate-100 rounded" title="Buka Dokumen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                </div>
+                            </div>
+
+                            <!-- 5. FOTO BUKTI SPEED TEST -->
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between shadow-sm bg-white dark:bg-slate-800">
+                                <div class="p-3 bg-slate-50 dark:bg-slate-900/40 flex flex-col items-center justify-center h-32 border-b border-slate-200 dark:border-slate-700">
+                                    <i class="fa-solid fa-gauge-high text-3xl text-sky-600 mb-1"></i>
+                                    <span class="text-[9px] font-mono text-slate-400 truncate w-full text-center">SPEEDTEST-RESULT.PNG</span>
+                                </div>
+                                <div class="p-3 flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="block text-[11px] font-bold text-slate-900 dark:text-slate-100 truncate searchable-text">FOTO SPEED TEST *</span>
+                                        <span class="block text-[9px] text-slate-400 font-mono">08/02/2022 13:36</span>
+                                        <span class="block text-[9px] text-sky-600 font-semibold">5.20 / 5.10 Mbps</span>
+                                    </div>
+                                    <a href="#" class="p-1 text-sky-600 hover:bg-slate-100 rounded" title="Buka Dokumen"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 13: RIWAYAT TICKETING -->
+                    <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="pb-3 border-b border-slate-200 dark:border-slate-700">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tiket Gangguan NOC</h3>
+                        </div>
+
+                        <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                            <i class="fa-solid fa-circle-check text-3xl text-emerald-500 mb-2"></i>
+                            <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Koneksi Pelanggan Normal & Clean</h4>
+                            <p class="text-[11px] text-slate-500 mt-1">Belum pernah ada riwayat laporan tiket gangguan NOC yang tercatat untuk pelanggan ini.</p>
+                        </div>
+                    </div>
+
+                    <!-- TAB 14: RIWAYAT PERUBAHAN (AUDIT LOG) -->
+                    <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="pb-3 border-b border-slate-200 dark:border-slate-700">
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Audit Log Riwayat Perubahan Data</h3>
+                        </div>
+
+                        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                        <th class="px-4 py-2.5">Waktu Eksekusi</th>
+                                        <th class="px-4 py-2.5">User Execution</th>
+                                        <th class="px-4 py-2.5">Role System</th>
+                                        <th class="px-4 py-2.5">Jenis Aksi</th>
+                                        <th class="px-4 py-2.5">Detail Catatan Audit</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 dark:divide-slate-700 font-mono text-[11px]">
+                                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                        <td class="px-4 py-2.5 searchable-text">08/02/2022 13:46:12</td>
+                                        <td class="px-4 py-2.5 font-sans searchable-text">System Migrasi</td>
+                                        <td class="px-4 py-2.5 font-sans text-slate-500">System Bot</td>
+                                        <td class="px-4 py-2.5 font-sans"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">AKTIVASI</span></td>
+                                        <td class="px-4 py-2.5 font-sans searchable-text">Layanan diaktifkan setelah pemasangan selesai. IP: 10.13.14.10, SN: ZTEGCC524A29.</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                                        <td class="px-4 py-2.5 searchable-text">06/01/2022 08:34:05</td>
+                                        <td class="px-4 py-2.5 font-sans searchable-text">Admin Cabang Jetis</td>
+                                        <td class="px-4 py-2.5 font-sans text-slate-500">Admin POP</td>
+                                        <td class="px-4 py-2.5 font-sans"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200">REGISTRASI</span></td>
+                                        <td class="px-4 py-2.5 font-sans searchable-text">Pendaftaran pelanggan baru disubmit dengan Request ID RQ000004.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- TAB 15: DETAIL TEKNIS LAMA -->
+                    <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6 searchable-section">
+                        <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
+                                <span class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Detail Teknis Jaringan Lama (Hasil Migrasi Database)</span>
+                            </div>
+                            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-xs">
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">ID Report Lama</span>
+                                    <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">PE000002</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">ID Request/Layanan Lama</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">RQ000004</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Tipe Koneksi Jaringan</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">KABEL (Fiber Optic Dropcore)</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">ONT Serial Number</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">ZTEGCC524A29</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">IP Address Dialed</span>
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">10.13.14.10</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Nomor ODP / Port</span>
+                                    <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">Odp 13 JTWN / Port 2</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Redaman Optik Kabel</span>
+                                    <span class="font-mono font-bold text-sky-600 searchable-text">-22.20 dBm</span>
+                                </div>
+                                <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
+                                    <span class="text-slate-400">Hasil Test Speed</span>
+                                    <span class="font-mono font-bold text-emerald-600 searchable-text">5.20 Mbps Down / 5.10 Mbps Up</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- TOAST NOTIFICATION -->
+<div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transition-all duration-300 translate-y-10 opacity-0 pointer-events-none">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toast-message">Disalin!</span>
+</div>
+
+<!-- MODALS SECTION -->
+<!-- MODAL: Manual Invoice -->
+<div id="manual-invoice-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Buat Tagihan Manual</h3>
+            <button onclick="closeModal('manual-invoice-modal')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-4 text-xs">
+            <div class="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pelanggan: Ardiyanto Cahyo Nugroho</span>
+                <span class="text-xs font-bold text-slate-900 dark:text-slate-100">PK000003 - Up to 5 Mbps (Rp 165.000)</span>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Periode Tagihan</label>
+                <input type="month" value="2026-08" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tanggal Terbit & Jatuh Tempo</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="date" value="2026-08-01" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                    <input type="date" value="2026-08-10" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onclick="closeModal('manual-invoice-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Batal</button>
+                <button type="button" onclick="closeModal('manual-invoice-modal')" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm">Proses Tagihan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Network Assignment -->
+<div id="network-assignment-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Atur Mini POP & Distribusi Jaringan</h3>
+            <button onclick="closeModal('network-assignment-modal')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4 text-xs">
+            <div class="pb-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">Pelanggan</span>
+                    <span class="text-sm font-bold text-slate-900 dark:text-slate-100">Ardiyanto Cahyo Nugroho</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase block">CID</span>
+                    <span class="font-mono text-xs text-sky-600 font-bold">C1X4ARQ000004</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Mini POP (OLT Node)</label>
+                <select class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                    <option value="1" selected>[JTS01] Mini POP Jetis 01</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Jalur Distribusi ODP</label>
+                <select class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                    <option value="1" selected>[DIST-JTS-01] Distribusi Jetis Utama (Odp 13 JTWN)</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onclick="closeModal('network-assignment-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Batal</button>
+                <button type="button" onclick="closeModal('network-assignment-modal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm">Simpan Penugasan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Device Modal -->
+<div id="device-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Ubah Data Perangkat ONT</h3>
+            <button onclick="closeModal('device-modal')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-3 text-xs">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Serial Number ONT</label>
+                <input type="text" value="ZTEGCC524A29" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-800 dark:text-slate-200">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">MAC Address</label>
+                <input type="text" value="32:6C:51:90:F2:46" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-800 dark:text-slate-200">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">IP Address & Redaman</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" value="10.13.14.10" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-800 dark:text-slate-200">
+                    <input type="text" value="-22.2 dBm" class="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-slate-800 dark:text-slate-200">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onclick="closeModal('device-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Batal</button>
+                <button type="button" onclick="closeModal('device-modal')" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm">Simpan Perangkat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Document Upload Modal -->
+<div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Upload Dokumen Pelanggan Baru</h3>
+            <button onclick="closeModal('document-upload-modal')" class="text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4 text-xs">
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Jenis Dokumen</label>
+                <select class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                    <option value="ktp">KTP PELANGGAN *</option>
+                    <option value="pemasangan">FOTO PEMASANGAN LAPANGAN *</option>
+                    <option value="kontrak">FOTO KONTRAK *</option>
+                    <option value="ttd">FOTO TTD PELANGGAN *</option>
+                    <option value="speedtest">FOTO BUKTI SPEED TEST *</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">File Gambar / PDF</label>
+                <input type="file" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300">Batal</button>
+                <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-sm">Upload File</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentViewMode = 'tabs'; // 'tabs' or 'all'
+
+    function switchTab(tabId) {
+        if (currentViewMode === 'all') {
+            setViewMode('tabs');
+        }
+
+        // Hide all tab panels
+        document.querySelectorAll('.tab-content').forEach(el => {
+            el.classList.add('hidden');
+        });
+        
+        // Show active tab panel
+        const activeTab = document.getElementById('tab-content-' + tabId);
+        if (activeTab) {
+            activeTab.classList.remove('hidden');
+        }
+
+        // Reset active state for tab buttons
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('border-sky-600', 'text-sky-600');
+            btn.classList.add('border-transparent', 'text-slate-500');
+        });
+
+        // Add active state to clicked tab button
+        const activeBtn = document.getElementById('tab-btn-' + tabId);
+        if (activeBtn) {
+            activeBtn.classList.add('border-sky-600', 'text-sky-600');
+            activeBtn.classList.remove('border-transparent', 'text-slate-500');
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+
+    function setViewMode(mode) {
+        currentViewMode = mode;
+        const btnTabs = document.getElementById('view-mode-tabs');
+        const btnAll = document.getElementById('view-mode-all');
+        const navWrapper = document.getElementById('tab-nav-wrapper');
+
+        if (mode === 'all') {
+            // Show all tabs simultaneously
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('hidden');
+            });
+            navWrapper.classList.add('hidden');
+
+            btnAll.classList.add('bg-white', 'dark:bg-slate-800', 'text-sky-600', 'shadow-sm');
+            btnAll.classList.remove('text-slate-600', 'dark:text-slate-400');
+
+            btnTabs.classList.remove('bg-white', 'dark:bg-slate-800', 'text-sky-600', 'shadow-sm');
+            btnTabs.classList.add('text-slate-600', 'dark:text-slate-400');
+        } else {
+            // Restore Tabbed navigation view
+            navWrapper.classList.remove('hidden');
+            btnTabs.classList.add('bg-white', 'dark:bg-slate-800', 'text-sky-600', 'shadow-sm');
+            btnTabs.classList.remove('text-slate-600', 'dark:text-slate-400');
+
+            btnAll.classList.remove('bg-white', 'dark:bg-slate-800', 'text-sky-600', 'shadow-sm');
+            btnAll.classList.add('text-slate-600', 'dark:text-slate-400');
+
+            // Default to Ringkasan tab
+            switchTab('ringkasan');
+        }
+    }
+
+    // Real-time Instant Filter & Search Engine
+    function filterContent() {
+        const query = document.getElementById('omni-search').value.toLowerCase().trim();
+        const clearBtn = document.getElementById('clear-search-btn');
+        const sections = document.querySelectorAll('.searchable-section');
+
+        if (query.length > 0) {
+            clearBtn.classList.remove('hidden');
+            if (currentViewMode === 'tabs') {
+                // Temporary show all tabs so search can find matching sections anywhere
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('hidden'));
+            }
+        } else {
+            clearBtn.classList.add('hidden');
+            if (currentViewMode === 'tabs') {
+                switchTab('ringkasan');
+            }
+        }
+
+        sections.forEach(sec => {
+            if (query === '') {
+                if (currentViewMode === 'all') sec.classList.remove('hidden');
+            } else {
+                const text = sec.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    sec.classList.remove('hidden');
+                } else {
+                    sec.classList.add('hidden');
+                }
+            }
+        });
+    }
+
+    function clearSearch() {
+        const input = document.getElementById('omni-search');
+        input.value = '';
+        filterContent();
+        input.focus();
+    }
+
+    function copyText(text, label) {
+        navigator.clipboard.writeText(text).then(() => {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            msg.innerText = label + ' disalin: ' + text;
+            toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+            }, 2500);
+        });
+    }
+
+    function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+    function toggleSidebar() { document.getElementById('sidebar')?.classList.toggle('-translate-x-full'); }
+    function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('whusnet-theme', isDark ? 'dark' : 'light');
+    }
+</script>
+
+</body>
+</html>

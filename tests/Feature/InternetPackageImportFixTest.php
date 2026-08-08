@@ -34,7 +34,7 @@ class InternetPackageImportFixTest extends TestCase
                     'package_type' => 'Broadband',
                     'category' => 'Home',
                     'status_row' => 'valid',
-                ]
+                ],
             ],
             'customers' => [],
             'services' => [],

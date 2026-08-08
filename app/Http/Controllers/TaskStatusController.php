@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Services\TaskService;
 use Illuminate\Http\RedirectResponse;
@@ -20,12 +21,12 @@ class TaskStatusController extends Controller
         $this->authorize('statusStart', $task);
 
         $memberIds = $task->teamMembers()->pluck('user_id')->toArray();
-        if (!in_array(auth()->id(), $memberIds)) {
+        if (! in_array(auth()->id(), $memberIds)) {
             $memberIds[] = auth()->id();
         }
 
         $activeTask = Task::where('id', '!=', $task->id)
-            ->where('status', \App\Enums\TaskStatus::IN_PROGRESS->value)
+            ->where('status', TaskStatus::IN_PROGRESS->value)
             ->whereHas('teamMembers', fn ($q) => $q->whereIn('user_id', $memberIds))
             ->first();
 
@@ -62,9 +63,15 @@ class TaskStatusController extends Controller
 
         $validated = $request->validate([
             'pending_reason' => 'required|string|max:500',
+            'report_deferred' => 'sometimes|boolean',
         ]);
 
-        $this->taskService->setPending($task, auth()->user(), $validated['pending_reason']);
+        $this->taskService->setPending(
+            $task,
+            auth()->user(),
+            $validated['pending_reason'],
+            (bool) ($validated['report_deferred'] ?? false)
+        );
 
         return back()->with('success', "Task [{$task->task_number}] dipending.");
     }

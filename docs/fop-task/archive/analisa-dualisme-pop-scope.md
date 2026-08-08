@@ -47,7 +47,7 @@ Indikasi ini drift arsitektur (2 developer/era beda), bukan desain sengaja:
 ## Checklist Eksekusi (Nanti)
 - [ ] Assign scope FOP Rian lewat `/users/{id}/edit` (quick fix non-kode, bisa langsung sekarang, gak perlu tunggu refactor)
 - [ ] Backfill `user_role_scopes` dari data `user_pops` existing (script sekali jalan)
-- [ ] Ganti `Pop::scopeForUser()` pake `EffectiveAccessService`
+- [x] Ganti `Pop::scopeForUser()` pake `EffectiveAccessService` — sudah beres (`Pop::scopeForUser()` di `app/Models/Pop.php` sudah baca `EffectiveAccessService::hasAllPopAccess()`/`getAllowedPopIds()`, bukan `user_pops` lagi).
 - [ ] Regression test semua dropdown "Cabang/POP" di form yang kepengaruh (12 file di atas)
-- [ ] Hapus halaman `/users/{id}/pops`, route `users.pops.edit`/`users.pops.update`
+- [x] Hapus halaman `/users/{id}/pops`, route `users.pops.edit`/`users.pops.update` — beres 2026-08-07, lihat `docs/plan/analisa-celah-scope-pop.md` temuan #6. `user_pops`/`User::pops()` SENGAJA belum dihapus (masih dipakai `UserScopeManagementService::syncUserRoleScope()` sebagai tabel backward-compat) — item checklist di bawah masih berlaku.
 - [ ] Hapus relasi `User::pops()` + tabel `user_pops` (migration drop, paling akhir setelah semua aman)

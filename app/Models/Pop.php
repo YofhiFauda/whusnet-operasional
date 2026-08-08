@@ -3,21 +3,18 @@
 namespace App\Models;
 
 use App\Models\Concerns\RecordsAuditLogs;
-use App\Models\Customer;
-use App\Models\Distribution;
-use App\Models\PopSequence;
-use App\Models\User;
-use App\Models\UserRoleScopeTarget;
+use App\Services\EffectiveAccessService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use LogicException;
-    
+
 #[Fillable([
     'code',
     'pop_code',
@@ -38,7 +35,7 @@ use LogicException;
 ])]
 class Pop extends Model
 {
-    use RecordsAuditLogs, HasFactory;
+    use HasFactory, RecordsAuditLogs;
 
     protected string $auditModule = 'POP/Cabang';
 
@@ -61,6 +58,7 @@ class Pop extends Model
 
     /**
      * Get the parent POP.
+     *
      * @return BelongsTo<Pop, $this>
      */
     public function parent(): BelongsTo
@@ -106,7 +104,7 @@ class Pop extends Model
     /**
      * Get the users assigned to this POP.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<User, $this>
+     * @return BelongsToMany<User, $this>
      */
     public function users()
     {
@@ -116,25 +114,35 @@ class Pop extends Model
     /**
      * Scope a query to only include POPs accessible by the given user.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \App\Models\User|null $user
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  User|null  $user
+     * @return Builder
      */
     public function scopeForUser($query, $user = null)
     {
         $user = $user ?? Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return $query->whereRaw('1 = 0'); // return empty if no user
         }
 
-        if (in_array($user->role?->name, ['Owner', 'Admin', 'Admin Pusat'], true)) {
-            return $query; // return all
+        // Fase 5.5 — pakai EffectiveAccessService, BUKAN pivot user_pops via
+        // whereHas('users'). Dua bug di versi lama:
+        //  1. Jalur user_pops TIDAK paham pop_tree — user ber-scope pop_tree bisa
+        //     lihat daftar POP yang salah di dropdown (kebocoran lintas cabang).
+        //  2. Cek akses penuh memakai role NAME ('Owner'/'Admin'/'Admin Pusat')
+        //     padahal seluruh repo pakai role CODE, dan 'Admin Pusat' tidak ada
+        //     di RoleSeeder → cek itu praktis mati.
+        // getAllowedPopIds() sudah resolve pop_tree DAN di-cache Redis;
+        // hasAllPopAccess() menangani deny-by-default (scope kosong ≠ akses penuh).
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($user)) {
+            return $query; // akses semua POP — tanpa filter
         }
 
-        return $query->whereHas('users', function ($q) use ($user) {
-            $q->where('user_id', $user->id);
-        });
+        // Scope kosong → whereIn('id', []) → tidak ada POP (deny-by-default).
+        return $query->whereIn($this->getTable().'.id', $access->getAllowedPopIds($user));
     }
 
     /**
@@ -149,23 +157,29 @@ class Pop extends Model
      */
     public function generateRegistrationNumber(): string
     {
-        if (!$this->cid_prefix) {
+        if (! $this->cid_prefix) {
             throw new LogicException('POP cid_prefix belum dikonfigurasi.');
         }
-        if (!$this->registration_prefix) {
+        if (! $this->registration_prefix) {
             throw new LogicException('POP registration_prefix belum dikonfigurasi.');
         }
 
         $prefix = $this->registration_prefix;
 
-        $candidateCode = DB::transaction(function () use ($prefix): string {
+        // customer_code only needs to be unique within a branch (mini-pops share
+        // their cabang's cid_prefix, so the collision check must cover the whole
+        // cabang subtree — not just this exact POP row — to stay consistent with
+        // the (pop_id, customer_code) DB constraint's real-world guarantee).
+        $branchPopId = $this->parent_id ?? $this->id;
+
+        $candidateCode = DB::transaction(function () use ($prefix, $branchPopId): string {
             $sequence = PopSequence::query()
                 ->where('pop_id', $this->id)
                 ->where('sequence_type', PopSequence::TYPE_REGISTRATION)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$sequence) {
+            if (! $sequence) {
                 $sequence = PopSequence::create([
                     'pop_id' => $this->id,
                     'sequence_type' => PopSequence::TYPE_REGISTRATION,
@@ -178,7 +192,7 @@ class Pop extends Model
             // akibat data import/migrasi yang memiliki kode lebih tinggi dari counter).
             $prefixLen = strlen($prefix) + 1;
             $maxExistingNumber = Customer::where('pop_id', $this->id)
-                ->where('customer_code', 'like', $prefix . '%')
+                ->where('customer_code', 'like', $prefix.'%')
                 ->selectRaw("MAX(CAST(SUBSTRING(customer_code, {$prefixLen}) AS UNSIGNED)) as max_num")
                 ->value('max_num') ?? 0;
 
@@ -186,11 +200,18 @@ class Pop extends Model
                 $sequence->current_number = $maxExistingNumber;
             }
 
-            // Loop sampai menemukan kode yang belum dipakai
+            // Loop sampai menemukan kode yang belum dipakai DI CABANG INI
             do {
                 $sequence->current_number++;
                 $candidate = sprintf('%s%06d', $prefix, $sequence->current_number);
-            } while (Customer::where('customer_code', $candidate)->exists());
+            } while (
+                Customer::where('customer_code', $candidate)
+                    ->where(function ($q) use ($branchPopId) {
+                        $q->where('pop_id', $branchPopId)
+                            ->orWhereHas('pop', fn ($pq) => $pq->where('parent_id', $branchPopId));
+                    })
+                    ->exists()
+            );
 
             $sequence->save();
 
@@ -212,7 +233,7 @@ class Pop extends Model
     public function extractBareRegistrationId(string $customerCode): string
     {
         $prefix = $this->cid_prefix;
-        if ($prefix !== '' && str_starts_with($customerCode, $prefix . '00')) {
+        if ($prefix !== '' && str_starts_with($customerCode, $prefix.'00')) {
             return substr($customerCode, strlen($prefix) + 2);
         }
 
@@ -228,16 +249,14 @@ class Pop extends Model
      *   Status pending/survey/installation/installed/terminated
      *     → REQ ID murni: "RQ######"
      *
-     *   Status active/suspended + punya distribusi
-     *     → CID lengkap: "{cid_prefix}{mini_pop}{dist_code}{req_id}_{DESA}_{NAMA}"
-     *       Contoh: D2X6CRQ001296_MANGKUJAYAN_DYAHGALUH
+     *   Status active/suspended + `customers.cid` SUDAH terisi
+     *     → pakai CID tersimpan apa adanya: "{cid_prefix}{mini_pop}{dist_code}{req_id}"
+     *       Contoh: D2X6CRQ001296 — termasuk CID legacy yang segmen distribusinya
+     *       "XX" (C1XXRQ000011) karena distribusinya memang tidak diketahui.
      *
-     *   Status active/suspended + belum punya distribusi
+     *   Status active/suspended + CID belum pernah digenerate
      *     → Format default: "{cid_prefix}00{req_id}"
      *       Contoh: C00RQ001296
-     *
-     * @param Customer $customer
-     * @return string
      */
     public function resolveDisplayId(Customer $customer): string
     {
@@ -250,8 +269,16 @@ class Pop extends Model
             return $reqId;
         }
 
-        // Jika sudah masuk distribusi → tampilkan CID lengkap
-        if ($customer->distribution_id && $customer->cid) {
+        // CID tersimpan = identitas OTORITATIF pelanggan; kalau sudah ada,
+        // itu yang ditampilkan.
+        //
+        // SENGAJA tidak lagi mensyaratkan `distribution_id` terisi. Dulu begitu,
+        // dan akibatnya 331 pelanggan aktif hasil migrasi legacy — yang CID-nya
+        // sudah ada (mis. C1XXRQ000011, segmen distribusi "XX" karena tidak
+        // diketahui) tapi `distribution_id`-nya NULL — ditampilkan sebagai
+        // "C00RQ000011": CID karangan yang tidak pernah ada di kenyataan, beda
+        // dari nilai di kolom `cid`, dan tidak ketemu waktu dicari.
+        if ($customer->cid) {
             return $customer->cid;
         }
 
@@ -274,7 +301,12 @@ class Pop extends Model
         $prefix = $this->cid_prefix;
         $tech = $customer->customerTechnicalDetail;
         $oltNumber = $this->resolveMiniPopSegment($customer, $tech?->olt_number);
-        $distCode = $distribution ? $distribution->code : 'XX';
+        // Default distribusi = "0" (belum di-assign distribusi manapun),
+        // sesuai skema Skema 2/3 di ID_NUMBERING_RULES.md. Dulu "XX" —
+        // diganti karena "XX" bukan bagian dari skema penomoran resmi,
+        // cuma placeholder ad-hoc yang bikin CID default kelihatan seperti
+        // segmen distribusi asli padahal belum pernah di-assign.
+        $distCode = $distribution ? $distribution->code : '0';
 
         // Use the permanent registration identifier part only, e.g. "RQ000001".
         $reqId = $this->extractBareRegistrationId($customer->customer_code);
@@ -329,14 +361,19 @@ class Pop extends Model
         }
 
         // 3. Fallback terakhir: olt_number free-text dari laporan teknis instalasi.
-        if (!empty($fallback)) {
+        if (! empty($fallback)) {
             $fallback = preg_replace('/[^A-Z0-9]/i', '', (string) $fallback) ?: '';
             if ($fallback !== '') {
                 return $fallback;
             }
         }
 
-        return '1';
+        // Default mini POP = "0" (belum di-assign mini POP manapun), sesuai
+        // skema Skema 3 di ID_NUMBERING_RULES.md. Dulu "1" — salah, karena
+        // "1" itu kode mini POP SUNGGUHAN di Master POP (mis. "C1"/"D1"),
+        // bukan default. Memakainya sebagai fallback bikin pelanggan yang
+        // belum di-assign kelihatan seperti sudah masuk mini POP 1.
+        return '0';
     }
 
     /**
@@ -345,7 +382,7 @@ class Pop extends Model
      */
     public function generateCid(): string
     {
-        if (!$this->cid_prefix) {
+        if (! $this->cid_prefix) {
             throw new LogicException('POP cid_prefix belum dikonfigurasi.');
         }
 
@@ -356,7 +393,7 @@ class Pop extends Model
                 ->lockForUpdate()
                 ->first();
 
-            if (!$sequence) {
+            if (! $sequence) {
                 $sequence = PopSequence::create([
                     'pop_id' => $this->id,
                     'sequence_type' => PopSequence::TYPE_CID,

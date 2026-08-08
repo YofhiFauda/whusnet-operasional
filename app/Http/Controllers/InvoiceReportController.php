@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceReportController extends Controller
@@ -17,7 +19,7 @@ class InvoiceReportController extends Controller
         $user = auth()->user();
 
         // Pengecekan permission: harus punya salah satu
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -35,7 +37,7 @@ class InvoiceReportController extends Controller
 
         // Jika user memfilter POP tertentu, pastikan POP itu ada di dalam POP yang diizinkan untuknya
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 $popId = '';
             }
         }
@@ -58,25 +60,28 @@ class InvoiceReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('issue_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(issue_date) dan mematikan
+            // index. Batas ditulis eksplisit startOfDay/endOfDay — lihat alasan
+            // lengkapnya di CustomerReportController::index().
+            $query->where('issue_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('issue_date', '<=', $endDate);
+            $query->where('issue_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         if ($showTunggakan) {
             $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', 'batal');
+                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
         }
 
         // Clone query untuk menghitung agregat ringkasan sebelum dipaginasi
         $summaryQuery = clone $query;
         $totalAmountSum = $summaryQuery->sum('total_amount');
         $totalPaidSum = $summaryQuery->sum('paid_amount');
-        
+
         // Sisa tunggakan dihitung dari invoice yang tidak batal
-        $totalTunggakanSum = $summaryQuery->where('invoice_status', '!=', 'batal')->sum('remaining_amount');
+        $totalTunggakanSum = $summaryQuery->where('invoice_status', '!=', InvoiceStatus::BATAL->value)->sum('remaining_amount');
 
         // Dapatkan data terpaginasi
         $invoices = $query->orderByDesc('issue_date')
@@ -84,7 +89,7 @@ class InvoiceReportController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
+        $allowedStatuses = array_column(InvoiceStatus::cases(), 'value');
 
         return view('reports.invoices.index', compact(
             'invoices',
@@ -109,7 +114,7 @@ class InvoiceReportController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->hasPermission('reports.view')) {
+        if (! $user->hasPermission('reports.view')) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -123,7 +128,7 @@ class InvoiceReportController extends Controller
         // Pastikan input pop_id divalidasi dengan POP yang diizinkan untuk user ini
         $allowedPopIds = Pop::forUser()->pluck('id')->toArray();
         if ($popId !== '') {
-            if (!in_array((int)$popId, $allowedPopIds)) {
+            if (! in_array((int) $popId, $allowedPopIds)) {
                 abort(403, 'Unauthorized action.');
             }
         }
@@ -145,33 +150,39 @@ class InvoiceReportController extends Controller
         }
 
         if ($startDate !== '') {
-            $query->whereDate('issue_date', '>=', $startDate);
+            // whereDate() membungkus kolom jadi DATE(issue_date) dan mematikan
+            // index. Batas ditulis eksplisit startOfDay/endOfDay — lihat alasan
+            // lengkapnya di CustomerReportController::index().
+            $query->where('issue_date', '>=', Carbon::parse($startDate)->startOfDay());
         }
 
         if ($endDate !== '') {
-            $query->whereDate('issue_date', '<=', $endDate);
+            $query->where('issue_date', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         if ($showTunggakan) {
             $query->where('remaining_amount', '>', 0)
-                ->where('invoice_status', '!=', 'batal');
+                ->where('invoice_status', '!=', InvoiceStatus::BATAL->value);
         }
 
-        $invoices = $query->orderByDesc('issue_date')
-            ->orderByDesc('id')
-            ->get();
+        // Sengaja TIDAK di-`get()` di sini. Query dieksekusi di dalam closure
+        // stream pakai `lazy()` supaya baris ditarik & ditulis sambil jalan.
+        // Versi lama memuat seluruh hasil ke memori PHP sebelum streaming
+        // dimulai — manfaat StreamedResponse hilang, dan ekspor 240.000 invoice
+        // berarti 240.000 model Invoice + relasinya sekaligus di RAM.
+        $query->orderByDesc('issue_date')->orderByDesc('id');
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="laporan-tagihan-' . now()->format('YmdHis') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="laporan-tagihan-'.now()->format('YmdHis').'.csv"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
 
-        $callback = function () use ($invoices) {
+        $callback = function () use ($query) {
             $file = fopen('php://output', 'w');
-            
+
             // Add UTF-8 BOM for proper Excel compatibility
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
@@ -192,7 +203,7 @@ class InvoiceReportController extends Controller
                 'Status Tagihan',
             ]);
 
-            foreach ($invoices as $invoice) {
+            foreach ($query->lazy(500) as $invoice) {
                 fputcsv($file, [
                     $invoice->invoice_number,
                     $invoice->customer->customer_code ?? '-',
@@ -206,7 +217,7 @@ class InvoiceReportController extends Controller
                     (float) $invoice->total_amount,
                     (float) $invoice->paid_amount,
                     (float) $invoice->remaining_amount,
-                    ucfirst(str_replace('_', ' ', $invoice->invoice_status)),
+                    $invoice->invoice_status->label(),
                 ]);
             }
 

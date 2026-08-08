@@ -2,8 +2,6 @@
 
 namespace Tests\Feature\Master;
 
-use App\Models\Pop;
-use App\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -37,7 +35,7 @@ class PopTest extends TestCase
         ]);
 
         $response->assertRedirect(route('master.pop.index'));
-        
+
         $this->assertDatabaseHas('pops', [
             'code' => 'POP-01',
             'pop_code' => 'P01',

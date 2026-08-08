@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tasks', function (Blueprint $table) {
-            if (!Schema::hasColumn('tasks', 'reject_reason')) {
+            if (! Schema::hasColumn('tasks', 'reject_reason')) {
                 $table->string('reject_reason', 1000)->nullable();
             }
-            if (!Schema::hasColumn('tasks', 'fop_review_status')) {
+            if (! Schema::hasColumn('tasks', 'fop_review_status')) {
                 $table->enum('fop_review_status', ['pending', 'approved', 'rejected'])->default('pending');
             }
         });

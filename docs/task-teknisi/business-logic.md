@@ -31,7 +31,7 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 `TaskPolicy` pakai **dua mekanisme guard sekaligus**, tergantung ability:
 
 ### A. Permission string statis
-`statusPending`, `uploadEvidence`, `editType`, `assignTeam` — cek `$user->hasPermission('task.xxx')` biasa + kadang syarat status tertentu.
+`statusPending`, `editType`, `assignTeam` — cek `$user->hasPermission('task.xxx')` biasa + kadang syarat status tertentu.
 
 ### B. `WorkflowTransitionPermission` dinamis (`canTransitionTo()`)
 `schedule`, `cancel`, `fopPending`(sebagiannya), `review`, `statusStart`, `statusComplete` — cek 3 lapis:
@@ -43,16 +43,27 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 
 **Fallback tambahan** di `statusStart`/`statusComplete`: kalau `canTransitionTo()` gagal, masih ada jalur alternatif — misal task tipe `MAINTENANCE` atau task tipe Survey/Pemasangan yang lagi `pending` tetap bisa distart/dicomplete asal user permission generik (`task.status.start`) dan `isMember()` true. Jadi **jangan asumsikan satu jalur guard tunggal** — cek kedua kondisi kalau debug masalah akses.
 
+**Cancel punya jalur guard KE-3 yang beda lagi (Task 12, 2026-07-22):** di atas cuma buat cancel dari halaman Task (`TaskPolicy::cancel()`, mekanisme B). Cancel dari tabel FOP Task (`FopTaskController::update()`, task_type NON-SRV/PSB) pakai permission STATIS terpisah `fop_tasks.cancel` (`config/rbac.php`, bukan `WorkflowTransitionPermission`) — 2 sistem permission BEDA buat aksi cancel yang secara efek sama-sama manggil `TaskService::cancel()`, tergantung dari halaman mana usernya masuk. Jangan kaget kalau user bisa cancel dari satu halaman tapi ditolak di halaman lain — itu 2 gate independen, cek keduanya kalau debug.
+
 ## 4. Batasan Tim (1–3 Teknisi)
 
 - Validasi form edit: `team_member_ids` max 3 (`TaskController::update()`).
 - Anggota pertama otomatis `role_in_task=lead`, sisanya `teknisi` (`TaskTeam` pivot) — ditentukan urutan array, bukan pilihan eksplisit user.
 - **Ganti anggota tim biasa** (`TaskController::update()` dengan `team_member_ids` baru) — hapus semua `TaskTeam` lama, insert ulang total. **Reassign 1 orang** (`TaskTeamController::update()` via `TaskService::reassignTeam()`) — beda mekanisme, update `user_id` di 1 row pivot tanpa hapus-insert semua, plus cek konflik dan kirim notifikasi personal ke yang lama & baru.
 
-## 5. Syarat Complete (Evidence)
+## 5. Syarat Complete & Laporan Pekerjaan Teknisi
 
-- `Task::canComplete()` saat ini **selalu return `true`** — placeholder, belum ada validasi hard-requirement jumlah evidence minimum di level model (komentar di code/dokumentasi lama menyebut "checklist wajib + min 1 bukti" tapi implementasi aktual permisif).
-- `TaskEvidenceController::store()` cuma nyimpen foto — gak ada blocking logic yang connect ke `canComplete()`. Jangan asumsikan sistem menolak complete tanpa evidence — saat ini tidak.
+- `Task::canComplete()` **selalu return `true`** — tidak ada hard-requirement generik di level model. Komentar/dokumentasi lama pernah menyebut "checklist wajib + min 1 bukti foto" (jalur `TaskEvidence`), tapi fitur itu **dihapus total (2026-08-06)** — model, controller, route, tabel `task_evidences` sudah dibuang (lihat [database-schema.md](database-schema.md)). Alasannya: fitur itu gak pernah benar-benar men-gate completion, dan tumpang tindih sama foto wajib yang sudah ada di tiap Laporan per tipe task.
+- **Syarat foto yang beneran mengikat ada di form Laporan masing-masing tipe task**, bukan di `canComplete()`:
+  - Survey (`CustomerSurveyController::store()`) — `survey_photo` + `house_photo` wajib saat `survey_status=completed`.
+  - Pemasangan (`CustomerInstallationController::store()`) — `installation_photo`, `contract_photo`, `signature_photo`, `speedtest_photo` wajib saat `installation_status=completed`.
+  - Maintenance/lainnya (`TaskMaintenanceController::store()`) — `opm_photo` + `speedtest_photo` wajib, langsung memicu `TaskService::complete()`.
+- **Blok "Laporan Pekerjaan Teknisi" di Detail Task (2026-08-06):** apa yang teknisi kerjakan (kendala teknis, material terpakai dari `FopTask::materials()->terpakai()`, foto OPM/Speedtest) sebelumnya cuma tersimpan di DB tanpa pernah tampil lagi di `/tasks/{id}`. Sekarang `TaskController::show()` eager-load `maintenanceReport`, dan view nampilinnya di section baru — berlaku untuk task non-Survey/Pemasangan (MTN, C-REQ, O-REQ, INFR, Ambil Modem), karena Survey/Pemasangan sudah punya halaman laporan lengkap sendiri (link "Lihat/Lanjutkan Laporan").
+- **Tile ringkasan "Foto Bukti" diganti "Durasi Aktual"** (`actualDurationMinutes()`, format jam/menit, merah kalau `isOverSla()`) di ringkasan atas Detail Task — bekas tempat count foto yang sekarang gak ada lagi.
+
+## 5b. Riwayat Task Saya (`/tasks-saya/riwayat`, 2026-08-06)
+
+Arsip task **status `selesai`** milik teknisi login, `TaskController::historyOwn()`. Beda dari `/tasks-saya` (`indexOwn()`): itu papan kerja aktif (task hari ini + `in_progress`/`pending` + `terjadwal` overdue, **buang** task selesai lama dari daftar), ini arsip lintas waktu — tiap kartu klik langsung ke `/tasks/{id}` yang sekarang sudah lengkap sama blok Laporan Pekerjaan (lihat §5). Guard sama dengan dashboard: `task.view.own` + `whereHas('teamMembers', user)`.
 
 ## 6. Efek Complete → Review FOP → Transisi Customer
 
@@ -81,6 +92,8 @@ FOP review (approve/reject/pending) via TaskController::review()
 
 **✅ Fixed (2026-07-07):** `TaskController::review()` approve untuk `task_type === PEMASANGAN` sekarang **ditolak** — satu-satunya jalur aktivasi resmi adalah `CustomerVerificationController::finalVerify()` (`/verifications/{customer}/admin`, lihat [docs/customer-lifecycle](../customer-lifecycle/README.md)), yang generate Invoice AWAL + CID sekaligus. Detail bug lama & perbaikannya ada di [bug.md](bug.md).
 
+**Klarifikasi (2026-07-14, fix reject-sync gap):** blok `reject:` di diagram atas ITU BUKAN jalur yang sama dengan `CustomerVerificationController::reject()` di Customer module. Diagram di atas = FOP nolak KUALITAS LAPORAN (foto kurang jelas dst) → `Task.status` balik `in_progress`, teknisi disuruh kerjain ulang, customer balik ke tahap in-progress, `FopTask` ikut mirror balik ke `in_progress` (unifikasi enum 2026-07-20 — dulu istilahnya `Proses`/"Perlu Review", enum `FopTaskStatus` itu sekarang udah dihapus). Reject di Customer module = admin nolak CUSTOMER-nya (gak eligible/belum bayar) → `Task.status` TETAP `selesai`, `fop_review_status=rejected`, terminal (`FopTask` TETAP `selesai` — kerjaan lapangan sukses, cuma dapet badge kedua "Verifikasi: Ditolak", gak ada jalur balik). Dua-duanya sama-sama nulis `fop_review_status=rejected` tapi efek ke `Task.status` & ke `FopTask` beda total — jangan disamain pas baca kode/log. Detail: `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
+
 ## 7. Maintenance Report — Jalur Khusus
 
 - Task tipe `MAINTENANCE` (dan tipe non-Survey/Pemasangan lain) pakai form laporan sendiri (`TaskMaintenanceController`), bukan form Survey/Instalasi.
@@ -90,3 +103,36 @@ FOP review (approve/reject/pending) via TaskController::review()
 ## 8. Audit
 
 - `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` di titik-titik kunci (`created`, `completed`, `cancelled`, `approved`, `rejected`, `reassigned`) — jadi ada kemungkinan create Task tercatat 2x (event otomatis + manual call di `TaskService::create()`), perlu diperhatikan kalau baca riwayat audit.
+
+## 9. Pemisahan Catatan — Issue/Teknis, Catatan FOP, Catatan Teknis (NOC)
+
+**Bug lama (ditutup 2026-08-07):** `Task.description` dibangun dengan `trim($fopTask->issue."\n".$fopTask->notes)` (`FopTaskController::store()`/`update()`) atau `trim($ticket->detail_keluhan."\n".$ticket->catatan_teknis)` (`TicketService::assignTechnicians()`) — dua sumber beda digabung jadi satu string, lalu ditampilkan di `tasks/show.blade.php` di bawah label **"Issue / Keluhan"**. Efeknya: pointer sistem (`fop_task->notes`, mis. `"Ticket TKT-2026-0123 — dikirim oleh Budi."`) atau asesmen teknis NOC (`ticket->catatan_teknis`, mis. `"Redaman -27 dBm."`) numpang keliatan seolah bagian dari keluhan pelanggan.
+
+**Sekarang — 3 field, 3 tempat, gak ada yang digabung atau dihapus:**
+
+| Field | Sumber | Ditampilkan di `tasks/show.blade.php` |
+|---|---|---|
+| `task->description` | `fop_task->issue` **saja**, atau `ticket->detail_keluhan` **saja** buat ticket-origin (MTN/C-REQ) | Box **"Issue / Keluhan"** (amber) |
+| `task->fopTask->ticket->catatan_teknis` | `ticket->catatan_teknis` — asesmen teknis NOC, opsional | Box **"Catatan Teknis (NOC)"** (biru), tampil kalau ada `fopTask->ticket` & kolomnya keisi |
+| `task->fopTask->notes` | `fop_task->notes` — pointer sistem pendek (`composeFopNotes()`) atau catatan bebas FOP kalau `FopTask` dibuat manual | Box **"Catatan FOP"**, tampil kalau kolomnya keisi |
+
+`TaskController::show()` eager-load `fopTask.ticket` buat nyuplai dua box tambahan itu — sebelumnya relasi ini gak pernah di-load sama sekali di halaman Task teknisi, jadi `fop_task->notes` & `ticket->catatan_teknis` invisible total dari sana walau isinya ada di DB.
+
+**Kenapa gak boleh digabung balik ke `description`:** dua sumber beda gampang menyimpang begitu salah satunya diedit belakangan (prinsip sama kayak `composeFopNotes()` di [ticketing/business-logic.md § 14](../ticketing/business-logic.md#14-format-tugas-cidnama)) — dan secara UX, teknisi gak bisa bedain mana keluhan asli pelanggan vs metadata sistem/asesmen NOC kalau nyampur di 1 box.
+
+Test regresi: `FopTaskCreateFollowsTicketingTest::test_task_show_separates_catatan_teknis_from_description_for_teknisi`.
+
+## 10. `completed_by` — Siapa yang Menyelesaikan Task
+
+**Gap lama (ditutup 2026-08-07):** `TaskService::complete()` cuma nulis `updated_by` — kolom generic yang ke-overwrite tiap update apapun setelahnya (start/pending/cancel/reassign), jadi begitu ada aksi lain pasca-selesai, jejak "siapa teknisi yang lapor" hilang. Data sebenernya ada di `audit_logs` (`action='completed'`), tapi blok "Riwayat Status (Audit Log)" di `tasks/show.blade.php` cuma keliatan buat role `owner`/`admin`/`fop` — anggota tim sendiri gak bisa liat siapa yang nyelesaiin task-nya sendiri.
+
+**Sekarang:**
+
+- Kolom `tasks.completed_by` (FK `users`, migrasi `2026_08_07_144209_add_completed_by_to_tasks_table`) diisi **sekali** di `TaskService::complete()`, barengan `completed_at` — gak pernah ditimpa lagi walau ada update lain setelahnya.
+- Relasi `Task::completedBy()`, di-eager-load di `TaskController::show()`.
+- `tasks/show.blade.php` blok "Waktu Pengerjaan" nampilin baris **"Diselesaikan & dilaporkan oleh: {nama}"** — keliatan buat semua yang bisa akses detail task, gak digated role.
+- Gate "Riwayat Status (Audit Log)" dibuka: sebelumnya `hasRole(['owner','admin','fop'])` doang, sekarang `|| $task->isMember(auth()->id())` — anggota tim task itu sendiri juga bisa liat riwayat lengkapnya.
+
+**Kasus 1 tim isi 2+ teknisi, dua-duanya klik "Selesai" barengan:** aman dari sononya — `TaskService::complete()` cuma nerima transisi dari status `IN_PROGRESS`/`PENDING`. Siapa pun yang requestnya nyampe DB duluan set status jadi `SELESAI`; request kedua otomatis abort 422 ("Task hanya bisa diselesaikan dari status In Progress atau Pending") karena status udah bukan itu lagi. Gak ada kondisi `completed_by` ketiban 2 kali.
+
+Test regresi: `TaskCompletedByTest`.

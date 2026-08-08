@@ -2,9 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\EffectiveAccessService;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
+use Database\Seeders\TaskFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,18 +21,19 @@ class FopDashboardAutoRefreshTest extends TestCase
     use RefreshDatabase;
 
     protected User $fopUser;
+
     protected Pop $pop;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
-        $this->seed(\Database\Seeders\TaskFeatureSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+        $this->seed(TaskFeatureSeeder::class);
 
         $this->pop = Pop::create([
             'code' => 'SMN',
@@ -41,11 +50,11 @@ class FopDashboardAutoRefreshTest extends TestCase
         $this->fopUser->role_id = $ownerRole->id;
         $this->fopUser->save();
 
-        app(\App\Services\EffectiveAccessService::class)->clearCache($this->fopUser);
+        app(EffectiveAccessService::class)->clearCache($this->fopUser);
 
         $this->fopUser->roleScopes()->create([
             'role_id' => $ownerRole->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP->value,
+            'scope_type' => ScopeType::ALL_POP->value,
         ]);
     }
 
@@ -55,7 +64,6 @@ class FopDashboardAutoRefreshTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('stat-cards-container');
-        $response->assertSee('kanban-pipeline-container');
         $response->assertSee('antrian-survey-container');
         $response->assertSee('status-teknisi-container');
         $response->assertSee('initEchoListeners');

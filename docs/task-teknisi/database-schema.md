@@ -5,11 +5,12 @@
 ```
 tasks ──belongsTo──▶ customers (nullable)
       ──belongsTo──▶ pops
-      ──belongsTo──▶ users (fop_id, created_by, updated_by)
+      ──belongsTo──▶ users (fop_id, created_by, updated_by, completed_by)
       ──hasMany───▶ task_teams ──belongsTo──▶ users
-      ──hasMany───▶ task_evidences ──belongsTo──▶ users (uploaded_by)
       ──hasOne────▶ task_maintenances
 ```
+
+> **`task_evidences` dihapus (2026-08-06)** — fitur Foto Bukti generik dibuang total (model, controller, route, tabel). Migration `2026_08_06_140732_drop_task_evidences_table.php` (`down()` reversible kalau perlu rollback). Alasan & pengganti: lihat [business-logic.md § 5](business-logic.md#5-syarat-complete--laporan-pekerjaan-teknisi).
 
 ## Tabel `tasks`
 
@@ -23,7 +24,7 @@ Migrasi: `2026_06_24_000001_create`.
 | `pop_id` | FK → `pops.id`, restrict delete | | |
 | `task_type` | string(30) | | Enum `App\Enums\TaskType` (sama dengan yang dipakai `FopTask`, lihat [docs/fop-task/database-schema.md](../fop-task/database-schema.md)) |
 | `title` | string | | |
-| `description` | text | ✔ | |
+| `description` | text | ✔ | **Konten CUMA dari sumber issue tunggal** — `fop_task->issue` (jalur `FopTaskController::store()`/`update()`) atau `ticket->detail_keluhan` (jalur `TicketService::assignTechnicians()`, ticket-origin MTN/C-REQ). **JANGAN digabung** sama `fop_task->notes` atau `ticket->catatan_teknis` (fix 2026-08-07, lihat [business-logic.md § 9](business-logic.md#9-pemisahan-catatan--issue-teknis-catatan-fop-catatan-teknis-noc)) — dua sumber itu tetap harus kebaca teknisi, tapi lewat box terpisah di `tasks/show.blade.php`, bukan digabung string di sini. |
 | `status` | string(30), default `draft` | | Enum `App\Enums\TaskStatus` |
 | `scheduled_at`, `started_at`, `completed_at`, `cancelled_at` | timestamp | ✔ | |
 | `cancel_reason`, `pending_reason`, `reject_reason` | string | ✔ | |
@@ -31,7 +32,8 @@ Migrasi: `2026_06_24_000001_create`.
 | `fop_id` | FK → `users.id`, null on delete | ✔ | FOP yang bikin/kelola task |
 | `sla_minutes` | unsignedSmallInteger | ✔ | Dari `TaskType::slaMinutes()` saat create |
 | `conflict_override` | boolean, default false | | Apakah konflik jadwal di-override saat create/edit |
-| `created_by`, `updated_by` | FK → `users.id`, null on delete | ✔ | |
+| `created_by`, `updated_by` | FK → `users.id`, null on delete | ✔ | `updated_by` generic — ke-overwrite tiap update apapun (start/pending/cancel/reassign), **bukan** sumber kebenaran siapa yang nyelesaikan task |
+| `completed_by` | FK → `users.id`, null on delete | ✔ | Migrasi `2026_08_07_144209_add_completed_by_to_tasks_table`. Teknisi yang menekan "Selesai" & kirim laporan — diisi **sekali** di `TaskService::complete()`, immutable setelahnya (beda dari `updated_by`). Lihat [business-logic.md § 10](business-logic.md#10-completed_by--siapa-yang-menyelesaikan-task) |
 | `created_at`/`updated_at` | timestamp | | |
 
 Index: `pop_id`, `customer_id`, `status`, `task_type`, `scheduled_at`, `fop_id`.
@@ -48,21 +50,6 @@ Migrasi: `2026_06_24_000002_create`. Pivot anggota tim per Task (beda dari `fop_
 | `role_in_task` | string(30), default `teknisi` | `lead` (anggota pertama) atau `teknisi` |
 
 Unique: (`task_id`, `user_id`). Index: `user_id`.
-
-## Tabel `task_evidences`
-
-Migrasi: `2026_06_24_000005_create`.
-
-| Kolom | Tipe | Keterangan |
-|-------|------|------------|
-| `id` | bigint PK | |
-| `task_id` | FK → `tasks.id`, cascade delete | |
-| `uploaded_by` | FK → `users.id`, null on delete | |
-| `file_path` | string | |
-| `caption` | string | ✔ |
-| `created_at`/`updated_at` | timestamp | |
-
-Index: `task_id`.
 
 ## Tabel `task_maintenances`
 
@@ -93,19 +80,14 @@ customer(): BelongsTo(Customer::class)
 pop(): BelongsTo(Pop::class)
 fop(): BelongsTo(User::class, 'fop_id')
 teamMembers(): HasMany(TaskTeam::class)
-evidences(): HasMany(TaskEvidence::class)
 maintenanceReport(): HasOne(TaskMaintenance::class)
 auditLogs(): MorphMany(AuditLog::class, 'auditable')
 
 // TaskTeam
 task(): BelongsTo(Task::class)
 user(): BelongsTo(User::class)
-
-// TaskEvidence
-task(): BelongsTo(Task::class)
-uploader(): BelongsTo(User::class, 'uploaded_by')
 ```
 
 ## Audit
 
-`Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` otomatis. Ditambah manual `AuditLog::log()` di `TaskService` untuk aksi domain-specific: `completed`, `cancelled`, `reassigned`, dan di `TaskController` untuk `approved`/`rejected` (hasil review FOP). `task_teams`, `task_evidences`, `task_maintenances` **tidak** py audit trait sendiri — perubahan di tabel ini cuma keliatan lewat perubahan `tasks` punya (kalau di-log manual) atau tidak sama sekali.
+`Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` otomatis. Ditambah manual `AuditLog::log()` di `TaskService` untuk aksi domain-specific: `completed`, `cancelled`, `reassigned`, dan di `TaskController` untuk `approved`/`rejected` (hasil review FOP). `task_teams`, `task_maintenances` **tidak** py audit trait sendiri — perubahan di tabel ini cuma keliatan lewat perubahan `tasks` punya (kalau di-log manual) atau tidak sama sekali.

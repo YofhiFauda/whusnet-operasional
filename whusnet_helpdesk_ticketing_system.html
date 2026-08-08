@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHUSNET - Worksheet Helpdesk Ticketing</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Alpine.js CDN for Reactive Interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0a0f1d',
+                            sidebar: '#0d1527',
+                            panel: '#131e36',
+                            card: '#182642',
+                            border: '#213354',
+                            accent: '#0090FF',
+                            accentHover: '#0070D2'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for clean dark UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1527;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #213354;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2d4570;
+        }
+        .writing-vertical {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+    </style>
+</head>
+<body class="bg-[#090e1a] text-slate-200 font-sans antialiased overflow-x-hidden selection:bg-cyan-500 selection:text-white" x-data="{ isFormOpen: true, activeTab: 'ticket', toastMsg: '', showToast: false, triggerToast(msg) { this.toastMsg = msg; this.showToast = true; setTimeout(() => this.showToast = false, 3000); } }">
+
+    <!-- MAIN TOP NAVBAR -->
+    <header class="h-14 bg-[#0d1527] border-b border-[#1b2a47] flex items-center justify-between px-4 sticky top-0 z-40">
+        <!-- Left Brand & Breadcrumb -->
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-900/50">
+                    <span class="text-xl tracking-tighter">W</span>
+                </div>
+                <span class="font-bold text-lg text-white tracking-wide">WHUSNET</span>
+            </div>
+            <div class="h-4 w-[1px] bg-slate-700 hidden sm:block"></div>
+            <nav class="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
+                <i class="fa-solid fa-house text-slate-500"></i>
+                <a href="#" class="hover:text-slate-200">Home</a>
+                <i class="fa-solid fa-chevron-right text-[10px] text-slate-600"></i>
+                <span class="text-cyan-400 font-medium">Worksheet Helpdesk — New Ticket</span>
+            </nav>
+        </div>
+
+        <!-- Center Global Search -->
+        <div class="flex-1 max-w-md mx-4 hidden md:block">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                <input type="text" placeholder="Cari pelanggan, CID, invoice, tiket, IP..." class="w-full bg-[#131e36] border border-[#213354] rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+                <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-[#1c2b4a] text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">/</span>
+            </div>
+        </div>
+
+        <!-- Right User Actions -->
+        <div class="flex items-center space-x-3 text-slate-400 text-sm">
+            <button class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800/60 transition"><i class="fa-regular fa-sun"></i></button>
+            <button class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800/60 transition"><i class="fa-regular fa-circle-question"></i></button>
+            <button class="p-1.5 hover:text-white rounded-lg hover:bg-slate-800/60 transition relative">
+                <i class="fa-regular fa-bell"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></span>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-cyan-500 rounded-full"></span>
+            </button>
+            <div class="h-5 w-[1px] bg-slate-700"></div>
+            <div class="flex items-center space-x-2 pl-1 cursor-pointer group">
+                <div class="w-7 h-7 rounded-lg bg-cyan-700 text-white font-semibold text-xs flex items-center justify-center border border-cyan-500/30">
+                    SU
+                </div>
+                <div class="text-left hidden lg:block">
+                    <p class="text-xs font-semibold text-slate-200 leading-none group-hover:text-cyan-400">Super Admin (Owner)</p>
+                    <p class="text-[10px] text-slate-500 leading-tight">28 Juli 2026, 16.32 WIB</p>
+                </div>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN WRAPPER -->
+    <div class="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+
+        <!-- LEFT SIDEBAR -->
+        <aside class="w-56 bg-[#0d1527] border-r border-[#1b2a47] flex-shrink-0 flex flex-col justify-between hidden md:flex text-xs">
+            <div class="p-3 space-y-6 overflow-y-auto">
+                <!-- Group 1: OPERASIONAL -->
+                <div>
+                    <div class="px-2 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Operasional</div>
+                    <ul class="space-y-1">
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <i class="fa-solid fa-chart-pie w-5 text-slate-500"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center justify-between px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-users w-5 text-slate-500"></i>
+                                    <span>Pelanggan</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-[9px] text-slate-600"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center justify-between px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-file-invoice-dollar w-5 text-slate-500"></i>
+                                    <span>Tagihan</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-[9px] text-slate-600"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center justify-between px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-wallet w-5 text-slate-500"></i>
+                                    <span>Pembayaran</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Group 2: JARINGAN & LAPANGAN -->
+                <div>
+                    <div class="px-2 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Jaringan & Lapangan</div>
+                    <ul class="space-y-1">
+                        <li>
+                            <a href="#" class="flex items-center justify-between px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-[#0090FF] fa-calendar-alt w-5 text-slate-500"></i>
+                                    <span>Penjadwalan Teknis</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-[9px] text-slate-600"></i>
+                            </a>
+                        </li>
+                        <!-- Active Parent: Ticketing -->
+                        <li x-data="{ open: true }">
+                            <button @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-cyan-400 bg-[#142340] rounded-md transition font-medium">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-headset w-5 text-cyan-400"></i>
+                                    <span>Ticketing</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-up text-[9px] text-cyan-400"></i>
+                            </button>
+                            <!-- Submenu -->
+                            <ul x-show="open" class="mt-1 pl-6 space-y-1 border-l border-[#213354] ml-4">
+                                <li>
+                                    <a href="#" class="block px-3 py-1.5 text-xs text-cyan-300 font-medium bg-cyan-950/40 rounded border border-cyan-800/40">New Ticket</a>
+                                </li>
+                                <li><a href="#" class="block px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200">Worksheet NOC</a></li>
+                                <li><a href="#" class="block px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200">Dashboard NOC</a></li>
+                                <li><a href="#" class="block px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200">Ticket Selesai</a></li>
+                                <li><a href="#" class="block px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200">Ticket Dibatalkan</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Group 3: LAPORAN -->
+                <div>
+                    <div class="px-2 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Laporan</div>
+                    <ul class="space-y-1">
+                        <li>
+                            <a href="#" class="flex items-center justify-between px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-chart-line w-5 text-slate-500"></i>
+                                    <span>Laporan Keuangan</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-[9px] text-slate-600"></i>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="flex items-center px-3 py-2 text-slate-400 hover:bg-[#15233f] hover:text-slate-200 rounded-md transition">
+                                <i class="fa-solid fa-list-check w-5 text-slate-500"></i>
+                                <span>Audit Log</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Sidebar Bottom Profile Footer -->
+            <div class="p-3 border-t border-[#1b2a47] bg-[#0b1222]">
+                <div class="flex items-center justify-between bg-[#131e36] p-2 rounded-lg border border-[#213354]">
+                    <div class="flex items-center space-x-2 overflow-hidden">
+                        <div class="w-7 h-7 rounded-md bg-cyan-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            SU
+                        </div>
+                        <div class="truncate">
+                            <p class="text-[11px] font-semibold text-slate-200 truncate">Super Admin (Owner)</p>
+                            <p class="text-[9px] text-slate-500 truncate">superadmin@whusnet.com</p>
+                        </div>
+                    </div>
+                    <button class="text-slate-500 hover:text-red-400 p-1 transition"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- COLLAPSED TICKET STRIP (Visible only when form is closed) -->
+        <div x-show="!isFormOpen" 
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 -translate-x-full"
+             x-transition:enter-end="opacity-100 translate-x-0"
+             @click="isFormOpen = true"
+             class="w-10 bg-[#0d1527] border-r border-[#1b2a47] flex flex-col items-center justify-between py-6 cursor-pointer hover:bg-[#14223d] group transition-all duration-300 shadow-xl z-20 flex-shrink-0">
+            <div class="flex flex-col items-center space-y-4">
+                <div class="w-7 h-7 rounded-lg bg-cyan-600/20 border border-cyan-500/40 text-cyan-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-cyan-600 group-hover:text-white transition">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                </div>
+                <div class="writing-vertical font-bold text-xs tracking-widest text-slate-400 group-hover:text-cyan-400 uppercase transition py-4">
+                    T I C K E T I N G
+                </div>
+            </div>
+            <div class="text-slate-500 group-hover:text-slate-200 text-xs">
+                <i class="fa-solid fa-angles-right animate-pulse"></i>
+            </div>
+        </div>
+
+        <!-- MAIN BODY CONTENT AREA -->
+        <div class="flex-1 flex overflow-hidden bg-[#090e1a]">
+
+            <!-- EXPANDABLE FORM PANEL (SECTION 01 - SECTION 03) -->
+            <div x-show="isFormOpen" 
+                 x-transition:enter="transition ease-in-out duration-300"
+                 x-transition:enter-start="-translate-x-full opacity-0"
+                 x-transition:enter-end="translate-x-0 opacity-100"
+                 x-transition:leave="transition ease-in-out duration-300"
+                 x-transition:leave-start="translate-x-0 opacity-100"
+                 x-transition:leave-end="-translate-x-full opacity-0"
+                 class="w-full lg:w-[580px] xl:w-[650px] bg-[#0d1628] border-r border-[#1b2a47] flex flex-col flex-shrink-0 shadow-2xl z-10">
+                
+                <!-- Form Header -->
+                <div class="p-4 border-b border-[#1b2a47] flex items-center justify-between bg-[#101b30]">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                            <i class="fa-solid fa-ticket"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-bold text-white tracking-wide">Create Service Ticket</h2>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-wider font-medium">WORKSHEET HELPDESK — PENGGANTI PENCATATAN MANUAL EXCEL</p>
+                        </div>
+                    </div>
+                    <!-- CLOSE BUTTON (COLLAPSE TRIGGER) -->
+                    <button @click="isFormOpen = false" 
+                            class="flex items-center space-x-1 px-2.5 py-1 text-xs text-slate-400 hover:text-white bg-[#182642] hover:bg-red-600/80 border border-[#263c66] hover:border-red-500 rounded-md transition duration-200 group">
+                        <i class="fa-solid fa-xmark text-slate-400 group-hover:text-white"></i>
+                        <span class="font-medium">Tutup</span>
+                    </button>
+                </div>
+
+                <!-- Form Scrollable Fields -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-5 text-xs">
+                    
+                    <!-- SECTION 01: CLASSIFICATION -->
+                    <div class="space-y-3 bg-[#121c33] p-3.5 rounded-xl border border-[#1d2d4d]">
+                        <div class="border-l-2 border-cyan-500 pl-2">
+                            <h3 class="font-bold text-slate-200 uppercase text-[11px] tracking-wider">SECTION 01: CLASSIFICATION</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">TICKET TYPE <span class="text-red-400">*</span></label>
+                                <select class="w-full bg-[#182642] border border-[#283e68] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500 transition">
+                                    <option value="">-- SELECT CLASSIFICATION --</option>
+                                    <option value="1">Gangguan Koneksi / Internet Down</option>
+                                    <option value="2">Koneksi Lambat / Lemot</option>
+                                    <option value="3">Router / Hardware Issue</option>
+                                    <option value="4">Peminjaman / Perubahan Paket</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-400 mb-1">PRIORITAS <span class="text-red-400">*</span></label>
+                                <select class="w-full bg-[#182642] border border-[#283e68] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500 transition">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 02: CUSTOMER IDENTITY -->
+                    <div class="space-y-3 bg-[#121c33] p-3.5 rounded-xl border border-[#1d2d4d]">
+                        <div class="border-l-2 border-cyan-500 pl-2">
+                            <h3 class="font-bold text-slate-200 uppercase text-[11px] tracking-wider">SECTION 02: CUSTOMER IDENTITY</h3>
+                        </div>
+                        
+                        <!-- Search Box -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">SEARCH CUSTOMER DATA <span class="text-red-400">*</span></label>
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                                <input type="text" placeholder="ENTER CID OR NAME..." class="w-full bg-[#182642] border border-[#283e68] rounded-lg pl-9 pr-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Customer Info Grid Display -->
+                        <div class="bg-[#0e1628] rounded-lg p-3 border border-[#1b2b4a] grid grid-cols-2 gap-y-3 gap-x-4 text-[11px]">
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">CUSTOMER NAME</span>
+                                <span class="font-semibold text-slate-300">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">CID NUMBER</span>
+                                <span class="font-semibold text-cyan-400">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">PHONE / HP</span>
+                                <span class="font-semibold text-slate-300">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ACTIVE PACKAGE</span>
+                                <span class="font-semibold text-slate-300">—</span>
+                            </div>
+                            <div class="col-span-2 border-t border-[#1a2947] pt-2">
+                                <span class="text-slate-500 block text-[10px]">SITE ADDRESS</span>
+                                <span class="font-medium text-slate-400">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">POP / CABANG</span>
+                                <span class="font-medium text-slate-400">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ODP PORT</span>
+                                <span class="font-medium text-slate-400">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">PERANGKAT PELANGGAN (ONT/ROUTER)</span>
+                                <span class="font-medium text-slate-400">—</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">GPS COORDINATES</span>
+                                <span class="font-medium text-cyan-500 flex items-center space-x-1">
+                                    <i class="fa-solid fa-location-dot text-red-400"></i>
+                                    <span>—</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 03: COMPLAINT & NOTES -->
+                    <div class="space-y-3 bg-[#121c33] p-3.5 rounded-xl border border-[#1d2d4d]">
+                        <div class="border-l-2 border-cyan-500 pl-2">
+                            <h3 class="font-bold text-slate-200 uppercase text-[11px] tracking-wider">SECTION 03: COMPLAINT & NOTES</h3>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">KATEGORI ISSUE <span class="text-red-400">*</span></label>
+                            <select class="w-full bg-[#182642] border border-[#283e68] rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500 transition">
+                                <option value="">-- PILIH KATEGORI ISSUE --</option>
+                                <option value="backbone">Backbone CUT</option>
+                                <option value="lemot">Koneksi Lemot / High Latency</option>
+                                <option value="los">Redetan LOS / Kabel Putus</option>
+                                <option value="billing">Kendala Pembayaran</option>
+                            </select>
+                            <p class="text-[10px] text-slate-500 mt-1">Pilih kategori otomatis isi Prioritas. Pilih "Lainnya" kalau issue belum ada di master.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-400 mb-1">DETAIL KELUHAN (CUSTOMER COMPLAINT) <span class="text-red-400">*</span></label>
+                            <textarea rows="3" placeholder="Describe the issue reported by the customer (misal: Koneksi LOS merah, internet lambat jam tertentu, dsb)..." class="w-full bg-[#182642] border border-[#283e68] rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition resize-none"></textarea>
+                        </div>
+
+                        <button class="text-xs text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 transition font-medium pt-1">
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            <span>Tampilkan Detail Tambahan (Catatan Teknis & Lampiran, Opsional)</span>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Form Bottom Action Bar -->
+                <div class="p-3 border-t border-[#1b2a47] bg-[#0f1a2e] flex items-center justify-between">
+                    <button @click="triggerToast('Form dibatalkan')" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition border border-transparent hover:border-slate-700 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>DISCARD <span class="text-[10px] text-slate-500 font-normal">(Esc)</span></span>
+                    </button>
+                    <button @click="triggerToast('Tiket baru berhasil dibuat!'); isFormOpen = false" class="px-5 py-2 text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 rounded-lg shadow-lg shadow-cyan-900/40 flex items-center space-x-2 transition">
+                        <span>CREATE TICKET</span>
+                        <span class="text-[10px] text-cyan-200 font-normal opacity-80">(Ctrl+Enter)</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT TASK LIST PANEL (Flex 1 - Adapts on expand/collapse) -->
+            <div class="flex-1 flex flex-col overflow-hidden bg-[#0a0f1d]">
+                
+                <!-- Panel Header & Tabs -->
+                <div class="p-4 border-b border-[#1b2a47] bg-[#0d1527] space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <h1 class="text-lg font-bold text-white tracking-wide">List Task Ticketing</h1>
+                            <span class="bg-cyan-950/80 text-cyan-400 border border-cyan-800/60 text-[11px] font-semibold px-2.5 py-0.5 rounded-full">5 Ticket</span>
+                        </div>
+                        <div class="flex items-center space-x-3 text-xs">
+                            <button @click="triggerToast('Data tiket diperbarui')" class="text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-medium transition">
+                                <i class="fa-solid fa-rotate-right text-xs"></i>
+                                <span>Refresh</span>
+                            </button>
+                            <a href="#" class="text-slate-400 hover:text-slate-200 font-medium transition">Worksheet NOC</a>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Tabs -->
+                    <div class="flex bg-[#121c33] p-1 rounded-lg border border-[#1e2e4f] max-w-lg text-xs font-medium">
+                        <button @click="activeTab = 'ticket'" :class="activeTab === 'ticket' ? 'bg-[#1e2f52] text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="flex-1 py-1.5 rounded-md text-center transition">
+                            Ticket
+                        </button>
+                        <button @click="activeTab = 'noc'" :class="activeTab === 'noc' ? 'bg-[#1e2f52] text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="flex-1 py-1.5 rounded-md text-center transition">
+                            Assign NOC
+                        </button>
+                        <button @click="activeTab = 'fop'" :class="activeTab === 'fop' ? 'bg-[#1e2f52] text-white shadow' : 'text-slate-400 hover:text-slate-200'" class="flex-1 py-1.5 rounded-md text-center transition">
+                            Assign FOP
+                        </button>
+                    </div>
+
+                    <p class="text-[11px] text-slate-500 italic">
+                        Selesai & Dibatalkan gak masuk antrean kerja — ada di halaman sendiri.
+                    </p>
+                </div>
+
+                <!-- Task Cards Container -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <!-- Single Row Compact List (1 Baris Per Pelanggan) -->
+                    <div class="space-y-2">
+                        
+                        <!-- CARD 1: HIGH PRIORITY (BACKBONE CUT) -->
+                        <div class="bg-[#121c33] hover:bg-[#15223d] border border-[#1d2e50] hover:border-cyan-500/40 rounded-xl p-3 px-4 transition-all duration-200 shadow-md group flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                            <div class="flex-1 min-w-0 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                <!-- Col 1: Code & Priority & Status -->
+                                <div class="flex items-center space-x-2 shrink-0 min-w-[210px]">
+                                    <span class="font-mono text-xs font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded">
+                                        TKT-2026-0006
+                                    </span>
+                                    <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded">
+                                        HIGH
+                                    </span>
+                                    <span class="text-[10px] font-semibold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50 flex items-center space-x-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                        <span>Ticket Masuk</span>
+                                    </span>
+                                </div>
+
+                                <!-- Col 2: Customer Name, Phone & CID -->
+                                <div class="min-w-[190px] max-w-[240px] shrink-0">
+                                    <h4 class="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate">Moch Hanif Asrofi</h4>
+                                    <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                                        <span class="font-mono text-cyan-300">CID: C1X4ARQ000723</span>
+                                        <span>•</span>
+                                        <span class="font-mono text-[10px] flex items-center space-x-1">
+                                            <i class="fa-solid fa-phone text-[9px] text-slate-500"></i>
+                                            <span>628315993480</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Col 3: Issue Title & Quote -->
+                                <div class="flex-1 min-w-0 pr-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="bg-[#182642] px-1.5 py-0.5 rounded border border-[#21355a] text-[10px] font-medium text-slate-300">Backbone CUT</span>
+                                        <h4 class="text-xs font-bold text-slate-200 truncate">Backbone CUT</h4>
+                                    </div>
+                                    <p class="text-[11px] text-slate-400 truncate mt-0.5 italic">"adasdasdads"</p>
+                                </div>
+
+                                <!-- Col 4: Time -->
+                                <div class="shrink-0 text-right min-w-[85px] sm:self-center">
+                                    <span class="text-[10px] text-slate-400 font-mono flex items-center justify-end space-x-1">
+                                        <i class="fa-regular fa-clock text-[9px]"></i>
+                                        <span>4 menit yang lalu</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex items-center space-x-1.5 shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-[#1b2a47]">
+                                <button @click="triggerToast('Tiket TKT-2026-0006 diselesaikan')" class="bg-emerald-600/90 hover:bg-emerald-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-check text-[9px]"></i>
+                                    <span>SELESAI</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke NOC')" class="bg-amber-600/90 hover:bg-amber-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-share text-[9px]"></i>
+                                    <span>KE NOC</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke FOP')" class="bg-sky-600/90 hover:bg-sky-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-arrow-right-long text-[9px]"></i>
+                                    <span>KE FOP</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CARD 2: LOW PRIORITY (LEMOT) -->
+                        <div class="bg-[#121c33] hover:bg-[#15223d] border border-[#1d2e50] hover:border-cyan-500/40 rounded-xl p-3 px-4 transition-all duration-200 shadow-md group flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                            <div class="flex-1 min-w-0 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                <!-- Col 1: Code & Priority & Status -->
+                                <div class="flex items-center space-x-2 shrink-0 min-w-[210px]">
+                                    <span class="font-mono text-xs font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded">
+                                        TKT-2026-0005
+                                    </span>
+                                    <span class="bg-slate-700/50 text-slate-300 border border-slate-600 text-[10px] font-bold px-2 py-0.5 rounded">
+                                        LOW
+                                    </span>
+                                    <span class="text-[10px] font-semibold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50 flex items-center space-x-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                        <span>Ticket Masuk</span>
+                                    </span>
+                                </div>
+
+                                <!-- Col 2: Customer Name, Phone & CID -->
+                                <div class="min-w-[190px] max-w-[240px] shrink-0">
+                                    <h4 class="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate">Affifta Atwin Safranda</h4>
+                                    <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                                        <span class="font-mono text-cyan-300">CID: C1X4CRQ000016</span>
+                                        <span>•</span>
+                                        <span class="font-mono text-[10px] flex items-center space-x-1">
+                                            <i class="fa-solid fa-phone text-[9px] text-slate-500"></i>
+                                            <span>6287737008759</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Col 3: Issue Title & Quote -->
+                                <div class="flex-1 min-w-0 pr-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="bg-[#182642] px-1.5 py-0.5 rounded border border-[#21355a] text-[10px] font-medium text-slate-300">Lemot</span>
+                                        <h4 class="text-xs font-bold text-slate-200 truncate">Koneksi Lambat</h4>
+                                    </div>
+                                    <p class="text-[11px] text-slate-400 truncate mt-0.5 italic">"asdasdasdasd"</p>
+                                </div>
+
+                                <!-- Col 4: Time -->
+                                <div class="shrink-0 text-right min-w-[85px] sm:self-center">
+                                    <span class="text-[10px] text-slate-400 font-mono flex items-center justify-end space-x-1">
+                                        <i class="fa-regular fa-clock text-[9px]"></i>
+                                        <span>29 menit yang lalu</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex items-center space-x-1.5 shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-[#1b2a47]">
+                                <button @click="triggerToast('Tiket TKT-2026-0005 diselesaikan')" class="bg-emerald-600/90 hover:bg-emerald-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-check text-[9px]"></i>
+                                    <span>SELESAI</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke NOC')" class="bg-amber-600/90 hover:bg-amber-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-share text-[9px]"></i>
+                                    <span>KE NOC</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke FOP')" class="bg-sky-600/90 hover:bg-sky-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-arrow-right-long text-[9px]"></i>
+                                    <span>KE FOP</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CARD 3: LOW PRIORITY (LEMOT) -->
+                        <div class="bg-[#121c33] hover:bg-[#15223d] border border-[#1d2e50] hover:border-cyan-500/40 rounded-xl p-3 px-4 transition-all duration-200 shadow-md group flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+                            <div class="flex-1 min-w-0 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                <!-- Col 1: Code & Priority & Status -->
+                                <div class="flex items-center space-x-2 shrink-0 min-w-[210px]">
+                                    <span class="font-mono text-xs font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded">
+                                        TKT-2026-0004
+                                    </span>
+                                    <span class="bg-slate-700/50 text-slate-300 border border-slate-600 text-[10px] font-bold px-2 py-0.5 rounded">
+                                        LOW
+                                    </span>
+                                    <span class="text-[10px] font-semibold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/50 flex items-center space-x-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                        <span>Ticket Masuk</span>
+                                    </span>
+                                </div>
+
+                                <!-- Col 2: Customer Name, Phone & CID -->
+                                <div class="min-w-[190px] max-w-[240px] shrink-0">
+                                    <h4 class="text-xs font-bold text-white group-hover:text-cyan-300 transition truncate">Chaniago Putra Pertama</h4>
+                                    <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                                        <span class="font-mono text-cyan-300">CID: C08RQ001555</span>
+                                        <span>•</span>
+                                        <span class="font-mono text-[10px] flex items-center space-x-1">
+                                            <i class="fa-solid fa-phone text-[9px] text-slate-500"></i>
+                                            <span>6287737008632</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Col 3: Issue Title & Quote -->
+                                <div class="flex-1 min-w-0 pr-1">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="bg-[#182642] px-1.5 py-0.5 rounded border border-[#21355a] text-[10px] font-medium text-slate-300">Lemot</span>
+                                        <h4 class="text-xs font-bold text-slate-200 truncate">Internet Putus Nyambung</h4>
+                                    </div>
+                                    <p class="text-[11px] text-slate-400 truncate mt-0.5 italic">"123123123adsdas"</p>
+                                </div>
+
+                                <!-- Col 4: Time -->
+                                <div class="shrink-0 text-right min-w-[85px] sm:self-center">
+                                    <span class="text-[10px] text-slate-400 font-mono flex items-center justify-end space-x-1">
+                                        <i class="fa-regular fa-clock text-[9px]"></i>
+                                        <span>30 menit yang lalu</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex items-center space-x-1.5 shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-[#1b2a47]">
+                                <button @click="triggerToast('Tiket TKT-2026-0004 diselesaikan')" class="bg-emerald-600/90 hover:bg-emerald-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-check text-[9px]"></i>
+                                    <span>SELESAI</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke NOC')" class="bg-amber-600/90 hover:bg-amber-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-share text-[9px]"></i>
+                                    <span>KE NOC</span>
+                                </button>
+                                <button @click="triggerToast('Tiket diteruskan ke FOP')" class="bg-sky-600/90 hover:bg-sky-500 text-white py-1 px-2 rounded text-[10px] font-bold uppercase transition flex items-center space-x-1 shadow">
+                                    <i class="fa-solid fa-arrow-right-long text-[9px]"></i>
+                                    <span>KE FOP</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div x-show="showToast" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-4"
+         class="fixed bottom-5 right-5 bg-cyan-950 border border-cyan-500 text-white px-4 py-2.5 rounded-xl shadow-2xl z-50 flex items-center space-x-3 text-xs font-medium"
+         style="display: none;">
+        <i class="fa-solid fa-circle-check text-cyan-400 text-sm"></i>
+        <span x-text="toastMsg"></span>
+    </div>
+
+</body>
+</html>

@@ -34,18 +34,18 @@ class ImportBatch extends Model
 
     public static function generateBatchNumber(): string
     {
-        $prefix = 'IMP-' . date('Ymd');
-        $latest = self::where('batch_number', 'like', $prefix . '-%')
+        $prefix = 'IMP-'.date('Ymd');
+        $latest = self::where('batch_number', 'like', $prefix.'-%')
             ->orderBy('batch_number', 'desc')
             ->first();
 
-        if (!$latest) {
-            return $prefix . '-0001';
+        if (! $latest) {
+            return $prefix.'-0001';
         }
 
         $lastNumber = (int) substr($latest->batch_number, -4);
-        $nextNumber = str_pad((string)($lastNumber + 1), 4, '0', STR_PAD_LEFT);
+        $nextNumber = str_pad((string) ($lastNumber + 1), 4, '0', STR_PAD_LEFT);
 
-        return $prefix . '-' . $nextNumber;
+        return $prefix.'-'.$nextNumber;
     }
 }

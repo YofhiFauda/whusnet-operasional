@@ -3,69 +3,47 @@
 @section('title', 'Task Saya')
 
 @section('content')
-<div x-data="{}" class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+<div x-data="technicianNotifier()" class="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-            <div>
-                <h1 class="text-base font-semibold text-text-main leading-tight">Task Saya Hari Ini</h1>
-                <p class="text-xs text-text-muted">
-                    Halo, {{ auth()->user()->name }} 👋 &mdash; {{ now()->translatedFormat('l, d F Y') }}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-surface border border-border sm:border-0 rounded-xl sm:rounded-none p-3.5 sm:p-0 shadow-sm sm:shadow-none">
+        <div class="flex items-start sm:items-center gap-3">
+            <div class="p-2 sm:p-0 rounded-lg bg-primary/10 sm:bg-transparent text-primary shrink-0">
+                <svg class="h-5 w-5 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between sm:justify-start gap-2">
+                    <h1 class="text-base sm:text-lg font-semibold text-text-main leading-tight truncate">Task Saya Hari Ini</h1>
+                    <div class="sm:hidden text-right shrink-0">
+                        <span class="font-mono text-lg font-bold text-text-main">{{ $tasks->count() }}</span>
+                        <span class="text-[10px] text-text-muted block -mt-1">task</span>
+                    </div>
+                </div>
+                <p class="text-xs text-text-muted mt-0.5 truncate">
+                    Halo, <span class="font-medium text-text-main">{{ auth()->user()->name }}</span> 👋 &mdash; {{ now()->translatedFormat('l, d F Y') }}
                 </p>
             </div>
         </div>
-        <div class="text-right">
-            <p class="text-2xl font-bold font-mono text-text-main leading-none">{{ $tasks->count() }}</p>
-            <p class="text-[11px] text-text-muted">task hari ini</p>
+
+        <div class="flex items-center justify-between sm:justify-end gap-3 pt-2.5 sm:pt-0 border-t border-border/60 sm:border-0">
+            <a href="{{ route('tasks.own.history') }}"
+               class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 text-xs font-semibold rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main transition-colors shadow-sm w-full sm:w-auto text-center"
+               title="Riwayat Task Saya">
+                <svg class="h-4 w-4 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Lihat Riwayat</span>
+            </a>
+            <div class="hidden sm:block text-right shrink-0">
+                <p class="text-2xl font-bold font-mono text-text-main leading-none">{{ $tasks->count() }}</p>
+                <p class="text-[11px] text-text-muted">task hari ini</p>
+            </div>
         </div>
     </div>
 
-    {{-- ══ Banner Notifikasi Real-Time (S8.2-T010) ═══════════════════ --}}
-    {{-- Banner muncul saat FOP assign task baru via echo channel private-teknisi.{userId} --}}
-    <div x-data="technicianNotifier()"
-         x-show="banner.visible"
-         x-cloak
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 -translate-y-3"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 -translate-y-3"
-         class="flex items-start gap-3 px-4 py-3 rounded-lg border shadow-md cursor-pointer"
-         style="background:var(--color-primary-soft,#eff6ff); border-color:var(--color-primary-border,#93c5fd); color:var(--color-primary,#2563eb)"
-         @click="scrollToCard()"
-         id="task-notification-banner"
-         role="alert"
-         aria-live="polite">
-
-        {{-- Bell Icon --}}
-        <svg class="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-
-        <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold leading-tight" x-text="banner.title"></p>
-            <p class="text-xs mt-0.5 opacity-80" x-text="banner.subtitle"></p>
-            <p class="text-[11px] mt-1 opacity-60">Klik banner ini untuk melihat task baru &darr;</p>
-        </div>
-
-        {{-- Close button --}}
-        <button @click.stop="dismissBanner()"
-                class="shrink-0 p-1 rounded hover:opacity-70 transition-opacity"
-                title="Tutup notifikasi"
-                aria-label="Tutup notifikasi">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
-
-    {{-- Flash messages ditangani otomatis oleh global Component Toast (<x-toast />) --}}
+    {{-- Notifikasi real-time & flash messages ditangani oleh global Component Toast (<x-toast />) --}}
 
     {{-- ══ Task Hari Ini ════════════════════════════════════════════ --}}
     @if($tasks->count() > 0)
@@ -97,16 +75,18 @@
                         </span>
                         {{-- Status badge --}}
                         @php
-                            $statusStyle = match($task->status->value) {
-                                'terjadwal'  => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
-                                'in_progress'=> 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
-                                'selesai'    => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
-                                'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
-                                default      => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
+                            $statusStyle = match(true) {
+                                $task->status->value === 'terjadwal'   => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
+                                $task->status->value === 'in_progress' => 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
+                                $task->status->value === 'selesai'     => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
+                                $task->status->value === 'dibatalkan'  => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
+                                $task->status->value === 'pending' && $task->report_deferred => 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
+                                $task->status->value === 'pending'     => 'background:#fefce8; color:#a16207; border-color:#fde68a',
+                                default                                => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
                             };
                         @endphp
                         <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border" style="{{ $statusStyle }}">
-                            {{ $task->status->label() }}
+                            {{ $task->status->displayLabel($task->report_deferred) }}
                         </span>
                         @if($task->isOverSla())
                         <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border"
@@ -124,7 +104,7 @@
                     <span class="font-mono text-[11px] text-text-muted shrink-0">{{ $task->task_number }}</span>
                 </div>
 
-                {{-- Nama pelanggan + alamat --}}
+                {{-- Nama pelanggan + alamat — selalu ditampilkan --}}
                 <p class="font-semibold text-text-main">{{ $task->customer?->full_name ?? $task->title }}</p>
                 @if($task->customer)
                 <p class="text-xs text-text-muted mt-0.5">
@@ -133,6 +113,34 @@
                         &mdash; {{ $task->pop->name }}
                     @endif
                 </p>
+                @endif
+
+                {{-- Koordinat Lokasi + Maps — digate sampai task mulai dikerjakan (S8.4-T011) --}}
+                @if($task->status->value !== 'terjadwal')
+                @php
+                    $lat = $task->customer?->customerAddress?->latitude ?? $task->pop?->latitude;
+                    $lng = $task->customer?->customerAddress?->longitude ?? $task->pop?->longitude;
+                @endphp
+                @if($lat && $lng)
+                <div class="mt-2.5 p-2 bg-surface-muted border border-border rounded-md flex items-center justify-between gap-3" data-coordinate-card>
+                    <div class="flex flex-col gap-0.5 min-w-0">
+                        <span class="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Koordinat Lokasi</span>
+                        <span class="font-mono text-[10px] text-text-secondary truncate">
+                            {{ $lat }}, {{ $lng }}
+                        </span>
+                    </div>
+                    <a href="https://www.google.com/maps/search/?api=1&query={{ $lat }},{{ $lng }}" 
+                       target="_blank"
+                       class="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 border border-border rounded bg-surface hover:bg-surface-muted text-primary transition-colors cursor-pointer"
+                       data-map-button>
+                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Maps
+                    </a>
+                </div>
+                @endif
                 @endif
 
                 {{-- Jadwal --}}
@@ -197,10 +205,13 @@
 
                 {{-- Tombol aksi --}}
                 <div class="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+                    {{-- "Buka Detail" digate sampai task mulai dikerjakan (S8.4-T011) --}}
+                    @if($task->status->value !== 'terjadwal')
                     <a href="{{ route('tasks.show', $task) }}"
                        class="flex-1 text-center text-xs font-semibold py-2 px-3 border border-border rounded-md bg-background hover:bg-surface-muted text-text-secondary transition-colors">
                         Buka Detail
                     </a>
+                    @endif
 
                     @if($task->status->value === 'terjadwal')
                         @if($task->task_type->value === 'SURVEY')
@@ -241,25 +252,24 @@
 
                     @can('statusComplete', $task)
                     @if(in_array($task->status->value, ['in_progress', 'pending']))
-                    @if($task->task_type->value === 'SURVEY')
-                    <a href="{{ route('customers.survey.report', $task->customer_id) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @elseif($task->task_type->value === 'PSB')
-                    <a href="{{ route('customers.installation.report', $task->customer_id) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @else
-                    <a href="{{ route('tasks.maintenance.report', $task) }}"
-                       class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
-                       style="background:var(--color-success)">
-                        Isi Laporan
-                    </a>
-                    @endif
+                        @php
+                            $reportUrl = match(true) {
+                                $task->task_type->value === 'SURVEY' => route('customers.survey.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
+                                $task->task_type->value === 'PSB' => route('customers.installation.report', ['customer' => $task->customer_id, 'return_to' => route('tasks.own')]),
+                                default => route('tasks.maintenance.report', $task),
+                            };
+                        @endphp
+                        @if($task->status->value === 'in_progress')
+                            <x-task.report-choice-dialog :task="$task" :report-url="$reportUrl" class="flex-1 justify-center">
+                                Isi Laporan
+                            </x-task.report-choice-dialog>
+                        @else
+                            <a href="{{ $reportUrl }}"
+                               class="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-md text-white transition-colors"
+                               style="background:var(--color-success)">
+                                Lanjutkan Laporan
+                            </a>
+                        @endif
                     @endif
                     @endcan
                 </div>
@@ -318,20 +328,14 @@
  * Listen ke Laravel Reverb channel private-teknisi.{userId} untuk event TaskScheduled.
  * Saat event diterima:
  *   1. Tampilkan banner notifikasi di atas list task.
- *   2. Fetch HTML card parsial dari /tasks-saya/partial/{taskId} lalu inject ke DOM.
- *   3. Klik banner → smooth-scroll ke card yang baru diinject.
+ *   2. event_type 'created'     → fetch card parsial dari /tasks-saya/partial/{taskId}, inject ke DOM.
+ *      event_type 'rescheduled' → fetch ulang & ganti card yang udah ada di tempat (jadwal lama jangan
+ *      nyangkut di layar) — kalau card belum ada di DOM, treat sama kayak 'created'.
+ *   3. Klik banner → smooth-scroll ke card.
  *   4. Auto-dismiss banner setelah 10 detik.
  */
 function technicianNotifier() {
     return {
-        banner: {
-            visible: false,
-            title: '',
-            subtitle: '',
-            taskId: null,
-        },
-        dismissTimer: null,
-
         init() {
             const userId = {{ auth()->id() }};
 
@@ -362,57 +366,130 @@ function technicianNotifier() {
         },
 
         handleTaskScheduled(event) {
-            // Hitung jadwal yang tampil di banner
             let jadwalLabel = '';
             if (event.scheduled_at) {
                 const dt = new Date(event.scheduled_at);
-                // Format: YYYY-MM-DD HH:mm (sederhana, tanpa dependency locale)
                 const pad = (n) => String(n).padStart(2, '0');
                 jadwalLabel = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
             }
 
-            // Teks banner berbeda berdasarkan konteks event
-            const isRescheduled = event.event_type === 'rescheduled';
-            this.banner.title    = isRescheduled
-                ? `Jadwal diperbarui: ${event.title}`
-                : `Task baru ditugaskan: ${event.title}`;
-            this.banner.subtitle = jadwalLabel ? `Jadwal: ${jadwalLabel}` : '';
-            this.banner.taskId   = event.id;
-            this.banner.visible  = true;
+            const isRefresh = event.event_type === 'rescheduled' || event.event_type === 'team_changed';
+            const isRemoval = event.event_type === 'removed' || event.event_type === 'cancelled';
 
-            // Auto-dismiss setelah 10 detik
-            clearTimeout(this.dismissTimer);
-            this.dismissTimer = setTimeout(() => this.dismissBanner(), 10000);
+            const toastType = isRemoval ? 'warning' : (isRefresh ? 'info' : 'success');
+            const toastTitle = isRemoval
+                ? 'Task Dibatalkan / Dipindahkan'
+                : (isRefresh ? 'Jadwal Task Diperbarui' : 'Task Baru Ditugaskan');
+            const toastDesc = `${event.title}` + (!isRemoval && jadwalLabel ? ` • Jadwal: ${jadwalLabel}` : '');
 
-            // Inject card task baru ke DOM — hanya untuk event 'created'
-            // Untuk reschedule, card sudah ada di DOM (perlu reload untuk update jadwal)
-            if (!isRescheduled) {
+            // Tampilkan notifikasi melayang menggunakan Komponen Toast Global (tampil 15 detik agar teknisi sempat membaca)
+            if (window.Toast) {
+                window.Toast.show(toastType, toastTitle, toastDesc, 15000);
+            }
+
+            if (isRemoval) {
+                this.removeTaskCard(event.id);
+            } else if (isRefresh) {
+                this.refreshTaskCard(event.id);
+                this.scrollToCard(event.id);
+            } else {
                 this.injectTaskCard(event.id);
+                this.scrollToCard(event.id);
             }
         },
 
-        dismissBanner() {
-            this.banner.visible = false;
-            clearTimeout(this.dismissTimer);
-        },
-
-        scrollToCard() {
-            if (!this.banner.taskId) return;
-            const card = document.getElementById(`task-card-${this.banner.taskId}`);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Highlight card sebentar
-                card.style.transition = 'box-shadow 0.3s';
-                card.style.boxShadow = '0 0 0 3px var(--color-primary, #2563eb)';
-                setTimeout(() => { card.style.boxShadow = ''; }, 2000);
-            }
-            this.dismissBanner();
+        scrollToCard(taskId) {
+            if (!taskId) return;
+            setTimeout(() => {
+                const card = document.getElementById(`task-card-${taskId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.transition = 'box-shadow 0.3s, border-color 0.3s';
+                    card.style.boxShadow = '0 0 0 3px var(--color-primary, #2563eb)';
+                    setTimeout(() => { card.style.boxShadow = ''; }, 2500);
+                }
+            }, 300);
         },
 
         async injectTaskCard(taskId) {
             // Cek apakah card sudah ada (mencegah duplikasi jika event diterima dua kali)
             if (document.getElementById(`task-card-${taskId}`)) return;
 
+            const freshCard = await this.fetchCard(taskId);
+            if (!freshCard) return;
+
+            // Dapatkan container task list hari ini
+            let container = document.getElementById('today-task-list');
+
+            if (!container) {
+                // Jika container belum ada (halaman kosong / tidak ada task hari ini),
+                // cari parent wrapper dan buat container baru
+                const emptyState = document.querySelector('[data-empty-tasks]');
+                if (emptyState) {
+                    // Sembunyikan empty state
+                    emptyState.style.display = 'none';
+                }
+                // Buat container baru dan inject sebelum section Mendatang atau di akhir content
+                container = document.createElement('div');
+                container.id = 'today-task-list';
+                container.className = 'space-y-3';
+                // Cari titik sisip di atas section Mendatang
+                const mendatangSection = document.querySelector('[data-section="mendatang"]');
+                const contentWrapper = document.querySelector('.max-w-2xl');
+                if (mendatangSection && contentWrapper) {
+                    contentWrapper.insertBefore(container, mendatangSection);
+                } else if (contentWrapper) {
+                    contentWrapper.appendChild(container);
+                }
+            }
+
+            // Inject card di awal list (task baru tampil di atas)
+            container.insertBefore(freshCard, container.firstChild);
+            this.initAlpineOn(freshCard);
+        },
+
+        // Jadwal task berubah (event_type 'rescheduled') — card yang udah
+        // kelihatan di layar masih nampilin jadwal lama, jadi diganti di
+        // tempat pakai HTML terbaru dari server (satu sumber kebenaran,
+        // gak ngoprek tampilan jadwal di JS). Kalau card belum ada di DOM
+        // (task-nya baru masuk ke "hari ini" gara-gara reschedule), inject
+        // baru — sama kayak event 'created'.
+        async refreshTaskCard(taskId) {
+            const existing = document.getElementById(`task-card-${taskId}`);
+
+            if (!existing) {
+                this.injectTaskCard(taskId);
+                return;
+            }
+
+            const freshCard = await this.fetchCard(taskId);
+            if (!freshCard) return;
+
+            existing.replaceWith(freshCard);
+            this.initAlpineOn(freshCard);
+        },
+
+        // Teknisi dilepas dari tim / task dibatalkan (event_type 'removed'/'cancelled')
+        // — kartu basi harus hilang dari layar, gak ada yang perlu di-fetch dari server.
+        removeTaskCard(taskId) {
+            const card = document.getElementById(`task-card-${taskId}`);
+            if (!card) return;
+
+            const container = card.parentElement;
+            card.remove();
+
+            // Kalau container jadi kosong, munculin lagi empty state (mirror
+            // injectTaskCard yang nyembuniinnya waktu card pertama masuk).
+            if (container && container.id === 'today-task-list' && container.children.length === 0) {
+                const emptyState = document.querySelector('[data-empty-tasks]');
+                if (emptyState) {
+                    emptyState.style.display = '';
+                }
+                container.remove();
+            }
+        },
+
+        async fetchCard(taskId) {
             try {
                 const res = await fetch(`/tasks-saya/partial/${taskId}`, {
                     headers: {
@@ -424,46 +501,24 @@ function technicianNotifier() {
 
                 if (!res.ok) {
                     console.warn(`[technicianNotifier] Gagal fetch card task #${taskId}: HTTP ${res.status}`);
-                    return;
+                    return null;
                 }
 
                 const html = await res.text();
-
-                // Dapatkan container task list hari ini
-                let container = document.getElementById('today-task-list');
-
-                if (!container) {
-                    // Jika container belum ada (halaman kosong / tidak ada task hari ini),
-                    // cari parent wrapper dan buat container baru
-                    const emptyState = document.querySelector('[data-empty-tasks]');
-                    if (emptyState) {
-                        // Sembunyikan empty state
-                        emptyState.style.display = 'none';
-                    }
-                    // Buat container baru dan inject sebelum section Mendatang atau di akhir content
-                    container = document.createElement('div');
-                    container.id = 'today-task-list';
-                    container.className = 'space-y-3';
-                    // Cari titik sisip di atas section Mendatang
-                    const mendatangSection = document.querySelector('[data-section="mendatang"]');
-                    const contentWrapper = document.querySelector('.max-w-2xl');
-                    if (mendatangSection && contentWrapper) {
-                        contentWrapper.insertBefore(container, mendatangSection);
-                    } else if (contentWrapper) {
-                        contentWrapper.appendChild(container);
-                    }
-                }
-
-                // Inject card di awal list (task baru tampil di atas)
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = html.trim();
-                const newCard = wrapper.firstElementChild;
-                if (newCard) {
-                    container.insertBefore(newCard, container.firstChild);
-                }
-
+                return wrapper.firstElementChild;
             } catch (err) {
-                console.error('[technicianNotifier] Error saat inject task card:', err);
+                console.error('[technicianNotifier] Error saat fetch task card:', err);
+                return null;
+            }
+        },
+
+        initAlpineOn(card) {
+            // Card partial bisa berisi komponen Alpine (mis. dialog laporan) —
+            // Alpine gak auto-scan DOM yang di-inject manual lewat innerHTML.
+            if (card && window.Alpine && typeof window.Alpine.initTree === 'function') {
+                window.Alpine.initTree(card);
             }
         },
     };

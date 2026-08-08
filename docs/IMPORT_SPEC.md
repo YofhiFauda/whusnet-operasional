@@ -584,3 +584,31 @@ Modul import dianggap selesai jika:
 * [ ] Import batch tersimpan.
 * [ ] Import error tersimpan.
 * [ ] Data hasil import bisa diedit manual.
+
+---
+
+## Catatan: Scope Lintas Cabang pada Resolusi Invoice (Fix 2026-07-21)
+
+Detail + test regresi: `docs/ANALISA_BUG_LIST_PELANGGAN_DAN_MIGRASI_REQ_ID.md` (Bug #1). Lihat juga
+`docs/LEGACY_MIGRATION_ACCURACY_ANALYSIS.md`.
+
+**Masalah:** nomor legacy (`old_request_id`/`RQ`, `old_invoice_id`/`old_cost_id`/`IDBIAYA`) menomori
+ulang dari 1 di tiap cabang → **tidak unik lintas cabang**. `RQ000005` ada di `jetis_db` (Hanif,
+PE000003) DAN `sand_db` (Eva, PE000005). `CustomerController::resolveLegacyInvoiceId()` dulu
+mencocokkan pembayaran → invoice lewat 3 fallback DB (`old_invoice_id`, `old_cost_id`,
+`old_request_id`+`billing_period`) **tanpa scope pelanggan**. Kalau jetis di-import lebih dulu,
+pembayaran Eva nyangkut ke invoice Hanif → user lapor "penggunannya Hanif Saifulloh".
+
+**Fix:** loop pembayaran meresolusi `paymentCustomerId` (di-scope per cabang) lebih dulu, lalu
+`resolveLegacyInvoiceId(..., $customerId)` membatasi semua fallback DB dengan
+`->where('customer_id', $customerId)`. `old_request_id`/`old_customer_id` tetap disimpan **mentah**
+(jejak legacy) — keunikan dijaga lewat scope query, konsisten dengan `customer_code` yang unique
+per-POP. Pola yang harus dipegang: **setiap `Model::where('kolom_legacy_id', ...)` pada jalur migrasi
+WAJIB di-scope per cabang/pelanggan** — jangan pernah anggap nomor legacy unik global.
+
+Checklist tambahan yang harus lolos:
+
+* [ ] Pembayaran menempel ke invoice **pelanggan yang sama** (bukan cabang lain yang kebetulan
+      nomor legacy-nya sama).
+* [ ] Dua cabang dengan `RQ`/`IDBIAYA` identik tetap menghasilkan pelanggan, invoice, & pembayaran
+      terpisah.

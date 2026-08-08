@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PopSequence extends Model
 {
     public const TYPE_REGISTRATION = 'registration';
+
     public const TYPE_CID = 'cid';
 
     /**

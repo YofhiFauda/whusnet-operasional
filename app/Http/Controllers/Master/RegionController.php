@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\City;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RegionController extends Controller

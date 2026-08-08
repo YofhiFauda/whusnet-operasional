@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FopTask;
+use App\Enums\TaskStatus;
 use App\Models\AuditLog;
+use App\Models\FopTask;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +12,8 @@ use Illuminate\Support\Facades\DB;
 class ResetCancelledFopTasks extends Command
 {
     protected $signature = 'fop:reset-cancelled-tasks';
-    protected $description = 'Reset FOP tasks with status Cancel back to Proses on the next day';
+
+    protected $description = 'Reset FOP tasks with status dibatalkan back to in_progress on the next day';
 
     /**
      * Execute the console command.
@@ -21,12 +23,13 @@ class ResetCancelledFopTasks extends Command
         $today = Carbon::today();
 
         // Query tasks that are Cancelled and the cancel time is before today
-        $tasksToReset = FopTask::where('status', 'Cancel')
+        $tasksToReset = FopTask::where('status', TaskStatus::DIBATALKAN->value)
             ->where('cancelled_at', '<', $today)
             ->get();
 
         if ($tasksToReset->isEmpty()) {
             $this->info('Tidak ada task FOP Cancelled yang perlu di-reset hari ini.');
+
             return 0;
         }
 
@@ -35,7 +38,7 @@ class ResetCancelledFopTasks extends Command
             DB::transaction(function () use ($task, &$count) {
                 $oldValues = $task->load('technicians')->toArray();
 
-                $task->status = 'Proses';
+                $task->status = TaskStatus::IN_PROGRESS->value;
                 $task->cancelled_at = null;
                 $task->pending_reason = null;
                 $task->client_request_date = null;
@@ -51,10 +54,11 @@ class ResetCancelledFopTasks extends Command
                 $count++;
             });
 
-            $this->info("Task FOP {$task->task_number} berhasil di-reset kembali ke status 'Proses'.");
+            $this->info("Task FOP {$task->task_number} berhasil di-reset kembali ke status 'in_progress'.");
         }
 
         $this->info("Berhasil me-reset {$count} task FOP.");
+
         return 0;
     }
 }

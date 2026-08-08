@@ -134,52 +134,52 @@ Do not hardcode values unless a token does not exist yet.
 
 ## 4.1 Color System
 
-The color system uses a modern **Sky Blue** and **Slate Blue-Gray** palette.
+The color system uses a modern **Indigo & Slate** palette designed for enterprise applications.
 
-Slate grays have a subtle blue undertone that harmonizes with the Sky Blue primary color. This creates a more cohesive, premium, and enterprise-grade look compared to pure neutral grays.
+Slate grays have a subtle cool undertone that harmonizes with the Indigo primary color. This creates a cohesive, premium, and enterprise-grade look compared to pure neutral grays.
 
 ### 4.1.1 Core Colors
 
-| Role | Hex | CSS Variable | Usage |
-|---|---:|---|---|
-| Primary | `#0284C7` | `--color-primary` | Main action, active menu, selected state |
-| Primary Hover | `#0369A1` | `--color-primary-hover` | Primary hover state |
-| Primary Soft | `#E0F2FE` | `--color-primary-soft` | Soft selected background |
-| Primary Border | `#BAE6FD` | `--color-primary-border` | Active subtle border |
-| App Background | `#F8FAFC` | `--color-background` | Application body |
-| Surface | `#FFFFFF` | `--color-surface` | Cards, tables, modals, drawers |
-| Surface Muted | `#F1F5F9` | `--color-surface-muted` | Disabled input, subtle sections |
-| Border | `#E2E8F0` | `--color-border` | Default border |
-| Border Strong | `#CBD5E1` | `--color-border-strong` | Strong divider, table header boundary |
-| Text Main | `#0F172A` | `--color-text-main` | Main text, headings |
-| Text Secondary | `#334155` | `--color-text-secondary` | Secondary body text |
-| Text Muted | `#64748B` | `--color-text-muted` | Helper text, placeholders |
-| Text Disabled | `#94A3B8` | `--color-text-disabled` | Disabled text |
-| White | `#FFFFFF` | `--color-white` | Text on dark/primary backgrounds |
+| Role | Light Hex | Dark Hex | CSS Variable | Usage |
+|---|---:|---:|---|---|
+| Primary | `#4F46E5` | `#4F46E5` | `--color-primary` | Main action, active menu, selected state (Indigo/Cobalt) |
+| Primary Hover | `#4338CA` | `#4338CA` | `--color-primary-hover` | Primary hover state |
+| Primary Soft | `#F5F3FF` | `#1E1B4B` | `--color-primary-soft` | Soft selected background |
+| Primary Border | `#C7D2FE` | `#312E81` | `--color-primary-border` | Active subtle border |
+| App Background | `#F8FAFC` | `#090D16` | `--color-background` | Application body |
+| Surface | `#FFFFFF` | `#111827` | `--color-surface` | Cards, tables, modals, drawers |
+| Surface Muted | `#F1F5F9` | `#1F2937` | `--color-surface-muted` | Disabled input, subtle sections |
+| Border | `#E2E8F0` | `#1E293B` | `--color-border` | Default border |
+| Border Strong | `#CBD5E1` | `#334155` | `--color-border-strong` | Strong divider, table header boundary |
+| Text Main | `#0F172A` | `#F8FAFC` | `--color-text-main` | Main text, headings |
+| Text Secondary | `#334155` | `#CBD5E1` | `--color-text-secondary` | Secondary body text |
+| Text Muted | `#64748B` | `#94A3B8` | `--color-text-muted` | Helper text, placeholders |
+| Text Disabled | `#94A3B8` | `#475569` | `--color-text-disabled` | Disabled text |
+| White | `#FFFFFF` | `#FFFFFF` | `--color-white` | Text on dark/primary backgrounds |
 
 ### 4.1.2 Semantic & Telco Alarm Colors
 
-| Role | Text | Background | Border | CSS Variable | Telco Alarm Severity |
-|---|---:|---:|---:|---|---|
-| Success | `#16A34A` | `#F0FDF4` | `#BBF7D0` | `--color-success` | Normal / Cleared |
-| Warning | `#D97706` | `#FFFBEB` | `#FDE68A` | `--color-warning` | Minor / Warning |
-| Error / Danger | `#DC2626` | `#FEF2F2` | `#FECACA` | `--color-error` | Critical / Major |
-| Info | `#0284C7` | `#EFF6FF` | `#BFDBFE` | `--color-info` | Information |
-| Neutral | `#475569` | `#F8FAFC` | `#E2E8F0` | `--color-neutral` | Unknown / Unmanaged |
-| Special | `#7C3AED` | `#F5F3FF` | `#DDD6FE` | `--color-purple` | Isolated / Admin Suspended |
+| Role | Light Text | Light BG | Light Border | Dark Text | Dark BG | Dark Border | CSS Variable | Telco Alarm Severity |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| Success | `#10B981` | `#ECFDF5` | `#A7F3D0` | `#34D399` | `#064E3B` | `#065F46` | `--color-success` | Normal / Cleared |
+| Warning | `#F59E0B` | `#FFFBEB` | `#FDE68A` | `#FBBF24` | `#451A03` | `#78350F` | `--color-warning` | Minor / Warning |
+| Error / Danger| `#EF4444` | `#FEF2F2` | `#FEE2E2` | `#F87171` | `#450A0A` | `#7F1D1D` | `--color-error` | Critical / Major |
+| Info | `#2563EB` | `#EFF6FF` | `#DBEAFE` | `#60A5FA` | `#172554` | `#1E3A8A` | `--color-info` | Information |
+| Neutral | `#64748B` | `#F8FAFC` | `#E2E8F0` | `#94A3B8` | `#090D16` | `#1E293B` | `--color-neutral` | Unknown / Unmanaged |
+| Special | `#7C3AED` | `#F5F3FF` | `#DDD6FE` | `#A78BFA` | `#2E1065` | `#4C1D95` | `--color-purple` | Isolated / Admin Suspended |
 
 ### 4.1.3 Telco Operational Status Colors
 
 Use semantic colors consistently for ISP/Telco operational states.
 
-| Status | Text Color | Background | Meaning |
-|---|---:|---:|---|
-| Active / Paid / Online | `#16A34A` | `#F0FDF4` | Service is up, paid, healthy |
-| Pre-active / Provisioning | `#0284C7` | `#E0F2FE` | Being configured, in progress |
-| Pending / Scheduled | `#D97706` | `#FFFBEB` | Awaiting action, installation scheduled |
-| Overdue / LOS (Loss of Signal) | `#DC2626` | `#FEF2F2` | Late payment, physical network down, critical |
-| Isolated / Suspended | `#7C3AED` | `#F5F3FF` | Soft-blocked due to billing or admin action |
-| Terminated / Churned | `#475569` | `#F8FAFC` | Service ended, inactive |
+| Status | Light Text | Light BG | Dark Text | Dark BG | Meaning |
+|---|---:|---:|---:|---:|---|
+| Active / Paid / Online | `#10B981` | `#ECFDF5` | `#34D399` | `#064E3B` | Service is up, paid, healthy |
+| Pre-active / Provisioning | `#2563EB` | `#EFF6FF` | `#60A5FA` | `#172554` | Being configured, in progress |
+| Pending / Scheduled | `#F59E0B` | `#FFFBEB` | `#FBBF24` | `#451A03` | Awaiting action, installation scheduled |
+| Overdue / LOS (Loss of Signal) | `#EF4444` | `#FEF2F2` | `#F87171` | `#450A0A` | Late payment, physical network down, critical |
+| Isolated / Suspended | `#7C3AED` | `#F5F3FF` | `#A78BFA` | `#2E1065` | Soft-blocked due to billing or admin action |
+| Terminated / Churned | `#64748B` | `#F8FAFC` | `#94A3B8` | `#0F172A` | Service ended, inactive |
 
 ### 4.1.4 Color Rules
 
@@ -576,7 +576,7 @@ export default {
 
 ### Dark Mode Rules
 
-- Primary color `#0284C7` tetap digunakan di dark mode untuk konsistensi aksi.
+- Primary color `#4F46E5` tetap digunakan di dark mode untuk konsistensi aksi.
 - Semantic badge color (text) tetap sama; hanya background dan border yang berubah.
 - Chart color tokens tidak berubah di dark mode — kontras alami sudah memadai.
 - Gambar atau ilustrasi yang memiliki background putih solid harus diberi `filter: brightness(0.9)` di dark mode agar tidak terlalu menyilaukan.
@@ -591,10 +591,10 @@ Use this as the base token system.
 ```css
 :root {
   /* Colors */
-  --color-primary: #0284C7;
-  --color-primary-hover: #0369A1;
-  --color-primary-soft: #E0F2FE;
-  --color-primary-border: #BAE6FD;
+  --color-primary: #4F46E5;
+  --color-primary-hover: #4338CA;
+  --color-primary-soft: #F5F3FF;
+  --color-primary-border: #C7D2FE;
 
   --color-background: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -609,21 +609,21 @@ Use this as the base token system.
   --color-text-disabled: #94A3B8;
   --color-white: #FFFFFF;
 
-  --color-success: #16A34A;
-  --color-success-bg: #F0FDF4;
-  --color-success-border: #BBF7D0;
+  --color-success: #10B981;
+  --color-success-bg: #ECFDF5;
+  --color-success-border: #A7F3D0;
 
-  --color-warning: #D97706;
+  --color-warning: #F59E0B;
   --color-warning-bg: #FFFBEB;
   --color-warning-border: #FDE68A;
 
-  --color-error: #DC2626;
+  --color-error: #EF4444;
   --color-error-bg: #FEF2F2;
-  --color-error-border: #FECACA;
+  --color-error-border: #FEE2E2;
 
-  --color-info: #0284C7;
+  --color-info: #2563EB;
   --color-info-bg: #EFF6FF;
-  --color-info-border: #BFDBFE;
+  --color-info-border: #DBEAFE;
 
   /* Typography */
   --font-ui: 'Inter', sans-serif;
@@ -678,28 +678,27 @@ Use this as the base token system.
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Dark Mode Override — lihat Section 4.12 untuk token lengkap */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: #0F172A;
-    --color-surface: #1E293B;
-    --color-surface-muted: #334155;
-    --color-border: #334155;
-    --color-border-strong: #475569;
-    --color-text-main: #F1F5F9;
+    --color-background: #090D16;
+    --color-surface: #111827;
+    --color-surface-muted: #1F2937;
+    --color-border: #1E293B;
+    --color-border-strong: #334155;
+    --color-text-main: #F8FAFC;
     --color-text-secondary: #CBD5E1;
     --color-text-muted: #94A3B8;
     --color-text-disabled: #475569;
-    --color-primary-soft: #0C2A3D;
-    --color-primary-border: #164B6D;
-    --color-success-bg: #052E16;
-    --color-success-border: #14532D;
-    --color-warning-bg: #2D1B00;
-    --color-warning-border: #713F12;
-    --color-error-bg: #2D0A0A;
+    --color-primary-soft: #1E1B4B;
+    --color-primary-border: #312E81;
+    --color-success-bg: #064E3B;
+    --color-success-border: #065F46;
+    --color-warning-bg: #451A03;
+    --color-warning-border: #78350F;
+    --color-error-bg: #450A0A;
     --color-error-border: #7F1D1D;
-    --color-info-bg: #0A1929;
-    --color-info-border: #0C3054;
+    --color-info-bg: #172554;
+    --color-info-border: #1E3A8A;
   }
 }
 ```

@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Distribution;
 use App\Models\Pop;
+use App\Services\EffectiveAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class DistributionController extends Controller
 {
@@ -21,12 +22,13 @@ class DistributionController extends Controller
         $pop_id = $request->query('pop_id');
 
         $distributions = Distribution::query()
+            ->applyUserScope()
             ->with('pop')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('code', 'like', "%{$search}%")
-                      ->orWhere('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->when($pop_id, function ($query) use ($pop_id) {
@@ -36,7 +38,11 @@ class DistributionController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $pops = Pop::where('status', 'active')->orderBy('name')->get();
+        // Dropdown filter WAJIB dari Pop::forUser(), bukan Pop::where('status','active')
+        // biasa — kalau enggak, user ber-scope selected_pop/pop_tree bisa pilih
+        // filter ke POP di luar cakupannya (gak bocor data, tapi bikin UI nawarin
+        // pilihan yang percuma). Lihat docs/plan/analisa-celah-scope-pop.md temuan #10.
+        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
 
         return view('master.distribusi.index', compact('distributions', 'search', 'pop_id', 'pops'));
     }
@@ -46,7 +52,7 @@ class DistributionController extends Controller
      */
     public function create(): View
     {
-        $pops = Pop::where('status', 'active')->orderBy('name')->get();
+        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
 
         return view('master.distribusi.create', compact('pops'));
     }
@@ -84,7 +90,9 @@ class DistributionController extends Controller
      */
     public function edit(Distribution $distribusi): View
     {
-        $pops = Pop::where('status', 'active')->orderBy('name')->get();
+        $this->authorizeDistributionPopScope($distribusi);
+
+        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
 
         return view('master.distribusi.edit', compact('distribusi', 'pops'));
     }
@@ -94,6 +102,7 @@ class DistributionController extends Controller
      */
     public function update(Request $request, Distribution $distribusi): RedirectResponse
     {
+        $this->authorizeDistributionPopScope($distribusi);
         $this->normalizeInput($request);
 
         $validated = $request->validate([
@@ -122,6 +131,8 @@ class DistributionController extends Controller
      */
     public function destroy(Distribution $distribusi): RedirectResponse
     {
+        $this->authorizeDistributionPopScope($distribusi);
+
         // Optional: Check if there are related customers before deleting
         // if ($distribusi->customers()->exists()) { ... }
 
@@ -130,6 +141,28 @@ class DistributionController extends Controller
         return redirect()
             ->route('master.distribusi.index')
             ->with('success', 'Distribusi berhasil dihapus.');
+    }
+
+    /**
+     * Guard per-record — index() sudah di-scope applyUserScope(), tapi
+     * edit/update/destroy diakses langsung lewat ID. Tanpa ini user ber-scope
+     * selected_pop/pop_tree bisa ubah/hapus distribusi POP lain lewat URL
+     * langsung (lihat docs/plan/analisa-celah-scope-pop.md temuan #10).
+     */
+    private function authorizeDistributionPopScope(Distribution $distribusi): void
+    {
+        $access = app(EffectiveAccessService::class);
+        $user = auth()->user();
+
+        if ($access->hasAllPopAccess($user)) {
+            return;
+        }
+
+        abort_unless(
+            in_array((int) $distribusi->pop_id, $access->getAllowedPopIds($user), true),
+            403,
+            'Anda tidak memiliki akses ke Distribusi di POP ini.'
+        );
     }
 
     private function normalizeInput(Request $request): void

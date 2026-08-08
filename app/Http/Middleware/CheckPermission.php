@@ -11,16 +11,16 @@ class CheckPermission
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next, string $permission): Response
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             abort(403, 'Unauthorized action.');
         }
 
         $user = auth()->user();
-        
+
         // Support full-access bypass
         if ($user->hasPermission('*')) {
             return $next($request);
@@ -28,7 +28,7 @@ class CheckPermission
 
         // Support multi-permission OR logic via pipe separator (e.g. 'customers.view|customers.create')
         $permissions = explode('|', $permission);
-        
+
         foreach ($permissions as $perm) {
             // Check via EffectiveAccessService
             if ($user->hasPermission(trim($perm))) {

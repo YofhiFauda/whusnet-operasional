@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
@@ -12,6 +13,7 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -47,7 +49,7 @@ class PaymentAuditLogTest extends TestCase
             'payment_method' => 'cash',
             'amount' => 75000,
             'received_by' => $owner->id,
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
             'note' => 'Pembayaran awal.',
         ]);
 
@@ -66,7 +68,7 @@ class PaymentAuditLogTest extends TestCase
 
         $this->assertNull($createLog->old_values);
         $this->assertSame('PAY-202606-8801', $createLog->new_values['payment_number']);
-        $this->assertSame('pending', $createLog->new_values['payment_status']);
+        $this->assertSame('valid', $createLog->new_values['payment_status']);
         $this->assertNotNull($createLog->created_at);
 
         $payment->update([
@@ -93,7 +95,7 @@ class PaymentAuditLogTest extends TestCase
             ->where('action', 'cancel')
             ->firstOrFail();
 
-        $this->assertSame('pending', $cancelLog->old_values['payment_status']);
+        $this->assertSame('valid', $cancelLog->old_values['payment_status']);
         $this->assertSame('ditolak', $cancelLog->new_values['payment_status']);
     }
 
@@ -104,6 +106,11 @@ class PaymentAuditLogTest extends TestCase
         $adminPusat = User::factory()->create([
             'role_id' => $adminPusatRole->id,
             'status' => 'active',
+        ]);
+        UserRoleScope::create([
+            'user_id' => $adminPusat->id,
+            'role_id' => $adminPusatRole->id,
+            'scope_type' => ScopeType::ALL_POP,
         ]);
 
         $pop = $this->createPop('POP-PAY-AUDIT-VIEW', 'PPV', 'POP Payment Audit View');
@@ -154,11 +161,9 @@ class PaymentAuditLogTest extends TestCase
         $customer = Customer::create([
             'customer_code' => str_replace('INV', 'C', $invoiceNumber),
             'full_name' => $customerName,
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'internet_package_id' => $this->package->id,
@@ -192,6 +197,7 @@ class PaymentAuditLogTest extends TestCase
 
         return Invoice::create([
             'invoice_number' => $invoiceNumber,
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

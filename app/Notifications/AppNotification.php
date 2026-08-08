@@ -2,20 +2,26 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Enums\NotificationType;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
-class AppNotification extends Notification implements ShouldQueue
+/**
+ * SENGAJA bukan ShouldQueue (`docs/plan/analisa-status-implementasi-
+ * notifikasi.md` §6.3/§8) — sebelumnya lewat queue, kalau Horizon down/
+ * nge-hang notifikasi ketunda diam-diam tanpa alert ke siapa pun. Volume
+ * per panggilan kecil (database insert + 1 broadcast event per penerima,
+ * bukan API eksternal), jadi kirim sinkron di request/command yang manggil
+ * lebih murah ketimbang ketergantungan availability queue worker buat fitur
+ * yang butuh sampai SEKARANG (lonceng notifikasi), bukan nanti.
+ */
+class AppNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public readonly string $title,
         public readonly string $message,
         public readonly ?string $actionUrl = null,
-        public readonly string $type = 'info'
+        public readonly NotificationType $type = NotificationType::INFO
     ) {}
 
     public function via(object $notifiable): array
@@ -29,7 +35,7 @@ class AppNotification extends Notification implements ShouldQueue
             'title' => $this->title,
             'message' => $this->message,
             'action_url' => $this->actionUrl,
-            'type' => $this->type,
+            'type' => $this->type->value,
         ];
     }
 
@@ -40,7 +46,7 @@ class AppNotification extends Notification implements ShouldQueue
             'title' => $this->title,
             'message' => $this->message,
             'action_url' => $this->actionUrl,
-            'type' => $this->type,
+            'type' => $this->type->value,
             'created_at' => now()->toIso8601String(),
             'read_at' => null,
         ]);

@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
-use App\Models\Permission;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -21,6 +23,8 @@ class PopCRUDTest extends TestCase
         parent::setUp();
 
         // Seed roles and permissions
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
@@ -74,6 +78,7 @@ class PopCRUDTest extends TestCase
             'role_id' => $csRole->id,
             'status' => 'active',
         ]);
+        $this->giveAllPopScope($user);
 
         $this->actingAs($user);
 
@@ -210,7 +215,7 @@ class PopCRUDTest extends TestCase
 
         $response = $this->put("/master/pop/{$cabang->id}", $updateData);
         $response->assertRedirect('/master/pop');
-        
+
         $this->assertDatabaseHas('pops', [
             'id' => $cabang->id,
             'code' => 'CBG-SLM-REV',
@@ -221,7 +226,7 @@ class PopCRUDTest extends TestCase
         // 8. Toggle status to inactive
         $response = $this->post("/master/pop/{$cabang->id}/toggle");
         $response->assertSessionHas('success');
-        
+
         $this->assertDatabaseHas('pops', [
             'id' => $cabang->id,
             'status' => 'inactive',

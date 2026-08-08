@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHUSNET - Worksheet Helpdesk NOC</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        whus: {
+                            bg: '#0a0f1d',
+                            card: '#111827',
+                            sidebar: '#0d1322',
+                            border: '#1f293d',
+                            borderLight: '#2d3748',
+                            accent: '#2563eb',
+                            hover: '#1e293b',
+                            textMuted: '#94a3b8',
+                            textDark: '#cbd5e1',
+                            excelGreen: '#107c41',
+                            excelHeader: '#162238'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0f1d;
+            color: #f1f5f9;
+        }
+
+        /* Custom Scrollbar for Excel Grid */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1322;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #233044;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        /* Excel Grid Specific Styles */
+        .excel-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .excel-table th {
+            background-color: #162238;
+            border-right: 1px solid #233044;
+            border-bottom: 2px solid #233044;
+            user-select: none;
+        }
+        .excel-table td {
+            border-right: 1px solid #1f293d;
+            border-bottom: 1px solid #1f293d;
+            position: relative;
+        }
+        .excel-row-num {
+            background-color: #111827;
+            color: #64748b;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border-right: 1px solid #233044;
+            user-select: none;
+        }
+
+        /* Drawer Slide-in Animation Helper */
+        .drawer-open {
+            transform: translateX(0) !important;
+        }
+        .backdrop-open {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col text-sm text-slate-200">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <header class="h-14 bg-whus-sidebar border-b border-whus-border flex items-center justify-between px-4 z-30 shrink-0">
+        <!-- Left Brand & Search -->
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-600/30">
+                    <i class="fa-solid fa-wifi text-sm"></i>
+                </div>
+                <span class="font-bold text-lg tracking-wider text-white">WHUSNET</span>
+            </div>
+
+            <button id="toggleSidebarMobile" class="lg:hidden text-slate-400 hover:text-white p-1">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+
+            <!-- Breadcrumb Navigation -->
+            <div class="hidden md:flex items-center space-x-2 text-xs text-slate-400 pl-4 border-l border-whus-border">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                <span id="breadcrumbCurrent" class="text-blue-400 font-medium">Worksheet Helpdesk — Excel Mode</span>
+            </div>
+        </div>
+
+        <!-- Global Search Bar -->
+        <div class="hidden md:flex items-center flex-1 max-w-md mx-6">
+            <div class="relative w-full">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                <input type="text" id="globalSearchInput" placeholder="Cari pelanggan, CID, invoice, tiket, IP..." 
+                    class="w-full bg-[#131b2e] border border-whus-border rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all">
+                <kbd class="absolute right-2.5 top-2 text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">/</kbd>
+            </div>
+        </div>
+
+        <!-- Right System Controls & User -->
+        <div class="flex items-center space-x-3">
+            <button class="w-8 h-8 rounded-lg bg-[#131b2e] border border-whus-border text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+                <i class="fa-regular fa-sun"></i>
+            </button>
+            <button class="w-8 h-8 rounded-lg bg-[#131b2e] border border-whus-border text-slate-400 hover:text-white flex items-center justify-center relative transition-colors">
+                <i class="fa-regular fa-bell"></i>
+                <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500"></span>
+            </button>
+
+            <!-- User Info Badge -->
+            <div class="flex items-center space-x-2 pl-2 border-l border-whus-border">
+                <div class="w-8 h-8 rounded-lg bg-blue-900/60 border border-blue-500/30 text-blue-300 font-bold flex items-center justify-center text-xs">
+                    SU
+                </div>
+                <div class="hidden lg:block text-left">
+                    <p class="text-xs font-semibold leading-tight text-slate-200">Super Admin (Owner)</p>
+                    <p class="text-[10px] text-slate-400">29 Juli 2026, 08:24 WIB</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Sidebar Navigation -->
+        <aside id="mainSidebar" class="w-56 bg-whus-sidebar border-r border-whus-border flex flex-col shrink-0 transition-all duration-300 z-20">
+            <div class="p-3 overflow-y-auto flex-1 space-y-6">
+                <!-- Group 1: Operational -->
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-3">Operasional</span>
+                    <nav class="mt-2 space-y-1">
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg transition-colors">
+                            <i class="fa-solid fa-chart-pie w-5 text-slate-500"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg transition-colors">
+                            <i class="fa-solid fa-users w-5 text-slate-500"></i>
+                            <span>Pelanggan</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg transition-colors">
+                            <i class="fa-solid fa-receipt w-5 text-slate-500"></i>
+                            <span>Tagihan</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg transition-colors">
+                            <i class="fa-solid fa-wallet w-5 text-slate-500"></i>
+                            <span>Pembayaran</span>
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- Group 2: Jaringan & Lapangan -->
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-3">Jaringan & Lapangan</span>
+                    <nav class="mt-2 space-y-1">
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg transition-colors">
+                            <i class="fa-solid fa-calendar-days w-5 text-slate-500"></i>
+                            <span>Penjadwalan Teknis</span>
+                        </a>
+                        <div class="space-y-1">
+                            <button class="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-blue-400 bg-blue-950/40 border border-blue-800/40 rounded-lg">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-headset w-5 text-blue-400"></i>
+                                    <span>Ticketing</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                            </button>
+                            <div class="pl-6 space-y-1 py-1">
+                                <a href="javascript:void(0)" onclick="openCreateTicketFormInExcel()" class="block py-1.5 px-3 text-xs text-blue-400 font-semibold bg-blue-500/10 rounded-md border-l-2 border-blue-500">New Ticket</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Worksheet NOC</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Dashboard NOC</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Ticket Selesai</a>
+                                <a href="javascript:void(0)" class="block py-1.5 px-3 text-xs text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-md">Ticket Dibatalkan</a>
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+
+                <!-- Group 3: Laporan -->
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-3">Laporan</span>
+                    <nav class="mt-2 space-y-1">
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-chart-line w-5 text-slate-500"></i>
+                            <span>Laporan Keuangan</span>
+                        </a>
+                        <a href="#" class="flex items-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-whus-hover rounded-lg">
+                            <i class="fa-solid fa-shield-halved w-5 text-slate-500"></i>
+                            <span>Audit Log</span>
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Sidebar Footer User Card -->
+            <div class="p-3 border-t border-whus-border">
+                <div class="p-2.5 rounded-xl bg-[#131b2e] border border-whus-border flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                            SU
+                        </div>
+                        <div class="overflow-hidden">
+                            <p class="text-xs font-semibold text-slate-200 truncate">Super Admin</p>
+                            <p class="text-[10px] text-slate-400 truncate">superadmin@whusnet.com</p>
+                        </div>
+                    </div>
+                    <button class="text-slate-500 hover:text-rose-400 transition-colors">
+                        <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex overflow-hidden relative">
+
+            <!-- SECTION B: EXCEL WORKSHEET GRID MODE (PENGGANTI MANUAL EXCEL) -->
+            <div id="viewExcelContainer" class="flex-1 flex flex-col overflow-hidden bg-[#0a0f1d]">
+                
+                <!-- Excel Toolbar Bar -->
+                <div class="bg-[#111827] border-b border-whus-border p-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-emerald-700/20 text-emerald-400 border border-emerald-600/40 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-file-excel text-emerald-500 text-sm"></i>
+                            <span>NOC WORKSHEET SPREADSHEET</span>
+                        </div>
+                        <span class="text-xs text-slate-400 hidden sm:inline">&bull; Klik ID Tiket atau Baris untuk membuka Detail Drawer</span>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button onclick="toggleExcelCreateDrawer()" id="excelCreateDrawerToggleBtn" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus-circle text-xs"></i>
+                            <span>+ Create Service Ticket</span>
+                        </button>
+                        <button onclick="addNewExcelRow()" class="px-3 py-1.5 bg-emerald-700/40 hover:bg-emerald-600 text-emerald-200 border border-emerald-600/50 rounded-lg text-xs font-medium transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-table-cells text-[10px]"></i>
+                            <span>Tambah Baris Kosong</span>
+                        </button>
+                        <button onclick="exportExcelToCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-medium transition-all flex items-center gap-1">
+                            <i class="fa-solid fa-download text-[10px]"></i>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- INTEGRATED EXCEL CREATE SERVICE TICKET PANEL / DRAWER -->
+                <div id="excelCreateTicketDrawer" class="bg-[#111827] border-b-2 border-blue-600/60 p-4 shadow-2xl space-y-4 shrink-0 transition-all duration-300">
+                    <div class="flex items-center justify-between border-b border-whus-border pb-2.5">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                                <i class="fa-solid fa-file-circle-plus text-xs"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xs font-bold text-white tracking-wide uppercase">CREATE SERVICE TICKET (EXCEL MODE)</h2>
+                                <p class="text-[10px] text-slate-400">Input data tiket baru & otomatis sinkron ke baris teratas Spreadsheet Worksheet NOC</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 text-[10px] font-mono bg-blue-900/40 text-blue-300 border border-blue-700/50 rounded">AUTO-ASSIGN NEXT: TKT-2026-0007</span>
+                            <button onclick="toggleExcelCreateDrawer()" class="text-slate-400 hover:text-white p-1">
+                                <i class="fa-solid fa-xmark text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="excelCreateTicketForm" onsubmit="handleExcelCreateTicket(event)" class="space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <!-- Field 1: Classification -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">
+                                    TICKET TYPE <span class="text-rose-400">*</span>
+                                </label>
+                                <select id="excelFormType" required class="w-full bg-[#1a2438] border border-whus-border rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                    <option value="">-- Tipe Tiket --</option>
+                                    <option value="Backbone CUT">Backbone CUT (FO Putus Utama)</option>
+                                    <option value="MTN - Maintenance">MTN - Maintenance Jaringan</option>
+                                    <option value="LOS / Red Light">LOS / Red Light (Fiber Cut Pelanggan)</option>
+                                    <option value="Lemot / Slow Speed">Lemot / High Latency</option>
+                                    <option value="Konfigurasi Router">Konfigurasi Router / Wi-Fi</option>
+                                </select>
+                            </div>
+
+                            <!-- Field 2: Priority -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">
+                                    PRIORITAS <span class="text-rose-400">*</span>
+                                </label>
+                                <select id="excelFormPriority" required class="w-full bg-[#1a2438] border border-whus-border rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                    <option value="High">High (Kritis / FO Putus)</option>
+                                    <option value="Medium" selected>Medium (Maintenance / Lemot)</option>
+                                    <option value="Low">Low (Informational)</option>
+                                </select>
+                            </div>
+
+                            <!-- Field 3: Customer Search -->
+                            <div class="md:col-span-2 relative">
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">
+                                    CARI PELANGGAN (CID / NAMA) <span class="text-rose-400">*</span>
+                                </label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-500 text-xs"></i>
+                                    <input type="text" id="excelCustomerSearchInput" placeholder="Ketik Nama / CID (misal: Hanif, Affifta)..." 
+                                        autocomplete="off"
+                                        oninput="onExcelCustomerSearchInput(this.value)"
+                                        class="w-full bg-[#1a2438] border border-whus-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono">
+                                    
+                                    <div id="excelCustomerSearchSuggestions" class="hidden absolute top-full left-0 right-0 mt-1 bg-[#131b2e] border border-whus-border rounded-lg shadow-2xl max-h-40 overflow-y-auto z-50"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Customer Technical Snapshot Bar in Excel Panel -->
+                        <div id="excelCustomerSnapshotBar" class="hidden bg-[#0a0f1d] border border-whus-border rounded-lg p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                            <div>
+                                <span class="text-[9px] text-slate-500 uppercase font-bold block">Pelanggan</span>
+                                <span id="exSnapName" class="font-bold text-slate-200 truncate block">—</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-500 uppercase font-bold block">CID / Phone</span>
+                                <span id="exSnapCidPhone" class="font-mono text-blue-400 font-semibold block">—</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-500 uppercase font-bold block">POP / Cabang</span>
+                                <span id="exSnapPop" class="text-slate-300 block">—</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-500 uppercase font-bold block">Paket / ODP</span>
+                                <span id="exSnapPackageOdp" class="text-emerald-400 font-semibold block truncate">—</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-500 uppercase font-bold block">Perangkat</span>
+                                <span id="exSnapOnt" class="font-mono text-slate-300 truncate block">—</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Complaint -->
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">
+                                    DETAIL KELUHAN (CUSTOMER COMPLAINT) <span class="text-rose-400">*</span>
+                                </label>
+                                <input type="text" id="excelFormComplaint" required placeholder="Tuliskan keluhan pelanggan secara rinci..." 
+                                    class="w-full bg-[#1a2438] border border-whus-border rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono">
+                            </div>
+
+                            <!-- Initial NOC Note -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">CATATAN INITIAL NOC</label>
+                                <input type="text" id="excelFormNocNotes" placeholder="Catatan analisa Helpdesk / NOC..." 
+                                    class="w-full bg-[#1a2438] border border-whus-border rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono">
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center justify-end space-x-2 pt-1">
+                            <button type="button" onclick="toggleExcelCreateDrawer()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium">
+                                Batal
+                            </button>
+                            <button type="submit" class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-1.5">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                                <span>SIMPAN KE SPREADSHEET (Ctrl+Enter)</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Excel Grid Main Table View (Clean Spreadsheet without Action Column) -->
+                <div class="flex-1 overflow-auto relative">
+                    <table class="w-full text-left border-collapse excel-table">
+                        <thead>
+                            <tr class="text-[11px] text-slate-300 uppercase tracking-wider sticky top-0 z-10">
+                                <th class="w-10 px-2 py-2 text-center bg-[#162238]">#</th>
+                                <th class="w-36 px-3 py-2 bg-[#162238]">ID TIKET</th>
+                                <th class="w-48 px-3 py-2 bg-[#162238]">PELANGGAN / CID</th>
+                                <th class="w-44 px-3 py-2 bg-[#162238]">TIPE / KATEGORI</th>
+                                <th class="w-28 px-3 py-2 bg-[#162238]">PRIORITAS</th>
+                                <th class="w-36 px-3 py-2 bg-[#162238]">POP / CABANG</th>
+                                <th class="w-72 px-3 py-2 bg-[#162238]">DETAIL KELUHAN</th>
+                                <th class="w-64 px-3 py-2 bg-[#162238]">CATATAN NOC INITIAL</th>
+                                <th class="w-36 px-3 py-2 bg-[#162238]">STATUS TIKET</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excelGridTbody" class="font-mono text-xs">
+                            <!-- Dynamic Excel Grid Rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Excel Status Bar Footer -->
+                <div class="h-8 bg-[#0e1424] border-t border-whus-border px-4 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check text-[10px] mr-1"></i> READY</span>
+                        <span id="excelRowCountLabel">Total Baris: 3 Tiket</span>
+                        <span>Shortcut: [Klik ID Tiket] untuk membuka Detail Drawer &bull; [Double Click Cell] untuk edit langsung</span>
+                    </div>
+                    <div>
+                        <span>Auto-Saved Local Worksheet &bull; WHUSNET Helpdesk NOC v3.2</span>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- SECTION C: TICKET DETAIL SLIDING SIDE DRAWER & BACKDROP -->
+            
+            <!-- Backdrop Overlay -->
+            <div id="ticketDetailBackdrop" onclick="closeTicketDetailDrawer()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 transition-opacity duration-300 opacity-0 pointer-events-none"></div>
+
+            <!-- Right Side Sliding Drawer Panel -->
+            <div id="ticketDetailDrawer" class="fixed top-0 right-0 h-full w-full max-w-2xl bg-[#0f172a] border-l border-whus-border shadow-2xl z-50 transition-transform duration-300 transform translate-x-full flex flex-col overflow-hidden">
+                
+                <!-- Drawer Header -->
+                <div class="p-4 bg-[#111827] border-b border-whus-border flex items-center justify-between shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                            <i class="fa-solid fa-receipt text-base"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <h2 id="dtTicketId" class="text-base font-bold text-blue-400 font-mono tracking-wide">TKT-2026-0006</h2>
+                                <span id="dtPriorityBadge" class="px-2 py-0.5 text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded">Prioritas: High</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">DETAIL TIKET HELPDESK & ROUTING NOC</p>
+                        </div>
+                    </div>
+
+                    <button onclick="closeTicketDetailDrawer()" class="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+
+                <!-- Drawer Scrollable Body -->
+                <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+                    
+                    <!-- Status & Quick Meta Info Banner -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 shadow-md space-y-3">
+                        <div class="flex items-center justify-between border-b border-whus-border pb-2.5">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-semibold text-slate-400">Status Saat Ini:</span>
+                                <span id="dtStatusBadge" class="px-2.5 py-0.5 text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">Ditangani Helpdesk</span>
+                            </div>
+                            <span id="dtTicketTypeBadge" class="px-2.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded">MTN - Maintenance</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 pt-1">
+                            <div>
+                                <span class="block text-[10px] text-slate-500 uppercase font-semibold">Dibuat Oleh</span>
+                                <span id="dtAssignedBy" class="text-slate-200 font-medium">Super Admin (Owner)</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] text-slate-500 uppercase font-semibold">Waktu Pembuatan</span>
+                                <span id="dtCreatedTime" class="text-slate-200 font-medium">28 Juli 2026, 16.28 WIB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Ticket Routing Toolbar inside Drawer -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 shadow-md">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-2.5 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                            AKSI ROUTING TIKET
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button onclick="actionUpdateDetailStatus('SELESAI')" class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-check text-xs"></i>
+                                <span>Selesai</span>
+                            </button>
+                            <button onclick="actionUpdateDetailStatus('NOC')" class="py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition-all flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-network-wired text-xs"></i>
+                                <span>Assign NOC</span>
+                            </button>
+                            <button onclick="actionUpdateDetailStatus('FOP')" class="py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-user-gear text-xs"></i>
+                                <span>Assign FOP</span>
+                            </button>
+                            <button onclick="actionUpdateDetailStatus('BATAL')" class="py-2 px-3 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                                <span>Batalkan</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Customer Technical Snapshot Card -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 shadow-md space-y-3">
+                        <div class="flex items-center justify-between border-b border-whus-border pb-2">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-user-gear text-xs"></i>
+                                <span>CUSTOMER TECHNICAL SNAPSHOT</span>
+                            </h3>
+                            <span class="text-[9px] text-slate-500">HISTORICAL DATA</span>
+                        </div>
+
+                        <div class="bg-[#0e1424] border border-whus-border rounded-lg overflow-hidden">
+                            <div class="grid grid-cols-2 border-b border-whus-border">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Customer Name</span>
+                                    <span id="dtCustomerName" class="text-xs font-semibold text-slate-100 mt-0.5 block">Moch Hanif Asrofi</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">CID Number</span>
+                                    <span id="dtSnapCid" class="text-xs font-bold text-blue-400 font-mono mt-0.5 block">C1X4ARQ080723</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 border-b border-whus-border">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Phone / HP</span>
+                                    <span id="dtSnapPhone" class="text-xs font-semibold text-slate-200 mt-0.5 block">6283159938480</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Active Package</span>
+                                    <span id="dtSnapPackage" class="text-xs font-semibold text-emerald-400 mt-0.5 block">Barbar UpTo 7M</span>
+                                </div>
+                            </div>
+
+                            <div class="p-2.5 border-b border-whus-border">
+                                <span class="block text-[10px] font-bold text-slate-500 uppercase">Site Address</span>
+                                <span id="dtSnapAddress" class="text-xs text-slate-300 mt-0.5 block">Dukuh Karanglo, RT 02/ RW 01, Ds Ngasinan Jetis</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 border-b border-whus-border">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">POP / Cabang</span>
+                                    <span id="dtCustomerPop" class="text-xs text-slate-200 mt-0.5 block">Jetis</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">ODP Port</span>
+                                    <span id="dtSnapOdp" class="text-xs text-slate-200 mt-0.5 block">Odp 4 JTK00</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 bg-[#0a0f1d]/50">
+                                <div class="p-2.5 border-r border-whus-border">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">Perangkat Pelanggan</span>
+                                    <span id="dtSnapOnt" class="text-xs text-slate-300 mt-0.5 block font-mono">ZTE F660 - V8</span>
+                                </div>
+                                <div class="p-2.5">
+                                    <span class="block text-[10px] font-bold text-slate-500 uppercase">GPS Coordinates</span>
+                                    <span id="dtSnapGps" class="text-xs text-blue-400 font-mono mt-0.5 block flex items-center gap-1">
+                                        <i class="fa-solid fa-location-dot text-rose-500 text-[10px]"></i>
+                                        <span>-7.9539520, 111.4712500</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Issue & NOC Technical Assessment -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 shadow-md space-y-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 border-b border-whus-border pb-2">ISSUE & NOC TECHNICAL ASSESSMENT</h3>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">DETAIL KELUHAN (CUSTOMER COMPLAINT)</label>
+                            <div id="dtComplaintText" class="p-3 bg-[#0e1424] border border-whus-border rounded-lg text-xs font-mono text-slate-200 min-h-[50px]">
+                                Backbone CUT pada jalur utama ODP Jetis
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">CATATAN TEKNIS (INITIAL NOC NOTES)</label>
+                            <div id="dtNocNotesText" class="p-3 bg-[#0e1424] border border-whus-border rounded-lg text-xs font-mono text-slate-300 italic min-h-[40px]">
+                                Opmeter loss -30dB, butuh splicing ulang.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History Audit Logs -->
+                    <div class="bg-whus-card border border-whus-border rounded-xl p-4 shadow-md space-y-3">
+                        <h3 class="text-xs font-bold uppercase text-slate-200 border-b border-whus-border pb-2">RIWAYAT TICKETING & AUDIT</h3>
+                        <div class="space-y-2 text-xs">
+                            <div class="p-2.5 bg-[#0e1424] border border-whus-border rounded-lg flex items-center justify-between">
+                                <div>
+                                    <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-semibold text-[10px]">Ticket Created</span>
+                                    <p class="text-slate-300 font-medium mt-1">Super Admin (Owner)</p>
+                                </div>
+                                <span class="text-[10px] text-slate-500">28 Juli 2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Drawer Footer Controls -->
+                <div class="p-3 bg-[#111827] border-t border-whus-border flex items-center justify-between shrink-0">
+                    <span class="text-[10px] text-slate-500">WHUSNET Helpdesk Drawer System</span>
+                    <button onclick="closeTicketDetailDrawer()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors">
+                        Tutup Drawer
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Mock Customer Database
+        const customerDb = [
+            {
+                name: "Moch Hanif Asrofi",
+                cid: "C1X4ARQ080723",
+                phone: "6283159938480",
+                package: "Barbar UpTo 7M",
+                address: "Dukuh Karanglo, RT 02/ RW 01, Ds Ngasinan Jetis",
+                pop: "Jetis",
+                odp: "Odp 4 JTK00",
+                ont: "ZTE F660 - V8",
+                gps: "-7.9539520, 111.4712500"
+            },
+            {
+                name: "Affifta Atwin Safranda",
+                cid: "C1X4CRQ080816",
+                phone: "6287737008759",
+                package: "Home Special 10M",
+                address: "Jl. Diponegoro No 14, Rt 01/03 Jetis",
+                pop: "Jetis",
+                odp: "Odp 2 JTK01",
+                ont: "Huawei HG8245H5",
+                gps: "-7.9541200, 111.4723000"
+            },
+            {
+                name: "Chaniago Putra Pertama",
+                cid: "C00RQ001555",
+                phone: "6287737008632",
+                package: "SOHO Speed 20M",
+                address: "Dusun Krajan, RT 04/01 Pacitan",
+                pop: "Pacitan Central",
+                odp: "Odp 1 PCT05",
+                ont: "Fiberhome AN5506",
+                gps: "-8.2012000, 111.0921000"
+            }
+        ];
+
+        // Active Tickets State Initialization
+        let ticketsData = [
+            {
+                id: "TKT-2026-0006",
+                type: "Backbone CUT",
+                priority: "High",
+                status: "Ditangani Helpdesk",
+                assignCategory: "Ticket",
+                customerName: "Moch Hanif Asrofi",
+                cid: "C1X4ARQ080723",
+                phone: "6283159938480",
+                pop: "Jetis",
+                complaint: "Backbone CUT pada jalur utama ODP Jetis",
+                nocNotes: "Opmeter loss -30dB, butuh splicing ulang.",
+                timeAgo: "4 menit yang lalu",
+                createdDate: "28 Juli 2026, 16.28 WIB",
+                address: "Dukuh Karanglo, RT 02/ RW 01, Ds Ngasinan Jetis",
+                package: "Barbar UpTo 7M",
+                odp: "Odp 4 JTK00",
+                ont: "ZTE F660 - V8",
+                gps: "-7.9539520, 111.4712500"
+            },
+            {
+                id: "TKT-2026-0005",
+                type: "Lemot / Slow Speed",
+                priority: "Low",
+                status: "Ditangani Helpdesk",
+                assignCategory: "Ticket",
+                customerName: "Affifta Atwin Safranda",
+                cid: "C1X4CRQ080816",
+                phone: "6287737008759",
+                pop: "Jetis",
+                complaint: "Koneksi terasa lambat saat streaming video jam malam",
+                nocNotes: "Checking bandwidth usage normal.",
+                timeAgo: "29 menit yang lalu",
+                createdDate: "28 Juli 2026, 16.00 WIB",
+                address: "Jl. Diponegoro No 14, Rt 01/03 Jetis",
+                package: "Home Special 10M",
+                odp: "Odp 2 JTK01",
+                ont: "Huawei HG8245H5",
+                gps: "-7.9541200, 111.4723000"
+            },
+            {
+                id: "TKT-2026-0004",
+                type: "LOS / Red Light",
+                priority: "Low",
+                status: "Ditangani Helpdesk",
+                assignCategory: "Ticket",
+                customerName: "Chaniago Putra Pertama",
+                cid: "C00RQ001555",
+                phone: "6287737008632",
+                pop: "Pacitan Central",
+                complaint: "Lampu indikator modem kedip merah LOS",
+                nocNotes: "Kabel dropcore tertekuk di tiang.",
+                timeAgo: "38 menit yang lalu",
+                createdDate: "28 Juli 2026, 15.50 WIB",
+                address: "Dusun Krajan, RT 04/01 Pacitan",
+                package: "SOHO Speed 20M",
+                odp: "Odp 1 PCT05",
+                ont: "Fiberhome AN5506",
+                gps: "-8.2012000, 111.0921000"
+            }
+        ];
+
+        let selectedExcelCustomer = null;
+        let currentSelectedTicketId = null;
+
+        window.onload = function() {
+            renderExcelGrid();
+
+            // Setup global keyboard shortcut
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    const excelDrawer = document.getElementById('excelCreateTicketDrawer');
+                    if (!excelDrawer.classList.contains('hidden')) {
+                        document.getElementById('excelCreateTicketForm').dispatchEvent(new Event('submit'));
+                    }
+                }
+                if (e.key === 'Escape') {
+                    closeTicketDetailDrawer();
+                }
+            });
+        };
+
+        // Toggle Excel Mode Create Ticket Drawer
+        function toggleExcelCreateDrawer() {
+            const drawer = document.getElementById('excelCreateTicketDrawer');
+            drawer.classList.toggle('hidden');
+        }
+
+        function openCreateTicketFormInExcel() {
+            const drawer = document.getElementById('excelCreateTicketDrawer');
+            drawer.classList.remove('hidden');
+            document.getElementById('excelCustomerSearchInput').focus();
+        }
+
+        // Customer Search inside Excel Mode Panel
+        function onExcelCustomerSearchInput(val) {
+            const suggestions = document.getElementById('excelCustomerSearchSuggestions');
+            if (!val || val.trim().length < 2) {
+                suggestions.classList.add('hidden');
+                return;
+            }
+
+            const query = val.toLowerCase();
+            const matches = customerDb.filter(c => 
+                c.name.toLowerCase().includes(query) || 
+                c.cid.toLowerCase().includes(query) ||
+                c.phone.includes(query)
+            );
+
+            if (matches.length === 0) {
+                suggestions.innerHTML = `<div class="p-2.5 text-xs text-slate-500 text-center">Data pelanggan tidak ditemukan.</div>`;
+            } else {
+                suggestions.innerHTML = matches.map(c => `
+                    <div onclick="selectExcelCustomer('${c.cid}')" class="p-2 hover:bg-slate-800 cursor-pointer border-b border-whus-border flex items-center justify-between transition-colors">
+                        <div>
+                            <span class="text-xs font-bold text-slate-200 block">${c.name}</span>
+                            <span class="text-[10px] text-slate-400">${c.pop} &bull; ${c.phone}</span>
+                        </div>
+                        <span class="text-xs font-mono text-blue-400 font-bold">${c.cid}</span>
+                    </div>
+                `).join('');
+            }
+            suggestions.classList.remove('hidden');
+        }
+
+        function selectExcelCustomer(cid) {
+            const customer = customerDb.find(c => c.cid === cid);
+            if (!customer) return;
+
+            selectedExcelCustomer = customer;
+            document.getElementById('excelCustomerSearchInput').value = `${customer.name} (${customer.cid})`;
+            document.getElementById('excelCustomerSearchSuggestions').classList.add('hidden');
+
+            // Render Snapshot Bar
+            const snapBar = document.getElementById('excelCustomerSnapshotBar');
+            snapBar.classList.remove('hidden');
+            document.getElementById('exSnapName').textContent = customer.name;
+            document.getElementById('exSnapCidPhone').textContent = `${customer.cid} / ${customer.phone}`;
+            document.getElementById('exSnapPop').textContent = customer.pop;
+            document.getElementById('exSnapPackageOdp').textContent = `${customer.package} / ${customer.odp}`;
+            document.getElementById('exSnapOnt').textContent = customer.ont;
+
+            showToast(`Data pelanggan ${customer.name} terpilih di Excel Mode!`, 'success');
+        }
+
+        // Handle Create Ticket directly inside Excel Mode
+        function handleExcelCreateTicket(e) {
+            e.preventDefault();
+
+            if (!selectedExcelCustomer) {
+                showToast("Pilih data pelanggan terlebih dahulu!", 'warning');
+                return;
+            }
+
+            const ticketType = document.getElementById('excelFormType').value;
+            const priority = document.getElementById('excelFormPriority').value;
+            const complaint = document.getElementById('excelFormComplaint').value;
+            const nocNotes = document.getElementById('excelFormNocNotes').value || 'Tidak ada catatan teknis awal.';
+
+            const newIdNum = ticketsData.length + 4;
+            const newId = `TKT-2026-000${newIdNum}`;
+
+            const newTicket = {
+                id: newId,
+                type: ticketType,
+                priority: priority,
+                status: "Ditangani Helpdesk",
+                assignCategory: "Ticket",
+                customerName: selectedExcelCustomer.name,
+                cid: selectedExcelCustomer.cid,
+                phone: selectedExcelCustomer.phone,
+                pop: selectedExcelCustomer.pop,
+                complaint: complaint,
+                nocNotes: nocNotes,
+                timeAgo: "Baru saja",
+                createdDate: "29 Juli 2026, 08:24 WIB",
+                address: selectedExcelCustomer.address,
+                package: selectedExcelCustomer.package,
+                odp: selectedExcelCustomer.odp,
+                ont: selectedExcelCustomer.ont,
+                gps: selectedExcelCustomer.gps
+            };
+
+            ticketsData.unshift(newTicket);
+            renderExcelGrid();
+
+            // Reset Excel Form
+            document.getElementById('excelCreateTicketForm').reset();
+            selectedExcelCustomer = null;
+            document.getElementById('excelCustomerSnapshotBar').classList.add('hidden');
+
+            showToast(`Tiket Baru ${newId} Ditambahkan ke Spreadsheet NOC!`, 'success');
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            let bgClass = "bg-slate-800 border-slate-700 text-slate-200";
+            let icon = "fa-circle-info text-blue-400";
+
+            if (type === 'success') {
+                bgClass = "bg-emerald-950/90 border-emerald-700/60 text-emerald-200";
+                icon = "fa-circle-check text-emerald-400";
+            } else if (type === 'warning') {
+                bgClass = "bg-amber-950/90 border-amber-700/60 text-amber-200";
+                icon = "fa-triangle-exclamation text-amber-400";
+            } else if (type === 'danger') {
+                bgClass = "bg-rose-950/90 border-rose-700/60 text-rose-400";
+                icon = "fa-circle-xmark text-rose-400";
+            }
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-lg border shadow-xl flex items-center space-x-3 text-xs font-medium transition-all duration-300 transform translate-x-10 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('translate-x-10', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-10');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function updateTicketCategory(id, target) {
+            const t = ticketsData.find(item => item.id === id);
+            if (!t) return;
+
+            if (target === 'SELESAI') {
+                t.status = 'Selesai';
+                showToast(`Tiket ${id} telah diselesaikan!`, 'success');
+            } else if (target === 'NOC') {
+                t.assignCategory = 'NOC';
+                t.status = 'Ditangani NOC';
+                showToast(`Tiket ${id} diteruskan ke tim NOC`, 'info');
+            } else if (target === 'FOP') {
+                t.assignCategory = 'FOP';
+                t.status = 'Ditangani FOP Lapangan';
+                showToast(`Tiket ${id} diteruskan ke Teknisi FOP`, 'info');
+            } else if (target === 'BATAL') {
+                t.status = 'Dibatalkan';
+                showToast(`Tiket ${id} telah dibatalkan`, 'warning');
+            }
+
+            renderExcelGrid();
+        }
+
+        function renderExcelGrid() {
+            const tbody = document.getElementById('excelGridTbody');
+            const countLabel = document.getElementById('excelRowCountLabel');
+            countLabel.textContent = `Total Baris: ${ticketsData.length} Tiket`;
+
+            tbody.innerHTML = ticketsData.map((t, index) => {
+                let statusBadgeClass = "bg-blue-500/20 text-blue-300 border-blue-500/30";
+                if (t.status === 'Selesai') {
+                    statusBadgeClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+                } else if (t.status === 'Ditangani NOC') {
+                    statusBadgeClass = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+                } else if (t.status === 'Ditangani FOP Lapangan' || t.status === 'Ditangani FOP') {
+                    statusBadgeClass = "bg-purple-500/20 text-purple-300 border-purple-500/30";
+                } else if (t.status === 'Dibatalkan') {
+                    statusBadgeClass = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+                }
+
+                return `
+                <tr class="hover:bg-slate-800/60 transition-colors group">
+                    <td class="excel-row-num">${index + 1}</td>
+                    <td class="px-3 py-2 text-blue-400 font-bold cursor-pointer hover:underline" onclick="openTicketDetailDrawer('${t.id}')">
+                        <span class="inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-sidebar text-[10px] opacity-60 group-hover:opacity-100"></i>
+                            <span>${t.id}</span>
+                        </span>
+                    </td>
+                    <td class="px-3 py-2 text-slate-200 font-sans" contenteditable="true" onblur="updateExcelCell('${t.id}', 'customerName', this.innerText)">${t.customerName}</td>
+                    <td class="px-3 py-2 text-slate-300" contenteditable="true" onblur="updateExcelCell('${t.id}', 'type', this.innerText)">${t.type}</td>
+                    <td class="px-3 py-2">
+                        <span class="px-2 py-0.5 text-[10px] rounded font-bold ${t.priority === 'High' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-300'}">${t.priority}</span>
+                    </td>
+                    <td class="px-3 py-2 text-slate-300" contenteditable="true" onblur="updateExcelCell('${t.id}', 'pop', this.innerText)">${t.pop}</td>
+                    <td class="px-3 py-2 text-slate-300 truncate max-w-xs" contenteditable="true" onblur="updateExcelCell('${t.id}', 'complaint', this.innerText)">${t.complaint}</td>
+                    <td class="px-3 py-2 text-slate-400 italic" contenteditable="true" onblur="updateExcelCell('${t.id}', 'nocNotes', this.innerText)">${t.nocNotes}</td>
+                    <td class="px-3 py-2 cursor-pointer" onclick="openTicketDetailDrawer('${t.id}')">
+                        <span class="px-2 py-0.5 text-[10px] rounded border ${statusBadgeClass} font-semibold">${t.status}</span>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        function updateExcelCell(id, field, value) {
+            const t = ticketsData.find(item => item.id === id);
+            if (t) {
+                t[field] = value;
+                showToast(`Cell updated for ${id}`, 'info');
+            }
+        }
+
+        function addNewExcelRow() {
+            const newIdNum = ticketsData.length + 4;
+            const newId = `TKT-2026-000${newIdNum}`;
+            const dummy = {
+                id: newId,
+                type: "Lemot / High Latency",
+                priority: "Medium",
+                status: "Draft Worksheet",
+                assignCategory: "Ticket",
+                customerName: "Ketik Nama Pelanggan...",
+                cid: "C1X4NEW000",
+                phone: "08123456789",
+                pop: "Jetis",
+                complaint: "Klik cell untuk memasukkan detail keluhan...",
+                nocNotes: "Catatan NOC...",
+                timeAgo: "Baru saja",
+                createdDate: "29 Juli 2026",
+                address: "-",
+                package: "Standard",
+                odp: "ODP-01",
+                ont: "ONT",
+                gps: "-"
+            };
+            ticketsData.unshift(dummy);
+            renderExcelGrid();
+            showToast(`Baris tiket baru ${newId} ditambahkan ke Worksheet`, 'success');
+        }
+
+        function exportExcelToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,ID,Customer,Type,Priority,POP,Complaint,Notes,Status\n";
+            ticketsData.forEach(t => {
+                csvContent += `"${t.id}","${t.customerName}","${t.type}","${t.priority}","${t.pop}","${t.complaint}","${t.nocNotes}","${t.status}"\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "WHUSNET_NOC_Worksheet.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Worksheet exported to CSV file!", "success");
+        }
+
+        function openTicketDetailDrawer(id) {
+            const t = ticketsData.find(item => item.id === id);
+            if (!t) return;
+
+            currentSelectedTicketId = id;
+
+            // Populate Drawer Fields
+            document.getElementById('dtTicketId').textContent = t.id;
+            document.getElementById('dtTicketTypeBadge').textContent = t.type;
+            document.getElementById('dtStatusBadge').textContent = t.status;
+            document.getElementById('dtPriorityBadge').textContent = `Prioritas: ${t.priority}`;
+            document.getElementById('dtCustomerName').textContent = t.customerName;
+            document.getElementById('dtCustomerPop').textContent = t.pop;
+            document.getElementById('dtCreatedTime').textContent = t.createdDate;
+
+            // Technical Snapshot
+            document.getElementById('dtSnapCid').textContent = t.cid;
+            document.getElementById('dtSnapPhone').textContent = t.phone;
+            document.getElementById('dtSnapPackage').textContent = t.package || 'Barbar UpTo 7M';
+            document.getElementById('dtSnapAddress').textContent = t.address || 'Dukuh Karanglo, RT 02/ RW 01, Ds Ngasinan Jetis';
+            document.getElementById('dtSnapOdp').textContent = t.odp || 'Odp 4 JTK00';
+            document.getElementById('dtSnapOnt').textContent = t.ont || 'ZTE F660 - V8';
+            document.getElementById('dtSnapGps').querySelector('span').textContent = t.gps || '-7.9539520, 111.4712500';
+
+            // Assessment
+            document.getElementById('dtComplaintText').textContent = t.complaint;
+            document.getElementById('dtNocNotesText').textContent = t.nocNotes || 'Tidak ada catatan teknis awal.';
+
+            // Open Drawer & Backdrop
+            const drawer = document.getElementById('ticketDetailDrawer');
+            const backdrop = document.getElementById('ticketDetailBackdrop');
+
+            backdrop.classList.add('backdrop-open');
+            drawer.classList.add('drawer-open');
+        }
+
+        function closeTicketDetailDrawer() {
+            const drawer = document.getElementById('ticketDetailDrawer');
+            const backdrop = document.getElementById('ticketDetailBackdrop');
+
+            drawer.classList.remove('drawer-open');
+            backdrop.classList.remove('backdrop-open');
+        }
+
+        function actionUpdateDetailStatus(action) {
+            if (!currentSelectedTicketId) return;
+            
+            updateTicketCategory(currentSelectedTicketId, action);
+            const t = ticketsData.find(item => item.id === currentSelectedTicketId);
+            if (t) {
+                document.getElementById('dtStatusBadge').textContent = t.status;
+            }
+            showToast(`Status Tiket ${currentSelectedTicketId} Berhasil Diperbarui!`, 'success');
+        }
+    </script>
+</body>
+</html>

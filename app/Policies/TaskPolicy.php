@@ -2,8 +2,12 @@
 
 namespace App\Policies;
 
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WorkflowTransitionPermission;
+use App\Services\EffectiveAccessService;
 
 /**
  * TaskPolicy — semua pengecekan via $user->can() / permission dinamis.
@@ -16,6 +20,15 @@ class TaskPolicy
      */
     public function before(User $user, string $ability): ?bool
     {
+        // 'cancel' & 'cancelViaFopTask' sengaja DIKELUARIN dari bypass wildcard —
+        // SRV/PSB gak boleh dibatalkan lewat jalur Task sama sekali (harus lewat
+        // halaman Customer), aturan ini berlaku buat SEMUA role termasuk
+        // owner/admin. Tanpa pengecualian ini, owner ber-permission '*' bakal
+        // nembus invarian SRV/PSB di dua method itu.
+        if (in_array($ability, ['cancel', 'cancelViaFopTask'], true)) {
+            return null;
+        }
+
         if ($user->hasPermission('*')) {
             return true;
         }
@@ -47,7 +60,7 @@ class TaskPolicy
     public function view(User $user, Task $task): bool
     {
         if ($user->can('task.view.all')) {
-            return true;
+            return $this->withinPopScope($user, $task);
         }
 
         if ($user->can('task.view.own') && $task->isMember($user->id)) {
@@ -72,7 +85,11 @@ class TaskPolicy
      */
     public function edit(User $user, Task $task): bool
     {
-        if (!$user->hasPermission('task.manage')) {
+        if (! $user->hasPermission('task.manage')) {
+            return false;
+        }
+
+        if (! $this->withinPopScope($user, $task)) {
             return false;
         }
 
@@ -81,10 +98,34 @@ class TaskPolicy
     }
 
     /**
+     * Guard scope POP — `task.view.all`/`task.manage` cuma permission, gak
+     * pernah cek `pop_id`. Tanpa ini, role apapun yang pegang permission itu
+     * (lumayan umum, mis. FOP/Admin) bisa lihat/edit task dari POP manapun
+     * lewat URL langsung (IDOR, lihat docs/plan/analisa-celah-scope-pop.md).
+     */
+    private function withinPopScope(User $user, Task $task): bool
+    {
+        $access = app(EffectiveAccessService::class);
+
+        if ($access->hasAllPopAccess($user)) {
+            return true;
+        }
+
+        return in_array((int) $task->pop_id, $access->getAllowedPopIds($user), true);
+    }
+
+    /**
      * Mengubah tipe task pada form edit.
      */
     public function editType(User $user, Task $task): bool
     {
+        // Tipe auto-only (Survey/Pemasangan/Ambil Modem) gak boleh diubah dari
+        // sini sama sekali — asalnya dari alur auto-sync (Registrasi Pelanggan
+        // / tombol Ambil Alat), bukan pilihan manual. Lihat TaskType::autoOnlyValues().
+        if (in_array($task->task_type->value, TaskType::autoOnlyValues(), true)) {
+            return false;
+        }
+
         return $user->hasPermission('task.edit.type') && $task->status->isEditable();
     }
 
@@ -96,6 +137,7 @@ class TaskPolicy
         if ($user->hasPermission('task.manage') || $user->hasPermission('task.assign.team')) {
             return $task->status->isEditable();
         }
+
         return $this->canTransitionTo($user, $task, 'terjadwal') && $task->status->isEditable();
     }
 
@@ -112,7 +154,49 @@ class TaskPolicy
      */
     public function cancel(User $user, Task $task): bool
     {
-        return $this->canTransitionTo($user, $task, 'dibatalkan') && !in_array($task->status->value, ['selesai', 'dibatalkan']);
+        // SRV/PSB terikat ke workflow Customer (List Pelanggan Gagal) — cancel
+        // buat 2 tipe ini WAJIB lewat halaman Customer (CustomerSurveyController/
+        // CustomerInstallationController::cancel()), bukan tombol Task langsung.
+        if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
+            return false;
+        }
+
+        return $this->canTransitionTo($user, $task, 'dibatalkan') && ! in_array($task->status->value, ['selesai', 'dibatalkan']);
+    }
+
+    /**
+     * Membatalkan `Task` eksekusi sebagai EFEK IKUTAN dari pembatalan tiket di
+     * /fop-tasks (FopTaskController::update()), bukan lewat tombol Cancel di
+     * halaman Task.
+     *
+     * Kenapa otoritasnya `fop_tasks.cancel` dan BUKAN `task.cancel`:
+     * dua permission itu menjaga dua pintu berbeda ke objek berbeda —
+     * `task.cancel` buat /tasks (objek `Task`), `fop_tasks.cancel` buat
+     * /fop-tasks (objek `FopTask`). Sengaja gak digabung: role `admin` di DB
+     * punya `fop_tasks.*` TAPI gak punya `task.cancel`, jadi maksa `task.cancel`
+     * di sini bakal bikin admin gak bisa lagi membatalkan tiket — padahal itu
+     * kewenangan yang selama ini dia punya. Membatalkan tiket memang SEHARUSNYA
+     * ikut membatalkan pekerjaannya; kalau enggak, Task-nya jadi yatim dan tetap
+     * kelihatan aktif di /tasks-saya walau tiketnya udah batal.
+     *
+     * Nilai tambah method ini dibanding cascade langsung tanpa policy: invarian
+     * dicek terhadap `Task` YANG BENERAN DIBATALIN (task_type & status-nya
+     * sendiri), bukan terhadap `FopTask.category` seperti guard di controller.
+     * Kalau dua kolom itu sampai menyimpang, tiket MTN gak bisa dipakai buat
+     * diam-diam membatalkan Task SURVEY/PSB — jalur sah SRV/PSB tetap cuma
+     * halaman Pelanggan, sama kayak cancel().
+     */
+    public function cancelViaFopTask(User $user, Task $task): bool
+    {
+        if (in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN], true)) {
+            return false;
+        }
+
+        if (in_array($task->status->value, ['selesai', 'dibatalkan'], true)) {
+            return false;
+        }
+
+        return $user->hasPermission('fop_tasks.cancel');
     }
 
     /**
@@ -155,10 +239,10 @@ class TaskPolicy
     public function statusStart(User $user, Task $task): bool
     {
         $canTransition = $this->canTransitionTo($user, $task, 'in_progress');
-        
-        $statusValue = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
 
-        if (!$canTransition && ($user->hasPermission('task.execute') || $task->task_type->value === \App\Enums\TaskType::MAINTENANCE->value)) {
+        $statusValue = $task->status instanceof TaskStatus ? $task->status->value : $task->status;
+
+        if (! $canTransition && ($user->hasPermission('task.execute') || $task->task_type->value === TaskType::MAINTENANCE->value)) {
             $canTransition = in_array($statusValue, ['terjadwal', 'pending']);
         }
 
@@ -171,9 +255,10 @@ class TaskPolicy
     public function statusComplete(User $user, Task $task): bool
     {
         $canTransition = $this->canTransitionTo($user, $task, 'selesai');
-        if (!$canTransition && $task->status === \App\Enums\TaskStatus::PENDING && in_array($task->task_type->value, [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])) {
+        if (! $canTransition && $task->status === TaskStatus::PENDING && in_array($task->task_type->value, [TaskType::SURVEY->value, TaskType::PEMASANGAN->value])) {
             $canTransition = true;
         }
+
         return $canTransition && $task->isMember($user->id);
     }
 
@@ -186,11 +271,15 @@ class TaskPolicy
     }
 
     /**
-     * Upload foto bukti.
+     * Pending top-level (reschedule penuh) — beda dari statusPending (Lapor Nanti,
+     * assignment tetap) dan fopPending (FOP-side, assignment tetap). Ini lepas
+     * assignment & balik ke antrian FOP, cuma boleh sebelum task selesai.
      */
-    public function uploadEvidence(User $user, Task $task): bool
+    public function statusReschedule(User $user, Task $task): bool
     {
-        return $user->hasPermission('task.execute') && $task->isMember($user->id);
+        return $user->hasPermission('task.execute')
+            && $task->isMember($user->id)
+            && in_array($task->status->value, ['terjadwal', 'in_progress']);
     }
 
     // ─── Dynamic Workflow Transitions Helper ──────────────────────────
@@ -200,19 +289,19 @@ class TaskPolicy
      */
     private function canTransitionTo(User $user, Task $task, string $newStatus): bool
     {
-        $fromStatus = $task->status instanceof \App\Enums\TaskStatus ? $task->status->value : $task->status;
+        $fromStatus = $task->status instanceof TaskStatus ? $task->status->value : $task->status;
 
-        $rule = \App\Models\WorkflowTransitionPermission::where('from_status', $fromStatus)
+        $rule = WorkflowTransitionPermission::where('from_status', $fromStatus)
             ->where('to_status', $newStatus)
             ->first();
 
-        if (!$rule) {
+        if (! $rule) {
             return false;
         }
 
         // Cek apakah role user terhubung dengan rule transisi status ini
         $hasRole = $rule->roles()->where('roles.id', $user->role_id)->exists();
-        if (!$hasRole) {
+        if (! $hasRole) {
             return false;
         }
 

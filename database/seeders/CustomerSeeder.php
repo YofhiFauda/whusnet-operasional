@@ -2,21 +2,24 @@
 
 namespace Database\Seeders;
 
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\City;
+use App\Models\Customer;
+use App\Models\CustomerAddress;
+use App\Models\CustomerDevice;
+use App\Models\CustomerInstallation;
+use App\Models\CustomerService;
+use App\Models\CustomerSurvey;
+use App\Models\CustomerTechnicalDetail;
+use App\Models\Distribution;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Pop;
-use App\Models\Customer;
-use App\Models\CustomerAddress;
-use App\Models\CustomerService;
-use App\Models\CustomerSurvey;
-use App\Models\CustomerInstallation;
-use App\Models\CustomerDevice;
-use App\Models\CustomerTechnicalDetail;
+use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
-use App\Models\Role;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +43,7 @@ class CustomerSeeder extends Seeder
 
         // 1. Get region references
         $city = City::query()->where('name', 'Ponorogo')->first() ?? City::query()->first();
-        if (!$city) {
+        if (! $city) {
             return;
         }
 
@@ -79,17 +82,18 @@ class CustomerSeeder extends Seeder
         }
 
         // Partition POPs to alternate between Jetis (starts with C) and Siman (starts with D)
-        $jetisPops = $pops->filter(fn($p) => str_starts_with($p->code, 'C'))->values();
-        $simanPops = $pops->filter(fn($p) => str_starts_with($p->code, 'D'))->values();
+        $jetisPops = $pops->filter(fn ($p) => str_starts_with($p->code, 'C'))->values();
+        $simanPops = $pops->filter(fn ($p) => str_starts_with($p->code, 'D'))->values();
 
-        $getPopByIndex = function($i) use ($pops, $jetisPops, $simanPops) {
+        $getPopByIndex = function ($i) use ($pops, $jetisPops, $simanPops) {
             $isJetis = ($i % 2 === 0);
             if ($isJetis && $jetisPops->isNotEmpty()) {
                 return $jetisPops[$i % $jetisPops->count()];
             }
-            if (!$isJetis && $simanPops->isNotEmpty()) {
+            if (! $isJetis && $simanPops->isNotEmpty()) {
                 return $simanPops[$i % $simanPops->count()];
             }
+
             return $pops[$i % $pops->count()];
         };
 
@@ -104,7 +108,7 @@ class CustomerSeeder extends Seeder
                 'name' => 'Teknisi',
                 'guard_name' => 'web',
                 'description' => 'Teknisi Lapangan dan Jaringan',
-                'is_system' => true
+                'is_system' => true,
             ]
         );
 
@@ -114,12 +118,12 @@ class CustomerSeeder extends Seeder
                 'name' => 'FOP',
                 'guard_name' => 'web',
                 'description' => 'Field Operations',
-                'is_system' => true
+                'is_system' => true,
             ]
         );
 
         $technician = User::where('role_id', $roleTeknisi->id)->first();
-        if (!$technician) {
+        if (! $technician) {
             $technician = User::create([
                 'name' => 'Teknisi Joko',
                 'email' => 'teknisi.joko@whusnet.com',
@@ -131,7 +135,7 @@ class CustomerSeeder extends Seeder
         }
 
         $fopUser = User::where('role_id', $roleFop->id)->first();
-        if (!$fopUser) {
+        if (! $fopUser) {
             $fopUser = User::create([
                 'name' => 'FOP Rian',
                 'email' => 'fop.rian@whusnet.com',
@@ -165,26 +169,26 @@ class CustomerSeeder extends Seeder
             'Heri Setiawan', 'Ani Suryani', 'Dedi Kurniawan', 'Tuti Alawiyah', 'Roni Wijaya',
             'Lilis Suryani', 'Andi Pratama', 'Novianti', 'Edi Sunarto', 'Ratna Sari',
             'Taufik Hidayat', 'Lia Lestari', 'Hendra Setiawan', 'Yuni Shara', 'Ferry Salim',
-            'Rani Mukerji', 'Anwar Ibrahim', 'Zulkifli Hasan', 'Prabowo Subianto', 'Megawati'
+            'Rani Mukerji', 'Anwar Ibrahim', 'Zulkifli Hasan', 'Prabowo Subianto', 'Megawati',
         ];
 
         $streetNames = [
             'Jl. Raya Ponorogo', 'Jl. Merdeka', 'Jl. Sudirman', 'Jl. Pahlawan', 'Jl. Diponegoro',
-            'Jl. Gajah Mada', 'Jl. HOS Cokroaminoto', 'Jl. Jendral Sudirman', 'Jl. Ahmad Yani'
+            'Jl. Gajah Mada', 'Jl. HOS Cokroaminoto', 'Jl. Jendral Sudirman', 'Jl. Ahmad Yani',
         ];
 
         $globalIdx = 1;
 
-        $createCustomerRecord = function($status, $customerStatus, $completenessStatus, $pop, $district, $village, $package, $regDate, $simple = false) use (&$globalIdx, $names, $streetNames, $city) {
+        $createCustomerRecord = function ($status, $customerStatus, $completenessStatus, $pop, $district, $village, $package, $regDate, $simple = false) use (&$globalIdx, $names, $streetNames, $city) {
             $name = $names[($globalIdx - 1) % count($names)];
             $emailName = strtolower(str_replace(' ', '.', $name));
             $num = $globalIdx;
 
             $address = $streetNames[($globalIdx - 1) % count($streetNames)]
-                . ' No. ' . (12 + $globalIdx)
-                . ', RT ' . str_pad((string)(($globalIdx % 9) + 1), 2, '0', STR_PAD_LEFT)
-                . '/RW ' . str_pad((string)(($globalIdx % 6) + 1), 2, '0', STR_PAD_LEFT)
-                . ', ' . $village->name . ', ' . $district->name;
+                .' No. '.(12 + $globalIdx)
+                .', RT '.str_pad((string) (($globalIdx % 9) + 1), 2, '0', STR_PAD_LEFT)
+                .'/RW '.str_pad((string) (($globalIdx % 6) + 1), 2, '0', STR_PAD_LEFT)
+                .', '.$village->name.', '.$district->name;
 
             // Generate registration code: e.g. C00RQ000001
             $customerCode = sprintf('%s00%s%06d', $pop->cid_prefix, $pop->registration_prefix, $globalIdx);
@@ -192,14 +196,12 @@ class CustomerSeeder extends Seeder
             $customer = Customer::create([
                 'customer_code' => $customerCode,
                 'full_name' => $name,
-                'identity_number' => '3502' . str_pad((string)(101990000000 + $num), 12, '0', STR_PAD_LEFT),
+                'identity_number' => '3502'.str_pad((string) (101990000000 + $num), 12, '0', STR_PAD_LEFT),
                 'gender' => $num % 2 === 0 ? 'Perempuan' : 'Laki-laki',
-                'email' => $emailName . str_pad((string)$num, 2, '0', STR_PAD_LEFT) . '@whusnet.test',
-                'phone' => '08' . (12 + ($num % 8)) . str_pad((string)(34000000 + ($num * 1379)), 8, '0', STR_PAD_LEFT),
-                'primary_phone' => '08' . (12 + ($num % 8)) . str_pad((string)(34000000 + ($num * 1379)), 8, '0', STR_PAD_LEFT),
+                'email' => $emailName.str_pad((string) $num, 2, '0', STR_PAD_LEFT).'@whusnet.test',
+                'primary_phone' => '08'.(12 + ($num % 8)).str_pad((string) (34000000 + ($num * 1379)), 8, '0', STR_PAD_LEFT),
                 'registration_date' => $regDate->format('Y-m-d'),
                 'status' => $status,
-                'customer_status' => $customerStatus,
                 'data_completeness_status' => $completenessStatus,
                 'address' => $address,
                 'latitude' => -7.8650000 + ($num * 0.0021000),
@@ -212,14 +214,14 @@ class CustomerSeeder extends Seeder
                 'contract_period_months' => $package->contract_period_months ?? 12,
                 'discount_amount' => $num % 5 === 0 ? 25000 : 0,
                 'tax_percent' => 11,
-                'sales_code' => 'SLS-PON-' . str_pad((string)(($num % 3) + 1), 3, '0', STR_PAD_LEFT),
-                'agent_code' => 'AGT-SMN-' . str_pad((string)(($num % 4) + 1), 3, '0', STR_PAD_LEFT),
+                'sales_code' => 'SLS-PON-'.str_pad((string) (($num % 3) + 1), 3, '0', STR_PAD_LEFT),
+                'agent_code' => 'AGT-SMN-'.str_pad((string) (($num % 4) + 1), 3, '0', STR_PAD_LEFT),
                 'created_at' => $regDate,
                 'updated_at' => now(),
             ]);
 
             // Create Address Relationship
-            if (!$simple) {
+            if (! $simple) {
                 CustomerAddress::create([
                     'customer_id' => $customer->id,
                     'full_address' => $address,
@@ -240,7 +242,7 @@ class CustomerSeeder extends Seeder
             return $customer;
         };
 
-        $createServiceRecord = function($customer, $package, $status, $activationDate = null, $dueDate = null) {
+        $createServiceRecord = function ($customer, $package, $status, $activationDate = null, $dueDate = null) {
             $discount = $customer->discount_amount ?? 0.00;
             $ppnPercent = 11.00;
             $discountedPrice = max(0, $package->monthly_price - $discount);
@@ -250,8 +252,8 @@ class CustomerSeeder extends Seeder
                 'customer_id' => $customer->id,
                 'internet_package_id' => $package->id,
                 'package_name_snapshot' => $package->name,
-                'download_speed_snapshot' => $package->download_speed_mbps . ' Mbps',
-                'upload_speed_snapshot' => $package->upload_speed_mbps . ' Mbps',
+                'download_speed_snapshot' => $package->download_speed_mbps.' Mbps',
+                'upload_speed_snapshot' => $package->upload_speed_mbps.' Mbps',
                 'monthly_price' => $package->monthly_price,
                 'discount' => $discount,
                 'ppn' => $ppnPercent,
@@ -311,12 +313,12 @@ class CustomerSeeder extends Seeder
 
             $task = Task::create([
                 'task_number' => sprintf('TASK-%s-SURV-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::SURVEY->value,
-                'title' => 'Survey Pelanggan: ' . $customer->full_name,
-                'description' => 'Lakukan survey kelayakan jaringan untuk pelanggan ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Pelanggan: '.$customer->full_name,
+                'description' => 'Lakukan survey kelayakan jaringan untuk pelanggan '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => $isScheduled ? \App\Enums\TaskStatus::TERJADWAL->value : \App\Enums\TaskStatus::PENDING->value,
+                'status' => $isScheduled ? TaskStatus::TERJADWAL->value : TaskStatus::PENDING->value,
                 'scheduled_at' => $isScheduled ? $regDate->copy()->addDay()->setHour(9)->setMinute(0) : null,
                 'created_by' => $fopUser->id,
                 'updated_by' => $fopUser->id,
@@ -363,11 +365,11 @@ class CustomerSeeder extends Seeder
             // Completed Survey Task
             $task = Task::create([
                 'task_number' => sprintf('TASK-%s-SURV-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::SURVEY->value,
-                'title' => 'Survey Pelanggan: ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Pelanggan: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'pending',
                 'scheduled_at' => $regDate->copy()->addDay()->setHour(9),
                 'started_at' => $regDate->copy()->addDay()->setHour(9)->setMinute(15),
@@ -394,7 +396,7 @@ class CustomerSeeder extends Seeder
                 'end_time' => $task->completed_at->toTimeString(),
                 'required_tools' => 'Tang, Splicer, OPM, Dropcore',
                 'cable_estimation_meter' => 120,
-                'nearest_odp' => 'ODP-PON-' . str_pad((string)(10 + $i), 3, '0', STR_PAD_LEFT),
+                'nearest_odp' => 'ODP-PON-'.str_pad((string) (10 + $i), 3, '0', STR_PAD_LEFT),
                 'survey_note' => 'Lokasi terjangkau. ODP terdekat aktif, port tersedia. Signal strength -19 dBm. Rekomendasi media: Fiber.',
                 'house_photo' => 'documents/simulasi/house.jpg',
                 'survey_photo' => 'documents/simulasi/survey.jpg',
@@ -426,11 +428,11 @@ class CustomerSeeder extends Seeder
             // Approved Survey Task
             $surveyTask = Task::create([
                 'task_number' => sprintf('TASK-%s-SURV-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::SURVEY->value,
-                'title' => 'Survey Pelanggan: ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Pelanggan: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'approved',
                 'scheduled_at' => $regDate->copy()->addDay()->setHour(9),
                 'started_at' => $regDate->copy()->addDay()->setHour(9)->setMinute(15),
@@ -466,11 +468,11 @@ class CustomerSeeder extends Seeder
 
             $installTask = Task::create([
                 'task_number' => sprintf('TASK-%s-INST-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::PEMASANGAN->value,
-                'title' => 'Pemasangan Baru: ' . $customer->full_name,
+                'task_type' => TaskType::PEMASANGAN->value,
+                'title' => 'Pemasangan Baru: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => $isScheduled ? \App\Enums\TaskStatus::TERJADWAL->value : \App\Enums\TaskStatus::PENDING->value,
+                'status' => $isScheduled ? TaskStatus::TERJADWAL->value : TaskStatus::PENDING->value,
                 'scheduled_at' => $isScheduled ? $regDate->copy()->addDays(3)->setHour(13)->setMinute(0) : null,
                 'created_by' => $fopUser->id,
                 'updated_by' => $fopUser->id,
@@ -519,11 +521,11 @@ class CustomerSeeder extends Seeder
             // Approved Survey Task
             $surveyTask = Task::create([
                 'task_number' => sprintf('TASK-%s-SURV-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::SURVEY->value,
-                'title' => 'Survey Pelanggan: ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Pelanggan: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'approved',
                 'scheduled_at' => $regDate->copy()->addDay()->setHour(9),
                 'started_at' => $regDate->copy()->addDay()->setHour(9)->setMinute(15),
@@ -557,11 +559,11 @@ class CustomerSeeder extends Seeder
             // Selesai Installation Task (waiting for review)
             $installTask = Task::create([
                 'task_number' => sprintf('TASK-%s-INST-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::PEMASANGAN->value,
-                'title' => 'Pemasangan Baru: ' . $customer->full_name,
+                'task_type' => TaskType::PEMASANGAN->value,
+                'title' => 'Pemasangan Baru: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'pending',
                 'scheduled_at' => $regDate->copy()->addDays(3)->setHour(13)->setMinute(0),
                 'started_at' => $regDate->copy()->addDays(3)->setHour(13)->setMinute(15),
@@ -595,9 +597,9 @@ class CustomerSeeder extends Seeder
             ]);
 
             // Device details
-            $sn = 'ZTEG' . str_pad((string)(8600000000 + $customer->id), 10, '0', STR_PAD_LEFT);
-            $mac = 'AA:BB:CC:DD:EE:' . str_pad(dechex($customer->id), 2, '0', STR_PAD_LEFT);
-            $ssid = 'Whusnet_' . str_replace(' ', '', $customer->full_name);
+            $sn = 'ZTEG'.str_pad((string) (8600000000 + $customer->id), 10, '0', STR_PAD_LEFT);
+            $mac = 'AA:BB:CC:DD:EE:'.str_pad(dechex($customer->id), 2, '0', STR_PAD_LEFT);
+            $ssid = 'Whusnet_'.str_replace(' ', '', $customer->full_name);
 
             CustomerDevice::create([
                 'customer_id' => $customer->id,
@@ -609,12 +611,12 @@ class CustomerSeeder extends Seeder
                 'wifi_ssid' => $ssid,
                 'wifi_password' => 'password123',
                 'connection_mode' => 'pppoe',
-                'pppoe_username' => 'pppoe_' . $customer->id,
-                'pppoe_password' => 'pass_' . $customer->id,
+                'pppoe_username' => 'pppoe_'.$customer->id,
+                'pppoe_password' => 'pass_'.$customer->id,
             ]);
 
             // Get a real distribution for this mini POP
-            $dist = \App\Models\Distribution::where('pop_id', $pop->id)->first();
+            $dist = Distribution::where('pop_id', $pop->id)->first();
 
             CustomerTechnicalDetail::create([
                 'customer_id' => $customer->id,
@@ -656,7 +658,7 @@ class CustomerSeeder extends Seeder
             );
 
             // Get a real distribution for this mini POP
-            $dist = \App\Models\Distribution::where('pop_id', $pop->id)->first();
+            $dist = Distribution::where('pop_id', $pop->id)->first();
             $customer->distribution_id = $dist?->id;
 
             // Set active customer CID
@@ -674,11 +676,11 @@ class CustomerSeeder extends Seeder
             // Survey Approved Task
             $surveyTask = Task::create([
                 'task_number' => sprintf('TASK-%s-SURV-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::SURVEY->value,
-                'title' => 'Survey Pelanggan: ' . $customer->full_name,
+                'task_type' => TaskType::SURVEY->value,
+                'title' => 'Survey Pelanggan: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'approved',
                 'scheduled_at' => $regDate->copy()->addDay()->setHour(9),
                 'started_at' => $regDate->copy()->addDay()->setHour(9)->setMinute(15),
@@ -712,11 +714,11 @@ class CustomerSeeder extends Seeder
             // Completed Installation Task (FOP approved)
             $installTask = Task::create([
                 'task_number' => sprintf('TASK-%s-INST-%04d', Carbon::now()->year, $customer->id),
-                'task_type' => \App\Enums\TaskType::PEMASANGAN->value,
-                'title' => 'Pemasangan Baru: ' . $customer->full_name,
+                'task_type' => TaskType::PEMASANGAN->value,
+                'title' => 'Pemasangan Baru: '.$customer->full_name,
                 'pop_id' => $customer->pop_id,
                 'customer_id' => $customer->id,
-                'status' => \App\Enums\TaskStatus::SELESAI->value,
+                'status' => TaskStatus::SELESAI->value,
                 'fop_review_status' => 'approved',
                 'scheduled_at' => $regDate->copy()->addDays(3)->setHour(13)->setMinute(0),
                 'started_at' => $regDate->copy()->addDays(3)->setHour(13)->setMinute(15),
@@ -750,9 +752,9 @@ class CustomerSeeder extends Seeder
             ]);
 
             // Device details
-            $sn = 'ZTEG' . str_pad((string)(8600000000 + $customer->id), 10, '0', STR_PAD_LEFT);
-            $mac = 'AA:BB:CC:DD:EE:' . str_pad(dechex($customer->id), 2, '0', STR_PAD_LEFT);
-            $ssid = 'Whusnet_' . str_replace(' ', '', $customer->full_name);
+            $sn = 'ZTEG'.str_pad((string) (8600000000 + $customer->id), 10, '0', STR_PAD_LEFT);
+            $mac = 'AA:BB:CC:DD:EE:'.str_pad(dechex($customer->id), 2, '0', STR_PAD_LEFT);
+            $ssid = 'Whusnet_'.str_replace(' ', '', $customer->full_name);
 
             CustomerDevice::create([
                 'customer_id' => $customer->id,
@@ -764,8 +766,8 @@ class CustomerSeeder extends Seeder
                 'wifi_ssid' => $ssid,
                 'wifi_password' => 'password123',
                 'connection_mode' => 'pppoe',
-                'pppoe_username' => 'pppoe_' . $customer->id,
-                'pppoe_password' => 'pass_' . $customer->id,
+                'pppoe_username' => 'pppoe_'.$customer->id,
+                'pppoe_password' => 'pass_'.$customer->id,
             ]);
 
             CustomerTechnicalDetail::create([

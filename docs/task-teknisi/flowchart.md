@@ -100,7 +100,7 @@ isMember(user)? ──tidak──▶ TOLAK
 status in [in_progress, pending]? ──tidak──▶ TOLAK 422
         │ ya
         ▼
-canComplete()? (saat ini SELALU true — placeholder, gak ada hard check evidence)
+canComplete()? (SELALU true — gak ada hard check di sini; foto wajib ada di form Laporan tipe masing-masing, lihat business-logic.md §5)
         │ ya
         ▼
 status=selesai, fop_review_status=pending, completed_at=now()
@@ -172,12 +172,27 @@ Kalau task_type SURVEY/PEMASANGAN & customer_id ada:
 FOP cancel (POST /tasks/{task}/cancel)
         │
         ▼
+Policy cancel: task_type in [SURVEY, PEMASANGAN]? ──ya──▶ TOLAK (2026-07-21)
+        │                                              — batalkan SRV/PSB WAJIB
+        │                                                lewat halaman Customer,
+        │                                                lihat docs/fop-task/
+        │                                                flowchart.md § 12
+        │ tidak
+        ▼
 Policy cancel: canTransitionTo(...,'dibatalkan') AND status not in [selesai,dibatalkan]
         │
         ▼
 status=dibatalkan, cancelled_at=now(), cancel_reason=...
 AuditLog::log('cancelled')
+        │
+        ▼
+status SEBELUM diubah == in_progress? (dicek Task 12, 2026-07-22)
+   • ya  → notifyTeam() ke semua anggota tim — AppNotification type=error,
+           "Task dibatalkan: {alasan}"
+   • tidak (terjadwal/draft) → gak ada notifikasi
 ```
+
+Notifikasi ini ditaruh di `TaskService::cancel()` sendiri (bukan di controller) — jadi berlaku SAMA buat semua pemicu cancel: tombol Cancel di halaman Task ini, tombol Cancel di tabel FOP Task (`FopTaskController::update()`, task_type NON-SRV/PSB, lihat `docs/fop-task/flowchart.md` § 13), MAUPUN cancel SRV/PSB dari halaman Customer (`CustomerSurveyController::cancel()`/`CustomerInstallationController::cancel()`, § 12) — 1 titik logic, gak diduplikasi per jalur.
 
 ## 7. Reassign Teknisi (`TaskTeamController` → `TaskService::reassignTeam()`)
 

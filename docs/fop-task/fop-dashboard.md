@@ -27,8 +27,8 @@ Data yang disiapkan (POP-scoped via `EffectiveAccessService` — user tanpa akse
    - `overdue_survey` — customer antrean survey yang `created_at + 1 hari < now()`
    - `overdue_installation` — customer nunggu instalasi yang Task survey-nya `completed_at + 3 hari < now()`
 3. **`$teknisiList`** — semua user role `teknisi` (scoped POP), status `aktif`/`terjadwal`/`standby` + lokasi (alamat customer) kalau lagi ada Task in-progress.
-4. **`$activeTeams`** — Task yang punya >1 anggota tim (`teamMembers`), terjadwal/in-progress hari ini — dikelompokkan sebagai "Tim Gabungan" (nama diparsing dari prefix `[Tim X]` di judul Task).
-5. **`$activeFopTeams`** — semua `FopTaskTeam` yang `isActive()` (POP-scoped), tiap team bawa list `FopTask` + status (fallback ke status Task eksekusi kalau ada) + progress percent + avatar inisial anggota.
+4. **`$activeTeams`** — legacy, **gak dipakai di blade** (dikonfirmasi lewat riset kode, lihat [analisa-sync-execution-task.md](analisa-sync-execution-task.md#3-logika-tombol--masukkan-ke-team--simptom-dari-bug-1-bukan-bug-terpisah)). Task yang punya >1 anggota tim (`teamMembers`), terjadwal/in-progress hari ini, dikelompokkan sebagai "Tim Gabungan" dengan nama diparsing dari prefix `[...]` di judul Task — variabel ini masih dihitung tapi gak pernah dirender, jadi harus diabaikan sebagai sumber kebenaran soal Team (pakai poin 5 di bawah).
+5. **`$activeFopTeams`** — sumber data Team yang BENERAN ditampilkan. Semua `FopTaskTeam` yang `isActive()` (POP-scoped), tiap team bawa list `FopTask` + status (fallback ke status Task eksekusi kalau ada) + progress percent + avatar inisial anggota. Sejak Task 1/2, ini query LANGSUNG ke DB tiap load — otomatis reflect hasil auto-team rebuild & switch teknisi tanpa cache/delay (dikonfirmasi lewat test, lihat [analisa-sync-execution-task.md](analisa-sync-execution-task.md)).
 6. **`$pops`** — daftar POP untuk filter (opsional).
 
 Return: `view('fop.dashboard', compact('surveyQueue','stats','teknisiList','activeTeams','activeFopTeams','pops'))`.
@@ -41,7 +41,7 @@ Return: `view('fop.dashboard', compact('surveyQueue','stats','teknisiList','acti
 2. **Stat cards** (grid 2/4 kolom) — Antrean Survey, Perlu Aksi FOP, Sedang Berjalan, Selesai Hari Ini. Badge merah "X Terlambat" muncul kalau `overdue_survey`/`overdue_installation` > 0.
 3. **Team FOP Aktif** — grid card per `FopTaskTeam` aktif:
    - Header: nama team + `work_date`
-   - Body: list tiket (`tugas` + badge status warna sesuai FopTaskStatus)
+   - Body: list tiket (`tugas` + badge status warna — sejak unifikasi 2026-07-20, `TaskStatus` kalau ada Task terhubung, atau `FopTask.status` sendiri kalau standalone/draft, lihat `database-schema.md`)
    - Footer: avatar inisial anggota (max 4 + counter) + total tiket
    - Klik card → `openTeamDetail(team.id)` (Alpine) buka detail panel
    - Link "Kelola Team →" ke `/fop-tasks`
@@ -75,6 +75,10 @@ Customer::whereIn('status', ['waiting_installation', 'installation_in_progress',
 
 Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` seperti versi dokumen lama) — samain sama logic di `FopTask::slaDeadline()` ([database-schema.md](database-schema.md)).
 
+**Alert SLA breach (baru, 2026-08-07) — bukan cuma indikator visual pasif lagi.** Sebelumnya angka/badge SLA di dashboard ini murni pull (dashboard harus dibuka buat kelihatan). Command scheduled `fop-tasks:check-sla-breach` (`everyThirtyMinutes()`, `routes/console.php`) sekarang notif in-app (lonceng + toast) ke semua user role `fop` di POP terkait begitu `FopTask::slaDeadline()` kelewat, pakai deadline yang SAMA PERSIS dipakai badge di dashboard ini — gak ada logic kedua yang bisa menyimpang. Dedup lewat kolom `fop_tasks.sla_breach_notified_at` (lihat [database-schema.md](database-schema.md)). Detail: `docs/plan/analisa-status-implementasi-notifikasi.md` §8.4.
+
+> ⚠️ **Known issue (ketemu gak sengaja pas verifikasi Task 1/2, belum difix):** `DATE_ADD(...)`/`NOW()` di atas MySQL-only, error kalau `index()` dijalanin di atas SQLite. Gak berdampak ke production (asumsi DB production MySQL), tapi bikin dashboard ini gak bisa diikutkan test otomatis di atas SQLite. Detail di [analisa-sync-execution-task.md](analisa-sync-execution-task.md#10-isu-lain-yang-ketemu-terpisah-belum-difix).
+
 ## Access Control
 
 - **Guard:** `$this->authorize('viewAll', Task::class)` — policy, bukan middleware permission string.
@@ -82,9 +86,11 @@ Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` sepe
 
 ## Related
 
-- [flowchart.md](flowchart.md) — alur status tiket & prioritas SLA
+- [flowchart.md](flowchart.md) — alur status tiket & prioritas SLA, auto-team formation (Task 1), switch teknisi (Task 2)
 - [user-flow.md](user-flow.md) — langkah pakai dashboard & `/fop-tasks`
 - [database-schema.md](database-schema.md) — tabel `fop_tasks`, `fop_task_teams`
+- [analisa-auto-team.md](analisa-auto-team.md) — analisa & Sprint Backlog Task 1/2
+- [analisa-sync-execution-task.md](analisa-sync-execution-task.md) — bugfix & sync execution Task terkait Team
 
 ---
 
@@ -93,4 +99,4 @@ Query ini basisnya tabel `customers` join `tasks` (bukan `customer_surveys` sepe
 - `resources/views/fop/dashboard.blade.php`
 - `routes/web.php` — `GET /fop`, `GET /api/fop/pipeline`
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-11 (ditambah catatan Task 1/2: sumber data Team `$activeFopTeams`, known issue SQL MySQL-only)

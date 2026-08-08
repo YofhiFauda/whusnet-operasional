@@ -8,8 +8,8 @@ use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
-use App\Models\Pop;
 use App\Models\Invoice;
+use App\Models\Pop;
 use App\Models\User;
 use App\Models\Village;
 use Carbon\Carbon;
@@ -47,11 +47,9 @@ class InvoiceModelTest extends TestCase
             'customer_code' => 'WHUS-2026-0001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -112,6 +110,7 @@ class InvoiceModelTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-202606-0001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,

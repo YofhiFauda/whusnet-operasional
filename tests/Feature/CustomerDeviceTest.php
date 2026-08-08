@@ -4,9 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,9 +24,11 @@ class CustomerDeviceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
 
         // RolePermissionSeeder does not reliably attach the device permissions used
         // by this test suite (same gap worked around in CustomerDeviceSensitiveFieldTest),
@@ -40,7 +48,7 @@ class CustomerDeviceTest extends TestCase
 
     private function attachPermission(Role $role, string $code): void
     {
-        $permission = \App\Models\Permission::firstOrCreate(
+        $permission = Permission::firstOrCreate(
             ['code' => $code],
             ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']
         );
@@ -137,11 +145,14 @@ class CustomerDeviceTest extends TestCase
             'technical_note' => 'Router pelanggan sudah dikonfigurasi manual.',
         ]);
 
+        // Teknisi gak punya customers.detail.view (Detail Pelanggan diblok),
+        // tab Perangkat diakses lewat halaman terpisah customers.fieldwork —
+        // lihat CustomerFieldworkController.
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('Spesifikasi Lengkap Perangkat');
         $response->assertSee('MikroTik');
         $response->assertSee('router002@whusnet');
         $response->assertSee('router-secret');
@@ -190,7 +201,7 @@ class CustomerDeviceTest extends TestCase
             ->get(route('customers.show', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Perangkat Pelanggan');
+        $response->assertSee('Spesifikasi Lengkap Perangkat');
         $response->assertSee('ZTE');
         $response->assertSee('zte004@whusnet');
         $response->assertDontSee('hidden-pppoe');
@@ -220,8 +231,10 @@ class CustomerDeviceTest extends TestCase
             'note' => 'Purnama Ayu Lestari Putri',
         ]);
 
+        // Teknisi gak punya customers.detail.view — lihat catatan di
+        // test_device_data_is_visible_on_customer_detail().
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
         $response->assertSee('Data Perangkat Migrasi');
@@ -259,7 +272,7 @@ class CustomerDeviceTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -269,8 +282,8 @@ class CustomerDeviceTest extends TestCase
     {
         return Customer::create([
             'customer_code' => $code,
-            'full_name' => 'Customer Device ' . $code,
-            'phone' => '0812345678',
+            'full_name' => 'Customer Device '.$code,
+            'primary_phone' => '0812345678',
             'pop_id' => $pop->id,
             'status' => 'installed',
             'data_completeness_status' => 'draft',
@@ -284,6 +297,7 @@ class CustomerDeviceTest extends TestCase
         $role = Role::where('name', $roleName)->firstOrFail();
         $user->role_id = $role->id;
         $user->save();
+        $this->giveAllPopScope($user);
 
         return $user;
     }

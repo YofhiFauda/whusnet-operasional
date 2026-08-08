@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
-use App\Models\InternetPackage;
 use App\Models\ImportBatch;
-use App\Models\ImportError;
+use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +21,7 @@ class CustomerImportLoggingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(VerifyCsrfToken::class);
     }
 
     public function test_confirm_import_creates_batch_log_and_stores_errors(): void
@@ -52,7 +52,6 @@ class CustomerImportLoggingTest extends TestCase
                     'status_row' => 'valid',
                     'old_customer_id' => 'CUST-LEG-1',
                     'full_name' => 'Valid Customer',
-                    'phone' => '087700000001',
                     'primary_phone' => '087700000001',
                     'village_id' => $village->id,
                     'district_id' => $district->id,
@@ -73,10 +72,10 @@ class CustomerImportLoggingTest extends TestCase
                     'status_row' => 'valid',
                     'old_customer_id' => 'CUST-LEG-3',
                     'full_name' => '', // missing name
-                    'phone' => '087700000003',
+                    'primary_phone' => '087700000003',
                     'village_id' => $village->id,
                     'pop_id' => $pop->id,
-                ]
+                ],
             ],
             'packages' => [],
             'services' => [],
@@ -87,11 +86,11 @@ class CustomerImportLoggingTest extends TestCase
 
         $response = $this->post('/customers/import/confirm', [
             'sheets' => json_encode($sheets),
-            'file_name' => 'test-import.xlsx'
+            'file_name' => 'test-import.xlsx',
         ]);
 
         $response->assertRedirect('/customers');
-        
+
         // Assert ImportBatch created
         $this->assertDatabaseHas('import_batches', [
             'file_name' => 'test-import.xlsx',
@@ -116,7 +115,7 @@ class CustomerImportLoggingTest extends TestCase
         // Assert records created in master tables
         $this->assertDatabaseHas('customers', [
             'full_name' => 'Valid Customer',
-            'phone' => '087700000001',
+            'primary_phone' => '087700000001',
             'old_customer_id' => 'CUST-LEG-1',
             'pop_id' => $pop->id,
         ]);
@@ -124,7 +123,7 @@ class CustomerImportLoggingTest extends TestCase
         $customer = Customer::where('full_name', 'Valid Customer')->first();
         $this->assertNotNull($customer);
         $this->assertNotNull($customer->customer_code);
-        
+
         $this->assertDatabaseHas('customer_addresses', [
             'customer_id' => $customer->id,
             'village_id' => $village->id,
@@ -132,7 +131,7 @@ class CustomerImportLoggingTest extends TestCase
 
         $this->assertDatabaseHas('customers', [
             'full_name' => 'CUST-LEG-3',
-            'phone' => '087700000003',
+            'primary_phone' => '087700000003',
             'old_customer_id' => 'CUST-LEG-3',
             'data_completeness_status' => 'perlu_dilengkapi',
         ]);

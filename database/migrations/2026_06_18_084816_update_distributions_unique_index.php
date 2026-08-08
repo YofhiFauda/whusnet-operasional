@@ -15,10 +15,10 @@ return new class extends Migration
             // Drop old unique index
             // Note: In some DBs, the index name might be distributions_code_unique
             $table->dropUnique(['code']);
-            
+
             // Add composite unique index
             $table->unique(['pop_id', 'code']);
-            
+
             // Fix description to be nullable (it was required in the first migration)
             $table->string('description')->nullable()->change();
         });

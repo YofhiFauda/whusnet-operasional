@@ -8,17 +8,19 @@ use App\Models\CustomerAddress;
 use App\Models\CustomerService;
 use App\Models\District;
 use App\Models\InternetPackage;
+use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
-use App\Models\Invoice;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\InternetPackageSeeder;
 use Database\Seeders\PermissionSeeder;
+use Database\Seeders\PonorogoRegionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SubscriptionStatusSeeder;
-use Database\Seeders\InternetPackageSeeder;
-use Database\Seeders\PonorogoRegionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,6 +32,8 @@ class CustomerFinalVerificationTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
@@ -48,11 +52,9 @@ class CustomerFinalVerificationTest extends TestCase
             'customer_code' => 'D00C000001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'installed',
-            'customer_status' => 'menunggu_pemasangan',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
             'district_id' => $district->id,
@@ -127,7 +129,7 @@ class CustomerFinalVerificationTest extends TestCase
         ]);
 
         $response->assertStatus(403);
-        
+
         $customer->refresh();
         $this->assertEquals('installed', $customer->status);
     }
@@ -177,7 +179,12 @@ class CustomerFinalVerificationTest extends TestCase
         $invoice = Invoice::where('customer_id', $customer->id)->first();
         $this->assertNotNull($invoice);
         $this->assertEquals('2026-06', $invoice->billing_period);
-        $this->assertEquals(166500, $invoice->total_amount);
-        $this->assertEquals('belum_dibayar', $invoice->invoice_status);
+        // Nominal dihitung server (InitialInvoiceService), bukan diambil dari
+        // total_amount kiriman form. Aktivasi 1 Juni: hari aktivasi digratiskan,
+        // jadi 30 - 1 = 29 dari 30 hari, lalu PPN 11%.
+        $expectedSubtotal = round((float) $customer->customerService->monthly_price * 29 / 30);
+        $this->assertEquals($expectedSubtotal, (float) $invoice->subtotal);
+        $this->assertEquals(round($expectedSubtotal * 1.11, 2), (float) $invoice->total_amount);
+        $this->assertEquals('belum_dibayar', $invoice->invoice_status->value);
     }
 }

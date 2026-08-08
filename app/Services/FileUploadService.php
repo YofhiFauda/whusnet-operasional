@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Models\Task;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -15,7 +14,7 @@ class FileUploadService
      */
     public static function getCustomerIdentifier(?Customer $customer): string
     {
-        if (!$customer) {
+        if (! $customer) {
             return 'UNKNOWN';
         }
 
@@ -28,32 +27,13 @@ class FileUploadService
      */
     public static function getCustomerName(?Customer $customer): string
     {
-        if (!$customer) {
+        if (! $customer) {
             return 'Pelanggan';
         }
 
         $name = trim(preg_replace('/[^A-Za-z0-9 _-]/', '', $customer->full_name ?? 'Pelanggan'));
+
         return $name !== '' ? $name : 'Pelanggan';
-    }
-
-    /**
-     * 1. Foto Bukti Task Lapangan (Task Evidences)
-     * Aturan folder: task-evidences/{task_id}
-     * Contoh format: TASK-2026-0008_C00RQ00012_Budi Santoso.jpg
-     */
-    public static function uploadTaskEvidence(UploadedFile $file, Task $task): string
-    {
-        $task->loadMissing('customer');
-        $taskId = $task->task_number ?: sprintf('TASK-%04d', $task->id);
-        $customerId = self::getCustomerIdentifier($task->customer);
-        $customerName = self::getCustomerName($task->customer);
-        $ext = $file->getClientOriginalExtension();
-
-        $folder = "task-evidences/{$taskId}";
-        $baseName = "{$taskId}_{$customerId}_{$customerName}";
-        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
-
-        return $file->storeAs($folder, $fileName, 'public');
     }
 
     /**
@@ -82,6 +62,7 @@ class FileUploadService
         }
 
         $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
         return $file->storeAs($folder, $fileName, 'public');
     }
 

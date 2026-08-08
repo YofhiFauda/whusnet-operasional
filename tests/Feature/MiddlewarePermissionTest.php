@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
 use Database\Seeders\PermissionSeeder;
-use Database\Seeders\RoleSeeder;
 use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -20,7 +22,7 @@ class MiddlewarePermissionTest extends TestCase
     {
         parent::setUp();
 
-        $compiledPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whusnet-test-views';
+        $compiledPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'whusnet-test-views';
         if (! is_dir($compiledPath)) {
             @mkdir($compiledPath, 0777, true);
         }
@@ -28,8 +30,8 @@ class MiddlewarePermissionTest extends TestCase
         config()->set('view.compiled', $compiledPath);
 
         // Seed roles and permissions for tests
-        $this->seed(\Database\Seeders\FeatureSeeder::class);
-        $this->seed(\Database\Seeders\ActionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(PermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);

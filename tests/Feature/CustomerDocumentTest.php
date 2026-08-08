@@ -2,12 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
+use Database\Seeders\ActionSeeder;
+use Database\Seeders\FeatureSeeder;
+use Database\Seeders\PermissionSeeder;
+use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,18 +29,23 @@ class CustomerDocumentTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RoleSeeder::class);
-        $this->seed(\Database\Seeders\PermissionSeeder::class);
-        $this->seed(\Database\Seeders\RolePermissionSeeder::class);
+        $this->seed(FeatureSeeder::class);
+        $this->seed(ActionSeeder::class);
+        $this->seed(RoleSeeder::class);
+        $this->seed(PermissionSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
     }
 
     public function test_technician_can_upload_customer_document(): void
     {
-        Storage::fake('local');
+        // FileUploadService::uploadCustomerRegistrationDoc() dkk nulis ke disk
+        // 'public', bukan 'local' — fake disk harus samain biar assertExists match.
+        Storage::fake('public');
 
         $pop = $this->createPop('DOC1');
         $technician = $this->createUserWithRole('Teknisi');
         $technician->pops()->attach($pop->id);
+        $this->grantPopScope($technician, $pop);
         $customer = $this->createCustomer($pop, 'TEST-DOC-001');
 
         $response = $this->actingAs($technician)
@@ -46,9 +59,9 @@ class CustomerDocumentTest extends TestCase
 
         $document = CustomerDocument::firstOrFail();
         $this->assertSame($customer->id, $document->customer_id);
-        $this->assertSame('ktp', $document->document_type);
+        $this->assertSame('ktp', $document->document_type->value);
         $this->assertSame($technician->id, $document->uploaded_by);
-        Storage::disk('local')->assertExists($document->file_path);
+        Storage::disk('public')->assertExists($document->file_path);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $technician->id,
@@ -73,13 +86,14 @@ class CustomerDocumentTest extends TestCase
         Storage::fake('local');
 
         $pop = $this->createPop('DOC2');
-        $technician = $this->createUserWithRole('Teknisi');
-        $technician->pops()->attach($pop->id);
+        $user = $this->createUserWithRole('NOC');
+        $user->pops()->attach($pop->id);
+        $this->grantPopScope($user, $pop);
         $customer = $this->createCustomer($pop, 'TEST-DOC-002');
 
-        $document = $this->createDocument($customer, $technician, 'rumah');
+        $document = $this->createDocument($customer, $user, 'rumah');
 
-        $response = $this->actingAs($technician)
+        $response = $this->actingAs($user)
             ->get(route('customers.show', $customer->id));
 
         $response->assertStatus(200);
@@ -152,7 +166,7 @@ class CustomerDocumentTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -162,8 +176,8 @@ class CustomerDocumentTest extends TestCase
     {
         return Customer::create([
             'customer_code' => $code,
-            'full_name' => 'Customer Document ' . $code,
-            'phone' => '0812345678',
+            'full_name' => 'Customer Document '.$code,
+            'primary_phone' => '0812345678',
             'pop_id' => $pop->id,
             'status' => 'installed',
             'data_completeness_status' => 'draft',
@@ -179,6 +193,19 @@ class CustomerDocumentTest extends TestCase
         $user->save();
 
         return $user;
+    }
+
+    private function grantPopScope(User $user, Pop $pop): void
+    {
+        $scope = UserRoleScope::create([
+            'user_id' => $user->id,
+            'role_id' => $user->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create([
+            'user_role_scope_id' => $scope->id,
+            'pop_id' => $pop->id,
+        ]);
     }
 
     private function createDocument(Customer $customer, User $uploader, string $type): CustomerDocument

@@ -16,7 +16,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customer_technical_details', function (Blueprint $table) {
-            if (!Schema::hasColumn('customer_technical_details', 'vlan')) {
+            if (! Schema::hasColumn('customer_technical_details', 'vlan')) {
                 $table->string('vlan', 20)->nullable()->after('olt_slot');
             }
         });

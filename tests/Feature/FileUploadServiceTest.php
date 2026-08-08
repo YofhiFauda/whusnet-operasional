@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
-use App\Models\Task;
 use App\Services\FileUploadService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -11,29 +10,6 @@ use Tests\TestCase;
 
 class FileUploadServiceTest extends TestCase
 {
-    public function test_upload_task_evidence_naming_rule()
-    {
-        Storage::fake('public');
-
-        $customer = new Customer([
-            'cid' => 'C00RQ00012',
-            'full_name' => 'Budi Santoso',
-        ]);
-        $customer->id = 12;
-
-        $task = new Task([
-            'task_number' => 'TASK-2026-0008',
-        ]);
-        $task->id = 8;
-        $task->setRelation('customer', $customer);
-
-        $file = UploadedFile::fake()->image('bukti.jpg');
-        $path = FileUploadService::uploadTaskEvidence($file, $task);
-
-        $this->assertEquals('task-evidences/TASK-2026-0008/TASK-2026-0008_C00RQ00012_Budi Santoso.jpg', $path);
-        Storage::disk('public')->assertExists($path);
-    }
-
     public function test_upload_customer_registration_naming_rule()
     {
         Storage::fake('public');

@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoiceStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -17,11 +20,19 @@ class InvoiceController extends Controller
         $status = trim((string) $request->query('status', ''));
         $statusGroup = trim((string) $request->query('status_group', ''));
         $invoiceType = trim((string) $request->query('invoice_type', ''));
-        $allowedStatuses = ['belum_dibayar', 'sebagian', 'lunas', 'batal'];
+        $allowedStatuses = array_column(InvoiceStatus::cases(), 'value');
 
         $query = Invoice::query()
             ->applyUserScope()
-            ->with(['customer', 'pop', 'customerService', 'internetPackage'])
+            ->with([
+                'customer.collector', 'pop', 'customerService', 'internetPackage',
+                // Dipakai baris anak "Cicilan Ke-N" di list. Hanya pembayaran
+                // VALID — yang ditolak tak boleh ikut menomori cicilan.
+                'payments' => fn ($q) => $q->where('payment_status', PaymentStatus::VALID->value)
+                    ->with('collector:id,name')
+                    ->orderBy('payment_date')
+                    ->orderBy('id'),
+            ])
             ->latest('issue_date')
             ->latest('id');
 
@@ -35,8 +46,7 @@ class InvoiceController extends Controller
                             ->orWhere('customer_code', 'like', "%{$search}%")
                             ->orWhere('old_customer_id', 'like', "%{$search}%")
                             ->orWhere('cid', 'like', "%{$search}%")
-                            ->orWhere('primary_phone', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%");
+                            ->orWhere('primary_phone', 'like', "%{$search}%");
                     });
             });
         }
@@ -54,9 +64,9 @@ class InvoiceController extends Controller
         }
 
         if ($statusGroup === 'lunas') {
-            $query->where('invoice_status', 'lunas');
+            $query->where('invoice_status', InvoiceStatus::LUNAS->value);
         } elseif ($statusGroup === 'belum_lunas') {
-            $query->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+            $query->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
         } elseif ($status !== '' && in_array($status, $allowedStatuses, true)) {
             $query->where('invoice_status', $status);
         }
@@ -68,7 +78,7 @@ class InvoiceController extends Controller
         // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.
         $unpaidBase = Invoice::query()
             ->applyUserScope()
-            ->whereIn('invoice_status', ['belum_dibayar', 'sebagian']);
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
 
         $unpaidAwalTotal = (clone $unpaidBase)
             ->whereIn('invoice_type', ['awal', 'reaktivasi'])
@@ -96,19 +106,21 @@ class InvoiceController extends Controller
     public function lunas(Request $request): View
     {
         $request->merge(['status_group' => 'lunas']);
+
         return $this->index($request);
     }
 
     public function belumLunas(Request $request): View
     {
         $request->merge(['status_group' => 'belum_lunas']);
+
         return $this->index($request);
     }
 
     /**
      * Display a single invoice detail.
      */
-    public function show(Invoice $invoice): View|\Illuminate\Http\JsonResponse
+    public function show(Invoice $invoice): View|JsonResponse
     {
         abort_unless(
             Invoice::query()->applyUserScope()->whereKey($invoice->id)->exists(),
@@ -127,7 +139,7 @@ class InvoiceController extends Controller
             'internetPackage',
             'creator',
             'payments' => function ($query) {
-                $query->with('receiver')->latest('payment_date')->latest('id');
+                $query->with(['receiver', 'collector'])->latest('payment_date')->latest('id');
             },
         ]);
 
@@ -135,6 +147,7 @@ class InvoiceController extends Controller
             if ($invoice->customer) {
                 $invoice->customer->append('clean_address');
             }
+
             return response()->json($invoice);
         }
 

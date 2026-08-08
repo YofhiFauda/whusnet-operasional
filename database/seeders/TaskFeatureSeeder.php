@@ -28,11 +28,11 @@ class TaskFeatureSeeder extends Seeder
         $root = Feature::updateOrCreate(
             ['code' => 'tasks'],
             [
-                'name'       => 'Eksekusi Task — Penjadwalan, Checklist & Quality Gate',
-                'type'       => FeatureType::ROOT,
+                'name' => 'Eksekusi Task — Penjadwalan, Checklist & Quality Gate',
+                'type' => FeatureType::ROOT,
                 'sort_order' => 16, // setelah fop_tasks (15) — lihat FeatureSeeder.php buat urutan blok Master Data
-                'is_active'  => true,
-                'parent_id'  => null,
+                'is_active' => true,
+                'parent_id' => null,
             ]
         );
 
@@ -41,11 +41,11 @@ class TaskFeatureSeeder extends Seeder
         $subFop = Feature::updateOrCreate(
             ['code' => 'tasks.fop'],
             [
-                'name'       => 'Aksi FOP (Koordinator Lapangan)',
-                'type'       => FeatureType::SUB_FEATURE,
+                'name' => 'Aksi FOP (Koordinator Lapangan)',
+                'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 1,
-                'is_active'  => true,
-                'parent_id'  => $root->id,
+                'is_active' => true,
+                'parent_id' => $root->id,
             ]
         );
 
@@ -54,11 +54,11 @@ class TaskFeatureSeeder extends Seeder
         $subTeknisi = Feature::updateOrCreate(
             ['code' => 'tasks.teknisi'],
             [
-                'name'       => 'Aksi Teknisi (Eksekutor Lapangan)',
-                'type'       => FeatureType::SUB_FEATURE,
+                'name' => 'Aksi Teknisi (Eksekutor Lapangan)',
+                'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 2,
-                'is_active'  => true,
-                'parent_id'  => $root->id,
+                'is_active' => true,
+                'parent_id' => $root->id,
             ]
         );
 
@@ -84,8 +84,8 @@ class TaskFeatureSeeder extends Seeder
                 $perm->update(['name' => $pd['name'], 'feature_id' => $subFop->id]);
             } else {
                 $perm = Permission::create([
-                    'code'       => $pd['code'],
-                    'name'       => $pd['name'],
+                    'code' => $pd['code'],
+                    'name' => $pd['name'],
                     'feature_id' => $subFop->id,
                 ]);
             }
@@ -106,8 +106,8 @@ class TaskFeatureSeeder extends Seeder
                 $perm->update(['name' => $pd['name'], 'feature_id' => $subTeknisi->id]);
             } else {
                 $perm = Permission::create([
-                    'code'       => $pd['code'],
-                    'name'       => $pd['name'],
+                    'code' => $pd['code'],
+                    'name' => $pd['name'],
                     'feature_id' => $subTeknisi->id,
                 ]);
             }
@@ -138,7 +138,7 @@ class TaskFeatureSeeder extends Seeder
         // ─── 8. Laporan ──────────────────────────────────────────────
 
         $this->command?->info('TaskFeatureSeeder: sub-feature FOP & Teknisi created/updated.');
-        $this->command?->info('TaskFeatureSeeder: ' . count($fopPermDefs) . ' FOP permissions seeded.');
-        $this->command?->info('TaskFeatureSeeder: ' . count($teknisiPermDefs) . ' Teknisi permissions seeded.');
+        $this->command?->info('TaskFeatureSeeder: '.count($fopPermDefs).' FOP permissions seeded.');
+        $this->command?->info('TaskFeatureSeeder: '.count($teknisiPermDefs).' Teknisi permissions seeded.');
     }
 }

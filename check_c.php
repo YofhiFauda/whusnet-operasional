@@ -1,9 +1,13 @@
 <?php
+
+use App\Models\Customer;
+use Illuminate\Contracts\Console\Kernel;
+
 require '/var/www/vendor/autoload.php';
 $app = require '/var/www/bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
-$customers = \App\Models\Customer::whereNotNull('cid')->get();
+$customers = Customer::whereNotNull('cid')->get();
 $updated = 0;
 foreach ($customers as $customer) {
     if ($pop = $customer->pop) {

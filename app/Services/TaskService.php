@@ -2,16 +2,24 @@
 
 namespace App\Services;
 
+use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Events\TaskCompleted;
 use App\Events\TaskScheduled;
 use App\Events\TaskStarted;
 use App\Jobs\SendTaskNotificationJob;
+use App\Models\AuditLog;
+use App\Models\CustomerInstallation;
+use App\Models\CustomerSurvey;
+use App\Models\FopTask;
 use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
+use App\Notifications\AppNotification;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class TaskService
@@ -21,55 +29,60 @@ class TaskService
     /**
      * Buat task baru beserta tim.
      *
-     * @param array $data   Validated data dari TaskRequest
-     * @param User  $actor  User yang membuat task (FOP)
-     * @return Task
+     * @param  array  $data  Validated data dari TaskRequest
+     * @param  User  $actor  User yang membuat task (FOP)
      */
     public function create(array $data, User $actor): Task
     {
-        return DB::transaction(function () use ($data, $actor) {
+        $task = DB::transaction(function () use ($data, $actor) {
             $taskType = TaskType::from($data['task_type']);
 
             $memberIds = $data['team_member_ids'] ?? [];
             $scheduledAt = $data['scheduled_at'] ?? null;
-            $status = (!empty($memberIds) && !empty($scheduledAt))
+            $status = (! empty($memberIds) && ! empty($scheduledAt))
                 ? TaskStatus::TERJADWAL->value
                 : TaskStatus::PENDING->value;
 
             $task = Task::create([
-                'task_number'       => $this->generateTaskNumber(),
-                'customer_id'       => $data['customer_id'] ?? null,
-                'pop_id'            => $data['pop_id'],
-                'task_type'         => $taskType->value,
-                'title'             => $data['title'],
-                'description'       => $data['description'] ?? null,
-                'status'            => $status,
-                'scheduled_at'      => $scheduledAt,
-                'fop_id'            => $actor->id,
-                'sla_minutes'       => $taskType->slaMinutes(),
+                'task_number' => $this->generateTaskNumber(),
+                'customer_id' => $data['customer_id'] ?? null,
+                'pop_id' => $data['pop_id'],
+                'task_type' => $taskType->value,
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'status' => $status,
+                'scheduled_at' => $scheduledAt,
+                'fop_id' => $actor->id,
+                'sla_minutes' => $taskType->slaMinutes(),
                 'conflict_override' => (bool) ($data['conflict_override'] ?? false),
-                'created_by'        => $actor->id,
-                'updated_by'        => $actor->id,
+                'created_by' => $actor->id,
+                'updated_by' => $actor->id,
             ]);
 
             // Simpan tim teknisi (1–3 orang)
             foreach ($memberIds as $index => $userId) {
                 TaskTeam::create([
-                    'task_id'      => $task->id,
-                    'user_id'      => $userId,
+                    'task_id' => $task->id,
+                    'user_id' => $userId,
                     'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
                 ]);
             }
 
-            // Kirim notifikasi async ke semua anggota tim
-            if (!empty($memberIds)) {
-                $this->notifyTeam($task, 'Task baru dijadwalkan untuk Anda', 'created');
-            }
-
-            \App\Models\AuditLog::log($task, 'created', null, $task->toArray());
+            AuditLog::log($task, 'created', null, $task->toArray());
 
             return $task->refresh();
         });
+
+        // Broadcast SETELAH transaction commit — TaskScheduled dipicu Reverb hampir
+        // instan, dan listener frontend langsung fetch() partial task lewat request
+        // HTTP baru (koneksi DB terpisah). Kalau broadcast masih di dalam transaction
+        // yang belum commit, request itu gak akan pernah nemu row-nya (404 diam-diam,
+        // fetchCard() cuma console.warn) — kartu gak pernah muncul tanpa reload manual.
+        if (! empty($data['team_member_ids'])) {
+            $this->notifyTeam($task, 'Task baru dijadwalkan untuk Anda', 'created');
+        }
+
+        return $task;
     }
 
     /**
@@ -77,34 +90,62 @@ class TaskService
      */
     public function update(Task $task, array $data, User $actor): Task
     {
-        return DB::transaction(function () use ($task, $data, $actor) {
+        $rescheduled = false;
+        $teamChanged = false;
+        $droppedIds = [];
+
+        $task = DB::transaction(function () use ($task, $data, $actor, &$rescheduled, &$teamChanged, &$droppedIds) {
             $oldValues = $task->toArray();
 
             $rescheduled = isset($data['scheduled_at'])
                 && $task->scheduled_at?->ne(Carbon::parse($data['scheduled_at']));
 
+            // Ambil roster lama SEBELUM disync ulang — dipakai buat deteksi
+            // teknisi yang di-drop, yang gak akan pernah ke-notify lewat
+            // notifyTeam() karena method itu iterasi tim BARU.
+            $oldMemberIds = isset($data['team_member_ids'])
+                ? $task->teamMembers()->pluck('user_id')->all()
+                : [];
+
             $task->update(array_merge($data, ['updated_by' => $actor->id]));
 
             // Update tim jika dikirim
             if (isset($data['team_member_ids'])) {
+                $newMemberIds = $data['team_member_ids'];
+                $droppedIds = array_values(array_diff($oldMemberIds, $newMemberIds));
+                $teamChanged = count($droppedIds) > 0 || count(array_diff($newMemberIds, $oldMemberIds)) > 0;
+
                 $task->teamMembers()->delete();
-                foreach ($data['team_member_ids'] as $index => $userId) {
+                foreach ($newMemberIds as $index => $userId) {
                     TaskTeam::create([
-                        'task_id'      => $task->id,
-                        'user_id'      => $userId,
+                        'task_id' => $task->id,
+                        'user_id' => $userId,
                         'role_in_task' => $index === 0 ? 'lead' : 'teknisi',
                     ]);
                 }
             }
 
-            if ($rescheduled) {
-                $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled');
-            }
+            AuditLog::log($task, 'updated', $oldValues, $task->toArray());
 
-            \App\Models\AuditLog::log($task, 'updated', $oldValues, $task->toArray());
+            $this->syncToFopTask($task);
 
             return $task->refresh();
         });
+
+        // Broadcast SETELAH transaction commit — lihat komentar sama di create().
+        // Kalau masih di dalam closure, listener frontend bisa fetch partial
+        // sebelum row ke-commit dan kartu gak pernah muncul tanpa reload.
+        if ($rescheduled) {
+            $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled');
+        } elseif ($teamChanged) {
+            $this->notifyTeam($task, 'Tim task Anda diperbarui.', 'team_changed');
+        }
+
+        if (! empty($droppedIds)) {
+            $this->notifyDroppedMembers($task, $droppedIds);
+        }
+
+        return $task;
     }
 
     // ─── Transisi Status ─────────────────────────────────────────
@@ -121,13 +162,13 @@ class TaskService
         );
 
         abort_unless(
-            $task->scheduled_at && !$task->scheduled_at->startOfDay()->isFuture(),
+            $task->scheduled_at && ! $task->scheduled_at->startOfDay()->isFuture(),
             422,
             'Task hanya bisa dimulai pada atau setelah hari yang dijadwalkan.'
         );
 
         $memberIds = $task->teamMembers()->pluck('user_id')->toArray();
-        if (!in_array($actor->id, $memberIds)) {
+        if (! in_array($actor->id, $memberIds)) {
             $memberIds[] = $actor->id;
         }
 
@@ -144,7 +185,7 @@ class TaskService
         }
 
         $task->update([
-            'status'     => TaskStatus::IN_PROGRESS->value,
+            'status' => TaskStatus::IN_PROGRESS->value,
             'started_at' => now(),
             'updated_by' => $actor->id,
         ]);
@@ -173,36 +214,48 @@ class TaskService
         );
 
         $task->update([
-            'status'            => TaskStatus::SELESAI->value,
+            'status' => TaskStatus::SELESAI->value,
             'fop_review_status' => 'pending',
-            'completed_at'      => now(),
-            'updated_by'        => $actor->id,
+            'completed_at' => now(),
+            'completed_by' => $actor->id,
+            'updated_by' => $actor->id,
         ]);
 
         $task = $task->refresh();
+
+        // Task Ambil Modem (DEAC) selesai → alat otomatis ditandai diambil.
+        // Ini pengganti klik manual "Ambil Alat" jaman FopTask belum dibuat
+        // (lihat CustomerController::retrieveDevice() & TicketService::createDeviceRetrievalTask()).
+        if ($task->task_type === TaskType::AMBIL_MODEM && $task->customer_id) {
+            $device = $task->customer?->customerDevice;
+            if ($device && ! $device->device_retrieved_at) {
+                $device->update(['device_retrieved_at' => $task->completed_at]);
+            }
+        }
+
         broadcast(new TaskCompleted($task));
 
         // Notify FOP users in the same POP
-        $fopUsers = \App\Models\User::whereHas('role', fn ($q) => $q->where('code', 'fop'))
+        $fopUsers = User::whereHas('role', fn ($q) => $q->where('code', 'fop'))
             ->where(function ($query) use ($task) {
-                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', \App\Enums\ScopeType::ALL_POP->value))
-                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [\App\Enums\ScopeType::SELECTED_POP->value, \App\Enums\ScopeType::POP_TREE->value])
+                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
                         ->whereHas('targets', fn ($t) => $t->where('pop_id', $task->pop_id))
                     );
             })
             ->get();
 
         foreach ($fopUsers as $fop) {
-            /** @var \App\Models\User $fop */
-            $fop->notify(new \App\Notifications\AppNotification(
-                title: 'Laporan Task Selesai: ' . $task->task_number,
+            /** @var User $fop */
+            $fop->notify(new AppNotification(
+                title: 'Laporan Task Selesai: '.$task->task_number,
                 message: "Teknisi {$actor->name} telah menyelesaikan task dan mengunggah laporan. Butuh review Anda.",
                 actionUrl: route('tasks.show', $task->id),
-                type: 'info'
+                type: NotificationType::INFO
             ));
         }
 
-        \App\Models\AuditLog::log($task, 'completed', ['status' => TaskStatus::IN_PROGRESS->value], ['status' => TaskStatus::SELESAI->value]);
+        AuditLog::log($task, 'completed', ['status' => TaskStatus::IN_PROGRESS->value], ['status' => TaskStatus::SELESAI->value]);
 
         return $task;
     }
@@ -210,7 +263,7 @@ class TaskService
     /**
      * Teknisi set task ke Pending (butuh reschedule).
      */
-    public function setPending(Task $task, User $actor, string $reason): Task
+    public function setPending(Task $task, User $actor, string $reason, bool $reportDeferred = false): Task
     {
         abort_unless(
             $task->status === TaskStatus::IN_PROGRESS,
@@ -218,20 +271,21 @@ class TaskService
             'Task hanya bisa di-pending dari status In Progress.'
         );
 
-        DB::transaction(function () use ($task, $reason, $actor) {
+        DB::transaction(function () use ($task, $reason, $actor, $reportDeferred) {
             $task->update([
-                'status'         => TaskStatus::PENDING->value,
+                'status' => TaskStatus::PENDING->value,
                 'pending_reason' => $reason,
-                'updated_by'     => $actor->id,
+                'report_deferred' => $reportDeferred,
+                'updated_by' => $actor->id,
             ]);
 
             // Stop the timer on CustomerSurvey or CustomerInstallation if task type is survey or pemasangan
             if ($task->customer_id) {
-                if ($task->task_type === \App\Enums\TaskType::SURVEY) {
-                    $survey = \App\Models\CustomerSurvey::where('customer_id', $task->customer_id)
+                if ($task->task_type === TaskType::SURVEY) {
+                    $survey = CustomerSurvey::where('customer_id', $task->customer_id)
                         ->latest()
                         ->first();
-                    if ($survey && $survey->started_at && !$survey->completed_at) {
+                    if ($survey && $survey->started_at && ! $survey->completed_at) {
                         $completedAt = now();
                         $survey->completed_at = $completedAt;
                         $survey->duration_minutes = $survey->started_at->diffInMinutes($completedAt);
@@ -239,11 +293,11 @@ class TaskService
                         $survey->end_time = $completedAt->toTimeString();
                         $survey->save();
                     }
-                } elseif ($task->task_type === \App\Enums\TaskType::PEMASANGAN) {
-                    $installation = \App\Models\CustomerInstallation::where('customer_id', $task->customer_id)
+                } elseif ($task->task_type === TaskType::PEMASANGAN) {
+                    $installation = CustomerInstallation::where('customer_id', $task->customer_id)
                         ->latest()
                         ->first();
-                    if ($installation && $installation->started_at && !$installation->completed_at) {
+                    if ($installation && $installation->started_at && ! $installation->completed_at) {
                         $completedAt = now();
                         $installation->completed_at = $completedAt;
                         $installation->end_time = $completedAt->toTimeString();
@@ -263,19 +317,25 @@ class TaskService
     public function cancel(Task $task, User $actor, string $reason): Task
     {
         abort_unless(
-            !in_array($task->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN]),
+            ! in_array($task->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN]),
             422,
             'Task yang sudah selesai atau dibatalkan tidak bisa dibatalkan lagi.'
         );
 
         $task->update([
-            'status'       => TaskStatus::DIBATALKAN->value,
+            'status' => TaskStatus::DIBATALKAN->value,
             'cancelled_at' => now(),
             'cancel_reason' => $reason,
-            'updated_by'   => $actor->id,
+            'updated_by' => $actor->id,
         ]);
 
-        \App\Models\AuditLog::log($task, 'cancelled', ['status' => $task->getOriginal('status')], ['status' => TaskStatus::DIBATALKAN->value, 'cancel_reason' => $reason]);
+        AuditLog::log($task, 'cancelled', ['status' => $task->getOriginal('status')], ['status' => TaskStatus::DIBATALKAN->value, 'cancel_reason' => $reason]);
+
+        // Teknisi harus tau begitu task-nya dibatalkan dari atas — baik yang lagi
+        // in_progress maupun yang masih terjadwal belum mulai, gak cukup cuma
+        // keliatan diam-diam ilang dari /tasks-saya (sebelumnya cuma di-notify
+        // kalau in_progress, task terjadwal yang dibatalkan jadi kartu basi).
+        $this->notifyTeam($task, "Task dibatalkan: {$reason}", 'cancelled');
 
         return $task->refresh();
     }
@@ -287,8 +347,8 @@ class TaskService
      */
     public function reassignTeam(Task $task, int $oldUserId, int $newUserId, int $reassignerId, ?string $newScheduledAt = null): void
     {
-        if (!in_array($task->status, ['terjadwal', 'in_progress'])) {
-            throw new \Exception("Hanya task terjadwal atau in progress yang bisa di-reassign.");
+        if (! in_array($task->status, [TaskStatus::TERJADWAL, TaskStatus::IN_PROGRESS], true)) {
+            throw new \Exception('Hanya task terjadwal atau in progress yang bisa di-reassign.');
         }
 
         $scheduleChanged = false;
@@ -296,10 +356,17 @@ class TaskService
 
         if ($newScheduledAt) {
             $parsedNewTime = Carbon::parse($newScheduledAt);
-            if (!$task->scheduled_at || !$parsedNewTime->eq($task->scheduled_at)) {
+            if (! $task->scheduled_at || ! $parsedNewTime->eq($task->scheduled_at)) {
                 $scheduleChanged = true;
                 $targetScheduledAt = $parsedNewTime->toDateTimeString();
             }
+        }
+
+        // Check if old user is in the team — cek duluan sebelum conflict-detection
+        // biar gak buang query conflict kalau oldUserId emang bukan member.
+        $hasMember = $task->teamMembers()->where('user_id', $oldUserId)->exists();
+        if (! $hasMember) {
+            throw new \Exception('Teknisi lama tidak ditemukan dalam tim task ini.');
         }
 
         // Determine user IDs to check for conflicts
@@ -319,46 +386,42 @@ class TaskService
             throw new \Exception("Teknisi memiliki jadwal yang bentrok: {$taskNum} pada {$sched}.");
         }
 
-        // Check if old user is in the team
-        $hasMember = $task->teamMembers()->where('user_id', $oldUserId)->exists();
-        if (!$hasMember) {
-            throw new \Exception("Teknisi lama tidak ditemukan dalam tim task ini.");
-        }
+        // Update the team member ID + task, dibungkus transaction sendiri biar
+        // service ini self-contained gak gantung transaction dari caller.
+        DB::transaction(function () use ($task, $oldUserId, $newUserId, $reassignerId, $scheduleChanged, $targetScheduledAt) {
+            $task->teamMembers()->where('user_id', $oldUserId)->update(['user_id' => $newUserId]);
 
-        // Update the team member ID
-        $task->teamMembers()->where('user_id', $oldUserId)->update(['user_id' => $newUserId]);
-
-        // If schedule changed, update task's scheduled_at
-        if ($scheduleChanged) {
-            $task->update([
-                'scheduled_at' => $targetScheduledAt,
-                'updated_by'   => $reassignerId,
-            ]);
-        } else {
-            $task->update([
-                'updated_by'   => $reassignerId,
-            ]);
-        }
+            if ($scheduleChanged) {
+                $task->update([
+                    'scheduled_at' => $targetScheduledAt,
+                    'updated_by' => $reassignerId,
+                ]);
+            } else {
+                $task->update([
+                    'updated_by' => $reassignerId,
+                ]);
+            }
+        });
 
         // Log the change — batch-load all relevant users to avoid N+1
         $allUserIds = array_unique(array_filter(array_merge([$reassignerId, $oldUserId, $newUserId], $otherUserIds)));
-        $usersById = \App\Models\User::whereIn('id', $allUserIds)->get()->keyBy('id');
+        $usersById = User::whereIn('id', $allUserIds)->get()->keyBy('id');
         $reassigner = $usersById->get($reassignerId);
         $oldUser = $usersById->get($oldUserId);
         $newUser = $usersById->get($newUserId);
 
-        \App\Models\AuditLog::log(
+        AuditLog::log(
             $task,
             'reassigned',
             [
                 'user_id' => $oldUserId,
                 'name' => $oldUser?->name,
-                'scheduled_at' => $task->getOriginal('scheduled_at')?->toDateTimeString()
+                'scheduled_at' => $task->getOriginal('scheduled_at')?->toDateTimeString(),
             ],
             [
                 'user_id' => $newUserId,
                 'name' => $newUser?->name,
-                'scheduled_at' => $task->scheduled_at?->toDateTimeString()
+                'scheduled_at' => $task->scheduled_at?->toDateTimeString(),
             ]
         );
 
@@ -367,24 +430,24 @@ class TaskService
             $url = route('tasks.show', $task->id);
             $msg = "Anda telah ditugaskan menggantikan {$oldUser?->name} untuk task ini.";
             if ($scheduleChanged) {
-                $msg .= " Jadwal diubah ke " . Carbon::parse($targetScheduledAt)->format('d M Y H:i');
+                $msg .= ' Jadwal diubah ke '.Carbon::parse($targetScheduledAt)->format('d M Y H:i');
             }
-            $newUser->notify(new \App\Notifications\AppNotification(
-                title: 'Task Baru Di-assign: ' . $task->task_number,
+            $newUser->notify(new AppNotification(
+                title: 'Task Baru Di-assign: '.$task->task_number,
                 message: $msg,
                 actionUrl: $url,
-                type: 'info'
+                type: NotificationType::INFO
             ));
         }
 
         // Notify old tech
         if ($oldUser) {
             $url = route('tasks.show', $task->id);
-            $oldUser->notify(new \App\Notifications\AppNotification(
-                title: 'Task Di-unassign: ' . $task->task_number,
-                message: "Tugas ini telah dialihkan ke teknisi lain.",
+            $oldUser->notify(new AppNotification(
+                title: 'Task Di-unassign: '.$task->task_number,
+                message: 'Tugas ini telah dialihkan ke teknisi lain.',
                 actionUrl: $url,
-                type: 'error'
+                type: NotificationType::ERROR
             ));
         }
 
@@ -395,48 +458,49 @@ class TaskService
             foreach ($otherUserIds as $otherId) {
                 $otherUser = $usersById->get($otherId);
                 if ($otherUser) {
-                    $otherUser->notify(new \App\Notifications\AppNotification(
-                        title: 'Jadwal Task Diperbarui: ' . $task->task_number,
+                    $otherUser->notify(new AppNotification(
+                        title: 'Jadwal Task Diperbarui: '.$task->task_number,
                         message: "Jadwal task diubah ke {$formattedTime}.",
                         actionUrl: $url,
-                        type: 'info'
+                        type: NotificationType::INFO
                     ));
                 }
             }
         }
 
         // Broadcast Event to notify techs/frontend about schedule/team change
-        broadcast(new \App\Events\TaskScheduled($task, $scheduleChanged ? 'rescheduled' : 'created'));
+        broadcast(new TaskScheduled($task, $scheduleChanged ? 'rescheduled' : 'created'));
+
+        $this->syncToFopTask($task);
     }
 
     /**
      * Deteksi apakah ada teknisi dalam daftar yang konflik jadwal pada waktu tersebut.
      *
-     * @param  array<int>     $userIds
-     * @param  string         $scheduledAt  ISO datetime
-     * @param  int            $durationMinutes
-     * @param  int|null       $excludeTaskId  Abaikan task ini (saat edit)
-     * @return \Illuminate\Support\Collection     User IDs yang konflik
+     * @param  array<int>  $userIds
+     * @param  string  $scheduledAt  ISO datetime
+     * @param  int|null  $excludeTaskId  Abaikan task ini (saat edit)
+     * @return Collection User IDs yang konflik
      */
     public function detectConflicts(
         array $userIds,
         string $scheduledAt,
         int $durationMinutes = 120,
         ?int $excludeTaskId = null
-    ): \Illuminate\Support\Collection {
+    ): Collection {
         $start = Carbon::parse($scheduledAt);
-        $end   = $start->copy()->addMinutes($durationMinutes);
+        $end = $start->copy()->addMinutes($durationMinutes);
 
         $conflictingTeams = TaskTeam::with(['user', 'task'])
             ->whereIn('user_id', $userIds)
             ->whereHas('task', function ($q) use ($start, $end, $excludeTaskId) {
                 $q->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value])
-                  ->where('scheduled_at', '<', $end->toDateTimeString());
+                    ->where('scheduled_at', '<', $end->toDateTimeString());
 
-                if (\Illuminate\Support\Facades\DB::connection()->getDriverName() === 'sqlite') {
+                if (DB::connection()->getDriverName() === 'sqlite') {
                     $q->whereRaw("datetime(scheduled_at, '+' || sla_minutes || ' minutes') > ?", [$start->toDateTimeString()]);
                 } else {
-                    $q->whereRaw("DATE_ADD(scheduled_at, INTERVAL sla_minutes MINUTE) > ?", [$start->toDateTimeString()]);
+                    $q->whereRaw('DATE_ADD(scheduled_at, INTERVAL sla_minutes MINUTE) > ?', [$start->toDateTimeString()]);
                 }
 
                 if ($excludeTaskId) {
@@ -460,34 +524,105 @@ class TaskService
 
     private function generateTaskNumber(): string
     {
-        $year  = date('Y');
+        $year = date('Y');
         $count = Task::whereBetween('created_at', [
             Carbon::createFromDate($year)->startOfYear(),
             Carbon::createFromDate($year)->endOfYear(),
         ])->count() + 1;
+
         return sprintf('TASK-%s-%04d', $year, $count);
     }
 
     private function notifyTeam(Task $task, string $message, string $eventType = 'created'): void
     {
-        $members = $task->teamMembers()->with('user')->get();
-        $url = route('tasks.show', $task->id);
+        // afterCommit(), bukan langsung — caller di controller (mis. FopTaskController::
+        // store()/update()/assignToTeam()) sering manggil method ini dari DALAM
+        // transaction milik MEREKA sendiri (nested/savepoint). broadcast(TaskScheduled)
+        // yang lolos sebelum COMMIT terluar bikin race: Reverb push ke frontend nyaris
+        // instan, listener langsung fetch() partial task via request HTTP baru (koneksi
+        // DB lain) yang belum bisa lihat row-nya — kartu gak pernah muncul tanpa reload
+        // manual. afterCommit() aman dipanggil di luar transaction juga (jalan langsung).
+        DB::afterCommit(function () use ($task, $message, $eventType) {
+            $members = $task->teamMembers()->with('user')->get();
+            $url = route('tasks.show', $task->id);
 
-        foreach ($members as $member) {
-            if ($member->user) {
-                // Send in-app notification + broadcast
-                $member->user->notify(new \App\Notifications\AppNotification(
-                    title: 'Update Task: ' . $task->task_number,
-                    message: $message,
-                    actionUrl: $url,
-                    type: $eventType === 'cancelled' || $eventType === 'rejected' ? 'error' : 'info'
-                ));
+            foreach ($members as $member) {
+                if ($member->user) {
+                    // Send in-app notification + broadcast
+                    $member->user->notify(new AppNotification(
+                        title: 'Update Task: '.$task->task_number,
+                        message: $message,
+                        actionUrl: $url,
+                        type: $eventType === 'cancelled' || $eventType === 'rejected' ? NotificationType::ERROR : NotificationType::INFO
+                    ));
 
-                // Optional: keep Telegram if already setup
-                \App\Jobs\SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+                    // Optional: keep Telegram if already setup
+                    SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+                }
             }
+
+            broadcast(new TaskScheduled($task, $eventType));
+        });
+    }
+
+    /**
+     * Broadcast 'removed' ke teknisi yang baru saja di-drop dari tim task.
+     * Gak bisa lewat notifyTeam() biasa — method itu iterasi $task->teamMembers
+     * (tim BARU), sedangkan dropped user udah gak ada di situ begitu dipanggil.
+     * TaskScheduled::broadcastOn() jadi butuh target user id eksplisit di sini.
+     *
+     * @param  array<int>  $droppedUserIds
+     */
+    private function notifyDroppedMembers(Task $task, array $droppedUserIds): void
+    {
+        // Sama alasan afterCommit() seperti notifyTeam() di atas.
+        DB::afterCommit(function () use ($task, $droppedUserIds) {
+            $users = User::whereIn('id', $droppedUserIds)->get();
+            $url = route('tasks.show', $task->id);
+
+            foreach ($users as $user) {
+                $user->notify(new AppNotification(
+                    title: 'Task Dilepas: '.$task->task_number,
+                    message: 'Anda tidak lagi ditugaskan pada task ini.',
+                    actionUrl: $url,
+                    type: NotificationType::INFO
+                ));
+            }
+
+            broadcast(new TaskScheduled($task, 'removed', $droppedUserIds));
+        });
+    }
+
+    /**
+     * Synchronize Task changes (technicians and schedule) to corresponding FopTask.
+     */
+    private function syncToFopTask(Task $task): void
+    {
+        $fopTask = FopTask::where('task_id', $task->id)->first();
+        if (! $fopTask) {
+            return;
         }
 
-        broadcast(new \App\Events\TaskScheduled($task, $eventType));
+        $oldTaskDate = $fopTask->task_date ? $fopTask->task_date->copy() : null;
+        $newTaskDate = $task->scheduled_at;
+
+        // Sync technicians
+        $technicianIds = $task->teamMembers()->pluck('user_id')->toArray();
+        $fopTask->technicians()->sync($technicianIds);
+
+        // Sync task_date
+        if ($newTaskDate) {
+            $fopTask->task_date = $newTaskDate;
+        }
+        $fopTask->save();
+
+        // Rebuild teams for old and new dates if scheduled date changed
+        $fopTeamService = app(FopTaskTeamService::class);
+        if ($oldTaskDate && $newTaskDate && ! $oldTaskDate->isSameDay($newTaskDate)) {
+            $fopTeamService->rebuildTeamsForDate($oldTaskDate);
+        }
+        if ($fopTask->task_date) {
+            $fopTeamService->rebuildTeamsForDate($fopTask->task_date);
+        }
     }
 }

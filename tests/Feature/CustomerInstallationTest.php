@@ -2,12 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
+use App\Enums\TaskStatus;
+use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\Task;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -18,9 +24,9 @@ class CustomerInstallationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
 
-        $this->seed(\Database\Seeders\DatabaseSeeder::class);
+        $this->seed(DatabaseSeeder::class);
     }
 
     public function test_technician_can_fill_installation(): void
@@ -33,7 +39,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-001',
             'full_name' => 'Test Installation Customer',
-            'phone' => '0812345678',
+            'primary_phone' => '0812345678',
             'status' => 'installation_in_progress',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -47,6 +53,22 @@ class CustomerInstallationTest extends TestCase
             'technician_id' => $technician->id,
         ]);
 
+        // Guard assignment di store() (fix RBAC Issue 3 — semua non-full-access
+        // wajib jadi anggota tim Task yang lagi jalan, gak cukup cuma modal
+        // permission generik customers.detail.installation.update).
+        $task = Task::create([
+            'task_number' => 'TASK-TEST-INST-001',
+            'customer_id' => $customer->id,
+            'pop_id' => $pop->id,
+            'task_type' => TaskType::PEMASANGAN->value,
+            'title' => 'Pemasangan Test Installation Customer',
+            'status' => TaskStatus::IN_PROGRESS->value,
+            'started_at' => now(),
+            'created_by' => $technician->id,
+            'updated_by' => $technician->id,
+        ]);
+        $task->teamMembers()->create(['user_id' => $technician->id, 'role_in_task' => 'lead']);
+
         $installationData = [
             'installation_status' => 'completed',
             'scheduled_date' => now()->format('Y-m-d'),
@@ -59,6 +81,14 @@ class CustomerInstallationTest extends TestCase
             'speedtest_photo' => UploadedFile::fake()->image('speedtest.jpg'),
             'installation_note' => 'Instalasi selesai dan koneksi normal.',
             'device_type' => 'ont',
+            'materials' => [
+                [
+                    'item_name' => 'Kabel Dropcore',
+                    'item_type' => 'kabel_dropcore',
+                    'qty' => 50,
+                    'unit' => 'meter',
+                ],
+            ],
         ];
 
         $response = $this->actingAs($technician)
@@ -92,7 +122,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-002',
             'full_name' => 'Visible Installation Customer',
-            'phone' => '0812345679',
+            'primary_phone' => '0812345679',
             'status' => 'waiting_installation',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
@@ -107,11 +137,14 @@ class CustomerInstallationTest extends TestCase
             'installation_note' => 'Jadwal pemasangan siang.',
         ]);
 
+        // Teknisi gak punya customers.detail.view (Detail Pelanggan diblok),
+        // tab Pemasangan diakses lewat halaman terpisah customers.fieldwork
+        // (lihat CustomerFieldworkController).
         $response = $this->actingAs($technician)
-            ->get(route('customers.show', $customer->id));
+            ->get(route('customers.fieldwork', $customer->id));
 
         $response->assertStatus(200);
-        $response->assertSee('Data Pemasangan Pelanggan');
+        $response->assertSee('Hasil Laporan Pemasangan Perangkat');
         $response->assertSee('Visible Installation Customer');
         $response->assertSee('Jadwal pemasangan siang.');
     }
@@ -124,7 +157,7 @@ class CustomerInstallationTest extends TestCase
         $customer = Customer::create([
             'customer_code' => 'TEST-INST-003',
             'full_name' => 'Unauthorized Installation Customer',
-            'phone' => '0812345680',
+            'primary_phone' => '0812345680',
             'pop_id' => $pop->id,
             'data_completeness_status' => 'draft',
             'registration_date' => now(),
@@ -146,7 +179,7 @@ class CustomerInstallationTest extends TestCase
             'pop_code' => $code,
             'registration_prefix' => 'C',
             'cid_prefix' => 'D',
-            'name' => 'POP ' . $code,
+            'name' => 'POP '.$code,
             'type' => 'cabang',
             'status' => 'active',
         ]);
@@ -162,7 +195,7 @@ class CustomerInstallationTest extends TestCase
 
         $user->roleScopes()->create([
             'role_id' => $role->id,
-            'scope_type' => \App\Enums\ScopeType::ALL_POP,
+            'scope_type' => ScopeType::ALL_POP,
         ]);
 
         return $user;

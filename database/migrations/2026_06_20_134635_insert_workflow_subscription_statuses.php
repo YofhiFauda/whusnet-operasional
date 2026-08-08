@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -77,7 +75,7 @@ return new class extends Migration
                 'is_active' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]
+            ],
         ]);
     }
 
@@ -91,7 +89,7 @@ return new class extends Migration
                 'survey_in_progress',
                 'waiting_acc',
                 'installation_in_progress',
-                'verification_admin'
+                'verification_admin',
             ])->delete();
 
         $revert = [
@@ -103,7 +101,7 @@ return new class extends Migration
             'terminated' => 8,
             'rejected' => 9,
         ];
-        
+
         foreach ($revert as $code => $order) {
             DB::table('subscription_statuses')->where('code', $code)->update(['workflow_order' => $order + 100]);
         }

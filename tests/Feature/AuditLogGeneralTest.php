@@ -117,6 +117,7 @@ class AuditLogGeneralTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-202606-9901',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
@@ -145,21 +146,6 @@ class AuditLogGeneralTest extends TestCase
             'action' => 'update',
             'auditable_type' => Invoice::class,
             'auditable_id' => $invoice->id,
-        ]);
-
-        $user = User::factory()->create(['status' => 'active']);
-
-        $response = $this->put(route('users.pops.update', $user->id), [
-            'pop_ids' => [$pop->id],
-        ]);
-
-        $response->assertRedirect(route('users.index'));
-
-        $this->assertDatabaseHas('audit_logs', [
-            'module' => 'User Management',
-            'action' => 'assign_pop',
-            'auditable_type' => User::class,
-            'auditable_id' => $user->id,
         ]);
 
         $device = CustomerDevice::create([
@@ -231,13 +217,11 @@ class AuditLogGeneralTest extends TestCase
     private function createCustomer(Pop $pop): Customer
     {
         $customer = Customer::create([
-            'customer_code' => 'C-AUDIT-' . $pop->pop_code,
+            'customer_code' => 'C-AUDIT-'.$pop->pop_code,
             'full_name' => 'Customer Audit',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'internet_package_id' => $this->package->id,

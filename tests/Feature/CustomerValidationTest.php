@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\Customer;
 use App\Models\City;
+use App\Models\Customer;
 use App\Models\District;
-use App\Models\Village;
 use App\Models\InternetPackage;
 use App\Models\Pop;
-use App\Services\CustomerValidationService;
+use App\Models\Village;
+use Carbon\Carbon;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,9 +18,13 @@ class CustomerValidationTest extends TestCase
     use RefreshDatabase;
 
     private Pop $defaultPop;
+
     private City $city;
+
     private District $district;
+
     private Village $village;
+
     private InternetPackage $package;
 
     protected function setUp(): void
@@ -53,7 +57,6 @@ class CustomerValidationTest extends TestCase
             'customer_code' => 'C-DFT-000001',
             'full_name' => 'John Doe Incomplete',
             'primary_phone' => '08123456789',
-            'phone' => '08123456789',
             'registration_date' => '2026-06-11',
             'pop_id' => $this->defaultPop->id,
             'status' => 'registered',
@@ -74,7 +77,6 @@ class CustomerValidationTest extends TestCase
             'customer_code' => 'C-DFT-000002',
             'full_name' => 'John Doe Partial',
             'primary_phone' => '08123456789',
-            'phone' => '08123456789',
             'registration_date' => '2026-06-11',
             'pop_id' => $this->defaultPop->id,
             'status' => 'registered',
@@ -96,7 +98,6 @@ class CustomerValidationTest extends TestCase
             'customer_code' => 'C-DFT-000003',
             'full_name' => 'John Doe Complete',
             'primary_phone' => '08123456789',
-            'phone' => '08123456789',
             'registration_date' => '2026-06-11',
             'pop_id' => $this->defaultPop->id,
             'status' => 'registered',
@@ -124,7 +125,7 @@ class CustomerValidationTest extends TestCase
             'ppn' => 11,
             'total_monthly_bill' => $this->package->monthly_price * 1.11,
             'activation_date' => $customer->registration_date,
-            'due_date' => \Carbon\Carbon::parse($customer->registration_date)->addMonth(),
+            'due_date' => Carbon::parse($customer->registration_date)->addMonth(),
             'service_status' => 'calon_pelanggan',
             'billing_status' => 'pending',
         ]);
@@ -145,7 +146,6 @@ class CustomerValidationTest extends TestCase
             'customer_code' => 'C-DFT-000004',
             'full_name' => 'John Doe Incomplete 2',
             'primary_phone' => '08123456789',
-            'phone' => '08123456789',
             'registration_date' => '2026-06-11',
             'pop_id' => $this->defaultPop->id,
             'status' => 'registered',
@@ -168,7 +168,6 @@ class CustomerValidationTest extends TestCase
             'customer_code' => 'C-DFT-000005',
             'full_name' => 'John Doe Complete 2',
             'primary_phone' => '08123456789',
-            'phone' => '08123456789',
             'registration_date' => '2026-06-11',
             'pop_id' => $this->defaultPop->id,
             'status' => 'registered',
@@ -194,7 +193,7 @@ class CustomerValidationTest extends TestCase
             'ppn' => 11,
             'total_monthly_bill' => $this->package->monthly_price * 1.11,
             'activation_date' => $customer->registration_date,
-            'due_date' => \Carbon\Carbon::parse($customer->registration_date)->addMonth(),
+            'due_date' => Carbon::parse($customer->registration_date)->addMonth(),
             'service_status' => 'calon_pelanggan',
             'billing_status' => 'pending',
         ]);

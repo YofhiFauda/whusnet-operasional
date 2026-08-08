@@ -45,11 +45,9 @@ class PaymentModelTest extends TestCase
             'customer_code' => 'WHUS-2026-0001',
             'full_name' => 'Budi Santoso',
             'gender' => 'Laki-laki',
-            'phone' => '081234567890',
             'primary_phone' => '081234567890',
             'registration_date' => '2026-06-01',
             'status' => 'active',
-            'customer_status' => 'aktif',
             'data_completeness_status' => 'siap_billing',
             'pop_id' => $pop->id,
             'city_id' => $city->id,
@@ -111,6 +109,7 @@ class PaymentModelTest extends TestCase
 
         $invoice = Invoice::create([
             'invoice_number' => 'INV-202606-0001',
+            'invoice_type' => 'bulanan',
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
             'customer_service_id' => $service->id,
@@ -138,7 +137,7 @@ class PaymentModelTest extends TestCase
             'amount' => 100000.00,
             'received_by' => $user->id,
             'proof_file' => 'payments/proof-001.jpg',
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
             'note' => 'Pembayaran awal.',
         ]);
 
@@ -148,7 +147,7 @@ class PaymentModelTest extends TestCase
             'invoice_id' => $invoice->id,
             'customer_id' => $customer->id,
             'pop_id' => $pop->id,
-            'payment_status' => 'pending',
+            'payment_status' => 'valid',
         ]);
 
         $payment->refresh();
