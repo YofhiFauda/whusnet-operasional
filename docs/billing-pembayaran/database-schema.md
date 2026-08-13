@@ -66,6 +66,7 @@ Migrasi sumber: `2026_06_13_000001_create`, `2026_06_15_000002_add_legacy_ids`, 
 |-------|------|----------|------------|
 | `id` | bigint PK | | |
 | `payment_number` | string(50), unique | | Format `PAY-{periode}-{urutan}`, digenerate `Payment::generatePaymentNumber()` via `payment_number_sequences` (lihat di bawah) |
+| `idempotency_key` | string(191), **unique** | ✔ | Penahan submit dobel jalur Tagihan (migrasi `2026_08_10_154725`). Nullable: seluruh pembayaran lama — hasil migrasi legacy maupun batch kolektor — tidak punya kunci ini dan tak boleh dipaksa punya; unique memperlakukan NULL sebagai berbeda satu sama lain sehingga baris lama tidak saling bertabrakan. Jalur batch kolektor tetap memakai `payment_batches.idempotency_key` (satu kunci per sesi submit, bukan per pembayaran) |
 | `old_payment_id` / `old_transaction_id` / `old_request_id` | string(50) | ✔ | Referensi data legacy |
 | `billing_period` | string(50) | ✔ | Legacy — periode bayar dari data lama |
 | `received_by_old` / `deposited_by_old` | string(50) | ✔ | Nama penerima/penyetor dari data legacy (sebelum ada FK `users`) |

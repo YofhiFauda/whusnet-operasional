@@ -62,6 +62,14 @@ function notificationDropdown() {
         open: false,
         notifications: <?php echo json_encode(auth()->user()->notifications()->take(10)->get(), 15, 512) ?>,
         unreadCount: <?php echo e(auth()->user()->unreadNotificationsCountCached()); ?>,
+
+        // Endpoint POST dirender server-side dari definisi route, bukan ditulis
+        // ulang sebagai path literal di JS. `markReadUrlTemplate` memakai
+        // placeholder karena id notifikasinya baru diketahui di klien (bisa
+        // datang dari Echo, bukan cuma dari render awal) — yang penting BENTUK
+        // URL-nya tetap berasal dari routes/web.php. ADHOC-20 langkah 3.
+        markReadUrlTemplate: '<?php echo e(route('notifications.markRead', ['id' => '__ID__'])); ?>',
+        markAllReadUrl: '<?php echo e(route('notifications.markAllRead')); ?>',
         
         init() {
             // Komponen ini mount di layout global (tiap halaman) — kalau Alpine
@@ -142,7 +150,7 @@ function notificationDropdown() {
                 notif.read_at = new Date().toISOString();
                 this.unreadCount = Math.max(0, this.unreadCount - 1);
 
-                await fetch(`/notifications/${id}/read`, {
+                await fetch(this.markReadUrlTemplate.replace('__ID__', encodeURIComponent(id)), {
                     method: 'POST',
                     headers: this.socketHeaders()
                 });
@@ -153,7 +161,7 @@ function notificationDropdown() {
             this.notifications.forEach(n => n.read_at = new Date().toISOString());
             this.unreadCount = 0;
 
-            await fetch('/notifications/mark-all-read', {
+            await fetch(this.markAllReadUrl, {
                 method: 'POST',
                 headers: this.socketHeaders()
             });

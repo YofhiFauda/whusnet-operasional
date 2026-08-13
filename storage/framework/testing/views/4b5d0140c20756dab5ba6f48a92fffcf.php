@@ -303,8 +303,9 @@
                         <span class="block text-sm font-mono font-bold text-text-main"><?php echo e($survey->cable_estimation_meter ?? '-'); ?> Meter</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Kebutuhan FOP / Tiang</span>
-                        <span class="block text-sm text-text-main"><?php echo e($survey->fop_id ?? '-'); ?></span>
+                        
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">FOP Penanggung Jawab</span>
+                        <span class="block text-sm text-text-main"><?php echo e($survey->fop->name ?? '-'); ?></span>
                     </div>
                     <?php if($survey->requested_installation_date): ?>
                     <div>
@@ -312,11 +313,13 @@
                         <span class="block text-sm font-mono font-bold text-text-main"><?php echo e(\App\Support\IndonesianDate::date($survey->requested_installation_date)); ?></span>
                     </div>
                     <?php endif; ?>
+                    <?php if($survey->required_tools): ?>
                     <div class="md:col-span-3">
                         
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alat Khusus / Kendala Peralatan</span>
-                        <p class="text-sm text-text-secondary whitespace-pre-wrap"><?php echo e($survey->required_tools ?? '-'); ?></p>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Kendala Peralatan</span>
+                        <p class="text-sm text-text-secondary whitespace-pre-wrap"><?php echo e($survey->required_tools); ?></p>
                     </div>
+                    <?php endif; ?>
                     <?php if($survey->survey_note): ?>
                     <div class="md:col-span-3 pt-4 border-t border-border mt-2">
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Surveyor</span>
@@ -325,6 +328,17 @@
                     <?php endif; ?>
                 </div>
             </div>
+
+            <?php echo $__env->make('verifications.partials.materials', [
+                'title' => 'Estimasi Material Hasil Survey',
+                'emptyText' => 'Surveyor tidak mencatat estimasi material.',
+                'rows' => $surveyMaterials,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            <?php echo $__env->make('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dicatat Surveyor',
+                'rows' => $surveyWorkTools,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <?php if($survey->survey_photo): ?>
@@ -482,6 +496,12 @@
                 </div>
             </div>
 
+            <?php echo $__env->make('verifications.partials.materials', [
+                'title' => 'Material Terpakai Saat Pemasangan',
+                'emptyText' => 'Tim pemasangan tidak mencatat material terpakai.',
+                'rows' => $installationMaterials,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
             
             
             <?php if(!empty($materialVariance)): ?>
@@ -519,6 +539,11 @@
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php echo $__env->make('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'rows' => $installationWorkTools,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
             
             <div class="mb-6">
@@ -792,9 +817,9 @@
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         
-                                        <input type="number" step="0.01" name="extra_installation_fee" id="fv_extra_installation_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            value="<?php echo e(old('extra_installation_fee', $customer->internetPackage->installation_fee ?? 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
+                                            value="<?php echo e(old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0))); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
                                 </div>
                                 <div>
@@ -802,7 +827,7 @@
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         
-                                        <input type="number" step="0.01" name="other_fee" id="fv_other_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="other_fee" id="fv_other_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('other_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -811,7 +836,7 @@
                                     <label for="extra_cable_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">KABEL TAMBAHAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_cable_fee" id="fv_extra_cable_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_cable_fee" id="fv_extra_cable_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('extra_cable_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -820,7 +845,7 @@
                                     <label for="extra_pole_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">TAMBAHAN TIANG</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_pole_fee" id="fv_extra_pole_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_pole_fee" id="fv_extra_pole_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('extra_pole_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -832,7 +857,7 @@
                                 <div class="relative">
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                     
-                                    <input type="number" step="0.01" min="0" name="prorate_amount_override" id="fv_prorate_amount"
+                                    <input type="text" inputmode="decimal" data-rupiah name="prorate_amount_override" id="fv_prorate_amount"
                                         class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                         value="<?php echo e(old('prorate_amount_override', '')); ?>" oninput="onProrateManualEdit()">
                                 </div>
@@ -1094,10 +1119,19 @@
         const discount = parseFloat(params.discount) || 0;
         const ppnRate = parseFloat(params.ppn) || 0;
 
-        const instFee = parseFloat(document.getElementById('fv_extra_installation_fee').value) || 0;
-        const cableFee = parseFloat(document.getElementById('fv_extra_cable_fee').value) || 0;
-        const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
-        const otherFee = parseFloat(document.getElementById('fv_other_fee').value) || 0;
+        // Kolom rupiah bermasking ribuan (data-rupiah): parseFloat('150.000')
+        // = 150, dan seluruh pratinjau kwitansi ikut salah. `params.*` di atas
+        // TIDAK dimasking — itu data-* dari server, bukan ketikan admin.
+        const angkaRupiah = (id) => {
+            const el = document.getElementById(id);
+
+            return (el && window.Rupiah ? window.Rupiah.angka(el.value) : parseFloat(el?.value)) || 0;
+        };
+
+        const instFee = angkaRupiah('fv_extra_installation_fee');
+        const cableFee = angkaRupiah('fv_extra_cable_fee');
+        const poleFee = angkaRupiah('fv_extra_pole_fee');
+        const otherFee = angkaRupiah('fv_other_fee');
 
         // Calculate Prorate (auto). Nilai final dipakai kwitansi diambil dari
         // input fv_prorate_amount — auto-filled di sini kecuali admin sudah
@@ -1174,9 +1208,12 @@
 
         // Auto-fill field prorata kecuali admin sudah edit manual (dirty).
         if (!prorateInput.dataset.dirty) {
-            prorateInput.value = autoProrateAmount;
+            // Ikut format ribuan supaya sama dengan kolom rupiah lain di form.
+            prorateInput.value = window.Rupiah
+                ? window.Rupiah.format(String(autoProrateAmount))
+                : autoProrateAmount;
         }
-        const prorateAmount = parseFloat(prorateInput.value) || 0;
+        const prorateAmount = angkaRupiah('fv_prorate_amount');
 
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di
@@ -1238,6 +1275,9 @@
                         { text: 'Batal', type: 'secondary' },
                         { text: 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
                             window.Dialog.close();
+                            // Submit programatik melewati listener `submit`
+                            // global — kolom biaya bermasking dibersihkan di sini.
+                            window.Rupiah?.normalisasiForm(verifyForm);
                             verifyForm.submit();
                         }}
                     ]

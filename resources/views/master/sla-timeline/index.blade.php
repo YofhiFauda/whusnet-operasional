@@ -41,13 +41,13 @@
                                         min="1"
                                         class="w-16 rounded-md border border-slate-300 dark:border-slate-600 px-2 py-1 text-sm"
                                         value="{{ $setting?->sla_duration ?? $type->defaultHandlingSlaHours() }}"
-                                        @change="save({{ $package->id }}, '{{ $type->value }}', $event.target.value, $refs.unit_{{ $package->id }}_{{ $loop->index }}.value)"
+                                        @change="save({{ $package->id }}, '{{ $type->value }}', $event.target.value, $refs.unit_{{ $package->id }}_{{ $loop->index }}.value, $event)"
                                         x-ref="duration_{{ $package->id }}_{{ $loop->index }}"
                                     >
                                     <select
                                         class="rounded-md border border-slate-300 dark:border-slate-600 px-1 py-1 text-sm"
                                         x-ref="unit_{{ $package->id }}_{{ $loop->index }}"
-                                        @change="save({{ $package->id }}, '{{ $type->value }}', $refs.duration_{{ $package->id }}_{{ $loop->index }}.value, $event.target.value)"
+                                        @change="save({{ $package->id }}, '{{ $type->value }}', $refs.duration_{{ $package->id }}_{{ $loop->index }}.value, $event.target.value, $event)"
                                     >
                                         <option value="hour" @selected(($setting?->sla_unit ?? 'day') === 'hour')>jam</option>
                                         <option value="day" @selected(($setting?->sla_unit ?? 'day') === 'day')>hari</option>
@@ -61,30 +61,82 @@
         </table>
     </div>
 
-    <p class="text-xs text-slate-500 dark:text-slate-400 mt-3" x-show="savedMessage" x-text="savedMessage"></p>
+    <p class="text-xs mt-3" x-show="savedMessage" x-cloak x-text="savedMessage"
+       :class="savedError ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-500 dark:text-slate-400'"></p>
 </div>
 
 @push('scripts')
 <script>
+    /**
+     * Matriks SLA per paket — simpan otomatis tiap kali nilai berubah.
+     *
+     * Versi lama cuma `.then(res => res.json()).then(() => savedMessage =
+     * 'Tersimpan.')` — tanpa cek `res.ok`, tanpa `.catch`. Ditolak 403, gagal
+     * validasi 422, atau server 500, layar TETAP menulis "Tersimpan.". Admin
+     * menutup halaman yakin SLA sudah berubah padahal tidak. Simpan-otomatis
+     * tanpa tombol membuat kebohongan itu makin mahal: tak ada satu pun langkah
+     * lain yang memberi kesempatan sadar.
+     */
     function slaTimelineMatrix() {
         return {
             savedMessage: '',
-            save(packageId, taskType, duration, unit) {
-                fetch(`{{ url('/master/sla-timeline') }}/${packageId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-HTTP-Method-Override': 'PUT',
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ task_type: taskType, sla_duration: duration, sla_unit: unit }),
-                })
-                    .then(res => res.json())
-                    .then(() => {
-                        this.savedMessage = 'Tersimpan.';
-                        setTimeout(() => (this.savedMessage = ''), 2000);
+            savedError: false,
+
+            async save(packageId, taskType, duration, unit, event) {
+                const input = event?.target;
+                const sebelumnya = input?.defaultValue;
+
+                this.savedMessage = 'Menyimpan…';
+                this.savedError = false;
+
+                try {
+                    const res = await fetch(`{{ url('/master/sla-timeline') }}/${packageId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'X-HTTP-Method-Override': 'PUT',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ task_type: taskType, sla_duration: duration, sla_unit: unit }),
                     });
+
+                    const data = await res.json().catch(() => ({}));
+
+                    if (!res.ok) {
+                        // Pesan validasi Laravel bersarang di `errors`; ambil yang
+                        // pertama supaya admin tahu APA yang salah, bukan cuma
+                        // "gagal".
+                        const pesan = data.message
+                            || Object.values(data.errors ?? {})[0]?.[0]
+                            || `Gagal menyimpan (HTTP ${res.status}).`;
+
+                        throw new Error(pesan);
+                    }
+
+                    // `defaultValue` diikutkan supaya percobaan berikutnya punya
+                    // titik pulang yang benar, bukan nilai gagal sebelumnya.
+                    if (input) input.defaultValue = input.value;
+
+                    this.savedMessage = 'Tersimpan.';
+                    setTimeout(() => (this.savedMessage = ''), 2000);
+
+                    if (window.Toast) {
+                        window.Toast.show('success', 'SLA tersimpan', '', 2500);
+                    }
+                } catch (e) {
+                    // Nilai dikembalikan ke semula: membiarkan angka baru
+                    // terpampang setelah gagal simpan sama menyesatkannya dengan
+                    // menulis "Tersimpan.".
+                    if (input && sebelumnya !== undefined) input.value = sebelumnya;
+
+                    this.savedError = true;
+                    this.savedMessage = e.message || 'Gagal menyimpan — nilai dikembalikan.';
+
+                    if (window.Toast) {
+                        window.Toast.show('error', 'SLA gagal disimpan', this.savedMessage, 6000);
+                    }
+                }
             },
         };
     }

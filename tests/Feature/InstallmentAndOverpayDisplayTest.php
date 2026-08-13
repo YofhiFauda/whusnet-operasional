@@ -402,6 +402,9 @@ class InstallmentAndOverpayDisplayTest extends TestCase
         $response->assertSee('id="qp-amount"', false);
         $response->assertSee('id="qp-overpay-hint"', false);
         $response->assertSee('id="qp-installment-hint"', false);
+        // Kolom nominal ikut masking ribuan seperti jalur pembayaran lain
+        // (`data-rupiah`, ditangani skrip di layouts/app.blade.php).
+        $response->assertSee('data-rupiah id="qp-amount"', false);
         // Field lebih bayar terpisah SUDAH DIHAPUS (2026-08-04) — nominal
         // lebih sekarang otomatis dihitung server dari selisih qp-amount
         // vs sisa tagihan, bukan diketik manual admin.

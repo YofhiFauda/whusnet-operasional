@@ -181,4 +181,38 @@
             Toast.error('Terdapat Kesalahan', errorHtml, 6000);
         @endif
     });
+
+    // Intercept native browser HTML form validation 'invalid' events and display via Toast component
+    let formToastLock = false;
+    document.addEventListener('invalid', (e) => {
+        // Prevent default browser validation popup bubble ("Please select an item in the list")
+        e.preventDefault();
+
+        if (formToastLock) return;
+        formToastLock = true;
+        setTimeout(() => { formToastLock = false; }, 400);
+
+        const el = e.target;
+        let message = el.validationMessage;
+
+        // Custom localized / friendly message mapping
+        if (el.tagName === 'SELECT' && (el.validity.valueMissing || !el.value)) {
+            message = 'Harap pilih salah satu item dalam daftar / pilihan terlebih dahulu.';
+        } else if ((el.type === 'checkbox' || el.type === 'radio') && el.validity.valueMissing) {
+            message = 'Harap pilih / centang minimal satu item dalam daftar.';
+        } else if (el.validity.valueMissing) {
+            const label = el.labels && el.labels[0] ? el.labels[0].innerText.replace('*', '').trim() : '';
+            message = label ? `Kolom "${label}" wajib diisi.` : 'Harap lengkapi kolom yang wajib diisi.';
+        } else if (el.validity.typeMismatch) {
+            message = 'Format data yang dimasukkan tidak sesuai.';
+        }
+
+        if (window.Toast && typeof window.Toast.warning === 'function') {
+            window.Toast.warning('Validasi Formulir', message, 5000);
+        }
+
+        try {
+            el.focus({ preventScroll: false });
+        } catch (err) {}
+    }, true);
 </script>

@@ -15,10 +15,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Role `kolektor` (RBAC baru, docs/plan/analisa-billing-tagihan-pembayaran-
- * kolektor.md §B-8 no. 4 & no. 5) — hak paling minimal. TIDAK boleh input
- * pembayaran lewat jalur mana pun (single-payment maupun batch), dan
- * worklist-nya cuma baca pelanggan sendiri, bukan `customers.view` penuh.
+ * Batas kewenangan role `kolektor` SETELAH kolektor-2.0.
+ *
+ * Yang BERUBAH (§8 dokumen 2.0 merevisi §B-8 no. 4 dokumen lama): kolektor
+ * sekarang boleh mencatat pembayaran — tapi HANYA lewat
+ * `/collector-worklist/pay`, hanya untuk pelanggan ber-`collector_id`
+ * dirinya. Uji jalur itu ada di CollectorSelfPaymentTest.
+ *
+ * Yang TETAP, dan itulah yang dikunci di file ini: kolektor tidak punya
+ * `payments.create` (bayar invoice mana pun), tidak bisa membuka Worksheet
+ * Admin, tidak bisa mencatat pembayaran atas nama kolektor lain lewat rute
+ * admin, dan tidak punya `customers.view` penuh.
  */
 class CollectorRoleCannotCreatePaymentsTest extends TestCase
 {
@@ -102,13 +109,27 @@ class CollectorRoleCannotCreatePaymentsTest extends TestCase
         ]);
     }
 
-    public function test_kolektor_role_seeded_with_only_kolektor_view_permission(): void
+    public function test_kolektor_role_seeded_with_own_worklist_permissions_only(): void
     {
         $kolektor = $this->createKolektor();
 
         $this->assertTrue($kolektor->hasPermission('kolektor.view'));
+        $this->assertTrue($kolektor->hasPermission('kolektor.pay'));
+        $this->assertTrue($kolektor->hasPermission('kolektor.deposit'));
+        $this->assertTrue($kolektor->hasPermission('kolektor.visit'));
+
+        // Kolektor menyetor, TIDAK memverifikasi. Kalau dia punya
+        // `collector_worksheet.validate`, dia bisa menutup setorannya sendiri
+        // dan cross check kehilangan seluruh gunanya.
+        $this->assertFalse($kolektor->hasPermission('collector_worksheet.validate'));
+        $this->assertFalse($kolektor->hasPermission('collector_worksheet.approve'));
+
+        // Batasnya di sini: `kolektor.pay` bukan `payments.create`. Yang satu
+        // cuma berlaku di rute worklist yang memaksa collector = auth user,
+        // yang satu lagi hak bayar invoice mana pun di halaman Tagihan.
         $this->assertFalse($kolektor->hasPermission('payments.create'));
         $this->assertFalse($kolektor->hasPermission('customers.view'));
+        $this->assertFalse($kolektor->hasPermission('collector_worksheet.view'));
     }
 
     public function test_kolektor_cannot_access_single_payment_form(): void
@@ -135,14 +156,23 @@ class CollectorRoleCannotCreatePaymentsTest extends TestCase
         $this->assertDatabaseCount('payments', 0);
     }
 
-    public function test_kolektor_cannot_access_batch_endpoint(): void
+    /**
+     * Rute batch ADMIN menerima id kolektor dari URL. Kolektor tak boleh
+     * menyentuhnya sama sekali — kalau boleh, kolektor A bisa mencatat
+     * pembayaran atas nama kolektor B (itulah alasan rute kolektor dibuat
+     * tanpa parameter, §9).
+     */
+    public function test_kolektor_cannot_access_admin_batch_endpoint_nor_worksheet(): void
     {
         $kolektor = $this->createKolektor();
 
-        $response = $this->actingAs($kolektor)->get(route('collectors.show', $kolektor->id));
+        $response = $this->actingAs($kolektor)->get(route('collector-worksheet.index'));
         $response->assertForbidden();
 
-        $response = $this->actingAs($kolektor)->post(route('collector-batch.store', $kolektor->id), [
+        $response = $this->actingAs($kolektor)->get(route('collector-worksheet.show', $kolektor->id));
+        $response->assertForbidden();
+
+        $response = $this->actingAs($kolektor)->post(route('payment-batches.store', $kolektor->id), [
             'idempotency_key' => 'test-key',
             'rows' => [],
         ]);

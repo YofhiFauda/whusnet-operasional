@@ -20,7 +20,7 @@ Fase MVP sudah lewat. Sprint aktif ada di `docs/TASKS.md` bagian "Status Project
 ## Tech Stack
 
 - PHP 8.3, Laravel 13, PHPUnit 12 (bukan Pest), Pint
-- Blade server-rendered + **Alpine.js 3 via CDN** (`layouts/app.blade.php`) — bukan SPA, tidak ada build step untuk Alpine
+- Blade server-rendered + **Alpine.js 3 dibundel lewat Vite** (`resources/js/app.js`, plugin `collapse` + `focus`) — bukan SPA, tapi Alpine **ikut build step**: tanpa `npm run build`/`npm run dev`, `public/build` kosong → ViteException & seluruh interaksi Alpine mati. `window.Alpine` di-set manual di `app.js` (dipakai `initTree()` di view realtime) — jangan dihapus
 - Tailwind CSS 4 (`@tailwindcss/vite`) + Vite 7 untuk `resources/css/app.css` & `resources/js/app.js`
 - Laravel Reverb + laravel-echo + pusher-js — realtime dashboard FOP & task teknisi
 - Laravel Horizon — queue worker
@@ -36,6 +36,12 @@ composer test         # config:clear && artisan test
 php artisan test --filter=TicketingTest
 vendor/bin/pint       # WAJIB sebelum commit
 php artisan migrate && php artisan db:seed
+npm run build            # WAJIB setelah ubah Blade/CSS/JS — Alpine ikut bundle ini
+docker compose run --rm assets   # setara, dari container — build + kembalikan pemilik
+                                 # public/build, node_modules, storage/framework/testing
+                                 # ke user host. JANGAN `docker compose exec app npm run
+                                 # build`: container app = root, hasilnya jadi milik root
+                                 # di bind mount, lalu build & test dari host gagal EACCES.
 php artisan reverb:start
 php artisan horizon
 ```
@@ -206,6 +212,7 @@ Lampiran tiket disimpan di disk **`local` (privat)**, bukan `public` — isinya 
 
 - **Komentar bahasa Indonesia yang menjelaskan *kenapa*, bukan *apa*.** Repo ini komentarnya panjang dan argumentatif di titik-titik rawan (observer, sync, guard). Waktu menyentuh area itu, ikuti gaya yang sama — jelaskan keputusan dan konsekuensi kalau dilanggar.
 - **Urutan route: static dulu, dynamic belakangan.** `routes/web.php` menandai ini eksplisit (`// Customers Management - Static Routes First` … `- Dynamic Routes Last`). Route `{id}` yang naik ke atas akan menelan route statis.
+- **Target aksi yang mengubah data dirender server-side.** URL POST/PUT/DELETE datang dari `route()` — di `action`, atribut `data-*`, atau field respons JSON. Klien boleh memilih di antara URL yang diberikan server, tapi **tidak boleh merakit path-nya** (`/invoices/${id}/payments`, `:action` yang menyusun URL dari state). Alasannya bukan estetika: form yang atribut `action`-nya gagal terisi akan POST ke URL halaman sendiri — aksi gagal tanpa pesan apa pun (bug assign kolektor 2026-08-08, ADHOC-20). Penjaga: `PostTargetRenderedServerSideTest`.
 - **Redirect setelah simpan pakai pola PRG.** Handler `POST`/`PUT`/`DELETE` selalu redirect (jangan render view langsung — refresh = double-submit). Create/update satu record → halaman Detail (`*.show`); list/board hanya untuk aksi list-oriented (import massal, papan FOP). Aturan + peta lengkap: `docs/PRG_REDIRECT_CONVENTION.md`.
 - Sederhana, tidak overengineered. Hindari abstraksi sebelum dibutuhkan, otomatisasi sebelum flow manual stabil, tabel baru kalau kolom cukup, campur banyak modul dalam satu task.
 - Jalankan `vendor/bin/pint` sebelum commit.
@@ -235,6 +242,7 @@ Modul punya struktur seragam: `README.md`, `business-logic.md`, `database-schema
 | FOP Task | `docs/fop-task/` (+ `analisa-sync-execution-task.md`, `analisa-auto-team.md`, `fop-dashboard.md`) |
 | Task teknisi | `docs/task-teknisi/` |
 | Billing & pembayaran | `docs/billing-pembayaran/` |
+| Kolektor (penagihan door-to-door, setoran, visit log) | `docs/kolektor/` |
 | Lifecycle pelanggan | `docs/customer-lifecycle/` |
 | Pendaftaran, data pelanggan, dashboard | `docs/pendaftaran-pelanggan/`, `docs/data-pelanggan/`, `docs/dashboard/` |
 | Master data | `docs/master/` (pop, distribution, internet-package, wilayah, sla-timeline, status-pelanggan) |

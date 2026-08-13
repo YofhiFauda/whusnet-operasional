@@ -46,10 +46,21 @@
             <form action="{{ route('invoices.payments.store', $invoice->id) }}" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
                 @csrf
 
+                {{-- Penahan submit dobel. Kuncinya lahir saat form DIRENDER dan
+                     ikut `old()` supaya tetap sama setelah validasi gagal —
+                     kalau digenerate ulang tiap render, submit ulang dianggap
+                     pembayaran baru dan penahannya tidak menahan apa pun.
+                     Server memperlakukan kunci yang sudah dipakai sebagai
+                     "sudah tercatat", bukan sebagai error. --}}
+                <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
+
                 <!-- Tanggal Bayar -->
                 <div>
                     <label for="payment_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
+                    {{-- `max` menahan tanggal masa depan di sisi UI; aturan
+                         sesungguhnya `before_or_equal:today` di controller. --}}
                     <input type="date" name="payment_date" id="payment_date" value="{{ old('payment_date', now()->format('Y-m-d')) }}" required
+                           max="{{ now()->format('Y-m-d') }}"
                            class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
                 </div>
 
@@ -69,7 +80,11 @@
                     <label for="amount" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nominal Diterima dari Pelanggan (Rp)</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-mono text-xs font-bold text-text-muted">Rp</span>
-                        <input type="number" name="amount" id="amount" value="{{ old('amount', (float) $invoice->remaining_amount) }}" min="1" step="0.01" required
+                        {{-- type="text" + data-rupiah: browser number input menolak
+                             titik ribuan. Batas nominal ditegakkan server
+                             (`amount` numeric|min:1|max:99999999.99). --}}
+                        <input type="text" inputmode="decimal" name="amount" id="amount" data-rupiah
+                               value="{{ old('amount', \App\Helpers\FormatHelper::rupiahInput($invoice->remaining_amount)) }}" required
                                class="w-full pl-9 pr-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono font-bold bg-surface text-text-main transition-colors">
                     </div>
                     <p class="text-[11px] text-text-muted mt-1.5">
@@ -234,7 +249,9 @@
         }
 
         function refreshHint() {
-            const amount = parseFloat(amountInput.value);
+            // Input bermasking ribuan — parseFloat('150.000') = 150, jadi
+            // petunjuk cicilan/lebih bayar akan berbohong tanpa parser ini.
+            const amount = window.Rupiah ? window.Rupiah.angka(amountInput.value) : parseFloat(amountInput.value);
             installmentHint.classList.add('hidden');
             settleHint.classList.add('hidden');
             overpayHint.classList.add('hidden');

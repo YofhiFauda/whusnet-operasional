@@ -28,7 +28,7 @@ Metode: audit kode (grep + baca controller/migration/blade) atas 6 aspek perform
 Controller besar sudah eager-load dengan benar:
 - `InvoiceController::index` (`app/Http/Controllers/InvoiceController.php:27-35`) — `with(['customer.collector', 'pop', 'customerService', 'internetPackage', 'payments.collector'])`
 - `PaymentController::index` (`app/Http/Controllers/PaymentController.php:39`)
-- `CustomerController::renderCustomerList` (`app/Http/Controllers/CustomerController.php:125-137`) — `select()` kolom terbatas + `with([...])`, sudah ada komentar alasan tuning
+- `RendersCustomerList::renderCustomerList` (`app/Http/Controllers/Concerns/RendersCustomerList.php:76-88`; sebelum ADHOC-31 ada di `CustomerController`) — `select()` kolom terbatas + `with([...])`, sudah ada komentar alasan tuning
 - `TaskController::index` (`app/Http/Controllers/TaskController.php:48`)
 - `FopTaskController::index` (`app/Http/Controllers/FopTaskController.php:43`, history line 1015)
 - `TicketController::worksheetTasks()` (`app/Http/Controllers/TicketController.php:103-119`) — kolom sempit + `limit(WORKSHEET_DISPLAY_LIMIT)`

@@ -51,17 +51,31 @@
         }
         .actions a { background: #fff; color: #0f172a; border-color: #cbd5e1; margin-left: 6px; }
         @media print {
+            /*
+             * margin:0 pada @page = satu-satunya cara mematikan header/footer
+             * bawaan browser (tanggal, judul dokumen, URL localhost:8000/...).
+             * Teks itu hidup di KOTAK MARGIN halaman, bukan di dokumen kita —
+             * tidak ada selector yang bisa menyembunyikannya. Nol-kan marginnya,
+             * kotaknya ikut hilang. Jarak ke tepi kertas dipindah ke padding
+             * elemen di bawah ini; menghapusnya membuat struk mepet tepi dan
+             * terpotong printer.
+             */
+            @page { margin: 0; }
             body { background: #fff; padding: 0; }
-            .struk { border: 0; padding: 0; width: auto; }
+            .struk { border: 0; padding: 6mm 5mm; width: auto; }
             .actions { display: none; }
         }
     </style>
 </head>
 <body>
+    {{-- Isi struk datang dari ReceiptPresenter — sama persis dengan lembar A4
+         di detail pembayaran dan kartu kolektor. Yang berbeda cuma bentuknya
+         (80mm, monospace). Menambah field langsung di sini bikin ketiga
+         cetakan menyimpang lagi; tambahkan di presenter. --}}
     <div class="struk">
         <div class="center">
             <div class="brand">WHUSNET</div>
-            <div class="muted">{{ $payment->pop->name ?? 'Kantor Pusat' }}</div>
+            <div class="muted">{{ $kwitansi['pop'] }}</div>
             <div class="muted">STRUK PEMBAYARAN</div>
         </div>
 
@@ -70,24 +84,24 @@
         <table>
             <tr>
                 <td class="muted">No. Struk</td>
-                <td class="val">{{ $payment->payment_number }}</td>
+                <td class="val">{{ $kwitansi['nomor'] }}</td>
             </tr>
             <tr>
                 <td class="muted">Tanggal</td>
-                <td class="val">{{ optional($payment->payment_date)->format('d/m/Y') }}</td>
+                <td class="val">{{ $kwitansi['tanggal_bayar'] }}</td>
             </tr>
             <tr>
                 <td class="muted">Metode</td>
-                <td class="val">{{ strtoupper($payment->payment_method) }}</td>
+                <td class="val">{{ $kwitansi['metode'] }}</td>
             </tr>
             <tr>
                 <td class="muted">Status</td>
-                <td class="val">{{ $payment->payment_status->label() }}</td>
+                <td class="val">{{ $kwitansi['status'] }}</td>
             </tr>
-            @if($installmentContext)
+            @if($kwitansi['keterangan_cicilan'])
             <tr>
                 <td class="muted">Keterangan</td>
-                <td class="val">{{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}</td>
+                <td class="val">{{ $kwitansi['keterangan_cicilan'] }}</td>
             </tr>
             @endif
         </table>
@@ -97,24 +111,34 @@
         <table>
             <tr>
                 <td class="muted">Pelanggan</td>
-                <td class="val">{{ $payment->customer->full_name ?? '-' }}</td>
+                <td class="val">{{ $kwitansi['pelanggan']['nama'] }}</td>
             </tr>
             <tr>
                 <td class="muted">CID</td>
-                <td class="val">{{ $payment->customer?->cid ?: ($payment->customer?->customer_code ?: '-') }}</td>
+                <td class="val">{{ $kwitansi['pelanggan']['cid'] }}</td>
+            </tr>
+            <tr>
+                <td class="muted">No. HP</td>
+                <td class="val">{{ $kwitansi['pelanggan']['hp'] }}</td>
+            </tr>
+            <tr>
+                <td class="muted">Alamat</td>
+                {{-- Penggalan yang sama dengan kartu kolektor & lembar A4 —
+                     80mm sempit, lipatan otomatis jatuh di tempat acak. --}}
+                <td class="val">{!! implode('<br>', array_map('e', $kwitansi['pelanggan']['alamat_baris'])) !!}</td>
             </tr>
             <tr>
                 <td class="muted">No. Tagihan</td>
-                <td class="val">{{ $payment->invoice->invoice_number ?? '-' }}</td>
+                <td class="val">{{ $kwitansi['invoice']['nomor'] }}</td>
             </tr>
-            @if($payment->invoice)
+            @if($kwitansi['invoice']['ada'])
             <tr>
                 <td class="muted">Periode</td>
-                <td class="val">{{ $payment->invoice->billing_period ?: '-' }}</td>
+                <td class="val">{{ $kwitansi['invoice']['periode'] }}</td>
             </tr>
             <tr>
                 <td class="muted">Paket</td>
-                <td class="val">{{ $payment->invoice->internetPackage->name ?? '-' }}</td>
+                <td class="val">{{ $kwitansi['invoice']['paket'] }}</td>
             </tr>
             @endif
         </table>
@@ -122,26 +146,26 @@
         <div class="sep"></div>
 
         <table>
-            @if($payment->invoice)
+            @if($kwitansi['invoice']['ada'])
             <tr>
                 <td class="muted">Total Tagihan</td>
-                <td class="val">Rp {{ number_format((float) $payment->invoice->total_amount, 0, ',', '.') }}</td>
+                <td class="val">{{ $kwitansi['invoice']['total'] }}</td>
             </tr>
             @endif
             <tr class="total">
                 <td>DIBAYAR</td>
-                <td class="val">Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}</td>
+                <td class="val">{{ $kwitansi['dibayar'] }}</td>
             </tr>
-            @if((float) $payment->overpay_amount > 0)
+            @if($kwitansi['lebih_bayar'])
             <tr>
                 <td class="muted">Lebih Bayar</td>
-                <td class="val">Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}</td>
+                <td class="val">{{ $kwitansi['lebih_bayar'] }}</td>
             </tr>
             @endif
-            @if($payment->invoice)
+            @if($kwitansi['invoice']['ada'])
             <tr>
                 <td class="muted">Sisa Tagihan</td>
-                <td class="val">Rp {{ number_format((float) $payment->invoice->remaining_amount, 0, ',', '.') }}</td>
+                <td class="val">{{ $kwitansi['invoice']['sisa'] }}{{ $kwitansi['invoice']['lunas'] ? ' (Lunas)' : '' }}</td>
             </tr>
             @endif
         </table>
@@ -151,12 +175,16 @@
         <table>
             <tr>
                 <td class="muted">Diterima oleh</td>
-                <td class="val">{{ $payment->receiver->name ?? '-' }}</td>
+                <td class="val">{{ $kwitansi['penerima'] }}</td>
             </tr>
-            @if($payment->note)
+            <tr>
+                <td class="muted">Ditagih oleh</td>
+                <td class="val">{{ $kwitansi['penagih'] }}</td>
+            </tr>
+            @if($kwitansi['catatan'])
             <tr>
                 <td class="muted">Catatan</td>
-                <td class="val">{{ $payment->note }}</td>
+                <td class="val">{{ $kwitansi['catatan'] }}</td>
             </tr>
             @endif
         </table>
@@ -165,7 +193,7 @@
 
         <div class="center muted">
             Struk sah tanpa tanda tangan.<br>
-            Dicetak {{ now()->format('d/m/Y H:i') }}
+            Dicetak {{ $kwitansi['dicetak'] }}
         </div>
     </div>
 

@@ -197,11 +197,54 @@ return [
             ActionCode::REJECT->value,
         ],
 
-        // Worklist read-only kolektor (docs/plan/analisa-billing-tagihan-
-        // pembayaran-kolektor.md §B-8 no. 5) — permission sendiri, cuma VIEW.
-        // Kolektor TIDAK diberi payments.create sama sekali (§B-8 no. 4).
+        // Worklist Kolektor — halaman kerja kolektor sendiri.
+        //
+        // VIEW: baca pelanggan yang ter-assign ke dirinya (bukan
+        // `customers.view` penuh).
+        // PAY: mencatat pembayaran dari worklist-nya sendiri. Kolektor TETAP
+        // TIDAK diberi `payments.create` — itu kewenangan bayar invoice mana
+        // pun; `kolektor.pay` cuma invoice pelanggan miliknya, lewat rute yang
+        // memaksa `collector_id = auth()->id()`.
+        //
+        // Merevisi §B-8 no. 4 dokumen lama ("kolektor tak boleh input
+        // pembayaran") — lihat docs/plan/kolektor/analisa-alur-kolektor-2.0.md §8.
         'kolektor' => [
             ActionCode::VIEW->value,
+            ActionCode::PAY->value,
+            // Menyetorkan hasil tagihan ke admin (Fase 2). Terpisah dari PAY
+            // supaya hak memegang kas bisa dicabut tanpa mencabut hak menagih.
+            ActionCode::DEPOSIT->value,
+            // Mencatat kunjungan tanpa hasil (Fase 3). Diberikan bersama VIEW —
+            // mencabutnya berarti mematikan satu-satunya kontrol anti-fraud
+            // modul ini, jadi jangan dilepas tanpa alasan kuat.
+            ActionCode::VISIT->value,
+        ],
+
+        // Worksheet Admin — halaman admin untuk mengelola kolektor: daftar
+        // kolektor, assign/lepas pelanggan, dan (Fase 2) cross check setoran.
+        // Feature SENDIRI, bukan numpang `customers.update`/`payments.create`:
+        // halaman ini punya audiens & kewenangan yang beda dari dua-duanya,
+        // dan harus bisa dimatikan per-role tanpa mencabut hak edit pelanggan
+        // atau hak bayar di halaman Tagihan.
+        //
+        // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9, §14.1.
+        'collector_worksheet' => [
+            ActionCode::VIEW->value,
+            ActionCode::ASSIGN->value,
+            // Cross check & tutup setoran. Pakai VALIDATE yang sudah ada —
+            // konsisten dengan `payments.validate`; jangan bikin action
+            // `verify` baru yang artinya sama persis.
+            ActionCode::VALIDATE->value,
+            // Hapus buku selisih = titik kerugian diakui. Permission SENDIRI,
+            // sengaja TIDAK diberikan ke `admin` di RolePermissionSeeder —
+            // admin yang memverifikasi tak boleh sekaligus menutup kerugian
+            // yang dia temukan sendiri. Owner lolos lewat wildcard `*`.
+            ActionCode::APPROVE->value,
+            // Kwitansi (Fase 4). Cetak & upload dipisah dari VALIDATE karena
+            // ini sumbu DOKUMEN, bukan sumbu kas: staf yang mengurus arsip
+            // kwitansi tak otomatis berwenang menutup setoran, dan sebaliknya.
+            ActionCode::PRINT->value,
+            ActionCode::UPLOAD->value,
         ],
 
         'reports' => [
@@ -396,5 +439,19 @@ return [
         'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
         'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
+
+        // Modul Kolektor — dua halaman, dua audiens (analisa-alur-kolektor-2.0
+        // §9). Labelnya nyebut halamannya biar di Role Matrix kelihatan mana
+        // yang lagi di-toggle: halaman admin atau halaman kolektor.
+        'kolektor.view' => 'Lihat Worklist Kolektor (pelanggan sendiri)',
+        'kolektor.pay' => 'Catat Pembayaran dari Worklist Sendiri',
+        'kolektor.deposit' => 'Setor Hasil Tagihan ke Admin',
+        'kolektor.visit' => 'Catat Kunjungan Tanpa Hasil (tidak ada orang/menolak/janji)',
+        'collector_worksheet.view' => 'Akses Halaman Worksheet Admin (Kolektor)',
+        'collector_worksheet.assign' => 'Assign / Lepas Pelanggan ke Kolektor',
+        'collector_worksheet.validate' => 'Cross Check & Verifikasi Setoran Kolektor',
+        'collector_worksheet.approve' => 'Hapus Buku Selisih Setoran (kerugian diakui)',
+        'collector_worksheet.print' => 'Cetak Kwitansi Pembayaran (ber-QR)',
+        'collector_worksheet.upload' => 'Upload & Cocokkan Kwitansi',
     ],
 ];

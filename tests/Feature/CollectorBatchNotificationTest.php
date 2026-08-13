@@ -146,7 +146,7 @@ class CollectorBatchNotificationTest extends TestCase
 
         Notification::fake();
 
-        $response = $this->actingAs($this->admin)->postJson(route('collector-batch.store', $this->kolektor->id), [
+        $response = $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
             'idempotency_key' => 'notif-batch-001',
             'rows' => [
                 ['invoice_id' => $invoice1->id, 'amount' => 100000, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
@@ -174,7 +174,7 @@ class CollectorBatchNotificationTest extends TestCase
 
         Notification::fake();
 
-        $this->actingAs($this->admin)->postJson(route('collector-batch.store', $this->kolektor->id), [
+        $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), [
             'idempotency_key' => 'notif-batch-002',
             'rows' => [
                 ['invoice_id' => $goodInvoice->id, 'amount' => 999999, 'payment_method' => 'cash', 'collected_date' => '2026-06-13'],
@@ -194,11 +194,11 @@ class CollectorBatchNotificationTest extends TestCase
             ],
         ];
 
-        $this->actingAs($this->admin)->postJson(route('collector-batch.store', $this->kolektor->id), $payload)->assertOk();
+        $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), $payload)->assertOk();
 
         Notification::fake();
 
-        $this->actingAs($this->admin)->postJson(route('collector-batch.store', $this->kolektor->id), $payload)
+        $this->actingAs($this->admin)->postJson(route('payment-batches.store', $this->kolektor->id), $payload)
             ->assertOk()
             ->assertJson(['already_processed' => true]);
 

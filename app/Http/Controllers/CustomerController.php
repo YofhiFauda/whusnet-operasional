@@ -11,6 +11,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Http\Controllers\Concerns\RedirectsToCustomer;
+use App\Http\Controllers\Concerns\RendersCustomerList;
 use App\Http\Requests\CustomerRegistrationRequest;
 use App\Models\AuditLog;
 use App\Models\City;
@@ -42,9 +43,11 @@ use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
+use App\Services\FopTaskProvisioningService;
 use App\Services\TelegramBotService;
 use App\Services\TicketService;
 use App\Support\IndonesianDate;
+use App\Support\RupiahInput;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -59,6 +62,7 @@ use Spatie\SimpleExcel\SimpleExcelWriter;
 class CustomerController extends Controller
 {
     use RedirectsToCustomer;
+    use RendersCustomerList;
 
     /**
      * Display a listing of the customers with search and filters.
@@ -81,293 +85,6 @@ class CustomerController extends Controller
         }
 
         return $this->renderCustomerList($request);
-    }
-
-    /**
-     * Query builder + view render bersama buat List Data Pelanggan biasa,
-     * List Pelanggan Putus, dan List Pelanggan Gagal — cuma beda filter
-     * status. Dipanggil dari index() di sini, dan dari
-     * CustomerTerminatedController / CustomerFailedController (extend class
-     * ini) dengan $forcedStatusGroup di-set biar gak bisa "dipaksa ganti
-     * grup" lewat query string di route yang salah permission-nya.
-     */
-    protected function renderCustomerList(Request $request, ?string $forcedStatusGroup = null)
-    {
-        $search = trim((string) $request->query('search', ''));
-        $statusGroup = $forcedStatusGroup ?? trim((string) $request->query('status_group', ''));
-        // Default to empty string '' (Semua active & suspend) if not specified
-        $status = $request->query('status', '');
-        // Fase 5.4 — filter wilayah multi-pilih (dropdown Kecamatan + Desa).
-        // Terima district_id[]/village_id[] (array) maupun tunggal (kompat lama).
-        $districtIds = array_values(array_filter(
-            (array) $request->query('district_id', []),
-            fn ($v) => $v !== '' && $v !== null
-        ));
-        $villageIds = array_values(array_filter(
-            (array) $request->query('village_id', []),
-            fn ($v) => $v !== '' && $v !== null
-        ));
-        $packageId = $request->query('package_id', '');
-        // Fase 5.4b — filter POP multi (dropdown Cabang + Mini POP).
-        // pop_id[] = cabang (customers.pop_id), mini_pop_id[] = Mini POP (OLT).
-        $popIds = array_values(array_filter(
-            (array) $request->query('pop_id', []),
-            fn ($v) => $v !== '' && $v !== null
-        ));
-        $miniPopIds = array_values(array_filter(
-            (array) $request->query('mini_pop_id', []),
-            fn ($v) => $v !== '' && $v !== null
-        ));
-        $completenessStatus = $request->query('completeness_status', '');
-        $collectorId = $request->query('collector_id', '');
-
-        // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
-        // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
-        // (teknis: ont_sn/ip_address/odp/olt/vlan; foto ktp/rumah/kontrak; npwp/
-        // company; lat/long; kontrak/diskon/pajak; sales/agent/referral). Select
-        // hanya yang dirender + accessor (display_id butuh cid/customer_code/
-        // distribution_id/status + relasi) + FK untuk eager load. FK WAJIB ikut,
-        // kalau tidak relasi belongsTo-nya gagal dimuat.
-        $query = Customer::query()
-            ->applyUserScope()
-            ->select([
-                'id', 'person_id',
-                'customer_code', 'old_customer_id', 'old_request_id', 'cid',
-                'full_name', 'primary_phone', 'email', 'identity_number', 'gender',
-                'status', 'data_completeness_status', 'registration_date',
-                'rejected_at', 'terminated_at', 'address',
-                'pop_id', 'distribution_id', 'mini_pop_id', 'collector_id',
-                'city_id', 'district_id', 'village_id', 'internet_package_id',
-                'created_at', 'updated_at',
-            ])
-            ->with(['city', 'district', 'village', 'internetPackage', 'subscriptionStatus', 'pop', 'distribution', 'customerAddress', 'customerService', 'customerDevice', 'latestInvoice', 'latestPayment', 'collector:id,name']);
-
-        // Search filter — Fase 5.3. Diarahkan per BENTUK input, bukan LIKE '%x%'
-        // di 8 kolom sekaligus (yang memaksa full scan tiap ketik):
-        //  - ada '@'  → email (identifier, prefix)
-        //  - ada digit → kode/HP/NIK/CID → PREFIX 'x%' (sargable, pakai index)
-        //  - selainnya → nama → substring '%x%' (nama memang butuh potongan tengah,
-        //                cuma 1 kolom, jauh lebih murah dari 8-kolom OR)
-        // Konsekuensi UX yang disengaja: query nama tidak lagi mencocokkan kode,
-        // dan sebaliknya — orang mencari BY nama ATAU BY kode, bukan campur.
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                if (str_contains($search, '@')) {
-                    $q->where('email', 'like', "{$search}%");
-                } elseif (preg_match('/\d/', $search)) {
-                    $q->where('customer_code', 'like', "{$search}%")
-                        ->orWhere('cid', 'like', "{$search}%")
-                        ->orWhere('old_customer_id', 'like', "{$search}%")
-                        ->orWhere('old_request_id', 'like', "{$search}%")
-                        ->orWhere('primary_phone', 'like', "{$search}%")
-                        ->orWhere('identity_number', 'like', "{$search}%");
-                } else {
-                    $q->where('full_name', 'like', "%{$search}%");
-                }
-            });
-        }
-
-        // Status filter
-        if ($status !== '') {
-            $query->where('status', $status);
-        } elseif ($statusGroup !== '') {
-            $statuses = match ($statusGroup) {
-                // Fase survey s/d siap-pemasangan. Semua status antara sengaja
-                // masuk sini: tanpa ini `survey_in_progress` & `waiting_acc` gak
-                // dipetakan ke grup mana pun DAN bukan default (active/suspended),
-                // jadi pelanggan yang lagi diproses — atau yang dikembalikan dari
-                // "Pelanggan Gagal" ke tahap ini — lenyap dari SEMUA daftar.
-                'survey' => ['waiting_survey', 'survey_in_progress', 'surveyed', 'waiting_acc'],
-                // Fase pemasangan s/d verifikasi admin. Alasan sama:
-                // `installation_in_progress`, `verification_admin`,
-                // `revision_installation` dulu invisible di mana-mana.
-                'verification' => ['waiting_installation', 'installation_in_progress', 'installed', 'verification_admin', 'revision_installation'],
-                'failed' => ['failed', 'rejected', 'gagal'],
-                'terminated' => ['terminated', 'putus'],
-                default => []
-            };
-            if (! empty($statuses)) {
-                $query->whereIn('status', $statuses);
-            }
-        } else {
-            // Default view shows only active & suspended customers
-            $query->whereIn('status', ['active', 'suspended']);
-        }
-
-        // District filter (multi)
-        if (! empty($districtIds)) {
-            $query->whereIn('district_id', $districtIds);
-        }
-
-        // Village filter (multi)
-        if (! empty($villageIds)) {
-            $query->whereIn('village_id', $villageIds);
-        }
-
-        // Service package filter
-        if ($packageId !== '') {
-            $query->where('internet_package_id', $packageId);
-        }
-
-        // POP filter (Cabang multi)
-        if (! empty($popIds)) {
-            $query->whereIn('pop_id', $popIds);
-        }
-
-        // Mini POP filter (multi)
-        if (! empty($miniPopIds)) {
-            $query->whereIn('mini_pop_id', $miniPopIds);
-        }
-
-        // Completeness status filter
-        if ($completenessStatus !== '') {
-            $query->where('data_completeness_status', $completenessStatus);
-        }
-
-        // Kolektor filter — 'none' = belum ada kolektor sama sekali, angka =
-        // kolektor tertentu. docs/plan/analisa-billing-tagihan-pembayaran-
-        // kolektor.md §B-3 (cara admin lihat "pelanggan ini kolektornya siapa").
-        if ($collectorId === 'none') {
-            $query->whereNull('collector_id');
-        } elseif ($collectorId !== '') {
-            $query->where('collector_id', $collectorId);
-        }
-
-        if ($statusGroup === 'failed') {
-            // Fase 5.1 — urut pakai kolom nyata rejected_at. Versi lama memakai
-            // subquery JSON berkorelasi ke audit_logs di ORDER BY (dieksekusi
-            // sekali per baris pelanggan, scan+parse JSON) — O(pelanggan ×
-            // audit_logs), timeout begitu audit membesar. Kolom diisi di
-            // CustomerWorkflowService, import, dan command backfill.
-            $query->orderByDesc('rejected_at');
-        } elseif ($statusGroup === 'terminated') {
-            $query->orderByDesc('terminated_at');
-        } else {
-            $query->orderBy('customer_code', 'asc');
-        }
-
-        // Baris per halaman — staf yang memproses ratusan baris lebih butuh
-        // melihat banyak sekaligus. Whitelist supaya tidak bisa disetel ke nilai
-        // ekstrem lewat query string.
-        $perPage = (int) request('per_page', 10);
-        if (! in_array($perPage, [10, 25, 50, 100], true)) {
-            $perPage = 10;
-        }
-
-        $customers = $query->paginate($perPage)->withQueryString();
-
-        // Untuk grup "failed" (Pelanggan Gagal), ambil alasan & tanggal penolakan
-        // dari AuditLog transisi terakhir ke status 'rejected' per customer.
-        if ($statusGroup === 'failed' && $customers->count() > 0) {
-            $customerIds = $customers->pluck('id')->all();
-            $rejectLogs = AuditLog::where('auditable_type', Customer::class)
-                ->whereIn('auditable_id', $customerIds)
-                ->where('module', 'Customer Workflow')
-                ->where('action', 'status_transition')
-                ->whereJsonContains('new_values->status', 'rejected')
-                ->orderByDesc('created_at')
-                ->get()
-                ->unique('auditable_id')
-                ->keyBy('auditable_id');
-
-            foreach ($customers as $customer) {
-                $log = $rejectLogs->get($customer->id);
-                $note = $log?->new_values['note'] ?? null;
-                $customer->reject_reason = $note ? preg_replace('/^Ditolak:\s*/', '', $note) : '-';
-                $customer->rejected_at = $log?->created_at;
-                $customer->status_before_reject = $log?->old_values['status'] ?? null;
-            }
-        }
-
-        // Untuk grup "terminated" (Putus Langganan), ambil alasan & tanggal
-        // pemutusan dari AuditLog terminate per customer.
-        if ($statusGroup === 'terminated' && $customers->count() > 0) {
-            $customerIds = $customers->pluck('id')->all();
-            $terminateLogs = AuditLog::where('auditable_type', Customer::class)
-                ->whereIn('auditable_id', $customerIds)
-                ->where('module', 'customers')
-                ->where('action', 'terminate')
-                ->orderByDesc('created_at')
-                ->get()
-                ->unique('auditable_id')
-                ->keyBy('auditable_id');
-
-            foreach ($customers as $customer) {
-                $log = $terminateLogs->get($customer->id);
-                $customer->termination_reason = $log?->new_values['reason'] ?? '-';
-                $customer->terminated_at = $log?->created_at;
-                $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
-            }
-        }
-
-        // Data for filter selects. Fase 5.4 — kecamatan pakai combobox typeahead
-        // (/api/wilayah/districts), jadi TIDAK memuat seluruh district. Cuma
-        // resolve label kecamatan yang SEDANG terpilih untuk chip awal.
-        $selectedDistricts = empty($districtIds)
-            ? collect()
-            : District::whereIn('id', $districtIds)->orderBy('name')->get(['id', 'name']);
-        $selectedVillages = empty($villageIds)
-            ? collect()
-            : Village::whereIn('id', $villageIds)->with('district:id,name')->orderBy('name')->get(['id', 'name', 'district_id']);
-        $packages = InternetPackage::orderBy('name')->get();
-        // Fase 5.4b — POP pakai dropdown filter (Cabang + Mini POP) via endpoint
-        // /api/pop/*, jadi TIDAK memuat seluruh POP. Resolve label yang terpilih
-        // saja untuk chip awal (tetap lewat forUser → aman scope).
-        $selectedCabang = empty($popIds)
-            ? collect()
-            : Pop::forUser()->whereIn('id', $popIds)->orderBy('name')->get(['id', 'name']);
-        $selectedMini = empty($miniPopIds)
-            ? collect()
-            : Pop::forUser()->whereIn('id', $miniPopIds)->with('parent:id,name')->orderBy('name')->get(['id', 'name', 'parent_id']);
-        $subscriptionStatuses = SubscriptionStatus::query()
-            ->where('is_active', true)
-            ->orderBy('workflow_order')
-            ->get();
-        $collectorOptions = User::query()
-            ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        // Customer count by status (for badge list / submenus)
-        $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
-
-        // Total is active + suspended customers
-        $totalCustomers = ($statusCounts['active'] ?? 0) + ($statusCounts['suspended'] ?? 0);
-
-        // Jumlah pelanggan aktif dengan invoice lewat tempo (untuk summary strip)
-        $overdueCount = Invoice::whereHas('customer', function ($q) {
-            $q->applyUserScope()->where('status', 'active');
-        })
-            ->where('invoice_status', '!=', 'lunas')
-            ->where('due_date', '<', now())
-            ->count();
-
-        return view('customers.index', compact(
-            'customers',
-            'selectedDistricts',
-            'selectedVillages',
-            'selectedCabang',
-            'selectedMini',
-            'packages',
-            'statusCounts',
-            'totalCustomers',
-            'overdueCount',
-            'subscriptionStatuses',
-            'search',
-            'status',
-            'statusGroup',
-            'districtIds',
-            'villageIds',
-            'packageId',
-            'popIds',
-            'miniPopIds',
-            'completenessStatus',
-            'collectorId',
-            'collectorOptions'
-        ));
     }
 
     /**
@@ -665,7 +382,11 @@ class CustomerController extends Controller
                 session()->flash('warning', 'Data pelanggan disimpan sebagai "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
             }
 
-            // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey)
+            // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
+            //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan
+            //    /fop-tasks dibuka: dia anchor wajib task_materials &
+            //    task_work_tools, dan tanpa itu isian estimasi material serta
+            //    checklist alat di laporan survey hilang tanpa pesan error.
             $year = date('Y');
             $count = Task::whereYear('created_at', $year)->count() + 1;
             Task::create([
@@ -679,6 +400,8 @@ class CustomerController extends Controller
                 'created_by' => auth()->id() ?? 1,
                 'updated_by' => auth()->id() ?? 1,
             ]);
+
+            app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
 
             return $customer;
         });
@@ -759,6 +482,15 @@ class CustomerController extends Controller
         }
 
         $this->authorizeCustomerPopScope($customer);
+
+        // Sama seperti jalur registrasi (CustomerRegistrationRequest): kolom
+        // rupiah diketik berformat ribuan. `tax_percent` bukan rupiah, jadi
+        // sengaja dilewat.
+        $request->merge(RupiahInput::parseKeys(
+            $request->only(['discount_amount', 'other_fee']),
+            'discount_amount',
+            'other_fee',
+        ));
 
         $validated = $request->validate([
             'full_name' => 'required|string|max:150',
@@ -1401,6 +1133,12 @@ class CustomerController extends Controller
 
         return response()->json([
             'invoice_id' => $latestInvoice ? $latestInvoice->id : null,
+            // Target POST form "Catat Pembayaran" di Quick Hub. Dikirim SERVER-SIDE,
+            // bukan dirakit klien dari invoice_id (`/invoices/${id}/payments` sebagai
+            // string literal) — path route tidak boleh diduplikasi di JS, dan kalau
+            // dirakit di klien, form tanpa nilai ini diam-diam POST ke URL halaman.
+            // ADHOC-20 langkah 3.
+            'payment_store_url' => $latestInvoice ? route('invoices.payments.store', $latestInvoice->id) : null,
             'invoice_number' => $latestInvoice ? $latestInvoice->invoice_number : null,
             'total_amount' => $latestInvoice ? (float) $latestInvoice->total_amount : 0,
             'remaining_amount' => $latestInvoice ? (float) $latestInvoice->remaining_amount : 0,
@@ -3578,6 +3316,15 @@ class CustomerController extends Controller
         }
 
         // 2. Validate request
+        // Nominal prorata & biaya tambahan diketik berformat ribuan.
+        $request->merge(RupiahInput::parseKeys(
+            $request->only(['prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee']),
+            'prorate_amount',
+            'extra_cable_fee',
+            'extra_installation_fee',
+            'extra_pole_fee',
+        ));
+
         $validated = $request->validate([
             'billing_period' => 'required|date_format:Y-m',
             'issue_date' => 'required|date',

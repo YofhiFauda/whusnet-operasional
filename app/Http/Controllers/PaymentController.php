@@ -5,13 +5,18 @@ namespace App\Http\Controllers;
 use App\Enums\InvoiceStatus;
 use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
+use App\Events\CollectorActivityUpdated;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Services\FileUploadService;
+use App\Services\Receipts\ReceiptPresenter;
+use App\Support\Money;
 use App\Support\ReasonValidationRule;
+use App\Support\RupiahInput;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -172,8 +177,11 @@ class PaymentController extends Controller
 
         $payment->load($relations);
         $installmentContext = $payment->installmentContext();
+        // Lembar cetak A4 di halaman ini memakai isi yang sama persis dengan
+        // struk thermal & kartu kolektor — lihat ReceiptPresenter.
+        $kwitansi = app(ReceiptPresenter::class)->for($payment);
 
-        return view('payments.show', compact('payment', 'installmentContext'));
+        return view('payments.show', compact('payment', 'installmentContext', 'kwitansi'));
     }
 
     /**
@@ -192,10 +200,11 @@ class PaymentController extends Controller
             'Anda tidak memiliki akses ke pembayaran POP ini.'
         );
 
-        $payment->load(['invoice.internetPackage', 'customer', 'pop', 'receiver']);
+        $payment->load(['invoice.internetPackage', 'customer', 'pop', 'receiver', 'collector']);
         $installmentContext = $payment->installmentContext();
+        $kwitansi = app(ReceiptPresenter::class)->for($payment);
 
-        return view('payments.receipt', compact('payment', 'installmentContext'));
+        return view('payments.receipt', compact('payment', 'installmentContext', 'kwitansi'));
     }
 
     /**
@@ -244,9 +253,47 @@ class PaymentController extends Controller
                 ->withErrors(['amount' => 'Tagihan yang batal tidak dapat menerima pembayaran.']);
         }
 
+        // Submit ulang dengan kunci yang sama TIDAK menyimpan payment kedua.
+        // Dicek sebelum validasi, sama seperti jalur kolektor: pada submit
+        // ulang tagihannya sudah lunas dari submit pertama, jadi validasi pasti
+        // gagal dan pengguna menerima error untuk pembayaran yang sebenarnya
+        // berhasil.
+        $duplikat = $this->existingPaymentFor($request);
+
+        if ($duplikat) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Pembayaran {$duplikat->payment_number} sudah tercatat sebelumnya — tidak diproses ulang.",
+                    'payment' => [
+                        'payment_number' => $duplikat->payment_number,
+                        'amount' => (float) $duplikat->amount,
+                    ],
+                    'already_processed' => true,
+                ]);
+            }
+
+            return redirect()
+                ->route('invoices.show', $invoice->id)
+                ->with('success', "Pembayaran {$duplikat->payment_number} sudah tercatat sebelumnya — tidak diproses ulang.");
+        }
+
+        // `150.000` yang diketik kasir = seratus lima puluh ribu, bukan 150,0.
+        // Tanpa normalisasi ini titiknya dibaca sebagai desimal Inggris dan
+        // pembayaran tercatat 1.000 kali lebih kecil TANPA satu pun error.
+        $request->merge(['amount' => RupiahInput::parse($request->input('amount'))]);
+
         $validated = $request->validate([
-            'payment_date' => 'required|date',
+            // Batas atas WAJIB, sejajar dengan jalur kolektor
+            // (RecordsCollectorBatch::batchValidationRules()). Tanggal masa
+            // depan merusak pemotongan pendapatan per periode dan membuat
+            // laporan bulan berjalan memuat uang yang belum ada.
+            'payment_date' => 'required|date|before_or_equal:today',
             'payment_method' => 'required|in:cash,transfer,qris,lainnya',
+            // Nullable, bukan required: endpoint ini juga dipakai dari JSON
+            // oleh pemanggil yang tak punya form untuk menaruh kuncinya.
+            // Tanpa kunci, perilakunya persis seperti dulu.
+            'idempotency_key' => 'nullable|string|max:191',
             // `amount` = TOTAL uang yang diserahkan pelanggan, bukan lagi
             // dibatasi sisa tagihan. Kalau melebihi sisa, kelebihannya
             // otomatis dipisah jadi overpay_amount di transaction di bawah —
@@ -270,45 +317,47 @@ class PaymentController extends Controller
             );
         }
 
-        $payment = DB::transaction(function () use ($invoice, $validated, $proofPath): Payment {
-            $lockedInvoice = Invoice::query()
-                ->whereKey($invoice->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $totalReceived = round((float) $validated['amount'], 2);
-            $remaining = round((float) $lockedInvoice->remaining_amount, 2);
-
-            if ($remaining <= 0) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Tagihan ini sudah lunas.',
-                ]);
+        try {
+            $payment = $this->recordPayment($invoice, $validated, $proofPath);
+        } catch (\InvalidArgumentException $e) {
+            // PaymentObserver::rejectBurstDuplicate() menolak pembayaran kembar
+            // dalam jendela 5 menit. Itu kondisi yang memang diantisipasi —
+            // klik dobel — jadi tak pantas keluar sebagai 500. Ditolak lagi di
+            // sini, tapi sebagai pesan validasi yang bisa dibaca admin.
+            // Penolakan LAIN dari observer (mis. nominal ≤ 0) tetap dilempar.
+            if (! str_contains($e->getMessage(), 'Duplicate payment detected')) {
+                throw $e;
             }
 
-            // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
-            // ada) jadi overpay_amount — bukan diminta admin pisah sendiri.
-            $appliedAmount = min($totalReceived, $remaining);
-            $overpayAmount = round($totalReceived - $appliedAmount, 2);
-
-            $payment = Payment::create([
-                'payment_number' => Payment::generatePaymentNumber($validated['payment_date']),
-                'invoice_id' => $lockedInvoice->id,
-                'customer_id' => $lockedInvoice->customer_id,
-                'pop_id' => $lockedInvoice->pop_id,
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $validated['payment_method'],
-                'amount' => $appliedAmount,
-                'overpay_amount' => $overpayAmount > 0 ? $overpayAmount : null,
-                'received_by' => auth()->id(),
-                'proof_file' => $proofPath,
-                'payment_status' => PaymentStatus::VALID->value,
-                'note' => $validated['note'] ?? null,
+            throw ValidationException::withMessages([
+                'amount' => 'Pembayaran dengan tanggal dan nominal yang sama baru saja tercatat untuk tagihan ini.',
             ]);
+        } catch (UniqueConstraintViolationException $e) {
+            // Dua request kembar tiba nyaris bersamaan: yang kalah balapan
+            // ditolak indeks unique, bukan menyimpan payment kedua. Pengecekan
+            // di awal method tidak cukup — di antara pengecekan dan penyimpanan
+            // masih ada celah, dan indeks database inilah penjaga terakhirnya.
+            $duplikat = $this->existingPaymentFor($request);
 
-            $lockedInvoice->recalculateFromPayments();
+            // Tanpa kunci idempotensi tak ada yang bisa ditelusuri — lempar apa
+            // adanya. Duplikat pada jalur itu ditahan
+            // PaymentObserver::rejectBurstDuplicate() di atas, bukan di sini;
+            // `payments_invoice_date_amount_unique` sudah DI-DROP 2026-08-03
+            // karena ikut menolak cicilan yang sah.
+            if (! $duplikat) {
+                throw $e;
+            }
 
-            return $payment;
-        });
+            return $request->expectsJson()
+                ? response()->json([
+                    'success' => true,
+                    'message' => "Pembayaran {$duplikat->payment_number} sudah tercatat sebelumnya — tidak diproses ulang.",
+                    'already_processed' => true,
+                ])
+                : redirect()
+                    ->route('invoices.show', $invoice->id)
+                    ->with('success', "Pembayaran {$duplikat->payment_number} sudah tercatat sebelumnya — tidak diproses ulang.");
+        }
 
         if ($request->expectsJson()) {
             $payment->invoice->refresh();
@@ -335,68 +384,73 @@ class PaymentController extends Controller
     }
 
     /**
-     * Bayar massal: lunasi banyak invoice sekaligus (nominal = sisa tagihan
-     * masing-masing) dari list global /invoices — dipakai kolektor untuk
-     * menyetorkan banyak pembayaran bulanan flat sekaligus, tanpa buka invoice
-     * satu-satu.
+     * Pembayaran yang sudah pernah tersimpan dengan kunci idempotensi ini.
+     *
+     * Tanpa kunci (pemanggil lama / JSON tanpa form) selalu null — perilakunya
+     * persis seperti sebelum penahan ini ada.
      */
-    public function bulkStore(Request $request): JsonResponse
+    private function existingPaymentFor(Request $request): ?Payment
     {
-        $validated = $request->validate([
-            'invoice_ids' => 'required|array|min:1',
-            'invoice_ids.*' => 'integer',
-            'payment_date' => 'required|date',
-            'payment_method' => 'required|in:cash,transfer,qris,lainnya',
-            'note' => 'nullable|string|max:1000',
-        ]);
+        $key = trim((string) $request->input('idempotency_key'));
 
-        $invoices = Invoice::query()
-            ->applyUserScope()
-            ->whereIn('id', $validated['invoice_ids'])
-            ->whereNotIn('invoice_status', [InvoiceStatus::LUNAS->value, InvoiceStatus::BATAL->value])
-            ->get();
-
-        $paid = 0;
-        $failed = 0;
-
-        foreach ($invoices as $invoice) {
-            try {
-                DB::transaction(function () use ($invoice, $validated) {
-                    $lockedInvoice = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
-
-                    $amount = round((float) $lockedInvoice->remaining_amount, 2);
-                    if ($amount <= 0) {
-                        throw new \RuntimeException('Sisa tagihan sudah nol.');
-                    }
-
-                    Payment::create([
-                        'payment_number' => Payment::generatePaymentNumber($validated['payment_date']),
-                        'invoice_id' => $lockedInvoice->id,
-                        'customer_id' => $lockedInvoice->customer_id,
-                        'pop_id' => $lockedInvoice->pop_id,
-                        'payment_date' => $validated['payment_date'],
-                        'payment_method' => $validated['payment_method'],
-                        'amount' => $amount,
-                        'received_by' => auth()->id(),
-                        'payment_status' => PaymentStatus::VALID->value,
-                        'note' => $validated['note'] ?? 'Pembayaran massal',
-                    ]);
-
-                    $lockedInvoice->recalculateFromPayments();
-                });
-
-                $paid++;
-            } catch (\Throwable $e) {
-                $failed++;
-            }
+        if ($key === '') {
+            return null;
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => "{$paid} tagihan berhasil dibayar".($failed > 0 ? ", {$failed} gagal" : '').'.',
-            'paid' => $paid,
-            'failed' => $failed,
-        ]);
+        return Payment::where('idempotency_key', $key)->first();
+    }
+
+    /**
+     * Simpan satu pembayaran dalam satu transaksi, dengan invoice terkunci.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function recordPayment(Invoice $invoice, array $validated, ?string $proofPath): Payment
+    {
+        return DB::transaction(function () use ($invoice, $validated, $proofPath): Payment {
+            $lockedInvoice = Invoice::query()
+                ->whereKey($invoice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $totalReceived = Money::of($validated['amount']);
+            $remaining = Money::of($lockedInvoice->remaining_amount);
+
+            if (Money::isZero($remaining)) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Tagihan ini sudah lunas.',
+                ]);
+            }
+
+            // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
+            // ada) jadi overpay_amount — bukan diminta admin pisah sendiri.
+            // Dipisah di ranah sen: pembagian dua angka uang yang harus
+            // berjumlah persis sama dengan yang diterima. Galat float membuat
+            // "bayar pas" melahirkan lebih bayar Rp0,000001 — baris hantu di
+            // tab Lebih Bayar yang tak bisa diselesaikan siapa pun.
+            $appliedAmount = Money::min($totalReceived, $remaining);
+            $overpayAmount = Money::sub($totalReceived, $appliedAmount);
+
+            $payment = Payment::create([
+                'payment_number' => Payment::generatePaymentNumber($validated['payment_date']),
+                'idempotency_key' => $validated['idempotency_key'] ?? null,
+                'invoice_id' => $lockedInvoice->id,
+                'customer_id' => $lockedInvoice->customer_id,
+                'pop_id' => $lockedInvoice->pop_id,
+                'payment_date' => $validated['payment_date'],
+                'payment_method' => $validated['payment_method'],
+                'amount' => $appliedAmount,
+                'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
+                'received_by' => auth()->id(),
+                'proof_file' => $proofPath,
+                'payment_status' => PaymentStatus::VALID->value,
+                'note' => $validated['note'] ?? null,
+            ]);
+
+            $lockedInvoice->recalculateFromPayments();
+
+            return $payment;
+        });
     }
 
     /**
@@ -420,6 +474,23 @@ class PaymentController extends Controller
             return redirect()
                 ->route('payments.show', $payment->id)
                 ->withErrors(['reject_reason' => 'Pembayaran ini sudah ditolak sebelumnya.']);
+        }
+
+        // Batas koreksi = titik verifikasi setoran. Sebelum itu payment masih
+        // sekadar catatan; sesudahnya uang fisiknya sudah dihitung dan
+        // diserahterimakan dua pihak, dan setoran terverifikasi adalah dokumen
+        // yang mereka sepakati. Menolak payment di dalamnya = mengubah dokumen
+        // itu belakangan, yaitu persis cara jejak uang bisa dihapus diam-diam.
+        //
+        // Koreksi yang benar: pembayaran pembalik (bertanda + beralasan) yang
+        // menerbitkan Kurang/Lebih Setor baru — setoran lama tak disentuh.
+        $deposit = $payment->collectorDeposit;
+        if ($deposit && $deposit->status->isVerified()) {
+            return redirect()
+                ->route('payments.show', $payment->id)
+                ->withErrors([
+                    'reject_reason' => "Pembayaran ini sudah masuk setoran {$deposit->deposit_number} yang berstatus {$deposit->status->label()}. Setoran terverifikasi tidak boleh diubah — buat pembayaran koreksi, jangan tolak yang ini.",
+                ]);
         }
 
         $validated = $request->validate([
@@ -447,6 +518,25 @@ class PaymentController extends Controller
         // siapa pun, kolektor baru sadar pas ngecek worklist-nya sendiri
         // (docs/plan/analisa-status-implementasi-notifikasi.md §5).
         $this->notifyPaymentRecorderIfDifferentActor($payment, auth()->user(), $validated['reject_reason']);
+
+        // Kalau yang ditolak adalah uang tagihan kolektor, SALDONYA TURUN.
+        // Notifikasi mendarat di lonceng, tapi Worklist yang sedang terbuka
+        // tetap memajang saldo lama — bentuknya persis "angka berubah tanpa
+        // penjelasan" yang modul ini justru ada untuk mencegah.
+        if ($payment->collected_by && $payment->pop_id) {
+            $kolektor = User::find($payment->collected_by);
+
+            if ($kolektor) {
+                CollectorActivityUpdated::dispatch(
+                    $kolektor,
+                    (int) $payment->pop_id,
+                    'pembayaran_ditolak',
+                    1,
+                    (float) $payment->amount,
+                    $payment->payment_number,
+                );
+            }
+        }
 
         return redirect()
             ->route('payments.show', $payment->id)

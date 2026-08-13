@@ -261,6 +261,7 @@ body {
 @media (min-width: 768px) {
   #sidebar {
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: width;
   }
   
   #sidebar.collapsed {
@@ -281,6 +282,7 @@ body {
     opacity: 0 !important;
     max-width: 0 !important;
     pointer-events: none !important;
+    display: none !important;
   }
   
   .chevron-icon {
@@ -292,6 +294,7 @@ body {
     opacity: 0 !important;
     width: 0 !important;
     pointer-events: none !important;
+    display: none !important;
   }
   
   #sidebar.collapsed .submenu-container {
@@ -310,8 +313,8 @@ body {
   }
   
   #sidebar.collapsed nav {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
   }
   
   #sidebar.collapsed nav a, 
@@ -322,10 +325,39 @@ body {
     gap: 0 !important;
   }
   
-  #sidebar.collapsed .sidebar-footer {
+  #sidebar.collapsed .sidebar-item-content {
     justify-content: center !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    gap: 0 !important;
+    width: 100% !important;
+  }
+
+  #sidebar.collapsed .sidebar-group-header {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  #sidebar.collapsed .sidebar-group-header p {
+    display: none !important;
+  }
+  
+  #sidebar.collapsed .sidebar-group-header .sidebar-divider {
+    display: block !important;
+  }
+  
+  #sidebar.collapsed .sidebar-footer {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  
+  #sidebar.collapsed .sidebar-footer-box {
+    justify-content: center !important;
+    padding: 0.375rem !important;
+  }
+  
+  #sidebar.collapsed .sidebar-user-info {
+    justify-content: center !important;
+    gap: 0 !important;
+    width: 100% !important;
   }
   
   #sidebar.collapsed .sidebar-footer-info {
@@ -703,11 +735,52 @@ body {
    Sesuai Design.md §3.2 & §1.9
 ───────────────────────────────────────────────────────────── */
 
+/* Custom sleek scrollbar for sidebar */
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(203, 213, 225, 0.6);
+  border-radius: 9999px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.6);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.9);
+}
+
+/* Submenu smooth slide animation container */
+.submenu-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 200ms ease-out;
+  overflow: hidden;
+}
+
+.submenu-container.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.submenu-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Glass header — topbar transparan dengan blur */
 .glass-header {
   background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .dark .glass-header {
   background: rgba(30, 41, 59, 0.85); /* slate-800 @ 85% */
@@ -720,7 +793,7 @@ body {
 }
 .dark .sidebar-light {
   background: #1E293B;
-  border-right-color: rgba(51, 65, 85, 1);
+  border-right-color: rgba(51, 65, 85, 0.8);
 }
 
 /* Sidebar nav item — default */
@@ -733,11 +806,11 @@ body {
   font-size: 14px;
   font-weight: 500;
   color: #475569;          /* slate-600 */
-  transition: background 150ms, color 150ms;
+  transition: all 150ms ease-in-out;
   text-decoration: none;
 }
 .sidebar-nav-item:hover {
-  background: rgba(241, 245, 249, 0.8); /* slate-100/80 */
+  background: rgba(241, 245, 249, 0.9); /* slate-100/90 */
   color: #0F172A;
 }
 .dark .sidebar-nav-item {
@@ -751,24 +824,26 @@ body {
 /* Sidebar nav item — active (menu induk) */
 .sidebar-nav-item-active {
   background: #F0F9FF;     /* sky-50 */
-  color: #0369A1;          /* sky-700 */
+  color: #0284C7;          /* sky-600 */
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.18);
 }
 .dark .sidebar-nav-item-active {
-  background: rgba(12, 74, 110, 0.3); /* sky-900/30 */
-  color: #7DD3FC;          /* sky-300 */
+  background: rgba(12, 74, 110, 0.35); /* sky-900/35 */
+  color: #38BDF8;          /* sky-400 */
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.25);
 }
 
 /* Sidebar sub-item — active (border kiri, lebih lembut dari induk) */
 .sidebar-subitem-active {
   background: #F0F9FF;     /* sky-50 */
-  color: #0369A1;          /* sky-700 */
+  color: #0284C7;          /* sky-600 */
   font-weight: 600;
-  border-left: 2px solid #0284C7; /* sky-600 */
+  border-left: 2.5px solid #0284C7; /* sky-600 */
 }
 .dark .sidebar-subitem-active {
-  background: rgba(12, 74, 110, 0.3);
-  color: #7DD3FC;
+  background: rgba(12, 74, 110, 0.35);
+  color: #38BDF8;
   border-left-color: #38BDF8;
 }
 

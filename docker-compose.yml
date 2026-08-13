@@ -1,4 +1,59 @@
 services:
+  # ── Build aset frontend (Vite: CSS Tailwind + JS termasuk Alpine) ──
+  #
+  # KENAPA ADA DI SINI, padahal Dockerfile sudah punya tahap `assets`:
+  # service app & nginx bind-mount `./:/var/www`, dan bind-mount MENUTUPI isi
+  # image di path yang sama. Artinya `public/build` yang benar-benar dilayani
+  # nginx (`root /var/www/public`) SELALU milik host, bukan hasil build image.
+  # Tahap di Dockerfile cuma menolong deploy berbasis image murni (tanpa mount).
+  #
+  # Sejak Alpine dicabut dari CDN (ADHOC-20), tidak adanya `public/build` bukan
+  # lagi sekadar "tampilan berantakan": Laravel melempar ViteException dan
+  # seluruh interaksi Alpine mati. Jadi build dijadikan SYARAT START, bukan
+  # langkah manual yang bisa terlupakan — app & nginx menunggu service ini
+  # keluar dengan sukses (`service_completed_successfully`).
+  #
+  # `npm install` (bukan `npm ci`) disengaja: ini jalan tiap `up`, dan install
+  # yang sudah sinkron selesai dalam hitungan detik, sementara `npm ci` selalu
+  # menghapus lalu memasang ulang node_modules di direktori host.
+  #
+  # Jalan sebagai root LALU `chown` hasilnya ke pemilik repo di host. Bukan
+  # `user:` sejak awal, karena build yang lama meninggalkan `public/build`
+  # milik root: user non-root tak bisa menghapusnya (direktorinya root, mode
+  # 755) dan Vite gagal EACCES saat mengosongkan outDir. Pola root+chown ini
+  # memperbaiki keadaan yang sudah terlanjur TANPA perlu sudo di host, dan
+  # mencegahnya terulang. Override HOST_UID/HOST_GID lewat .env kalau UID host
+  # bukan 1000 (`id -u; id -g`).
+  #
+  # `storage/framework/testing` ikut di-chown karena kena jebakan yang sama:
+  # `php artisan test` dari host memakai direktori itu sebagai disk sementara,
+  # dan begitu ada proses root (docker) yang menulis duluan, seluruh test yang
+  # menyentuh unggahan berkas gagal `Permission denied` — kegagalan yang sama
+  # sekali tidak ada hubungannya dengan kode yang sedang diuji. Bind mount di
+  # service ini adalah direktori HOST (service app memakai named volume untuk
+  # storage), jadi yang diperbaiki memang berkas yang dipakai test.
+  assets:
+    image: node:22-alpine
+    container_name: whusnet-assets
+    working_dir: /var/www
+    restart: "no"
+    command: >
+      sh -c "
+        echo '📦 Membangun aset frontend (Vite)...';
+        npm install --no-audit --no-fund &&
+        npm run build &&
+        chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} public/build node_modules &&
+        if [ -d storage/framework/testing ]; then
+          chown -R ${HOST_UID:-1000}:${HOST_GID:-1000} storage/framework/testing;
+          echo '🧹 storage/framework/testing dikembalikan ke pemilik host.';
+        fi &&
+        echo '✅ Aset siap di public/build.'
+      "
+    volumes:
+      - ./:/var/www
+    networks:
+      - app_network
+
   app:
     image: whusnet-app:latest
     build:
@@ -25,6 +80,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Tanpa manifest Vite, halaman apa pun yang meng-@vite langsung 500
+      # (ViteException) — jadi PHP-FPM tidak boleh melayani sebelum aset jadi.
+      assets:
+        condition: service_completed_successfully
     environment:
       APP_NAME: Whusnet-Operasional
       # DB_* SENGAJA tak diulang di sini (2026-08-03). Compose `environment:`
@@ -39,9 +98,36 @@ services:
       # .env.testing bisa menang saat testing.
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SESSION_DRIVER: file
-      CACHE_STORE: file
-      QUEUE_CONNECTION: sync
+      # SESSION_DRIVER & CACHE_STORE SENGAJA tidak diulang di sini — pelajaran
+      # yang sama dengan DB_* dan QUEUE_CONNECTION di atas.
+      #
+      # `CACHE_STORE: file` di lapisan ini mengisi $_SERVER, dan `env()` Laravel
+      # membaca $_SERVER LEBIH DULU daripada putenv() — sehingga
+      # `force="true"` pada phpunit.xml kalah. Akibatnya SELURUH test berbagi
+      # cache file yang PERSISTEN lintas run: `user.1.permissions` yang
+      # ter-cache sebagai `["*"]` di satu run membuat test RBAC di run
+      # berikutnya melihat user biasa punya akses penuh. Itu penyebab 9 test
+      # RBAC merah — bukan logika permission-nya.
+      #
+      # Nilainya ada di `.env` (file), jadi runtime tidak berubah.
+      # QUEUE_CONNECTION SENGAJA tidak diulang di sini — sama alasannya dengan
+      # DB_* di atas. Nilainya sudah `redis` di .env, jadi runtime tidak
+      # berubah; yang berubah cuma siapa yang menang saat testing.
+      #
+      # Waktu baris `QUEUE_CONNECTION: redis` pernah ada di sini, ia jadi env
+      # var level-OS dan mengisi $_SERVER. `env()` Laravel membaca $_SERVER
+      # LEBIH DULU daripada putenv(), sementara `force="true"` di phpunit.xml
+      # hanya menulis putenv() — jadi test yang seharusnya `sync` justru
+      # mendorong job ke Redis ASLI. Horizon lalu menjalankan job berisi model
+      # yang di-serialize dengan koneksi sqlite milik test: 576 job gagal
+      # dengan SQLiteDatabaseDoesNotExistException, dan bertambah tiap kali
+      # suite dijalankan.
+      #
+      # Harus LEBIH BESAR dari timeout job terpanjang (MatchPaymentReceipt =
+      # 240 dtk, supervisor kwitansi = 300 dtk). Kalau lebih kecil, job yang
+      # masih berjalan sudah dianggap mati dan diambil worker kedua — satu
+      # berkas kwitansi dibaca dua kali.
+      REDIS_QUEUE_RETRY_AFTER: 360
       LOG_CHANNEL: stack
       LOG_LEVEL: debug
     healthcheck:
@@ -68,6 +154,11 @@ services:
         condition: service_healthy
       reverb:
         condition: service_started
+      # nginx yang melayani /build/* langsung dari disk — kalau berkasnya belum
+      # ada, aset 404 sementara halamannya sendiri sudah tampil (gaya & Alpine
+      # hilang tanpa error yang jelas).
+      assets:
+        condition: service_completed_successfully
     networks:
       - app_network
 
@@ -133,6 +224,8 @@ services:
       DB_PASSWORD: root
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sejajar dengan service `app` — lihat catatan di sana.
+      REDIS_QUEUE_RETRY_AFTER: 360
     command: php artisan horizon
     depends_on:
       app:
@@ -241,6 +334,8 @@ services:
       DB_PASSWORD: root
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sejajar dengan service `app` — lihat catatan di sana.
+      REDIS_QUEUE_RETRY_AFTER: 360
     command: php artisan schedule:work
     depends_on:
       app:

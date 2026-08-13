@@ -72,7 +72,7 @@ Daftar material terstruktur (baris berulang: barang, tipe, jumlah, satuan, catat
 
 - `required_tools` **tidak dihapus** (ada data survey lama) — turun peran jadi "Alat Khusus / Kendala Peralatan": peralatan kerja non-habis-pakai (tangga, bor). Material habis pakai masuk `task_materials`.
 - `cable_estimation_meter` tetap dipakai dan **otomatis diturunkan** jadi satu baris `kabel_dropcore` (qty = nilai itu, unit meter) — teknisi tidak diminta mengisi angka yang sama dua kali. Kalau teknisi sudah menambah baris dropcore manual, baris otomatis tidak dibuat (cegah dobel).
-- Baris menempel di **FopTask kategori SURVEY** milik pelanggan. Kalau FopTask-nya belum terbentuk, baris material dilewat dan laporan survey tetap tersimpan — menggagalkan seluruh laporan cuma karena anchor belum ada lebih merugikan daripada kehilangan daftar estimasi.
+- Baris menempel di **FopTask kategori SURVEY** milik pelanggan. Kalau anchor-nya belum ada, **dibuat saat itu juga** lewat `FopTaskProvisioningService::ensureForCustomer()` (2026-08-11) — sebelumnya baris material dilewat diam-diam, dan itu ternyata membuang seluruh isian teknisi tanpa satu pun pesan error (lihat ADHOC-28 di `docs/TASKS.md`).
 - Barang dipilih dari **Master Barang** (`items`). Barang di luar master dicatat lewat pilihan "Lainnya" (`item_id` null) supaya teknisi tidak terhambat di lapangan.
 
 ### Batalkan Survey — sebelum/selagi dikerjakan (`cancel()`)
@@ -119,7 +119,7 @@ Daftar material terstruktur (baris berulang: barang, tipe, jumlah, satuan, catat
 
 - Form Step 5 diisi awal (**prefill**) dari baris `estimasi` milik pelanggan; kalau laporan pernah disimpan/direvisi, baris `terpakai` yang tersimpan yang menang. Teknisi mengubah jumlah ke realita, boleh tambah/hapus baris. Tanpa prefill, seksi ini cenderung dikosongkan dan perbandingannya jadi tak berguna.
 - **Wajib minimal satu baris valid kalau `installation_status = completed`** (qty > 0 dan barang terisi). Kalau `failed`/revisi, tidak wajib — mengikuti pola field lain di form ini.
-- Baris menempel di **FopTask kategori PEMASANGAN**; sama seperti estimasi, kalau anchor belum ada baris dilewat tanpa menggagalkan laporan.
+- Baris menempel di **FopTask kategori PEMASANGAN**; sama seperti estimasi, anchor dibuat lewat `FopTaskProvisioningService::ensureForCustomer()` kalau belum ada (2026-08-11).
 - **Tidak menggantikan `customer_technical_details.passive_device*`.** Dua-duanya tetap ada dan tidak digabung:
   | | `task_materials` (kind `terpakai`) | `customer_technical_details.passive_device*` |
   |---|---|---|
@@ -138,6 +138,27 @@ Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan �
 - Sama kayak Survey: ini satu-satunya jalur sah, `TaskPolicy::cancel()` + `FopTaskController::update()` block cancel langsung buat task_type PEMASANGAN.
 
 ## 7. Tahap 5 — Verifikasi Admin & Aktivasi (`CustomerVerificationController`)
+
+### Halaman baca (`showAdmin`, `/verifications/{customer}/admin`)
+
+Halaman ini **harus memperlihatkan apa yang benar-benar diinput teknisi** — itu satu-satunya dasar admin memutuskan aktivasi. Yang ditampilkan per tab (2026-08-11, ADHOC-28):
+
+| Tab | Blok | Sumber |
+|---|---|---|
+| Survey | Estimasi Material Hasil Survey | `task_materials` kind `estimasi` (`TaskMaterialService::estimatesForCustomer()`) |
+| Survey | Alat Kerja Dicatat Surveyor | `task_work_tools` milik FopTask kategori SURVEY |
+| Survey | Catatan Kendala Peralatan | `customer_surveys.required_tools` — teks bebas, disembunyikan kalau kosong |
+| Survey | FOP Penanggung Jawab | `customer_surveys.fop_id` → relasi `CustomerSurvey::fop()` |
+| Pemasangan | Material Terpakai Saat Pemasangan | `task_materials` kind `terpakai` milik FopTask kategori PSB |
+| Pemasangan | Alat Kerja Dipakai Tim Pemasangan | `task_work_tools` milik FopTask kategori PSB |
+| Pemasangan | Estimasi vs Terpakai + selisih | `TaskMaterialService::varianceForCustomer()` |
+
+Dua catatan yang gampang salah dibaca:
+
+- **Daftar baris dan tabel variance dua-duanya perlu ada.** Variance mengagregasi per barang dan membuang catatan per baris, jadi ia tidak bisa menggantikan daftar yang benar-benar diisi teknisi.
+- Blok material & alat **tetap dirender walau kosong**, dengan keterangan "tidak mencatat". Seksi yang hilang saat kosong bikin admin tidak bisa membedakan "teknisi tidak mengisi" dari "halaman memang tidak punya seksi itu" — persis kebingungan yang memicu ADHOC-28.
+
+Sebelumnya `customer_surveys.fop_id` tampil mentah dengan label "Kebutuhan FOP / Tiang". Kolomnya menunjuk ke `users` (FOP yang menugaskan), jadi label dan isinya tidak pernah nyambung.
 
 ### Approve → Aktivasi (`finalVerify`)
 
@@ -160,7 +181,7 @@ Setara `CustomerSurveyController::cancel()` di §4, tapi buat tahap Pemasangan �
 
 ### Kembalikan dari Pelanggan Gagal (`CustomerController::restoreFromFailed`, 2026-07-20)
 
-- List **Pelanggan Gagal** (`/customers?status_group=failed`) dirapikan jadi tabel ringkas: CID, Nama, Alasan, Tanggal Ditolak, Action (Detail + **Kembalikan**). Alasan & tanggal dibaca dari `AuditLog` transisi terakhir ke `rejected` (module `Customer Workflow`, action `status_transition`) — bukan kolom dedicated, karena `Customer`/`CustomerStatusLog` gak punya kolom alasan reject sendiri.
+- List **Pelanggan Gagal** (`/customers/failed`) dirapikan jadi tabel ringkas: CID, Nama, Alasan, Tanggal Ditolak, Action (Detail + **Kembalikan**). Alasan & tanggal dibaca dari `AuditLog` transisi terakhir ke `rejected` (module `Customer Workflow`, action `status_transition`) — bukan kolom dedicated, karena `Customer`/`CustomerStatusLog` gak punya kolom alasan reject sendiri.
 - **Urut DESC berdasarkan tanggal ditolak (2026-07-20)**: `CustomerController::index()` orderBy subquery `AuditLog::selectRaw('MAX(created_at)')` (scoped ke module+action+`new_values->status=rejected` per customer) — bukan `customer_code` seperti grup status lain. Perlu subquery karena "tanggal ditolak" bukan kolom asli di `customers`, dihitung on-the-fly dari `AuditLog`; sorting harus terjadi SEBELUM `paginate()`, gak bisa sort di PHP setelah data diambil (cuma benar untuk 1 halaman, bukan global).
 - **Kembalikan** — tombol cuma muncul kalau `AuditLog` reject terakhir punya `old_values.status` yang valid (status SEBELUM ditolak). Aksi ini **bypass** `WorkflowTransition::REJECTED->allowedNextTransitions()` (yang tetap kosong di enum, gak diubah) — set `customer.status` langsung balik ke status sebelum ditolak lewat `Customer::update()`, BUKAN lewat `CustomerWorkflowService::transition()`. Konsekuensi: gak tercatat di `customer_status_logs` (state-machine log resmi), cuma di `AuditLog` module `Customer Workflow` action baru `status_restore`.
 - Permission: `customers.detail.installation.validate` (sama dengan permission Reject/Approve/Revisi — no perm baru).
@@ -264,7 +285,7 @@ Jika di futur ada kebutuhan teknisi lihat identitas/alamat *saat di lokasi* (mis
 
 ### List Putus Langganan + Ambil Alat + Langganan Lagi (2026-07-20)
 
-- List **Putus Langganan** (`/customers?status_group=terminated`) dirapikan jadi tabel: ID, Nama, Kontrak (Sewa/Beli — dari `customer_service.contract_type`), Alasan Putus, Tanggal Pemutusan (dibaca dari `AuditLog` module `customers` action `terminate`, sama pola kayak Pelanggan Gagal — bukan kolom dedicated), Status Alat, Action.
+- List **Putus Langganan** (`/customers/terminated`) dirapikan jadi tabel: ID, Nama, Kontrak (Sewa/Beli — dari `customer_service.contract_type`), Alasan Putus, Tanggal Pemutusan (dibaca dari `AuditLog` module `customers` action `terminate`, sama pola kayak Pelanggan Gagal — bukan kolom dedicated), Status Alat, Action.
 - **Urut DESC berdasarkan Tanggal Pemutusan (2026-07-20)**: sama pola persis kayak Pelanggan Gagal di atas — subquery `AuditLog::selectRaw('MAX(created_at)')` (module `customers`, action `terminate`), bukan `customer_code`.
 - **Status Alat** — kolom baru `customer_devices.device_retrieved_at` (nullable timestamp, migrasi `2026_07_18_163955_add_device_retrieved_at_to_customer_devices_table`). Null = "Belum di Ambil", terisi = "Sudah di Ambil". **Tidak ada kolom ini sebelumnya** — sebelum perubahan ini, gak ada cara sistem tahu status pengambilan alat pelanggan yang putus.
 - **Ambil Alat** (`CustomerController::retrieveDevice`) — cuma muncul kalau alat belum diambil, set `device_retrieved_at = now()`. Guard: `customer.status === 'terminated'` dan `customerDevice` harus ada. Permission `customers.detail.devices.retrieve` *(dipisah dari `customers.update` 2026-07-20, lihat [docs/rbac/business-logic.md § 3.1](../rbac/business-logic.md#31-langkah-nambah-permission-baru-fitur-existing--contoh-nyata-customersdetaildevicesretrieve))*.

@@ -102,7 +102,11 @@ FOP review (approve/reject/pending) via TaskController::review()
 
 ## 8. Audit
 
-- `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` di titik-titik kunci (`created`, `completed`, `cancelled`, `approved`, `rejected`, `reassigned`) — jadi ada kemungkinan create Task tercatat 2x (event otomatis + manual call di `TaskService::create()`), perlu diperhatikan kalau baca riwayat audit.
+- `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` untuk peristiwa bisnis bernama yang tidak bisa disimpulkan dari perubahan kolom: `completed`, `cancelled`, `reassigned` (TaskService), `pending`/`reschedule`/`approved`/`rejected` (TaskController).
+
+  **Duplikat murni sudah dicabut (2026-08-13).** `TaskService::create()`/`update()` dulu ikut menulis `created`/`updated` yang isinya sama persis dengan tulisan trait — tiap task lahir dan tiap update menghasilkan dua baris audit, dan itu tampil dobel di "Riwayat Perubahan Status" halaman Detail Task. Sekarang trait yang memegang keduanya (lebih presisi: mencatat kolom yang benar-benar berubah, dan menangkap jalur artisan/tinker juga).
+
+  Sisa pasangan trait+bisnis (mis. `update` berisi `status: selesai` bersama `completed`) **tetap ditulis dua-duanya** — keduanya bernilai untuk audit. Yang menyaringnya adalah lapisan penyajian: `App\Support\TaskAuditTimeline` dipakai `TaskController::show()` untuk memilih baris bernama dan menyembunyikan derau mesin (mis. prefix `[Team 1]` di `title`). **Tidak ada baris audit yang dihapus dari database** — halaman Audit Log tetap menampilkan semuanya. Penjaga: `TaskStatusTimelineNoDuplicateTest`.
 
 ## 9. Pemisahan Catatan — Issue/Teknis, Catatan FOP, Catatan Teknis (NOC)
 

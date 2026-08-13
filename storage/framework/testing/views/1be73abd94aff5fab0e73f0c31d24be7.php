@@ -46,17 +46,28 @@
         }
         .actions a { background: #fff; color: #0f172a; border-color: #cbd5e1; margin-left: 6px; }
         @media print {
+            /*
+             * margin:0 pada @page = satu-satunya cara mematikan header/footer
+             * bawaan browser (tanggal, judul dokumen, URL localhost:8000/...).
+             * Teks itu hidup di KOTAK MARGIN halaman, bukan di dokumen kita —
+             * tidak ada selector yang bisa menyembunyikannya. Nol-kan marginnya,
+             * kotaknya ikut hilang. Jarak ke tepi kertas dipindah ke padding
+             * elemen di bawah ini; menghapusnya membuat struk mepet tepi dan
+             * terpotong printer.
+             */
+            @page { margin: 0; }
             body { background: #fff; padding: 0; }
-            .struk { border: 0; padding: 0; width: auto; }
+            .struk { border: 0; padding: 6mm 5mm; width: auto; }
             .actions { display: none; }
         }
     </style>
 </head>
 <body>
+    
     <div class="struk">
         <div class="center">
             <div class="brand">WHUSNET</div>
-            <div class="muted"><?php echo e($payment->pop->name ?? 'Kantor Pusat'); ?></div>
+            <div class="muted"><?php echo e($kwitansi['pop']); ?></div>
             <div class="muted">STRUK PEMBAYARAN</div>
         </div>
 
@@ -65,24 +76,24 @@
         <table>
             <tr>
                 <td class="muted">No. Struk</td>
-                <td class="val"><?php echo e($payment->payment_number); ?></td>
+                <td class="val"><?php echo e($kwitansi['nomor']); ?></td>
             </tr>
             <tr>
                 <td class="muted">Tanggal</td>
-                <td class="val"><?php echo e(optional($payment->payment_date)->format('d/m/Y')); ?></td>
+                <td class="val"><?php echo e($kwitansi['tanggal_bayar']); ?></td>
             </tr>
             <tr>
                 <td class="muted">Metode</td>
-                <td class="val"><?php echo e(strtoupper($payment->payment_method)); ?></td>
+                <td class="val"><?php echo e($kwitansi['metode']); ?></td>
             </tr>
             <tr>
                 <td class="muted">Status</td>
-                <td class="val"><?php echo e($payment->payment_status->label()); ?></td>
+                <td class="val"><?php echo e($kwitansi['status']); ?></td>
             </tr>
-            <?php if($installmentContext): ?>
+            <?php if($kwitansi['keterangan_cicilan']): ?>
             <tr>
                 <td class="muted">Keterangan</td>
-                <td class="val"><?php echo e($installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number']); ?></td>
+                <td class="val"><?php echo e($kwitansi['keterangan_cicilan']); ?></td>
             </tr>
             <?php endif; ?>
         </table>
@@ -92,24 +103,33 @@
         <table>
             <tr>
                 <td class="muted">Pelanggan</td>
-                <td class="val"><?php echo e($payment->customer->full_name ?? '-'); ?></td>
+                <td class="val"><?php echo e($kwitansi['pelanggan']['nama']); ?></td>
             </tr>
             <tr>
                 <td class="muted">CID</td>
-                <td class="val"><?php echo e($payment->customer?->cid ?: ($payment->customer?->customer_code ?: '-')); ?></td>
+                <td class="val"><?php echo e($kwitansi['pelanggan']['cid']); ?></td>
+            </tr>
+            <tr>
+                <td class="muted">No. HP</td>
+                <td class="val"><?php echo e($kwitansi['pelanggan']['hp']); ?></td>
+            </tr>
+            <tr>
+                <td class="muted">Alamat</td>
+                
+                <td class="val"><?php echo implode('<br>', array_map('e', $kwitansi['pelanggan']['alamat_baris'])); ?></td>
             </tr>
             <tr>
                 <td class="muted">No. Tagihan</td>
-                <td class="val"><?php echo e($payment->invoice->invoice_number ?? '-'); ?></td>
+                <td class="val"><?php echo e($kwitansi['invoice']['nomor']); ?></td>
             </tr>
-            <?php if($payment->invoice): ?>
+            <?php if($kwitansi['invoice']['ada']): ?>
             <tr>
                 <td class="muted">Periode</td>
-                <td class="val"><?php echo e($payment->invoice->billing_period ?: '-'); ?></td>
+                <td class="val"><?php echo e($kwitansi['invoice']['periode']); ?></td>
             </tr>
             <tr>
                 <td class="muted">Paket</td>
-                <td class="val"><?php echo e($payment->invoice->internetPackage->name ?? '-'); ?></td>
+                <td class="val"><?php echo e($kwitansi['invoice']['paket']); ?></td>
             </tr>
             <?php endif; ?>
         </table>
@@ -117,26 +137,26 @@
         <div class="sep"></div>
 
         <table>
-            <?php if($payment->invoice): ?>
+            <?php if($kwitansi['invoice']['ada']): ?>
             <tr>
                 <td class="muted">Total Tagihan</td>
-                <td class="val">Rp <?php echo e(number_format((float) $payment->invoice->total_amount, 0, ',', '.')); ?></td>
+                <td class="val"><?php echo e($kwitansi['invoice']['total']); ?></td>
             </tr>
             <?php endif; ?>
             <tr class="total">
                 <td>DIBAYAR</td>
-                <td class="val">Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?></td>
+                <td class="val"><?php echo e($kwitansi['dibayar']); ?></td>
             </tr>
-            <?php if((float) $payment->overpay_amount > 0): ?>
+            <?php if($kwitansi['lebih_bayar']): ?>
             <tr>
                 <td class="muted">Lebih Bayar</td>
-                <td class="val">Rp <?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?></td>
+                <td class="val"><?php echo e($kwitansi['lebih_bayar']); ?></td>
             </tr>
             <?php endif; ?>
-            <?php if($payment->invoice): ?>
+            <?php if($kwitansi['invoice']['ada']): ?>
             <tr>
                 <td class="muted">Sisa Tagihan</td>
-                <td class="val">Rp <?php echo e(number_format((float) $payment->invoice->remaining_amount, 0, ',', '.')); ?></td>
+                <td class="val"><?php echo e($kwitansi['invoice']['sisa']); ?><?php echo e($kwitansi['invoice']['lunas'] ? ' (Lunas)' : ''); ?></td>
             </tr>
             <?php endif; ?>
         </table>
@@ -146,12 +166,16 @@
         <table>
             <tr>
                 <td class="muted">Diterima oleh</td>
-                <td class="val"><?php echo e($payment->receiver->name ?? '-'); ?></td>
+                <td class="val"><?php echo e($kwitansi['penerima']); ?></td>
             </tr>
-            <?php if($payment->note): ?>
+            <tr>
+                <td class="muted">Ditagih oleh</td>
+                <td class="val"><?php echo e($kwitansi['penagih']); ?></td>
+            </tr>
+            <?php if($kwitansi['catatan']): ?>
             <tr>
                 <td class="muted">Catatan</td>
-                <td class="val"><?php echo e($payment->note); ?></td>
+                <td class="val"><?php echo e($kwitansi['catatan']); ?></td>
             </tr>
             <?php endif; ?>
         </table>
@@ -160,7 +184,7 @@
 
         <div class="center muted">
             Struk sah tanpa tanda tangan.<br>
-            Dicetak <?php echo e(now()->format('d/m/Y H:i')); ?>
+            Dicetak <?php echo e($kwitansi['dicetak']); ?>
 
         </div>
     </div>

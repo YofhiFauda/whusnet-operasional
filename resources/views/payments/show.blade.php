@@ -17,6 +17,14 @@
 
 <style>
     @media print {
+        /*
+         * Header/footer bawaan browser (tanggal, judul dokumen, URL
+         * localhost:8000/...) dicetak di KOTAK MARGIN halaman, di luar
+         * jangkauan selector mana pun. margin:0 menghapus kotaknya sekalian.
+         * Jarak ke tepi kertas ditanggung `.print-only.p-8` — jangan ikut
+         * dinolkan.
+         */
+        @page { margin: 0; }
         .no-print, header, aside, #sidebar-backdrop, #toastContainer, .modal-backdrop, nav, footer { display: none !important; }
         .print-only { display: block !important; }
         .screen-only { display: none !important; }
@@ -29,20 +37,26 @@
 </style>
 
 <!-- PRINT ONLY A4 KWITANSI PEMBAYARAN SHEET -->
+{{-- Isi lembar ini berasal dari ReceiptPresenter, sumber yang sama dengan
+     struk thermal (payments/receipt) dan kartu kolektor. Dulu tiap view
+     membaca $payment sendiri-sendiri sehingga satu pembayaran tercetak beda
+     isi tergantung dari halaman mana tombolnya ditekan. --}}
 <div class="print-only p-8 bg-white text-slate-900 font-sans text-xs leading-normal">
     <!-- Header Struk -->
     <div class="flex justify-between items-start border-b pb-4 mb-4 border-slate-300">
         <div>
             <h1 class="text-xl font-black tracking-tight text-slate-900">WHUSNET OPERASIONAL</h1>
-            <p class="text-xs text-slate-600 font-medium">ISP Service Provider • POP {{ $payment->pop->name ?? 'Kantor Pusat' }}</p>
+            <p class="text-xs text-slate-600 font-medium">ISP Service Provider • POP {{ $kwitansi['pop'] }}</p>
             <p class="text-[10px] text-slate-500 mt-0.5">Sistem Billing & Operasional Terpadu</p>
         </div>
         <div class="text-right">
             <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">KWITANSI PEMBAYARAN RESMI</h2>
-            <p class="font-mono text-xs font-bold text-slate-800">No: {{ $payment->payment_number }}</p>
-            <p class="text-xs text-slate-600 mt-0.5">Status: <span class="font-bold uppercase text-emerald-700">● {{ $payment->payment_status->label() }}</span></p>
-            @if($installmentContext)
-                <p class="text-[11px] text-slate-600 font-medium mt-0.5">{{ $installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number'] }}</p>
+            <p class="font-mono text-xs font-bold text-slate-800">No: {{ $kwitansi['nomor'] }}</p>
+            {{-- Warna status IKUT statusnya. Sebelumnya emerald tanpa syarat:
+                 pembayaran DITOLAK pun tercetak hijau di kwitansi resmi. --}}
+            <p class="text-xs text-slate-600 mt-0.5">Status: <span class="font-bold uppercase {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">● {{ $kwitansi['status'] }}</span></p>
+            @if($kwitansi['keterangan_cicilan'])
+                <p class="text-[11px] text-slate-600 font-medium mt-0.5">{{ $kwitansi['keterangan_cicilan'] }}</p>
             @endif
         </div>
     </div>
@@ -51,17 +65,18 @@
     <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">DITERIMA DARI PELANGGAN</p>
-            <p class="font-bold text-sm text-slate-900">{{ $payment->customer->full_name ?? '-' }}</p>
-            <p class="font-mono text-xs text-slate-700">CID: {{ $payment->customer->cid ?? $payment->customer->customer_code ?? '-' }}</p>
-            <p class="text-slate-600 font-mono">No. HP: {{ $payment->customer->primary_phone ?? $payment->customer->phone ?? '-' }}</p>
-            <p class="text-slate-600 mt-1">Alamat: {{ $payment->customer->address ?? '-' }}</p>
+            <p class="font-bold text-sm text-slate-900">{{ $kwitansi['pelanggan']['nama'] }}</p>
+            <p class="font-mono text-xs text-slate-700">CID: {{ $kwitansi['pelanggan']['cid'] }}</p>
+            <p class="text-slate-600 font-mono">No. HP: {{ $kwitansi['pelanggan']['hp'] }}</p>
+            <p class="text-slate-600 mt-1">Alamat: {!! implode('<br>', array_map('e', $kwitansi['pelanggan']['alamat_baris'])) !!}</p>
         </div>
         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-right space-y-1">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">RINCIAN TRANSAKSI</p>
-            <p><span class="text-slate-500">Tanggal Bayar:</span> <span class="font-semibold">{{ optional($payment->payment_date)->format('d/m/Y') }}</span></p>
-            <p><span class="text-slate-500">Metode Bayar:</span> <span class="font-semibold uppercase font-mono">{{ strtoupper($payment->payment_method) }}</span></p>
-            <p><span class="text-slate-500">Kolektor/Kasir:</span> <span class="font-semibold">{{ $payment->collector ? $payment->collector->name : 'Direct (Kasir POP ' . ($payment->pop->name ?? '-') . ')' }}</span></p>
-            <p><span class="text-slate-500">Ref Invoice:</span> <span class="font-mono font-bold text-slate-800">{{ $payment->invoice->invoice_number ?? '-' }}</span></p>
+            <p><span class="text-slate-500">Tanggal Bayar:</span> <span class="font-semibold">{{ $kwitansi['tanggal_bayar'] }}</span></p>
+            <p><span class="text-slate-500">Tanggal Ditagih:</span> <span class="font-semibold">{{ $kwitansi['tanggal_ditagih'] }}</span></p>
+            <p><span class="text-slate-500">Metode Bayar:</span> <span class="font-semibold uppercase font-mono">{{ $kwitansi['metode'] }}</span></p>
+            <p><span class="text-slate-500">Kolektor/Kasir:</span> <span class="font-semibold">{{ $kwitansi['penagih'] }}</span></p>
+            <p><span class="text-slate-500">Ref Invoice:</span> <span class="font-mono font-bold text-slate-800">{{ $kwitansi['invoice']['nomor'] }}</span></p>
         </div>
     </div>
 
@@ -77,18 +92,21 @@
         <tbody class="divide-y divide-slate-200 font-medium">
             <tr>
                 <td class="py-3 px-3">
-                    <p class="font-bold text-slate-900">Pelunasan Invoice Internet {{ $payment->invoice->internetPackage->name ?? 'Layanan ISP' }}</p>
-                    <p class="text-[11px] text-slate-500">No. Invoice: {{ $payment->invoice->invoice_number ?? '-' }} • Periode {{ $payment->invoice->billing_period ?? '-' }}</p>
+                    {{-- Judul baris ikut keterangan cicilan. Dulu selalu
+                         "Pelunasan Invoice" — cicilan sebagian pun tercetak
+                         seolah tagihannya sudah lunas. --}}
+                    <p class="font-bold text-slate-900">{{ $kwitansi['keterangan_cicilan'] ?: 'Pembayaran' }} — Internet {{ $kwitansi['invoice']['paket'] }}</p>
+                    <p class="text-[11px] text-slate-500">No. Invoice: {{ $kwitansi['invoice']['nomor'] }} • Periode {{ $kwitansi['invoice']['periode'] }}</p>
                 </td>
-                <td class="py-3 px-3 text-center font-mono uppercase">{{ $payment->payment_method }}</td>
-                <td class="py-3 px-3 text-right font-mono font-bold">Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}</td>
+                <td class="py-3 px-3 text-center font-mono uppercase">{{ $kwitansi['metode'] }}</td>
+                <td class="py-3 px-3 text-right font-mono font-bold">{{ $kwitansi['dibayar'] }}</td>
             </tr>
-            @if((float) $payment->overpay_amount > 0)
+            @if($kwitansi['lebih_bayar'])
             <tr>
                 <td class="py-3 px-3" colspan="2">
                     <p class="text-slate-600 font-medium">Catatan Lebih Bayar (Deposit / Overpay Pelanggan)</p>
                 </td>
-                <td class="py-3 px-3 text-right font-mono font-bold text-sky-700">Rp {{ number_format((float) $payment->overpay_amount, 0, ',', '.') }}</td>
+                <td class="py-3 px-3 text-right font-mono font-bold text-sky-700">{{ $kwitansi['lebih_bayar'] }}</td>
             </tr>
             @endif
         </tbody>
@@ -98,32 +116,46 @@
     <div class="flex justify-between items-start gap-6 text-xs border-t pt-4 border-slate-300">
         <div class="space-y-1.5 max-w-xs">
             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">KETERANGAN & CATATAN</p>
-            <p class="text-[11px] text-slate-600 italic">"{{ $payment->note ?: 'Tagihan Bulanan. Struk ini adalah bukti pembayaran sah yang dikeluarkan oleh sistem billing WHUSNET.' }}"</p>
-            <p class="text-[10px] text-slate-400 mt-4">Dicetak otomatis pada: {{ now()->format('d/m/Y H:i') }} WIB</p>
+            {{-- Catatan kosong tetap kosong. Kalimat "Tagihan Bulanan…" yang
+                 dulu muncul sebagai fallback terbaca seperti catatan petugas,
+                 padahal tak pernah ada yang menulisnya. --}}
+            @if($kwitansi['catatan'])
+                <p class="text-[11px] text-slate-600 italic">"{{ $kwitansi['catatan'] }}"</p>
+            @else
+                <p class="text-[11px] text-slate-400 italic">Tanpa catatan.</p>
+            @endif
+            <p class="text-[10px] text-slate-500">Kwitansi ini diterbitkan sistem billing WHUSNET dan sah tanpa tanda tangan.</p>
+            <p class="text-[10px] text-slate-400 mt-4">Dicetak otomatis pada: {{ $kwitansi['dicetak'] }} WIB</p>
         </div>
 
         <div class="w-64 space-y-1.5 text-xs text-right">
-            @if($payment->invoice)
+            @if($kwitansi['invoice']['ada'])
             <div class="flex justify-between text-slate-600">
                 <span>Total Tagihan Invoice</span>
-                <span class="font-mono font-semibold">Rp {{ number_format((float) $payment->invoice->total_amount, 0, ',', '.') }}</span>
+                <span class="font-mono font-semibold">{{ $kwitansi['invoice']['total'] }}</span>
             </div>
             @endif
-            <div class="flex justify-between text-emerald-700 font-bold text-sm pt-1.5 border-t border-slate-300">
+            <div class="flex justify-between font-bold text-sm pt-1.5 border-t border-slate-300 {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">
                 <span>JUMLAH DIBAYAR</span>
-                <span class="font-mono">Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}</span>
+                <span class="font-mono">{{ $kwitansi['dibayar'] }}</span>
             </div>
-            @if($payment->invoice)
+            @if($kwitansi['lebih_bayar'])
+            <div class="flex justify-between text-sky-700">
+                <span>Lebih Bayar</span>
+                <span class="font-mono font-semibold">{{ $kwitansi['lebih_bayar'] }}</span>
+            </div>
+            @endif
+            @if($kwitansi['invoice']['ada'])
             <div class="flex justify-between text-slate-600">
                 <span>Sisa Tagihan</span>
-                <span class="font-mono font-bold {{ (float)$payment->invoice->remaining_amount > 0 ? 'text-rose-600' : 'text-emerald-600' }}">
-                    Rp {{ number_format((float) $payment->invoice->remaining_amount, 0, ',', '.') }} {{ (float)$payment->invoice->remaining_amount == 0 ? '(Lunas)' : '' }}
+                <span class="font-mono font-bold {{ $kwitansi['invoice']['lunas'] ? 'text-emerald-600' : 'text-rose-600' }}">
+                    {{ $kwitansi['invoice']['sisa'] }} {{ $kwitansi['invoice']['lunas'] ? '(Lunas)' : '' }}
                 </span>
             </div>
             @endif
             <div class="pt-6">
                 <span class="text-[10px] text-slate-500 block">Diterima oleh Kasir / Admin:</span>
-                <span class="font-bold text-slate-900 block text-xs">{{ $payment->receiver->name ?? 'System' }}</span>
+                <span class="font-bold text-slate-900 block text-xs">{{ $kwitansi['penerima'] }}</span>
             </div>
         </div>
     </div>

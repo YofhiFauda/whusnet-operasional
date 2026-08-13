@@ -394,7 +394,8 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="discount_amount">DISKON PROMOSI (RP) <span class="text-red-500">*</span></label>
-                            <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', $customer->discount_amount)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
+                            
+                            <input type="text" inputmode="decimal" data-rupiah name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', \App\Helpers\FormatHelper::rupiahInput($customer->discount_amount))); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
                         </div>
 
                         <div>
@@ -404,7 +405,7 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="other_fee">BIAYA LAIN DI LUAR STANDAR (RP)</label>
-                            <input type="number" name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="<?php echo e(old('other_fee', $customer->customerService?->other_fee ?? 0)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 11000">
+                            <input type="text" inputmode="decimal" data-rupiah name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="<?php echo e(old('other_fee', \App\Helpers\FormatHelper::rupiahInput($customer->customerService?->other_fee ?? 0))); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 11000">
                         </div>
                     </div>
 
@@ -764,10 +765,14 @@
             basePrice = parseFloat(selectedOption.getAttribute('data-price')) || 0;
         }
 
-        const discount = parseFloat(discountInput.value) || 0;
+        // Diskon & biaya lain bermasking ribuan — parseFloat('10.000') = 10.
+        // `tax_percent` TIDAK dimasking (persen), jadi tetap parseFloat.
+        const angka = (el) => (el && window.Rupiah ? window.Rupiah.angka(el.value) : parseFloat(el ? el.value : 0)) || 0;
+
+        const discount = angka(discountInput);
         const taxPercent = parseFloat(taxInput.value) || 0;
         const otherFeeInput = document.getElementById('other_fee');
-        const otherFee = otherFeeInput ? (parseFloat(otherFeeInput.value) || 0) : 0;
+        const otherFee = angka(otherFeeInput);
 
         const taxable = Math.max(0, basePrice - discount);
         const tax = Math.round(taxable * (taxPercent / 100));

@@ -197,6 +197,10 @@ return [
     */
 
     'defaults' => [
+        // Antrean cepat: event broadcast (dashboard FOP, task teknisi, status
+        // tagihan) dan notifikasi. Pekerjaan di sini hitungan milidetik, jadi
+        // `timeout` pendek justru pengaman — job yang menggantung lebih baik
+        // dipotong daripada menahan layar realtime orang lain.
         'supervisor-1' => [
             'connection' => 'redis',
             'queue' => ['default'],
@@ -210,6 +214,28 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+
+        // Antrean lambat: pembacaan kwitansi (pdftotext, lalu raster per
+        // halaman). Dipisah supaya upload bulk 100 berkas tidak menghadang
+        // antrean `default` — kalau digabung, dashboard realtime berhenti
+        // bergerak sampai tumpukan kwitansi habis, tanpa error apa pun.
+        //
+        // `timeout` di sini harus >= MatchPaymentReceipt::$timeout (240) dan
+        // keduanya harus < REDIS_QUEUE_RETRY_AFTER (360), kalau tidak job yang
+        // masih berjalan diambil worker kedua dan satu berkas dibaca dua kali.
+        'supervisor-kwitansi' => [
+            'connection' => 'redis',
+            'queue' => ['kwitansi'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 300,
+            'nice' => 5,
+        ],
     ],
 
     'environments' => [
@@ -219,11 +245,17 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-kwitansi' => [
+                'maxProcesses' => 4,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-kwitansi' => [
+                'maxProcesses' => 2,
             ],
         ],
     ],

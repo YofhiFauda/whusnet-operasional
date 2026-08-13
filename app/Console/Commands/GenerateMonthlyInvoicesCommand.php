@@ -13,8 +13,8 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-#[Signature('billing:generate-monthly-invoices {--dry-run : List what would be created without inserting anything}')]
-#[Description('Generate flat BULANAN invoices for active customers for the current billing period, skipping anyone who already has one.')]
+#[Signature('billing:generate-monthly-invoices {--period= : Billing period YYYY-MM (default: bulan berjalan)} {--dry-run : List what would be created without inserting anything}')]
+#[Description('Generate flat BULANAN invoices for active customers for a billing period, skipping anyone who already has one.')]
 class GenerateMonthlyInvoicesCommand extends Command
 {
     /**
@@ -28,7 +28,20 @@ class GenerateMonthlyInvoicesCommand extends Command
      */
     public function handle(): int
     {
-        $billingPeriod = now()->format('Y-m');
+        // Tiap `migrate:fresh` + import legacy meninggalkan lubang antara bulan
+        // terakhir yang ada di dump legacy dan bulan berjalan. Tanpa opsi ini
+        // lubang itu permanen: command dipatok `now()`, jadi bulan yang sudah
+        // lewat tidak akan pernah punya tagihan sekalipun cron akhirnya hidup
+        // lagi. Idempotensinya dijaga Invoice::hasActiveSubscriptionInvoiceForPeriod()
+        // yang sama, jadi menambal periode lama aman diulang.
+        $billingPeriod = $this->resolveBillingPeriod();
+
+        if ($billingPeriod === null) {
+            $this->error('Format --period harus YYYY-MM, contoh: --period=2026-07.');
+
+            return self::FAILURE;
+        }
+
         $dryRun = (bool) $this->option('dry-run');
 
         // Enum, bukan string literal — nama status pelanggan yang berubah tanpa
@@ -158,5 +171,28 @@ class GenerateMonthlyInvoicesCommand extends Command
         $this->info("Periode {$billingPeriod}: ".($dryRun ? 'akan dibuat' : 'dibuat')." {$created}, dilewati {$skipped}, gagal {$failed}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Periode tagihan yang mau digenerate, `null` kalau --period tidak valid.
+     *
+     * Sengaja divalidasi ketat (bukan Carbon::parse yang permisif): `--period=2026-7`
+     * atau `--period=juli` akan menghasilkan billing_period yang tidak cocok dengan
+     * format `Y-m` di seluruh sistem, dan tagihannya jadi tidak terlihat oleh
+     * pengecekan dobel maupun daftar tagihan.
+     */
+    private function resolveBillingPeriod(): ?string
+    {
+        $period = trim((string) $this->option('period'));
+
+        if ($period === '') {
+            return now()->format('Y-m');
+        }
+
+        if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period) !== 1) {
+            return null;
+        }
+
+        return $period;
     }
 }

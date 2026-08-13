@@ -91,7 +91,9 @@
         </div>
 
         
-        <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+        
+        <form action="<?php echo e(route('tickets.store')); ?>" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+            <?php echo csrf_field(); ?>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar">
 

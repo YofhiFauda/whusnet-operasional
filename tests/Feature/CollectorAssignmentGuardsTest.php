@@ -120,7 +120,7 @@ class CollectorAssignmentGuardsTest extends TestCase
             'status' => 'active',
         ]);
 
-        $response = $this->actingAs($admin)->post(route('collectors.assign', $notAKolektor->id), [
+        $response = $this->actingAs($admin)->post(route('collector-worksheet.assign', $notAKolektor->id), [
             'customer_ids' => [$customer->id],
         ]);
 
@@ -144,11 +144,11 @@ class CollectorAssignmentGuardsTest extends TestCase
         $kolektorPopA = $this->createKolektor($popA);
         $customerInPopB = $this->createCustomer($popB, 'C-G2-001');
 
-        $response = $this->actingAs($admin)->post(route('collectors.assign', $kolektorPopA->id), [
+        $response = $this->actingAs($admin)->post(route('collector-worksheet.assign', $kolektorPopA->id), [
             'customer_ids' => [$customerInPopB->id],
         ]);
 
-        $response->assertRedirect(route('collectors.show', ['collector' => $kolektorPopA->id, 'tab' => 'assign']));
+        $response->assertRedirect(route('collector-worksheet.show', ['collector' => $kolektorPopA->id, 'tab' => 'assign']));
         $response->assertSessionHasErrors('customer_ids');
         $this->assertDatabaseHas('customers', ['id' => $customerInPopB->id, 'collector_id' => null]);
     }
@@ -160,11 +160,11 @@ class CollectorAssignmentGuardsTest extends TestCase
         $kolektor = $this->createKolektor($pop);
         $customer = $this->createCustomer($pop, 'C-G3-001');
 
-        $response = $this->actingAs($admin)->post(route('collectors.assign', $kolektor->id), [
+        $response = $this->actingAs($admin)->post(route('collector-worksheet.assign', $kolektor->id), [
             'customer_ids' => [$customer->id],
         ]);
 
-        $response->assertRedirect(route('collectors.show', ['collector' => $kolektor->id, 'tab' => 'assign']));
+        $response->assertRedirect(route('collector-worksheet.show', ['collector' => $kolektor->id, 'tab' => 'assign']));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('customers', ['id' => $customer->id, 'collector_id' => $kolektor->id]);
@@ -185,13 +185,13 @@ class CollectorAssignmentGuardsTest extends TestCase
         $customer->update(['collector_id' => $kolektorA->id]);
 
         // Reassign ke kolektor lain — cukup assign ke kolektor baru, timpa yang lama.
-        $this->actingAs($admin)->post(route('collectors.assign', $kolektorB->id), [
+        $this->actingAs($admin)->post(route('collector-worksheet.assign', $kolektorB->id), [
             'customer_ids' => [$customer->id],
         ]);
         $this->assertDatabaseHas('customers', ['id' => $customer->id, 'collector_id' => $kolektorB->id]);
 
         // Lepas — endpoint terpisah, per pelanggan.
-        $this->actingAs($admin)->post(route('collectors.release', ['collector' => $kolektorB->id, 'customer' => $customer->id]));
+        $this->actingAs($admin)->post(route('collector-worksheet.release', ['collector' => $kolektorB->id, 'customer' => $customer->id]));
         $this->assertDatabaseHas('customers', ['id' => $customer->id, 'collector_id' => null]);
     }
 
@@ -205,9 +205,9 @@ class CollectorAssignmentGuardsTest extends TestCase
         $customer->update(['collector_id' => $kolektorA->id]);
 
         // Coba lepas lewat kolektor B, padahal pelanggan itu punya A.
-        $response = $this->actingAs($admin)->post(route('collectors.release', ['collector' => $kolektorB->id, 'customer' => $customer->id]));
+        $response = $this->actingAs($admin)->post(route('collector-worksheet.release', ['collector' => $kolektorB->id, 'customer' => $customer->id]));
 
-        $response->assertRedirect(route('collectors.show', ['collector' => $kolektorB->id, 'tab' => 'assign']));
+        $response->assertRedirect(route('collector-worksheet.show', ['collector' => $kolektorB->id, 'tab' => 'assign']));
         $response->assertSessionHasErrors('customer_ids');
         $this->assertDatabaseHas('customers', ['id' => $customer->id, 'collector_id' => $kolektorA->id]);
     }

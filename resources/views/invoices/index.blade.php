@@ -24,8 +24,8 @@
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tagihan berasal dari pelanggan aktif dan layanan pelanggan yang sudah tersimpan.</p>
     </div>
     <div class="flex items-center gap-2">
-        @if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create'))
-            <a href="{{ route('collectors.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+        @if(auth()->user()->hasPermission('collector_worksheet.view'))
+            <a href="{{ route('collector-worksheet.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
                 Kolektor
             </a>
         @endif
@@ -202,7 +202,10 @@
                                                 data-invoice-id="{{ $invoice->id }}"
                                                 data-invoice-number="{{ $invoice->invoice_number }}"
                                                 data-remaining="{{ (float) $invoice->remaining_amount }}"
-                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                {{-- Target POST dirender server-side; modal TIDAK boleh merakit
+                                                     `/invoices/${id}/payments` sendiri. ADHOC-20 langkah 3. --}}
+                                                data-payment-store-url="{{ route('invoices.payments.store', $invoice->id) }}"
+                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining), this.dataset.paymentStoreUrl)"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">
                                             {{ $invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar' }}
                                         </button>

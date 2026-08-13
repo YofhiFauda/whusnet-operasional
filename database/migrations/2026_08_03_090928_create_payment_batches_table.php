@@ -9,15 +9,18 @@ return new class extends Migration
     /**
      * Wadah RINGAN untuk satu sesi submit batch pembayaran kolektor — cuma
      * untuk dedup (idempotency_key) + pengelompokan (siapa kolektor, siapa
-     * admin, kapan disubmit). SENGAJA TANPA `declared_total`/`recorded_total`/
-     * `variance`/status selisih — itu bagian dari fitur Setoran Kolektor
-     * (rekonsiliasi kas) yang di-drop dari scope (lihat §B-11 di
-     * docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md, ditandai
-     * DILUAR SCOPE 2026-08-01). Kalau fitur itu diaktifkan lagi nanti, tabel
-     * ini yang diperluas — jangan bikin tabel baru lagi.
+     * yang submit, kapan). SENGAJA TANPA `declared_total`/`recorded_total`/
+     * `variance`/status selisih.
      *
-     * docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §A-7 #6,
-     * §D-9 no. 2 (disederhanakan).
+     * ⚠️ Alasannya BERUBAH (2026-08-08). Dulu: fitur Setoran Kolektor di-drop
+     * dari scope (§B-11 ⛔ dokumen lama). Sekarang: Setoran DIHIDUPKAN LAGI di
+     * kolektor-2.0, tapi ditaruh di tabelnya sendiri `collector_deposits`
+     * (Fase 2) — bukan di sini. Batch = "satu sesi submit", Setoran = "satu
+     * serah-terima uang"; satu setoran bisa memuat pembayaran dari banyak
+     * batch, jadi menempelkan declared/variance ke tabel ini malah salah
+     * kardinalitas. Tabel ini tetap seperti apa adanya.
+     *
+     * docs/plan/kolektor/analisa-alur-kolektor-2.0.md §11.4.
      */
     public function up(): void
     {

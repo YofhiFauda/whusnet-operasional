@@ -223,7 +223,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
-                                    <button @click="openEditModal(<?php echo e(json_encode($task)); ?>, <?php echo e(json_encode($task->technicians->pluck('id'))); ?>)"
+                                    
+                                    <button @click="openEditModal(<?php echo e(json_encode($task)); ?>, <?php echo e(json_encode($task->technicians->pluck('id'))); ?>, '<?php echo e(route('fop-tasks.update', $task->id)); ?>')"
                                             class="text-slate-400 dark:text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 p-1.5 rounded"
                                             title="Edit">
                                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -311,7 +312,19 @@
                     </button>
                 </div>
 
-                <form :action="formAction" method="POST" enctype="multipart/form-data" @submit="isSubmitting = true">
+                
+                <form :action="formAction" method="POST" enctype="multipart/form-data"
+                      @submit="
+                          if (!$el.getAttribute('action')) {
+                              $event.preventDefault();
+                              if (window.Toast) {
+                                  window.Toast.error('Aksi Gagal', 'Target penyimpanan task tidak dikenal. Tutup modal dan muat ulang halaman.');
+                              }
+
+                              return;
+                          }
+                          isSubmitting = true;
+                      ">
                     <div class="p-5 max-h-[75vh] overflow-y-auto space-y-4">
                         <?php echo csrf_field(); ?>
                         <template x-if="modal.isEdit">
@@ -812,6 +825,9 @@
             modal: {
                 open: false,
                 isEdit: false,
+                // URL PUT dari tombol Edit baris (route('fop-tasks.update')).
+                // Kosong = mode tambah, atau baris tanpa izin update.
+                updateUrl: '',
                 data: {
                     id: '', task_number: '', task_date: '', category: '', tugas: '',
                     customer_id: '', village_id: '', pop_id: '', issue: '', notes: '',
@@ -842,9 +858,16 @@
                 return this.ticketValues.includes(this.modal.data.category);
             },
 
+            /**
+             * Ketiga cabang mengembalikan URL yang DIRENDER SERVER-SIDE — tidak ada
+             * path yang dirakit dari id di sini. Ketiganya endpoint berbeda dengan
+             * permission berbeda (fop-tasks.update / tickets.store / fop-tasks.store),
+             * jadi tidak bisa disatukan jadi satu action statis; yang bisa dijamin
+             * adalah tiap kandidatnya berasal dari routes/web.php. ADHOC-20 langkah 3.
+             */
             get formAction() {
                 if (this.modal.isEdit) {
-                    return '<?php echo e(url('/fop-tasks')); ?>/' + this.modal.data.id;
+                    return this.modal.updateUrl || '';
                 }
                 return this.isTicketMode ? '<?php echo e(route('tickets.store')); ?>' : '<?php echo e(route('fop-tasks.store')); ?>';
             },
@@ -1081,6 +1104,7 @@
 
             openCreateModal() {
                 this.modal.isEdit = false;
+                this.modal.updateUrl = '';
                 this.searchTech = '';
                 this.isSubmitting = false;
                 this.clearTicketCustomer();
@@ -1126,10 +1150,16 @@
                 };
             },
 
-            openEditModal(task, assignedTechs) {
+            openEditModal(task, assignedTechs, updateUrl) {
                 this.modal.isEdit = true;
                 this.searchTech = '';
                 this.isSubmitting = false;
+                // Dirender server-side di tombol Edit tiap baris. Kalau kosong,
+                // formAction sengaja balik '' supaya form TIDAK submit ke mana pun
+                // — dulu getter ini merakit URL sendiri, dan begitu perakitannya
+                // meleset form jatuh ke POST /fop-tasks (= BIKIN task baru padahal
+                // user sedang mengedit).
+                this.modal.updateUrl = updateUrl || '';
                 this.modal.data = {
                     id: task.id,
                     task_number: task.task_number,

@@ -159,7 +159,15 @@
             TicketController@store bercabang wantsJson(): fallback non-JS (mis.
             submit dari /fop-tasks) tetap PRG normal.
         --}}
-        <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+        {{-- action/method/@csrf dirender server-side walau jalur normalnya fetch()
+             di submitForm(). Tanpa ini form tidak punya target sama sekali: kalau
+             Alpine gagal boot (atau submitForm() melempar sebelum preventDefault),
+             browser POST ke URL halaman ini — /tickets/create yang cuma GET, jadi
+             tiket hilang tanpa jejak. Dengan target eksplisit, fallback-nya POST
+             beneran ke TicketController@store yang sudah bercabang wantsJson().
+             ADHOC-20 langkah 3. --}}
+        <form action="{{ route('tickets.store') }}" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+            @csrf
 
             <div class="flex-1 overflow-y-auto custom-scrollbar">
 

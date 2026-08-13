@@ -16,6 +16,7 @@ use App\Models\Task;
 use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
+use App\Services\FopTaskProvisioningService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -457,13 +458,15 @@ class CustomerSurveyController extends Controller
 
             $survey->save();
 
-            // Estimasi material menempel di FopTask SURVEY pelanggan ini.
-            // Kalau task-nya belum ada (laporan disimpan sebelum papan FOP sempat
-            // auto-sync), baris material dilewat — laporan survey tetap tersimpan.
-            // Menggagalkan seluruh laporan cuma karena anchor-nya belum terbentuk
-            // jelas lebih merugikan daripada kehilangan daftar estimasi.
+            // Estimasi material menempel di FopTask SURVEY pelanggan ini. Kalau
+            // anchor-nya belum ada, DIBUAT sekarang juga — bukan dilewat.
+            // Melewatnya membuang estimasi material + checklist alat yang barusan
+            // diisi teknisi tanpa satu pun pesan error, dan halaman Verifikasi
+            // Admin selamanya menampilkan seksi kosong (gejala nyata di
+            // produksi: 1791 survey, 0 baris task_materials).
             $materialService = app(TaskMaterialService::class);
-            $surveyFopTask = $materialService->resolveTaskFor($customer, TaskType::SURVEY);
+            $surveyFopTask = $materialService->resolveTaskFor($customer, TaskType::SURVEY)
+                ?? app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
 
             if ($surveyFopTask) {
                 $materialService->sync($surveyFopTask, MaterialKind::ESTIMASI, $materialRows, auth()->id());

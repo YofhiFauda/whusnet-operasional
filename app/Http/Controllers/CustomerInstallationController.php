@@ -16,6 +16,7 @@ use App\Models\Task;
 use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
+use App\Services\FopTaskProvisioningService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -444,8 +445,12 @@ class CustomerInstallationController extends Controller
             // Ini KONSUMSI material, beda dari customer_technical_details.passive_device*
             // yang mencatat aset terpasang permanen di sisi pelanggan. Dua-duanya
             // tetap ada dan tidak digabung.
+            // Anchor dibuat kalau belum ada — alasannya sama dengan jalur survey:
+            // melewatkannya membuang material terpakai + checklist alat yang
+            // barusan diisi teknisi tanpa pesan error apa pun.
             $materialService = app(TaskMaterialService::class);
-            $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
+            $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN)
+                ?? app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::PEMASANGAN);
 
             if ($installFopTask) {
                 $materialService->sync(

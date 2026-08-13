@@ -225,6 +225,82 @@ Definisi "ringan" dipakukan jadi angka, supaya tidak subjektif:
 - **Fase 3** (endpoint GeoJSON): bbox **wajib** (bukan opsional), cap 500 + fallback agregat grid, cache Redis TTL 30-60s dengan key termasuk hash scope POP, header cache HTTP.
 - **Fase 4** (peta task FOP): panel map **di luar** container yang di-refresh `refreshDashboardContainers()`; listener Echo untuk peta mem-patch marker per event, bukan re-render.
 
+### Skalabilitas jangka panjang — OLT, ODC, ODP, Homepass
+
+Rencana Fase 0-5 & metrik di atas diukur untuk skala **customer aktif** (~20rb). Seiring waktu, jenis marker bertambah dan salah satunya menembus asumsi itu — perlu dipisah karena order-of-magnitude-nya beda jauh.
+
+**Realita skala per jenis marker:**
+
+| Jenis | Order of magnitude | Kenapa |
+|---|---|---|
+| OLT | puluhan | = `pops.type=mini_pop`, tabel sudah ada, tumbuh lambat |
+| ODC | ratusan | kalau dibuat, 1 ODC pecah ke banyak ODP |
+| ODP | ribuan | sudah diantisipasi di Fase 1 |
+| **Homepass** | **puluhan-ratusan ribu** | beda kelas — homepass = rumah yang **sudah dilewati kabel**, bukan cuma pelanggan aktif. Termasuk prospek belum daftar, pelanggan nonaktif/terminated, rumah tetangga yang kena lewat pas tarik kabel. Kalau target pelanggan aktif 20rb, homepass riil bisa 3-5x itu dalam beberapa tahun ekspansi |
+
+Cap 500 titik/respons dari rencana di atas masih benar untuk OLT/ODC/ODP. Homepass yang membuatnya keteteran: 1 kecamatan padat bisa punya 500+ homepass di satu layar zoom kampung, dan `GROUP BY ROUND()` yang dihitung ulang tiap request tiap user jadi kerja berulang untuk data yang jarang berubah (homepass bertambah harian, bukan detik-detik).
+
+**Teknik tambahan khusus pertumbuhan:**
+
+| Teknik | Dampak | Risiko | Efektif? |
+|---|---|---|---|
+| **Zoom-gated layer** — OLT tampil dari zoom kabupaten, ODC dari zoom kecamatan, ODP dari zoom desa, **Homepass baru muncul di zoom jalan (≥16)** | Membatasi kardinalitas maksimum yang PERNAH diminta browser, apa pun total data di DB | Perlu tentukan ambang zoom per jenis — sekali ditentukan, murah selamanya | Ya, paling murah & paling besar dampaknya, pasang dari awal |
+| **Filter status aktif by default** — homepass `terminated`/`rejected` tak ikut ditarik kecuali eksplisit dicentang | Memotong pertumbuhan tak terbatas dari churn historis; data lama tak ikut membebani peta yang dipakai harian | Perlu toggle "tampilkan riwayat" untuk kasus audit | Ya, kemenangan mudah, prioritas tinggi |
+| **Cache cluster precomputed** — tabel `map_cluster_cache(asset_type, zoom_bucket, grid_cell, count, centroid)`, diisi job queue (Horizon sudah ada) tiap ada perubahan data, **bukan** dihitung ulang tiap request | Request peta jadi baca tabel kecil siap pakai, bukan `GROUP BY` di jutaan baris tiap klik | Job perlu jalan konsisten — cluster basi kalau job gagal diam-diam; perlu command `geo:rebuild-clusters` untuk perbaikan manual | Ya — pengganti "cache Redis TTL 30-60s" begitu volume homepass masuk skala puluhan ribu; cache TTL mulai kalah rapi dibanding cache yang di-invalidate on-write |
+| **Toggle layer per jenis** (checkbox OLT/ODC/ODP/Homepass) | User yang cuma mau lihat ODP tak ikut menanggung biaya fetch homepass | UI tambahan, ringan | Ya |
+| **Batasi broadcast realtime ke agregat, bukan per-marker**, begitu homepass ikut disiarkan | Pola "patch marker per event Echo" (Fase 4) aman untuk task FOP (puluhan/hari) — **tidak aman** kalau nanti homepass baru ikut broadcast tiap instalasi selesai (bisa ratusan/hari di banyak POP sekaligus). Push per-marker ke semua client jadi badai event | Perlu keputusan eksplisit: homepass **tidak** realtime, cukup refresh manual/interval | Ya — dicatat sebagai batasan, bukan fitur yang perlu dibangun |
+| **Vector tile / pre-rendered cluster tile** (mis. `Martin`/`tegola`, atau MBTiles statis) | Solusi jangka panjang sungguhan — peta minta "gambar tile siap pakai" per zoom/grid, bukan data mentah | Infrastruktur baru (tile server, storage, build pipeline), kompleksitas naik signifikan | **Jangan bangun sekarang** — lihat ambang keputusan di bawah |
+
+**Ambang keputusan** — supaya tidak dibangun kepagian (CLAUDE.md: hindari otomatisasi sebelum flow manual stabil). Ukur pakai perluasan `geo:audit` (mis. `geo:audit --track-growth` atau command baru `geo:map-metrics`):
+
+- Total homepass aktif per POP **> 30.000-50.000** → cluster-cache table (`map_cluster_cache`) wajib, bukan opsional lagi.
+- Waktu respons endpoint bbox **p95 > 500ms** di zoom padat → sinyal pertama migrasi ke pre-computed cluster.
+- Kalau dua-duanya terlampaui bersamaan → titik mempertimbangkan vector tile.
+
+**Perubahan ke fase yang sudah ada** (bukan fase baru, kecuali baris terakhir):
+- Zoom-gate per jenis + filter status aktif → masuk syarat endpoint Fase 2.1/3.
+- Cluster-cache table + ambang eskalasi vector tile → **Fase 6 (kondisional, di masa depan)**, dipicu ambang di atas, bukan dijadwalkan sekarang.
+
+### Mekanisme konkret di balik 3 metrik inti
+
+Tiga metrik performa (payload <200KB/cap 500 titik, 1 node canvas 60fps, load <2 detik di 4G) saling mengunci — payload kecil membuat canvas ringan, canvas ringan + payload kecil membuat load cepat. Ini rincian *cara*, bukan sekadar target.
+
+**1. Payload < 200KB, cap 500 titik/viewport**
+
+| Langkah | Cara | Kenapa jalan |
+|---|---|---|
+| Query dibatasi bbox | `WHERE lat BETWEEN...AND lng BETWEEN...` dari `map.getBounds()` Leaflet — bukan `SELECT *` lalu filter di JS | DB cuma kirim yang kelihatan di layar, bukan seluruh tabel |
+| `LIMIT 500` di query, `ORDER BY` jarak ke pusat viewport | Kalau kepotong, yang hilang duluan yang paling pinggir layar — bukan acak | User tak sadar ada data hilang |
+| >500 kandidat → ganti bentuk respons jadi **agregat grid** (`GROUP BY ROUND(lat,2), ROUND(lng,2)` → count+centroid), bukan potong diam-diam | Di zoom rendah (500 homepass di 1 layar) respons isinya belasan cluster, bukan 500 titik | Payload turun drastis justru saat data terbanyak |
+| Field GeoJSON dipangkas: `id, lat, lon, t (tipe), s (status)` — bukan nama lengkap/alamat penuh | Detail lengkap baru diambil 1 baris saat marker diklik (endpoint terpisah) | Properti gemuk dikali 500 baru berat; dikali 4 field pendek ringan |
+| Gzip di response (Laravel/nginx compression) | JSON teks kompresi bagus, biasa turun 70-80% | 40KB mentah → ~10-15KB transfer aktual — jauh di bawah pagar 200KB |
+| `Cache-Control`/Redis per bbox | Viewport yang sama diminta ulang (pan balik) tak query DB lagi | TTFB nyaris nol untuk area populer |
+
+**2. DOM = 1 Node Canvas, 60 FPS**
+
+Murni pilihan renderer, bukan soal jumlah data lagi (sudah beres di poin 1):
+
+- Default Leaflet gambar tiap marker jadi elemen DOM sendiri (`<img>`/`<div>`/`<path>`) — 500 marker = 500+ node, browser HP murah nge-lag tiap pan (reflow per node).
+- Set `preferCanvas: true` saat init peta → semua vector layer (titik, lingkaran) digambar ke **satu** `<canvas>` lewat `context.arc()` — bukan satu node per titik.
+- Syaratnya pakai `L.circleMarker` (vector, ikut canvas), **bukan** `L.marker` dengan ikon PNG (`L.marker` selalu bikin `<img>` DOM sendiri, walau `preferCanvas` aktif — beda kelas objek di Leaflet). Warna beda per status/tim/ODP digambar sebagai `fillColor` lingkaran, bukan file ikon per marker.
+- Pan/zoom jadi repaint 1 bitmap, bukan hitung ulang layout ratusan elemen → itu yang bikin 60fps mulus di WebView Android murah.
+- Popup saat klik tetap boleh DOM biasa — cuma 1 aktif sekaligus, bukan 500.
+
+**3. Load HP 4G < 2 detik**
+
+Komposit, jalan paralel bukan berurutan:
+
+| Komponen | Anggaran waktu (4G ~1.5Mbps) | Cara ditekan |
+|---|---|---|
+| JS `map.js` (Leaflet+plugin, entry terpisah) | ~0.3-0.5s | Entry point sendiri, bukan ikut `app.js` global (halaman lain tak menanggung) |
+| Lazy-init peta | 0 detik di page-load awal | Baru dieksekusi saat panel dibuka (`x-init` on first `x-show`) — "2 detik" dihitung sejak dibuka, bukan sejak halaman termuat |
+| Tile OSM pertama | ~0.5-1s (beban terbesar sebenarnya, bukan data marker) | `minZoom`/zoom awal wajar → cuma belasan tile diminta, bukan puluhan; browser buka koneksi paralel otomatis |
+| Data GeoJSON | ~0.1-0.3s | Kecil (poin 1) + gzip + cache Redis, jalan paralel dengan tile — tak nunggu tile selesai dulu |
+| Render | <0.1s | 1 node canvas (poin 2), bukan ratusan reflow DOM |
+| Pan balik ke area sama | mendekati instan | Tile di HTTP cache browser + data di cache Redis server |
+
+Total realistis: **1-2 detik** — jumlah komponen di atas, bukan angka tebakan.
+
 ## Catatan proses
 
 - Buat entri **Sprint 9 — Geospasial** di `docs/TASKS.md`; jangan campur ke S8.10 yang sedang jalan.

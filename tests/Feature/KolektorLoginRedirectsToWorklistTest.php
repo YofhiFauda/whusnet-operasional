@@ -30,14 +30,19 @@ class KolektorLoginRedirectsToWorklistTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_kolektor_with_only_kolektor_view_permission_is_redirected_to_worklist_not_403(): void
+    public function test_kolektor_with_only_kolektor_permissions_is_redirected_to_worklist_not_403(): void
     {
         $role = Role::where('code', 'kolektor')->firstOrFail();
         $kolektor = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
 
-        // Pastikan role ini SENGAJA cuma punya kolektor.view (kondisi persis
-        // yang dilaporkan bikin 403) — matches seeded RolePermissionSeeder.
-        $this->assertEquals(['kolektor.view'], $kolektor->role->permissions()->pluck('code')->toArray());
+        // Role ini SENGAJA cuma punya permission bertema `kolektor.*` — tanpa
+        // dashboard.view (kondisi persis yang dulu bikin 403). `kolektor.pay`,
+        // `.deposit`, `.visit` menyusul di kolektor-2.0 dan tetap tak membuka
+        // halaman lain.
+        $this->assertEqualsCanonicalizing(
+            ['kolektor.view', 'kolektor.pay', 'kolektor.deposit', 'kolektor.visit'],
+            $kolektor->role->permissions()->pluck('code')->toArray()
+        );
 
         $response = $this->actingAs($kolektor)->get(route('dashboard'));
 

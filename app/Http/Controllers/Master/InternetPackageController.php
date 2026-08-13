@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\InternetPackage;
+use App\Support\RupiahInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -95,6 +96,18 @@ class InternetPackageController extends Controller
      */
     private function validatePackage(Request $request, ?InternetPackage $package = null): array
     {
+        // Harga & biaya pasang diketik berformat ribuan (`138.000`). Tanpa
+        // normalisasi, titiknya dibaca desimal Inggris dan paket tersimpan
+        // seharga 138 rupiah — kesalahan yang menular ke SETIAP tagihan yang
+        // lahir dari paket itu, bukan cuma ke satu transaksi.
+        // `discount_default` & `ppn` SENGAJA tidak ikut: keduanya persen (0-100),
+        // bukan rupiah, dan tidak pernah pakai pemisah ribuan.
+        $request->merge(RupiahInput::parseKeys(
+            $request->only(['monthly_price', 'installation_fee']),
+            'monthly_price',
+            'installation_fee',
+        ));
+
         $validated = $request->validate([
             'package_code' => [
                 'required',

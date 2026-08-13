@@ -22,8 +22,8 @@
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tagihan berasal dari pelanggan aktif dan layanan pelanggan yang sudah tersimpan.</p>
     </div>
     <div class="flex items-center gap-2">
-        <?php if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create')): ?>
-            <a href="<?php echo e(route('collectors.index')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+        <?php if(auth()->user()->hasPermission('collector_worksheet.view')): ?>
+            <a href="<?php echo e(route('collector-worksheet.index')); ?>" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
                 Kolektor
             </a>
         <?php endif; ?>
@@ -204,7 +204,9 @@
                                                 data-invoice-id="<?php echo e($invoice->id); ?>"
                                                 data-invoice-number="<?php echo e($invoice->invoice_number); ?>"
                                                 data-remaining="<?php echo e((float) $invoice->remaining_amount); ?>"
-                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                
+                                                data-payment-store-url="<?php echo e(route('invoices.payments.store', $invoice->id)); ?>"
+                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining), this.dataset.paymentStoreUrl)"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">
                                             <?php echo e($invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar'); ?>
 

@@ -19,11 +19,18 @@ class RolePermissionSeeder extends Seeder
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
 
-            // Worklist read-only — SATU permission saja, sengaja tanpa
-            // payments.create/customers.view. docs/plan/analisa-billing-
-            // tagihan-pembayaran-kolektor.md §B-8 no. 4 & no. 5.
+            // Kolektor — DUA permission saja, sengaja tanpa `payments.create`
+            // (bayar invoice mana pun) dan tanpa `customers.view` (daftar
+            // pelanggan penuh). `kolektor.pay` cuma berlaku di rute worklist
+            // yang memaksa `collector_id = auth()->id()`.
+            //
+            // Merevisi §B-8 no. 4 dokumen lama — lihat
+            // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §8.
             'kolektor' => [
                 'kolektor.view',
+                'kolektor.pay',
+                'kolektor.deposit',
+                'kolektor.visit',
             ],
 
             'atasan' => [
@@ -76,6 +83,15 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.*', // Access to all detail sections (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.*', // Ex: view, create, update, delete, cancel, print
                 'payments.*', // Ex: view, create, update, validate, reject, print
+                // Halaman admin atas kolektor. SENGAJA bukan wildcard `*`:
+                // `collector_worksheet.approve` (hapus buku selisih) khusus
+                // Owner — admin yang menemukan selisih tak boleh sekaligus
+                // menutup kerugiannya sendiri.
+                'collector_worksheet.view',
+                'collector_worksheet.assign',
+                'collector_worksheet.validate',
+                'collector_worksheet.print',
+                'collector_worksheet.upload',
                 'reports.*',
                 'audit_logs.view',
                 'audit_logs.export',
@@ -265,6 +281,11 @@ class RolePermissionSeeder extends Seeder
                 'payments.validate',
                 'payments.reject',
                 'payments.print',
+                'collector_worksheet.view', // Cross check kolektor DALAM scope POP-nya
+                'collector_worksheet.assign',
+                'collector_worksheet.validate',
+                'collector_worksheet.print',
+                'collector_worksheet.upload',
                 'reports.view',
                 'reports.export',
                 'tickets.*',

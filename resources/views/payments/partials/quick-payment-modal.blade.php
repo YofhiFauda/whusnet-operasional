@@ -133,7 +133,11 @@
 
                     <div>
                         <label for="qp-amount" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nominal Diterima dari Pelanggan</label>
-                        <input type="number" id="qp-amount" min="1" step="1" required
+                        {{-- data-rupiah butuh type="text" (input number menolak
+                             titik ribuan). `min` HTML ikut hilang bersamanya,
+                             jadi batas bawah dijaga qpNominalValid() + validasi
+                             server `amount|numeric|min:1`. --}}
+                        <input type="text" inputmode="decimal" data-rupiah id="qp-amount" required
                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                         <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
                             Boleh diisi lebih besar dari sisa tagihan — kelebihannya otomatis tercatat sebagai lebih bayar.
@@ -195,6 +199,11 @@
     @push('scripts')
         <script>
             let qpInvoiceId = null;
+            // URL POST pencatatan pembayaran — SELALU dari server (data-payment-store-url
+            // di tombol Bayar, route('invoices.payments.store')). Modal ini dipakai dari
+            // dua halaman; merakit path sendiri berarti menduplikasi definisi route di
+            // klien dan, kalau nilainya kosong, POST uang ke URL halaman. ADHOC-20 langkah 3.
+            let qpPaymentStoreUrl = null;
             let qpRemainingAmount = 0;
             let qpNextInstallment = 1;
 
@@ -202,11 +211,36 @@
                 return 'Rp ' + Math.round(value).toLocaleString('id-ID');
             }
 
+            /** Nilai nominal sebagai angka, apa pun bentuk maskingnya. */
+            function qpNominal() {
+                const raw = document.getElementById('qp-amount').value;
+
+                return window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+            }
+
+            /** Nilai untuk dikirim ke server: tanpa titik ribuan. */
+            function qpNominalPolos() {
+                const raw = document.getElementById('qp-amount').value;
+
+                return window.Rupiah ? window.Rupiah.polos(raw) : raw;
+            }
+
+            /** Isi ulang field dengan format ribuan. */
+            function qpSetNominal(nilai) {
+                // Sisa tagihan diisi APA ADANYA, tanpa dibulatkan: membulatkan
+                // sisa ber-sen berarti admin menyetujui nominal yang bukan sisa
+                // sebenarnya, dan bagian pecahannya diam-diam jadi lebih bayar.
+                const teks = String(nilai ?? '');
+                document.getElementById('qp-amount').value = window.Rupiah ? window.Rupiah.formatDariServer(teks) : teks;
+            }
+
             function qpRefreshInstallmentHint() {
                 const installmentHint = document.getElementById('qp-installment-hint');
                 const settleHint = document.getElementById('qp-settle-hint');
                 const overpayHint = document.getElementById('qp-overpay-hint');
-                const amount = parseFloat(document.getElementById('qp-amount').value);
+                // Input bermasking ribuan: parseFloat('150.000') = 150, dan
+                // pratinjau cicilan/lebih bayar akan berbohong tanpa parser ini.
+                const amount = qpNominal();
 
                 installmentHint.classList.add('hidden');
                 settleHint.classList.add('hidden');
@@ -242,8 +276,9 @@
                 }
             }
 
-            function openQuickPaymentModal(invoiceId, invoiceNumber, remainingAmount) {
+            function openQuickPaymentModal(invoiceId, invoiceNumber, remainingAmount, paymentStoreUrl) {
                 qpInvoiceId = invoiceId;
+                qpPaymentStoreUrl = paymentStoreUrl || null;
                 
                 // Show modal and reset loading/error state
                 document.getElementById('quick-payment-modal').classList.remove('hidden');
@@ -274,7 +309,7 @@
                 document.getElementById('qp-due').textContent = 'Rp ' + Math.round(remainingAmount).toLocaleString('id-ID');
                 
                 // Reset form fields
-                document.getElementById('qp-amount').value = Math.round(remainingAmount);
+                qpSetNominal(remainingAmount);
                 document.getElementById('qp-payment-date').value = new Date().toISOString().slice(0, 10);
                 document.getElementById('qp-payment-method').value = 'cash';
                 document.getElementById('qp-allocation').value = 'Tagihan Bulanan';
@@ -375,7 +410,7 @@
                     document.getElementById('qp-paid').textContent = 'Rp ' + Math.round(paidAmount).toLocaleString('id-ID');
                     document.getElementById('qp-due').textContent = 'Rp ' + Math.round(remainingAmountFromDb).toLocaleString('id-ID');
 
-                    document.getElementById('qp-amount').value = Math.round(remainingAmountFromDb);
+                    qpSetNominal(remainingAmountFromDb);
 
                     qpRemainingAmount = remainingAmountFromDb;
                     // Sama seperti PaymentController::create() — cuma hitung
@@ -399,6 +434,7 @@
             function closeQuickPaymentModal() {
                 document.getElementById('quick-payment-modal').classList.add('hidden');
                 qpInvoiceId = null;
+                qpPaymentStoreUrl = null;
             }
 
             document.getElementById('qp-amount')?.addEventListener('input', qpRefreshInstallmentHint);
@@ -412,11 +448,24 @@
             // Form Submit Handler
             document.getElementById('quick-payment-form')?.addEventListener('submit', function (e) {
                 e.preventDefault();
-                if (!qpInvoiceId) return;
+                if (!qpInvoiceId || !qpPaymentStoreUrl) return;
 
                 const submitBtn = document.getElementById('qp-submit-btn');
                 const errorBox = document.getElementById('qp-error');
                 errorBox.classList.add('hidden');
+
+                // Batas bawah dulu ditegakkan atribut `min` milik input number.
+                // Sejak kolomnya jadi teks bermasking, cek itu harus di sini —
+                // kalau tidak, nominal 0 baru ketahuan salah setelah bolak-balik
+                // ke server.
+                const nominal = qpNominal();
+                if (isNaN(nominal) || nominal < 1) {
+                    errorBox.textContent = 'Nominal wajib diisi minimal Rp 1.';
+                    errorBox.classList.remove('hidden');
+                    document.getElementById('qp-amount').focus();
+                    return;
+                }
+
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Menyimpan...';
 
@@ -425,7 +474,10 @@
                 // amount = TOTAL diterima dari pelanggan. Server yang
                 // memisah bagian penutup tagihan vs lebih bayar — lihat
                 // PaymentController::store().
-                payload.append('amount', document.getElementById('qp-amount').value);
+                // Dikirim tanpa titik ribuan. Modal ini submit lewat FormData,
+                // bukan event `submit`, jadi normalisasi global di
+                // layouts/app.blade.php tidak ikut jalan di sini.
+                payload.append('amount', qpNominalPolos());
                 payload.append('payment_date', document.getElementById('qp-payment-date').value);
                 payload.append('payment_method', document.getElementById('qp-payment-method').value);
 
@@ -441,7 +493,7 @@
                     payload.append('proof_file', fileInput.files[0]);
                 }
 
-                fetch(`/invoices/${qpInvoiceId}/payments`, {
+                fetch(qpPaymentStoreUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,

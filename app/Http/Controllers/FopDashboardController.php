@@ -23,6 +23,13 @@ use Illuminate\View\View;
 
 class FopDashboardController extends Controller
 {
+    /**
+     * Sejauh mana ke belakang papan menengok untuk tim yang task-nya masih aktif.
+     * Bukan tak terhingga: papan FOP alat kerja harian, bukan arsip — tim yang
+     * lebih tua dari ini hanya bisa dilihat lewat /fop-tasks.
+     */
+    private const BOARD_MAX_PAST_DAYS = 30;
+
     public function __construct(
         private readonly EffectiveAccessService $accessService,
         private readonly TeknisiWorkloadService $teknisiWorkload
@@ -165,13 +172,25 @@ class FopDashboardController extends Controller
         $pops = Pop::forUser($user)->where('status', 'active')->orderBy('name')->get();
 
         // ── Team FOP Aktif — card per team, list task + footer avatar ────
-        // Dibatasi ke work_date hari ini. Sebelumnya SELURUH team yang pernah ada
-        // dimuat lengkap dengan anak-anaknya lalu difilter di PHP —
-        // FopTaskTeamService::rebuildTeamsForDate() membuat team baru tiap tanggal
-        // kerja, jadi setelah setahun operasi itu 300+ team per refresh dashboard.
-        // Keputusan produk (2026-07-22): papan FOP = hari ini saja. Task yang tidak
-        // selesai hari ini harus di-pending teknisi supaya terjadwal ulang, bukan
-        // dibiarkan menggantung di papan kemarin.
+        //
+        // Sebelumnya SELURUH team yang pernah ada dimuat lengkap dengan anak-anaknya
+        // lalu difilter di PHP — FopTaskTeamService::rebuildTeamsForDate() membuat
+        // team baru tiap tanggal kerja, jadi setelah setahun operasi itu 300+ team
+        // per refresh dashboard. Perbaikan 2026-07-22 memangkasnya jadi "hari ini
+        // saja", dan itu kebablasan ke arah sebaliknya: tim yang SUDAH dijadwalkan
+        // di /fop-tasks lenyap dari papan begitu ganti hari, padahal task-nya masih
+        // hidup dan teknisinya masih melihatnya (TaskController::index() punya
+        // cabang overdue, papan ini tidak).
+        //
+        // Sekarang: hari ini SELALU tampil (termasuk tim yang task-nya baru
+        // dijadwalkan), ditambah tim tanggal lampau yang MASIH punya task aktif.
+        // Yang membuat versi lama mahal bukan rentang tanggalnya, tapi memuat
+        // semua team beserta anaknya — di sini tim lampau yang task-nya sudah
+        // selesai/batal disaring di SQL (whereHas), jadi tidak ikut dimuat sama
+        // sekali. Ditambah pagar BOARD_MAX_PAST_DAYS supaya papan tidak pelan-pelan
+        // berubah jadi arsip.
+        $boardFloor = $today->copy()->subDays(self::BOARD_MAX_PAST_DAYS)->startOfDay();
+
         $activeFopTeams = FopTaskTeam::with([
             'members',
             'fopTasks.technicians',
@@ -185,7 +204,19 @@ class FopDashboardController extends Controller
             // DATE dan menyimpannya sebagai '2026-07-22 00:00:00'. Perbandingan
             // sama-dengan jadi tidak cocok di sqlite. Bentuk rentang benar di
             // kedua engine DAN tetap bisa memakai index.
-            ->whereBetween('work_date', [$startOfToday, $endOfToday])
+            ->where(function ($q) use ($startOfToday, $endOfToday, $boardFloor) {
+                $q->whereBetween('work_date', [$startOfToday, $endOfToday])
+                    ->orWhere(function ($lampau) use ($startOfToday, $boardFloor) {
+                        $lampau->whereBetween('work_date', [$boardFloor, $startOfToday])
+                            ->whereHas('fopTasks', fn ($t) => $t->whereNotIn(
+                                'status',
+                                [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]
+                            ));
+                    });
+            })
+            // Tanggal terlama di atas — tim yang harinya sudah lewat lebih perlu
+            // ditangani lebih dulu daripada yang baru dijadwalkan hari ini.
+            ->orderBy('work_date')
             ->get()
             // Filter koleksi yang SUDAH dimuat, bukan `->filter->isActive()`:
             // isActive() memanggil relasi fopTasks() lewat query baru, jadi

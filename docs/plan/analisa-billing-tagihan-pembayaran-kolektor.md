@@ -1,5 +1,22 @@
 # DONE PARTIAL
 
+> ## ⚠️ SEBAGIAN DIREVISI oleh kolektor-2.0 (2026-08-08)
+>
+> Dua keputusan di dokumen ini **tidak berlaku lagi**. Baca
+> `docs/plan/kolektor/analisa-alur-kolektor-2.0.md` §8 sebelum memakai dokumen ini:
+>
+> - **§B-8 no. 4 & no. 5** — "kolektor tidak boleh input pembayaran", "UI kolektor
+>   read-only". DIREVISI: kolektor mencatat pembayarannya sendiri lewat
+>   `kolektor.pay` di `/collector-worklist`. Yang tetap: kolektor tak diberi
+>   `payments.create`, tak bisa membuka halaman admin, tak bisa menagih pelanggan
+>   di luar `collector_id`-nya.
+> - **§B-11 ⛔ "DILUAR SCOPE"** — Setoran/rekonsiliasi kas. DIREVISI: dihidupkan
+>   lagi di Fase 2 kolektor-2.0, dengan bentuk lebih ringan (`collector_deposits`).
+>
+> Sisa dokumen ini masih berlaku: model mental Tagihan/Pembayaran (§B-2), dua kolom
+> kolektor (§B-3), kelebihan bayar dikembalikan fisik (§B-8 no. 6),
+> `payment_date` vs `collected_date` (§B-8 no. 8).
+
 # Analisa Billing: Tagihan → Pembayaran → Kolektor & Setoran
 
 **Tanggal:** 2026-07-24

@@ -138,26 +138,44 @@ pemasangan                                                      OR install.view
 
 ## Controller Implementation
 
+### Concerns\RendersCustomerList (trait)
+Query builder + render bersama tiga halaman daftar pelanggan.
+
+```php
+protected function renderCustomerList(
+    Request $request,
+    ?string $forcedStatusGroup = null,
+    string $view = 'customers.index'
+): View
+```
+
+- `$forcedStatusGroup` dikunci dari controller, **bukan** dari query string — halaman
+  Putus/Gagal tidak bisa "dipaksa ganti grup" lewat URL di route yang permission-nya beda.
+- `$view` menentukan Blade mana yang dirender; tiap halaman punya view sendiri.
+- Ditaruh di trait, **bukan** di `CustomerController`: sebelumnya dua controller halaman-daftar
+  `extends CustomerController` demi satu method protected, ikut mewarisi ~3.400 baris method
+  tulis (store/update/destroy/import/aktivasi) yang bukan urusannya.
+
 ### CustomerController
 - **`index(Request $request)`** — List Data Pelanggan
   - Guard: `permission:customers.view`
   - Redirect lama URL `?status_group=terminated|failed` ke route baru
-  - Protected method `renderCustomerList($request, $forcedStatusGroup = null)` — dipakai subclass
+  - `use RendersCustomerList` → `$this->renderCustomerList($request)` (view `customers.index`)
 
 - **`show(Customer $customer)`** — Detail Pelanggan
   - Guard: `permission:customers.detail.view`
   - Load 17 relasi (city, district, village, packages, services, pop, invoices, payments, dll)
   - Render semua tab
 
-### CustomerTerminatedController (NEW, extends CustomerController)
+### CustomerTerminatedController (extends Controller, use RendersCustomerList)
 - **`index(Request $request)`** — List Pelanggan Putus
   - Guard: `permission:customers.terminated.view`
-  - Call `$this->renderCustomerList($request, 'terminated')`
+  - Call `$this->renderCustomerList($request, 'terminated', 'customers.terminated')`
 
-### CustomerFailedController (NEW, extends CustomerController)
+### CustomerFailedController (extends Controller, use RendersCustomerList)
 - **`index(Request $request)`** — List Pelanggan Gagal
   - Guard: `permission:customers.failed.view`
-  - Call `$this->renderCustomerList($request, 'failed')`
+  - Call `$this->renderCustomerList($request, 'failed', 'customers.failed')`
 
 ### CustomerFieldworkController (NEW, extends Controller)
 - **`show(Customer $customer)`** — Perangkat & Pemasangan
@@ -217,6 +235,12 @@ Test files updated (2026-07-28):
 | `CustomerDeviceSensitiveFieldTest::test_teknisi_can_see_and_update_sensitive_fields()` | Use fieldwork route |
 | `CustomerInstallationTest::test_installation_data_is_visible_on_customer_detail()` | Use fieldwork route |
 | `CustomerListFilterKeepsStatusGroupTest` | Use `route('customers.terminated')` / `route('customers.failed')` |
+
+Tambahan (2026-08-12) — pemisahan view:
+
+| Test | Isi |
+|------|-----|
+| `CustomerListSeparateViewsTest` | `assertViewIs` per halaman (`customers.index` / `customers.failed` / `customers.terminated`), tabel arsip tidak bocor ke List Pelanggan, isolasi status per halaman, query string tidak bisa menimpa `$forcedStatusGroup` |
 | `RestoredFailedCustomerStaysVisibleTest` | Use `route('customers.failed')` |
 | `CustomerListStatusTimestampOrderingTest::test_tab_gagal_*` | Use `route('customers.failed')` |
 

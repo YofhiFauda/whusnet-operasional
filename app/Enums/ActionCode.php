@@ -23,4 +23,29 @@ enum ActionCode: string
     case VIEW_SENSITIVE = 'view_sensitive';
     case UPDATE_SENSITIVE = 'update_sensitive';
     case RETRIEVE = 'retrieve';
+
+    /**
+     * Kolektor mencatat pembayaran dari Worklist-nya sendiri. SENGAJA bukan
+     * CREATE: `kolektor.create` ambigu (bikin kolektor, atau bikin
+     * pembayaran?), dan kewenangannya jauh lebih sempit ketimbang
+     * `payments.create` — cuma invoice pelanggan yang ter-assign ke dirinya.
+     *
+     * docs/plan/kolektor/analisa-alur-kolektor-2.0.md §14.1.
+     */
+    case PAY = 'pay';
+
+    /**
+     * Kolektor menyerahkan hasil tagihannya ke admin. Terpisah dari PAY:
+     * boleh menagih tak otomatis boleh menyetor, dan sebaliknya — mis. saat
+     * seorang kolektor sementara dilarang memegang kas.
+     */
+    case DEPOSIT = 'deposit';
+
+    /**
+     * Kolektor mencatat hasil kunjungan yang TIDAK menghasilkan uang
+     * (tidak ada orang / menolak / janji bayar). Terpisah dari PAY karena
+     * inilah kewajiban pelaporan yang justru harus tetap jalan waktu kolektor
+     * pulang dengan tangan kosong.
+     */
+    case VISIT = 'visit';
 }

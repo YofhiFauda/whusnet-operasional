@@ -19,8 +19,10 @@ use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
 use App\Services\InitialInvoiceService;
 use App\Services\TaskMaterialService;
+use App\Services\TaskWorkToolService;
 use App\Services\TeknisiWorkloadService;
 use App\Services\TelegramBotService;
+use App\Support\RupiahInput;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -188,6 +190,7 @@ class CustomerVerificationController extends Controller
             'latestSurvey.technician',
             'latestSurvey.surveyor2',
             'latestSurvey.surveyor3',
+            'latestSurvey.fop',
             'customerService',
             'internetPackage',
             'pop',
@@ -198,9 +201,41 @@ class CustomerVerificationController extends Controller
         // Selisih estimasi vs realisasi material — inti nilai bisnis pencatatan
         // material sebelum modul Inventory ada. Kosong untuk pelanggan lama yang
         // laporannya dibuat sebelum fitur ini.
-        $materialVariance = app(TaskMaterialService::class)->varianceForCustomer($customer);
+        $materialService = app(TaskMaterialService::class);
+        $materialVariance = $materialService->varianceForCustomer($customer);
 
-        return view('verifications.admin', compact('customer', 'materialVariance'));
+        // Baris material mentah per tahap — tabel variance saja tidak cukup:
+        // variance mengagregasi dan membuang catatan per baris, padahal yang
+        // diinput teknisi adalah daftar barang beserta catatannya. Estimasi
+        // ditampilkan di tab Survey (di situ diinputnya), realisasi di tab
+        // Pemasangan.
+        $surveyMaterials = $materialService->estimatesForCustomer($customer);
+        $installationFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
+        $installationMaterials = $installationFopTask
+            ? $installationFopTask->materials()->terpakai()->orderBy('id')->get()
+            : collect();
+
+        // Checklist alat kerja diinput teknisi di form Survey DAN form Pemasangan,
+        // tapi ditulis ke task_work_tools — bukan ke kolom customer_surveys /
+        // customer_installations. Tanpa dibaca eksplisit di sini, halaman
+        // verifikasi cuma menampilkan teks bebas `required_tools` dan admin
+        // kehilangan daftar alat yang sebenarnya dicatat.
+        $workToolService = app(TaskWorkToolService::class);
+        $surveyWorkTools = $workToolService->rowsFor(
+            $workToolService->resolveTaskForCustomer($customer, TaskType::SURVEY)
+        );
+        $installationWorkTools = $workToolService->rowsFor(
+            $workToolService->resolveTaskForCustomer($customer, TaskType::PEMASANGAN)
+        );
+
+        return view('verifications.admin', compact(
+            'customer',
+            'materialVariance',
+            'surveyMaterials',
+            'installationMaterials',
+            'surveyWorkTools',
+            'installationWorkTools'
+        ));
     }
 
     public function processToTeam(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -314,6 +349,17 @@ class CustomerVerificationController extends Controller
         // bulan yang sebenarnya ditagih, dan bulan yang dilewati
         // GenerateMonthlyInvoicesCommand (dari `activation_date` = `issue_date`)
         // bukan bulan yang tertulis di tagihan.
+        // Biaya tambahan & override prorata diketik berformat ribuan. Salah
+        // baca di sini langsung mengubah nominal tagihan PERTAMA pelanggan.
+        $request->merge(RupiahInput::parseKeys(
+            $request->only(['extra_installation_fee', 'extra_cable_fee', 'extra_pole_fee', 'other_fee', 'prorate_amount_override']),
+            'extra_installation_fee',
+            'extra_cable_fee',
+            'extra_pole_fee',
+            'other_fee',
+            'prorate_amount_override',
+        ));
+
         $validated = $request->validate([
             'issue_date' => 'required|date',
             'extra_installation_fee' => 'nullable|numeric|min:0',

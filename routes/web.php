@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\CollectorBatchController;
-use App\Http\Controllers\CollectorController;
+use App\Http\Controllers\CollectorDepositController;
+use App\Http\Controllers\CollectorPaymentController;
+use App\Http\Controllers\CollectorVisitController;
 use App\Http\Controllers\CollectorWorklistController;
+use App\Http\Controllers\CollectorWorksheetController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
 use App\Http\Controllers\CustomerDocumentController;
@@ -37,7 +39,9 @@ use App\Http\Controllers\Master\WorkToolController;
 use App\Http\Controllers\NocDashboardController;
 use App\Http\Controllers\NocWorksheetController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentBatchController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\TaskController;
@@ -192,38 +196,110 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:payments.create')->group(function () {
         Route::get('/invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('invoices.payments.create');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
-        Route::post('/invoices/bulk-pay', [PaymentController::class, 'bulkStore'])->name('invoices.payments.bulk-store');
     });
 
     Route::middleware('permission:payments.reject')->group(function () {
         Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     });
 
-    // Hub Kolektor — daftar kolektor + detail per-kolektor (tab Worklist&Bayar,
-    // tab Atur Pelanggan). Pengganti "Atur Kolektor" + "Tab Kolektor" lama.
-    // View gate: siapa pun yang bisa assign (customers.update) ATAU bayar
-    // (payments.create) boleh lihat. Static routes (/collectors) dulu,
-    // dynamic ({collector}) belakangan.
-    Route::middleware('permission:customers.update|payments.create')->group(function () {
-        Route::get('/collectors', [CollectorController::class, 'index'])->name('collectors.index');
-        Route::get('/collectors/{collector}', [CollectorController::class, 'show'])->name('collectors.show');
+    // ===================== MODUL KOLEKTOR =====================
+    // Dua halaman, dua audiens, dua permission — JANGAN disatukan
+    // (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9):
+    //   /collector-worksheet → ADMIN: daftar kolektor, assign, cross check
+    //   /collector-worklist  → KOLEKTOR: pelanggan sendiri + catat pembayaran
+    // Konsekuensinya kolektor tak pernah menyentuh halaman admin, jadi role
+    // `kolektor` tetap tanpa `payments.create` maupun `customers.update`.
+
+    // Worksheet Admin — permission SENDIRI (`collector_worksheet.view`), bukan
+    // numpang customers.update/payments.create seperti dulu: halaman ini harus
+    // bisa dimatikan per-role tanpa mencabut hak edit pelanggan atau hak bayar
+    // di halaman Tagihan. Static routes dulu, dynamic ({collector}) belakangan.
+    Route::middleware('permission:collector_worksheet.view')->group(function () {
+        Route::get('/collector-worksheet', [CollectorWorksheetController::class, 'index'])->name('collector-worksheet.index');
+        Route::get('/collector-worksheet/{collector}', [CollectorWorksheetController::class, 'show'])->name('collector-worksheet.show');
     });
 
-    Route::middleware('permission:customers.update')->group(function () {
-        Route::post('/collectors/{collector}/assign', [CollectorController::class, 'assign'])->name('collectors.assign');
-        Route::post('/collectors/{collector}/customers/{customer}/release', [CollectorController::class, 'release'])->name('collectors.release');
+    Route::middleware('permission:collector_worksheet.assign')->group(function () {
+        // DUA rute, SATU method & satu blok guard:
+        //   - tanpa parameter → dipakai panel index, kolektor tujuan dikirim
+        //     lewat `collector_id` di body (dipilih dari dropdown);
+        //   - dengan {collector} → dipakai tab Atur Pelanggan, kolektornya
+        //     sudah tetap dari halamannya.
+        // Versi tanpa parameter SENGAJA ada: sebelumnya panel index menyusun
+        // URL tujuan di klien lewat Alpine (`:action`), dan Alpine dimuat dari
+        // CDN. Begitu CDN tak termuat, form-nya mem-POST ke URL halaman
+        // sendiri dan assign diam-diam tidak terjadi. Target POST untuk aksi
+        // yang mengubah data tidak boleh bergantung pada skrip pihak ketiga.
+        Route::post('/collector-worksheet/assign', [CollectorWorksheetController::class, 'assign'])->name('collector-worksheet.assign-selected');
+        Route::post('/collector-worksheet/{collector}/assign', [CollectorWorksheetController::class, 'assign'])->name('collector-worksheet.assign');
+        Route::post('/collector-worksheet/{collector}/customers/{customer}/release', [CollectorWorksheetController::class, 'release'])->name('collector-worksheet.release');
     });
 
-    // Endpoint bayar batch (1-by-1 maupun massal, lihat CollectorBatchController)
-    // dipakai dari tab Worklist & Bayar di halaman /collectors/{collector}.
+    // Admin mencatat pembayaran MEWAKILI seorang kolektor. Kolektornya dari
+    // route parameter — aman karena digerbang `payments.create` (hak bayar
+    // penuh, admin). Bandingkan dengan rute kolektor di bawah.
     Route::middleware('permission:payments.create')->group(function () {
-        Route::post('/collector-batch/{collector}', [CollectorBatchController::class, 'store'])->name('collector-batch.store');
+        Route::post('/payment-batches/{collector}', [PaymentBatchController::class, 'store'])->name('payment-batches.store');
     });
 
-    // Worklist read-only kolektor — permission SENDIRI (kolektor.view), bukan
-    // customers.view. Kolektor cuma boleh baca pelanggannya sendiri.
+    // Worklist Kolektor — halaman kerja kolektor sendiri.
     Route::middleware('permission:kolektor.view')->group(function () {
         Route::get('/collector-worklist', [CollectorWorklistController::class, 'index'])->name('collector-worklist.index');
+    });
+
+    // Kolektor mencatat pembayarannya SENDIRI. TANPA parameter {collector} —
+    // kolektor diambil dari auth()->user(). Kalau id kolektor boleh dikirim
+    // dari klien, kolektor A bisa mencatat pembayaran atas nama kolektor B.
+    Route::middleware('permission:kolektor.pay')->group(function () {
+        Route::post('/collector-worklist/pay', [CollectorPaymentController::class, 'store'])->name('collector-worklist.pay');
+    });
+
+    // Kolektor menyetorkan SELURUH saldonya ke admin. Sama seperti rute bayar:
+    // tanpa parameter, kolektor dari auth()->user().
+    Route::middleware('permission:kolektor.deposit')->group(function () {
+        Route::post('/collector-worklist/deposit', [CollectorDepositController::class, 'store'])->name('collector-worklist.deposit');
+    });
+
+    // Kolektor mencatat kunjungan tanpa hasil. Tanpa parameter kolektor —
+    // pelakunya auth()->user(), supaya catatan tak bisa ditulis atas nama
+    // orang lain (laporan aging jadi tak bisa dipercaya kalau bisa).
+    Route::middleware('permission:kolektor.visit')->group(function () {
+        Route::post('/collector-worklist/visits', [CollectorVisitController::class, 'store'])->name('collector-worklist.visits.store');
+    });
+
+    // Cross check setoran oleh admin. Guard uangnya (verifikator ≠ penyetor,
+    // POP scope seluruh payment, selisih wajib beralasan) ada di
+    // CollectorDepositService — permission ini cuma gerbang halamannya.
+    Route::middleware('permission:collector_worksheet.validate')->group(function () {
+        Route::post('/collector-deposits/{deposit}/verify', [CollectorDepositController::class, 'verify'])->name('collector-deposits.verify');
+    });
+
+    // Hapus buku selisih — Owner. Titik di mana kerugian diakui, jadi
+    // permission-nya terpisah dari verifikasi (§11.4 no. 4).
+    Route::middleware('permission:collector_worksheet.approve')->group(function () {
+        Route::post('/collector-deposits/{deposit}/write-off', [CollectorDepositController::class, 'writeOff'])->name('collector-deposits.write-off');
+    });
+
+    // Kwitansi — sumbu DOKUMEN, terpisah dari sumbu kas (§13.2). Permission
+    // sendiri: staf yang mengurus arsip tak otomatis boleh menutup setoran.
+    Route::middleware('permission:collector_worksheet.print')->group(function () {
+        Route::get('/collector-worksheet/{collector}/receipts/print', [PaymentReceiptController::class, 'print'])->name('payment-receipts.print');
+    });
+
+    Route::middleware('permission:collector_worksheet.upload')->group(function () {
+        Route::post('/payment-receipts', [PaymentReceiptController::class, 'store'])->name('payment-receipts.store');
+        Route::post('/payment-receipts/{receipt}/match', [PaymentReceiptController::class, 'matchManually'])->name('payment-receipts.match');
+        Route::post('/payment-receipts/{receipt}/detach', [PaymentReceiptController::class, 'detach'])->name('payment-receipts.detach');
+    });
+
+    // Unduh berkas kwitansi. Digerbang `view` (bukan upload) karena membaca
+    // arsip adalah kebutuhan yang lebih luas daripada mengelolanya — dan
+    // berkasnya TIDAK PERNAH dilayani lewat URL publik.
+    Route::middleware('permission:collector_worksheet.view')->group(function () {
+        // Static route DULU — `progress/{collector}` sebelum `{receipt}/...`,
+        // supaya "progress" tidak pernah tertangkap sebagai id kwitansi.
+        Route::get('/payment-receipts/progress/{collector}', [PaymentReceiptController::class, 'progress'])->name('payment-receipts.progress');
+        Route::get('/payment-receipts/{receipt}/download', [PaymentReceiptController::class, 'download'])->name('payment-receipts.download');
     });
 
     // Detail Pelanggan — permission SENDIRI (customers.detail.view), terpisah

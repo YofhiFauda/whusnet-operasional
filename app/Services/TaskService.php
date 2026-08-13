@@ -68,7 +68,12 @@ class TaskService
                 ]);
             }
 
-            AuditLog::log($task, 'created', null, $task->toArray());
+            // Pencatatan pembuatan TIDAK ditulis di sini. Model Task memakai trait
+            // RecordsAuditLogs (event Eloquent `created`) yang sudah menulisnya —
+            // dari SEMUA jalur masuk, bukan cuma service ini. Dulu keduanya jalan
+            // bersamaan dan tiap task lahir dengan dua baris audit berisi hal yang
+            // sama persis (`create` module "Task Management" + `created` module
+            // "Task"), yang kemudian tampil dobel di Riwayat Perubahan Status.
 
             return $task->refresh();
         });
@@ -95,8 +100,6 @@ class TaskService
         $droppedIds = [];
 
         $task = DB::transaction(function () use ($task, $data, $actor, &$rescheduled, &$teamChanged, &$droppedIds) {
-            $oldValues = $task->toArray();
-
             $rescheduled = isset($data['scheduled_at'])
                 && $task->scheduled_at?->ne(Carbon::parse($data['scheduled_at']));
 
@@ -125,7 +128,11 @@ class TaskService
                 }
             }
 
-            AuditLog::log($task, 'updated', $oldValues, $task->toArray());
+            // Idem `create()`: trait RecordsAuditLogs sudah menulis `update` berisi
+            // KOLOM YANG BENAR-BENAR BERUBAH (lebih presisi dari snapshot penuh yang
+            // dulu ditulis di sini), jadi tidak ditulis dua kali. Log manual di
+            // service ini disisakan hanya untuk peristiwa yang tidak bisa
+            // disimpulkan dari perubahan kolom: completed, cancelled, reassigned.
 
             $this->syncToFopTask($task);
 
@@ -184,11 +191,26 @@ class TaskService
             );
         }
 
+        $previousStatus = $task->status->value;
+
         $task->update([
             'status' => TaskStatus::IN_PROGRESS->value,
             'started_at' => now(),
             'updated_by' => $actor->id,
         ]);
+
+        // "Mulai Task" dikasih NAMA, sejajar completed/cancelled/reassigned.
+        // Sebelumnya aksi ini cuma meninggalkan baris generik dari trait
+        // (`update` berisi status+started_at), jadi di Riwayat Perubahan Status
+        // ia tampil sebagai "Update" — peristiwa paling sering dilakukan teknisi
+        // justru yang paling tidak terbaca. Dengan nama ini, TaskAuditTimeline
+        // otomatis menyembunyikan kembaran generiknya.
+        AuditLog::log(
+            $task,
+            'started',
+            ['status' => $previousStatus],
+            ['status' => TaskStatus::IN_PROGRESS->value, 'started_at' => $task->started_at?->toDateTimeString()]
+        );
 
         $task = $task->refresh();
         broadcast(new TaskStarted($task));
@@ -272,6 +294,18 @@ class TaskService
         );
 
         DB::transaction(function () use ($task, $reason, $actor, $reportDeferred) {
+            // Dua peristiwa berbeda yang kebetulan berbagi kolom `status`:
+            // "Lapor Nanti" = kerja lapangan SUDAH selesai, laporannya menyusul;
+            // "Pending" = kerja berhenti, butuh jadwal ulang. Trait cuma bisa
+            // bilang "status jadi pending" — bedanya cuma kelihatan dari flag
+            // report_deferred, jadi namanya ditulis di sini.
+            AuditLog::log(
+                $task,
+                $reportDeferred ? 'report_deferred' : 'pending',
+                ['status' => $task->status->value],
+                ['status' => TaskStatus::PENDING->value, 'pending_reason' => $reason]
+            );
+
             $task->update([
                 'status' => TaskStatus::PENDING->value,
                 'pending_reason' => $reason,

@@ -17,6 +17,8 @@ Modul ini punya **2 entity task yang beda tapi nyambung**:
 
 Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObserver`, plus (Task 10) tiap Task selesai kerja dicatat durasi & SLA-nya di tabel `task_reports` (dual-cycle: akumulasi durasi kerja aktual, exclude jeda pending) — bisa dilihat lengkap di halaman Detail Riwayat. **Prinsip fix reject-sync gap (2026-07-14):** Task (kerjaan lapangan) VS keputusan bisnis (customer diterima/ditolak) itu 2 hal beda — begitu teknisi selesai kerja (tiket kategori Survey/Pemasangan), `FopTask` LANGSUNG `Selesai` (gak nangkring di antrian aktif), nasib customer (Menunggu/Diterima/Ditolak) tampil sebagai badge KEDUA di Riwayat, gak pernah ngubah status utama. Detail: `docs/project_verifikasi_reject_gap.md` (§ DESAIN FINAL).
 
+**Lahirnya FopTask Survey & PSB (2026-08-11).** Dua kategori itu tidak bisa dipilih manual — dibuat `FopTaskProvisioningService::ensureForCustomer()` dari registrasi pelanggan, transisi status ke `waiting_survey`/`waiting_installation`, dan sebagai jaring pengaman saat Laporan Survey/Pemasangan disimpan. Papan `/fop-tasks` tetap menyapu pelanggan lama lewat service yang sama. **Ini bukan sekadar kerapian:** `task_materials` & `task_work_tools` wajib punya `fop_task_id`, jadi selama FopTask cuma lahir saat papan dibuka, estimasi material & checklist alat yang diisi teknisi hilang tanpa pesan error. Detail & rasional: [flowchart.md §2](flowchart.md).
+
 **Team** (`FopTaskTeam`) = roster teknisi yang berlaku 1 hari (bisa nyambung ke hari berikutnya kalau ada tiket Pending). **Sejak Task 1 (Auto-Team Formation), Team gak lagi dibuat manual** — kebentuk/berubah sendiri lewat `FopTaskTeamService::rebuildTeamsForDate()` berdasar graf overlap teknisi per tiket (siapa kerja bareng siapa hari itu). FOP cuma perlu drop-in manual (`assign-to-team`) buat kasus solo/konflik, atau pakai **Switch Teknisi** (Task 2) buat mindahin teknisi antar Team dalam 1 submit atomic. Detail algoritma & rasional di [analisa-auto-team.md](analisa-auto-team.md) dan [analisa-sync-execution-task.md](analisa-sync-execution-task.md).
 
 **Integrasi Ticketing (2026-07-23/24):** `FopTask` category MTN & C-REQ bisa punya `ticket` terkait (`FopTask::ticket()`, hasOne ke `Ticket`) — hasil auto-sync dari tiket internal perusahaan yang diajukan helpdesk/NOC/sales, atau dari FOP sendiri yang submit langsung dari modal "Tambah Task FOP" (mode Ticketing otomatis nyala kalau kategori MTN/C-REQ dipilih, termasuk pas Edit kalau tiket udah nyambung). Detail lengkap: [docs/ticketing/README.md](../ticketing/README.md).
@@ -25,7 +27,7 @@ Status `FopTask` (Task 9) di-derive otomatis dari `Task` eksekusi lewat `TaskObs
 
 | Dokumen | Isi |
 |---------|-----|
-| [flowchart.md](flowchart.md) | Alur status tiket, auto-sync, prioritas SLA, auto-team formation (Task 1), switch teknisi (Task 2) |
+| [flowchart.md](flowchart.md) | Alur status tiket, pembuatan FopTask Survey/PSB (`FopTaskProvisioningService`), sapuan & prioritas SLA, auto-team formation (Task 1), switch teknisi (Task 2) |
 | [user-flow.md](user-flow.md) | Langkah FOP di `/fop`, `/fop-tasks`, `/fop-tasks/history` |
 | [database-schema.md](database-schema.md) | Tabel, kolom, relasi, migrasi |
 | [fop-dashboard.md](fop-dashboard.md) | Detail dashboard `/fop` (stat card, Team FOP Aktif, antrean survey) |

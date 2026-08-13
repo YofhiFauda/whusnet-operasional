@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\Gender;
+use App\Support\RupiahInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,6 +27,16 @@ class CustomerRegistrationRequest extends FormRequest
                 'identity_number' => preg_replace('/[^0-9]/', '', (string) $this->identity_number),
             ]);
         }
+
+        // Kolom rupiah diketik berformat ribuan (`10.000`). Tanpa normalisasi,
+        // titiknya lolos `numeric` sebagai desimal Inggris — diskon 10 ribu
+        // tersimpan 10 rupiah dan langganan pelanggan ini salah tagih terus.
+        // `tax_percent` TIDAK ikut: itu persen, bukan rupiah.
+        $this->merge(RupiahInput::parseKeys(
+            $this->only(['discount_amount', 'other_fee']),
+            'discount_amount',
+            'other_fee',
+        ));
     }
 
     /**

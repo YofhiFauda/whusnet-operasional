@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\CollectorBalanceService;
 use App\Services\UserScopeManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -250,6 +251,30 @@ class UserController extends Controller
                     $validator->errors()->add(
                         'status',
                         "Kolektor ini masih memegang {$assignedCount} pelanggan. Pindahkan/lepas dulu lewat layar Atur Kolektor sebelum menonaktifkan."
+                    );
+                }
+
+                // Guard uang (kolektor-2.0 §11.7): kolektor yang masih pegang
+                // kas atau masih punya kurang setor tak boleh dinonaktifkan.
+                // Tanpa ini, kolektor bertunggakan tinggal di-nonaktifkan dan
+                // angkanya lenyap dari semua daftar — padahal itu uang
+                // perusahaan yang belum kembali. Jalan keluar satu-satunya
+                // tetap: disetorkan/dilunasi, atau dihapus buku oleh Owner.
+                $balanceService = app(CollectorBalanceService::class);
+
+                $balance = $balanceService->balance($user);
+                if ($balance > 0) {
+                    $validator->errors()->add(
+                        'status',
+                        'Kolektor ini masih memegang saldo Rp'.number_format($balance, 0, ',', '.').' yang belum disetorkan. Setorkan & verifikasi dulu sebelum menonaktifkan.'
+                    );
+                }
+
+                $shortfall = $balanceService->outstandingShortfall($user);
+                if ($shortfall > 0) {
+                    $validator->errors()->add(
+                        'status',
+                        'Kolektor ini masih punya kurang setor Rp'.number_format($shortfall, 0, ',', '.').'. Lunasi lewat setoran berikutnya atau minta Owner menghapus bukunya dulu.'
                     );
                 }
             }

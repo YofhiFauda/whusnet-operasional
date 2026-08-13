@@ -24,10 +24,20 @@ class MigrateLegacyDataCommand extends Command
      *
      * @var string
      */
+
+    /**
+     * JIKA INGIN MIGRASI TANPA BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --without-billing
+     *
+     * JIKA INGIN MIGRASI DENGAN BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman
+     *
+     *  */
     protected $signature = 'app:import-legacy-sql 
                         {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql} 
                         {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)} 
-                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}';
+                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}
+                        {--without-billing : Impor pelanggan/layanan/data teknis saja, tanpa tagihan & pembayaran legacy}';
 
     /**
      * The console command description.
@@ -1127,7 +1137,7 @@ class MigrateLegacyDataCommand extends Command
                     'invoice_type' => $type,
                     'billing_period' => $period,
                     'issue_date' => $issueDate,
-                    'due_date' => Carbon::parse($issueDate)->addDays(10)->format('Y-m-d'),
+                    'due_date' => $this->legacyDueDate($issueDate),
                     'total_amount' => $totalAmount,
                     'monthly_fee' => $isAwal ? null : $monthlyFee,
                     'extra_installation_fee' => $isAwal ? $installationFee : 0,
@@ -1331,13 +1341,32 @@ class MigrateLegacyDataCommand extends Command
             }
         }
 
+        // Riwayat tagihan legacy hanya menutup ~5% dari bulan-bulan yang benar-benar
+        // dilalui pelanggan: `biaya_tagihan` itu kontrak biaya per pemasangan (tanpa
+        // kolom periode), dan satu-satunya jejak per bulan (`apikeuangan_
+        // buktitransaksitagihan`) cuma berisi puluhan baris per bulan untuk ribuan
+        // pelanggan. Hasilnya riwayat yang bolong-bolong dan menyesatkan kalau dibaca
+        // sebagai tunggakan.
+        //
+        // Karena itu ada skenario go-live "pelanggan saja": tagihan berjalan
+        // diselesaikan manual di luar sistem, lalu sistem mulai bersih dari periode
+        // berikutnya lewat `billing:generate-monthly-invoices`. Harga langganan tetap
+        // ikut terimpor (`customer_services.monthly_price` dari `BIAYABULANAN`), jadi
+        // generator tetap punya dasar nominal. `activation_date` juga tidak bergantung
+        // pada sheet ini — sumbernya `prosedure_permintaan_wifi`/`riwayat_pelanggan`.
+        $withoutBilling = (bool) $this->option('without-billing');
+
+        if ($withoutBilling) {
+            $this->warn('--without-billing: '.count($invoicesSheet).' tagihan & '.count($paymentsSheet).' pembayaran legacy TIDAK diimpor.');
+        }
+
         $sheets = [
             'packages' => $packagesSheet,
             'customers' => $customersSheet,
             'services' => $servicesSheet,
             'technical_details' => $technicalSheet,
-            'invoices' => $invoicesSheet,
-            'payments' => $paymentsSheet,
+            'invoices' => $withoutBilling ? [] : $invoicesSheet,
+            'payments' => $withoutBilling ? [] : $paymentsSheet,
         ];
 
         // Ensure we are logged in as admin to have full access/audit logs
@@ -1521,6 +1550,32 @@ class MigrateLegacyDataCommand extends Command
         }
 
         return $period.'-01';
+    }
+
+    /**
+     * Jatuh tempo sebuah invoice legacy.
+     *
+     * Aturannya tanggal kalender tetap — tempo tanggal 10 — persis seperti
+     * GenerateMonthlyInvoicesCommand. Dulu di sini `addDays(10)`, sehingga
+     * seluruh tagihan bulanan hasil import jatuh tempo tanggal 11 sementara
+     * tagihan yang digenerate cron jatuh tempo tanggal 10: satu aturan bisnis,
+     * dua hasil, dan pelanggan yang sama bisa punya dua tanggal tempo berbeda
+     * cuma karena tagihannya berasal dari jalur yang berbeda.
+     *
+     * Invoice AWAL terbit di tanggal aktivasi, yang sering sudah lewat tanggal
+     * 10. Tempo tidak boleh mendahului terbit, jadi kasus itu digeser ke
+     * tanggal 10 bulan berikutnya.
+     */
+    private function legacyDueDate(string $issueDate): string
+    {
+        $issued = Carbon::parse($issueDate);
+        $due = $issued->copy()->day(10);
+
+        if ($due->lt($issued)) {
+            $due = $issued->copy()->addMonthNoOverflow()->day(10);
+        }
+
+        return $due->format('Y-m-d');
     }
 
     private function resolveLegacyUserLabel(mixed $value, array $penggunaMap): string

@@ -111,3 +111,31 @@ Broadcast::channel('fop.{pop_id}', function ($user, $popId) {
 Broadcast::channel('teknisi.{user_id}', function ($user, $userId) {
     return (int) $user->id === (int) $userId;
 });
+
+/**
+ * Siklus hidup setoran kolektor per POP (App\Events\CollectorDepositUpdated) —
+ * dipakai Worksheet Admin supaya admin tahu kolektor mana yang baru menyetor
+ * tanpa memuat ulang halaman.
+ *
+ * Digerbang `collector_worksheet.view`, bukan `payments.view`: yang berhak
+ * mendengar kabar setoran adalah orang yang memang mengurus worksheet kolektor.
+ * Pola scope-nya sama dengan channel lain di file ini — EffectiveAccessService,
+ * bukan $user->pops() legacy.
+ *
+ * Sisi KOLEKTOR tidak punya channel sendiri di sini: event yang sama juga
+ * disiarkan ke `App.Models.User.{id}` miliknya, yang otorisasinya sudah
+ * terdefinisi di paling atas file ini.
+ */
+Broadcast::channel('collector-activity.{popId}', function ($user, $popId) {
+    if (! $user->hasPermission('collector_worksheet.view')) {
+        return false;
+    }
+
+    $access = app(EffectiveAccessService::class);
+
+    if ($access->hasAllPopAccess($user)) {
+        return true;
+    }
+
+    return in_array((int) $popId, $access->getAllowedPopIds($user), true);
+});

@@ -223,6 +223,19 @@ class Customer extends Model
     }
 
     /**
+     * Riwayat kunjungan kolektor — termasuk kunjungan yang tidak menghasilkan
+     * uang. Dipakai laporan aging untuk memunculkan pola "berulang tidak ada
+     * orang tapi tunggakannya menua"
+     * (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §12).
+     *
+     * @return HasMany<CollectorVisit, $this>
+     */
+    public function collectorVisits(): HasMany
+    {
+        return $this->hasMany(CollectorVisit::class);
+    }
+
+    /**
      * @return HasOne<Invoice, $this>
      */
     public function latestInvoice(): HasOne

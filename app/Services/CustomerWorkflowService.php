@@ -108,6 +108,15 @@ class CustomerWorkflowService
                             'updated_by' => Auth::id() ?? 1,
                         ]);
                     }
+
+                    // FopTask lahir bareng antreannya, bukan menunggu papan
+                    // /fop-tasks dibuka. Dia anchor wajib buat task_materials &
+                    // task_work_tools — kalau belum ada saat teknisi mengisi
+                    // laporan, estimasi material dan checklist alat dibuang senyap.
+                    app(FopTaskProvisioningService::class)->ensureForCustomer(
+                        $customer,
+                        TaskType::from($taskType)
+                    );
                 }
 
                 // S8.8-T005: Trigger notifikasi ke pelanggan setelah status Active

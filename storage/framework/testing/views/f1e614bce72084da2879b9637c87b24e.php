@@ -755,7 +755,8 @@ unset($__errorArgs, $__bag); ?>
 
                             <div>
                                 <label for="discount_amount" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Diskon Promosi (Rp) <span class="text-rose-500">*</span></label>
-                                <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', 0)); ?>" min="0" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['discount_amount'];
+                                
+                                <input type="text" inputmode="decimal" data-rupiah name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', 0)); ?>" class="w-full text-xs font-mono px-3 py-2.5 border <?php $__errorArgs = ['discount_amount'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
 if (isset($message)) { $__messageOriginal = $message; }
@@ -1065,7 +1066,9 @@ unset($__errorArgs, $__bag); ?>
         const discountInput = document.getElementById('discount_amount');
         
         let basePrice = 0;
-        let discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
+        // Kolom diskon bermasking ribuan — parseFloat('10.000') = 10, dan
+        // rincian harga di layar akan berbohong tanpa parser ini.
+        let discount = (discountInput && window.Rupiah ? window.Rupiah.angka(discountInput.value) : parseFloat(discountInput ? discountInput.value : 0)) || 0;
 
         if (select && select.selectedIndex >= 0) {
             const selectedOpt = select.options[select.selectedIndex];

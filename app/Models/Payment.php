@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +16,7 @@ class Payment extends Model
 
     protected $fillable = [
         'payment_number',
+        'idempotency_key',
         'old_payment_id',
         'old_transaction_id',
         'old_request_id',
@@ -23,6 +25,7 @@ class Payment extends Model
         'deposited_by_old',
         'invoice_id',
         'payment_batch_id',
+        'collector_deposit_id',
         'customer_id',
         'pop_id',
         'payment_date',
@@ -107,6 +110,30 @@ class Payment extends Model
     public function paymentBatch(): BelongsTo
     {
         return $this->belongsTo(PaymentBatch::class);
+    }
+
+    /**
+     * Setoran tempat payment ini sudah ikut diserahkan ke admin. `null` =
+     * uangnya masih di tangan kolektor — itulah definisi saldo kolektor
+     * (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §11.1).
+     *
+     * @return BelongsTo<CollectorDeposit, $this>
+     */
+    public function collectorDeposit(): BelongsTo
+    {
+        return $this->belongsTo(CollectorDeposit::class, 'collector_deposit_id');
+    }
+
+    /**
+     * Arsip kwitansi yang tercocokkan ke pembayaran ini. Sumbu DOKUMEN —
+     * ketiadaannya tidak berpengaruh apa pun pada status uang
+     * (docs/kolektor/business-logic.md § Kwitansi).
+     *
+     * @return HasMany<PaymentReceipt, $this>
+     */
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(PaymentReceipt::class);
     }
 
     /**

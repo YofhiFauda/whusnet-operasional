@@ -52,7 +52,9 @@ class TeknisiWorkloadService
 
         return $teknisi->map(function (User $t) use ($activeByUser, $countByUser) {
             $activeTask = $activeByUser->get($t->id);
-            $taskCount = (int) ($countByUser[$t->id] ?? 0);
+            $counts = $countByUser[$t->id] ?? ['total' => 0, 'overdue' => 0];
+            $taskCount = (int) $counts['total'];
+            $overdueCount = (int) $counts['overdue'];
 
             return [
                 'id' => $t->id,
@@ -64,6 +66,11 @@ class TeknisiWorkloadService
                     default => 'standby',
                 },
                 'task_count' => $taskCount,
+                // Pecahan tunggakan dari `task_count`. Angka gabungan saja
+                // menyamarkan beda antara "3 task hari ini" (normal) dan "3 task
+                // yang seharusnya kelar 3 hari lalu" (perlu ditangani) — padahal
+                // keduanya menentukan boleh-tidaknya teknisi ini dapat task baru.
+                'overdue_count' => $overdueCount,
                 'location' => $activeTask
                     ? ($activeTask->customer?->clean_address ?? 'Tidak Diketahui')
                     : '-',
@@ -106,8 +113,11 @@ class TeknisiWorkloadService
      * membungkusnya jadi `DATE(scheduled_at)` sehingga index apa pun di kolom
      * itu tidak akan pernah terpakai.
      *
+     * Hasilnya dipecah: `total` (hari ini + tunggakan) dan `overdue` (tunggakan
+     * saja), supaya tabel bisa menunjukkan komposisinya, bukan cuma angka bulat.
+     *
      * @param  array<int>  $teknisiIds
-     * @return Collection<int, int> keyed by user_id
+     * @return Collection<int, array{total:int, overdue:int}> keyed by user_id
      */
     private function scheduledCountByUser(array $teknisiIds, Carbon $today): Collection
     {
@@ -127,8 +137,17 @@ class TeknisiWorkloadService
                 });
             })
             ->groupBy('task_teams.user_id')
-            ->selectRaw('task_teams.user_id as user_id, COUNT(*) as total')
-            ->pluck('total', 'user_id');
+            ->selectRaw(
+                'task_teams.user_id as user_id, COUNT(*) as total, SUM(CASE WHEN tasks.scheduled_at < ? THEN 1 ELSE 0 END) as overdue',
+                [$startOfDay]
+            )
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                (int) $row->user_id => [
+                    'total' => (int) $row->total,
+                    'overdue' => (int) $row->overdue,
+                ],
+            ]);
     }
 
     private function initials(string $name): string

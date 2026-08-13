@@ -959,7 +959,9 @@
                                                                 data-invoice-id="<?php echo e($invoice->id); ?>"
                                                                 data-invoice-number="<?php echo e($invoice->invoice_number); ?>"
                                                                 data-remaining="<?php echo e((float) $invoice->remaining_amount); ?>"
-                                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                                
+                                                                data-payment-store-url="<?php echo e(route('invoices.payments.store', $invoice->id)); ?>"
+                                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining), this.dataset.paymentStoreUrl)"
                                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer <?php echo e($settled ? 'hidden' : ''); ?>">
                                                             Bayar
                                                         </button>
@@ -1234,7 +1236,8 @@
                         </div>
                         <div>
                             <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
-                            <input type="number" name="prorate_amount" id="prorate_amount" value="0" min="0" step="1" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                            
+                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
                         </div>
                         <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                             <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
@@ -1579,7 +1582,10 @@
 
     const BASE_NETT = <?php echo e((float)$totalBill); ?>;
     function recalcInvoiceTotal() {
-        const prorate = parseFloat(document.getElementById('prorate_amount')?.value || 0) || 0;
+        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
+        // pratinjau total tagihan akan berbohong tanpa parser ini.
+        const prorateEl = document.getElementById('prorate_amount');
+        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
         const total   = BASE_NETT + prorate;
         const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
         const totalEl = document.getElementById('preview-total');

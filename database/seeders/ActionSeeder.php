@@ -109,6 +109,21 @@ class ActionSeeder extends Seeder
                 'name' => 'Retrieve',
                 'description' => 'Mengambil kembali alat/aset dari pelanggan',
             ],
+            [
+                'code' => ActionCode::PAY,
+                'name' => 'Pay',
+                'description' => 'Mencatat pembayaran dari worklist kolektor sendiri',
+            ],
+            [
+                'code' => ActionCode::DEPOSIT,
+                'name' => 'Deposit',
+                'description' => 'Menyetorkan hasil tagihan kolektor ke admin',
+            ],
+            [
+                'code' => ActionCode::VISIT,
+                'name' => 'Visit',
+                'description' => 'Mencatat hasil kunjungan penagihan tanpa uang',
+            ],
         ];
 
         foreach ($actions as $action) {

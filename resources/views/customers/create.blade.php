@@ -371,7 +371,9 @@
 
                             <div>
                                 <label for="discount_amount" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Diskon Promosi (Rp) <span class="text-rose-500">*</span></label>
-                                <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="{{ old('discount_amount', 0) }}" min="0" class="w-full text-xs font-mono px-3 py-2.5 border @error('discount_amount') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="0">
+                                {{-- data-rupiah butuh type="text"; batas `min`
+                                     diganti validasi server. --}}
+                                <input type="text" inputmode="decimal" data-rupiah name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="{{ old('discount_amount', 0) }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('discount_amount') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="0">
                                 @error('discount_amount')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror
@@ -591,7 +593,9 @@
         const discountInput = document.getElementById('discount_amount');
         
         let basePrice = 0;
-        let discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
+        // Kolom diskon bermasking ribuan — parseFloat('10.000') = 10, dan
+        // rincian harga di layar akan berbohong tanpa parser ini.
+        let discount = (discountInput && window.Rupiah ? window.Rupiah.angka(discountInput.value) : parseFloat(discountInput ? discountInput.value : 0)) || 0;
 
         if (select && select.selectedIndex >= 0) {
             const selectedOpt = select.options[select.selectedIndex];

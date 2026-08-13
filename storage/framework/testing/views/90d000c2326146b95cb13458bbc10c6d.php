@@ -251,9 +251,13 @@
                 
                 <?php if(auth()->id() === $notif->notifiable_id): ?>
                 <div class="mt-3 sm:mt-0 sm:ml-4 shrink-0 flex gap-2">
-                    <button type="button" 
-                            onclick="toggleRead('<?php echo e($notif->id); ?>', this)" 
+                    
+                    <button type="button"
+                            onclick="toggleRead(this)"
                             data-read="<?php echo e($isRead ? 'true' : 'false'); ?>"
+                            data-row-id="<?php echo e($notif->id); ?>"
+                            data-url-read="<?php echo e(route('notifications.markRead', $notif->id)); ?>"
+                            data-url-unread="<?php echo e(route('notifications.markUnread', $notif->id)); ?>"
                             class="px-3 py-1.5 border rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer <?php if($isRead): ?> bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700 <?php else: ?> bg-sky-50/80 text-sky-700 border-sky-200/80 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60 dark:hover:bg-sky-900/40 <?php endif; ?>">
                         <?php echo e($isRead ? 'Tandai Belum Dibaca' : 'Tandai Dibaca'); ?>
 
@@ -300,10 +304,11 @@
 
 <?php $__env->startSection('scripts'); ?>
 <script>
-async function toggleRead(id, button) {
+async function toggleRead(button) {
     const isRead = button.getAttribute('data-read') === 'true';
-    const url = isRead ? `/notifications/${id}/unread` : `/notifications/${id}/read`;
-    
+    const url = isRead ? button.dataset.urlUnread : button.dataset.urlRead;
+    if (!url) return;
+
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -317,15 +322,15 @@ async function toggleRead(id, button) {
             const newReadState = !isRead;
             button.setAttribute('data-read', newReadState.toString());
             
-            const card = document.getElementById(`notif-row-${id}`);
+            const card = document.getElementById(`notif-row-${button.dataset.rowId}`);
             if (newReadState) {
-                card.classList.remove('bg-sky-50/20', 'dark:bg-sky-950/15', 'border-l-4', 'border-l-sky-500', 'dark:border-l-sky-400');
-                card.classList.add('bg-white', 'border-slate-200', 'opacity-80', 'dark:bg-slate-800/60', 'dark:border-slate-800', 'dark:opacity-75');
+                card?.classList.remove('bg-sky-50/20', 'dark:bg-sky-950/15', 'border-l-4', 'border-l-sky-500', 'dark:border-l-sky-400');
+                card?.classList.add('bg-white', 'border-slate-200', 'opacity-80', 'dark:bg-slate-800/60', 'dark:border-slate-800', 'dark:opacity-75');
                 button.innerHTML = 'Tandai Belum Dibaca';
                 button.className = 'px-3 py-1.5 border rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700';
             } else {
-                card.classList.remove('bg-white', 'border-slate-200', 'opacity-80', 'dark:bg-slate-800/60', 'dark:border-slate-800', 'dark:opacity-75');
-                card.classList.add('bg-sky-50/20', 'dark:bg-sky-950/15', 'border-slate-200', 'dark:border-slate-800', 'border-l-4', 'border-l-sky-500', 'dark:border-l-sky-400');
+                card?.classList.remove('bg-white', 'border-slate-200', 'opacity-80', 'dark:bg-slate-800/60', 'dark:border-slate-800', 'dark:opacity-75');
+                card?.classList.add('bg-sky-50/20', 'dark:bg-sky-950/15', 'border-slate-200', 'dark:border-slate-800', 'border-l-4', 'border-l-sky-500', 'dark:border-l-sky-400');
                 button.innerHTML = 'Tandai Dibaca';
                 button.className = 'px-3 py-1.5 border rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer bg-sky-50/80 text-sky-700 border-sky-200/80 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60 dark:hover:bg-sky-900/40';
             }

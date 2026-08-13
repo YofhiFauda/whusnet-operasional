@@ -23,6 +23,28 @@ class FormatHelper
     }
 
     /**
+     * Nilai awal untuk input bermasking `data-rupiah` — TANPA prefiks "Rp".
+     *
+     * Sen dipertahankan kalau ada (`150000.5` → `150.000,50`) dan dibuang
+     * kalau nol (`150000` → `150.000`). Membulatkan tanpa syarat seperti
+     * `number_format($v, 0, ...)` terlihat rapi tapi mengubah nominalnya:
+     * sisa tagihan 150.000,50 tampil 150.001 lalu ditolak validasi "melebihi
+     * sisa tagihan" — baris yang tidak disentuh siapa pun jadi tak bisa
+     * dibayar. Di form setoran akibatnya lebih jauh lagi: uang fisik yang
+     * benar terkirim dibulatkan, setoran ditandai SELISIH, dan kolektor
+     * ditagih uang yang sudah dia serahkan.
+     *
+     * @param  float|int|string|null  $amount
+     */
+    public static function rupiahInput($amount): string
+    {
+        $nilai = (float) ($amount ?? 0);
+        $adaSen = round(fmod(abs($nilai) * 100, 100)) > 0;
+
+        return number_format($nilai, $adaSen ? 2 : 0, ',', '.');
+    }
+
+    /**
      * Format a date to Indonesian Format (e.g. 16 Juni 2026 or Selasa, 16 Juni 2026).
      *
      * @param  string|\DateTime|Carbon|null  $date

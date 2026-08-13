@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RendersCustomerList;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 /**
- * Halaman List Pelanggan Gagal — route & permission (customers.failed.view)
- * sendiri, terpisah dari List Data Pelanggan biasa (CustomerController::index()).
- * Lihat catatan CustomerTerminatedController — pola sama persis.
+ * Halaman List Pelanggan Gagal — route, permission (customers.failed.view), dan
+ * view (customers/failed.blade.php) sendiri. Lihat catatan
+ * CustomerTerminatedController — pola sama persis.
  */
-class CustomerFailedController extends CustomerController
+class CustomerFailedController extends Controller
 {
-    public function index(Request $request)
+    use RendersCustomerList;
+
+    public function index(Request $request): View
     {
-        return $this->renderCustomerList($request, 'failed');
+        return $this->renderCustomerList($request, 'failed', 'customers.failed');
     }
 }

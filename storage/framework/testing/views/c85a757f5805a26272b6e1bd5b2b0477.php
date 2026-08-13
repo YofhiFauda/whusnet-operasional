@@ -45,10 +45,15 @@
             <form action="<?php echo e(route('invoices.payments.store', $invoice->id)); ?>" method="POST" enctype="multipart/form-data" class="p-6 space-y-5">
                 <?php echo csrf_field(); ?>
 
+                
+                <input type="hidden" name="idempotency_key" value="<?php echo e(old('idempotency_key', (string) \Illuminate\Support\Str::uuid())); ?>">
+
                 <!-- Tanggal Bayar -->
                 <div>
                     <label for="payment_date" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tanggal Bayar</label>
+                    
                     <input type="date" name="payment_date" id="payment_date" value="<?php echo e(old('payment_date', now()->format('Y-m-d'))); ?>" required
+                           max="<?php echo e(now()->format('Y-m-d')); ?>"
                            class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono bg-surface text-text-main transition-colors">
                 </div>
 
@@ -68,7 +73,9 @@
                     <label for="amount" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Nominal Diterima dari Pelanggan (Rp)</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-mono text-xs font-bold text-text-muted">Rp</span>
-                        <input type="number" name="amount" id="amount" value="<?php echo e(old('amount', (float) $invoice->remaining_amount)); ?>" min="1" step="0.01" required
+                        
+                        <input type="text" inputmode="decimal" name="amount" id="amount" data-rupiah
+                               value="<?php echo e(old('amount', \App\Helpers\FormatHelper::rupiahInput($invoice->remaining_amount))); ?>" required
                                class="w-full pl-9 pr-3 py-2 border border-border rounded-lg shadow-2xs focus:ring-2 focus:ring-primary/25 focus:border-primary text-xs font-mono font-bold bg-surface text-text-main transition-colors">
                     </div>
                     <p class="text-[11px] text-text-muted mt-1.5">
@@ -233,7 +240,9 @@
         }
 
         function refreshHint() {
-            const amount = parseFloat(amountInput.value);
+            // Input bermasking ribuan — parseFloat('150.000') = 150, jadi
+            // petunjuk cicilan/lebih bayar akan berbohong tanpa parser ini.
+            const amount = window.Rupiah ? window.Rupiah.angka(amountInput.value) : parseFloat(amountInput.value);
             installmentHint.classList.add('hidden');
             settleHint.classList.add('hidden');
             overpayHint.classList.add('hidden');
