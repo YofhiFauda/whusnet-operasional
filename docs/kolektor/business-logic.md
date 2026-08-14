@@ -382,11 +382,24 @@ Diperbarui 2026-08-11. Urutannya ditentukan di **satu tempat**: `ReceiptNumberEx
 
 `ReceiptMatchMethod` punya empat nilai (`teks`, `qr`, `ocr`, `manual`) justru supaya kolom itu jujur waktu ada kwitansi salah tempel: metode menentukan seberapa jauh harus ditelusuri.
 
-### Satu LEMBAR memuat banyak kwitansi
+### Satu LEMBAR memuat banyak kwitansi — tapi satu kwitansi tetap satu halaman
 
-Halaman cetak adalah grid 2 kolom bergaris putus-putus — **8 kwitansi per lembar A4 untuk digunting**. Admin yang menekan Print lalu "Save as PDF" menghasilkan **satu berkas untuk banyak pembayaran**, dan itulah bentuk yang dipakai verifikasi massal.
+Diperbarui 2026-08-14: tata letak diganti dari grid 2 kolom (8 kwitansi/lembar, digunting) jadi
+satu kolom bergaya struk — field lengkap (alamat, invoice, total/sisa tagihan, catatan), **satu
+pembayaran = satu halaman A4** (`page-break-after` per kartu). QR + `payment_number` sebagai teks
+tetap dicetak di tiap halaman — dua penanda itu tidak boleh hilang, itulah yang dibaca ulang jalur
+TEKS/QR/OCR di atas. Konsekuensi paling nyata: mencetak 50 pembayaran sekarang menghasilkan 50
+halaman, bukan ~7 lembar gunting — trade-off sadar demi keterbacaan dan format kwitansi yang
+konsisten dengan struk (`payments/receipt.blade.php`) dan lembar A4 (`payments/show.blade.php`),
+bukan lagi bentuk keempat yang menyimpang sendiri.
 
-Konsekuensinya di data: satu baris `payment_receipts` **per nomor**. Model "satu baris = satu pembayaran" tetap utuh, sehingga UI, POP scope, pencocokan manual, dan `detach` bekerja tanpa perubahan. Berkas satuan lewat jalur yang sama persis — daftarnya cuma berisi satu.
+Admin yang menekan Print lalu "Save as PDF" tetap menghasilkan **satu berkas untuk banyak
+pembayaran** (satu PDF multi-halaman) — itulah bentuk yang dipakai verifikasi massal, cuma
+jumlah halamannya sekarang mengikuti jumlah kwitansi, bukan dibagi 8.
+
+Konsekuensinya di data **tidak berubah**: satu baris `payment_receipts` **per nomor**. Model "satu
+baris = satu pembayaran" tetap utuh, sehingga UI, POP scope, pencocokan manual, dan `detach`
+bekerja tanpa perubahan. Berkas satuan lewat jalur yang sama persis — daftarnya cuma berisi satu.
 
 ### Berkas unggahan = arsip LEMBAR, bukan dokumen kwitansi
 

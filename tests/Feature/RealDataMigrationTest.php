@@ -761,7 +761,6 @@ class RealDataMigrationTest extends TestCase
                 'city' => $row['KOTA'] ?? '',
                 'latitude' => $lat,
                 'longitude' => $lon,
-                'foto_ktp' => $row['FOTOKTP'] ?? '',
                 'foto_rumah' => $fotoRumah ?? '',
                 'foto_kontrak' => $fotoKontrak ?? '',
                 'sales_code' => $salesCode,

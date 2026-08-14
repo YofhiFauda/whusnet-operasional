@@ -82,7 +82,6 @@ class CustomerRegistrationRequest extends FormRequest
             'status' => 'nullable|string|max:50',
 
             // Documents
-            'foto_ktp' => 'required|file|image|mimes:jpeg,png,jpg|max:2048',
             'foto_rumah' => 'nullable|file|image|mimes:jpeg,png,jpg|max:2048',
             'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
         ];
@@ -96,9 +95,6 @@ class CustomerRegistrationRequest extends FormRequest
             'identity_number.digits' => 'NIK harus berjumlah 16 digit angka.',
             'identity_number.regex' => 'NIK hanya boleh berisi angka.',
             'primary_phone.regex' => 'Format nomor HP tidak valid (harus format Indonesia, misal: 0812...).',
-            'foto_ktp.required' => 'Foto KTP wajib dilampirkan.',
-            'foto_ktp.image' => 'File KTP harus berupa gambar.',
-            'foto_ktp.mimes' => 'Format gambar KTP harus jpeg, png, atau jpg.',
             'address.required' => 'Alamat lengkap instalasi wajib diisi.',
             'city_id.required' => 'Kota wajib dipilih.',
             'district_id.required' => 'Kecamatan wajib dipilih.',

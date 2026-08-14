@@ -51,15 +51,15 @@ class CustomerDocumentTest extends TestCase
         $response = $this->actingAs($technician)
             ->from(route('customers.show', $customer->id))
             ->post(route('customers.documents.store', $customer->id), [
-                'document_type' => 'ktp',
-                'document_file' => UploadedFile::fake()->image('ktp.jpg'),
+                'document_type' => 'rumah',
+                'document_file' => UploadedFile::fake()->image('rumah.jpg'),
             ]);
 
         $response->assertRedirect(route('customers.show', $customer->id));
 
         $document = CustomerDocument::firstOrFail();
         $this->assertSame($customer->id, $document->customer_id);
-        $this->assertSame('ktp', $document->document_type->value);
+        $this->assertSame('rumah', $document->document_type->value);
         $this->assertSame($technician->id, $document->uploaded_by);
         Storage::disk('public')->assertExists($document->file_path);
 
@@ -78,7 +78,7 @@ class CustomerDocumentTest extends TestCase
 
         $this->assertNull($auditLog->old_values);
         $this->assertSame($customer->id, $auditLog->new_values['customer_id']);
-        $this->assertSame('ktp', $auditLog->new_values['document_type']);
+        $this->assertSame('rumah', $auditLog->new_values['document_type']);
     }
 
     public function test_customer_document_is_visible_on_customer_detail_for_permitted_user(): void

@@ -16,7 +16,6 @@ use Database\Seeders\FeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -109,7 +108,6 @@ class CustomerActionRedirectPermissionGapTest extends TestCase
             'internet_package_id' => $this->package->id,
             'contract_period_months' => 12,
             'status' => 'registered',
-            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
         ]);
 
         // Data harus tetap tersimpan — bug lama bukan soal gagal simpan,
@@ -151,7 +149,6 @@ class CustomerActionRedirectPermissionGapTest extends TestCase
             'internet_package_id' => $this->package->id,
             'contract_period_months' => 12,
             'status' => 'registered',
-            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
         ]);
 
         $customer = Customer::where('full_name', 'Pelanggan Gap Test 2')->firstOrFail();

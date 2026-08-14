@@ -35,7 +35,7 @@
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Masukkan data identitas calon pelanggan, wilayah pemasangan, foto dokumen KTP, dan paket layanan internet.
+                Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
             </p>
         </div>
 
@@ -115,18 +115,14 @@
 
         <!-- MOBILE RESPONSIVE STEPPER (Visible on < lg screens: 1 row x 3 items) -->
         <div class="lg:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 shadow-sm">
-            <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="grid grid-cols-2 gap-2 text-center">
                 <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
                     <span class="w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">1</span>
                     <span class="truncate text-[11px] font-semibold">1. Data Diri</span>
                 </button>
                 <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
                     <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">2</span>
-                    <span class="truncate text-[11px] font-semibold">2. KTP</span>
-                </button>
-                <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">3</span>
-                    <span class="truncate text-[11px] font-semibold">3. Paket</span>
+                    <span class="truncate text-[11px] font-semibold">2. Paket</span>
                 </button>
             </div>
         </div>
@@ -203,44 +199,9 @@
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">2. Dokumen Lampiran</span>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">2. Layanan &amp; Paket</span>
                                     <span id="step-nav-status-2" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Foto KTP</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        <!-- Step 3 Navigation Card -->
-                        <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
-                            <div class="flex items-start gap-3">
-                                <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
-                                    <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'x','class' => 'w-3 h-3']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'x','class' => 'w-3 h-3']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-                                    </span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">3. Layanan &amp; Paket</span>
-                                    <span id="step-nav-status-3" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-3" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Paket Internet, Jenis Kontrak, Masa Kontrak, Diskon</span>
+                                    <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Paket Internet, Jenis Kontrak, Masa Kontrak, Diskon</span>
                                 </div>
                             </div>
                         </button>
@@ -529,149 +490,10 @@ unset($__errorArgs, $__bag); ?>
                         </div>
                     </div>
 
-                    <!-- STEP 2 PANEL: Dokumen Lampiran KTP -->
+                    <!-- STEP 2 PANEL: Layanan & Paket Internet -->
                     <div id="step-panel-2" class="step-panel space-y-6 hidden">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
-                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Upload file foto KTP asli calon pelanggan untuk verifikasi identitas</p>
-                        </div>
-
-                        <div class="max-w-xl mx-auto">
-                            <!-- Foto KTP Dropzone -->
-                            <div class="border-2 border-dashed <?php $__errorArgs = ['foto_ktp'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> border-rose-400 bg-rose-50/20 <?php else: ?> border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 rounded-2xl p-6 text-center transition-all shadow-sm relative group">
-                                <div id="default-placeholder-foto_ktp" class="py-6 space-y-3">
-                                    <div class="w-14 h-14 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-2xl border border-sky-200 dark:border-sky-800">
-                                        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'id-card','class' => 'w-4 h-4']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'id-card','class' => 'w-4 h-4']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-                                    </div>
-                                    <div>
-                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">UPLOAD FOTO KTP <span class="text-rose-500">*</span></span>
-                                        <span class="block text-[11px] text-slate-400 dark:text-slate-500 mt-1">Format gambar JPG, PNG (Maksimal 2MB)</span>
-                                    </div>
-                                </div>
-
-                                <!-- Preview Container -->
-                                <div id="preview-container-foto_ktp" style="display: none;" class="py-3 flex flex-col items-center justify-center">
-                                    <div class="relative inline-block">
-                                        <img id="preview-img-foto_ktp" class="max-h-48 max-w-full rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-md" src="" alt="Preview Foto KTP">
-                                        <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-3 -right-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus Foto KTP">
-                                            <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'x','class' => 'w-3 h-3']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'x','class' => 'w-3 h-3']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-                                        </button>
-                                    </div>
-                                    <span class="block text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-3 flex items-center gap-1.5">
-                                        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'circle-check','class' => 'w-3 h-3']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'circle-check','class' => 'w-3 h-3']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?> File KTP Siap Diunggah
-                                    </span>
-                                </div>
-
-                                <div class="mt-4">
-                                    <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
-                                    <label for="foto_ktp" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-5 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'upload','class' => 'w-3 h-3']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'upload','class' => 'w-3 h-3']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-                                        <span>Pilih File Gambar</span>
-                                    </label>
-                                    <span id="file-label-foto_ktp" class="block text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
-                                </div>
-
-                                <?php $__errorArgs = ['foto_ktp'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-2"><?php echo e($message); ?></p>
-                                <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- STEP 3 PANEL: Layanan & Paket Internet -->
-                    <div id="step-panel-3" class="step-panel space-y-6 hidden">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
-                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
                         </div>
 
@@ -915,16 +737,12 @@ unset($__errorArgs, $__bag); ?>
 <script>
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
-    const totalStepsCount = 3;
+    const totalStepsCount = 2;
 
     const formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
             optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
-        },
-        'dokumen': {
-            required: ['foto_ktp'],
-            optional: []
         },
         'layanan': {
             required: ['internet_package_id', 'jenis_kontrak', 'contract_period_months', 'discount_amount'],
@@ -934,8 +752,7 @@ unset($__errorArgs, $__bag); ?>
 
     const stepKeys = {
         1: 'data-diri',
-        2: 'dokumen',
-        3: 'layanan'
+        2: 'layanan'
     };
 
     document.addEventListener("DOMContentLoaded", function() {
@@ -1016,48 +833,6 @@ unset($__errorArgs, $__bag); ?>
                 console.error("Gagal memuat desa:", err);
                 villageSelect.innerHTML = '<option value="" disabled selected>Gagal memuat desa</option>';
             });
-    }
-
-    /* File Change & Preview Helper */
-    function onFileChange(fieldId) {
-        const input = document.getElementById(fieldId);
-        const label = document.getElementById('file-label-' + fieldId);
-        const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
-        const previewContainer = document.getElementById('preview-container-' + fieldId);
-        const previewImg = document.getElementById('preview-img-' + fieldId);
-
-        if (input.files && input.files.length > 0) {
-            const file = input.files[0];
-            label.textContent = file.name;
-            input.setAttribute('data-populated', 'true');
-
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    if (previewImg) previewImg.src = e.target.result;
-                    if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                    // Preview pakai inline style karena kontainernya juga ber-class 'flex'
-                    // — alasan sama seperti di setElementVisible().
-                    setElementVisible(previewContainer, true);
-                };
-                reader.readAsDataURL(file);
-            }
-        } else {
-            label.textContent = "Belum ada file dipilih";
-            input.removeAttribute('data-populated');
-            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
-            setElementVisible(previewContainer, false);
-            if (previewImg) previewImg.src = '';
-        }
-        runLiveProgressUpdates();
-    }
-
-    function clearFile(fieldId) {
-        const input = document.getElementById(fieldId);
-        if (input) {
-            input.value = '';
-            onFileChange(fieldId);
-        }
     }
 
     /* Live Layanan Billing Calculation */
@@ -1251,7 +1026,6 @@ unset($__errorArgs, $__bag); ?>
             city_id: 'Kota',
             district_id: 'Kecamatan',
             village_id: 'Desa',
-            foto_ktp: 'Foto KTP',
             internet_package_id: 'Paket Internet',
             jenis_kontrak: 'Jenis Kontrak',
             contract_period_months: 'Masa Kontrak',
@@ -1267,7 +1041,7 @@ unset($__errorArgs, $__bag); ?>
         document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');
 
         // Update mobile stepper buttons UI
-        for (let i = 1; i <= 3; i++) {
+        for (let i = 1; i <= totalStepsCount; i++) {
             const mBtn = document.getElementById('mobile-step-btn-' + i);
             if (mBtn) {
                 if (i === currentActiveStep) {

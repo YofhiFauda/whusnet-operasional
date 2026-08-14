@@ -234,38 +234,10 @@
                     <div id="step-panel-2" class="step-panel space-y-6 hidden">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
                             <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tinjau foto KTP dari registrasi, lalu unggah Foto Rumah dan Foto ODP / Jalur terdekat.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unggah Foto Rumah dan Foto ODP / Jalur terdekat.</p>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                            <!-- Foto KTP (Read Only dari Registrasi) -->
-                            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
-                                @if($customer->foto_ktp)
-                                    <div>
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto KTP (Registrasi)</span>
-                                        <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <img class="max-h-36 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
-                                                 src="{{ asset('storage/' . $customer->foto_ktp) }}"
-                                                 alt="Preview Foto KTP"
-                                                 onclick="window.open('{{ asset('storage/' . $customer->foto_ktp) }}', '_blank')">
-                                        </div>
-                                    </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Terlampir di System
-                                    </span>
-                                @else
-                                    <div class="py-4">
-                                        <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center text-lg border border-slate-200 dark:border-slate-700">
-                                            <x-ui.icon name="id-card" class="w-4 h-4" />
-                                        </div>
-                                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 mt-3 uppercase">Foto KTP Kosong</span>
-                                    </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-950/40 py-1 px-2.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                        <x-ui.icon name="triangle-alert" class="w-3 h-3" /> Belum diunggah
-                                    </span>
-                                @endif
-                            </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                             <!-- Foto Rumah (Input Upload Baru) -->
                             <div class="border-2 border-dashed @error('house_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative group">

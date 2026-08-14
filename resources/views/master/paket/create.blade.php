@@ -41,9 +41,9 @@
                     <label for="category" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Kategori <span class="text-rose-500">*</span></label>
                     <select id="category" name="category" class="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-slate-800 {{ $errors->has('category') ? 'border-rose-400 bg-rose-50 dark:bg-rose-900/20' : 'border-slate-300 dark:border-slate-600' }}">
                         <option value="">-- Pilih Kategori --</option>
-                        @foreach(\App\Models\internetPackage::CATEGORIES as $value => $label)
+                        @foreach(\App\Models\InternetPackage::CATEGORIES as $value => $label)
                             <option value="{{ $value }}" {{ old('category') === $value ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
+                        @endforeach  
                     </select>
                     @error('category')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>

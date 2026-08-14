@@ -650,21 +650,15 @@ class TicketController extends Controller
         ];
     }
 
+    /**
+     * Panel pratinjau form tiket menampilkan perangkat sebagai SERIAL NUMBER —
+     * harus sama persis dengan yang dibekukan TicketService::deviceSummary()
+     * ke `tickets.customer_device`, kalau tidak preview dan tiket jadinya beda.
+     * Rationale & konsekuensi permission-nya ditulis di service itu.
+     */
     private function deviceSummary(?CustomerDevice $device): ?string
     {
-        if (! $device) {
-            return null;
-        }
-
-        // Cuma field non-sensitif — SN/MAC/PPPoE sengaja gak ikut, itu dikunci
-        // permission customers.detail.devices.view_sensitive di modul Pelanggan.
-        $parts = array_filter([
-            $device->brand,
-            $device->model,
-            $device->device_type,
-        ]);
-
-        return $parts ? implode(' ', $parts) : null;
+        return $device?->serial_number ?: null;
     }
 
     private function authorizeTicketScope(Ticket $ticket): void

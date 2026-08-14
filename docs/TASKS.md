@@ -42,6 +42,31 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-33 | **Pelanggan Gagal & Putus masih menumpang satu Blade** — view sendiri per halaman + trait `RendersCustomerList` (lihat detail di bawah) | Done — 2026-08-12 |
 | ADHOC-34 | **Tim FOP hilang dari papan begitu ganti hari** — papan menampilkan tim lampau yang masih punya task aktif (maks 30 hari) + pecahan tunggakan di tabel beban teknisi + hapus `fop:reset-cancelled-tasks` (lihat detail di bawah) | Done — 2026-08-13 |
 | ADHOC-35 | **Riwayat Perubahan Status di Detail Task tampil dobel** — dua lapis pencatat audit; duplikat murni dicabut + timeline disaring `TaskAuditTimeline` (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-36 | **Pencarian pada Halaman Collector Worklist** — pencarian rute kerja berdasarkan Nama Lengkap, CID, atau No. Invoice (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-37 | **Jejak uang putus sesudah setoran kolektor diverifikasi** — tak ada konsep Saldo Kas Admin, dan pembayaran manual di kantor tak pernah masuk setoran apa pun. Rancangan modul **Setoran Kas** (admin → owner/bank) + Card Saldo di Worksheet Admin. Analisa & rancangan lengkap: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md) | **Terbuka** — dianalisa 2026-08-14, **belum ada kode**, menunggu persetujuan mulai koding |
+
+#### ADHOC-37 — Saldo Kas Admin & Modul Setoran Kas (2026-08-14) — **BELUM DIKERJAKAN**
+
+**Pemicu:** pertanyaan user — setoran kolektor yang sukses seharusnya masuk ke Saldo Admin, dan perlu modul Setoran Kas dengan rincian sumber uang yang jelas untuk atasan/Owner.
+
+**Temuan:** `CollectorDepositService::verify()` hanya mengubah status + menulis `declared_amount`/`difference`/audit. Tak ada apa pun yang mencatat uang masuk kas kantor (`saldo_admin`/`admin_balance` → nol hasil di seluruh repo). Pembayaran manual di kantor (`collected_by = NULL`) juga tak pernah masuk setoran apa pun.
+
+**Keputusan user:** saldo per admin (per user) · transfer/QRIS dipisah sebagai rekap saja, bukan kewajiban setor · verifikator Owner + atasan · selisih fase 1 dicatat + catatan wajib, penutupan hanya lewat hapus buku Owner.
+
+**Rancangan:** tabel `cash_deposits` (`SETKAS-{tahun}-{4}`) + kolom `cash_deposit_id` di `collector_deposits` & `payments` (bukan tabel pivot), enum `CashDepositStatus`, `AdminCashBalanceService` (saldo TURUNAN, tanpa kolom saldo), `CashDepositService`, feature permission baru `cash_deposit`.
+
+**Data historis — titik nol (§7):** satu baris sentinel `SETKAS-0000-0000` berstatus `saldo_awal` (terminal keras, `declared_amount` 0, `depositor_id` NULL) menyerap seluruh sumber lama lewat `cash_deposit_id`. Cutoff berbasis tanggal **ditolak** — ia menambah aturan kedua yang harus diulang di tiap query kas dan pasti ada yang lupa; backfill retroaktif **ditolak** — mengarang riwayat setoran bank yang tak pernah terjadi.
+
+Analisa, rumus saldo, risiko & rencana test: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md).
+
+#### ADHOC-36 — Pencarian pada Halaman Collector Worklist (2026-08-13)
+
+**Pemicu:** Kebutuhan kolektor di lapangan untuk menyaring daftar rute kerja (worklist) berdasarkan Nama Lengkap, CID/Kode Pelanggan, atau Nomor Invoice.
+
+**Rincian Perubahan:**
+- **Controller `CollectorWorklistController`**: Menambahkan penanganan parameter query `search` dan menerapkan penyaringan `like` pada `invoice_number`, serta relasi customer (`full_name`, `cid`, `customer_code`). Meneruskan variabel `$search` ke view.
+- **View `collector-worklist.index`**: Menambahkan form pencarian modern yang responsif dan mendukung tema Light & Dark Mode. Menyediakan tombol reset saat pencarian aktif.
+- **Test `CollectorWorklistSearchTest`**: Membuat feature test lengkap untuk memastikan validasi pencarian berdasarkan nama, CID, nomor invoice, mempertahankan pagination query, serta menjaga data POP scope agar tidak bocor.
 
 #### ADHOC-35 — Riwayat Perubahan Status tampil dobel (2026-08-13)
 

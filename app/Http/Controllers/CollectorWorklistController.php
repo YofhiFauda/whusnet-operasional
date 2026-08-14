@@ -39,8 +39,22 @@ class CollectorWorklistController extends Controller
     {
         $collector = $request->user();
 
-        $invoices = $this->worklist
-            ->dueInvoices($collector, $collector)
+        $search = trim((string) $request->query('search', ''));
+
+        $query = $this->worklist->dueInvoices($collector, $collector);
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($cq) use ($search) {
+                        $cq->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('cid', 'like', "%{$search}%")
+                            ->orWhere('customer_code', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $invoices = $query
             ->paginate(150)
             ->withQueryString();
 
@@ -85,7 +99,7 @@ class CollectorWorklistController extends Controller
         return view('collector-worklist.index', compact(
             'invoices', 'canPay', 'canDeposit', 'canLogVisit', 'dueWindowDays',
             'balance', 'unsettledCount', 'outstandingShortfall', 'pendingDeposits',
-            'visitCandidates', 'todayVisits',
+            'visitCandidates', 'todayVisits', 'search',
         ));
     }
 }

@@ -264,9 +264,13 @@ class CollectorWorksheetController extends Controller
         $outstandingShortfall = $this->balance->outstandingShortfall($collector);
         $openShortfallDeposits = $this->balance->openShortfallDeposits($collector);
 
+        // `payments.customer` dimuat di sini supaya tab Setoran bisa menampilkan
+        // "pelanggan yang bayar" per setoran tanpa N+1 — sebelumnya cuma
+        // hitungan jumlah transaksi yang muncul, baris pelanggannya sendiri
+        // tak pernah ditarik.
         $deposits = CollectorDeposit::query()
             ->where('collector_id', $collector->id)
-            ->with(['payments', 'verifier', 'settlesDeposit'])
+            ->with(['payments.customer:id,full_name', 'verifier', 'settlesDeposit'])
             ->orderByDesc('submitted_at')
             ->orderByDesc('id')
             ->paginate(25, ['*'], 'deposit_page')

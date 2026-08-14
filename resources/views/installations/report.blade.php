@@ -248,33 +248,7 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Dokumen foto yang diunggah pada tahap registrasi &amp; survey.</p>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <!-- Foto KTP -->
-                            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
-                                @if($customer->foto_ktp)
-                                    <div>
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto KTP</span>
-                                        <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <img class="max-h-32 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
-                                                 src="{{ asset('storage/' . $customer->foto_ktp) }}"
-                                                 alt="Preview Foto KTP"
-                                                 onclick="window.open('{{ asset('storage/' . $customer->foto_ktp) }}', '_blank')">
-                                        </div>
-                                    </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Sudah diupload
-                                    </span>
-                                @else
-                                    <div class="flex flex-col justify-center py-4">
-                                        <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center text-base mb-2">
-                                            <x-ui.icon name="id-card" class="w-4 h-4" />
-                                        </div>
-                                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Foto KTP</span>
-                                        <span class="block text-[10px] text-amber-600 dark:text-amber-400 mt-1">Belum diupload saat registrasi</span>
-                                    </div>
-                                @endif
-                            </div>
-
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <!-- Foto Rumah -->
                             <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
                                 @if($customer->latestSurvey?->house_photo)

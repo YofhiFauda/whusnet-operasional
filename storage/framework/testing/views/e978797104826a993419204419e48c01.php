@@ -21,6 +21,13 @@
     <div class="flex flex-col gap-3.5 sm:flex-row sm:items-start sm:justify-between">
         <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                <a href="<?php echo e(route('tasks.own')); ?>"
+                   class="h-10 w-10 flex items-center justify-center rounded-md border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main transition-all active:scale-95 shadow-xs cursor-pointer"
+                   title="Kembali ke Task Saya">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </a>
                 
                 <?php
                     $statusStyle = match($task->status->value) {

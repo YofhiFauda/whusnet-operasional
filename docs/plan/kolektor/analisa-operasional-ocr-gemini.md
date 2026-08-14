@@ -1,3 +1,5 @@
+# PENDING
+
 # Analisa Operasional OCR Gemini — rate limit, cooldown, dan antisipasi galat
 
 **Status:** rancangan, **belum diimplementasikan**. Dicatat 2026-08-12 atas permintaan user.

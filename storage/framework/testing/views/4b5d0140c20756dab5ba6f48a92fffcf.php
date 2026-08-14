@@ -192,13 +192,7 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     Dokumen & Foto
                 </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <?php if($customer->foto_ktp): ?>
-                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto KTP</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_ktp)); ?>" alt="KTP" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_ktp)); ?>', 'Foto KTP')">
-                    </div>
-                    <?php endif; ?>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <?php if($customer->foto_rumah): ?>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
@@ -211,8 +205,8 @@
                         <img src="<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>', 'Foto Kontrak')">
                     </div>
                     <?php endif; ?>
-                    <?php if(!$customer->foto_ktp && !$customer->foto_rumah && !$customer->foto_kontrak): ?>
-                    <div class="col-span-3 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
+                    <?php if(!$customer->foto_rumah && !$customer->foto_kontrak): ?>
+                    <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
                         <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi.</p>
                     </div>

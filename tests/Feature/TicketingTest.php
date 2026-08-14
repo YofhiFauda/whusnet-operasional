@@ -789,6 +789,7 @@ class TicketingTest extends TestCase
             'device_type' => 'ONT',
             'brand' => 'Huawei',
             'model' => 'HG8245H',
+            'serial_number' => 'HWTC1A2B3C4D',
         ]);
 
         $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
@@ -800,9 +801,27 @@ class TicketingTest extends TestCase
         $this->assertSame('081234567890', $ticket->customer_phone);
         $this->assertSame('ODP-PLR-01', $ticket->customer_odp);
         $this->assertSame('Paket Gold 50Mbps', $ticket->customer_package);
-        $this->assertSame('Huawei HG8245H ONT', $ticket->customer_device);
+        // Perangkat di tiket dibekukan sebagai SERIAL NUMBER, bukan merek/tipe.
+        $this->assertSame('HWTC1A2B3C4D', $ticket->customer_device);
         $this->assertSame('-7.8681000', (string) $ticket->customer_latitude);
         $this->assertSame('111.4619000', (string) $ticket->customer_longitude);
+    }
+
+    public function test_ticket_device_snapshot_kosong_saat_perangkat_belum_punya_serial_number(): void
+    {
+        // Merek/tipe TIDAK lagi dipakai sebagai pengganti: perangkat di tiket
+        // dimaksudkan sebagai identitas unik alat. "Huawei HG8245H" yang muncul
+        // di ratusan tiket justru menyesatkan teknisi.
+        CustomerDevice::create([
+            'customer_id' => $this->customer->id,
+            'device_type' => 'ONT',
+            'brand' => 'Huawei',
+            'model' => 'HG8245H',
+        ]);
+
+        $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), $this->validPayload());
+
+        $this->assertNull(Ticket::first()->customer_device);
     }
 
     public function test_ticket_falls_back_to_customer_device_odp_when_denormalized_code_missing(): void

@@ -10,7 +10,7 @@
 <article class="bg-surface border border-border rounded-lg p-4 space-y-3" id="customer-card-{{ $customer->id }}" data-pop-id="{{ $customer->pop_id }}" data-customer-id="{{ $customer->id }}">
     <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-            <span class="font-mono text-xs font-semibold text-primary">{{ $customer->display_id }}</span>
+            @include('verifications.partials.queue-id', ['customer' => $customer, 'idClass' => 'font-mono text-xs font-semibold'])
             <h4 class="text-base font-semibold text-text-main truncate">{{ $customer->full_name }}</h4>
             <a href="tel:{{ $customer->primary_phone }}" class="font-mono text-xs text-text-muted hover:text-primary transition-colors">{{ $customer->primary_phone }}</a>
         </div>

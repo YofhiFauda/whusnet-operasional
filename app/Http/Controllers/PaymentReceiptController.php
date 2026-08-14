@@ -31,6 +31,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class PaymentReceiptController extends Controller
 {
+    /**
+     * Batas jumlah kwitansi per permintaan cetak.
+     *
+     * Bukan angka sembarang — dipilih di BAWAH `max_input_vars` PHP (default
+     * 1000), bukan sama dengannya. `payment_ids[]` sekarang dikirim lewat
+     * body POST (§414 fix, 2026-08-14); kalau batas ini dipasang di angka yang
+     * sama atau lebih besar dari `max_input_vars`, PHP sudah memotong
+     * kelebihannya SEBELUM Laravel sempat memvalidasi — error jelas yang mau
+     * ditegakkan di sini tidak akan pernah sempat muncul, dan kwitansi yang
+     * ke-generate diam-diam kurang dari yang seharusnya. 500 memberi jarak
+     * aman dari batas itu.
+     */
+    private const MAX_PRINT_BATCH = 500;
+
     public function __construct(private readonly PaymentReceiptService $receipts) {}
 
     /**
@@ -46,8 +60,10 @@ class PaymentReceiptController extends Controller
         abort_unless($collector->hasRole('kolektor'), 404, 'User ini bukan kolektor.');
 
         $validated = $request->validate([
-            'payment_ids' => 'required|array|min:1',
+            'payment_ids' => 'required|array|min:1|max:'.self::MAX_PRINT_BATCH,
             'payment_ids.*' => 'integer',
+        ], [
+            'payment_ids.max' => 'Setoran ini terlalu besar untuk dicetak sekaligus (maksimal '.self::MAX_PRINT_BATCH.' kwitansi per cetak). Cetak per batch.',
         ]);
 
         // Dua penyaring, dua alasan berbeda:

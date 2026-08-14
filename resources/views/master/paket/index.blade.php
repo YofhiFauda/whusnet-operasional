@@ -43,7 +43,7 @@
                 <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Kategori</label>
                 <select name="category" class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500">
                     <option value="">Semua Kategori</option>
-                    @foreach(\App\Models\internetPackage::CATEGORIES as $value => $label)
+                    @foreach(\App\Models\InternetPackage::CATEGORIES as $value => $label)
                         <option value="{{ $value }}" {{ $category === $value ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>

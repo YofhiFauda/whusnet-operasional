@@ -56,7 +56,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'odp_code',
     'olt_code',
     'vlan_id',
-    'foto_ktp',
     'foto_rumah',
     'foto_kontrak',
     'created_by',
@@ -69,7 +68,6 @@ class Customer extends Model
     protected string $auditModule = 'Data Pelanggan';
 
     protected array $auditHidden = [
-        'foto_ktp',
         'foto_rumah',
         'foto_kontrak',
     ];

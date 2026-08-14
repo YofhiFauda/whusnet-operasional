@@ -68,7 +68,7 @@ trait RendersCustomerList
 
         // Fase 5.6 — batasi kolom yang ditarik untuk daftar (G/row bloat).
         // `customers` punya ~45 kolom termasuk banyak yang TIDAK dipakai di list
-        // (teknis: ont_sn/ip_address/odp/olt/vlan; foto ktp/rumah/kontrak; npwp/
+        // (teknis: ont_sn/ip_address/odp/olt/vlan; foto rumah/kontrak; npwp/
         // company; lat/long; kontrak/diskon/pajak; sales/agent/referral). Select
         // hanya yang dirender + accessor (display_id butuh cid/customer_code/
         // distribution_id/status + relasi) + FK untuk eager load. FK WAJIB ikut,

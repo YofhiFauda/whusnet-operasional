@@ -187,7 +187,7 @@
                     };
                 @endphp
 
-                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+                <div x-data="{ expandedPayments: false, paymentsPage: 1 }" class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
                     {{-- Header --}}
                     <div class="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40">
                         <div>
@@ -258,6 +258,94 @@
                     @if ($deposit->status === \App\Enums\DepositStatus::DIHAPUS_BUKU)
                         <div class="px-5 pb-4 text-xs text-slate-500 dark:text-slate-400">
                             Alasan Hapus Buku: {{ $deposit->write_off_reason }}
+                        </div>
+                    @endif
+
+                    {{-- Pelanggan yang bayar + cetak kwitansi — cuma muncul setelah setoran
+                         DIPERIKSA kantor (`isVerified()`, bukan "harus terverifikasi": setoran
+                         yang berakhir Kurang Setor pun sudah selesai diperiksa, lihat §12
+                         docs/kolektor/business-logic.md). Sebelum itu uangnya masih di tas
+                         kolektor — kantor belum punya dasar menerbitkan bukti apa pun. Cetak di
+                         sini menumpang route & guard yang sama dengan tab Kwitansi
+                         (payment-receipts.print → applyUserScope + payment_status=valid +
+                         status setoran != menunggu_verifikasi), cuma di-scope ke SATU setoran. --}}
+                    @if ($deposit->status->isVerified() && auth()->user()->hasPermission('collector_worksheet.print'))
+                        <div class="px-5 pb-4 pt-1 border-t border-slate-100 dark:border-slate-700/80">
+                            <div class="flex items-center justify-between gap-2 pt-3">
+                                {{-- Accordion, bukan drawer: bisa dibuka bareng beberapa setoran
+                                     sekaligus buat cross check, dan konteks metrik di atas
+                                     (Tercatat Sistem/Selisih) tetap kelihatan tanpa pindah panel. --}}
+                                <button type="button" @click="expandedPayments = !expandedPayments"
+                                        class="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider hover:text-slate-800 dark:hover:text-slate-200">
+                                    <svg class="h-3.5 w-3.5 transition-transform" :class="expandedPayments ? 'rotate-90' : ''"
+                                         fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    <span>Pelanggan yang Bayar ({{ $deposit->payments->count() }})</span>
+                                </button>
+                                @if ($deposit->payments->isNotEmpty())
+                                    {{-- POST, bukan link GET: setoran harian bisa memuat puluhan/
+                                         ratusan pembayaran, dan payment_ids sebanyak itu di query
+                                         string GET melewati batas panjang URL server (414
+                                         Request-URI Too Large, kejadian nyata 2026-08-14). --}}
+                                    <form action="{{ route('payment-receipts.print', $collector->id) }}" method="POST" target="_blank" class="no-confirm">
+                                        @csrf
+                                        @foreach ($deposit->payments as $payment)
+                                            <input type="hidden" name="payment_ids[]" value="{{ $payment->id }}">
+                                        @endforeach
+                                        <button type="submit" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline whitespace-nowrap">
+                                            Cetak Kwitansi Massal
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                            @php
+                                // Dipotong 100/halaman DI SISI TAMPILAN saja — bukan query
+                                // ulang ke server. Datanya sudah dieager-load penuh lewat
+                                // `payments.customer` (CollectorWorksheetController::show()),
+                                // jadi pager di sini murni Alpine x-show, gak nambah query.
+                                // Form "Cetak Kwitansi Massal" di atas TETAP baca SELURUH
+                                // $deposit->payments, bukan cuma halaman yang lagi kelihatan —
+                                // paging tampilan tidak boleh diam-diam ikut memotong yang
+                                // dicetak.
+                                $paymentChunks = $deposit->payments->chunk(100)->values();
+                            @endphp
+                            <div x-show="expandedPayments" x-collapse class="space-y-1 mt-2">
+                                @forelse ($paymentChunks as $chunkIndex => $chunk)
+                                    <div x-show="paymentsPage === {{ $chunkIndex + 1 }}" class="space-y-1">
+                                        @foreach ($chunk as $payment)
+                                            <div class="flex items-center justify-between gap-2 text-xs py-1.5 px-3 rounded-lg bg-slate-50 dark:bg-slate-900/40">
+                                                <div class="min-w-0 truncate">
+                                                    <span class="font-medium text-slate-700 dark:text-slate-300">{{ $payment->customer->full_name ?? '-' }}</span>
+                                                    <span class="font-mono text-slate-400 dark:text-slate-500 ml-1">{{ $payment->payment_number }}</span>
+                                                </div>
+                                                <div class="flex items-center gap-3 shrink-0">
+                                                    <span class="font-mono font-semibold text-slate-700 dark:text-slate-300">Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}</span>
+                                                    <a href="{{ route('payment-receipts.print', ['collector' => $collector->id, 'payment_ids' => [$payment->id]]) }}"
+                                                       target="_blank"
+                                                       class="text-sky-600 dark:text-sky-400 hover:underline font-semibold">Kwitansi</a>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @empty
+                                    <p class="text-xs text-slate-400 dark:text-slate-500">Tidak ada pembayaran dalam setoran ini.</p>
+                                @endforelse
+
+                                @if ($paymentChunks->count() > 1)
+                                    <div class="flex items-center justify-between gap-2 pt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                        <button type="button" @click="paymentsPage = Math.max(1, paymentsPage - 1)"
+                                                :disabled="paymentsPage === 1"
+                                                :class="paymentsPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:text-slate-800 dark:hover:text-slate-200'"
+                                                class="font-semibold">&larr; Sebelumnya</button>
+                                        <span>Halaman <span x-text="paymentsPage"></span> dari {{ $paymentChunks->count() }} &bull; {{ $deposit->payments->count() }} pembayaran</span>
+                                        <button type="button" @click="paymentsPage = Math.min({{ $paymentChunks->count() }}, paymentsPage + 1)"
+                                                :disabled="paymentsPage === {{ $paymentChunks->count() }}"
+                                                :class="paymentsPage === {{ $paymentChunks->count() }} ? 'opacity-40 cursor-not-allowed' : 'hover:text-slate-800 dark:hover:text-slate-200'"
+                                                class="font-semibold">Berikutnya &rarr;</button>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endif
 
@@ -533,7 +621,12 @@
                                 teks — teksnya yang menyelamatkan berkas ketika QR-nya rusak.
                             </p>
 
-                            <form action="{{ route('payment-receipts.print', $collector->id) }}" method="GET" target="_blank" class="no-confirm"
+                            {{-- POST, bukan GET: daftar kandidat bisa sampai 200 baris (batas
+                                 query di controller), dan 200 payment_id di query string GET
+                                 gampang lewat batas panjang URL server (414 Request-URI Too
+                                 Large). Rute menerima GET & POST sekaligus, jadi cukup ganti
+                                 method di sini tanpa menyentuh controller. --}}
+                            <form action="{{ route('payment-receipts.print', $collector->id) }}" method="POST" target="_blank" class="no-confirm"
                                   x-data="{ 
                                       selectAll: false, 
                                       toggleAll() {
@@ -550,6 +643,7 @@
                                           return false;
                                       }
                                   ">
+                                @csrf
 
                                 @if ($receiptCandidates->isNotEmpty())
                                     <div class="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 mb-2.5 text-xs">
@@ -722,8 +816,9 @@
                                 @endif
 
                                 {{-- Lembar unggahan apa adanya — arsip bahwa kertasnya
-                                     benar tercetak & diserahkan. Satu lembar bisa memuat
-                                     8 kwitansi, jadi labelnya bukan "kwitansi". --}}
+                                     benar tercetak & diserahkan. Satu berkas unggahan bisa
+                                     memuat banyak kwitansi (satu payment_id per baris hasil
+                                     cocok), jadi labelnya bukan "kwitansi". --}}
                                 <a href="{{ route('payment-receipts.download', $receipt->id) }}" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline">Lembar asal</a>
                             </div>
                         </div>

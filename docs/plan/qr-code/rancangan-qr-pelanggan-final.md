@@ -6,6 +6,7 @@ Dokumen ini **tidak** mengubah kode apa pun — murni desain untuk direview sebe
 **Tanggal:** 2026-08-07
 **Revisi:** 2026-08-08 — semua temuan review (R1–R15) dan keputusan lanjutan telah diterapkan ke badan dokumen. Dokumen ini adalah versi bersih yang siap dijadikan acuan implementasi.
 **Revisi:** 2026-08-08 (lanjutan) — hasil review teknis kedua: checklist Fase 1/2 dilengkapi (registrasi rate limiter, seeder permission). Lihat §12 untuk detail.
+**Revisi:** 2026-08-14 — **§6.6 (Portal Pelanggan) dinaikkan dari rancangan awal jadi rancangan siap-implementasi.** Portal dikonfirmasi sebagai aplikasi terpisah demi keamanan. Yang berubah: pertanyaan menggantung §6.6.5 dijawab (**password terpisah**, bukan ganti PIN), jalur login tanpa scan QR ditambahkan, titik picu webhook dikoreksi ke `Invoice::recalculateFromPayments()`, pola **outbox** menggantikan job-langsung, whitelist kolom respons ditulis eksplisit, dan riwayat ticketing dapat pemetaan status sendiri (§6.6.8). Fase 5 di §10 dipecah jadi 5a/5b/5c.
 
 > **Catatan referensi baris:** nomor baris kode (`Pop.php:264`, `Customer.php:379`, dst) di seluruh dokumen ini adalah rujukan **saat dokumen ditulis**, bukan acuan permanen — kode berubah, nomor baris bergeser. Saat implementasi, berpatokan pada **nama metode/migration/perilaku** (`Pop::resolveDisplayId()`, `Customer::getDisplayIdAttribute()`, migration `scope_customer_code_unique_to_pop`), bukan nomor barisnya.
 
@@ -30,7 +31,8 @@ Dokumen ini **tidak** mengubah kode apa pun — murni desain untuk direview sebe
 |---|---|---|
 | Ticketing | Ya, langsung | Tidak menyentuh alur sync Ticket↔FopTask↔Task sama sekali |
 | Pembayaran + PIN | Ya, bertahap | QR = pintu ke halaman tagihan, bukan instrumen bayar. QRIS menyusul saat gateway diputuskan |
-| Login pelanggan | Mekanisme siap, portal ditunda | Faktor pembuktian = **PIN 6 digit** (§6.5). Yang belum ada tinggal portal & tabel sesi pelanggan |
+| Login pelanggan | Mekanisme siap, App ini menyediakan **API layer** — portal adalah aplikasi web terpisah (§6.6) | PIN 6 digit (§6.5) jadi kunci **klaim akun**; kredensial portal seterusnya = **password ≥10 karakter** (§6.6.5). Token API terpisah dari sesi staf. App ini tidak menunggu portal jadi untuk mulai Fase 5a |
+| Pembayaran (gateway/QRIS) | **DITAHAN** — tidak dimulai tanpa perintah resmi tertulis dari pemilik produk | Fase 2 (halaman tagihan manual: rekening+salin+WA admin) **tetap jalan**, ini bukan yang ditahan. Yang ditahan cuma integrasi vendor gateway (Fase 4) |
 | Absen teknisi | Ya, dengan syarat | QR sendirian **tidak** membuktikan kehadiran — butuh geolocation + cek penugasan + cek jadwal. **Dijadwalkan di Fase 3 (terakhir)** setelah fondasi dan tagihan terbukti stabil |
 
 **Tambahan PIN (2026-08-07):** PIN di-generate otomatis bersamaan QR sebagai faktor login pelanggan — layak, dengan satu koreksi penting: **PIN dicetak di kartu pelanggan terpisah, bukan di stiker ONT.** Rincian di §6.5.
@@ -48,7 +50,7 @@ Satu QR Code per pelanggan, dicetak sekali (stiker di ONT / kartu pelanggan), me
 | A | **Pembayaran** — buka halaman tagihan pelanggan | Pelanggan (publik) | Fase 2 |
 | B | **Ticketing** — buat tiket dengan pelanggan ter-prefill | Helpdesk/NOC/FOP (login) | Fase 1 |
 | C | **Absen teknisi** — mulai Task di lokasi pelanggan | Teknisi (login) | Fase 3 |
-| D | **Login pelanggan** ke portal masing-masing | Pelanggan | Fase 4 — **belum diimplementasi**, hanya disiapkan slot-nya |
+| D | **Login pelanggan** ke portal masing-masing (App ini = API layer; portal = aplikasi web terpisah, §6.6) | Pelanggan | Fase 5a (API layer) — Fase 5b (konsumsi API oleh portal) di luar scope repo ini |
 
 Prinsip: **satu QR, satu URL, routing ditentukan server berdasarkan siapa yang memindai.**
 Bukan 4 QR berbeda — pelanggan cuma punya satu stiker.
@@ -655,14 +657,18 @@ QR statis **bisa difoto** — teknisi bisa menyimpan foto QR semua pelanggannya 
 - Beberapa scan dari koordinat yang hampir identik untuk pelanggan berbeda-beda
 - Scan token yang sudah dicabut
 
-### 6.4 Fungsi D — Login pelanggan (disiapkan, belum diimplementasi)
+### 6.4 Fungsi D — Login pelanggan (Fase 5, App ini = penyedia API)
 
-Belum ada portal pelanggan. Yang disiapkan sekarang hanya agar nanti tidak perlu cetak ulang stiker:
+**Perubahan arsitektur (2026-08-08):** Portal pelanggan bukan halaman di dalam Whusnet Operasional — itu **aplikasi web terpisah** (domain & kemungkinan repo berbeda). App ini **tidak merender UI portal**; perannya adalah **penyedia API** yang dikonsumsi portal itu. Rincian kontrak API di §6.6.
+
+Yang sudah siap dari desain sebelumnya, tetap berlaku:
 - Field `purpose` di `qr_scan_logs` sudah menerima nilai `login`
 - Dispatcher sudah punya titik cabang untuk itu
-- Token sudah bersifat opaque & revocable — prasyarat untuk auth
+- Token QR sudah bersifat opaque & revocable — prasyarat untuk auth
 
-Saat diimplementasi, **scan QR tidak boleh langsung mengautentikasi** — QR berperan sebagai identifier, faktor pembuktiannya adalah PIN (§6.5).
+Prinsip tak berubah: **scan QR tidak boleh langsung mengautentikasi** — QR berperan sebagai identifier, faktor pembuktiannya adalah PIN (§6.5). Yang berubah cuma **apa yang terjadi setelah PIN benar**: dulu dirancang "bikin sesi Laravel", sekarang harus "terbitkan API token yang bisa dibawa portal lintas domain" — sesi cookie biasa tidak bisa dipakai lintas origin. Detail di §6.6.2.
+
+**Koreksi 2026-08-14:** scan QR bukan satu-satunya jalur masuk, dan PIN bukan kredensial portal yang permanen. Pelanggan juga bisa login langsung dengan **Login ID + password** tanpa memindai apa pun (§6.6.2), dan PIN dipersempit perannya jadi kunci **klaim akun sekali pakai** plus gerbang halaman tagihan publik (§6.6.5).
 
 ---
 
@@ -792,6 +798,264 @@ Login pertama dengan PIN cetak
 - **PIN tidak dipakai untuk absen teknisi** — menghindari melatih pelanggan menyebutkan PIN ke petugas lapangan (modus penipuan).
 - **PIN tidak menggantikan HMAC** — dua pertanyaan berbeda.
 - **PIN tidak dipakai staf internal** — staf login lewat `users` + RBAC.
+
+---
+
+## 6.6 Portal Pelanggan — Kontrak API (Fase 5)
+
+**Status:** rancangan siap-implementasi (revisi 2026-08-14). Bentuk terpisah **dikonfirmasi pemilik produk** — alasannya keamanan: aplikasi yang menghadap pelanggan tidak boleh punya kredensial DB operasional, tidak boleh membawa kode RBAC internal, dan kompromi total atas portal tidak boleh setara dengan kompromi atas data operasional.
+
+Konsekuensi yang diterima sadar: satu jalur integrasi baru untuk dirawat (API + webhook), latensi, dan kemungkinan data di portal tertinggal dari operasional. §6.6.6 dirancang khusus supaya ketertinggalan itu tidak bisa berubah jadi angka yang salah.
+
+### 6.6.1 Pembagian tanggung jawab
+
+```
+┌─────────────────────────────┐         ┌──────────────────────────────┐
+│  Whusnet Operasional (app   │  API    │  Portal Pelanggan             │
+│  ini) — backend & API       │◄───────►│  (aplikasi terpisah, domain   │
+│  provider                   │  HTTPS  │  berbeda — di luar repo ini)  │
+└─────────────────────────────┘         └──────────────────────────────┘
+```
+
+| | Whusnet Operasional | Portal Pelanggan |
+|---|---|---|
+| Peran | Sumber kebenaran + penerbit kredensial + penyedia API | Klien tipis |
+| Simpan data pelanggan? | Ya (sudah) | **Tidak** — selain cache tampilan berumur pendek |
+| Simpan kredensial pelanggan? | Ya (`customer_portal_accounts`) | **Tidak** — portal hanya memegang token hasil terbitan |
+| Akses DB operasional? | — | **Tidak pernah.** Tidak ada kredensial DB, tidak ada replika |
+| Boleh menulis data? | Ya | **Tidak** di fase ini — portal read-only kecuali ganti password |
+
+**Aturan keras: portal tidak boleh jadi tempat kedua yang menghitung apa pun.** Sisa tagihan, status lunas, dan status tiket datang sudah jadi dari API. Portal tidak menjumlahkan pembayaran sendiri, tidak menyimpan saldo. Alasan bukan estetika: repo ini punya `Money` dan `Invoice::recalculateFromPayments()` justru karena cabang lunas/sebagian pernah salah gara-gara galat pembulatan — menghidupkan perhitungan kedua di aplikasi lain mengembalikan kelas bug itu, kali ini tanpa test yang menjaganya.
+
+App ini **tidak** menunggu portal selesai dibangun untuk mulai — Fase 5a (API layer) bisa berjalan begitu Fase 1-2 kelar. Fase 5b (portal mengonsumsi API) proyek/tim terpisah, di luar scope dokumen & repo ini.
+
+### 6.6.2 Autentikasi lintas aplikasi
+
+**Dua jalur masuk, satu penerbit token.** Rancangan lama hanya punya jalur QR — itu lubang: pelanggan yang membuka portal dari laptop tidak sedang berdiri di depan ONT-nya, dan tidak semua orang bisa memindai QR ke kolom login.
+
+| Jalur | Dipakai kapan | Bukti | Hasil |
+|---|---|---|---|
+| **A — QR + PIN** | Pelanggan memindai stiker/kartu dari HP | Token QR + signature (§5) + PIN (§6.5.4) | Akses halaman tagihan; kalau akun portal sudah diklaim, sekaligus terbitkan token API |
+| **B — Login ID + password** | Pelanggan membuka portal langsung | `login_id` + password (§6.6.5) | Token API |
+
+**Login ID** = `{prefix_pop}-{customer_code}` (mis. `PNG-RQ000631`), dicetak di kartu pelanggan bersama PIN. Unik global **karena** `customer_code` cuma unik per POP (composite unique `(pop_id, customer_code)`) — prefix POP-lah yang melengkapinya. **Bukan `display_id`**: `display_id` berubah RQ↔CID seiring lifecycle (§2.1), jadi login ID yang memakainya akan basi begitu pelanggan aktif.
+
+```
+[1] Portal kirim kredensial pelanggan
+      POST /api/customer-portal/auth/login
+      header : X-Portal-Client: <client_id> + client secret
+      body   : { login_id, password }              ← jalur B
+             atau { qr_code, pin }                 ← jalur A
+[2] Operasional verifikasi → terbitkan
+      access_token   (15 menit, terikat customer_id)
+      refresh_token  (30 hari, rotating, sekali pakai)
+[3] Portal simpan token di sesi server-side-nya (HttpOnly), BUKAN localStorage
+[4] Tiap panggilan data: Authorization: Bearer <access_token>
+      → identitas pelanggan dibaca DARI TOKEN
+```
+
+> **Aturan tunggal yang menutup IDOR:** endpoint `/api/customer-portal/*` **tidak pernah menerima `customer_id`** atau identitas pelanggan lain dari klien. Pemilik data ditentukan sepenuhnya oleh token. Dengan begitu bug atau kompromi di portal tidak bisa berubah jadi kebocoran lintas pelanggan — portal secara struktural **tidak mampu** meminta data orang lain, bukan sekadar "tidak seharusnya".
+
+Dua lapis kredensial disengaja: **client secret portal** membuktikan "ini portal resmi" (dipakai untuk rate limit dan sebagai tuas darurat — cabut secret, seluruh portal mati seketika tanpa menyentuh QR/PIN); **token pelanggan** membuktikan "ini pelanggan X". Portal tidak pernah memegang kunci yang bisa membaca semua pelanggan.
+
+Penyimpanan token:
+- Tabel baru `customer_portal_tokens` — **bukan** numpang Sanctum `personal_access_tokens` polymorphic yang dipakai bareng `users` (staf). Alasan: konsisten dengan pola repo ini (tabel token eksplisit + audit trail, lihat `customer_qr_tokens`), dan menghindari campur baur kredensial staf dengan kredensial pelanggan di tabel yang sama. Sanctum juga belum terpasang di repo — menambah dependensi butuh persetujuan (§9).
+- Kolom kunci: `customer_id`, `token_hash` (hash, bukan plaintext — pola sama seperti `pin_hash`), `type` (`access`/`refresh`), `parent_id` (rantai rotasi refresh), `expires_at`, `revoked_at`, `last_used_at`, `ip_address` saat terbit.
+- **Refresh token sekali pakai.** Dipakai dua kali = indikasi token dicuri → seluruh rantai turunannya dicabut, pelanggan dipaksa login ulang. Tanpa aturan ini, pencuri token bisa memperpanjang akses selamanya tanpa terdeteksi.
+- Revoke manual ("Keluar dari semua perangkat") — `POST /api/customer-portal/auth/logout-all`.
+- Verifikasi tiap request: token ada, belum expired, belum revoked, `hash_equals` (bukan `===`, konsisten §3.3).
+- Pelanggan `terminated`/layanan dihentikan → akun portal dinonaktifkan dan token dicabut otomatis lewat `CustomerObserver`, ikut pola pencabutan token QR (§7).
+
+### 6.6.3 CORS & rate limit — permukaan baru yang tidak ada di app ini sekarang
+
+- `config/cors.php`: whitelist origin domain portal **secara spesifik** untuk grup route `/api/customer-portal/*` — bukan wildcard, bukan berlaku ke seluruh app (endpoint staf tetap same-origin only).
+- `RateLimiter::for('customer-portal-api', ...)` — baru, per token+IP (usul 120 req/menit). Pola sama seperti temuan `qr-public` sebelumnya: didaftarkan eksplisit di `AppServiceProvider::boot()`, jangan diasumsikan sudah ada.
+- `RateLimiter::for('customer-portal-auth', ...)` — **terpisah dan jauh lebih ketat**: 5 percobaan/15 menit per (IP + login_id) untuk `login`, `claim`, dan `me/password`. Limiter API tidak boleh dipakai untuk endpoint kredensial — 120 req/menit di endpoint login adalah brute-force yang diizinkan. Hitungan lockout tetap ikut disimpan di DB (`customer_portal_accounts.failed_attempts`/`locked_until`), bukan cache saja, dengan alasan yang sama seperti PIN (§6.5.4): cache di-flush, lockout hilang.
+
+### 6.6.4 Empat fitur portal → endpoint
+
+Semua endpoint di bawah prefix `/api/customer-portal`, semua butuh Bearer token pelanggan.
+
+| # | Fitur diminta | Endpoint (App ini) | Fase | Catatan |
+|---|---|---|---|---|
+| 1 | Ganti Password | `PUT /me/password` | 5a | **Password terpisah dari PIN** — keputusan 2026-08-14, lihat §6.6.5 |
+| 2 | API tagihan & pembayaran | `GET /me`, `GET /me/invoices`, `GET /me/invoices/{invoice_number}`, `GET /me/payments`, `GET /me/payments/{payment_number}/receipt` | 5b | Scoped keras ke pemilik token. **Bukan** lewat `EffectiveAccessService` (itu scope POP staf) |
+| 3 | Notifikasi setelah pembayaran selesai | Webhook keluar (App ini → Portal), bukan endpoint masuk | 5c | Lihat §6.6.6 — bukan push realtime lintas domain langsung |
+| 4 | Riwayat Ticketing | `GET /me/tickets`, `GET /me/tickets/{ticket_number}` | 5b | Read-only, field dipangkas & status dipetakan — lihat §6.6.7 |
+
+**Identifier publik = nomor dokumen (`INV-…`, `PAY-…`, `TKT-…`), bukan `id` autoincrement.** ID berurutan mengundang enumerasi dan membocorkan volume bisnis (berapa tagihan terbit sebulan) ke siapa pun yang punya satu akun portal.
+
+**Dokumen milik pelanggan lain → 404, bukan 403.** 403 mengonfirmasi bahwa nomor itu ada.
+
+#### Whitelist kolom respons
+
+Pakai Eloquent API Resource per entitas. **Jangan** kembalikan model apa adanya — `Payment` dan `Invoice` di repo ini penuh kolom migrasi legacy dan jejak kerja internal yang tidak ada urusannya dengan pelanggan.
+
+| Entitas | Boleh keluar | Haram keluar |
+|---|---|---|
+| Invoice | `invoice_number`, `invoice_type`, `billing_period`, `issue_date`, `due_date`, `total_amount`, `paid_amount`, `remaining_amount`, `invoice_status` + label | `id`, `pop_id`, `customer_service_id`, `internet_package_id`, `old_invoice_id`, `old_cost_id`, `old_request_id` |
+| Payment | `payment_number`, `payment_date`, `billing_period`, `amount`, `overpay_amount`, `payment_method`, `payment_status` + label, ada/tidaknya kwitansi | `id`, `received_by`, `collected_by`, `collector_deposit_id`, `payment_batch_id`, `idempotency_key`, `old_*`, `note`, `reject_reason`, `rejected_by`, `proof_file` |
+
+Dua yang perlu penjelasan:
+
+- **`reject_reason` haram keluar.** Isinya alasan internal ("setoran kolektor belum masuk", "bukti transfer tidak terbaca") — sebagian menyangkut petugas, bukan pelanggan, dan sebagian terbaca sebagai tuduhan. Pembayaran `ditolak` ditampilkan sebagai **"belum terverifikasi — hubungi admin"**, titik.
+- **`overpay_amount` justru boleh keluar.** Kelebihan bayar adalah uang pelanggan; menyembunyikannya menimbulkan sengketa yang lebih mahal daripada menampilkannya.
+
+**Nominal dikirim sebagai string desimal (`"150000.00"`), bukan float JSON.** Repo ini punya `Money` persis karena galat float mengubah *cabang* lunas/sebagian, bukan cuma tampilannya (lihat komentar di `Invoice::recalculateFromPayments()`). Serialisasi float di JSON menghidupkan ulang masalah itu di seberang.
+
+**Berkas kwitansi di-stream lewat controller yang memeriksa kepemilikan token**, dari disk `local` privat — pola sama dengan `TicketController::download()` untuk lampiran tiket. Jangan pernah mengirim URL storage langsung ke portal: URL yang bocor jadi akses permanen tanpa autentikasi.
+
+### 6.6.5 Kredensial portal — password terpisah, PIN jadi kunci aktivasi
+
+**Keputusan 2026-08-14 (dikonfirmasi pemilik produk).** Pertanyaan menggantung di revisi sebelumnya — "Ganti Password" itu ganti PIN atau password baru? — dijawab: **password terpisah.** PIN tidak dihapus; perannya dipersempit.
+
+| Kredensial | Dipakai di | Kenapa bentuknya begitu |
+|---|---|---|
+| **PIN 6 digit** (§6.5) | Gerbang halaman tagihan publik lewat scan QR, **dan klaim akun portal — sekali** | Diketik di HP sambil berdiri di depan ONT. Kredensial panjang bukan pilihan realistis di situ |
+| **Password ≥10 karakter** | Login portal seterusnya | Diketik di keyboard, sesi panjang, permukaan publik permanen. 10⁶ kombinasi terlalu tipis untuk itu — PIN bertahan hanya selama rate limiter tidak jebol, dan kredensial yang keamanannya bersandar penuh pada satu lapis pengaman adalah kredensial yang salah untuk pintu utama |
+
+Argumen tandingannya nyata dan tetap berlaku: dua kredensial = dua permukaan bocor dan dua jalur reset. Itu diterima dengan mata terbuka, dengan mitigasi bahwa **keduanya tidak setara** — PIN tidak bisa dipakai login portal setelah akun diklaim, jadi PIN yang bocor tidak membuka portal.
+
+**Alur klaim akun (sekali seumur akun):**
+
+```
+Portal → "Aktivasi Akun"
+   │  Login ID (PNG-RQ000631)  +  PIN 6 digit dari kartu
+   ▼
+POST /api/customer-portal/auth/claim
+   ├─ verifikasi PIN lewat jalur yang SAMA dengan §6.5.4
+   │  (termasuk lockout 5x/15 menit — tidak ada jalur bypass kedua)
+   ├─ tolak kalau akun sudah pernah diklaim  → arahkan ke "Lupa Password"
+   ├─ password baru: ≥10 karakter, cek daftar password umum,
+   │  tolak yang memuat login_id / nomor HP / tanggal lahir
+   ▼
+customer_portal_accounts dibuat  (password_hash bcrypt, claimed_at)
+pin_must_change = false, pin_first_used_at = now()   (§6.5.5b)
+```
+
+**Ganti password (fitur #1):**
+
+```
+PUT /api/customer-portal/me/password   { current_password, new_password }
+   ├─ current_password WAJIB — sesi yang dicuri tidak cukup untuk
+   │  mengambil alih akun secara permanen
+   ├─ new ≠ current, ≥10 karakter, aturan sama dengan klaim
+   ▼
+password_hash diganti, password_changed_at = now()
+SEMUA token pelanggan itu dicabut KECUALI sesi yang sedang dipakai
+notifikasi ke pelanggan ("password portal diganti") + audit log
+   → audit mencatat siapa/kapan/IP, TIDAK pernah passwordnya
+```
+
+**Lupa password:**
+- **Jalur A — mandiri via OTP** ke `primary_phone`, kalau gateway WA/SMS sudah ada.
+- **Jalur B — helpdesk**, verifikasi identitas minimal 2 faktor, sama ketatnya dengan reset PIN (§6.5.5). Yang diterbitkan helpdesk adalah **PIN klaim baru**, bukan password pilihan admin, dan pelanggan menetapkan sendiri passwordnya. Alasan: admin yang tahu password pelanggan membuat password berhenti berfungsi sebagai bukti identitas — persis argumen yang sudah dipakai untuk PIN di §6.5.2.
+
+**Tabel `customer_portal_accounts` terpisah dari `customers`.** Master pelanggan adalah pusat sistem yang dibaca hampir semua modul; menempelkan kolom kredensial ke sana berarti setiap query pelanggan berpotensi ikut menarik rahasia, dan setiap serialisasi `Customer` jadi calon kebocoran. Kolom: `customer_id` (unique), `login_id` (unique), `password_hash`, `password_changed_at`, `failed_attempts`, `locked_until`, `status`, `claimed_at`, `last_login_at`.
+
+### 6.6.6 Notifikasi pembayaran selesai → webhook, bukan push langsung
+
+**Keputusan desain (bukan yang Anda spesifikkan detailnya — default yang saya pilih):** App ini mengirim **webhook** ke portal, bukan push realtime lintas domain (WebSocket cross-origin butuh portal ikut pasang client Echo/Reverb terpisah — kompleksitas & permukaan serang tak sepadan untuk kebutuhan ini).
+
+Prinsipnya: **webhook memberi tahu, API yang jadi kebenaran.** Portal boleh langsung menampilkan isi webhook, tapi tidak menyimpannya sebagai sumber. Kalau webhook hilang, portal tetap benar begitu pelanggan membuka halaman — karena halamannya menarik dari `GET /me/invoices`.
+
+**Titik picu — satu, dan bukan `PaymentObserver`.** Revisi sebelumnya menaruhnya di `PaymentObserver`; itu terlalu awal dan tidak lengkap. `Invoice::recalculateFromPayments()` sudah menjadi satu-satunya tempat status & nominal invoice berubah karena pembayaran — semua jalur lewat sana (bayar satuan, bulk, batch kolektor, **dan penolakan/pembatalan pembayaran**), persis alasan `InvoiceStatusUpdated` ditaruh di situ. Menempel di observer pembayaran berarti melewatkan jalur reject dan mengirim event sebelum invoice-nya sendiri selesai dihitung.
+
+```
+DB::transaction:
+   Payment tersimpan   (guard PaymentObserver nominal > 0 tetap berlaku)
+   Invoice::recalculateFromPayments()
+        ├─ update paid_amount / remaining_amount / invoice_status
+        ├─ InvoiceStatusUpdated::dispatch()     ← realtime internal (SUDAH ADA)
+        └─ INSERT portal_outbox                 ← BARU
+COMMIT
+   ↓
+Worker Horizon (queue 'portal')
+   POST {portal}/webhooks/whusnet
+        X-Whusnet-Event-Id   : uuid   (idempotency)
+        X-Whusnet-Timestamp  : unix
+        X-Whusnet-Signature  : HMAC-SHA256("{timestamp}.{body}", PORTAL_WEBHOOK_SECRET)
+   ├─ 2xx   → delivered_at terisi
+   └─ gagal → attempts++, backoff 1m/5m/30m/2j/6j, maks 8x
+              → status=failed + alert (bukan hilang diam-diam)
+```
+
+**Kenapa outbox, bukan job langsung dari observer** — dua kegagalan yang tidak tertutup tanpanya:
+1. HTTP di dalam transaksi menggantungkan transaksi selama portal lambat, dan kalau transaksi rollback, portal terlanjur diberi tahu soal pembayaran yang tidak jadi.
+2. Job tanpa baris DB: kalau job hilang (Redis di-flush, worker mati sebelum ack), tidak ada jejak apa pun untuk dikirim ulang. Outbox memberi daftar yang bisa direkonsiliasi — "event mana yang belum sampai" jadi pertanyaan yang punya jawaban.
+
+Tabel `portal_outbox`: `event_id` (uuid), `event_type`, `customer_id`, `payload_json`, `attempts`, `next_attempt_at`, `delivered_at`, `last_error`, `status`. Baris `delivered` dipruning 90 hari, ikut kebijakan retensi `qr_scan_logs` (§4.2).
+
+**Payload berisi STATE penuh, bukan delta:**
+
+```json
+{
+  "event_id": "b1f2…",
+  "event": "invoice.updated",
+  "occurred_at": "2026-08-14T09:12:33+07:00",
+  "customer": { "login_id": "PNG-RQ000631" },
+  "invoice": {
+    "invoice_number": "INV-2026-08-000123",
+    "invoice_status": "lunas",
+    "total_amount": "150000.00",
+    "paid_amount": "150000.00",
+    "remaining_amount": "0.00"
+  }
+}
+```
+
+Tidak ada `"+150000"`. Event bisa hilang, dobel, atau datang tidak berurutan; dengan state penuh, event terakhir yang menang dan yang tertinggal tidak merusak apa pun. Dengan delta, satu event dobel langsung membuat angka di portal salah dan tidak ada yang tahu sampai pelanggan protes. `occurred_at` dipakai portal untuk membuang event basi yang datang terlambat.
+
+**Payload tidak memuat PII** — login ID, nomor dokumen, nominal. Tanpa nama, alamat, nomor HP, NIK. Webhook melintasi jaringan ke host yang bukan milik kita; tidak ada alasan menitipkan identitas pelanggan di situ.
+
+Keamanan webhook:
+
+| Ancaman | Mitigasi |
+|---|---|
+| Pihak ketiga memalsukan webhook ke portal | HMAC-SHA256 atas `timestamp.body`, diverifikasi `hash_equals()` |
+| Replay payload lama yang tercegat | Tolak `timestamp` di luar ±300 detik **dan** `event_id` yang sudah pernah diproses |
+| `PORTAL_WEBHOOK_SECRET` bocor | Terpisah dari `QR_HMAC_SECRET` dan `APP_KEY`; rotasi dengan jendela dua-secret seperti §7.5 |
+| Portal mati berjam-jam | Outbox menahan + retry; data tetap benar lewat API saat portal hidup lagi |
+
+**Yang tidak dikirim:** apa pun yang belum final. Pembayaran yang masih menunggu verifikasi tidak memicu event "lunas" — status di portal hanya boleh berubah setelah invoice benar-benar dihitung ulang.
+
+Fallback tetap ada: kalau webhook gagal terus, portal cukup **poll** `GET /me/invoices` / `GET /me/payments` — endpoint yang sama dipakai fitur #2, tidak perlu endpoint tambahan.
+
+### 6.6.7 Riwayat ticketing (fitur #4) — apa yang pelanggan boleh lihat
+
+Hanya tiket dengan `customer_id` = pemilik token.
+
+**Boleh keluar:** `ticket_number`, tanggal dibuat, kategori keluhan, `detail_keluhan`, status versi pelanggan (dipetakan, lihat bawah), `resolved_at`.
+
+**Haram keluar — dan ini bukan sekadar higienis:**
+
+| Field | Kenapa |
+|---|---|
+| `catatan_teknis` | Kolom ini **sengaja dipisah** dari `detail_keluhan` supaya catatan internal NOC tidak tercampur ke deskripsi keluhan. Mengirimkannya ke portal membatalkan pemisahan yang baru saja dikerjakan itu |
+| `handler` + `status` mentah | Pelanggan tidak perlu tahu tiketnya sedang di Helpdesk, NOC, atau FOP — itu struktur organisasi internal, dan bocornya mengundang pertanyaan "kenapa masih di NOC?" yang bukan urusan portal |
+| `fop_task_id`, nomor `TFOP-`/`TASK-` | Penomoran internal; tidak berarti apa pun bagi pelanggan |
+| `ticket_histories` mentah, nama user internal | Memuat siapa mengerjakan apa — data karyawan |
+| Lampiran tiket, koordinat, snapshot perangkat | Lampiran disimpan di disk privat justru karena bisa memuat data pelanggan/jaringan |
+
+**Pemetaan status ke bahasa pelanggan** — satu presenter, **jangan bikin enum baru** untuk ini:
+
+| Kondisi internal | Tampil di portal |
+|---|---|
+| `handler=helpdesk`, `status=open` | Diterima |
+| `handler=noc`, `status=open` | Sedang Ditangani |
+| `handler=fop`, FopTask/Task belum selesai | Sedang Ditangani |
+| `status=closed`, atau FopTask/Task selesai | Selesai |
+| `status=cancelled`, atau FopTask dibatalkan | Dibatalkan |
+
+> **Jebakan:** begitu `handler=FOP`, `TicketHandlingStatus` **berhenti bermakna** — status sesungguhnya turun dari FopTask/Task. Presenter yang cuma membaca `tickets.status` akan menampilkan "Sedang Ditangani" **selamanya** untuk tiket yang sebetulnya sudah lama selesai di lapangan. Ini persis jenis kesalahan yang diperingatkan di aturan sinkronisasi Ticket↔FopTask↔Task; baca `docs/ticketing/business-logic.md` sebelum menulis presenter-nya, dan pastikan ada test untuk tiket pasca-FOP yang sudah selesai.
+
+**Membuat tiket dari portal = di luar cakupan.** Jalur masuk tiket sekarang melewati Helpdesk yang menyaring dan mengisi snapshot pelanggan; tiket yang masuk langsung dari pelanggan mengubah alur Ticketing↔FopTask yang sudah jadi bagian paling rawan di repo. Kalau nanti dibuka, rancang terpisah — jangan diselundupkan ke fase portal.
+
+### 6.6.8 Yang TIDAK dikerjakan di repo ini
+
+- UI/halaman portal itu sendiri — itu Fase 5b, proyek terpisah.
+- Autentikasi staf (`users`) tidak tersentuh — dua sistem kredensial (staf vs pelanggan) tetap terpisah total, tidak ada percampuran tabel/token.
+- Payment gateway/QRIS — tetap **ditahan** (§10 Fase 4), notifikasi di §6.6.6 ini soal pembayaran manual yang sudah dicatat lewat `/payments`, bukan soal integrasi gateway.
 
 ---
 
@@ -949,6 +1213,14 @@ Tanpa menjawab ini, fitur yang secara teknis sempurna akan tersendat di logistik
 | Kebocoran lintas cabang | Semua endpoint terautentikasi lewat `EffectiveAccessService` |
 | Timing attack pada perbandingan signature | `hash_equals()`, bukan `===` |
 | Format URL basi karena perubahan domain/algoritma | Prefix versi `/q1/` di URL — migrasi ke `/q2/` tanpa cetak ulang stiker |
+| **Portal pelanggan dikompromikan seluruhnya** | Portal tidak punya kredensial DB, tidak punya kunci master. Kerugian terbatas pada pelanggan yang tokennya sedang aktif; client secret bisa dicabut → portal mati seketika tanpa menyentuh QR/PIN (§6.6.2) |
+| **IDOR lewat portal** (baca data pelanggan lain) | Endpoint `/me/*` tidak pernah menerima `customer_id`; pemilik data hanya dari token. Portal secara struktural tidak bisa meminta data orang lain (§6.6.2) |
+| **Enumerasi tagihan/pembayaran** | Identifier publik = nomor dokumen, bukan `id` autoincrement; dokumen milik orang lain → 404, bukan 403 (§6.6.4) |
+| **Brute-force password portal** | Password ≥10 karakter + limiter `customer-portal-auth` 5/15 menit per (IP + login_id) + lockout di DB (§6.6.3, §6.6.5) |
+| **Token portal dicuri** | Access token 15 menit; refresh token sekali pakai — pemakaian kedua mencabut seluruh rantai; ganti password mencabut semua sesi lain (§6.6.2, §6.6.5) |
+| **Webhook dipalsukan / di-replay** | HMAC-SHA256 atas `timestamp.body` + jendela ±300 detik + `event_id` idempoten (§6.6.6) |
+| **Data internal bocor lewat respons API** | Whitelist kolom per Resource; `catatan_teknis`, `reject_reason`, penulis internal, dan penomoran FOP/Task tidak pernah diserialisasi (§6.6.4, §6.6.7) |
+| **Angka di portal menyimpang dari operasional** | Portal tidak menghitung apa pun; webhook mengirim state penuh, bukan delta; API tetap jadi kebenaran (§6.6.1, §6.6.6) |
 
 **Catatan konfigurasi wajib:**
 - Halaman publik **harus HTTPS** — Geolocation API diblokir di HTTP.
@@ -1049,11 +1321,65 @@ Deliverable:
 
 ### Fase 4 — Payment Gateway
 
-Belum diputuskan vendornya. Tidak memblokir Fase 1–3. Saat nanti diimplementasi, yang berubah hanya isi tombol "Bayar" — token, signature, dan stiker tidak tersentuh.
+**DITAHAN (2026-08-08) — tidak dimulai tanpa perintah resmi tertulis dari pemilik produk.** Ini bukan "belum diputuskan vendornya" (status lama), tapi status tegas: jangan riset vendor, jangan spike integrasi, jangan sentuh kode di area ini sampai ada instruksi eksplisit.
 
-### Fase 5 — Login pelanggan
+Tidak memblokir Fase 1–3, dan tidak memblokir halaman tagihan manual di Fase 2 (rekening + salin + WhatsApp admin — itu **tetap jalan**, bukan bagian yang ditahan). Saat nanti diizinkan lanjut, yang berubah hanya isi tombol "Bayar" — token, signature, dan stiker tidak tersentuh.
 
-Blocked sampai portal pelanggan ada. PIN sudah siap dari Fase 2.
+### Fase 5 — Portal Pelanggan (API layer)
+
+**Tidak lagi blocked menunggu portal ada** — portal adalah aplikasi terpisah (§6.6), App ini cuma menyediakan API-nya. Bisa mulai begitu Fase 1-2 selesai. Tidak bergantung Fase 3 (absen) maupun Fase 4 (gateway, yang sedang ditahan): pelanggan tetap dapat nilai — lihat tagihan, riwayat bayar, status tiket — tanpa bisa bayar online.
+
+Dipecah tiga; tiap bagian bisa dihentikan tanpa menyisakan setengah jadi.
+
+#### 5a — Identitas & kredensial (prasyarat 5b/5c)
+
+- Migration `customer_portal_accounts` (§6.6.5) + `customer_portal_tokens` (§6.6.2)
+- `login_id` = `{prefix_pop}-{customer_code}`, dibangkitkan bersama token QR & ikut dicetak di kartu pelanggan (§7.6)
+- `CustomerPortalAuthService` — `claim()`, `login()`, `refresh()`, `changePassword()`, `revoke()`, `revokeAll()`
+- `config/cors.php` — whitelist domain portal untuk grup route `/api/customer-portal/*`, bukan wildcard
+- **Daftarkan `RateLimiter::for('customer-portal-api', ...)` dan `customer-portal-auth`** di `AppServiceProvider::boot()` — belum ada, sama seperti temuan `qr-public` sebelumnya
+- Hook `CustomerObserver`: pelanggan `terminated` → akun portal nonaktif + seluruh token dicabut
+
+**Test wajib:**
+- Klaim tanpa PIN benar ditolak; klaim kedua kali ditolak (arahkan ke lupa password)
+- Password <10 karakter / memuat `login_id` / memuat nomor HP ditolak
+- Ganti password tanpa `current_password` ditolak
+- Ganti password mencabut token lain, menyisakan sesi yang dipakai
+- 5 kali gagal → lockout bertahan **walau cache di-flush** (hitungan di DB)
+- Refresh token dipakai dua kali → seluruh rantai turunannya dicabut
+- Token expired/revoked → 401, bukan data kosong (jangan bocorkan status lewat body yang sama)
+- PIN yang sudah dipakai klaim tidak bisa dipakai login portal
+- CORS: origin di luar whitelist ditolak
+
+#### 5b — API baca (fitur #2 & #4)
+
+- Endpoint `GET /me`, `/me/invoices`, `/me/invoices/{invoice_number}`, `/me/payments`, `/me/payments/{payment_number}/receipt`, `/me/tickets`, `/me/tickets/{ticket_number}`
+- API Resource dengan whitelist kolom (§6.6.4) + presenter status tiket (§6.6.7)
+- Semua scoped ke pemilik token, **bukan** POP scope staf
+
+**Test wajib:**
+- Token pelanggan A tidak bisa membaca dokumen pelanggan B — uji juga dengan **menebak nomor dokumen yang valid milik orang lain**, bukan cuma ID acak
+- Dokumen milik orang lain → 404, bukan 403
+- Snapshot payload membuktikan kolom haram tidak ikut terserialisasi (`catatan_teknis`, `reject_reason`, `received_by`, `collected_by`, `old_*`, `proof_file`)
+- Nominal keluar sebagai string desimal, bukan float
+- Tiket `handler=fop` yang FopTask-nya sudah selesai tampil **"Selesai"**, bukan "Sedang Ditangani"
+- Kwitansi milik pelanggan lain → 404; berkas tidak pernah dilayani lewat URL storage langsung
+
+#### 5c — Push pasca-pembayaran (fitur #3)
+
+- Migration `portal_outbox` + penulisan baris di `Invoice::recalculateFromPayments()` (§6.6.6)
+- Job pengirim di queue `portal` (Horizon) + backoff + status `failed` + alert
+- `PORTAL_WEBHOOK_SECRET` di `.env`, terpisah dari `QR_HMAC_SECRET`
+- Halaman monitor pengiriman + kirim-ulang manual (permission `portal_outbox.view`, lewat matrix role)
+- Command pruning baris `delivered` >90 hari
+
+**Test wajib:**
+- Baris outbox tertulis di transaksi yang sama — transaksi rollback → tidak ada baris tertinggal
+- Pembayaran **ditolak/dibatalkan** juga memicu event dengan state terbaru (jalur yang terlewat kalau pemicunya ditaruh di `PaymentObserver`)
+- Portal balas 500 → retry sesuai backoff, lalu `failed` + alert, tidak hilang diam-diam
+- Event yang sama dikirim ulang tidak menggandakan apa pun (idempotency `event_id`)
+- Signature salah ditolak; `timestamp` lewat 5 menit ditolak
+- Payload tidak memuat nama/alamat/HP/NIK
 
 ---
 
@@ -1069,7 +1395,12 @@ Blocked sampai portal pelanggan ada. PIN sudah siap dari Fase 2.
    WHERE customer_code IS NULL OR customer_code = '' OR pop_id IS NULL;
    ```
 6. **Program logistik cetak fisik** — printer, media, stok, prosedur (lihat §7.6). Harus direncanakan sebelum Fase 2, bukan setelah.
-7. **Payment gateway** — tidak memblokir Fase 1–3, dibahas terpisah.
+7. **Payment gateway** — **ditahan eksplisit**, tidak dimulai tanpa perintah resmi dari pemilik produk (§10 Fase 4). Tidak memblokir Fase 1-3 & Fase 5.
+8. **Domain portal.** Payload QR sudah memuat `portal.whusnet.id` (§3.1) dan itu **harus tetap menunjuk ke dispatcher `/q1/` di Operasional**, yang lalu me-redirect ke portal. Kalau stiker menunjuk langsung ke host portal, ganti vendor/host portal = cetak ulang seluruh stiker fisik. Perlu keputusan: subdomain mana yang dipakai portal (mis. `akun.whusnet.id`), dan siapa yang memegang DNS-nya.
+9. **Siapa membangun portal** — tim yang sama atau vendor luar? Menentukan seberapa formal kontrak API perlu ditulis (spesifikasi OpenAPI + environment uji, atau cukup dokumen ini).
+10. **Hosting portal.** "Terpisah demi keamanan" kehilangan maknanya kalau portal berjalan di server dan user sistem yang sama dengan Operasional. Perlu ditegaskan: host/VPS terpisah, atau minimal user & jaringan terisolasi, dan portal **tidak** diberi kredensial DB operasional dalam bentuk apa pun.
+11. **Gateway WA/SMS untuk lupa password** — tanpa itu, reset hanya lewat helpdesk (§6.6.5 Jalur B), yang berarti beban helpdesk naik seiring jumlah pengguna portal.
+12. **Kwitansi: cukup dilihat, atau boleh diunduh PDF?** Memengaruhi beban penyimpanan dan jalur streaming di `GET /me/payments/{payment_number}/receipt`.
 
 ---
 
@@ -1085,7 +1416,12 @@ Blocked sampai portal pelanggan ada. PIN sudah siap dari Fase 2.
 | 4 | Stiker/ECC — print test fisik | **2** (cetak kartu PIN) | Cetak QR **tanpa PIN** di Fase 1 tetap bisa jalan untuk validasi digital sebelum print test fisik selesai |
 | 5 | Legacy `customer_code`/`pop_id` kosong | **Tidak mengunci fase mana pun** | Asal `issue()` menolak dengan jelas — lihat §11.2 |
 | 6 | Logistik cetak fisik | **2** | Sudah dinyatakan eksplisit "wajib sebelum Fase 2" di §7.6 |
-| 7 | Vendor payment gateway | **4** saja | Non-blocking terhadap Fase 1–3 sejak awal |
+| 7 | Vendor payment gateway | **4** saja, dan **4 sekarang ditahan eksplisit** — bukan cuma non-blocking, tapi dilarang mulai tanpa perintah resmi | Non-blocking terhadap Fase 1–3 & Fase 5 |
+| 8 | Domain portal | **5a** (sebagian) & **Fase 2** (cetak) | Yang mengunci cetak stiker cuma keputusan "stiker tetap menunjuk `/q1/` di Operasional" — itu sudah diputuskan. Subdomain portal boleh menyusul |
+| 9 | Siapa membangun portal | **Tidak mengunci 5a–5c** | API dibangun berdasarkan kontrak di §6.6 terlepas dari siapa konsumennya |
+| 10 | Hosting portal terpisah | **5b** (sebelum data asli mengalir keluar) | Boleh dibangun & diuji dengan data uji sebelum keputusan hosting final |
+| 11 | Gateway WA/SMS | **Tidak mengunci** | Jalur helpdesk (§6.6.5 B) sudah cukup untuk gelombang pertama |
+| 12 | Kwitansi unduh/lihat | **5b** | Menentukan bentuk endpoint kwitansi; kecil, tapi jangan diputuskan sambil koding |
 
 **Konsekuensi:** Fase 1 (Fondasi + Ticketing prefill) tidak terkunci satu pun dari 7 poin ini — sprint bisa mulai dari situ sekarang. Q1/Q3/Q6 (konfirmasi FOP/Operasional) dan Q2/Q5 (jalankan query) berjalan paralel, bukan prasyarat sebelum baris kode pertama.
 
@@ -1156,6 +1492,29 @@ Ditolak di titik penerbitan, bukan diam-diam menghasilkan token dengan bahan HMA
 | 2026-08-08 | **Nomor baris di dokumen ini diperlakukan sebagai rujukan saat-ditulis, bukan acuan permanen** | Kode berubah di luar siklus revisi dokumen (`Customer.php` sudah bergeser ~13 baris sejak draf ini ditulis); implementasi berpatokan ke nama metode/migration, bukan baris |
 | 2026-08-08 | **7 poin §11 dipetakan ke fase yang dikunci masing-masing (§11.1)** — Fase 1 tidak terkunci satu pun | Business/operational open questions tidak boleh menahan seluruh sprint kalau yang dibutuhkan cuma sebagian fase |
 | 2026-08-08 | **`issue()` menolak eksplisit pelanggan `customer_code`/`pop_id` kosong (§11.2)** | Sebelumnya cuma tersirat dari "bahan wajib HMAC" — kegagalan proses harus terlihat, bukan diam-diam menghasilkan token dari bahan tidak lengkap |
+| 2026-08-08 | **Fase 4 (Payment Gateway) DITAHAN eksplisit** — tidak dimulai tanpa perintah resmi tertulis dari pemilik produk | Instruksi langsung. Fase 2 tagihan manual (rekening+salin+WA) TIDAK ikut ditahan — cuma integrasi vendor gateway |
+| 2026-08-08 | **Portal pelanggan = aplikasi web terpisah, App ini cuma penyedia API (§6.6)** | Instruksi langsung. Mengubah Fase 5 dari "tunggu portal ada" jadi "bangun API layer, tidak menunggu" |
+| 2026-08-08 | **Token API portal pakai tabel `customer_portal_tokens` sendiri, bukan Sanctum default polymorphic bareng `users`** | Konsisten pola repo (tabel token eksplisit + audit trail); menghindari campur kredensial staf & pelanggan di tabel sama |
+| 2026-08-08 | ~~**"Ganti Password" direkonsiliasi jadi "Ganti PIN" — flagged, belum dikonfirmasi**~~ **DIBATALKAN 2026-08-14** | Asumsi ditolak pemilik produk: yang dimaksud memang password terpisah. Lihat baris 2026-08-14 di bawah |
+| 2026-08-08 | **Notifikasi pembayaran ke portal via webhook + retry idempoten, bukan push realtime lintas domain** | WebSocket cross-origin butuh portal pasang client sendiri — kompleksitas tak sepadan; webhook cukup dan dipakai pola retry yang sudah didukung queue+Horizon repo ini |
+| 2026-08-14 | **Portal pelanggan = aplikasi terpisah, dikonfirmasi** | Aplikasi yang menghadap publik tidak boleh memegang kredensial DB operasional maupun kode RBAC internal; kompromi portal tidak boleh setara kompromi data operasional |
+| 2026-08-14 | **Portal tidak menghitung apa pun — sisa/lunas datang jadi dari API** | Perhitungan kedua di aplikasi lain menghidupkan ulang kelas bug yang melahirkan `Money` & `recalculateFromPayments()`, kali ini tanpa test yang menjaganya |
+| 2026-08-14 | **"Ganti Password" = password terpisah, bukan ganti PIN** | Portal adalah pintu publik dengan sesi panjang dan input keyboard; 10⁶ kombinasi hanya aman selama rate limiter tidak jebol. PIN dipersempit jadi gerbang QR + kunci klaim sekali pakai |
+| 2026-08-14 | **Login ID = `{prefix_pop}-{customer_code}`** | Unik global karena `customer_code` cuma unik per POP; `display_id` ditolak karena berubah RQ↔CID (§2.1) |
+| 2026-08-14 | **Jalur login kedua (login ID + password) ditambahkan** | Rancangan lama hanya punya jalur QR — pelanggan yang membuka portal dari laptop tidak sedang berdiri di depan ONT-nya |
+| 2026-08-14 | **Endpoint `/me/*` tidak pernah menerima `customer_id`** | Membuat portal secara struktural tidak mampu meminta data pelanggan lain — bukan sekadar "tidak seharusnya" |
+| 2026-08-14 | **Identifier publik = nomor dokumen, bukan `id`** | ID berurutan mengundang enumerasi dan membocorkan volume bisnis |
+| 2026-08-14 | **Access token 15 menit + refresh token rotating sekali pakai** | Pemakaian refresh kedua kali = sinyal token dicuri; tanpa rotasi, pencuri memperpanjang akses selamanya tanpa terdeteksi |
+| 2026-08-14 | **Titik picu webhook dikoreksi: `Invoice::recalculateFromPayments()`, bukan `PaymentObserver`** | Observer pembayaran melewatkan jalur reject/pembatalan dan memicu sebelum invoice selesai dihitung. `recalculateFromPayments()` sudah jadi satu titik untuk semua jalur bayar |
+| 2026-08-14 | **Outbox menggantikan job-langsung untuk webhook** | HTTP dalam transaksi = notifikasi terkirim untuk pembayaran yang bisa rollback; job tanpa baris DB = kegagalan tidak bisa direkonsiliasi atau dikirim ulang |
+| 2026-08-14 | **Payload webhook = state penuh, bukan delta** | Event hilang/dobel/tidak berurutan tidak boleh membuat angka di portal salah diam-diam |
+| 2026-08-14 | **Payload webhook tanpa PII** | Melintasi jaringan ke host yang bukan milik kita; tidak ada alasan menitipkan identitas pelanggan di sana |
+| 2026-08-14 | **`reject_reason` tidak diekspos; ditampilkan "belum terverifikasi"** | Alasan penolakan menyangkut proses internal/petugas dan terbaca sebagai tuduhan ke pelanggan |
+| 2026-08-14 | **`catatan_teknis` tidak diekspos ke portal** | Kolom itu baru saja sengaja dipisah dari `detail_keluhan` supaya catatan internal NOC tidak tercampur; mengekspornya membatalkan pemisahan itu |
+| 2026-08-14 | **Status tiket dipetakan ke 4 label pelanggan, dibaca dari sisi FOP untuk tiket pasca-eskalasi** | `TicketHandlingStatus` berhenti bermakna begitu `handler=FOP`; presenter naif akan menampilkan "Sedang Ditangani" selamanya |
+| 2026-08-14 | **Membuat tiket dari portal di luar cakupan Fase 5** | Jalur masuk tiket melewati penyaringan Helpdesk; membukanya mengubah alur tersinkron paling rawan di repo |
+| 2026-08-14 | **Nominal dikirim sebagai string desimal di JSON** | Float mengubah cabang lunas/sebagian, bukan cuma tampilan |
+| 2026-08-14 | **Stiker tetap menunjuk `/q1/` di Operasional, bukan langsung ke host portal** | Ganti host/vendor portal tidak boleh berarti cetak ulang seluruh stiker fisik |
 
 ### Alternatif yang dipertimbangkan dan ditolak
 
@@ -1186,6 +1545,17 @@ Ditolak di titik penerbitan, bukan diam-diam menghasilkan token dengan bahan HMA
 | Dashboard `pin_must_change > 30 hari` | Mayoritas pelanggan tidak pernah login → ribuan baris noise permanen |
 | Fallback ketik-manual signature di stiker | 36 karakter di HP standing — tidak ada yang akan pakai; dead code yang memberi false sense of safety |
 | Absen di Fase 2 (lebih awal) | Fondasi belum terbukti; risiko tertinggi seharusnya dibangun di atas yang sudah stabil |
+| Portal sebagai route group di dalam Operasional | Aplikasi publik jadi satu proses dengan aplikasi internal; satu RCE di portal = akses penuh ke DB operasional |
+| Portal punya koneksi/replika DB operasional | Kredensial DB di aplikasi publik membatalkan seluruh alasan memisahkannya |
+| Portal memegang satu kunci master untuk membaca semua pelanggan | Kompromi portal langsung jadi kebocoran seluruh basis pelanggan; token per-pelanggan membatasi kerugian pada sesi yang aktif |
+| PIN 6 digit sebagai kredensial portal permanen | Pintu publik dengan sesi panjang; keamanannya bersandar penuh pada rate limiter |
+| Password diset admin saat pelanggan lupa | Admin yang tahu password membuat password berhenti jadi bukti identitas — argumen yang sama sudah dipakai untuk PIN |
+| Push realtime (Echo/Reverb) lintas domain ke portal | Portal harus memasang client broadcasting sendiri; kompleksitas & permukaan serang tak sepadan untuk notifikasi pembayaran |
+| Webhook kirim delta (`+150000`) | Satu event dobel/hilang langsung membuat angka di portal salah, tanpa cara mendeteksinya |
+| Portal menyimpan saldo & status hasil hitungan sendiri | Sumber kebenaran kedua yang pasti menyimpang; sengketa tagihan jadi tidak bisa diselesaikan |
+| `id` autoincrement sebagai identifier di API portal | Enumerasi + membocorkan volume bisnis |
+| 403 untuk dokumen milik pelanggan lain | 403 mengonfirmasi nomor dokumen itu ada |
+| Endpoint portal menerima `customer_id` dari klien | Menyerahkan penegakan kepemilikan ke aplikasi yang justru paling mungkin dikompromikan |
 
 ### Koreksi selama perancangan
 

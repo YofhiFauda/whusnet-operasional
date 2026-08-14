@@ -265,8 +265,6 @@ class CustomerController extends Controller
         // customers. Sumber kebenaran service_status = customer_services.
         $serviceStatus = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
 
-        $fotoKtp = $request->file('foto_ktp');
-        unset($validated['foto_ktp']);
         $fotoRumah = $request->file('foto_rumah');
         unset($validated['foto_rumah']);
         $fotoKontrak = $request->file('foto_kontrak');
@@ -277,7 +275,7 @@ class CustomerController extends Controller
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoKtp, $fotoRumah, $fotoKontrak) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak) {
             // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
             // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
             // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
@@ -288,9 +286,6 @@ class CustomerController extends Controller
             $customer = Customer::create($validated);
 
             $updates = [];
-            if ($fotoKtp instanceof UploadedFile) {
-                $updates['foto_ktp'] = FileUploadService::uploadCustomerRegistrationDoc($fotoKtp, $customer, 'ktp');
-            }
             if ($fotoRumah instanceof UploadedFile) {
                 $updates['foto_rumah'] = FileUploadService::uploadSurveyPhoto($fotoRumah, $customer, 'house');
             }
@@ -327,7 +322,6 @@ class CustomerController extends Controller
                 'latitude' => $validated['latitude'] ?? null,
                 'longitude' => $validated['longitude'] ?? null,
                 'house_photo' => $validated['foto_rumah'] ?? null,
-                'ktp_photo' => $validated['foto_ktp'] ?? null,
                 'contract_photo' => $validated['foto_kontrak'] ?? null,
             ]);
 
@@ -548,19 +542,13 @@ class CustomerController extends Controller
 
         $originalFiles = Customer::query()
             ->whereKey($customer->getKey())
-            ->first(['foto_ktp', 'foto_rumah', 'foto_kontrak'])
-            ?->only(['foto_ktp', 'foto_rumah', 'foto_kontrak']) ?? [
-                'foto_ktp' => null,
+            ->first(['foto_rumah', 'foto_kontrak'])
+            ?->only(['foto_rumah', 'foto_kontrak']) ?? [
                 'foto_rumah' => null,
                 'foto_kontrak' => null,
             ];
 
         // Handle deletions
-        if ($request->input('delete_foto_ktp') == '1') {
-            $validated['foto_ktp'] = null;
-        } else {
-            $validated['foto_ktp'] = $customer->foto_ktp;
-        }
         if ($request->input('delete_foto_rumah') == '1') {
             $validated['foto_rumah'] = null;
         } else {
@@ -573,9 +561,6 @@ class CustomerController extends Controller
         }
 
         // Handle new uploads
-        if ($request->hasFile('foto_ktp')) {
-            $validated['foto_ktp'] = FileUploadService::uploadCustomerRegistrationDoc($request->file('foto_ktp'), $customer, 'ktp');
-        }
         if ($request->hasFile('foto_rumah')) {
             $validated['foto_rumah'] = FileUploadService::uploadSurveyPhoto($request->file('foto_rumah'), $customer, 'house');
         }
@@ -642,7 +627,6 @@ class CustomerController extends Controller
                 'latitude' => $validated['latitude'] ?? null,
                 'longitude' => $validated['longitude'] ?? null,
                 'house_photo' => $validated['foto_rumah'] ?? null,
-                'ktp_photo' => $validated['foto_ktp'] ?? null,
                 'contract_photo' => $validated['foto_kontrak'] ?? null,
             ]);
 
@@ -1107,18 +1091,18 @@ class CustomerController extends Controller
         $lng = $address?->longitude;
         $mapsUrl = ($lat && $lng) ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}" : null;
 
-        // Berkas KTP & Foto Rumah untuk kartu pratinjau di tab Profil & Berkas.
+        // Berkas Foto Rumah untuk kartu pratinjau di tab Profil & Berkas.
         // Yang dikirim cuma dokumen TERBARU per tipe: kartu di modal hanya ruang
         // untuk satu pratinjau, riwayat lengkapnya tetap di halaman Detail.
         $latestDocuments = $customer->documents()
-            ->whereIn('document_type', [DocumentType::KTP->value, DocumentType::RUMAH->value])
+            ->whereIn('document_type', [DocumentType::RUMAH->value])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get()
             ->groupBy('document_type')
             ->map(fn ($docs) => $docs->first());
 
-        $documentPayload = collect([DocumentType::KTP->value, DocumentType::RUMAH->value])
+        $documentPayload = collect([DocumentType::RUMAH->value])
             ->mapWithKeys(function (string $type) use ($latestDocuments) {
                 $doc = $latestDocuments->get($type);
 
@@ -1214,8 +1198,8 @@ class CustomerController extends Controller
     {
         $sheets = [
             'customers' => [
-                'headers' => ['old_customer_id', 'old_request_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'ktp_photo', 'profile_photo', 'pop_code', 'pop_name', 'distribution_code', 'latitude', 'longitude', 'foto_ktp', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
-                'data' => [['PE000001', 'RQ000001', 'C00RQ000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'ktp.jpg', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_ktp.jpg', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']],
+                'headers' => ['old_customer_id', 'old_request_id', 'customer_code', 'full_name', 'identity_number', 'gender', 'phone', 'alternative_phone', 'email', 'customer_type', 'company_name', 'npwp', 'full_address', 'old_region_id', 'city', 'district', 'village', 'old_branch_id', 'old_account_status', 'registration_date', 'profile_photo', 'pop_code', 'pop_name', 'distribution_code', 'latitude', 'longitude', 'foto_rumah', 'foto_kontrak', 'sales_code', 'agent_code', 'referral_customer_code'],
+                'data' => [['PE000001', 'RQ000001', 'C00RQ000001', 'Budi Santoso', '3502180101900001', 'Laki-laki', '081234567890', '', 'budi@example.com', 'rumah', '', '', 'Jl. Merdeka No. 10', 'WL0001', 'Ponorogo', 'Sukorejo', 'Sukorejo', 'CB001', 'ACTIVE', '2025-05-06', 'foto.jpg', 'SMN', 'POP Sukorejo', '-7.8712', '111.4623', 'foto_rumah.jpg', 'foto_kontrak.jpg', 'SLS001', '', '']],
             ],
             'packages' => [
                 'headers' => ['old_package_id', 'name', 'package_type', 'category', 'monthly_price', 'upload_speed', 'download_speed', 'upload_limit', 'download_limit', 'olt_profile', 'ppp_profile', 'bonus', 'description'],
@@ -2181,7 +2165,6 @@ class CustomerController extends Controller
                         'distribution_id' => $distribution?->id,
                         'status' => 'registered', // Default, updated by service activation or mapping
                         'created_by' => auth()->id(),
-                        'foto_ktp' => $row['foto_ktp'] ?? null,
                         'foto_rumah' => $row['foto_rumah'] ?? null,
                         'foto_kontrak' => $row['foto_kontrak'] ?? null,
                         'sales_code' => $row['sales_code'] ?? null,
@@ -2208,7 +2191,6 @@ class CustomerController extends Controller
                         'village_id' => $row['village_id'] ?? null,
                         'latitude' => $row['latitude'] ?? null,
                         'longitude' => $row['longitude'] ?? null,
-                        'ktp_photo' => $row['foto_ktp'] ?? $row['ktp_photo'] ?? null,
                         'house_photo' => $row['foto_rumah'] ?? $row['house_photo'] ?? null,
                         'contract_photo' => $row['foto_kontrak'] ?? $row['contract_photo'] ?? null,
                     ]);

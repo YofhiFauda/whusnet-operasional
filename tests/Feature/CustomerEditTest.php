@@ -167,7 +167,6 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
             'foto_rumah' => UploadedFile::fake()->image('rumah.jpg'),
         ];
 
@@ -177,7 +176,6 @@ class CustomerEditTest extends TestCase
         $response->assertSessionHas('success');
 
         $customer->refresh();
-        $this->assertNotNull($customer->foto_ktp);
         $this->assertNotNull($customer->foto_rumah);
     }
 
@@ -197,8 +195,8 @@ class CustomerEditTest extends TestCase
             'status' => 'active',
         ]);
 
-        $oldKtpPath = 'documents/old_ktp.jpg';
-        Storage::disk('public')->put($oldKtpPath, 'old ktp');
+        $oldRumahPath = 'documents/old_rumah.jpg';
+        Storage::disk('public')->put($oldRumahPath, 'old rumah');
 
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
@@ -207,7 +205,7 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => $oldKtpPath,
+            'foto_rumah' => $oldRumahPath,
         ]);
 
         $replaceData = [
@@ -216,7 +214,7 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => UploadedFile::fake()->image('new_ktp_2.jpg'),
+            'foto_rumah' => UploadedFile::fake()->image('new_rumah_2.jpg'),
         ];
 
         $response = $this->put("/customers/{$customer->id}", $replaceData);
@@ -224,7 +222,7 @@ class CustomerEditTest extends TestCase
         $response->assertRedirect("/customers/{$customer->id}");
         $customer->refresh();
 
-        $this->assertNotSame($oldKtpPath, $customer->foto_ktp);
+        $this->assertNotSame($oldRumahPath, $customer->foto_rumah);
     }
 
     public function test_customer_edit_can_delete_existing_file_using_delete_flags(): void
@@ -243,8 +241,8 @@ class CustomerEditTest extends TestCase
             'status' => 'active',
         ]);
 
-        $oldKtpPath = UploadedFile::fake()->image('ktp_to_del.jpg')->store('documents', 'public');
         $oldRumahPath = UploadedFile::fake()->image('rumah_to_del.jpg')->store('documents', 'public');
+        $oldKontrakPath = UploadedFile::fake()->image('kontrak_to_del.jpg')->store('documents', 'public');
 
         $customer = Customer::create([
             'customer_code' => 'C-SMN-000001',
@@ -253,8 +251,8 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'foto_ktp' => $oldKtpPath,
             'foto_rumah' => $oldRumahPath,
+            'foto_kontrak' => $oldKontrakPath,
         ]);
 
         $deleteData = [
@@ -263,10 +261,10 @@ class CustomerEditTest extends TestCase
             'registration_date' => '2026-06-15',
             'pop_id' => $pop->id,
             'status' => 'registered',
-            'delete_foto_ktp' => '1',
             'delete_foto_rumah' => '1',
-            'foto_ktp' => null,
+            'delete_foto_kontrak' => '1',
             'foto_rumah' => null,
+            'foto_kontrak' => null,
         ];
 
         $response = $this->put("/customers/{$customer->id}", $deleteData);
@@ -274,7 +272,7 @@ class CustomerEditTest extends TestCase
         $response->assertRedirect("/customers/{$customer->id}");
         $customer->refresh();
 
-        $this->assertNull($customer->foto_ktp);
         $this->assertNull($customer->foto_rumah);
+        $this->assertNull($customer->foto_kontrak);
     }
 }

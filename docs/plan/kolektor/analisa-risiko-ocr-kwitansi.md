@@ -1,4 +1,5 @@
-# BELUM DIKERJAKAN — Analisa Risiko OCR Kwitansi & Rancangan Antisipasi
+# BELUM DIKERJAKAN (PENDING) 
+## Analisa Risiko OCR Kwitansi & Rancangan Antisipasi
 
 **Tanggal:** 2026-08-08
 **Status:** dicatat atas permintaan user. **Belum ada kode yang diubah.**

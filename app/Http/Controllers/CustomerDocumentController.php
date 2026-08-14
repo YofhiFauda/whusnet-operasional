@@ -31,7 +31,6 @@ class CustomerDocumentController extends Controller
         $type = $validated['document_type'];
 
         $path = match ($type) {
-            'ktp' => FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp'),
             'rumah' => FileUploadService::uploadSurveyPhoto($file, $customer, 'house'),
             'survey' => FileUploadService::uploadSurveyPhoto($file, $customer, 'odp'),
             'kontrak' => FileUploadService::uploadInstallationPhoto($file, $customer, 'kontrak'),

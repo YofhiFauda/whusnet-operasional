@@ -282,8 +282,16 @@ Route::middleware('auth')->group(function () {
 
     // Kwitansi — sumbu DOKUMEN, terpisah dari sumbu kas (§13.2). Permission
     // sendiri: staf yang mengurus arsip tak otomatis boleh menutup setoran.
+    //
+    // GET *dan* POST ke rute yang sama: cetak SATUAN (link <a>, 1 payment_id)
+    // tetap pakai GET — aman, pendek. Cetak MASSAL (form, N payment_ids) wajib
+    // POST — setoran dengan puluhan/ratusan pembayaran per hari membuat query
+    // string GET gampang lewat batas panjang URL server (414 Request-URI Too
+    // Large, kejadian nyata 2026-08-14 begitu cetak massal per-setoran dipakai
+    // untuk setoran besar). Nama rute tetap sama supaya route() di kedua jalur
+    // (link satuan & form massal) tidak perlu dibedakan pemanggilnya.
     Route::middleware('permission:collector_worksheet.print')->group(function () {
-        Route::get('/collector-worksheet/{collector}/receipts/print', [PaymentReceiptController::class, 'print'])->name('payment-receipts.print');
+        Route::match(['get', 'post'], '/collector-worksheet/{collector}/receipts/print', [PaymentReceiptController::class, 'print'])->name('payment-receipts.print');
     });
 
     Route::middleware('permission:collector_worksheet.upload')->group(function () {

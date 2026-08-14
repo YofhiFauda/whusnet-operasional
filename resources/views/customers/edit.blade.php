@@ -239,46 +239,7 @@
                         <p class="text-xs text-text-muted mt-1">Ubah lampiran dokumen pendukung pelanggan (opsional)</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- Foto KTP -->
-                        <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
-                            <input type="hidden" name="delete_foto_ktp" id="delete_foto_ktp" value="0">
-                            <div id="default-placeholder-foto_ktp" class="text-center py-4 @if($customer->foto_ktp) hidden @endif">
-                                <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
-                                </svg>
-                                <span class="block text-xs font-bold text-text-main mt-3">FOTO KTP</span>
-                                <span class="block text-[10px] text-text-muted mt-1">Format: JPG, PNG (Max 2MB)</span>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="preview-container-foto_ktp" class="@if(!$customer->foto_ktp) hidden @endif text-center py-2 flex flex-col items-center justify-center">
-                                <div class="relative inline-block">
-                                    <img id="preview-img-foto_ktp" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="{{ $customer->foto_ktp ? asset('storage/' . $customer->foto_ktp) : '' }}" alt="Preview Foto KTP">
-                                    <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <span class="block text-xs font-bold text-text-main mt-2">PREVIEW FOTO KTP</span>
-                            </div>
-
-                            <div class="mt-4">
-                                <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')" @if($customer->foto_ktp) data-populated="true" @endif>
-                                <label for="foto_ktp" class="block w-full text-center bg-surface-muted border border-border hover:bg-surface-muted/80 text-text-secondary text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
-                                    Pilih File
-                                </label>
-                                <span id="file-label-foto_ktp" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
-                                    @if($customer->foto_ktp)
-                                        {{ basename($customer->foto_ktp) }}
-                                    @else
-                                        Belum ada file dipilih
-                                    @endif
-                                </span>
-                            </div>
-                        </div>
-
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Foto Rumah -->
                         <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
                             <input type="hidden" name="delete_foto_rumah" id="delete_foto_rumah" value="0">
@@ -557,7 +518,7 @@
         },
         'dokumen': {
             required: [],
-            optional: ['foto_ktp', 'foto_rumah', 'foto_kontrak']
+            optional: ['foto_rumah', 'foto_kontrak']
         },
         'layanan': {
             required: ['internet_package_id', 'contract_period_months', 'discount_amount', 'tax_percent'],
@@ -932,7 +893,6 @@
             village_id: 'Desa',
             latitude: 'Latitude',
             longitude: 'Longitude',
-            foto_ktp: 'Foto KTP',
             foto_rumah: 'Foto Rumah',
             foto_kontrak: 'Foto Kontrak',
             internet_package_id: 'Paket Internet',

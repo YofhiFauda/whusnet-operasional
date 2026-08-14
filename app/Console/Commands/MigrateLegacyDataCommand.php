@@ -610,7 +610,6 @@ class MigrateLegacyDataCommand extends Command
                 'city' => $row['KOTA'] ?? '',
                 'latitude' => $lat,
                 'longitude' => $lon,
-                'foto_ktp' => $row['FOTOKTP'] ?? '',
                 'foto_rumah' => $fotoRumah ?? '',
                 'foto_kontrak' => $fotoKontrak ?? '',
                 'sales_code' => $salesCode,

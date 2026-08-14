@@ -81,7 +81,7 @@ $featureMeta = [
     'customers.detail.address' => ['name' => 'Alamat & Lokasi GPS Pelanggan', 'desc' => 'Mengatur koordinat peta GPS, alamat rumah, RT/RW, dan kelurahan pelanggan.'],
     'customers.detail.packages' => ['name' => 'Paket & Tarif Khusus Pelanggan', 'desc' => 'Mengatur penetapan paket internet berlangganan dan diskon custom pelanggan.'],
     'customers.detail.devices' => ['name' => 'Konfigurasi Modem & Perangkat', 'desc' => 'Melihat dan mengatur data teknis ONT/Modem, MAC Address, IP, Port OLT, dan akun PPPoE.'],
-    'customers.detail.documents' => ['name' => 'Berkas & Dokumen Pelanggan', 'desc' => 'Mengunggah dan mengelola foto KTP, foto rumah, dan formulir kontrak registrasi.'],
+    'customers.detail.documents' => ['name' => 'Berkas & Dokumen Pelanggan', 'desc' => 'Mengunggah dan mengelola foto rumah dan formulir kontrak registrasi.'],
     'customers.terminated' => ['name' => 'Daftar Pelanggan Putus/Berhenti', 'desc' => 'Melihat riwayat pelanggan yang sudah tidak berlangganan (churn/terminasi).'],
     'customers.failed' => ['name' => 'Daftar Pelanggan Batal/Gagal', 'desc' => 'Melihat riwayat calon pelanggan yang batal dipasang atau gagal survei.'],
     'customers.detail.survey' => ['name' => 'Survei Kelayakan Lokasi', 'desc' => 'Menginput dan mengecek hasil survei jaringan, redaman kabel, dan foto lokasi calon pelanggan.'],
@@ -217,7 +217,7 @@ $permissionDescMap = [
     'customers.detail.devices.update_sensitive' => 'Ubah kredensial PPPoE/WiFi & parameter jaringan sensitif pelanggan.',
     'customers.detail.devices.retrieve' => 'Catat pengambilan alat dari pelanggan putus langganan (memunculkan task DEAC).',
     'customers.detail.documents.view' => 'Buka & unduh berkas dokumen pelanggan. Berkas dilayani lewat controller, bukan URL publik.',
-    'customers.detail.documents.upload' => 'Unggah dokumen pelanggan (KTP, foto rumah, formulir registrasi).',
+    'customers.detail.documents.upload' => 'Unggah dokumen pelanggan (foto rumah, formulir registrasi).',
     'customers.detail.documents.download' => '[Belum aktif] Unduhan berkas digerbangi `customers.detail.documents.view`, bukan permission ini.',
     'customers.detail.documents.delete' => '[Belum aktif] Dokumen pelanggan belum bisa dihapus dari UI.',
 

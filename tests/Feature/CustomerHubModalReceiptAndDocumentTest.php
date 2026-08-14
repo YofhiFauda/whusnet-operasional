@@ -18,7 +18,7 @@ use Tests\TestCase;
 /**
  * Modal Hub Aksi Cepat kehilangan dua jalur yang ada di desain acuan:
  * tombol "Cetak Struk" (kwitansi pembayaran terakhir) dan kartu berkas
- * KTP/Foto Rumah beserta form uploadnya.
+ * Foto Rumah beserta form uploadnya.
  *
  * Keduanya bergantung pada payload /customers/{id}/payment-info — kalau field
  * receipt_url / documents hilang dari sana, tombol dan kartu jadi mati tanpa
@@ -48,10 +48,10 @@ class CustomerHubModalReceiptAndDocumentTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('onclick="printLatestReceipt()"', false);
         $response->assertSee('Cetak Struk', false);
-        $response->assertSee('Ganti / Upload KTP', false);
         $response->assertSee('Upload Foto Lokasi', false);
-        $response->assertSee('name="document_type" value="ktp"', false);
         $response->assertSee('name="document_type" value="rumah"', false);
+        // Foto KTP dihapus total dari sistem — kartunya tidak boleh balik lagi.
+        $response->assertDontSee('name="document_type" value="ktp"', false);
     }
 
     public function test_upload_form_hidden_without_document_upload_permission(): void
@@ -65,7 +65,7 @@ class CustomerHubModalReceiptAndDocumentTest extends TestCase
         $response = $this->actingAs($user)->get(route('customers.index'));
 
         $response->assertStatus(200);
-        $response->assertDontSee('name="document_type" value="ktp"', false);
+        $response->assertDontSee('name="document_type" value="rumah"', false);
     }
 
     public function test_payment_info_returns_receipt_url_and_document_state(): void
@@ -77,8 +77,8 @@ class CustomerHubModalReceiptAndDocumentTest extends TestCase
 
         CustomerDocument::create([
             'customer_id' => $customer->id,
-            'document_type' => 'ktp',
-            'file_path' => 'customers/ktp-test.jpg',
+            'document_type' => 'rumah',
+            'file_path' => 'customers/rumah-test.jpg',
             'uploaded_by' => auth()->id(),
         ]);
 
@@ -86,10 +86,9 @@ class CustomerHubModalReceiptAndDocumentTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('recent_payments.0.receipt_url', route('payments.receipt', $payment->id));
-        $response->assertJsonPath('documents.ktp.exists', true);
-        // Foto rumah belum diunggah — kartu harus tampil sebagai "Belum".
-        $response->assertJsonPath('documents.rumah.exists', false);
-        $response->assertJsonPath('documents.rumah.url', null);
+        $response->assertJsonPath('documents.rumah.exists', true);
+        // Payload berkas tidak lagi memuat tipe ktp.
+        $response->assertJsonMissingPath('documents.ktp');
         $response->assertJsonPath('documents_upload_url', route('customers.documents.store', $customer->id));
     }
 

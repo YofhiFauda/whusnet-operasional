@@ -178,26 +178,16 @@
         <div class="flex items-center justify-between gap-2 mt-4 pt-3.5 border-t border-border">
             
             <div class="flex items-center gap-1.5 shrink-0">
-                <?php if($phoneWa): ?>
-                <a href="https://wa.me/<?php echo e($phoneWa); ?>" 
-                   target="_blank" 
-                   title="Hubungi WhatsApp"
-                   class="p-2.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-900/50 active:scale-95 transition-all shadow-sm cursor-pointer">
-                    <svg class="h-4.5 w-4.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.768-.001 1.298.409 2.522 1.189 3.518l-.756 2.766 2.831-.744a5.748 5.748 0 002.504.588h.002c3.18 0 5.767-2.586 5.768-5.766 0-1.541-.6-2.99-1.691-4.08-1.091-1.09-2.539-1.69-4.079-1.648zm0 10.153a4.398 4.398 0 01-2.241-.614l-.16-.095-1.666.438.444-1.624-.105-.167a4.394 4.394 0 01-.67-2.326c.001-2.426 1.975-4.4 4.402-4.4 1.177 0 2.283.458 3.115 1.29a4.382 4.382 0 011.29 3.117c-.001 2.426-1.975-4.4-4.409 4.4z"/>
-                    </svg>
-                </a>
-                <?php endif; ?>
-
                 <?php if($task->status->value !== 'terjadwal' && $lat && $lng): ?>
                 <a href="https://www.google.com/maps/search/?api=1&query=<?php echo e($lat); ?>,<?php echo e($lng); ?>" 
                    target="_blank" 
                    title="Petunjuk Arah Maps"
-                   class="p-2.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 active:scale-95 transition-all shadow-sm cursor-pointer">
-                    <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                   class="inline-flex items-center justify-center gap-1.5 p-2.5 min-[426px]:px-3.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 active:scale-95 transition-all shadow-sm cursor-pointer font-ui">
+                    <svg class="h-4.5 w-4.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
+                    <span class="hidden min-[426px]:inline text-xs font-semibold">Maps</span>
                 </a>
                 <?php endif; ?>
             </div>

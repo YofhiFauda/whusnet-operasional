@@ -38,8 +38,8 @@ class FileUploadService
 
     /**
      * 2. Registrasi Pelanggan
-     * Aturan folder: registrations/ktp
-     * Contoh format: ktp_C00RQ00012_Budi Santoso.jpg
+     * Aturan folder: registrations/{type}
+     * Contoh format: rumah_C00RQ00012_Budi Santoso.jpg
      */
     public static function uploadCustomerRegistrationDoc(UploadedFile $file, Customer $customer, string $type): string
     {
@@ -47,10 +47,7 @@ class FileUploadService
         $customerName = self::getCustomerName($customer);
         $ext = $file->getClientOriginalExtension();
 
-        if ($type === 'ktp') {
-            $folder = 'registrations/ktp';
-            $baseName = "ktp_{$customerId}_{$customerName}";
-        } elseif ($type === 'rumah') {
+        if ($type === 'rumah') {
             $folder = 'surveys/rumah';
             $baseName = "rumah_{$customerId}_{$customerName}";
         } elseif ($type === 'kontrak') {

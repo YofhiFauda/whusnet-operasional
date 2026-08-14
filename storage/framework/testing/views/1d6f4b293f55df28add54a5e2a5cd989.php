@@ -70,15 +70,6 @@
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-
-        
-        <div class="flex items-center gap-2 font-ui w-full sm:w-auto justify-between sm:justify-start">
-            <span class="text-[10px] uppercase font-bold text-text-muted tracking-wider">Urut:</span>
-            <select x-model="sortBy" class="h-10 px-3 rounded-xl border border-border bg-surface text-xs font-semibold text-text-secondary focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all cursor-pointer">
-                <option value="time">Waktu (SLA)</option>
-                <option value="priority">Prioritas FOP</option>
-            </select>
-        </div>
     </div>
 
     

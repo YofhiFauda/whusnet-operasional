@@ -27,7 +27,6 @@ class CustomerCreateTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('IDENTITAS PELANGGAN');
-        $response->assertSee('UPLOAD DOKUMEN LAMPIRAN');
         $response->assertSee('LAYANAN');
     }
 
@@ -79,7 +78,6 @@ class CustomerCreateTest extends TestCase
             'odp_code' => 'ODP-PON-999',
             'olt_code' => 'OLT-ZTE-C320',
             'vlan_id' => '1024',
-            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
         ];
 
         $response = $this->post('/customers', $data);
@@ -139,7 +137,6 @@ class CustomerCreateTest extends TestCase
             'district_id',
             'village_id',
             'internet_package_id',
-            'foto_ktp',
         ]);
     }
 
@@ -185,7 +182,6 @@ class CustomerCreateTest extends TestCase
             'status' => 'registered',
 
             // Faked uploads
-            'foto_ktp' => UploadedFile::fake()->image('ktp.jpg'),
             'foto_rumah' => UploadedFile::fake()->image('rumah.jpg'),
             'foto_kontrak' => UploadedFile::fake()->create('contract.pdf', 500),
         ];
@@ -196,11 +192,9 @@ class CustomerCreateTest extends TestCase
         $response->assertRedirect("/customers/{$customer->id}");
         $response->assertSessionHas('success');
 
-        $this->assertNotNull($customer->foto_ktp);
         $this->assertNotNull($customer->foto_rumah);
         $this->assertNotNull($customer->foto_kontrak);
 
-        Storage::disk('public')->assertExists($customer->foto_ktp);
         Storage::disk('public')->assertExists($customer->foto_rumah);
         Storage::disk('public')->assertExists($customer->foto_kontrak);
     }

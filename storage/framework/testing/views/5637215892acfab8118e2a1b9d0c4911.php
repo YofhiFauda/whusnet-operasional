@@ -62,7 +62,10 @@
                         $installation = $customer->latestInstallation;
                     ?>
                     <tr class="hover:bg-surface-muted/45 transition-colors" id="customer-row-<?php echo e($customer->id); ?>" data-pop-id="<?php echo e($customer->pop_id); ?>">
-                        <td class="px-4 py-3.5 whitespace-nowrap font-mono text-xs"><?php echo e($customer->display_id); ?></td>
+                        
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            <?php echo $__env->make('verifications.partials.queue-id', ['customer' => $customer, 'idClass' => 'font-mono text-xs'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+                        </td>
                         <td class="px-4 py-3.5 font-medium text-text-main"><?php echo e($customer->full_name); ?></td>
                         <td class="px-4 py-3.5 font-mono text-xs whitespace-nowrap"><?php echo e($customer->primary_phone); ?></td>
                         <td class="px-4 py-3.5"><?php echo e($customer->village->name ?? '-'); ?></td>
@@ -108,6 +111,9 @@
 
 
 
+<?php echo $__env->make('customers.partials._network_assignment_modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+
 <div id="rejectModal" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center hidden bg-black/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
     <div class="bg-surface border border-border rounded-t-lg sm:rounded-lg shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto transform translate-y-4 sm:translate-y-0 sm:scale-95 transition-transform duration-300">
         <div class="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-border bg-error-bg/60">
@@ -141,6 +147,8 @@
     function processToTimHandler() {
         return {};
     }
+
+<?php echo $__env->make('customers.partials._network_assignment_js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
 
     /**
@@ -185,6 +193,13 @@
         const modal = document.getElementById('rejectModal');
         if (modal && !modal.classList.contains('hidden')) {
             closeRejectModal();
+
+            return;
+        }
+
+        const netModal = document.getElementById('network-modal-wrapper');
+        if (netModal && !netModal.classList.contains('hidden')) {
+            closeNetworkAssignmentModal();
         }
     });
 

@@ -75,7 +75,10 @@
                         $installation = $customer->latestInstallation;
                     @endphp
                     <tr class="hover:bg-surface-muted/45 transition-colors" id="customer-row-{{ $customer->id }}" data-pop-id="{{ $customer->pop_id }}">
-                        <td class="px-4 py-3.5 whitespace-nowrap font-mono text-xs">{{ $customer->display_id }}</td>
+                        {{-- ID = pemicu modal Atur Jaringan & Mini POP (sama seperti kolom CID di List Pelanggan). --}}
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            @include('verifications.partials.queue-id', ['customer' => $customer, 'idClass' => 'font-mono text-xs'])
+                        </td>
                         <td class="px-4 py-3.5 font-medium text-text-main">{{ $customer->full_name }}</td>
                         <td class="px-4 py-3.5 font-mono text-xs whitespace-nowrap">{{ $customer->primary_phone }}</td>
                         <td class="px-4 py-3.5">{{ $customer->village->name ?? '-' }}</td>
@@ -121,6 +124,10 @@
 
 {{-- Modal Final Verify telah dipindahkan ke halaman verifications/admin.blade.php --}}
 
+{{-- Modal Atur Jaringan & Mini POP — markup + skrip dipakai bareng List
+     Pelanggan. Dipanggil dari tombol di verifications/partials/queue-actions. --}}
+@include('customers.partials._network_assignment_modal')
+
 {{-- Modal Reject — di mobile menempel ke bawah layar (bottom sheet) supaya
      tombolnya berada dalam jangkauan ibu jari, bukan melayang di tengah. --}}
 <div id="rejectModal" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center hidden bg-black/50 backdrop-blur-sm transition-opacity opacity-0 duration-300">
@@ -156,6 +163,8 @@
     function processToTimHandler() {
         return {};
     }
+
+@include('customers.partials._network_assignment_js')
 
 
     /**
@@ -200,6 +209,13 @@
         const modal = document.getElementById('rejectModal');
         if (modal && !modal.classList.contains('hidden')) {
             closeRejectModal();
+
+            return;
+        }
+
+        const netModal = document.getElementById('network-modal-wrapper');
+        if (netModal && !netModal.classList.contains('hidden')) {
+            closeNetworkAssignmentModal();
         }
     });
 
