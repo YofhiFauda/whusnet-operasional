@@ -44,6 +44,24 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-35 | **Riwayat Perubahan Status di Detail Task tampil dobel** — dua lapis pencatat audit; duplikat murni dicabut + timeline disaring `TaskAuditTimeline` (lihat detail di bawah) | Done — 2026-08-13 |
 | ADHOC-36 | **Pencarian pada Halaman Collector Worklist** — pencarian rute kerja berdasarkan Nama Lengkap, CID, atau No. Invoice (lihat detail di bawah) | Done — 2026-08-13 |
 | ADHOC-37 | **Jejak uang putus sesudah setoran kolektor diverifikasi** — modul **Setoran Kas** (admin → owner/bank): saldo kas turunan, rincian sumber per kolektor/pelanggan, titik nol data historis, Card Saldo di Worksheet Admin. Analisa & rancangan: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md) | Done — 2026-08-14 |
+| ADHOC-38 | **Metode Pembayaran + Saldo Pelanggan di Modal Bayar Invoice** — dropdown Cash/Transfer (field Nama Bank+No. Rekening)/Kolektor (pilih kolektor, saldo kolektor tetap derived); ledger `customer_balance_mutations` (saldo aktif dari lebih bayar, bisa dipakai sebagian di pembayaran berikutnya); Ringkasan Tagihan tambah Metode Bayar + Saldo Pelanggan; dialog sukses + tombol Cetak Struk. Meng-override keputusan §D-5 (saldo pelanggan DILUAR SCOPE) atas permintaan eksplisit user — lihat catatan override di [`docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md`](plan/analisa-billing-tagihan-pembayaran-kolektor.md). Rencana: [`docs/plan/metode-pembayaran-pada-modal-mighty-tower.md`](plan/metode-pembayaran-pada-modal-mighty-tower.md) | Done — 2026-08-18 |
+
+#### ADHOC-38 — Metode Pembayaran + Saldo Pelanggan di Modal Bayar Invoice (2026-08-18) — **Done**
+
+**Pemicu:** permintaan user — Modal Bayar di Invoice butuh metode Cash/Transfer/Kolektor dengan field pendukung masing-masing, dan pelanggan lebih bayar harus dapat saldo aktif yang bisa dipakai di pembayaran berikutnya.
+
+**Yang dibangun:**
+- `App\Enums\PaymentMethod` (cash/transfer/qris/kolektor/lainnya) — ganti literal array `in:cash,transfer,qris,lainnya` yang dulu tersebar.
+- Migration: `bank_name`+`account_number` di `payments`; tabel baru `customer_balance_mutations` (ledger append-only credit/debit, **bukan** kolom `customers.balance` — konsisten pola `CollectorBalanceService`/`AdminCashBalanceService` yang derived-only).
+- `App\Services\CustomerBalanceService` — `balance()`, `credit()`, `debit()` (lock saat dipakai), `reverseCreditForPayment()` (dipanggil `PaymentController::reject()`).
+- `App\Services\PaymentService::record()` — extract dari `PaymentController::recordPayment()`, tambah orkestrasi pakai-saldo + field kondisional per metode.
+- `InvoiceController::show()` JSON payload tambah `customer_balance` + `available_collectors` untuk modal.
+- `quick-payment-modal.blade.php` — dropdown Kolektor, field Transfer/Kolektor kondisional, blok Saldo Pelanggan, Ringkasan Tagihan tambah 2 baris, dialog sukses + tombol Cetak Struk (`window.open('/payments/{id}/kwitansi')`).
+- Cash → Saldo Admin sudah otomatis benar tanpa sentuh `AdminCashBalanceService` (filter `payment_method='cash' AND collected_by IS NULL` sudah ada).
+
+**Test baru:** `PaymentMethodKolektorTest`, `PaymentMethodTransferBankFieldsTest`, `CustomerBalanceCreditOnOverpayTest`, `CustomerBalanceDebitOnPaymentTest`, `CustomerBalanceServiceTest` (Unit) — semua lulus, plus regresi existing (`PaymentInputTest`, `PaymentCollectedByNotCopiedFromCustomerTest` disesuaikan menambahkan `bank_name`/`account_number` karena validasi Transfer sekarang wajib).
+
+**Di luar scope task ini:** `BackfillCustomerBalanceFromOverpay` (artisan command, dibuat tapi TIDAK dijalankan ke data produksi — butuh review manual finance dulu); UI `_quick_hub_modal.blade.php` & `payments/create.blade.php` belum ikut menampilkan opsi baru (backend sudah kompatibel lewat validasi bersama).
 
 #### ADHOC-37 — Saldo Kas Admin & Modul Setoran Kas (2026-08-14) — **Done**
 

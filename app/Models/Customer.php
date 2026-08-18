@@ -250,6 +250,18 @@ class Customer extends Model
     }
 
     /**
+     * Ledger saldo pelanggan (kredit lebih bayar, debit pemakaian). Jumlah
+     * saldo berjalan TIDAK disimpan di kolom Customer — selalu dihitung
+     * [[CustomerBalanceService::balance()]] dari baris-baris ini.
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function balanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
+    }
+
+    /**
      * @return HasOne<Payment, $this>
      */
     public function latestPayment(): HasOne

@@ -96,6 +96,26 @@
                     <p class="text-[10px] text-text-muted mt-1">Format: JPG, PNG, atau PDF maksimal 2 MB.</p>
                 </div>
 
+                
+                <?php if($customerBalance > 0): ?>
+                <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg px-3 py-2.5 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-sky-800 dark:text-sky-300 font-semibold">Saldo Pelanggan Tersedia</span>
+                        <span class="font-mono font-bold text-sky-800 dark:text-sky-300">Rp <?php echo e(number_format($customerBalance, 0, ',', '.')); ?></span>
+                    </div>
+                    <label class="flex items-center gap-2 text-[11px] text-sky-800 dark:text-sky-300 font-medium cursor-pointer">
+                        <input type="checkbox" id="use-balance-toggle" <?php if(old('use_balance_amount')): echo 'checked'; endif; ?> class="rounded border-sky-300 text-sky-600 focus:ring-sky-500">
+                        Pakai saldo pelanggan untuk pembayaran ini
+                    </label>
+                    <div id="use-balance-amount-wrap" class="<?php echo e(old('use_balance_amount') ? '' : 'hidden'); ?>">
+                        <label for="use_balance_amount" class="block text-[10px] font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider mb-1">Nominal Saldo Dipakai</label>
+                        <input type="text" inputmode="decimal" name="use_balance_amount" id="use_balance_amount" data-rupiah
+                               value="<?php echo e(old('use_balance_amount')); ?>"
+                               class="w-full px-3 py-2 border border-sky-200 dark:border-sky-500/30 rounded-lg shadow-2xs focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500 text-xs font-mono bg-surface text-text-main transition-colors">
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Catatan -->
                 <div>
                     <label for="note" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Catatan Pembayaran</label>
@@ -229,20 +249,49 @@
 <script>
     (function () {
         const remaining = <?php echo e((float) $invoice->remaining_amount); ?>;
+        const customerBalance = <?php echo e((float) $customerBalance); ?>;
         const nextInstallment = <?php echo e((int) $nextInstallmentNumber); ?>;
         const amountInput = document.getElementById('amount');
         const installmentHint = document.getElementById('installment-hint');
         const settleHint = document.getElementById('settle-hint');
         const overpayHint = document.getElementById('overpay-hint');
+        const useBalanceToggle = document.getElementById('use-balance-toggle');
+        const useBalanceAmountWrap = document.getElementById('use-balance-amount-wrap');
+        const useBalanceAmountInput = document.getElementById('use_balance_amount');
 
         function formatRupiah(value) {
             return 'Rp ' + value.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
         }
 
+        /** Nominal saldo yang mau dipakai, dibatasi maks saldo tersedia. */
+        function useBalanceAmount() {
+            if (!useBalanceToggle || !useBalanceToggle.checked) {
+                return 0;
+            }
+
+            const raw = useBalanceAmountInput.value;
+            const nilai = window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+
+            return isNaN(nilai) ? 0 : Math.min(nilai, customerBalance);
+        }
+
+        /** Saldo dipakai memotong langsung Nominal Diterima — admin tak perlu
+         *  hitung manual "sisa tagihan minus saldo". Dipanggil tiap saldo
+         *  dipakai berubah (centang/nominal), BUKAN tiap Nominal Diterima
+         *  diketik manual (supaya tidak lawan input admin). */
+        function applyBalanceToAmount() {
+            const nilai = Math.max(0, remaining - useBalanceAmount());
+            amountInput.value = window.Rupiah ? window.Rupiah.formatDariServer(String(nilai)) : String(nilai);
+            refreshHint();
+        }
+
         function refreshHint() {
             // Input bermasking ribuan — parseFloat('150.000') = 150, jadi
             // petunjuk cicilan/lebih bayar akan berbohong tanpa parser ini.
-            const amount = window.Rupiah ? window.Rupiah.angka(amountInput.value) : parseFloat(amountInput.value);
+            // Saldo yang dipakai ikut dihitung — pratinjau harus mencerminkan
+            // TOTAL yang menutup tagihan, sama seperti server
+            // (PaymentService::record()).
+            const amount = (window.Rupiah ? window.Rupiah.angka(amountInput.value) : parseFloat(amountInput.value)) + useBalanceAmount();
             installmentHint.classList.add('hidden');
             settleHint.classList.add('hidden');
             overpayHint.classList.add('hidden');
@@ -274,6 +323,26 @@
         }
 
         amountInput.addEventListener('input', refreshHint);
+
+        useBalanceToggle?.addEventListener('change', function (e) {
+            useBalanceAmountWrap.classList.toggle('hidden', !e.target.checked);
+
+            if (e.target.checked) {
+                // Default: pakai saldo semaksimal mungkin (dibatasi sisa
+                // tagihan) — admin boleh menurunkannya manual.
+                const max = Math.min(customerBalance, remaining);
+                useBalanceAmountInput.value = window.Rupiah ? window.Rupiah.formatDariServer(String(max)) : String(max);
+            } else {
+                useBalanceAmountInput.value = '';
+            }
+
+            // Nominal Diterima ikut terpotong sebesar saldo dipakai (atau
+            // balik ke sisa tagihan penuh kalau saldo dibatalkan).
+            applyBalanceToAmount();
+        });
+
+        useBalanceAmountInput?.addEventListener('input', applyBalanceToAmount);
+
         refreshHint();
     })();
 </script>

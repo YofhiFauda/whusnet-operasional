@@ -32,6 +32,8 @@ class Payment extends Model
         'payment_date',
         'collected_date',
         'payment_method',
+        'bank_name',
+        'account_number',
         'amount',
         'overpay_amount',
         'received_by',
@@ -196,6 +198,19 @@ class Payment extends Model
     }
 
     /**
+     * Baris ledger saldo pelanggan yang menyebut payment ini — sebagai
+     * SUMBER kredit (overpay) atau sebagai KONSUMEN debit (pemakaian
+     * saldo). Dua peran, satu kolom `payment_id`; dibedakan lewat `type`
+     * kalau perlu difilter salah satunya saja.
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function balanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
+    }
+
+    /**
      * Posisi cicilan payment ini pada invoice-nya ("Cicilan Ke-N") + apakah
      * payment ini yang melunasi tagihan. Dipakai konsisten di
      * payments/show, payments/receipt, invoices/show — satu sumber
@@ -322,6 +337,8 @@ class Payment extends Model
             'payment_date',
             'collected_date',
             'payment_method',
+            'bank_name',
+            'account_number',
             'amount',
             'overpay_amount',
             'received_by',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\NotificationType;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Events\CollectorActivityUpdated;
 use App\Models\Invoice;
@@ -11,9 +12,10 @@ use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Services\CustomerBalanceService;
 use App\Services\FileUploadService;
+use App\Services\PaymentService;
 use App\Services\Receipts\ReceiptPresenter;
-use App\Support\Money;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -22,6 +24,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -39,7 +42,7 @@ class PaymentController extends Controller
         $method = trim((string) $request->query('method', ''));
         $status = trim((string) $request->query('status', ''));
         $invoiceType = trim((string) $request->query('invoice_type', ''));
-        $allowedMethods = ['cash', 'transfer', 'qris', 'lainnya'];
+        $allowedMethods = array_column(PaymentMethod::cases(), 'value');
         $allowedStatuses = array_column(PaymentStatus::cases(), 'value');
 
         $query = Payment::query()
@@ -223,7 +226,14 @@ class PaymentController extends Controller
             ->where('payment_status', PaymentStatus::VALID->value)
             ->count() + 1;
 
-        return view('payments.create', compact('invoice', 'nextInstallmentNumber'));
+        // Saldo pelanggan (dari sisa bayar/overpay sebelumnya) — dipakai
+        // checklist "Pakai saldo pelanggan" di atas Catatan. 0 kalau invoice
+        // tak terhubung pelanggan.
+        $customerBalance = $invoice->customer
+            ? app(CustomerBalanceService::class)->balance($invoice->customer)
+            : 0.0;
+
+        return view('payments.create', compact('invoice', 'nextInstallmentNumber', 'customerBalance'));
     }
 
     /**
@@ -289,15 +299,40 @@ class PaymentController extends Controller
             // depan merusak pemotongan pendapatan per periode dan membuat
             // laporan bulan berjalan memuat uang yang belum ada.
             'payment_date' => 'required|date|before_or_equal:today',
-            'payment_method' => 'required|in:cash,transfer,qris,lainnya',
+            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            // Transfer & Kolektor punya field pendukung wajib — lihat
+            // PaymentMethod::requiresBankDetails()/requiresCollector().
+            'bank_name' => 'required_if:payment_method,transfer|nullable|string|max:100',
+            'account_number' => 'required_if:payment_method,transfer|nullable|string|max:50',
+            'collected_by' => [
+                'required_if:payment_method,kolektor',
+                'nullable',
+                'exists:users,id',
+                function ($attribute, $value, $fail) {
+                    if (! $value) {
+                        return;
+                    }
+
+                    $collector = User::find($value);
+
+                    if (! $collector || ! $collector->hasRole('kolektor')) {
+                        $fail('User yang dipilih bukan kolektor.');
+                    }
+                },
+            ],
+            // Nominal saldo pelanggan yang dipakai untuk pembayaran ini.
+            // Dicek ulang (dengan lock) di PaymentService::record() — di
+            // sini cuma validasi bentuk, bukan kecukupan saldo.
+            'use_balance_amount' => 'nullable|numeric|min:0',
             // Nullable, bukan required: endpoint ini juga dipakai dari JSON
             // oleh pemanggil yang tak punya form untuk menaruh kuncinya.
             // Tanpa kunci, perilakunya persis seperti dulu.
             'idempotency_key' => 'nullable|string|max:191',
-            // `amount` = TOTAL uang yang diserahkan pelanggan, bukan lagi
-            // dibatasi sisa tagihan. Kalau melebihi sisa, kelebihannya
-            // otomatis dipisah jadi overpay_amount di transaction di bawah —
-            // admin tak perlu hitung sendiri "sisa tagihan dikurangi total"
+            // `amount` = TOTAL uang tunai/transfer/kolektor yang diserahkan
+            // pelanggan (di luar saldo), bukan lagi dibatasi sisa tagihan.
+            // Kalau amount+saldo melebihi sisa, kelebihannya otomatis
+            // dipisah jadi overpay_amount di transaction di bawah — admin
+            // tak perlu hitung sendiri "sisa tagihan dikurangi total"
             // (2026-08-04: versi lama minta itu, gampang salah ketik/hitung
             // di lapangan, lihat docs/plan/analisa-billing-tagihan-
             // pembayaran-kolektor.md §D-5).
@@ -318,7 +353,7 @@ class PaymentController extends Controller
         }
 
         try {
-            $payment = $this->recordPayment($invoice, $validated, $proofPath);
+            $payment = app(PaymentService::class)->record($invoice, $validated, $proofPath);
         } catch (\InvalidArgumentException $e) {
             // PaymentObserver::rejectBurstDuplicate() menolak pembayaran kembar
             // dalam jendela 5 menit. Itu kondisi yang memang diantisipasi —
@@ -366,6 +401,7 @@ class PaymentController extends Controller
                 'success' => true,
                 'message' => "Pembayaran {$payment->payment_number} berhasil dicatat.",
                 'payment' => [
+                    'id' => $payment->id,
                     'payment_number' => $payment->payment_number,
                     'amount' => (float) $payment->amount,
                 ],
@@ -398,59 +434,6 @@ class PaymentController extends Controller
         }
 
         return Payment::where('idempotency_key', $key)->first();
-    }
-
-    /**
-     * Simpan satu pembayaran dalam satu transaksi, dengan invoice terkunci.
-     *
-     * @param  array<string, mixed>  $validated
-     */
-    private function recordPayment(Invoice $invoice, array $validated, ?string $proofPath): Payment
-    {
-        return DB::transaction(function () use ($invoice, $validated, $proofPath): Payment {
-            $lockedInvoice = Invoice::query()
-                ->whereKey($invoice->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $totalReceived = Money::of($validated['amount']);
-            $remaining = Money::of($lockedInvoice->remaining_amount);
-
-            if (Money::isZero($remaining)) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Tagihan ini sudah lunas.',
-                ]);
-            }
-
-            // Auto-split: bagian yang menutup tagihan dulu, sisanya (kalau
-            // ada) jadi overpay_amount — bukan diminta admin pisah sendiri.
-            // Dipisah di ranah sen: pembagian dua angka uang yang harus
-            // berjumlah persis sama dengan yang diterima. Galat float membuat
-            // "bayar pas" melahirkan lebih bayar Rp0,000001 — baris hantu di
-            // tab Lebih Bayar yang tak bisa diselesaikan siapa pun.
-            $appliedAmount = Money::min($totalReceived, $remaining);
-            $overpayAmount = Money::sub($totalReceived, $appliedAmount);
-
-            $payment = Payment::create([
-                'payment_number' => Payment::generatePaymentNumber($validated['payment_date']),
-                'idempotency_key' => $validated['idempotency_key'] ?? null,
-                'invoice_id' => $lockedInvoice->id,
-                'customer_id' => $lockedInvoice->customer_id,
-                'pop_id' => $lockedInvoice->pop_id,
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $validated['payment_method'],
-                'amount' => $appliedAmount,
-                'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
-                'received_by' => auth()->id(),
-                'proof_file' => $proofPath,
-                'payment_status' => PaymentStatus::VALID->value,
-                'note' => $validated['note'] ?? null,
-            ]);
-
-            $lockedInvoice->recalculateFromPayments();
-
-            return $payment;
-        });
     }
 
     /**
@@ -511,6 +494,11 @@ class PaymentController extends Controller
                 ->firstOrFail();
 
             $lockedInvoice->recalculateFromPayments();
+
+            // Kredit saldo pelanggan yang lahir dari lebih bayar payment ini
+            // ikut dibalik — kalau tidak, pelanggan tetap punya saldo aktif
+            // dari uang yang ternyata tak pernah sah tercatat.
+            app(CustomerBalanceService::class)->reverseCreditForPayment($payment);
         });
 
         // Notif ke yang mencatat setoran (kolektor lapangan kalau ada, kalau

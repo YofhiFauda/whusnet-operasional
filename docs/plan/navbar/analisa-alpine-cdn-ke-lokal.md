@@ -1,3 +1,5 @@
+# DONE
+
 # Analisa: Alpine.js dari CDN ke Bundle Lokal
 
 **Status:** **Dikerjakan 2026-08-13** — Langkah 1 (plugin sudah terpasang), Langkah 2 (wiring
