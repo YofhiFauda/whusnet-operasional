@@ -2,7 +2,7 @@
 
 @section('title', 'Lebih Bayar - Whusnet Operasional')
 @section('page_title', 'Lebih Bayar')
-@section('breadcrumb_parent', 'Pembayaran')
+@section('breadcrumb_parent', 'Riwayat Transaksi Pembayaran')
 @section('breadcrumb_parent_url', route('payments.index'))
 
 @section('content')
@@ -16,8 +16,13 @@
                 <span class="font-semibold text-text-main">Lebih Bayar</span>
             </nav>
             <h1 class="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Daftar Pembayaran Lebih Bayar</h1>
+            {{-- Copy lama bilang "bukan saldo ledger, diselesaikan manual" —
+                 sudah TIDAK BENAR sejak Saldo Pelanggan aktif
+                 (CustomerBalanceService, 2026-08-18): overpay di sini otomatis
+                 jadi kredit yang bisa dipakai pelanggan di pembayaran
+                 berikutnya. --}}
             <p class="text-xs text-text-muted mt-1">
-                Uang lebih yang diserahkan pelanggan saat membayar tagihan. <span class="font-semibold text-amber-600 dark:text-amber-400">Catatan saja, bukan saldo ledger</span> — diselesaikan manual (refund atau potong tagihan berikutnya).
+                Uang lebih yang diserahkan pelanggan saat membayar tagihan. <span class="font-semibold text-emerald-600 dark:text-emerald-400">Otomatis jadi Saldo Pelanggan</span> — bisa dipakai pelanggan sebagian/seluruhnya di pembayaran tagihan berikutnya.
             </p>
         </div>
         <div>
@@ -25,7 +30,7 @@
                 <svg class="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-                <span>Kembali ke Daftar Pembayaran</span>
+                <span>Kembali ke Riwayat Transaksi</span>
             </a>
         </div>
     </div>

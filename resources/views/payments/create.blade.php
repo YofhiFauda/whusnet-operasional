@@ -2,8 +2,8 @@
 
 @section('title', 'Input Pembayaran - Whusnet Operasional')
 @section('page_title', 'Input Pembayaran')
-@section('breadcrumb_parent', 'Pembayaran')
-@section('breadcrumb_parent_url', route('payments.index'))
+@section('breadcrumb_parent', 'Tagihan')
+@section('breadcrumb_parent_url', route('invoices.index'))
 
 @section('content')
 <div class="space-y-6">

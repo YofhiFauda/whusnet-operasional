@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Daftar Pembayaran - Whusnet Operasional')
-@section('page_title', 'Daftar Pembayaran')
-@section('breadcrumb_parent', 'Pembayaran')
-@section('breadcrumb_parent_url', route('payments.index'))
+@section('title', 'Riwayat Transaksi Pembayaran - Whusnet Operasional')
+@section('page_title', 'Riwayat Transaksi Pembayaran')
+{{-- Tanpa breadcrumb_parent — halaman ini puncak grup "Pembayaran" di nav,
+     sama seperti invoices.index puncak grup "Tagihan" (lihat pola sana). --}}
 
 @section('content')
 <div class="space-y-6">
@@ -12,7 +12,7 @@
     <!-- Naked Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Daftar Pembayaran</h1>
+            <h1 class="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Riwayat Transaksi Pembayaran</h1>
             <p class="text-xs text-text-muted mt-1">
                 Seluruh riwayat transaksi pembayaran tagihan pelanggan ISP terhubung dengan Invoice & POP.
             </p>

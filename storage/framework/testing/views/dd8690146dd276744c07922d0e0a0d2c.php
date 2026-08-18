@@ -1,6 +1,6 @@
 <?php $__env->startSection('title', 'Detail Pembayaran ' . $payment->payment_number . ' - Whusnet Operasional'); ?>
 <?php $__env->startSection('page_title', 'Detail Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pembayaran'); ?>
+<?php $__env->startSection('breadcrumb_parent', 'Riwayat Transaksi Pembayaran'); ?>
 <?php $__env->startSection('breadcrumb_parent_url', route('payments.index')); ?>
 
 <?php $__env->startSection('content'); ?>

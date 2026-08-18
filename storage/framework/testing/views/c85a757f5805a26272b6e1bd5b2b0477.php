@@ -1,7 +1,7 @@
 <?php $__env->startSection('title', 'Input Pembayaran - Whusnet Operasional'); ?>
 <?php $__env->startSection('page_title', 'Input Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent_url', route('payments.index')); ?>
+<?php $__env->startSection('breadcrumb_parent', 'Tagihan'); ?>
+<?php $__env->startSection('breadcrumb_parent_url', route('invoices.index')); ?>
 
 <?php $__env->startSection('content'); ?>
 <div class="space-y-6">

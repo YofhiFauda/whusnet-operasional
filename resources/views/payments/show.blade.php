@@ -2,7 +2,7 @@
 
 @section('title', 'Detail Pembayaran ' . $payment->payment_number . ' - Whusnet Operasional')
 @section('page_title', 'Detail Pembayaran')
-@section('breadcrumb_parent', 'Pembayaran')
+@section('breadcrumb_parent', 'Riwayat Transaksi Pembayaran')
 @section('breadcrumb_parent_url', route('payments.index'))
 
 @section('content')
