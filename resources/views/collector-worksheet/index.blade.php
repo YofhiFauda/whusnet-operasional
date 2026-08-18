@@ -41,6 +41,36 @@
         <x-ui.alert variant="success" class="rounded-2xl">{{ session('success') }}</x-ui.alert>
     @endif
 
+    {{-- Posisi kas admin yang sedang membuka halaman. Uang kolektor berpindah
+         tangan TEPAT di halaman ini (saat setoran diverifikasi), jadi di sini
+         pula posisinya ditampilkan. Kartu yang sama dipakai halaman Setoran
+         Kas — satu partial supaya angkanya mustahil menyimpang. --}}
+    @if (auth()->user()->hasPermission('cash_deposit.create') || auth()->user()->hasPermission('cash_deposit.view'))
+        <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Kas Anda</h2>
+                {{-- Tautan ke pandangan PEMERIKSA hanya untuk yang berhak
+                     membukanya. Admin biasa berhenti di halaman ini: kas &
+                     riwayatnya sendiri tersaji penuh di bawah (§10). --}}
+                @if (auth()->user()->hasPermission('cash_deposit.view'))
+                    <a href="{{ route('cash-deposits.index') }}" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline shrink-0">
+                        Rincian &amp; Pemeriksaan →
+                    </a>
+                @endif
+            </div>
+            @include('partials.admin-cash-balance-card', [
+                'tunai' => $kasTunai,
+                'nonTunai' => $kasNonTunai,
+                'selisihTerbuka' => $kasSelisih,
+                'ringkas' => true,
+                'dapatSetor' => true,
+                'sumberCount' => $kasSumberCount,
+                'idempotencyKey' => $kasIdempotencyKey,
+            ])
+            @include('partials.admin-cash-deposit-history', ['riwayat' => $kasRiwayat])
+        </div>
+    @endif
+
     {{-- Summary Stat Cards --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {{-- Total Kolektor --}}

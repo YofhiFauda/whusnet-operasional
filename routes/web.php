@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CashDepositController;
 use App\Http\Controllers\CollectorDepositController;
 use App\Http\Controllers\CollectorPaymentController;
 use App\Http\Controllers\CollectorVisitController;
@@ -278,6 +279,54 @@ Route::middleware('auth')->group(function () {
     // permission-nya terpisah dari verifikasi (§11.4 no. 4).
     Route::middleware('permission:collector_worksheet.approve')->group(function () {
         Route::post('/collector-deposits/{deposit}/write-off', [CollectorDepositController::class, 'writeOff'])->name('collector-deposits.write-off');
+    });
+
+    // ===================== SETORAN KAS ADMIN =====================
+    // Satu tingkat DI ATAS setoran kolektor: pelanggan → kolektor → admin →
+    // owner/bank. Feature permission SENDIRI (`cash_deposit.*`), bukan
+    // menumpang `collector_worksheet.*` — halaman ini memeriksa ADMIN, dan
+    // kalau menumpang, tiap admin yang berwenang memverifikasi kolektor
+    // otomatis berwenang menutup setoran kasnya sendiri.
+    // docs/plan/kolektor/analisa-setoran-kas-admin.md §4.5.
+    // Static routes dulu, dynamic ({deposit}) belakangan.
+    //
+    // DUA TINGKAT RINCIAN (§10):
+    //   - `cash_deposit.view`   → pandangan PEMERIKSA: posisi kas admin mana pun
+    //     dalam scope-nya, antrean pemeriksaan, rincian sampai tingkat
+    //     pelanggan. Owner & atasan.
+    //   - `cash_deposit.create` → pandangan PENYETOR: kas & riwayat setoran
+    //     SENDIRI, tersaji di Worksheet Admin. Admin & pop_admin, TANPA `view`.
+    Route::middleware('permission:cash_deposit.view')->group(function () {
+        Route::get('/cash-deposits', [CashDepositController::class, 'index'])->name('cash-deposits.index');
+    });
+
+    // Unduh bukti setoran — digerbang DUA permission dengan arti berbeda, dan
+    // pembedanya diperiksa di controller: pemegang `view` boleh mengambil bukti
+    // siapa pun dalam scope-nya, pemegang `create` HANYA buktinya sendiri.
+    // Penyetor tetap harus bisa membuka berkas yang dia unggah sendiri.
+    Route::middleware('permission:cash_deposit.view|cash_deposit.create')->group(function () {
+        Route::get('/cash-deposits/{deposit}/download', [CashDepositController::class, 'download'])->name('cash-deposits.download');
+    });
+
+    // Admin menyetorkan SELURUH saldo tunainya. TANPA parameter admin —
+    // penyetor diambil dari auth()->user(), sama alasannya dengan rute setor
+    // kolektor: kalau id penyetor boleh datang dari klien, admin A bisa
+    // menutup saldo admin B.
+    Route::middleware('permission:cash_deposit.create')->group(function () {
+        Route::post('/cash-deposits', [CashDepositController::class, 'store'])->name('cash-deposits.store');
+    });
+
+    // Pemeriksaan setoran kas — Owner & atasan. Guard uangnya (pemeriksa ≠
+    // penyetor, POP scope seluruh sumber, selisih wajib beralasan) ada di
+    // CashDepositService; permission ini cuma gerbang halamannya.
+    Route::middleware('permission:cash_deposit.validate')->group(function () {
+        Route::post('/cash-deposits/{deposit}/verify', [CashDepositController::class, 'verify'])->name('cash-deposits.verify');
+    });
+
+    // Menutup selisih kas = titik kerugian (atau kelebihan) diakui. Permission
+    // terpisah dari pemeriksaan, pola sama dengan hapus buku setoran kolektor.
+    Route::middleware('permission:cash_deposit.approve')->group(function () {
+        Route::post('/cash-deposits/{deposit}/write-off', [CashDepositController::class, 'writeOff'])->name('cash-deposits.write-off');
     });
 
     // Kwitansi — sumbu DOKUMEN, terpisah dari sumbu kas (§13.2). Permission

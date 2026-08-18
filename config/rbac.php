@@ -247,6 +247,24 @@ return [
             ActionCode::UPLOAD->value,
         ],
 
+        // Setoran Kas Admin — uang kolektor yang sudah diverifikasi + tunai
+        // yang diterima di loket, diteruskan ke owner/bank.
+        // docs/plan/kolektor/analisa-setoran-kas-admin.md §4.5.
+        'cash_deposit' => [
+            ActionCode::VIEW->value,
+            // Menyetorkan saldo kas sendiri. Terpisah dari VIEW supaya hak
+            // memegang kas bisa dicabut tanpa mencabut hak membaca posisinya.
+            ActionCode::CREATE->value,
+            // Memeriksa & menutup setoran kas orang lain — Owner & atasan.
+            // Pakai VALIDATE yang sudah ada, konsisten dengan
+            // `collector_worksheet.validate`.
+            ActionCode::VALIDATE->value,
+            // Menutup selisih kas (kerugian ATAU kelebihan diakui). Permission
+            // sendiri, sengaja TIDAK diberikan bersama VALIDATE — pemeriksa
+            // tak boleh sekaligus menutup selisih yang dia temukan sendiri.
+            ActionCode::APPROVE->value,
+        ],
+
         'reports' => [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,
@@ -400,6 +418,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fitur yang DIKECUALIKAN dari auto-grant `view`
+    |--------------------------------------------------------------------------
+    |
+    | RoleManagementService::syncPermissions() otomatis ikut mencentang
+    | `{feature}.view` setiap kali ada permission anak yang dicentang —
+    | masuk akal untuk hampir semua fitur: percuma memberi hak "ubah" tanpa
+    | hak "lihat" halamannya.
+    |
+    | Tidak berlaku di sini. Pada `cash_deposit`, `view` BUKAN "halaman yang
+    | sama tapi baca saja": ia pandangan PEMERIKSA — posisi kas admin mana pun
+    | dalam scope, antrean pemeriksaan, dan rincian sumber sampai nama
+    | pelanggan. Admin cukup `create` (menyetor + riwayat sendiri di Worksheet
+    | Admin). Tanpa pengecualian ini, mencentang "Setor" diam-diam memberi
+    | admin pandangan yang justru sengaja dipisahkan darinya.
+    |
+    | docs/plan/kolektor/analisa-setoran-kas-admin.md §10.
+    */
+    'view_autogrant_exempt' => [
+        'cash_deposit',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Permission Name Overrides (Label Kontekstual)
     |--------------------------------------------------------------------------
     |
@@ -453,5 +494,9 @@ return [
         'collector_worksheet.approve' => 'Hapus Buku Selisih Setoran (kerugian diakui)',
         'collector_worksheet.print' => 'Cetak Kwitansi Pembayaran (ber-QR)',
         'collector_worksheet.upload' => 'Upload & Cocokkan Kwitansi',
+        'cash_deposit.view' => 'Akses Halaman Setoran Kas (Admin)',
+        'cash_deposit.create' => 'Menyetorkan Kas ke Owner / Bank',
+        'cash_deposit.validate' => 'Periksa & Tutup Setoran Kas Admin',
+        'cash_deposit.approve' => 'Tutup Selisih Setoran Kas (kerugian/kelebihan diakui)',
     ],
 ];

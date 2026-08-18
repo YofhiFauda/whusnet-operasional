@@ -26,6 +26,7 @@ class Payment extends Model
         'invoice_id',
         'payment_batch_id',
         'collector_deposit_id',
+        'cash_deposit_id',
         'customer_id',
         'pop_id',
         'payment_date',
@@ -122,6 +123,21 @@ class Payment extends Model
     public function collectorDeposit(): BelongsTo
     {
         return $this->belongsTo(CollectorDeposit::class, 'collector_deposit_id');
+    }
+
+    /**
+     * Setoran kas admin yang menyerap pembayaran ini.
+     *
+     * Hanya terisi untuk pembayaran MANUAL di kantor (`collected_by` null).
+     * Pembayaran yang ditagih kolektor masuk kas lewat setoran kolektornya,
+     * bukan lewat kolom ini — menautkan keduanya membuat uang yang sama
+     * terhitung dua kali.
+     *
+     * @return BelongsTo<CashDeposit, $this>
+     */
+    public function cashDeposit(): BelongsTo
+    {
+        return $this->belongsTo(CashDeposit::class, 'cash_deposit_id');
     }
 
     /**

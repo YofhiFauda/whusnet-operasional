@@ -35,6 +35,7 @@ class CollectorDeposit extends Model
         'settlement_amount',
         'settled_amount',
         'settles_deposit_id',
+        'cash_deposit_id',
         'note',
         'submitted_at',
         'verified_by',
@@ -68,6 +69,14 @@ class CollectorDeposit extends Model
     public function collector(): BelongsTo
     {
         return $this->belongsTo(User::class, 'collector_id');
+    }
+
+    /**
+     * @return BelongsTo<Pop, $this>
+     */
+    public function pop(): BelongsTo
+    {
+        return $this->belongsTo(Pop::class, 'pop_id');
     }
 
     /**
@@ -105,6 +114,39 @@ class CollectorDeposit extends Model
         return Money::of($this->payments()
             ->where('payment_status', PaymentStatus::VALID->value)
             ->sum('amount'));
+    }
+
+    /**
+     * Setoran kas admin yang menyerap uang setoran ini — `null` selama uangnya
+     * masih ada di tangan admin.
+     *
+     * @return BelongsTo<CashDeposit, $this>
+     */
+    public function cashDeposit(): BelongsTo
+    {
+        return $this->belongsTo(CashDeposit::class, 'cash_deposit_id');
+    }
+
+    /**
+     * Uang yang benar-benar mendarat di kas kantor dari setoran ini.
+     *
+     * Yang dipakai `declared_amount` (uang fisik yang dihitung di meja), BUKAN
+     * `computedAmount()`: yang berpindah ke brankas adalah lembaran uangnya,
+     * bukan angka yang tercatat sistem. Kurang setor otomatis terpantul di sini
+     * tanpa penyesuaian tambahan.
+     *
+     * Selisih POSITIF dikurangkan lagi karena kelebihan setor dikembalikan
+     * fisik ke kolektor saat itu juga (§B-8 no. 6) — uang itu tak pernah
+     * menjadi kas kantor. Kalau tidak dikurangkan, admin diminta menyetorkan
+     * uang yang sudah dia kembalikan.
+     *
+     * docs/plan/kolektor/analisa-setoran-kas-admin.md §2.
+     */
+    public function cashReceivedByOffice(): float
+    {
+        $lebih = Money::atLeastZero($this->difference);
+
+        return Money::atLeastZero(Money::sub($this->declared_amount, $lebih));
     }
 
     /**

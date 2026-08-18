@@ -7,6 +7,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
 use App\Events\CollectorActivityUpdated;
+use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
 use App\Models\Customer;
 use App\Models\District;
@@ -17,6 +18,7 @@ use App\Models\Pop;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Services\AdminCashBalanceService;
 use App\Services\CollectorBalanceService;
 use App\Services\CollectorVisitService;
 use App\Services\CollectorWorklistService;
@@ -61,6 +63,7 @@ class CollectorWorksheetController extends Controller
         private readonly CollectorBalanceService $balance,
         private readonly CollectorVisitService $visits,
         private readonly EffectiveAccessService $access,
+        private readonly AdminCashBalanceService $cash,
     ) {}
 
     /**
@@ -154,8 +157,56 @@ class CollectorWorksheetController extends Controller
 
         $activityChannels = $this->activityChannels($request->user());
 
+        // Posisi kas ADMIN yang sedang membuka halaman ini. Ditampilkan di sini
+        // karena inilah tempat uang kolektor berpindah tangan: begitu admin
+        // memverifikasi setoran, uangnya menjadi tanggung jawab dia — dan
+        // sebelum modul Setoran Kas ada, perpindahan itu tak pernah tercatat
+        // di mana pun (docs/plan/kolektor/analisa-setoran-kas-admin.md §1).
+        $kasTunai = $this->cash->tunaiBelumDisetor($request->user());
+        $kasNonTunai = $this->cash->nonTunaiRekap($request->user());
+        $kasSelisih = $this->cash->selisihTerbuka($request->user());
+
+        // Cuma JUMLAH sumber, bukan barisnya. Halaman ini sudah menarik daftar
+        // kolektor, seluruh tunggakan, dan pelanggan tak ber-kolektor —
+        // menambah dua query agregat aman, menambah dua daftar penuh tidak.
+        // Rincian per pelanggan tetap jadi urusan halaman Setoran Kas (§9.1).
+        $kasSumberCount = $this->cash->unsettledCollectorDepositsQuery($request->user())->count()
+            + $this->cash->unsettledManualPaymentsQuery($request->user())->count();
+
+        // Kunci idempotensi dibuat SERVER-SIDE per pemuatan halaman: klik dobel
+        // atau retry jaringan tidak boleh melahirkan dua setoran atas uang yang
+        // sama.
+        $kasIdempotencyKey = (string) str()->uuid();
+
+        // Riwayat setoran SENDIRI — pandangan PENYETOR (§10).
+        //
+        // Sengaja tidak memuat `payments.customer` maupun nama kolektor:
+        // pertanyaan admin di sini cuma "setoran saya sudah diperiksa belum",
+        // bukan "uang itu dari pelanggan siapa". Rincian sampai tingkat
+        // pelanggan adalah pandangan PEMERIKSA dan tinggal di `/cash-deposits`.
+        // Yang di-eager-load hanya kolom nominal, supaya total tetap bisa
+        // dihitung tanpa N+1 dan tanpa menarik data pelanggan.
+        $kasRiwayat = CashDeposit::query()
+            ->realDeposits()
+            ->where('depositor_id', $request->user()->id)
+            ->with([
+                'verifier:id,name',
+                'collectorDeposits:id,cash_deposit_id,declared_amount,difference',
+                'manualPayments:id,cash_deposit_id,amount',
+            ])
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
+            ->paginate(5, ['*'], 'kas_page')
+            ->withQueryString();
+
         return view('collector-worksheet.index', compact(
             'activityChannels',
+            'kasTunai',
+            'kasNonTunai',
+            'kasSelisih',
+            'kasSumberCount',
+            'kasIdempotencyKey',
+            'kasRiwayat',
             'collectors',
             'unassignedCustomers',
             'search',

@@ -46,7 +46,7 @@ $functionalCategories = [
         'subtitle' => 'Penerbitan tagihan bulanan, pencatatan pembayaran kasir, serta penagihan lapangan kolektor.',
         'icon' => 'credit-card',
         'badge' => 'bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800',
-        'features' => ['invoices', 'payments', 'kolektor', 'collector_worksheet'],
+        'features' => ['invoices', 'payments', 'kolektor', 'collector_worksheet', 'cash_deposit'],
     ],
     'group_reports' => [
         'title' => 'Dashboard & Laporan',
@@ -93,6 +93,7 @@ $featureMeta = [
     'payments' => ['name' => 'Pencatatan Pembayaran & Kasir', 'desc' => 'Input pembayaran tagihan, penerimaan uang kasir, upload bukti bayar, dan verifikasi.'],
     'kolektor' => ['name' => 'Worklist Penagihan Kolektor', 'desc' => 'Tampilan khusus penagih lapangan (Kolektor) untuk mencatat uang tagihan yang diterima di tempat.'],
     'collector_worksheet' => ['name' => 'Pengawasan Admin Kolektor', 'desc' => 'Dashboard monitor admin untuk memantau setoran kas penagihan dari para kolektor.'],
+    'cash_deposit' => ['name' => 'Setoran Kas Admin ke Owner / Bank', 'desc' => 'Uang yang sudah diterima admin (dari setoran kolektor + pembayaran tunai di kantor) diteruskan ke Owner atau rekening bank, lalu diperiksa.'],
     'reports' => ['name' => 'Laporan Operasional & Keuangan', 'desc' => 'Laporan rekapitulasi pembayaran, piutang pelanggan, statistik aktivasi, dan cetak laporan.'],
     'audit_logs' => ['name' => 'Catatan Aktivitas Sistem (Audit Log)', 'desc' => 'Jejak audit keamanan yang mencatat seluruh aksi penting pengguna dalam sistem.'],
 ];
@@ -282,6 +283,10 @@ $permissionDescMap = [
     'collector_worksheet.approve' => 'Hapus buku selisih setoran — titik kerugian diakui. Sengaja tidak diberikan ke admin yang memverifikasi.',
     'collector_worksheet.print' => 'Cetak kwitansi pembayaran ber-QR untuk seorang kolektor.',
     'collector_worksheet.upload' => 'Unggah kwitansi terpindai, cocokkan manual, dan lepas kecocokannya.',
+    'cash_deposit.create' => 'Memegang kas & menyetorkannya ke Owner/bank dari Worksheet Admin, plus melihat riwayat setorannya SENDIRI. Ini yang dibutuhkan admin.',
+    'cash_deposit.view' => 'Pandangan PEMERIKSA: posisi kas admin mana pun dalam scope, antrean pemeriksaan, dan rincian sumber sampai nama pelanggan. Bukan untuk admin penyetor.',
+    'cash_deposit.validate' => 'Periksa uang yang diserahkan lalu tutup setoran kas. Pemeriksa tidak boleh sama dengan penyetor.',
+    'cash_deposit.approve' => 'Tutup selisih kas — titik kerugian (atau kelebihan) diakui. Sengaja terpisah dari memeriksa.',
 
     // ── Laporan ──────────────────────────────────────────────────
     'reports.view' => 'Buka SEMUA halaman laporan (pelanggan, tagihan, pembayaran, import) sekaligus tombol ekspornya.',

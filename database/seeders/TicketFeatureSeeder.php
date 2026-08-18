@@ -82,8 +82,29 @@ class TicketFeatureSeeder extends Seeder
         // terlanjur punya permission ini gak boleh error, dan barisnya masih
         // dipakai buat membaca audit log lama. Halaman Worksheet NOC sekarang
         // digerbangi `noc_worksheet.view` (feature root).
-        Feature::whereIn('code', ['noc_worksheet.masuk', 'noc_worksheet.diproses'])
-            ->update(['is_active' => false]);
+        //
+        // updateOrCreate (bukan cuma update) — di DB baru (fresh install) baris
+        // ini belum pernah ada sama sekali, cuma warisan DB lama yang sempat
+        // punya dua tab aktif. Tanpa create, config/rbac.php tetap minta
+        // permission `noc_worksheet.masuk.view`/`.diproses.view` digenerate
+        // tapi Feature-nya gak ada → rbac:generate-permissions error.
+        $retiredNocTabs = [
+            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.masuk', 'name' => 'Ticket Masuk (Nonaktif)', 'sort_order' => 1],
+            ['parent' => 'noc_worksheet', 'code' => 'noc_worksheet.diproses', 'name' => 'Ticket Diproses (Nonaktif)', 'sort_order' => 2],
+        ];
+
+        foreach ($retiredNocTabs as $sf) {
+            Feature::updateOrCreate(
+                ['code' => $sf['code']],
+                [
+                    'name' => $sf['name'],
+                    'type' => FeatureType::SUB_FEATURE,
+                    'sort_order' => $sf['sort_order'],
+                    'is_active' => false,
+                    'parent_id' => $rootIds[$sf['parent']],
+                ]
+            );
+        }
 
         app(PermissionGeneratorService::class)->generate();
 

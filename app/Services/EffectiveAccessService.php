@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ScopeType;
 use App\Models\Pop;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 
 class EffectiveAccessService
@@ -85,6 +86,43 @@ class EffectiveAccessService
         }
 
         return false;
+    }
+
+    /**
+     * SIAPA SAJA yang punya permission ini — kebalikan arah `userCan()`.
+     *
+     * Dipakai untuk memilih audiens: siapa yang perlu dikabari, siapa yang
+     * boleh muncul di daftar pilihan. Sebelum ini tiap pemanggil menuliskan
+     * daftar role-nya sendiri (`whereIn('code', ['owner', 'atasan'])`), dan
+     * daftar seperti itu langsung salah begitu Role Matrix memberikan
+     * permission yang sama ke role lain: orangnya berwenang, tapi tak pernah
+     * dikabari — kewenangan yang tak terlihat sama saja dengan tak ada.
+     *
+     * Pencocokannya mengikuti `userCan()`: exact, wildcard global `*`, feature
+     * wildcard, nested wildcard, dan prefix. Role `owner` selalu lolos karena
+     * `getPermissions()` memberinya `*` tanpa baris apa pun di
+     * `role_permissions` — kalau tidak diperlakukan khusus di sini, Owner
+     * justru jadi satu-satunya yang tak pernah masuk audiens.
+     *
+     * @return Builder<User>
+     */
+    public function usersWithPermission(string $code): Builder
+    {
+        $parts = explode('.', $code);
+
+        $wildcards = ['*', $code.'.*'];
+        if (count($parts) > 1) {
+            $wildcards[] = $parts[0].'.*';
+        }
+
+        return User::query()->whereHas('role', function ($role) use ($code, $wildcards) {
+            $role->where('code', 'owner')
+                ->orWhereHas('permissions', function ($permission) use ($code, $wildcards) {
+                    $permission->where('code', $code)
+                        ->orWhereIn('code', $wildcards)
+                        ->orWhere('code', 'like', $code.'.%');
+                });
+        });
     }
 
     /**

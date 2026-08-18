@@ -43,9 +43,9 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-34 | **Tim FOP hilang dari papan begitu ganti hari** — papan menampilkan tim lampau yang masih punya task aktif (maks 30 hari) + pecahan tunggakan di tabel beban teknisi + hapus `fop:reset-cancelled-tasks` (lihat detail di bawah) | Done — 2026-08-13 |
 | ADHOC-35 | **Riwayat Perubahan Status di Detail Task tampil dobel** — dua lapis pencatat audit; duplikat murni dicabut + timeline disaring `TaskAuditTimeline` (lihat detail di bawah) | Done — 2026-08-13 |
 | ADHOC-36 | **Pencarian pada Halaman Collector Worklist** — pencarian rute kerja berdasarkan Nama Lengkap, CID, atau No. Invoice (lihat detail di bawah) | Done — 2026-08-13 |
-| ADHOC-37 | **Jejak uang putus sesudah setoran kolektor diverifikasi** — tak ada konsep Saldo Kas Admin, dan pembayaran manual di kantor tak pernah masuk setoran apa pun. Rancangan modul **Setoran Kas** (admin → owner/bank) + Card Saldo di Worksheet Admin. Analisa & rancangan lengkap: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md) | **Terbuka** — dianalisa 2026-08-14, **belum ada kode**, menunggu persetujuan mulai koding |
+| ADHOC-37 | **Jejak uang putus sesudah setoran kolektor diverifikasi** — modul **Setoran Kas** (admin → owner/bank): saldo kas turunan, rincian sumber per kolektor/pelanggan, titik nol data historis, Card Saldo di Worksheet Admin. Analisa & rancangan: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md) | Done — 2026-08-14 |
 
-#### ADHOC-37 — Saldo Kas Admin & Modul Setoran Kas (2026-08-14) — **BELUM DIKERJAKAN**
+#### ADHOC-37 — Saldo Kas Admin & Modul Setoran Kas (2026-08-14) — **Done**
 
 **Pemicu:** pertanyaan user — setoran kolektor yang sukses seharusnya masuk ke Saldo Admin, dan perlu modul Setoran Kas dengan rincian sumber uang yang jelas untuk atasan/Owner.
 
@@ -57,7 +57,17 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 
 **Data historis — titik nol (§7):** satu baris sentinel `SETKAS-0000-0000` berstatus `saldo_awal` (terminal keras, `declared_amount` 0, `depositor_id` NULL) menyerap seluruh sumber lama lewat `cash_deposit_id`. Cutoff berbasis tanggal **ditolak** — ia menambah aturan kedua yang harus diulang di tiap query kas dan pasti ada yang lupa; backfill retroaktif **ditolak** — mengarang riwayat setoran bank yang tak pernah terjadi.
 
-Analisa, rumus saldo, risiko & rencana test: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md).
+**Terpasang:** enum `CashDepositStatus`/`CashDepositChannel`, 3 migrasi, model `CashDeposit` (+ `CollectorDeposit::cashReceivedByOffice()`), `AdminCashBalanceService` & `CashDepositService`, `CashDepositController` + 5 route, feature RBAC `cash_deposit` (admin/pop_admin menyetor; atasan memeriksa; Owner menutup selisih), halaman `/cash-deposits` + kartu saldo di Worksheet Admin + menu sidebar. **40 test hijau** (`AdminCashBalanceTest`, `CashDepositVerificationTest`, `CashLedgerZeroPointTest`).
+
+**Halaman dibersihkan (§12, 2026-08-18):** `/cash-deposits` jadi **murni lembar kerja penerima** — kartu posisi kas admin, rincian saldo belum disetor, dan pemilih `admin_id` dicabut (itu isi Worksheet Admin). Isinya kini: card analisa penerimaan · setoran masuk dari seluruh admin dalam scope (menunggu di atas, + filter) · rincian sumber per setoran sampai nama pelanggan · aksi verifikasi/tutup selisih/unduh bukti. `cashHolderIds()` dibuang sebagai kode mati. **54 test kas hijau.**
+
+**Koreksi alur (§11, 2026-08-18):** `/cash-deposits` adalah **worksheet PENERIMA** (Owner/atasan), bukan halaman penyetor. `OwnerCashBalanceService` menutup putusnya rantai uang di anak panah terakhir: sesudah Owner memeriksa, saldo benar-benar **pindah** dari admin ke Owner — tiga angka terpisah (Brankas tunai · Masuk Bank · Dalam Perjalanan). `OwnerCashBalanceTest` (9 test).
+
+**Dua tingkat rincian (§10, 2026-08-18):** `cash_deposit.view` dicabut dari admin/pop_admin — halaman `/cash-deposits` jadi pandangan **pemeriksa** (Owner/atasan): kas admin mana pun dalam scope, antrean pemeriksaan, rincian sampai nama pelanggan. Admin dapat pandangan **penyetor** di Worksheet Admin: kartu saldo + form setor + **Riwayat Setoran Kas Anda** (tanpa nama pelanggan/kolektor). Unduh bukti dibuka untuk keduanya, tapi penyetor dibatasi ke setorannya sendiri. **44 test kas hijau.**
+
+**Koreksi letak (§9, 2026-08-18):** aksi setor pindah ke **Worksheet Admin** — tombol + panel lipat di kartu "Kas Anda", simetris dengan kolektor yang menyetor dari halaman kerjanya sendiri. `/cash-deposits` jadi **arsip & pemeriksaan** (form setor dicabut). Redirect sesudah setor dipilih dari daftar tertutup di server lewat penanda `redirect_to`, bukan URL dari klien (open-redirect).
+
+Analisa, rumus saldo, risiko, daftar berkas & test: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md).
 
 #### ADHOC-36 — Pencarian pada Halaman Collector Worklist (2026-08-13)
 

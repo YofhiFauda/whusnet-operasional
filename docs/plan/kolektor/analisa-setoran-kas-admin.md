@@ -1,14 +1,16 @@
-# BELUM DIKERJAKAN (PENDING)
+# SUDAH DIKERJAKAN
 ## Analisa Saldo Kas Admin & Rancangan Modul Setoran Kas
 
-**Tanggal:** 2026-08-14
-**Status:** dicatat atas permintaan user. **Belum ada kode yang diubah.**
+**Tanggal:** 2026-08-14 (analisa) → **diimplementasikan 2026-08-14** (ADHOC-37)
+**Status:** rancangan di bawah sudah **terpasang seluruhnya**. Perbedaan terhadap
+rancangan awal dicatat di §6 & §8.
 **Pemicu:** pertanyaan user — *"ketika setoran dari kolektor sukses, seharusnya saldo itu masuk ke Saldo Admin. Terus ada modul baru Setoran Kas, biar atasan/Owner tahu jelas dari mana sumber uangnya."*
 
 Konteks modul: [`docs/kolektor/business-logic.md`](../../kolektor/business-logic.md), [`analisa-alur-kolektor-2.0 .md`](<analisa-alur-kolektor-2.0 .md>) §11.
 
 > Modul ini **satu tingkat di atas** Setoran Kolektor. Rantai uangnya:
 > **pelanggan → kolektor → admin → owner/bank.** Hari ini rantai itu putus di anak panah ketiga.
+
 
 ---
 
@@ -189,14 +191,18 @@ memverifikasi kolektor otomatis bisa menutup setoran kasnya sendiri.
 
 ---
 
-## 6. Rencana test
+## 6. Test — TERPASANG (30 test, 85 assertion, hijau)
 
 | Test | Cakupan |
 |---|---|
-| `AdminCashBalanceTest` | rumus §2 + seluruh pengecualian: setoran belum diverifikasi, payment ditolak, non-tunai, sumber yang sudah tersetor, `LEBIH_SETOR` yang dikembalikan |
-| `CashDepositVerificationTest` | selisih dua arah, `note` wajib saat selisih, verifikator ≠ penyetor, hapus buku Owner |
-| `CashDepositPopScopeTest` | verifikator yang tak melihat seluruh sumber ditolak; `isVisibleTo()` all-or-nothing |
-| `CashLedgerZeroPointTest` | §7: sumber lama tak muncul di saldo; setoran yang belum diverifikasi saat migrasi **muncul** sesudah diverifikasi; sentinel ditolak dari `verify()`/`writeOff()`; migrasi diulang tak menggandakan apa pun; `outstandingShortfall()` kolektor tetap hidup untuk setoran `SELISIH` yang terserap |
+| `AdminCashBalanceTest` (12) | rumus §2 + seluruh pengecualian: setoran belum diverifikasi, payment ditolak, non-tunai (+ rekap per metode), sumber yang sudah tersetor, `LEBIH_SETOR` yang dikembalikan, dobel hitung jalur manual, saldo kembali nol sesudah setor, transfer tanpa bank ditolak |
+| `CashDepositVerificationTest` (11) | selisih dua arah, `note` wajib saat selisih, pemeriksa ≠ penyetor, gerbang POP scope seluruh sumber, sentinel ditolak dari `verify()`/`writeOff()`, penutupan selisih Owner, admin tanpa `validate` ditolak 403 |
+| `CashLedgerZeroPointTest` (7) | §7: sumber lama tak muncul di saldo; setoran yang belum diverifikasi saat migrasi **muncul** sesudah diverifikasi; non-tunai tak terserap; migrasi diulang tak menggandakan apa pun; `outstandingShortfall()` kolektor tetap hidup untuk setoran `SELISIH` yang terserap; sentinel tak pernah muncul di daftar |
+
+**Beda dari rencana:** `CashDepositPopScopeTest` **tidak dibuat sebagai file terpisah** — guard
+scope-nya hidup di jalur verifikasi, jadi kasusnya ditaruh di `CashDepositVerificationTest`
+bersama guard lain yang menjaga transisi yang sama. Bahan skenario ketiganya dibagi lewat
+trait `Tests\Concerns\BuildsCashLedgerScenario` supaya ketiga file berangkat dari data identik.
 
 ---
 
@@ -268,7 +274,246 @@ tak masuk daftar setoran maupun laporan Owner. Guard-nya di `CashDepositService`
 
 ---
 
-## 8. Catatan scope
+## 8. Berkas yang terpasang (ADHOC-37, 2026-08-14)
 
-Modul ini **di luar Sprint 8.10** (Audit Trail + Notification System). Dicatat sebagai **ADHOC-37**,
-belum dikerjakan, menunggu persetujuan user untuk mulai koding.
+| Lapis | Berkas |
+|---|---|
+| Enum | `app/Enums/CashDepositStatus.php`, `app/Enums/CashDepositChannel.php` |
+| Migrasi | `2026_08_14_100001_create_cash_deposits_table.php`, `..._100002_add_cash_deposit_id_to_money_sources.php`, `..._100003_seed_cash_ledger_zero_point.php` |
+| Model | `app/Models/CashDeposit.php` + `CollectorDeposit::cashReceivedByOffice()`/`cashDeposit()`, `Payment::cashDeposit()` |
+| Service | `app/Services/AdminCashBalanceService.php`, `app/Services/CashDepositService.php` |
+| Controller | `app/Http/Controllers/CashDepositController.php` |
+| Route | `routes/web.php` — `cash-deposits.{index,store,verify,write-off,download}` |
+| RBAC | feature `cash_deposit` di `FeatureSeeder`, `config/rbac.php` (4 action + label), `RolePermissionSeeder` (admin & pop_admin: view+create; atasan: view+validate; Owner lewat `*`) |
+| View | `resources/views/cash-deposits/index.blade.php`, `resources/views/partials/admin-cash-balance-card.blade.php`, kartu di `collector-worksheet/index.blade.php`, menu sidebar |
+| Test | `AdminCashBalanceTest`, `CashDepositVerificationTest`, `CashLedgerZeroPointTest`, trait `Tests\Concerns\BuildsCashLedgerScenario` |
+
+**Pembagian permission yang dipilih (turunan D3):** admin & pop_admin *menyetor* tapi tidak
+memeriksa; atasan *memeriksa* tapi tidak menyetor — atasan tak pernah punya saldo sendiri, jadi
+mustahil jadi penyetor sekaligus pemeriksa. `approve` (menutup selisih) tetap Owner saja.
+
+**Catatan scope:** modul ini di luar Sprint 8.10 (Audit Trail + Notification System), dikerjakan
+sebagai **ADHOC-37** atas permintaan user.
+
+---
+
+## 9. Koreksi letak: aksi setor pindah ke Worksheet Admin (2026-08-18) — **TERPASANG**
+
+**Pemicu:** user — *"setoran dari admin ke owner sudah benar, tapi posisinya kurang benar. Seharusnya ada di halaman Worksheet Admin lewat tombol di Card."*
+
+**Sebab salah letak:** modul ini lahir sebagai halaman sendiri, padahal padanannya di sisi kolektor
+tidak begitu — kolektor menyetor dari **halaman kerjanya sendiri** (`/collector-worklist`), bukan
+dari halaman setoran terpisah. Admin harus simetris: dia bekerja di `/collector-worksheet`, dan di
+situ pula uangnya berpindah tangan (§1 — verifikasi setoran kolektor terjadi persis di halaman itu).
+
+### 9.1 Pembagian baru: aksi vs arsip
+
+| Halaman | Perannya | Audiens |
+|---|---|---|
+| `/collector-worksheet` | **AKSI** — lihat saldo, setorkan kas | admin, pop_admin |
+| `/cash-deposits` | **ARSIP & PEMERIKSAAN** — riwayat, rincian per kolektor/pelanggan, verifikasi, tutup selisih, unduh bukti | Owner, atasan (admin membaca miliknya) |
+
+Yang dibutuhkan admin saat memegang uang cuma satu tombol. Rincian per pelanggan dan riwayat adalah
+pekerjaan PEMERIKSA, bukan penyetor — memaksa keduanya ke satu halaman membuat halaman aksi penuh
+hal yang tak dipakai saat beraksi.
+
+### 9.2 Keputusan user (2026-08-18)
+
+| # | Pertanyaan | Keputusan |
+|---|---|---|
+| D5 | Bentuk form setor | **Panel lipat di bawah kartu** (Alpine `x-collapse`) — pola yang sama dengan form verifikasi setoran kolektor yang sudah inline di kartu setoran. Bukan modal/drawer: tak menambah pola baru. |
+| D6 | Nasib `/cash-deposits` | **Jadi arsip & pemeriksaan.** Form setor dicabut dari sana — satu aksi, satu tempat. Dua jalur UI untuk satu aksi adalah cara tercepat keduanya menyimpang. |
+| D7 | Menu sidebar | **Tetap**, digerbang `cash_deposit.view`. Owner/atasan butuh jalan langsung ke antrean pemeriksaan tanpa lewat halaman kolektor. |
+
+### 9.3 Perubahan
+
+1. **`partials/admin-cash-balance-card.blade.php`** — parameter baru `$dapatSetor` & `$sumberCount`.
+   Bila `$dapatSetor`, kartu Tunai tumbuh: baris "N sumber" + tombol **Setorkan Kas** yang membuka
+   panel. `/cash-deposits` memanggilnya dengan `dapatSetor = false`, jadi satu berkas tetap melayani
+   dua halaman dan angkanya mustahil menyimpang.
+2. **`partials/cash-deposit-form.blade.php`** (baru) — isi panel lipat. Dipisah supaya
+   `collector-worksheet/index.blade.php` tidak membengkak.
+3. **`CollectorWorksheetController::index()`** — tambah `$kasSumberCount` (dua `count()`, TIDAK
+   menarik baris; halaman ini sudah berat) dan `$kasIdempotencyKey` per pemuatan halaman.
+4. **`CashDepositController`** — `index()` melepas `$idempotencyKey`; `store()` menerima
+   `redirect_to` dan memilih tujuan dari **daftar tertutup di server** (`worksheet` →
+   `collector-worksheet.index`, selain itu → `cash-deposits.index`). Bukan URL mentah dari klien —
+   itu open-redirect.
+5. **`cash-deposits/index.blade.php`** — blok form setor dicabut; sisanya utuh.
+
+**Tidak berubah:** service, enum, migrasi, model, route, permission, guard POP scope, sentinel titik
+nol. Ini murni pemindahan titik masuk UI.
+
+### 9.4 Test tambahan
+
+- setor dengan `redirect_to=worksheet` mendarat di Worksheet Admin; tanpa parameter tetap ke
+  `/cash-deposits`; nilai `redirect_to` asing TIDAK PERNAH jadi tujuan (jaring open-redirect);
+- tombol setor tidak dirender saat saldo nol maupun untuk user tanpa `cash_deposit.create`;
+- `/cash-deposits` tidak lagi memuat form setor.
+
+**Hasil:** enam test baru di `AdminCashBalanceTest` (bagian "Letak aksi setor"), total **40 test kas
+hijau** (110 assertion). Regresi Worksheet/Kolektor/PostTarget/RBAC: 183 passed, 3 skipped.
+
+---
+
+## 10. Dua tingkat rincian: penyetor vs pemeriksa (2026-08-18) — **TERPASANG**
+
+**Pemicu:** user — *"rincian ada dua: rincian untuk Admin dan rincian untuk orang yang punya akses
+Setoran Kas, karena kalau admin mengakses halaman itu isinya data sensitif."*
+
+**Sebab:** sesudah §9, `/cash-deposits` masih digerbang `cash_deposit.view` yang ikut dipegang
+admin — padahal isinya pandangan PEMERIKSA: posisi kas admin mana pun dalam scope, antrean
+pemeriksaan lintas penyetor, dan rincian sampai tingkat pelanggan. Admin yang cuma menyetor tak
+berkepentingan membaca sebaran uang rekan-rekannya.
+
+### 10.1 Pembagian
+
+| Pandangan | Permission | Tempat | Isi |
+|---|---|---|---|
+| **Penyetor** | `cash_deposit.create` | Worksheet Admin | Kartu saldo + form setor + **Riwayat Setoran Kas Anda** (nomor, tanggal, channel/bank, total tercatat, uang diterima, selisih, pemeriksa, unduh bukti sendiri) |
+| **Pemeriksa** | `cash_deposit.view` | `/cash-deposits` | Seluruh isi di atas untuk admin mana pun dalam scope + rincian sumber sampai **nama pelanggan** + antrean pemeriksaan + pemilih pemegang kas |
+
+Riwayat penyetor **tidak memuat nama pelanggan maupun nama kolektor**: pertanyaan admin di sini
+cuma *"setoran saya sudah diperiksa belum, hasilnya apa"*. Selisih tetap ditampilkan penuh — itu
+kewajiban (atau kelebihan) yang menyangkut dirinya langsung, bukan temuan internal pemeriksa.
+
+### 10.2 Perubahan
+
+1. **`RolePermissionSeeder`** — `cash_deposit.view` **dicabut** dari `admin` & `pop_admin`; keduanya
+   tinggal `cash_deposit.create`. Owner/atasan tetap memegang `view`.
+2. **`routes/web.php`** — `/cash-deposits` tetap `cash_deposit.view`. Rute **unduh bukti** dipisah ke
+   `permission:cash_deposit.view|cash_deposit.create`: penyetor harus tetap bisa mengambil kembali
+   berkas yang dia unggah sendiri.
+3. **`CashDepositController::download()`** — pemegang `create` tanpa `view` dibatasi ke setoran
+   miliknya sendiri. Tanpa itu, rute yang sengaja dibuka untuknya berubah jadi jalan membaca bukti
+   setoran admin lain, termasuk nomor rekening tujuan yang bukan urusannya.
+4. **`partials/admin-cash-deposit-history.blade.php`** (baru) + `$kasRiwayat` di
+   `CollectorWorksheetController::index()` — 5 baris per halaman, eager-load hanya kolom nominal
+   (`declared_amount`, `difference`, `amount`) supaya total tetap terhitung tanpa N+1 dan tanpa
+   menarik data pelanggan.
+5. **Tautan** ke `/cash-deposits` (kartu & form) hanya dirender untuk pemegang `view` — menawarkannya
+   ke admin biasa cuma melahirkan 403 sesudah diklik. Menu sidebar ikut hilang sendiri karena sudah
+   digerbang `cash_deposit.view`.
+
+**Konsekuensi D7 (§9.2) berubah:** sidebar "Setoran Kas" kini hanya muncul untuk pemeriksa. Admin
+masuk lewat Worksheet Admin, dan tak ada lagi halaman yang perlu dia buka untuk urusan kasnya.
+
+### 10.3 Test
+
+Empat test baru di `AdminCashBalanceTest`: admin penyetor **403** di `/cash-deposits`; riwayatnya
+tampil di Worksheet Admin **tanpa nama pelanggan**; riwayat hanya memuat setoran sendiri; penyetor
+**tidak bisa** mengunduh bukti setoran admin lain. Total **44 test kas hijau** (122 assertion);
+regresi Worksheet/Kolektor/PostTarget/RBAC 197 passed, 3 skipped.
+
+### 10.4 Susulan: fitur ini harus dikenali Role Matrix (2026-08-18)
+
+Temuan lapangan: di DB produksi user, `FEATURE ADA? false` dan `PERMISSION ROW []` — feature
+`cash_deposit` belum pernah di-seed, jadi barisnya tak ada di Matrix dan admin mustahil diberi hak
+apa pun. Saldonya sendiri sudah benar (Rp 12.501.304 atas nama admin yang memverifikasi
+`SETOR-2026-0010`). Owner tetap melihat semuanya karena `getPermissions()` mengembalikan `['*']`
+untuk role owner — dia lolos tanpa butuh satu baris permission pun.
+
+Perintah pemasangan di lingkungan berjalan: `php artisan db:seed --class=FeatureSeeder` lalu
+`php artisan rbac:generate-permissions`. **Jangan** `RolePermissionSeeder` — baris terakhirnya
+`$role->permissions()->sync()` yang menimpa seluruh centang Matrix yang sudah diatur manual.
+
+Dua perbaikan kode ikut dipasang:
+
+1. **`resources/views/roles/matrix.blade.php`** — `cash_deposit` didaftarkan ke grup
+   *Tagihan & Keuangan* (sebelumnya jatuh ke "Modul Tambahan Lainnya"), plus nama ramah
+   *"Setoran Kas Admin ke Owner / Bank"* dan deskripsi per-permission.
+2. **Auto-grant `view` dikecualikan** — `config/rbac.php > view_autogrant_exempt` +
+   `RoleManagementService::syncPermissions()`. Pada hampir semua fitur, mencentang aksi anak wajar
+   ikut memberi hak membuka halamannya; di sini TIDAK, karena `cash_deposit.view` adalah pandangan
+   PEMERIKSA. Tanpa pengecualian ini, satu centang "Setor" diam-diam membatalkan pemisahan dua
+   tingkat rincian yang justru jadi tujuan §10. Dijaga
+   `test_mencentang_hak_setor_tidak_ikut_memberi_pandangan_pemeriksa`.
+
+---
+
+## 11. Koreksi alur: `/cash-deposits` adalah worksheet PENERIMA (2026-08-18) — **TERPASANG**
+
+**Pemicu:** user — *"Setoran Kas itu Worksheet dari Owner yang menerima uang setoran dari Admin.
+Admin tidak boleh akses halaman ini, dan kalau saldo admin disetorkan ke Owner maka saldo itu
+pindah ke Owner."*
+
+**Kesalahan yang dikoreksi:** modul ini dibangun seolah `/cash-deposits` milik penyetor, padahal ia
+milik PENERIMA. Akibatnya rantai uang putus untuk **kedua kalinya** — persis penyakit §1, satu
+tingkat lebih tinggi: sesudah Owner memeriksa setoran, saldo admin turun (benar, uangnya sudah
+diserahkan) tapi tak ada siapa pun yang menerimanya di sistem.
+
+```
+pelanggan → kolektor → admin → owner/bank
+                ^         ^        ^
+              §11 lama   §1      §11 baru
+             (sudah OK) (sudah OK)  ← yang ditutup sekarang
+```
+
+### 11.1 `OwnerCashBalanceService` — tiga angka, tak pernah dijumlahkan
+
+| Angka | Sumber | Kenapa terpisah |
+|---|---|---|
+| **Brankas (tunai)** | `cash_deposits` diperiksa oleh viewer, `channel = tunai_brankas` → `declared_amount − max(difference, 0)` | uang fisik yang benar-benar dipegang |
+| **Masuk Bank** | idem, `channel = transfer_bank`, dibatasi periode | uangnya di rekening, tak pernah lewat tangan Owner; menjumlahkannya melahirkan "tunai" yang mustahil dihitung ulang di meja |
+| **Dalam Perjalanan** | setoran `menunggu_verifikasi` (POP-scoped), pakai `computedAmount()` | klaim satu pihak, bukan kas — dicatat terpisah supaya selisih ketahuan saat dihitung, bukan tertelan lebih dulu |
+
+Yang masuk brankas adalah **yang dihitung Owner** (`declared_amount`), bukan yang diklaim admin —
+kurang setor terpantul sendiri. Kelebihan dikurangkan lagi karena dikembalikan fisik saat itu juga,
+aturan yang sama dengan dua tingkat sebelumnya.
+
+**`DIHAPUS_BUKU` IKUT dihitung di sini**, berbeda dari perlakuan setoran kolektor di sisi admin.
+Beda arti: di sana hapus buku berarti uangnya tak pernah sampai; di sini yang ditutup adalah
+SELISIHNYA, sedangkan uang fisik yang sudah dihitung Owner tetap ada di brankasnya.
+
+### 11.2 Halaman
+
+`/cash-deposits` kini berjudul **"Setoran Kas — Penerimaan dari Admin"**, dibuka dengan kartu
+**Kas Diterima** milik pembacanya, baru disusul posisi kas admin yang sedang diperiksa. Admin
+penyetor tetap 403 (§10) — dan sekarang alasannya utuh: halaman itu memang bukan halamannya.
+
+### 11.3 Test
+
+`OwnerCashBalanceTest` (9): saldo benar-benar **pindah** admin → Owner sesudah diperiksa (dan tidak
+lebih cepat dari itu); brankas mengikuti uang yang dihitung, bukan yang diklaim; kelebihan tak
+mengendap; transfer masuk bank bukan brankas; kas melekat ke pemeriksa (atasan ≠ Owner); halaman
+tertutup untuk admin; kartu tampil untuk penerima; "dalam perjalanan" ikut POP scope pembaca;
+sentinel titik nol tak pernah terhitung.
+
+---
+
+## 12. `/cash-deposits` dibersihkan jadi murni lembar kerja penerima (2026-08-18) — **TERPASANG**
+
+**Pemicu:** user — *"Setoran Kas murni lembar kerja Owner untuk mengelola saldo yang dapat
+diverifikasi dan dianalisa, sehingga admin yang setor tidak mempunyai tampilan apa pun di sini."*
+
+**Yang masih salah sesudah §11:** halaman itu tetap menampilkan **saldo admin yang BELUM
+disetor** — kartu posisi kas admin, rincian sumber dari `unsettledCollectorDepositsQuery()`, dan
+pemilih "buka kas admin siapa". Itu isi Worksheet Admin yang dipindahkan ke halaman yang salah:
+uang yang belum diserahkan bukan urusan penerima, dan tak ada satu pun keputusan di halaman ini
+yang bergantung padanya.
+
+Yang seharusnya ditampilkan bukan saldo admin, melainkan **isi setoran yang masuk**.
+
+### 12.1 Isi halaman sekarang
+
+1. **Card analisa penerimaan** (§11.1) — Brankas tunai · Masuk Bank per rekening · Dalam Perjalanan.
+2. **Setoran masuk** dari admin mana pun dalam scope POP pembaca, yang `menunggu_verifikasi`
+   selalu di atas (satu-satunya baris yang menuntut tindakan), + filter Semua/Menunggu/Selesai.
+3. **Rincian sumber per setoran**, bisa dibuka: tiap setoran kolektor → kolektornya siapa →
+   pelanggan yang bayar & nominalnya; plus blok pembayaran tunai di loket. Inilah permintaan asli
+   user — *"atasan atau Owner tahu jelas dari mana sumber uangnya"*.
+4. **Aksi**: verifikasi (pemeriksa ≠ penyetor), tutup selisih (Owner), unduh bukti.
+
+### 12.2 Yang dicabut
+
+| Dicabut | Alasan |
+|---|---|
+| Kartu posisi kas admin + rincian saldo belum disetor | isi Worksheet Admin, bukan halaman penerima |
+| Pemilih `admin_id` di header | tak ada lagi "kas siapa yang dibuka" — halaman ini menampilkan semua setoran masuk sekaligus |
+| `AdminCashBalanceService::cashHolderIds()` | jadi kode mati begitu pemilih hilang; dibuang bersama tiga test yang menjaganya |
+
+### 12.3 Test
+
+`OwnerCashBalanceTest` naik jadi 11: ditambah *rincian sumber tampil sampai nama pelanggan* (dari
+kolektor mana, pelanggan siapa, total berapa) dan *setoran seluruh admin dalam scope tampil di satu
+halaman*. Total kas **54 test hijau** (151 assertion).

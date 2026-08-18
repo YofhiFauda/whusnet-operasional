@@ -302,7 +302,7 @@
                 @if ($k['invoice']['ada'])
                     <tr>
                         <td class="lbl">Sisa Tagihan</td>
-                        <td class="val">{{ $k['invoice']['sisa'] }}{{ $k['invoice']['lunas'] ? ' (Lunas)' : '' }}</td>
+                        <td class="val">{{ $k['invoice']['sisa'] }}{{ $k['invoice']['lunas'] ? ' ' : '' }}</td>
                     </tr>
                 @endif
             </table>

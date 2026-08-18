@@ -105,6 +105,19 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 12,
             ],
             [
+                // Setoran Kas Admin — satu tingkat DI ATAS setoran kolektor.
+                // Feature sendiri, sengaja tidak menumpang
+                // 'collector_worksheet': di sana admin yang memeriksa, di sini
+                // admin yang DIPERIKSA. Menumpang berarti tiap admin yang boleh
+                // memverifikasi kolektor otomatis boleh menutup setoran kasnya
+                // sendiri.
+                // docs/plan/kolektor/analisa-setoran-kas-admin.md §4.5.
+                'code' => 'cash_deposit',
+                'name' => 'Setoran Kas (Admin → Owner/Bank)',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 12,
+            ],
+            [
                 'code' => 'reports',
                 'name' => 'Laporan',
                 'type' => FeatureType::ROOT,

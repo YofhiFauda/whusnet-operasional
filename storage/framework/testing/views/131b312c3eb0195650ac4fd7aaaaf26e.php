@@ -235,6 +235,19 @@
                     </a>
                     <?php endif; ?>
 
+                    <?php if(auth()->user()->hasPermission('cash_deposit.view')): ?>
+                    <a href="<?php echo e(route('cash-deposits.index')); ?>" title="Setoran Kas (Admin → Owner/Bank)"
+                       class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                              <?php echo e(Request::is('cash-deposits*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('cash-deposits*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3Z"/>
+                            </svg>
+                            <span class="sidebar-text">Setoran Kas</span>
+                        </div>
+                    </a>
+                    <?php endif; ?>
+
                     <?php if(auth()->user()->hasPermission('kolektor.view')): ?>
                     <a href="<?php echo e(route('collector-worklist.index')); ?>" title="Worklist Kolektor"
                        class="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors

@@ -60,6 +60,12 @@ class RolePermissionSeeder extends Seeder
                 'tickets.selesai.view',
                 'tickets.dibatalkan.view',
                 'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
+                // Setoran Kas: atasan MEMERIKSA, tidak menyetor. `create`
+                // sengaja tak diberikan — atasan bukan pemegang kas, dan tanpa
+                // saldo sendiri dia mustahil jadi penyetor sekaligus pemeriksa.
+                // `approve` (menutup selisih) tetap Owner lewat wildcard `*`.
+                'cash_deposit.view',
+                'cash_deposit.validate',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -92,6 +98,18 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.print',
                 'collector_worksheet.upload',
+                // Setoran Kas: admin MENYETOR, tidak memeriksa. `validate` &
+                // `approve` sengaja tidak diberikan — pemeriksa setoran kas
+                // adalah Owner/atasan, dan admin yang memeriksa setorannya
+                // sendiri membuat cross check jadi tanda tangan di atas kertas
+                // sendiri.
+                //
+                // `view` juga TIDAK diberikan: halaman /cash-deposits adalah
+                // pandangan PEMERIKSA — posisi kas admin mana pun lintas POP,
+                // antrean pemeriksaan, dan rincian sampai tingkat pelanggan.
+                // Admin cukup melihat kas & riwayat SETORANNYA SENDIRI, dan itu
+                // sudah tersaji di Worksheet Admin lewat `create` (§10).
+                'cash_deposit.create',
                 'reports.*',
                 'audit_logs.view',
                 'audit_logs.export',
@@ -286,6 +304,10 @@ class RolePermissionSeeder extends Seeder
                 'collector_worksheet.validate',
                 'collector_worksheet.print',
                 'collector_worksheet.upload',
+                // Sama seperti admin: pop_admin memegang kas cabangnya, jadi
+                // menyetor — bukan memeriksa, dan tidak membuka pandangan
+                // pemeriksa (§10).
+                'cash_deposit.create',
                 'reports.view',
                 'reports.export',
                 'tickets.*',
