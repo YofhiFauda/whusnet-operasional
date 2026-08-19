@@ -528,6 +528,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/installation/report', [CustomerInstallationController::class, 'report'])->name('customers.installation.report');
         Route::post('/customers/{customer}/installation/start', [CustomerInstallationController::class, 'start'])->name('customers.installation.start');
         Route::post('/customers/{customer}/installation', [CustomerInstallationController::class, 'store'])->name('customers.installation.store');
+        Route::post('/customers/{customer}/installation/pemasangan', [CustomerInstallationController::class, 'storePemasangan'])->name('customers.installation.pemasangan');
+        Route::post('/customers/{customer}/installation/speedtest', [CustomerInstallationController::class, 'storeSpeedtest'])->name('customers.installation.speedtest');
         Route::post('/customers/{customer}/test-report', [CustomerTestReportController::class, 'store'])->name('customers.test-report.store');
     });
 

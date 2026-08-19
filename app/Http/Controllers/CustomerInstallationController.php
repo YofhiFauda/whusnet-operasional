@@ -223,7 +223,19 @@ class CustomerInstallationController extends Controller
             ? $installWorkTools
             : $workToolService->surveyRowsForCustomer($customer);
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo'));
+        // Gerbang Laporan Speedtest (ADHOC): panel step 6 cuma kebuka kalau
+        // Laporan Pemasangan & Perangkat sudah lengkap — 3 foto wajib +
+        // minimal satu baris material terpakai. Dihitung dari data
+        // tersimpan, BUKAN dari status installation, supaya tahan reload
+        // & tidak butuh kolom baru buat menandai "tahap pemasangan selesai".
+        $pemasanganComplete = $installation
+            && $installation->installation_photo
+            && $installation->contract_photo
+            && $installation->signature_photo
+            && $installFopTask
+            && $installFopTask->materials()->terpakai()->exists();
+
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -540,6 +552,349 @@ class CustomerInstallationController extends Controller
             DB::rollBack();
 
             return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Simpan Laporan Pemasangan & Perangkat (step 5 wizard) — TIDAK
+     * menyelesaikan task/transisi workflow. Ini "tombol Aktivasi" yang
+     * membuka Laporan Speedtest (step 6): tanpa data pemasangan lengkap
+     * di sini, panel speedtest di report() tetap terkunci.
+     *
+     * Sengaja endpoint TERPISAH dari store() (dipakai modal admin
+     * customers/tabs/_installation.blade.php) — store() tetap dipertahankan
+     * apa adanya supaya alur admin manual (radio installation_status) tidak
+     * ikut berubah perilaku.
+     */
+    public function storePemasangan(Request $request, Customer $customer)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['installation_in_progress', 'revision_installation'], true),
+            403,
+            'Data pemasangan pelanggan ini sudah melewati tahap pemasangan dan tidak dapat diubah oleh role Anda.'
+        );
+
+        $assignmentTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($assignmentTask && $assignmentTask->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
+        );
+
+        $validated = $request->validate([
+            'device_type' => 'required|string|in:modem,ont,onu,router,other',
+            'brand' => 'nullable|string|max:100',
+            'model' => 'nullable|string|max:100',
+            'serial_number' => 'nullable|string|max:100',
+            'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
+            'wifi_ssid' => 'nullable|string|max:150',
+            'wifi_password' => 'nullable|string|max:150',
+            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'pppoe_username' => 'nullable|string|max:150',
+            'pppoe_password' => 'nullable|string|max:150',
+            'ip_address' => 'nullable|string|max:50',
+            'router_number' => 'nullable|string|max:50',
+            'odp_number' => 'nullable|string|max:100',
+            'odp_port' => 'nullable|string|max:50',
+            'olt_number' => 'nullable|string|max:50',
+            'olt_slot' => 'nullable|string|max:20',
+            'olt_port' => 'nullable|string|max:50',
+            'vlan' => 'nullable|string|max:20',
+            'initial_attenuation' => 'nullable|string|max:50',
+
+            'installation_photo' => 'nullable|image|max:2048',
+            'contract_photo' => 'nullable|image|max:2048',
+            'signature_photo' => 'nullable|image|max:2048',
+            'installation_note' => 'nullable|string',
+
+            'started_at' => 'nullable|date',
+
+            'materials' => 'nullable|array',
+            'materials.*.item_id' => 'nullable|integer|exists:items,id',
+            'materials.*.item_name' => 'nullable|string|max:150',
+            'materials.*.item_type' => ['nullable', 'string', Rule::exists('item_categories', 'code')->where('is_active', true)],
+            'materials.*.qty' => 'nullable|numeric|min:0',
+            'materials.*.unit' => 'nullable|string|max:20',
+            'materials.*.note' => 'nullable|string|max:255',
+            'work_tools_ids' => 'nullable|array',
+            'work_tools_ids.*' => 'nullable|integer|exists:work_tools,id',
+            'work_tools_manual' => 'nullable|array',
+            'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
+            'work_tools_manual.*.note' => 'nullable|string|max:255',
+        ]);
+
+        $installation = $customer->installations()->latest()->first();
+        if (! $installation) {
+            return redirect()->back()->withInput()->with('error', 'Data pemasangan belum dimulai — tekan "Start Proses" terlebih dahulu.');
+        }
+
+        // Sama seperti gerbang "completed" di store(): tiga foto + minimal
+        // satu baris material adalah syarat wajib SEBELUM Laporan Speedtest
+        // boleh dibuka — di sinilah gerbang itu sebenarnya ditegakkan.
+        if (! $installation->installation_photo && ! $request->hasFile('installation_photo')) {
+            return redirect()->back()->withInput()->withErrors(['installation_photo' => 'Foto pemasangan lapangan wajib diunggah.']);
+        }
+        if (! $installation->contract_photo && ! $request->hasFile('contract_photo')) {
+            return redirect()->back()->withInput()->withErrors(['contract_photo' => 'Foto kontrak wajib diunggah.']);
+        }
+        if (! $installation->signature_photo && ! $request->hasFile('signature_photo')) {
+            return redirect()->back()->withInput()->withErrors(['signature_photo' => 'Foto tanda tangan pelanggan wajib diunggah.']);
+        }
+
+        $hasMaterial = collect($validated['materials'] ?? [])->contains(
+            fn ($row) => (float) ($row['qty'] ?? 0) > 0
+                && (! empty($row['item_id']) || trim((string) ($row['item_name'] ?? '')) !== '')
+        );
+        if (! $hasMaterial) {
+            return redirect()->back()->withInput()->withErrors(['materials' => 'Perangkat pasif terpakai wajib diisi minimal satu baris.']);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if ($request->hasFile('installation_photo')) {
+                $installation->installation_photo = FileUploadService::uploadInstallationPhoto($request->file('installation_photo'), $customer, 'pemasangan');
+            }
+            if ($request->hasFile('contract_photo')) {
+                $installation->contract_photo = FileUploadService::uploadInstallationPhoto($request->file('contract_photo'), $customer, 'kontrak');
+            }
+            if ($request->hasFile('signature_photo')) {
+                $installation->signature_photo = FileUploadService::uploadInstallationPhoto($request->file('signature_photo'), $customer, 'ttd');
+            }
+            $installation->installation_note = $validated['installation_note'] ?? null;
+
+            // Status TETAP in_progress di sini — completed baru ditetapkan di
+            // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
+            $installation->installation_status = 'in_progress';
+
+            if (! empty($validated['started_at'])) {
+                $installation->started_at = $validated['started_at'];
+            }
+
+            $task = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->latest('id')
+                ->first();
+            if ($task && ! $installation->fop_id) {
+                $installation->fop_id = $task->fop_id ?? $task->created_by;
+            }
+
+            $installation->save();
+
+            // Redaman awal disimpan di customer_technical_details, bukan
+            // kolom installation — konsisten dengan store() & modal admin.
+            CustomerTechnicalDetail::updateOrCreate(
+                ['customer_id' => $customer->id],
+                array_filter([
+                    'ssid' => $validated['wifi_ssid'] ?? null,
+                    'router_mac' => $validated['mac_address'] ?? null,
+                    'router_or_ont_serial' => $validated['serial_number'] ?? null,
+                    'odp_number' => $validated['odp_number'] ?? null,
+                    'odp_port' => $validated['odp_port'] ?? null,
+                    'olt_number' => $validated['olt_number'] ?? null,
+                    'olt_slot' => $validated['olt_slot'] ?? null,
+                    'olt_port' => $validated['olt_port'] ?? null,
+                    'vlan' => $validated['vlan'] ?? null,
+                    'router_number' => $validated['router_number'] ?? null,
+                    'initial_attenuation' => $validated['initial_attenuation'] ?? null,
+                ], fn ($v) => $v !== null)
+            );
+
+            $materialService = app(TaskMaterialService::class);
+            $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN)
+                ?? app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::PEMASANGAN);
+
+            if ($installFopTask) {
+                $materialService->sync(
+                    $installFopTask,
+                    MaterialKind::TERPAKAI,
+                    $validated['materials'] ?? [],
+                    auth()->id()
+                );
+
+                $workToolService = app(TaskWorkToolService::class);
+                $workToolService->sync(
+                    $installFopTask,
+                    $workToolService->rowsFromRequest(
+                        $validated['work_tools_ids'] ?? [],
+                        $validated['work_tools_manual'] ?? []
+                    ),
+                    auth()->id()
+                );
+            }
+
+            $customer->customerDevice()->updateOrCreate(
+                ['customer_id' => $customer->id],
+                [
+                    'device_type' => $validated['device_type'] ?? null,
+                    'brand' => $validated['brand'] ?? null,
+                    'model' => $validated['model'] ?? null,
+                    'serial_number' => $validated['serial_number'] ?? null,
+                    'mac_address' => $validated['mac_address'] ?? null,
+                    'wifi_ssid' => $validated['wifi_ssid'] ?? null,
+                    'wifi_password' => $validated['wifi_password'] ?? null,
+                    'connection_mode' => $validated['connection_mode'] ?? null,
+                    'pppoe_username' => $validated['pppoe_username'] ?? null,
+                    'pppoe_password' => $validated['pppoe_password'] ?? null,
+                    'ip_address' => $validated['ip_address'] ?? null,
+                ]
+            );
+
+            DB::commit();
+
+            return redirect()->route('customers.installation.report', [
+                'customer' => $customer->id,
+                'return_to' => $request->input('return_to'),
+                'activated' => 1,
+            ])->with('success', 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            // withInput() — tanpa ini, satu exception tak terduga (mis. disk
+            // penuh saat upload foto) membuat SEMUA isian step 5 yang baru
+            // diketik teknisi keliatan hilang begitu halaman reload.
+            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Simpan Laporan Uji Koneksi (Speedtest, step 6 wizard) — SATU-SATUNYA
+     * titik penyelesaian pemasangan di alur wizard teknisi (task complete +
+     * transisi workflow ke verification_admin). Ditolak kalau Laporan
+     * Pemasangan & Perangkat belum lengkap — lihat gerbang di report().
+     */
+    public function storeSpeedtest(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
+    {
+        abort_unless(auth()->user()->hasPermission('customers.detail.installation.update'), 403);
+
+        abort_unless(
+            in_array($customer->status, ['installation_in_progress', 'revision_installation'], true),
+            403,
+            'Data pemasangan pelanggan ini sudah melewati tahap pemasangan dan tidak dapat diubah oleh role Anda.'
+        );
+
+        $assignmentTask = Task::where('customer_id', $customer->id)
+            ->where('task_type', TaskType::PEMASANGAN->value)
+            ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+            ->latest('id')
+            ->first();
+
+        abort_unless(
+            auth()->user()->hasFullAccess()
+                || ($assignmentTask && $assignmentTask->teamMembers->pluck('user_id')->contains(auth()->id())),
+            403,
+            'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
+        );
+
+        $installation = $customer->installations()->latest()->first();
+
+        $materialService = app(TaskMaterialService::class);
+        $installFopTask = $materialService->resolveTaskFor($customer, TaskType::PEMASANGAN);
+
+        abort_unless(
+            $installation
+                && $installation->installation_photo
+                && $installation->contract_photo
+                && $installation->signature_photo
+                && $installFopTask
+                && $installFopTask->materials()->terpakai()->exists(),
+            422,
+            'Selesaikan dan simpan Laporan Pemasangan & Perangkat (tekan Aktivasi) terlebih dahulu sebelum mengisi Laporan Speedtest.'
+        );
+
+        $validated = $request->validate([
+            'test_upload' => 'required|numeric',
+            'test_download' => 'required|numeric',
+            'jitter_ms' => 'nullable|numeric',
+            'latency_ms' => 'nullable|numeric',
+            'packet_loss_percent' => 'nullable|numeric',
+            'speedtest_photo' => 'nullable|image|max:2048',
+            'actual_attenuation' => 'nullable|string|max:50',
+            'completed_at' => 'nullable|date',
+        ]);
+
+        $techDetail = $customer->customerTechnicalDetail;
+        if (! ($techDetail?->speedtest_photo) && ! $request->hasFile('speedtest_photo')) {
+            return redirect()->back()->withInput()->withErrors(['speedtest_photo' => 'Foto hasil speedtest wajib diunggah.']);
+        }
+
+        $package = $customer->internetPackage;
+        $speed_conformity_percent = null;
+        if ($package && $package->download_speed_mbps > 0 && ! empty($validated['test_download'])) {
+            $speed_conformity_percent = ($validated['test_download'] / $package->download_speed_mbps) * 100;
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $speedtestData = [
+                'test_upload' => $validated['test_upload'] ?? null,
+                'test_download' => $validated['test_download'] ?? null,
+                'jitter_ms' => $validated['jitter_ms'] ?? null,
+                'latency_ms' => $validated['latency_ms'] ?? null,
+                'packet_loss_percent' => $validated['packet_loss_percent'] ?? null,
+                'actual_attenuation' => $validated['actual_attenuation'] ?? null,
+                'speed_conformity_percent' => $speed_conformity_percent,
+            ];
+            if ($request->hasFile('speedtest_photo')) {
+                $speedtestData['speedtest_photo'] = FileUploadService::uploadInstallationPhoto($request->file('speedtest_photo'), $customer, 'speedtest');
+            }
+
+            CustomerTechnicalDetail::updateOrCreate(['customer_id' => $customer->id], $speedtestData);
+
+            $completedAt = ! empty($validated['completed_at'])
+                ? Carbon::parse($validated['completed_at'])
+                : now();
+
+            $installation->installation_status = 'completed';
+            $installation->completed_at = $completedAt;
+            $installation->finished_date = $completedAt->toDateString();
+            $installation->end_time = $completedAt->toTimeString();
+            $installation->save();
+
+            $task = Task::where('customer_id', $customer->id)
+                ->where('task_type', TaskType::PEMASANGAN->value)
+                ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
+                ->latest('id')
+                ->first();
+            if ($task) {
+                app(TaskService::class)->complete($task, auth()->user());
+            }
+
+            $workflowService->transition($customer, 'installed');
+            $workflowService->transition($customer, 'verification_admin');
+
+            broadcast(new InstallationCompleted($customer))->toOthers();
+
+            try {
+                $telegram = app(TelegramBotService::class);
+                $message = "🛠 <b>Pemasangan Selesai</b>\n";
+                $message .= "Pelanggan: {$customer->full_name}\n";
+                $message .= "No. HP: {$customer->primary_phone}\n";
+                $message .= "POP: {$customer->pop->name}\n";
+                $message .= 'Menunggu Verifikasi Admin untuk Aktivasi & Penagihan.';
+                $telegram->sendMessage($message);
+            } catch (\Exception $e) {
+                Log::error('Gagal mengirim notifikasi Telegram: '.$e->getMessage());
+            }
+
+            DB::commit();
+
+            return redirect(SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue'))
+                ->with('success', 'Laporan Speedtest tersimpan. Status beralih ke Verifikasi Admin.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 }

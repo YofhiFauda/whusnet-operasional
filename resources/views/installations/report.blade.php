@@ -39,17 +39,20 @@
         </div>
     </div>
 
-    <!-- MAIN FORM CONTAINER -->
-    <form action="{{ route('customers.installation.store', $customer->id) }}" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
-        @csrf
-        <input type="hidden" name="return_to" value="{{ $returnTo }}">
-        <input type="hidden" name="started_at" id="hidden_started_at">
-        <input type="hidden" name="completed_at" id="hidden_completed_at">
-        {{-- Teknisi lapangan hanya melaporkan pemasangan yang selesai; jalur "failed"
-             ditentukan admin verifikasi, bukan dari form ini. Tanpa field ini request
-             ditolak validasi (installation_status required). --}}
-        <input type="hidden" name="installation_status" id="installation_status" value="completed">
-
+    {{--
+        DUA FORM TERPISAH (bukan satu wizard-form): #form-pemasangan
+        membungkus step-panel-5, #form-speedtest membungkus step-panel-6.
+        Tombol submit-nya ada di footer BERSAMA di luar kedua form (supaya
+        satu footer dipakai semua step) — makanya trigger-nya JS
+        (handlePemasanganSubmit/handleSpeedtestSubmit) yang manggil
+        document.getElementById('form-...').submit(), bukan type="submit"
+        biasa. Step 5 submit ke customers.installation.pemasangan TANPA
+        menyelesaikan task/workflow; Step 6 baru terbuka setelah itu
+        (gerbang $pemasanganComplete) & submit ke customers.installation.speedtest
+        — SATU-SATUNYA titik penyelesaian pemasangan di alur wizard ini.
+        Lihat CustomerInstallationController::storePemasangan()/storeSpeedtest().
+    --}}
+    <div id="wizard-container" class="space-y-6">
         <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
         <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
             <div class="flex items-center justify-between">
@@ -377,6 +380,12 @@
 
                     <!-- STEP 5 PANEL: Laporan Pemasangan & Perangkat -->
                     <div id="step-panel-5" class="step-panel space-y-6 hidden">
+                    {{-- Form sendiri — submit lewat tombol footer "Aktivasi Laporan Speedtest"
+                         (form="form-pemasangan"). Lihat catatan gerbang di kepala file. --}}
+                    <form id="form-pemasangan" action="{{ route('customers.installation.pemasangan', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                        @csrf
+                        <input type="hidden" name="return_to" value="{{ $returnTo }}">
+                        <input type="hidden" name="started_at" id="hidden_started_at">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
                             <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">5. LAPORAN PEMASANGAN &amp; PERANGKAT</h4>
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Masukkan data spesifikasi perangkat aktif, distribusi jaringan, dan foto bukti pemasangan.</p>
@@ -384,6 +393,14 @@
 
                         @php
                             $failedInstallation = $customer->installations()->where('installation_status', 'failed')->latest()->first();
+
+                            // Prefill step 5 dari data yang SUDAH TERSIMPAN (bukan cuma old()) —
+                            // "Aktivasi" me-redirect balik ke halaman ini, kalau field cuma baca
+                            // old() maka begitu redirect (bukan validation-failure) semua field
+                            // ini keliatan kosong lagi padahal sudah kesimpen di DB. Lihat catatan
+                            // gerbang $pemasanganComplete di kepala file.
+                            $dev = $customer->customerDevice;
+                            $tech5 = $customer->customerTechnicalDetail;
                         @endphp
                         @if($failedInstallation)
                             <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl p-4 space-y-2 shadow-sm">
@@ -408,68 +425,68 @@
                                     <div>
                                         <label for="device_type" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Jenis Perangkat <span class="text-rose-500">*</span></label>
                                         <select name="device_type" id="device_type" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
-                                            <option value="ont" {{ old('device_type', 'ont') === 'ont' ? 'selected' : '' }}>ONT</option>
-                                            <option value="modem" {{ old('device_type') === 'modem' ? 'selected' : '' }}>Modem</option>
-                                            <option value="onu" {{ old('device_type') === 'onu' ? 'selected' : '' }}>ONU</option>
-                                            <option value="router" {{ old('device_type') === 'router' ? 'selected' : '' }}>Router</option>
-                                            <option value="other" {{ old('device_type') === 'other' ? 'selected' : '' }}>Lainnya</option>
+                                            <option value="ont" {{ old('device_type', $dev->device_type ?? 'ont') === 'ont' ? 'selected' : '' }}>ONT</option>
+                                            <option value="modem" {{ old('device_type', $dev->device_type ?? '') === 'modem' ? 'selected' : '' }}>Modem</option>
+                                            <option value="onu" {{ old('device_type', $dev->device_type ?? '') === 'onu' ? 'selected' : '' }}>ONU</option>
+                                            <option value="router" {{ old('device_type', $dev->device_type ?? '') === 'router' ? 'selected' : '' }}>Router</option>
+                                            <option value="other" {{ old('device_type', $dev->device_type ?? '') === 'other' ? 'selected' : '' }}>Lainnya</option>
                                         </select>
                                     </div>
 
                                     <div>
                                         <label for="connection_mode" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Mode Koneksi <span class="text-rose-500">*</span></label>
                                         <select name="connection_mode" id="connection_mode" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
-                                            <option value="pppoe" {{ old('connection_mode', 'pppoe') === 'pppoe' ? 'selected' : '' }}>PPPoE</option>
-                                            <option value="bridge" {{ old('connection_mode') === 'bridge' ? 'selected' : '' }}>Bridge</option>
-                                            <option value="static" {{ old('connection_mode') === 'static' ? 'selected' : '' }}>Static IP</option>
-                                            <option value="dhcp" {{ old('connection_mode') === 'dhcp' ? 'selected' : '' }}>DHCP</option>
-                                            <option value="other" {{ old('connection_mode') === 'other' ? 'selected' : '' }}>Lainnya</option>
+                                            <option value="pppoe" {{ old('connection_mode', $dev->connection_mode ?? 'pppoe') === 'pppoe' ? 'selected' : '' }}>PPPoE</option>
+                                            <option value="bridge" {{ old('connection_mode', $dev->connection_mode ?? '') === 'bridge' ? 'selected' : '' }}>Bridge</option>
+                                            <option value="static" {{ old('connection_mode', $dev->connection_mode ?? '') === 'static' ? 'selected' : '' }}>Static IP</option>
+                                            <option value="dhcp" {{ old('connection_mode', $dev->connection_mode ?? '') === 'dhcp' ? 'selected' : '' }}>DHCP</option>
+                                            <option value="other" {{ old('connection_mode', $dev->connection_mode ?? '') === 'other' ? 'selected' : '' }}>Lainnya</option>
                                         </select>
                                     </div>
 
                                     <div>
                                         <label for="brand" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Merk Perangkat</label>
-                                        <input type="text" name="brand" id="brand" value="{{ old('brand') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTE / Huawei / FiberHome">
+                                        <input type="text" name="brand" id="brand" value="{{ old('brand', $dev->brand ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTE / Huawei / FiberHome">
                                     </div>
 
                                     <div>
                                         <label for="model" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Tipe Model</label>
-                                        <input type="text" name="model" id="model" value="{{ old('model') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Contoh: F609 / HG8245H">
+                                        <input type="text" name="model" id="model" value="{{ old('model', $dev->model ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Contoh: F609 / HG8245H">
                                     </div>
 
                                     <div>
                                         <label for="serial_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number') }}" class="w-full text-xs data-text px-3 py-2 border @error('serial_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTEGC1234567">
+                                        <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number', $dev->serial_number ?? '') }}" class="w-full text-xs data-text px-3 py-2 border @error('serial_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTEGC1234567">
                                     </div>
 
                                     <div>
                                         <label for="mac_address" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">MAC Address</label>
-                                        <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="00:11:22:33:44:55">
+                                        <input type="text" name="mac_address" id="mac_address" value="{{ old('mac_address', $dev->mac_address ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="00:11:22:33:44:55">
                                     </div>
 
                                     <div>
                                         <label for="pppoe_username" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Username PPPoE</label>
-                                        <input type="text" name="pppoe_username" id="pppoe_username" value="{{ old('pppoe_username') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="user_ponorogo_01">
+                                        <input type="text" name="pppoe_username" id="pppoe_username" value="{{ old('pppoe_username', $dev->pppoe_username ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="user_ponorogo_01">
                                     </div>
 
                                     <div>
                                         <label for="pppoe_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password PPPoE</label>
-                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                     </div>
 
                                     <div class="md:col-span-2">
                                         <label for="ip_address" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">IP Address (Statik)</label>
-                                        <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="192.168.x.x">
+                                        <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $dev->ip_address ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="192.168.x.x">
                                     </div>
 
                                     <div>
                                         <label for="wifi_ssid" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">SSID WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="WHUSNET_Pelanggan">
+                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="WHUSNET_Pelanggan">
                                     </div>
 
                                     <div>
                                         <label for="wifi_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_password') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $dev->wifi_password ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_password') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                     </div>
                                 </div>
                             </div>
@@ -484,43 +501,43 @@
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
                                             <label for="odp_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor ODP</label>
-                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ODP-01">
+                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $tech5->odp_number ?? $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ODP-01">
                                         </div>
                                         <div>
                                             <label for="odp_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port ODP</label>
-                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Port 4">
+                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $tech5->odp_port ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Port 4">
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
                                             <label for="olt_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor OLT</label>
-                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                         <div>
                                             <label for="olt_slot" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Slot OLT</label>
-                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                         <div>
                                             <label for="olt_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port OLT</label>
-                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
                                             <label for="vlan" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">VLAN (Jaringan)</label>
-                                            <input type="text" name="vlan" id="vlan" value="{{ old('vlan') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="100">
+                                            <input type="text" name="vlan" id="vlan" value="{{ old('vlan', $tech5->vlan ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="100">
                                         </div>
                                         <div>
                                             <label for="router_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor Router</label>
-                                            <input type="text" name="router_number" id="router_number" value="{{ old('router_number') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Distribusi">
+                                            <input type="text" name="router_number" id="router_number" value="{{ old('router_number', $tech5->router_number ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Distribusi">
                                         </div>
                                     </div>
 
                                     <div>
                                         <label for="initial_attenuation" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Redaman Awal Pemasangan (dBm)</label>
-                                        <input type="text" name="initial_attenuation" id="initial_attenuation" value="{{ old('initial_attenuation') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="-19.5">
+                                        <input type="text" name="initial_attenuation" id="initial_attenuation" value="{{ old('initial_attenuation', $tech5->initial_attenuation ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="-19.5">
                                     </div>
                                 </div>
                             </div>
@@ -558,7 +575,11 @@
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <!-- Foto Pemasangan Lapangan -->
                                     <div class="border-2 border-dashed @error('installation_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        <div id="default-placeholder-installation_photo" class="py-3 space-y-2">
+                                        {{-- Sudah pernah diupload (mis. balik lagi ke step 5 setelah Aktivasi) —
+                                             file input TIDAK BISA di-prefill browser, jadi ini satu-satunya cara
+                                             nunjukin datanya belum hilang: thumbnail dari storage, bukan placeholder
+                                             kosong. --}}
+                                        <div id="default-placeholder-installation_photo" class="py-3 space-y-2" style="{{ $installation->installation_photo ?? null ? 'display:none' : '' }}">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
                                                 <x-ui.icon name="wrench" class="w-4 h-4" />
                                             </div>
@@ -566,6 +587,13 @@
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO PEMASANGAN <span class="text-rose-500">*</span></span>
                                                 <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Lokasi/Router Terpasang</span>
                                             </div>
+                                        </div>
+
+                                        <div id="existing-installation_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->installation_photo ?? null ? '' : 'display:none' }}">
+                                            @if($installation->installation_photo ?? null)
+                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->installation_photo) }}" alt="Foto Pemasangan Tersimpan">
+                                            @endif
+                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
                                         </div>
 
                                         <div id="preview-container-installation_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
@@ -579,17 +607,17 @@
                                         </div>
 
                                         <div class="mt-2">
-                                            <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('installation_photo')">
+                                            <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->installation_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('installation_photo')">
                                             <label for="installation_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                Pilih Foto Pemasangan
+                                                {{ ($installation->installation_photo ?? null) ? 'Ganti Foto Pemasangan' : 'Pilih Foto Pemasangan' }}
                                             </label>
-                                            <span id="file-label-installation_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">Belum ada file</span>
+                                            <span id="file-label-installation_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->installation_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
                                         </div>
                                     </div>
 
                                     <!-- Foto Kontrak -->
                                     <div class="border-2 border-dashed @error('contract_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        <div id="default-placeholder-contract_photo" class="py-3 space-y-2">
+                                        <div id="default-placeholder-contract_photo" class="py-3 space-y-2" style="{{ $installation->contract_photo ?? null ? 'display:none' : '' }}">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
                                                 <x-ui.icon name="file-text" class="w-4 h-4" />
                                             </div>
@@ -597,6 +625,13 @@
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO KONTRAK <span class="text-rose-500">*</span></span>
                                                 <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Form Fisik Bertanda Tangan</span>
                                             </div>
+                                        </div>
+
+                                        <div id="existing-contract_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->contract_photo ?? null ? '' : 'display:none' }}">
+                                            @if($installation->contract_photo ?? null)
+                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->contract_photo) }}" alt="Foto Kontrak Tersimpan">
+                                            @endif
+                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
                                         </div>
 
                                         <div id="preview-container-contract_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
@@ -610,17 +645,17 @@
                                         </div>
 
                                         <div class="mt-2">
-                                            <input type="file" name="contract_photo" id="contract_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('contract_photo')">
+                                            <input type="file" name="contract_photo" id="contract_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->contract_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('contract_photo')">
                                             <label for="contract_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                Pilih Foto Kontrak
+                                                {{ ($installation->contract_photo ?? null) ? 'Ganti Foto Kontrak' : 'Pilih Foto Kontrak' }}
                                             </label>
-                                            <span id="file-label-contract_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">Belum ada file</span>
+                                            <span id="file-label-contract_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->contract_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
                                         </div>
                                     </div>
 
                                     <!-- Foto TTD Pelanggan -->
                                     <div class="border-2 border-dashed @error('signature_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        <div id="default-placeholder-signature_photo" class="py-3 space-y-2">
+                                        <div id="default-placeholder-signature_photo" class="py-3 space-y-2" style="{{ $installation->signature_photo ?? null ? 'display:none' : '' }}">
                                             <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
                                                 <x-ui.icon name="signature" class="w-4 h-4" />
                                             </div>
@@ -628,6 +663,13 @@
                                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO TTD PELANGGAN <span class="text-rose-500">*</span></span>
                                                 <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Bukti Serah Terima</span>
                                             </div>
+                                        </div>
+
+                                        <div id="existing-signature_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->signature_photo ?? null ? '' : 'display:none' }}">
+                                            @if($installation->signature_photo ?? null)
+                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->signature_photo) }}" alt="Foto TTD Tersimpan">
+                                            @endif
+                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
                                         </div>
 
                                         <div id="preview-container-signature_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
@@ -641,11 +683,11 @@
                                         </div>
 
                                         <div class="mt-2">
-                                            <input type="file" name="signature_photo" id="signature_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('signature_photo')">
+                                            <input type="file" name="signature_photo" id="signature_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->signature_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('signature_photo')">
                                             <label for="signature_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                Pilih Foto TTD
+                                                {{ ($installation->signature_photo ?? null) ? 'Ganti Foto TTD' : 'Pilih Foto TTD' }}
                                             </label>
-                                            <span id="file-label-signature_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">Belum ada file</span>
+                                            <span id="file-label-signature_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->signature_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -654,9 +696,10 @@
                             <!-- Catatan Pemasangan -->
                             <div class="pt-2">
                                 <label for="installation_note" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Catatan Pemasangan Teknisi</label>
-                                <textarea name="installation_note" id="installation_note" rows="2" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Tuliskan catatan teknis tambahan selama proses pemasangan...">{{ old('installation_note') }}</textarea>
+                                <textarea name="installation_note" id="installation_note" rows="2" class="w-full text-xs font-sans px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Tuliskan catatan teknis tambahan selama proses pemasangan...">{{ old('installation_note', $installation->installation_note ?? '') }}</textarea>
                             </div>
                         </div>
+                    </form>
                     </div>
 
                     <!-- STEP 6 PANEL: Laporan Uji Koneksi (Speedtest) -->
@@ -666,7 +709,32 @@
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Masukkan hasil pengujian kecepatan internet untuk memastikan koneksi pelanggan aktif &amp; stabil.</p>
                         </div>
 
-                        <div class="space-y-5">
+                        @unless($pemasanganComplete)
+                            {{-- Default step 6: title+deskripsi (di atas) + satu tombol Aktivasi.
+                                 Tombol ini yang men-submit form-pemasangan (data step 5) — bukan
+                                 link balik ke step 5. Validasi required step 5 dicek di JS
+                                 (attemptActivate()); belum lengkap → Toast, gak submit. Server
+                                 (storePemasangan/storeSpeedtest) tetap jadi penegak gerbang yang
+                                 sesungguhnya. --}}
+                            <div class="py-10 text-center bg-slate-50/70 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                                <div class="w-12 h-12 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-3">
+                                    <x-ui.icon name="zap" class="w-5 h-5" />
+                                </div>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                                    Lengkapi dulu data wajib di <strong>Laporan Pemasangan &amp; Perangkat</strong> (step 5), lalu tekan tombol di bawah ini.
+                                </p>
+                                <button type="button" onclick="attemptActivate()" class="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm">
+                                    <x-ui.icon name="zap" class="w-3 h-3" /> Aktivasi Laporan Speedtest
+                                </button>
+                            </div>
+                        @else
+                        {{-- Form sendiri — submit lewat tombol footer "Simpan & Selesaikan
+                             Pemasangan" (form="form-speedtest"). Ini titik penyelesaian
+                             pemasangan (task complete + transisi workflow). --}}
+                        <form id="form-speedtest" action="{{ route('customers.installation.speedtest', $customer->id) }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                            @csrf
+                            <input type="hidden" name="return_to" value="{{ $returnTo }}">
+                            <input type="hidden" name="completed_at" id="hidden_completed_at">
 
                             <!-- Primary Speed Metrics Grid -->
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/40 dark:bg-sky-950/20 p-4 rounded-xl border border-sky-100 dark:border-sky-900/40">
@@ -743,7 +811,8 @@
                                 </div>
                             </div>
 
-                        </div>
+                        </form>
+                        @endunless
                     </div>
 
                 </div>
@@ -764,15 +833,18 @@
                             Lanjut <x-ui.icon name="chevron-right" class="w-2.5 h-2.5" />
                         </button>
 
-                        <button type="button" onclick="handleSubmit()" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
-                            <x-ui.icon name="send" class="w-3 h-3" /> Simpan &amp; Laporkan Pemasangan
+                        {{-- Step 6: submit form-speedtest — SATU-SATUNYA titik penyelesaian pemasangan.
+                             Tombol "Aktivasi" (submit form-pemasangan) ada DI DALAM panel step 6
+                             sendiri (attemptActivate()), bukan di footer — lihat step-panel-6. --}}
+                        <button type="button" onclick="handleSpeedtestSubmit()" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
+                            <x-ui.icon name="send" class="w-3 h-3" /> Simpan &amp; Selesaikan Pemasangan
                         </button>
                     </div>
                 </div>
 
             </div>
         </div>
-    </form>
+    </div>
 </div>
 @endsection
 
@@ -785,6 +857,11 @@
     // Step 1-4 read-only (data registrasi/survey); hanya 5 & 6 yang punya input.
     const inputSteps = [5, 6];
     const readOnlySteps = [1, 2, 3, 4];
+
+    // Gerbang server-side (CustomerInstallationController::report()) — step 6
+    // baru punya form kalau ini true. JS di sini cuma ikut menyesuaikan
+    // tombol/nav; penegakan sesungguhnya ada di storeSpeedtest().
+    const pemasanganComplete = @json($pemasanganComplete);
 
     // ═══════════════════════════════════════════════════════════
     // TIMER LOGIC
@@ -831,10 +908,30 @@
         return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     }
 
-    function handleSubmit() {
+    function handlePemasanganSubmit() {
+        // Belum menyelesaikan pemasangan — timer TIDAK berhenti di sini,
+        // baru berhenti saat Laporan Speedtest disubmit (handleSpeedtestSubmit).
+        document.getElementById('form-pemasangan').submit();
+    }
+
+    // Tombol Aktivasi di panel step 6 (default/terkunci) manggil ini.
+    // Belum lengkap → Toast + gak submit apa-apa. Server (storePemasangan)
+    // tetap menegakkan gerbang yang sama kalau ada yang lolos validasi klien.
+    function attemptActivate() {
+        const missing = getMissingRequiredFields(5);
+        if (missing.length > 0) {
+            if (window.Toast) {
+                window.Toast.warning('Laporan Pemasangan Belum Lengkap', 'Wajib diisi dulu: ' + missing.join(', '));
+            }
+            return;
+        }
+        handlePemasanganSubmit();
+    }
+
+    function handleSpeedtestSubmit() {
         // Timer berhenti tepat saat submit — completed_at harus mencerminkan itu.
         stopTimerAndGetCompletedAt();
-        document.getElementById('wizard-form').submit();
+        document.getElementById('form-speedtest').submit();
     }
 
     const formFields = {
@@ -854,7 +951,10 @@
     };
 
     document.addEventListener("DOMContentLoaded", function() {
-        const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
+        // Dua form terpisah sekarang (form-pemasangan, form-speedtest) — step 6
+        // gak selalu ada di DOM (terkunci = cuma placeholder, querySelectorAll
+        // aman dapat NodeList kosong).
+        const inputs = document.querySelectorAll('#form-pemasangan input, #form-pemasangan select, #form-pemasangan textarea, #form-speedtest input, #form-speedtest select, #form-speedtest textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);
             input.addEventListener('change', runLiveProgressUpdates);
@@ -862,6 +962,13 @@
 
         updateWizardButtons();
         runLiveProgressUpdates();
+
+        // Baru saja "Aktivasi" ditekan (redirect balik dengan ?activated=1) —
+        // langsung arahkan ke step 6 supaya teknisi gak perlu klik manual.
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('activated') === '1' && pemasanganComplete) {
+            goToStep(6);
+        }
     });
 
     /*
@@ -880,18 +987,20 @@
 
     /*
      * Aturan tombol wizard — satu-satunya tempat visibilitas tombol ditentukan.
-     * Step pertama  : Batal + Lanjut
-     * Step tengah   : Sebelumnya + Batal + Lanjut
-     * Step terakhir : Sebelumnya + Batal + Simpan & Laporkan Pemasangan
+     * Step 1-5      : Sebelumnya (kecuali step 1) + Batal + Lanjut
+     * Step 6        : Sebelumnya + Batal + Simpan & Selesaikan Pemasangan
+     *                 (submit form-speedtest) — cuma kalau pemasanganComplete.
+     *                 Kalau masih terkunci, gak ada tombol footer sama sekali:
+     *                 tombol "Aktivasi" ada DI DALAM panel step 6 sendiri.
      * "Batal" selalu tampil, jadi tidak ikut diatur di sini.
      */
     function updateWizardButtons() {
         const isFirstStep = currentActiveStep === 1;
-        const isLastStep = currentActiveStep === totalStepsCount;
+        const isStep6 = currentActiveStep === 6;
 
         setElementVisible(document.getElementById('btn-prev'), ! isFirstStep);
-        setElementVisible(document.getElementById('btn-next'), ! isLastStep);
-        setElementVisible(document.getElementById('btn-submit'), isLastStep);
+        setElementVisible(document.getElementById('btn-next'), ! isStep6);
+        setElementVisible(document.getElementById('btn-submit'), isStep6 && pemasanganComplete);
     }
 
     /* File Change & Preview Helper */
@@ -899,8 +1008,10 @@
         const input = document.getElementById(fieldId);
         const label = document.getElementById('file-label-' + fieldId);
         const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
+        const existingBlock = document.getElementById('existing-' + fieldId);
         const previewContainer = document.getElementById('preview-container-' + fieldId);
         const previewImg = document.getElementById('preview-img-' + fieldId);
+        const hasExisting = input.dataset.hasExisting === '1';
 
         if (input.files && input.files.length > 0) {
             const file = input.files[0];
@@ -912,16 +1023,28 @@
                 reader.onload = function(e) {
                     if (previewImg) previewImg.src = e.target.result;
                     if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                    setElementVisible(existingBlock, false);
                     setElementVisible(previewContainer, true);
                 };
                 reader.readAsDataURL(file);
             }
         } else {
-            label.textContent = "Belum ada file";
             input.removeAttribute('data-populated');
-            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
             setElementVisible(previewContainer, false);
             if (previewImg) previewImg.src = '';
+
+            // Dibatalkan (clearFile) — balik ke foto yang SUDAH TERSIMPAN kalau
+            // ada (bukan placeholder kosong, biar gak keliatan kayak hilang),
+            // baru fallback ke placeholder kosong kalau memang belum pernah upload.
+            if (hasExisting) {
+                label.textContent = 'Tersimpan di server';
+                if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                setElementVisible(existingBlock, true);
+            } else {
+                label.textContent = 'Belum ada file';
+                if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
+                setElementVisible(existingBlock, false);
+            }
         }
         runLiveProgressUpdates();
     }
@@ -934,30 +1057,57 @@
         }
     }
 
+    // Dipakai runLiveProgressUpdates (indikator nav) DAN attemptActivate
+    // (gerbang klik tombol Aktivasi) — satu sumber kebenaran field wajib
+    // yang "sudah terisi di browser", biar dua tempat itu gak bisa beda jawaban.
+    function getMissingRequiredFields(step) {
+        const config = formFields[stepKeys[step]];
+        const missing = [];
+
+        config.required.forEach(field => {
+            const el = document.getElementById(field);
+            if (! el) {
+                missing.push(getLabelName(field));
+                return;
+            }
+            // File field dianggap terisi kalau ada file BARU dipilih ATAU
+            // sudah tersimpan dari submit sebelumnya (data-has-existing) — file
+            // input gak bisa di-prefill browser, jadi tanpa ini foto yang
+            // sudah kesimpen keliatan "belum diisi" lagi begitu balik ke step 5.
+            const isFilePopulated = el.type === 'file'
+                && ((el.files && el.files.length > 0) || el.dataset.hasExisting === '1');
+            if (! ((el.value && el.value.trim() !== "") || isFilePopulated)) {
+                missing.push(getLabelName(field));
+            }
+        });
+
+        return missing;
+    }
+
     /* Live Stepper Auditor & Progress Calculator */
     function runLiveProgressUpdates() {
         let totalRequiredFieldsCount = 0;
         let filledRequiredFieldsCount = 0;
 
         inputSteps.forEach(step => {
-            const config = formFields[stepKeys[step]];
-            let requiredMissing = [];
+            // Step 6 terkunci = panelnya cuma placeholder, field-nya gak ada
+            // di DOM sama sekali — lewati, updateStepNavStatus(6, ...) diurus
+            // terpisah lewat updateLockedStep6Nav() di bawah.
+            if (step === 6 && ! pemasanganComplete) {
+                return;
+            }
 
-            config.required.forEach(field => {
-                totalRequiredFieldsCount++;
-                const el = document.getElementById(field);
-                if (el) {
-                    const isFilePopulated = el.type === 'file' && el.files && el.files.length > 0;
-                    if ((el.value && el.value.trim() !== "") || isFilePopulated) {
-                        filledRequiredFieldsCount++;
-                    } else {
-                        requiredMissing.push(getLabelName(field));
-                    }
-                }
-            });
+            const config = formFields[stepKeys[step]];
+            const requiredMissing = getMissingRequiredFields(step);
+            totalRequiredFieldsCount += config.required.length;
+            filledRequiredFieldsCount += config.required.length - requiredMissing.length;
 
             updateStepNavStatus(step, requiredMissing);
         });
+
+        if (! pemasanganComplete) {
+            updateLockedStep6Nav();
+        }
 
         const progressPercentage = totalRequiredFieldsCount > 0 ? Math.round((filledRequiredFieldsCount / totalRequiredFieldsCount) * 100) : 0;
         const pctEl = document.getElementById('progress-percentage');
@@ -1007,6 +1157,29 @@
         }
     }
 
+    // Step 6 belum ada field-nya sama sekali di DOM selama terkunci — nav
+    // kartunya ditandai "Terkunci" (bukan "Belum Lengkap") supaya jelas ini
+    // gerbang berurutan, bukan sekadar field kosong yang lupa diisi.
+    function updateLockedStep6Nav() {
+        const navBtn = document.getElementById('step-nav-6');
+        const iconDiv = document.getElementById('step-nav-icon-6');
+        const statusSpan = document.getElementById('step-nav-status-6');
+        const missingSpan = document.getElementById('step-nav-missing-6');
+
+        if (!navBtn || !iconDiv || !statusSpan || !missingSpan) return;
+
+        statusSpan.textContent = 'Terkunci';
+        statusSpan.className = 'text-[9px] font-bold block uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5';
+        iconDiv.innerHTML = `<span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400"><x-ui.icon name="lock" class="w-2.5 h-2.5" /></span>`;
+        missingSpan.textContent = 'Aktivasi dulu di step 5';
+
+        if (currentActiveStep !== 6) {
+            navBtn.className = "w-full text-left p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/30 opacity-70 transition-all group focus:outline-none";
+        } else {
+            navBtn.className = "w-full text-left p-3 rounded-xl border-2 border-sky-500 bg-sky-50/50 dark:bg-sky-900/20 transition-all group focus:outline-none shadow-sm";
+        }
+    }
+
     function getLabelName(field) {
         const labels = {
             device_type: 'Jenis Perangkat',
@@ -1026,6 +1199,20 @@
 
     /* Stepper Page Switcher */
     function goToStep(stepNumber) {
+        // Lompat langsung ke step 6 (nav sidebar / mobile stepper) tanpa step 5
+        // lengkap → Toast, TETAP di step sekarang. Begitu step 5 lengkap, boleh
+        // masuk step 6 (nampilin title+deskripsi+tombol Aktivasi) meski belum
+        // disubmit — attemptActivate() yang benar-benar mengaktivasi.
+        if (stepNumber === 6 && ! pemasanganComplete && currentActiveStep !== 6) {
+            const missing = getMissingRequiredFields(5);
+            if (missing.length > 0) {
+                if (window.Toast) {
+                    window.Toast.warning('Laporan Pemasangan Belum Lengkap', 'Isi dulu Laporan Pemasangan & Perangkat (step 5): ' + missing.join(', '));
+                }
+                return;
+            }
+        }
+
         document.getElementById('step-panel-' + currentActiveStep).classList.add('hidden');
         currentActiveStep = stepNumber;
         document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');

@@ -57,7 +57,7 @@ menyentuhnya.
 |---|---|---|
 | Prefix | — (keluar) | `/api/customer-portal/*` |
 | Arah | **Keluar** (Whusnet mendorong) | **Masuk** (portal menarik) |
-| Lawan bicara | Sistem lain (NMS/provisioning) | Portal, atas nama satu pelanggan |
+| Lawan bicara | Sistem lain — gateway AI agent, NMS/provisioning | Portal, atas nama satu pelanggan |
 | Auth | HMAC-SHA256 per-request | Client secret portal **+** bearer token pelanggan |
 | Identitas | `webhook_endpoints` terdaftar manual | `customer_portal_accounts.login_id` |
 | Pembatas data | `pop_id` opsional per endpoint | `customer_id` pemilik token |

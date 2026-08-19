@@ -110,7 +110,7 @@ perlu dibaca kembali.
 | `name` | string(100) | Label manusia, mis. "NMS Ponorogo" |
 | `url` | string(500) | Wajib `https://`, divalidasi saat simpan |
 | `secret_encrypted` | text | **Terenkripsi simetris** (`encrypted` cast), bukan hash |
-| `events` | json | Event yang dilanggan, mis. `["installation.completed"]` |
+| `events` | json | Event yang dilanggan, mis. `["installation.activated"]` |
 | `pop_id` | FK `pops` nullable | Batasi cabang. `null` = semua cabang, keputusan sadar |
 | `is_active` | boolean | Dimatikan manual atau otomatis setelah gagal beruntun |
 | `consecutive_failures` | unsigned int | Direset ke 0 setiap pengiriman sukses |
@@ -146,7 +146,7 @@ keputusan penamaan, bukan perbedaan desain.
 |---|---|---|
 | `id` | id | |
 | `webhook_endpoint_id` | FK | |
-| `event` | string(50) | `installation.started` / `installation.completed` / `invoice.updated` |
+| `event` | string(50) | `installation.activated` / `invoice.updated` |
 | `event_id` | uuid, index | **Satu baris = satu event.** Tetap sama di semua percobaan |
 | `idempotency_key` | string(100) nullable, index | Mengelompokkan event yang saling menggantikan |
 | `customer_id` | FK nullable, `nullOnDelete` | Penelusuran |

@@ -1,49 +1,62 @@
 # Flowchart — API Eksternal
 
-## 1. Webhook Pemasangan — dari tombol teknisi sampai sistem luar
+## 1. Webhook Pemasangan — dari tombol Aktivasi sampai sistem luar
+
+Wizard Laporan Pemasangan punya enam langkah. Yang memicu webhook adalah **tombol
+Aktivasi** di panel step 6, yang mengirim form step 5 — bukan tombol Mulai Pemasangan,
+dan bukan Laporan Speedtest.
 
 ```mermaid
 flowchart TD
-    A[Teknisi tekan Mulai Pemasangan] --> B["CustomerInstallationController::start()"]
-    B --> C{"DB::transaction closure"}
-    C --> D[customer_installations: started_at, in_progress]
-    C --> E[transition: installation_in_progress]
-    C --> F["TaskService::start()"]
-    C --> G["broadcast(InstallationStarted)"]
-    G -.->|listener| H[INSERT webhook_outbox, status=pending]
+    W1[Step 1-4: data pelanggan & foto] --> W5[Step 5: Perangkat — SN, ODP, OLT, VLAN]
+    W5 --> BTN[["Tombol AKTIVASI"]]
+    BTN --> A["CustomerInstallationController::storePemasangan()"]
+    A --> GATE{3 foto + minimal 1 material?}
+    GATE -->|tidak| ERR[Balik ke form, tidak ada event]
+    GATE -->|ya| TX{"DB::beginTransaction :660"}
+    TX --> D[customer_installations: foto, catatan<br/>status TETAP in_progress]
+    TX --> E[customer_technical_details: SN, ODP, ODP port, OLT, VLAN]
+    TX --> F[task_materials + task_work_tools]
+    TX --> G["customer_devices: serial_number :735<br/>(TANPA odp)"]
+    G --> EV["event(InstallationActivated) — pernyataan TERAKHIR"]
+    EV -.->|listener| H[INSERT webhook_outbox, status=pending]
+    H --> Q["DB::commit :752"]
+    Q --> W6[Step 6: Laporan Speedtest terbuka]
 
-    I[Teknisi simpan Laporan Pemasangan = completed] --> J["CustomerInstallationController::store()"]
-    J --> K{"DB::beginTransaction manual"}
-    K --> L[customer_technical_details: SN, ODP, OLT, VLAN]
-    K --> M[customer_devices: serial_number]
-    K --> N["TaskService::complete()"]
-    K --> O[transition: installed -> verification_admin]
-    K --> P["broadcast(InstallationCompleted)"]
-    P -.->|listener| H
-
-    H --> Q[COMMIT]
-    Q -->|afterCommit| R[Worker Horizon ambil baris pending]
+    Q -->|afterCommit| R[Worker Horizon queue 'webhook']
     R --> S[Tanda tangani HMAC atas payload TERSIMPAN]
     S --> T{2xx?}
     T -->|ya| U[status=delivered, delivered_at]
     T -->|tidak| V[attempts++, next_attempt_at, last_error]
-    V --> W{attempts >= 8?}
-    W -->|belum| R
-    W -->|habis| X[status=failed + consecutive_failures++]
-    X --> Y{Lewat ambang?}
-    Y -->|ya| Z[is_active=false + beri tahu Owner]
-    Y -->|tidak| AA[Berhenti untuk event ini]
+    V --> X{attempts >= 8?}
+    X -->|belum| R
+    X -->|habis| Y[status=failed + consecutive_failures++]
+    Y --> Z{Lewat ambang?}
+    Z -->|ya| Z1[is_active=false + beri tahu Owner]
+    Z -->|tidak| Z2[Berhenti untuk event ini]
 ```
 
-Empat hal yang menentukan benar-tidaknya alur ini:
+Lima hal yang menentukan benar-tidaknya alur ini:
 
-**Baris outbox ditulis di dalam transaksi, pengiriman terjadi setelah commit.** Dua
-controller memakai gaya transaksi berbeda — `start()` closure `DB::transaction(..., 3)`
-(`:76-102`), `store()` `DB::beginTransaction()` manual (`:368`) dengan commit di
-`:531` — tapi aturannya sama. Job yang berjalan sebelum commit membaca
-`customer_technical_details` yang belum tertulis, jadi SN dan ODP terkirim `null`
-padahal teknisi sudah mengisinya. Kalau transaksi di-rollback, sistem luar sudah
-diberi tahu soal pemasangan yang tidak pernah tercatat.
+**Event di-dispatch paling akhir, sebelum `DB::commit()`.** `storePemasangan()` menulis
+berurutan dan `customer_devices` adalah yang **terakhir** (`:735-750`). Event yang
+terbit sebelum baris itu menghasilkan payload tanpa data perangkat — persis data yang
+jadi alasan event ini ada.
+
+**Event ini belum ada di repo.** Tidak seperti rancangan sebelumnya yang menumpang
+`InstallationStarted`/`InstallationCompleted`, di sini `App\Events\InstallationActivated`
+harus dibuat dan di-dispatch dari controller. Satu baris, tapi controller memang
+tersentuh.
+
+**Baris outbox ditulis di dalam transaksi, pengiriman terjadi setelah commit.**
+`storePemasangan()` memakai `DB::beginTransaction()` manual (`:660`) dengan commit di
+`:752`. Job yang berjalan sebelum commit membaca data yang belum tertulis; kalau
+transaksi di-rollback, sistem luar sudah diberi tahu soal pemasangan yang tidak pernah
+tercatat.
+
+**Gerbang tiga foto + satu material berjalan lebih dulu.** Aktivasi yang ditolak karena
+foto kontrak belum diunggah tidak menghasilkan event apa pun — dan itu benar: tidak ada
+yang perlu dikabarkan.
 
 **Retry mengirim payload yang tersimpan, bukan merakit ulang.** Satu baris outbox =
 satu event; `attempts` dinaikkan di tempat. Merakit ulang dari model berarti percobaan
@@ -59,23 +72,35 @@ ditandatangani dengan secret masing-masing.
 
 ---
 
-## 2. Pemasangan revisi — kenapa `event_id` saja tidak cukup
+## 2. Aktivasi ditekan berkali-kali — kenapa `event_id` saja tidak cukup
+
+`storePemasangan()` tidak punya gerbang "sudah pernah diaktivasi". Ia menerima status
+`installation_in_progress` **dan** `revision_installation` (`:573-577`), dan isinya
+sekadar `updateOrCreate`. Jadi penekanan berulang adalah keadaan normal, bukan
+penyalahgunaan.
 
 ```mermaid
 flowchart LR
-    A[Teknisi lapor selesai] --> B["installation.completed<br/>event_id=E1<br/>idempotency_key=installation:8842:attempt:1"]
-    B --> C[Verifikasi admin MENOLAK]
-    C --> D[Status: revision_installation]
-    D --> E[Teknisi lapor selesai lagi<br/>SN/ODP bisa berbeda]
-    E --> F["installation.completed<br/>event_id=E2<br/>idempotency_key=installation:8842:attempt:2"]
+    A[Aktivasi ditekan] --> B["installation.activated<br/>event_id=E1<br/>idempotency_key=installation:1174"]
+    B --> C{Kenapa ditekan lagi?}
+    C -->|SN salah ketik, diperbaiki| E
+    C -->|Foto kontrak buram, diunggah ulang| E
+    C -->|Verifikasi admin menolak → revisi| E
+    E[Aktivasi ditekan lagi] --> F["installation.activated<br/>event_id=E2<br/>idempotency_key=installation:1174"]
     F --> G{Penerima}
     G -->|"pakai event_id saja"| H[Dua pemasangan terdaftar<br/>provisioning dobel]
-    G -->|"pakai idempotency_key"| I[Upsert state pemasangan<br/>attempt:2 menang]
+    G -->|"pakai idempotency_key"| I[Upsert state pemasangan<br/>E2 menang]
 ```
 
-`event_id` menjawab "apakah kiriman ini duplikat jaringan". `idempotency_key` menjawab
-"apakah event ini menggantikan yang sebelumnya". Keduanya dibutuhkan, dan keduanya
-punya aturan berbeda soal kapan nilainya sama.
+`event_id` menjawab "apakah kiriman ini duplikat jaringan" — nilainya sama hanya untuk
+percobaan ulang **pengiriman** kejadian yang sama.
+
+`idempotency_key` menjawab "apakah event ini menggantikan yang sebelumnya" — nilainya
+sama untuk semua Aktivasi terhadap baris `customer_installations` yang sama, karena
+satu baris = satu pemasangan fisik. Koreksi terhadap pemasangan yang sama memang harus
+berbagi kunci.
+
+Keduanya dibutuhkan, dan keduanya punya aturan berbeda soal kapan nilainya sama.
 
 ---
 
