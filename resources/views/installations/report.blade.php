@@ -573,123 +573,61 @@
                                 </h5>
 
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <!-- Foto Pemasangan Lapangan -->
-                                    <div class="border-2 border-dashed @error('installation_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        {{-- Sudah pernah diupload (mis. balik lagi ke step 5 setelah Aktivasi) —
-                                             file input TIDAK BISA di-prefill browser, jadi ini satu-satunya cara
-                                             nunjukin datanya belum hilang: thumbnail dari storage, bukan placeholder
-                                             kosong. --}}
-                                        <div id="default-placeholder-installation_photo" class="py-3 space-y-2" style="{{ $installation->installation_photo ?? null ? 'display:none' : '' }}">
-                                            <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <x-ui.icon name="wrench" class="w-4 h-4" />
+                                    @foreach ([
+                                        ['field' => 'installation_photo', 'icon' => 'wrench', 'label' => 'FOTO PEMASANGAN', 'hint' => 'Lokasi/Router Terpasang', 'cta' => 'Pilih Foto Pemasangan', 'alt' => 'Preview Foto Pemasangan'],
+                                        ['field' => 'contract_photo', 'icon' => 'file-text', 'label' => 'FOTO KONTRAK', 'hint' => 'Form Fisik Bertanda Tangan', 'cta' => 'Pilih Foto Kontrak', 'alt' => 'Preview Foto Kontrak'],
+                                        ['field' => 'signature_photo', 'icon' => 'signature', 'label' => 'FOTO TTD PELANGGAN', 'hint' => 'Bukti Serah Terima', 'cta' => 'Pilih Foto TTD', 'alt' => 'Preview Foto TTD'],
+                                    ] as $photo)
+                                        @php $existingPath = $installation->{$photo['field']} ?? null; @endphp
+                                        <div class="border-2 border-dashed @error($photo['field']) border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
+                                            {{-- Placeholder kosong — cuma tampil kalau belum ada foto tersimpan SAMA
+                                                 SEKALI (belum pernah upload). Sekali sudah tersimpan, default view-nya
+                                                 jadi thumbnail-dari-server (blok "sudah tersimpan" di bawah), bukan
+                                                 placeholder kosong ini — supaya "Aktivasi" gagal karena field lain
+                                                 lalu redirect balik gak bikin technician kira foto yang sudah
+                                                 keupload hilang (file input emang gak bisa direfill browser, tapi
+                                                 foto yang SUDAH TERSIMPAN tetap harus keliatan). --}}
+                                            <div id="default-placeholder-{{ $photo['field'] }}" class="py-3 space-y-2 {{ $existingPath ? 'hidden' : '' }}">
+                                                <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
+                                                    <x-ui.icon name="{{ $photo['icon'] }}" class="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['label'] }} <span class="text-rose-500">*</span></span>
+                                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{{ $photo['hint'] }}</span>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO PEMASANGAN <span class="text-rose-500">*</span></span>
-                                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Lokasi/Router Terpasang</span>
-                                            </div>
-                                        </div>
 
-                                        <div id="existing-installation_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->installation_photo ?? null ? '' : 'display:none' }}">
-                                            @if($installation->installation_photo ?? null)
-                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->installation_photo) }}" alt="Foto Pemasangan Tersimpan">
+                                            {{-- Foto yang sudah tersimpan di server (upload sebelumnya) — beda dari
+                                                 preview-container di bawah (itu preview file yang BARU dipilih di
+                                                 browser, belum tentu tersubmit). --}}
+                                            @if($existingPath)
+                                                <div id="existing-preview-{{ $photo['field'] }}" class="py-2 flex flex-col items-center justify-center">
+                                                    <div class="relative inline-block w-full">
+                                                        <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$existingPath) }}" alt="{{ $photo['alt'] }} (tersimpan)">
+                                                    </div>
+                                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
+                                                </div>
                                             @endif
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
-                                        </div>
 
-                                        <div id="preview-container-installation_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
-                                            <div class="relative inline-block w-full">
-                                                <img id="preview-img-installation_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Pemasangan">
-                                                <button type="button" onclick="clearFile('installation_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
-                                                </button>
+                                            <div id="preview-container-{{ $photo['field'] }}" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                                <div class="relative inline-block w-full">
+                                                    <img id="preview-img-{{ $photo['field'] }}" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="{{ $photo['alt'] }}">
+                                                    <button type="button" onclick="clearFile('{{ $photo['field'] }}')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
+                                                        <x-ui.icon name="x" class="w-2.5 h-2.5" />
+                                                    </button>
+                                                </div>
+                                                <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
                                             </div>
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
-                                        </div>
 
-                                        <div class="mt-2">
-                                            <input type="file" name="installation_photo" id="installation_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->installation_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('installation_photo')">
-                                            <label for="installation_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                {{ ($installation->installation_photo ?? null) ? 'Ganti Foto Pemasangan' : 'Pilih Foto Pemasangan' }}
-                                            </label>
-                                            <span id="file-label-installation_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->installation_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Foto Kontrak -->
-                                    <div class="border-2 border-dashed @error('contract_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        <div id="default-placeholder-contract_photo" class="py-3 space-y-2" style="{{ $installation->contract_photo ?? null ? 'display:none' : '' }}">
-                                            <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <x-ui.icon name="file-text" class="w-4 h-4" />
-                                            </div>
-                                            <div>
-                                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO KONTRAK <span class="text-rose-500">*</span></span>
-                                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Form Fisik Bertanda Tangan</span>
+                                            <div class="mt-2">
+                                                <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ $existingPath ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
+                                                <label for="{{ $photo['field'] }}" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                                    {{ $existingPath ? 'Ganti Foto' : $photo['cta'] }}
+                                                </label>
+                                                <span id="file-label-{{ $photo['field'] }}" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingPath ? 'Pakai foto tersimpan' : 'Belum ada file' }}</span>
                                             </div>
                                         </div>
-
-                                        <div id="existing-contract_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->contract_photo ?? null ? '' : 'display:none' }}">
-                                            @if($installation->contract_photo ?? null)
-                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->contract_photo) }}" alt="Foto Kontrak Tersimpan">
-                                            @endif
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
-                                        </div>
-
-                                        <div id="preview-container-contract_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
-                                            <div class="relative inline-block w-full">
-                                                <img id="preview-img-contract_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Kontrak">
-                                                <button type="button" onclick="clearFile('contract_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
-                                                </button>
-                                            </div>
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
-                                        </div>
-
-                                        <div class="mt-2">
-                                            <input type="file" name="contract_photo" id="contract_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->contract_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('contract_photo')">
-                                            <label for="contract_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                {{ ($installation->contract_photo ?? null) ? 'Ganti Foto Kontrak' : 'Pilih Foto Kontrak' }}
-                                            </label>
-                                            <span id="file-label-contract_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->contract_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Foto TTD Pelanggan -->
-                                    <div class="border-2 border-dashed @error('signature_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
-                                        <div id="default-placeholder-signature_photo" class="py-3 space-y-2" style="{{ $installation->signature_photo ?? null ? 'display:none' : '' }}">
-                                            <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
-                                                <x-ui.icon name="signature" class="w-4 h-4" />
-                                            </div>
-                                            <div>
-                                                <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO TTD PELANGGAN <span class="text-rose-500">*</span></span>
-                                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Bukti Serah Terima</span>
-                                            </div>
-                                        </div>
-
-                                        <div id="existing-signature_photo" class="py-2 flex flex-col items-center justify-center" style="{{ $installation->signature_photo ?? null ? '' : 'display:none' }}">
-                                            @if($installation->signature_photo ?? null)
-                                                <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$installation->signature_photo) }}" alt="Foto TTD Tersimpan">
-                                            @endif
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
-                                        </div>
-
-                                        <div id="preview-container-signature_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
-                                            <div class="relative inline-block w-full">
-                                                <img id="preview-img-signature_photo" class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto TTD">
-                                                <button type="button" onclick="clearFile('signature_photo')" class="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md focus:outline-none cursor-pointer" title="Hapus File">
-                                                    <x-ui.icon name="x" class="w-2.5 h-2.5" />
-                                                </button>
-                                            </div>
-                                            <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Terpilih</span>
-                                        </div>
-
-                                        <div class="mt-2">
-                                            <input type="file" name="signature_photo" id="signature_photo" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ ($installation->signature_photo ?? null) ? '1' : '0' }}" onchange="onFileChange('signature_photo')">
-                                            <label for="signature_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                {{ ($installation->signature_photo ?? null) ? 'Ganti Foto TTD' : 'Pilih Foto TTD' }}
-                                            </label>
-                                            <span id="file-label-signature_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ ($installation->signature_photo ?? null) ? 'Tersimpan di server' : 'Belum ada file' }}</span>
-                                        </div>
-                                    </div>
+                                    @endforeach
                                 </div>
                             </div>
 
@@ -919,6 +857,9 @@
     // tetap menegakkan gerbang yang sama kalau ada yang lolos validasi klien.
     function attemptActivate() {
         const missing = getMissingRequiredFields(5);
+        if (! hasAtLeastOneMaterialRow()) {
+            missing.push('Perangkat Pasif / Material Terpakai');
+        }
         if (missing.length > 0) {
             if (window.Toast) {
                 window.Toast.warning('Laporan Pemasangan Belum Lengkap', 'Wajib diisi dulu: ' + missing.join(', '));
@@ -926,6 +867,16 @@
             return;
         }
         handlePemasanganSubmit();
+    }
+
+    // storePemasangan() server wajib minimal satu baris material terpakai
+    // (qty > 0). Dicek di sini juga — kalau lolos di browser tapi gagal di
+    // server, redirect-back bikin komponen material-rows Alpine re-init dari
+    // $materialRows ASLI (bukan input user), baris yang barusan diedit teknisi
+    // hilang. Gerbang klien ini nyegah technician sampai ke titik itu.
+    function hasAtLeastOneMaterialRow() {
+        const qtyInputs = document.querySelectorAll('#form-pemasangan [name^="materials"][name$="[qty]"]');
+        return Array.from(qtyInputs).some(el => parseFloat(el.value) > 0);
     }
 
     function handleSpeedtestSubmit() {
@@ -1008,43 +959,37 @@
         const input = document.getElementById(fieldId);
         const label = document.getElementById('file-label-' + fieldId);
         const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
-        const existingBlock = document.getElementById('existing-' + fieldId);
         const previewContainer = document.getElementById('preview-container-' + fieldId);
         const previewImg = document.getElementById('preview-img-' + fieldId);
-        const hasExisting = input.dataset.hasExisting === '1';
+        // Thumbnail foto yang SUDAH tersimpan di server (redirect pasca-Aktivasi)
+        // — cuma ada di DOM kalau instalasi ini memang sudah punya foto itu.
+        const existingPreview = document.getElementById('existing-preview-' + fieldId);
+        const hasExisting = input.dataset.hasExisting === 'true';
 
         if (input.files && input.files.length > 0) {
             const file = input.files[0];
             label.textContent = file.name;
             input.setAttribute('data-populated', 'true');
+            if (existingPreview) existingPreview.classList.add('hidden');
 
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     if (previewImg) previewImg.src = e.target.result;
                     if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                    setElementVisible(existingBlock, false);
                     setElementVisible(previewContainer, true);
                 };
                 reader.readAsDataURL(file);
             }
         } else {
+            // Batal pilih file baru — balik ke thumbnail tersimpan kalau ada,
+            // placeholder kosong kalau belum pernah upload sama sekali.
+            label.textContent = hasExisting ? 'Pakai foto tersimpan' : 'Belum ada file';
             input.removeAttribute('data-populated');
+            if (defaultPlaceholder) defaultPlaceholder.classList.toggle('hidden', hasExisting);
+            if (existingPreview) existingPreview.classList.remove('hidden');
             setElementVisible(previewContainer, false);
             if (previewImg) previewImg.src = '';
-
-            // Dibatalkan (clearFile) — balik ke foto yang SUDAH TERSIMPAN kalau
-            // ada (bukan placeholder kosong, biar gak keliatan kayak hilang),
-            // baru fallback ke placeholder kosong kalau memang belum pernah upload.
-            if (hasExisting) {
-                label.textContent = 'Tersimpan di server';
-                if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                setElementVisible(existingBlock, true);
-            } else {
-                label.textContent = 'Belum ada file';
-                if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
-                setElementVisible(existingBlock, false);
-            }
         }
         runLiveProgressUpdates();
     }
@@ -1070,12 +1015,9 @@
                 missing.push(getLabelName(field));
                 return;
             }
-            // File field dianggap terisi kalau ada file BARU dipilih ATAU
-            // sudah tersimpan dari submit sebelumnya (data-has-existing) — file
-            // input gak bisa di-prefill browser, jadi tanpa ini foto yang
-            // sudah kesimpen keliatan "belum diisi" lagi begitu balik ke step 5.
-            const isFilePopulated = el.type === 'file'
-                && ((el.files && el.files.length > 0) || el.dataset.hasExisting === '1');
+            const isFilePopulated = el.type === 'file' && (
+                (el.files && el.files.length > 0) || el.dataset.hasExisting === 'true'
+            );
             if (! ((el.value && el.value.trim() !== "") || isFilePopulated)) {
                 missing.push(getLabelName(field));
             }

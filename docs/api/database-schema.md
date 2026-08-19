@@ -107,15 +107,24 @@ perlu dibaca kembali.
 | Kolom | Tipe | Catatan |
 |---|---|---|
 | `id` | id | |
-| `name` | string(100) | Label manusia, mis. "NMS Ponorogo" |
-| `url` | string(500) | Wajib `https://`, divalidasi saat simpan |
-| `secret_encrypted` | text | **Terenkripsi simetris** (`encrypted` cast), bukan hash |
+| `name` | string(100) | Label manusia, mis. "Website B — NMS Ponorogo" |
+| `transport` | string(20) | `http_json` / `telegram` |
+| `url` | string(500) nullable | Wajib `https://` untuk `http_json`; kosong untuk `telegram` |
+| `secret_encrypted` | text nullable | **Terenkripsi simetris** (`encrypted` cast), bukan hash. Hanya `http_json` |
+| `config` | json (`encrypted`) | Pengaturan khusus transport — untuk `telegram`: `bot_token` + `chat_id` |
 | `events` | json | Event yang dilanggan, mis. `["installation.activated"]` |
 | `pop_id` | FK `pops` nullable | Batasi cabang. `null` = semua cabang, keputusan sadar |
 | `is_active` | boolean | Dimatikan manual atau otomatis setelah gagal beruntun |
 | `consecutive_failures` | unsigned int | Direset ke 0 setiap pengiriman sukses |
 | `last_failed_at` | timestamp nullable | |
 | `timestamps` | | |
+
+**`config` menyimpan kredensial Telegram Eksternal, dan itu wajib.**
+`config/services.php:38-41` cuma punya satu `TELEGRAM_BOT_TOKEN` dan satu
+`TELEGRAM_CHAT_ID` — dipakai enam pemanggilan `TelegramBotService` inline yang melayani
+tim internal. Kalau transport `telegram` ikut membacanya, pesan untuk pihak luar
+mendarat di grup internal yang sama dan pemisahan internal/eksternal batal seketika.
+Karena `config` memuat bot token, seluruh kolomnya di-cast `encrypted`.
 
 **`secret_encrypted`, bukan `secret_hash`.** HMAC menuntut kedua pihak memegang
 rahasia yang sama, jadi kita harus bisa membacanya kembali setiap kali menandatangani.
@@ -151,7 +160,7 @@ keputusan penamaan, bukan perbedaan desain.
 | `idempotency_key` | string(100) nullable, index | Mengelompokkan event yang saling menggantikan |
 | `customer_id` | FK nullable, `nullOnDelete` | Penelusuran |
 | `payload` | json | Isi yang dikirim, apa adanya |
-| `status` | string(15) | `pending` / `delivered` / `failed` |
+| `status` | string(15) | `pending` / `delivered` / `failed` / `skipped` |
 | `attempts` | unsigned tinyint | Dinaikkan di tempat, maks 8 |
 | `next_attempt_at` | timestamp nullable, index | |
 | `response_status` | unsigned smallint nullable | Percobaan terakhir |
@@ -173,6 +182,10 @@ membuangnya sebagai duplikat, sehingga perubahan itu hilang tanpa jejak.
 Konsekuensinya, riwayat per-percobaan tidak tersimpan; yang tersimpan adalah keadaan
 terakhir. Untuk forensik pengiriman yang lebih dalam, log aplikasi yang dipakai, bukan
 tabel ini.
+
+`skipped` khusus transport `telegram`: penekanan Aktivasi yang tidak mengubah teks
+pesan tidak dikirim, tapi barisnya tetap ditulis. Menghapusnya membuat pertanyaan
+"kenapa mitra tidak dapat kabar" tidak punya jawaban.
 
 Indeks: `(status, next_attempt_at)` untuk worker mengambil pekerjaan,
 `(webhook_endpoint_id, created_at)` untuk halaman riwayat, `event_id` dan

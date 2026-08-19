@@ -102,18 +102,17 @@ class InstallationSpeedtestActivationGateTest extends TestCase
         $this->assertEquals('in_progress', $installation->installation_status);
         $this->assertNotNull($installation->installation_photo);
 
-        // Step 6 sekarang terbuka, DAN data step 5 yang barusan diisi tidak hilang.
+        // Step 6 sekarang terbuka, DAN data step 5 yang barusan diisi tidak hilang —
+        // termasuk foto: dropzone wajib nunjukin thumbnail tersimpan, bukan
+        // "Belum ada file" lagi (regresi yang dilaporkan user: keliatan hilang
+        // padahal sudah kesimpen).
         $page = $this->actingAs($technician)
             ->get(route('customers.installation.report', $customer->id));
         $page->assertDontSee('Aktivasi Laporan Speedtest');
         $page->assertSee('WHUSNET_GATE_TEST');
-        // Bug 2026-08-19: file input gak bisa di-prefill browser — tanpa
-        // state "Sudah Tersimpan", ketiga foto wajib keliatan reset ke
-        // "Belum ada file" begitu balik/reload ke step 5 padahal udah kesimpen.
-        $page->assertSee('Sudah Tersimpan');
-        $page->assertSee('Ganti Foto Pemasangan');
-        $page->assertDontSee('Pilih Foto Pemasangan');
         $page->assertSee('ZTEGC1234567');
+        $page->assertSee('Sudah Tersimpan');
+        $page->assertSee($installation->installation_photo);
     }
 
     public function test_store_speedtest_completes_task_and_transitions_workflow(): void

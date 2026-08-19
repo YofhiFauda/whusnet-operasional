@@ -11,6 +11,12 @@ Belum ada satu baris kode API di repo per 2026-08-18.
 | `database-schema.md` | Tabel & kolom baru beserta alasannya |
 | `flowchart.md` | Alur webhook dan alur auth portal |
 | `rencana-implementasi.md` | Fase, gerbang persetujuan, rencana test |
+| `keputusan.md` | **Kenapa jadi begini** — alternatif yang ditolak, alasan webhook vs REST, peta pengembangan, pertanyaan terbuka |
+
+Empat berkas pertama menjelaskan rancangan **seperti apa adanya**. `keputusan.md`
+menjelaskan **kenapa**, dan mencatat apa yang sudah ditolak beserta alasannya. Baca ia
+sebelum mengusulkan perubahan arah — kemungkinan besar usulan itu sudah pernah
+ditimbang.
 
 ## Hubungan dengan `docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §6.6
 
@@ -57,10 +63,47 @@ menyentuhnya.
 |---|---|---|
 | Prefix | — (keluar) | `/api/customer-portal/*` |
 | Arah | **Keluar** (Whusnet mendorong) | **Masuk** (portal menarik) |
-| Lawan bicara | Sistem lain — gateway AI agent, NMS/provisioning | Portal, atas nama satu pelanggan |
-| Auth | HMAC-SHA256 per-request | Client secret portal **+** bearer token pelanggan |
+| Event | `installation.activated` — satu, tidak ada yang lain | — |
+| Lawan bicara | Website B (provisioning) + Telegram Eksternal | Portal, atas nama satu pelanggan |
+| Auth | HMAC-SHA256 per-request; Telegram: bot token | Client secret portal **+** bearer token pelanggan |
 | Identitas | `webhook_endpoints` terdaftar manual | `customer_portal_accounts.login_id` |
 | Pembatas data | `pop_id` opsional per endpoint | `customer_id` pemilik token |
+
+### Webhook atau REST? Keduanya campuran, titik beratnya berlawanan
+
+| | API 1 — Pemasangan | API 2 — Portal Pelanggan |
+|---|---|---|
+| **Utama** | **Webhook** — `installation.activated` | **REST** — 13 endpoint `/api/customer-portal/*` |
+| **Pelengkap** | REST: 1 endpoint baca untuk rekonsiliasi | Webhook: 1 event `invoice.updated` |
+| Yang memulai | Whusnet | Portal (atas nama pelanggan) |
+| Pemicu | kejadian di lapangan | orang membuka halaman |
+
+**Aturannya satu kalimat: REST kalau ada yang bertanya, webhook kalau ada yang
+terjadi.**
+
+**API 1 berat ke webhook** karena tidak ada yang bertanya. Mesin provisioning tidak
+tahu kapan teknisi menekan Aktivasi — kita yang harus memberi tahu. Satu event bisa
+punya beberapa tujuan sekaligus; Website B dan Telegram Eksternal adalah dua pelanggan
+dari event yang sama, dengan retry masing-masing. REST-nya cuma jaring pengaman: satu
+endpoint baca untuk konsumen yang mati lebih lama dari 8 kali retry, atau mitra baru
+yang butuh backfill. Bentuknya dirancang di `keputusan.md` §3, belum masuk fase.
+
+**API 2 berat ke REST** karena pelanggan yang membuka halaman — merekalah yang
+bertanya, dan mereka bertanya kapan saja. Webhook-nya cuma satu, dan itu bukan hiasan:
+portal adalah aplikasi terpisah tanpa akses DB kita, jadi tanpa `invoice.updated` ia
+tidak akan pernah tahu pembayaran sudah masuk sampai ada yang me-refresh.
+
+**Satu hal yang menghubungkan keduanya:** dua webhook itu memakai mesin yang sama —
+`webhook_endpoints` + `webhook_outbox`, retry dan backoff identik, cuma beda keluarga
+event. Bukan dua sistem webhook; satu sistem yang melayani dua modul. Itu sebabnya di
+`database-schema.md` keduanya ditaruh di satu tabel.
+
+Alasan lengkap pemilihan ini — termasuk hitungan biaya polling dan empat kelemahan
+webhook yang diterima sadar — ada di `keputusan.md` §2.
+
+**Telegram Internal ≠ Telegram Eksternal.** Enam pemanggilan `TelegramBotService`
+inline yang sudah ada melayani tim sendiri dan **tidak disentuh**. Yang berpasangan
+dengan webhook adalah kanal eksternal terpisah, dengan bot dan chat sendiri.
 
 Model keamanan yang berbeda ini disengaja. Untuk integrasi mesin-ke-mesin, token
 bearer berumur panjang adalah satu rahasia statis yang, kalau bocor dari log atau

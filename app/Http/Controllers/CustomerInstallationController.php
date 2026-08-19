@@ -633,7 +633,7 @@ class CustomerInstallationController extends Controller
 
         $installation = $customer->installations()->latest()->first();
         if (! $installation) {
-            return redirect()->back()->withInput()->with('error', 'Data pemasangan belum dimulai — tekan "Start Proses" terlebih dahulu.');
+            return redirect()->back()->with('error', 'Data pemasangan belum dimulai — tekan "Start Proses" terlebih dahulu.');
         }
 
         // Sama seperti gerbang "completed" di store(): tiga foto + minimal
@@ -759,10 +759,7 @@ class CustomerInstallationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // withInput() — tanpa ini, satu exception tak terduga (mis. disk
-            // penuh saat upload foto) membuat SEMUA isian step 5 yang baru
-            // diketik teknisi keliatan hilang begitu halaman reload.
-            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
@@ -894,7 +891,7 @@ class CustomerInstallationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 }

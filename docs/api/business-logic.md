@@ -7,78 +7,94 @@
 
 ## API 1 — Webhook Pemasangan (outbound)
 
-### Satu event: tombol Aktivasi di Laporan Pemasangan
+### Titik pemicu: tombol "Aktivasi Laporan Speedtest"
 
-**Revisi 2026-08-19 — titik pemicunya berubah, dan rancangan sebelumnya salah.**
+Bukan tombol **Mulai Pemasangan**, dan bukan penyelesaian laporan. Pemicunya adalah
+tombol **Aktivasi Laporan Speedtest** di wizard Laporan Pemasangan
+(`resources/views/installations/report.blade.php:665`), yang men-submit form step 5
+(`:385`) ke `CustomerInstallationController::storePemasangan()`
+(`app/Http/Controllers/CustomerInstallationController.php:569`).
 
-Versi pertama dokumen ini memakai dua event, `installation.started` (tombol Mulai
-Pemasangan) dan `installation.completed` (laporan tersimpan `completed`). Alasannya:
-SN dan ODP belum ada saat pemasangan dimulai, jadi satu event dianggap mustahil.
+Docblock methodnya menyebut perannya persis (`:558-566`): *"Ini 'tombol Aktivasi' yang
+membuka Laporan Speedtest (step 6)"*.
 
-Alasan itu gugur. Laporan Pemasangan sekarang berupa wizard enam langkah, dan
-**tombol "Aktivasi"** — yang tampil di panel step 6 dan mengirim form step 5 ke
-`CustomerInstallationController::storePemasangan()` — adalah titik di mana keenam data
-yang diminta sudah lengkap sekaligus:
+**Kenapa titik ini yang benar, dan bukan yang lain:**
 
-| Data | Sumber saat Aktivasi ditekan |
-|---|---|
-| Nama | `customers.full_name`, sudah ada sejak pendaftaran |
-| Cabang POP | `customers.pop_id` |
-| Desa | `customers.village_id` |
-| Paket | `customers.internet_package_id` |
-| **SN** | baru saja ditulis ke `customer_technical_details.router_or_ont_serial` + `customer_devices.serial_number` |
-| **ODP** | baru saja ditulis ke `customer_technical_details.odp_number` / `odp_port` |
+| Kandidat | Endpoint | Kenapa tidak |
+|---|---|---|
+| Tombol Mulai Pemasangan | `start()` `:33` | Hanya memindahkan status ke `installation_in_progress`. SN dan ODP belum ada sama sekali |
+| Simpan Laporan Speedtest | `storeSpeedtest()` `:772` | Terlalu belakang — pemasangan fisik sudah selesai dan sistem luar baru diberi tahu setelah teknisi mengisi angka speedtest |
+| **Aktivasi Laporan Speedtest** | **`storePemasangan()` `:569`** | **Semua enam data sudah tersimpan, dan pemasangan fisik baru saja rampung** |
 
-Jadi satu event sudah cukup, dan dua event justru mengirim kabar setengah jadi lebih
-dulu tanpa ada yang membutuhkannya:
+Wizard Laporan Pemasangan sengaja dipecah dua submit. Step 5 (`storePemasangan`)
+menyimpan perangkat, SN, ODP, foto, dan material — **tanpa** menyelesaikan task
+maupun memindahkan workflow (`:675-677`: status instalasi tetap `in_progress`).
+Step 6 (`storeSpeedtest`) barulah titik penyelesaian. Tombol Aktivasi adalah gerbang
+di antara keduanya: ia menyimpan step 5 dan membuka panel speedtest.
 
-| Event | Kapan |
-|---|---|
-| `installation.activated` | Teknisi menekan **Aktivasi** di Laporan Pemasangan |
+Itu berarti tepat pada saat tombol ditekan, keenam data yang diminta sudah ada di
+database — dan itulah yang membuat permintaan satu-trigger bisa dipenuhi apa adanya.
 
-`installation.started` dan `installation.completed` **dibatalkan dari rancangan.**
-Kalau nanti sistem luar memang perlu tahu pekerjaan sedang berjalan, itu event
-tambahan yang dirancang saat kebutuhannya muncul — bukan sekarang.
+### Satu event: `installation.activated`
 
-### Titik pemicu: event baru, dan controller memang harus disentuh
+| Data diminta | Sumber saat Aktivasi ditekan | Status |
+|---|---|---|
+| Nama | `customers.full_name` | Sudah ada sejak pendaftaran |
+| Cabang POP | `customers.pop_id` → `pops` | Sudah ada sejak pendaftaran |
+| Desa | `customers.village_id` → `villages` | Sudah ada sejak pendaftaran |
+| Paket | `customers.internet_package_id` | Sudah ada sejak pendaftaran |
+| **SN** | `serial_number` → ditulis `:699` & `:740` | **Baru saja disimpan** |
+| **ODP** | `odp_number`/`odp_port` → ditulis `:700-701` | **Baru saja disimpan** |
 
-Berbeda dari rancangan sebelumnya, **keuntungan "nol perubahan controller" hilang di
-sini.** `storePemasangan()` tidak menyiarkan event apa pun. Yang ada di repo —
-`InstallationStarted` (`:101`) dan `InstallationCompleted` (`:512`) — menempel di
-titik yang salah untuk kebutuhan ini.
+**`installation.activated` adalah satu-satunya event di API 1.** Keputusan pemilik
+produk, 2026-08-19. Konsumen membutuhkan data perangkat untuk provisioning, dan itu
+sudah lengkap saat Aktivasi ditekan — kabar penyelesaian pemasangan tidak menambah
+apa pun bagi mereka.
 
-Jadi perlu event baru, `App\Events\InstallationActivated`, di-dispatch dari
-`storePemasangan()`. Satu baris, ditaruh sebagai pernyataan **terakhir sebelum
-`DB::commit()`**.
+Aturan turunannya, dan ini yang paling sering dilanggar belakangan: **jangan pernah
+memasang listener webhook pada event instalasi lain yang sudah ada di aplikasi.**
+Modul ini punya satu event dan satu titik pemicu. Kalau suatu saat konsumen benar-benar
+meminta kabar penyelesaian, itu event baru yang dirancang tersendiri, bukan listener
+tambahan yang ditempelkan ke event lama karena "kebetulan sudah ada".
 
-Kenapa harus paling akhir: method itu menulis berurutan — `customer_installations`
-(foto, catatan, status), lalu `customer_technical_details` (SN, ODP, OLT, VLAN),
-material dan alat kerja, dan **terakhir `customer_devices`** (`:735-750`). Event yang
-di-dispatch sebelum baris terakhir itu menghasilkan payload tanpa data perangkat yang
-justru jadi alasan event ini ada.
+### Konsekuensi: controller HARUS disentuh
 
-Alternatif yang **ditolak**: mengamati (`observer`) `CustomerDevice` atau
-`CustomerTechnicalDetail`. Terlihat menghindari sentuhan controller, tapi keduanya
-juga ditulis dari modal admin (`store()`) dan dari jalur lain, sehingga event akan
-terbit di saat yang tidak diminta — dan karena datanya tersebar di dua model, satu
-Aktivasi akan memicunya **dua kali**. Event eksplisit lebih jujur soal maksudnya.
+Revisi sebelumnya dokumen ini menyatakan webhook bisa dipasang tanpa mengubah
+`CustomerInstallationController` sama sekali, dengan menumpang event yang sudah
+disiarkan di sana. **Itu tidak berlaku untuk titik pemicu yang benar:**
+`storePemasangan()` tidak menyiarkan apa pun.
 
-`storePemasangan()` memakai `DB::beginTransaction()` manual di `:660` dengan
-`DB::commit()` di `:752`. Aturannya sama seperti sebelumnya: baris outbox ditulis **di
-dalam** transaksi, pengirimannya berjalan **setelah commit**. Job yang berjalan sebelum
-commit membaca data yang belum tertulis; kalau transaksi di-rollback, sistem luar
-sudah menerima kabar soal pemasangan yang tidak pernah tercatat.
+Jadi implementasinya perlu satu kelas event baru — `App\Events\InstallationActivated`,
+membawa `Customer` dan memakai `SerializesModels`, mengikuti bentuk event instalasi
+lain di `app/Events/` — di-dispatch di dalam transaksi `storePemasangan()`, sebelum
+`DB::commit()` di `:751`.
 
-Satu jebakan kecil tapi nyata: presenter **harus membaca relasi yang segar**. Objek
-`$customer` di dalam method itu sudah lama dimuat, dan `customerDevice` /
-`customerTechnicalDetail` yang sempat ter-cache akan mengembalikan nilai sebelum
-Aktivasi. Muat ulang relasinya di presenter, jangan percaya yang sudah menempel.
+Perubahannya kecil dan terisolasi: satu baris dispatch, satu kelas event, satu
+listener. Tapi ia tetap perubahan pada berkas 900+ baris yang memegang alur paling
+rawan di modul pemasangan, jadi disebut terang-terangan alih-alih disembunyikan di
+balik klaim "nol edit".
 
-> **Catatan status kode:** `storePemasangan()`, `storeSpeedtest()`, dan wizard enam
-> langkah di `resources/views/installations/report.blade.php` masih berupa perubahan
-> yang belum di-commit saat rancangan ini ditulis. Kalau nama method, urutan step,
-> atau letak tombol Aktivasi berubah sebelum implementasi dimulai, titik pemicu di
-> dokumen ini ikut berubah — periksa ulang, jangan salin nomor barisnya buta.
+**Event baru, bukan memakai ulang yang sudah ada.** Event instalasi yang sekarang
+disiarkan di controller ini melayani dashboard realtime FOP. Mengubah artinya, atau
+menambahkan listener webhook di atasnya, akan mengubah perilaku konsumen yang sudah
+berjalan — dan menautkan nasib webhook eksternal ke event internal yang bisa berubah
+kapan saja tanpa ada yang ingat webhook ikut mendengarkan.
+
+### Perhatian: `store()` legacy masih hidup
+
+Endpoint lama `customers.installation.store` (`routes/web.php:530` → `store()` `:241`)
+**tidak dihapus**. Ia dipakai modal admin di
+`resources/views/customers/tabs/_installation.blade.php`, dengan radio
+`installation_status` manual.
+
+Artinya ada dua jalur berbeda yang bisa menyimpan data pemasangan: wizard teknisi
+(dua submit) dan modal admin (satu submit). Rancangan ini memilih **hanya wizard
+teknisi** — itu jalur lapangan yang sebenarnya dan satu-satunya yang punya gerbang
+kelengkapan data (3 foto wajib + material terpakai). Modal admin tidak memicu webhook.
+
+Kalau kelak jalur admin juga perlu memicu webhook, ia men-dispatch
+`InstallationActivated` yang sama secara eksplisit — keputusan sadar, bukan efek
+samping dari menumpang event lain.
 
 ### Payload
 
@@ -86,8 +102,8 @@ Aktivasi. Muat ulang relasinya di presenter, jangan percaya yang sudah menempel.
 {
   "event": "installation.activated",
   "event_id": "0f4a9b2e-7c31-4d5a-9f10-2b8e6c5a1d33",
-  "idempotency_key": "installation:1174",
-  "occurred_at": "2026-08-19T14:32:07+07:00",
+  "idempotency_key": "installation:8842:activation:3",
+  "occurred_at": "2026-08-18T14:32:07+07:00",
   "data": {
     "customer": {
       "cid": "C1X4ARQ000631",
@@ -103,20 +119,11 @@ Aktivasi. Muat ulang relasinya di presenter, jangan percaya yang sudah menempel.
     },
     "task": {
       "number": "TASK-2026-0184",
-      "started_at": "2026-08-19T09:12:00+07:00"
+      "started_at": "2026-08-18T09:12:00+07:00"
     }
   }
 }
 ```
-
-`idempotency_key` = `installation:{customer_installations.id}` — baris pemasangan yang
-sedang dikerjakan. Lihat "Aktivasi bisa ditekan berkali-kali" di bawah; angka itu
-bukan hiasan.
-
-Tidak ada `completed_at`: saat Aktivasi ditekan, `customer_installations.installation_status`
-sengaja **masih `in_progress`** (`storePemasangan():676`). Pemasangan baru berstatus
-selesai di step 6 (Laporan Speedtest). Mengirim `completed_at` di sini berarti
-mengarang tanggal untuk keadaan yang belum terjadi.
 
 `harga_bulanan` adalah **string desimal**, sama seperti seluruh nominal di kedua API.
 
@@ -125,6 +132,10 @@ sama seperti portal. `cid` tetap dikirim karena itu yang tercetak di kwitansi da
 dipakai staf, tapi **`cid` tidak cocok jadi kunci** — ia nullable untuk pelanggan yang
 belum aktif dan tidak punya unique constraint (lihat "Kenapa bukan cid" di bawah).
 Kunci pencocokan yang stabil adalah `login_id`.
+
+Tidak ada `task.completed_at`: pada saat Aktivasi ditekan, task PSB memang belum
+selesai — penyelesaiannya terjadi di step 6. Mengirim kunci yang selalu `null` hanya
+mengundang konsumen menunggunya terisi.
 
 ### Dari mana tiap field dibaca
 
@@ -160,16 +171,15 @@ Webhook memakai urutan **perangkat dulu** (versi blade), karena
 pemasangan, sementara `customers.odp_code` bisa berupa rencana awal dari pendaftaran.
 Untuk provisioning, ODP yang benar adalah yang kabelnya betul-betul masuk.
 
-Ada ketimpangan penulisan yang harus diketahui, bukan diperbaiki diam-diam di task
-ini: **kedua** jalur penyimpanan menulis `serial_number` ke `customer_devices` tapi
-tidak pernah menulis `odp`/`odp_port` ke sana — `storePemasangan()` di `:735-750` dan
-`store()` di `:478-493`. Yang menerima ODP hanya `customer_technical_details`
-(`storePemasangan():696-712`, `store():418-442`).
+**Untuk ODP, sumber 1 hampir selalu kosong — dan itu bukan kebetulan.**
+`storePemasangan()` menulis `odp_number`/`odp_port` ke `customer_technical_details`
+(`:700-701`) tapi **tidak** menulis `odp`/`odp_port` ke `customer_devices`
+(`:735-750`). Ketimpangan yang sama ada di `store()` legacy (`:418-442` vs
+`:478-493`). Jadi ODP hasil pemasangan praktis selalu ketemu di sumber 2, dan rantai
+fallback bukan kemewahan defensif — ia jalur normal.
 
-Akibatnya praktis: setelah Aktivasi, **SN ketemu di sumber 1, ODP ketemu di sumber 2.**
-Rantai fallback menutupinya, tapi jangan berasumsi keduanya datang dari tempat yang
-sama — sebuah presenter yang cuma membaca `customer_devices` akan mengirim ODP `null`
-untuk pemasangan yang ODP-nya jelas-jelas diisi teknisi.
+Merapikan penulisan ganda itu adalah task tersendiri dengan risikonya sendiri. Jangan
+diselundupkan ke pekerjaan webhook.
 
 Perlu juga dicatat: **ODP bukan entitas.** Tidak ada model `Odp` maupun tabel `odps`
 di repo — ODP hanyalah string bebas di tiga kolom. Payload mengirim kode ODP apa
@@ -181,55 +191,165 @@ versi baru.
 Satu kelas, `app/Services/Webhooks/InstallationWebhookPresenter`, meniru alasan
 `ReceiptPresenter` (`app/Services/Receipts/ReceiptPresenter.php:8-23`): sebelum kelas
 itu ada, tiga halaman cetak merakit isi kwitansi sendiri-sendiri dan satu pembayaran
-tercetak beda-beda tergantung tombol mana yang ditekan. Webhook punya risiko yang
-sama begitu event kedua ditambahkan.
+tercetak beda-beda tergantung tombol mana yang ditekan.
 
-Aturannya sama: **event boleh berbeda, isi tidak.**
+Di sini presenter tetap dibutuhkan meski event-nya cuma satu, karena **tujuannya
+lebih dari satu**. Website B menerima JSON, Telegram Eksternal menerima teks — dan
+rantai fallback SN/ODP di atas tidak boleh disalin ke renderer kedua. Ia dirakit
+sekali, dirender dua kali.
 
-### Aktivasi bisa ditekan berkali-kali — dan itu normal
+### Satu event, banyak tujuan: transport
 
-Ini bagian yang paling mudah terlewat, dan pindahnya titik pemicu ke tombol Aktivasi
-justru membuatnya **lebih sering** terjadi, bukan kurang.
+Satu `installation.activated` bisa punya beberapa pelanggan sekaligus. Contoh yang
+sudah disepakati: **Website B** (sistem provisioning) dan **Telegram Eksternal**
+(notifikasi + catatan untuk pihak luar).
 
-`storePemasangan()` menerima status `installation_in_progress` **dan**
-`revision_installation` (`:573-577`), dan ia sekadar `updateOrCreate` — tidak ada
-gerbang "sudah pernah diaktivasi". Jadi Aktivasi bisa ditekan berulang dalam satu
-pemasangan yang sama:
+Keduanya bukan dua sistem terpisah. Satu event → payload dirakit **sekali** oleh
+presenter → satu baris `webhook_outbox` per endpoint → pengiriman independen dengan
+retry masing-masing. Website B mati tidak menahan Telegram, dan sebaliknya.
 
-- Teknisi salah ketik SN, kembali ke step 5, perbaiki, tekan Aktivasi lagi.
-- Foto kontrak buram, diunggah ulang, tekan Aktivasi lagi.
-- Verifikasi admin menolak → `revision_installation` → teknisi perbaiki → Aktivasi lagi.
+Yang berbeda hanyalah cara mengetuk pintunya:
 
-Semuanya sah dan semuanya harus terkirim: penekanan kedua justru sering membawa SN
-atau ODP yang **benar**, dan itu persis informasi yang paling dibutuhkan sistem
-provisioning.
+| | `http_json` (Website B) | `telegram` (Telegram Eksternal) |
+|---|---|---|
+| Tujuan | URL milik konsumen | `api.telegram.org/bot{token}/sendMessage` |
+| Auth | HMAC `X-Whusnet-Signature` | bot token di dalam URL |
+| Bentuk kiriman | JSON terstruktur | teks ter-render, `parse_mode: HTML` |
+| Verifikasi signature | wajib | **tidak mungkin** — Telegram tidak membaca header kita |
+| Sukses | 2xx | `ok: true` di body respons |
 
-Yang rusak kalau tidak ditangani adalah kontrak idempotensinya. Dengan `event_id`
-saja, penerima melihat beberapa event berbeda dan tidak punya cara tahu bahwa yang
-terbaru **menggantikan** yang sebelumnya. Untuk provisioning, itu berarti beberapa
-kali penyalaan layanan atau beberapa baris pelanggan untuk satu rumah.
+Karena itu `webhook_endpoints` punya kolom `transport` dan `config`, dan presenter
+punya dua renderer di atas **satu** sumber data: `toJson()` untuk `http_json`,
+`toTelegramText()` untuk `telegram`. Bukan dua pipeline — satu outbox, dua adapter
+pengiriman. Kalau isi payload perlu field baru, ia ditambahkan di presenter dan kedua
+renderer ikut, sama seperti aturan `ReceiptPresenter`.
+
+Telegram tidak menerima signature, jadi jaminan keasliannya berbeda dan lebih lemah:
+yang membuktikan pesan itu dari kita hanyalah bot yang mengirimnya. Itu memadai untuk
+notifikasi, **tidak** memadai untuk memicu tindakan otomatis. Konsumen yang perlu
+memprovision layanan berlangganan `http_json`, bukan membaca grup Telegram.
+
+### Telegram Internal vs Telegram Eksternal
+
+Repo ini sudah mengirim Telegram dari enam tempat — `CustomerInstallationController`,
+`CustomerSurveyController`, `CustomerController`, `CustomerVerificationController`,
+`SendTaskNotificationJob`, `CheckCountdownStatus` — semuanya lewat
+`TelegramBotService::sendMessage()` inline. Itu **Telegram Internal**: kabar untuk tim
+sendiri, dan ia **tidak disentuh sama sekali** oleh rancangan ini.
+
+Yang berpasangan dengan webhook adalah **Telegram Eksternal**: saluran terpisah untuk
+pihak luar, hidup sebagai salah satu `webhook_endpoints`.
+
+| | Telegram Internal | Telegram Eksternal |
+|---|---|---|
+| Pembaca | Tim Whusnet | Pihak luar (mitra/vendor) |
+| Jalur | `TelegramBotService` inline di 6 tempat | `webhook_outbox`, transport `telegram` |
+| Kredensial | `config('services.telegram.*')` global | **per-endpoint**, disimpan di `webhook_endpoints.config` |
+| Dipicu | bermacam kejadian operasional | hanya event yang dilanggan |
+| Retry | tidak ada — galat ditelan ke log | ada, backoff sama dengan `http_json` |
+| Diubah task ini? | **tidak** | dibangun baru |
+
+**Kredensialnya wajib terpisah, dan ini bukan detail.** `config/services.php:38-41`
+cuma punya satu `TELEGRAM_BOT_TOKEN` dan satu `TELEGRAM_CHAT_ID`. Kalau transport
+`telegram` membacanya, pesan untuk pihak luar mendarat di grup internal yang sama —
+pemisahan yang baru saja dibuat langsung batal, dan pihak luar berpotensi ikut membaca
+kabar operasional internal kalau mereka ditambahkan ke grup itu.
+
+Jadi endpoint bertransport `telegram` menyimpan `bot_token` dan `chat_id`-nya sendiri
+di `webhook_endpoints.config` (token ikut terenkripsi, sama perlakuan seperti
+`secret_encrypted`). `TelegramBotService` yang ada tidak dipakai ulang apa adanya —
+ia mengunci kredensial di konstruktor dari config global (`:15-18`). Adapter eksternal
+memerlukan token dan chat per-pengiriman.
+
+Karena keduanya terpisah penuh — bot berbeda, chat berbeda, pemicu berbeda — **tidak
+ada tabrakan**. Dua integrasi Telegram yang berjalan bersamaan bukan risiko teknis:
+keduanya sekadar `Http::post()` ke `api.telegram.org`, tanpa state bersama.
+
+### Isi pesan Telegram Eksternal
+
+Payload `http_json` memuat identitas lengkap karena provisioning memang membutuhkannya,
+dan ia dikirim ke satu endpoint dengan retensi yang bisa kita minta pertanggungjawaban.
+
+Telegram berbeda: pesan yang terkirim ke sebuah chat **menetap selamanya di luar
+kendali kita**. Kebijakan purge 90 hari untuk `webhook_outbox` tidak menjangkau
+riwayat chat. Siapa pun yang ditambahkan ke grup itu tahun depan bisa menggulir ke
+atas dan membaca data pelanggan hari ini.
+
+Karena grup ini eksternal, isinya dibatasi:
+
+**Keluar:** `login_id` atau CID, nama POP, desa, nama paket, SN, ODP, nomor task,
+nomor aktivasi, waktu.
+
+**Tidak keluar:** nomor HP, alamat lengkap, NIK, koordinat, dan kredensial perangkat
+(`pppoe_password`, `wifi_password`) — yang terakhir tidak pernah masuk payload mana
+pun, termasuk `http_json`.
+
+Nama pelanggan: **keputusan Anda.** Ia berguna untuk pembacaan manusia dan berisiko
+sebagai catatan permanen di pihak luar. Kalau ragu, kirim `login_id` saja — yang butuh
+nama membuka sistemnya. Catatan pembanding: pesan Telegram Internal yang ada sekarang
+(`storeSpeedtest()` `:876-886`) memuat nama **dan** nomor HP; itu memang untuk tim
+sendiri, dan jangan dijadikan acuan untuk kanal eksternal.
+
+### Aktivasi bisa ditekan berkali-kali
+
+Ini kasus yang paling mudah terlewat, dan pada titik pemicu ini ia **lebih sering**
+terjadi daripada di skenario mana pun.
+
+`storePemasangan()` tidak mengunci apa pun setelah sukses. Teknisi yang salah mengetik
+SN, memasang ulang di ODP lain, atau menambah foto tinggal mengubah isian dan menekan
+Aktivasi lagi — `updateOrCreate` di `:695` dan `:735` memang dirancang untuk itu.
+Ditambah alur revisi: verifikasi admin menolak (`revision_installation`, diterima di
+`:574`), teknisi memperbaiki, tekan Aktivasi lagi.
+
+Semua penekanan itu sah dan semuanya harus terkirim — penekanan kedua justru sering
+membawa SN atau ODP yang **benar**, yang persis dibutuhkan sistem provisioning.
+
+Yang rusak adalah kontrak idempotensinya. Kalau `event_id` dipakai sendirian, penerima
+menghadapi dua event dengan id berbeda dan tidak punya cara tahu bahwa yang kedua
+**menggantikan** yang pertama, bukan menambah. Untuk provisioning, itu berarti dua
+kali penyalaan layanan atau dua baris pelanggan dengan SN berbeda.
 
 Karena itu payload membawa **dua** kunci dengan tugas berbeda:
 
 | Kunci | Tetap sama saat | Untuk |
 |---|---|---|
 | `event_id` | percobaan **ulang pengiriman** kejadian yang sama | Membuang kiriman dobel akibat jaringan |
-| `idempotency_key` | Aktivasi ditekan lagi untuk pemasangan yang sama | Mengenali bahwa event ini **state terbaru** |
+| `idempotency_key` | — berubah tiap penekanan Aktivasi | Mengenali bahwa event ini **state terbaru** untuk pemasangan itu |
 
-`idempotency_key` = `installation:{customer_installations.id}` — id baris pemasangan
-yang sedang dikerjakan, yaitu baris yang diambil `storePemasangan()` lewat
-`$customer->installations()->latest()->first()` (`:635`).
+`idempotency_key` = `installation:{customer_id}:activation:{n}`, dengan `n` dinaikkan
+tiap penekanan. Penerima memperlakukan event sebagai **upsert atas state pemasangan
+pelanggan** — nomor tertinggi yang menang, sama semangatnya dengan "payload berisi
+STATE penuh, bukan delta" di §6.6.6.
 
-Dipilih id baris, bukan `customer_id` atau hitungan percobaan, karena itu yang paling
-tepat menggambarkan maksudnya: **satu baris `customer_installations` = satu pemasangan
-fisik.** Semua penekanan Aktivasi terhadap baris yang sama adalah koreksi atas
-pemasangan yang sama, jadi kuncinya memang harus sama. Kalau kelak revisi membuat
-baris pemasangan baru, kuncinya berubah dengan sendirinya — dan itu pun benar, karena
-saat itu memang pemasangan yang berbeda.
+Konsekuensi operasional yang harus disadari: penekanan berulang berarti webhook bisa
+terkirim beberapa kali untuk satu pemasangan dalam hitungan menit. Itu normal, bukan
+bug, dan konsumen harus dirancang menerimanya sejak awal.
 
-Penerima memperlakukan event ini sebagai **upsert atas state pemasangan**, bukan
-penambahan — yang terakhir menang, sama semangatnya dengan "payload berisi STATE
-penuh, bukan delta" di §6.6.6.
+### Aktivasi berulang: Website B menerima semua, Telegram tidak
+
+Ini satu-satunya titik di mana kedua transport **sengaja berperilaku beda**.
+
+Aktivasi bisa ditekan berkali-kali dan itu jalur normal. Untuk Website B setiap
+penekanan harus terkirim: penekanan kedua sering membawa SN atau ODP yang benar, dan
+penerima memperlakukannya sebagai upsert lewat `idempotency_key`. Kehilangan satu pun
+berarti provisioning memakai data basi.
+
+Untuk manusia yang membaca grup Telegram, perilaku yang sama jadi masalah: satu
+pemasangan bermasalah bisa mengirim lima pesan dalam dua menit. Telegram sendiri
+membatasi sekitar 20 pesan/menit per grup dan membalas `429` di atas itu — jadi
+membanjiri kanal bukan cuma berisik, ia membuang pesan.
+
+Dua aturan untuk transport `telegram`, keduanya **tidak** berlaku untuk `http_json`:
+
+1. **Lewati kalau tidak ada yang berubah.** Kalau teks ter-render identik dengan
+   kiriman terakhir yang berhasil untuk pelanggan yang sama, jangan kirim. Penekanan
+   Aktivasi yang tidak mengubah data apa pun tidak menghasilkan kabar apa pun.
+2. **Sebutkan nomor aktivasinya** saat memang berubah — mis. *"Aktivasi #2 — data
+   perangkat diperbarui"*. Pembaca harus bisa membedakan koreksi dari pemasangan baru.
+   Tanpa itu, dua pesan untuk satu pelanggan terbaca sebagai dua pemasangan.
+
+Baris outbox untuk Telegram yang dilewati aturan 1 ditandai `skipped`, bukan dihapus —
+supaya pertanyaan "kenapa mitra tidak dapat kabar" punya jawaban.
 
 ### Pengiriman, kegagalan, dan pengulangan
 
@@ -243,9 +363,11 @@ yang terus dicoba selamanya hanya menumpuk antrean — tapi kegagalan **tidak bo
 hilang diam-diam**, jadi baris outbox berstatus `failed` tetap tinggal sebagai daftar
 yang bisa direkonsiliasi.
 
-Urutan tidak dijamin. Kalau `started` gagal dan masuk backoff sementara `completed`
-lolos, konsumen bisa menerima terbalik. `occurred_at` adalah penentu urutan, bukan
-waktu terima.
+Urutan tidak dijamin, dan dengan Aktivasi yang bisa ditekan berulang itu bukan kasus
+teoretis: kalau penekanan pertama gagal lalu masuk backoff sementara penekanan kedua
+langsung lolos, konsumen menerima yang lama **setelah** yang baru. Penentu urutan
+adalah `occurred_at` dan nomor di `idempotency_key`, bukan waktu terima — event dengan
+nomor lebih rendah yang datang belakangan harus dibuang, bukan ditimpakan.
 
 ### Keamanan
 
@@ -274,66 +396,6 @@ Endpoint boleh diikat ke satu `pop_id`. Ini bukan kenyamanan: CLAUDE.md menyatak
 setiap query pelanggan wajib lewat pembatasan POP, dan webhook adalah query pelanggan
 yang hasilnya dikirim keluar organisasi. Endpoint tanpa `pop_id` menerima seluruh
 cabang dan harus diperlakukan sebagai keputusan sadar.
-
-### Konsumen pertama: gateway AI agent (OpenClaw) → Telegram
-
-Rencana penggunaannya: sebuah gateway/orkestrator antar-tool berlangganan event
-pemasangan, lalu menyampaikannya ke Telegram lewat LLM. **Whusnet tidak berubah sama
-sekali untuk ini** — gateway cukup didaftarkan sebagai satu baris `webhook_endpoints`
-biasa. Tidak ada endpoint baru, tidak ada kolom `channel`, tidak ada kode Telegram di
-repo ini.
-
-Pembagian tugasnya tegas: **Whusnet mendorong fakta, gateway memutuskan kalimatnya.**
-Itu sebabnya bentuk yang sudah dirancang (JSON + HMAC + `event_id` +
-`idempotency_key`) cocok apa adanya — semuanya kontrak mesin-ke-mesin, bukan teks
-siap-kirim.
-
-Yang **tidak** boleh dilakukan: memanggil `TelegramBotService` dari listener webhook.
-Terlihat lebih pendek, tapi memindahkan tiga masalah ke dalam repo ini yang sebenarnya
-sudah dipegang gateway — Telegram tidak mengenal `event_id` (retry setelah respons
-timeout menghasilkan pesan dobel di grup), punya rate limit sendiri (~30 pesan/detik
-global, ~20/menit per grup) yang tidak sejalan dengan backoff kita, dan
-`TelegramBotService::sendMessage()` (`app/Services/TelegramBotService.php:41-52`)
-mengembalikan `bool` sambil menelan galat, sehingga outbox tidak bisa membedakan 429
-"perlambat" dari 401 "token salah".
-
-Kewajiban di sisi gateway, dan ini bagian dari kontrak:
-
-- **Dedupe pakai `event_id`.** Retry kita mengirim id yang sama; tanpa dedupe, satu
-  jaringan lambat jadi beberapa pesan identik di grup.
-- **Perlakukan `idempotency_key` sebagai penanda pengganti.** Pemasangan revisi
-  Aktivasi ditekan lagi (koreksi SN, foto ulang, revisi) menerbitkan `installation.activated`
-  lagi dengan kunci yang sama — itu koreksi, bukan pemasangan kedua.
-- **Verifikasi signature.** Meskipun gateway milik sendiri, endpoint-nya tetap
-  terbuka di internet. Tanpa verifikasi, siapa pun yang tahu URL-nya bisa menyuntikkan
-  "pemasangan selesai" palsu ke grup operasional.
-
-**PII berpindah, tidak hilang.** Payload memuat nama, desa, paket, SN, dan ODP.
-Whusnet tidak memangkasnya — sistem provisioning butuh data itu. Yang harus diputuskan
-di sisi gateway adalah apa yang benar-benar sampai ke chat: grup Telegram menyimpan
-riwayat, dan siapa pun yang ditambahkan belakangan bisa membacanya ke belakang. Untuk
-grup operasional, CID + POP + SN/ODP biasanya sudah cukup tanpa nama pelanggan.
-
-**Diam di Telegram bukan berarti tidak ada pemasangan.** Kalau gateway mati, outbox
-menahan dan mengulang; baris `failed` tetap tinggal sebagai daftar rekonsiliasi.
-Halaman riwayat pengiriman adalah tempat memeriksanya — bukan grup chat.
-
-#### Yang sengaja belum dirancang: API baca untuk mesin
-
-Gateway yang menjalankan LLM biasanya juga ingin **bertanya** ("berapa pemasangan
-selesai hari ini di Jetis?", "status pelanggan C1X4ARQ000631?"). Itu permukaan ketiga
-— API operasional untuk mesin, dengan token mesin, POP scope, dan daftar putih kolom
-sendiri — dan **tidak ada di dokumen ini**. Keputusan saat ini: agent hanya menerima
-event.
-
-Batas itu ditulis di sini supaya tidak longgar diam-diam. Menaikkannya dari "terima
-event" ke "boleh bertanya" adalah penambahan permukaan yang terukur. Menaikkannya ke
-**"boleh bertindak"** adalah kategori yang berbeda: agent yang boleh mengubah data
-sekaligus membaca teks yang ditulis orang luar — `detail_keluhan` sebuah tiket diisi
-pelanggan — berarti kalimat di dalam tiket itu bisa berfungsi sebagai perintah. Untuk
-sistem yang memegang tagihan dan saldo, itu dirancang sendiri dengan daftar putih
-aksi, konfirmasi manusia untuk aksi berisiko, dan audit terpisah. Jangan diselundupkan
-sebagai "sekalian" ke fase webhook.
 
 ---
 
@@ -646,3 +708,4 @@ terfilter, dan biarkan controller hanya menambah filter tampilan.
   melewati penyaringan itu dan menyentuh bagian paling rawan di repo.
 - Ubah data pelanggan dari portal. Portal read-only kecuali ganti password.
 - UI portal itu sendiri — proyek dan repo terpisah.
+
