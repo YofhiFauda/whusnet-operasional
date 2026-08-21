@@ -43,7 +43,7 @@ class KwitansiPdfDicocokkanOtomatisTest extends TestCase
     {
         parent::setUp();
 
-        $this->fixture = base_path('tests/Fixtures/kwitansi-qr.pdf');
+        $this->fixture = base_path('tests/fixtures/kwitansi-qr.pdf');
 
         if (! app(PdfPageRasterizer::class)->isAvailable()) {
             $this->markTestSkipped('pdftoppm (poppler-utils) tidak terpasang di lingkungan ini.');

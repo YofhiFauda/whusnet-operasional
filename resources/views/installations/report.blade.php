@@ -42,14 +42,17 @@
     {{--
         DUA FORM TERPISAH (bukan satu wizard-form): #form-pemasangan
         membungkus step-panel-5, #form-speedtest membungkus step-panel-6.
-        Tombol submit-nya ada di footer BERSAMA di luar kedua form (supaya
-        satu footer dipakai semua step) — makanya trigger-nya JS
-        (handlePemasanganSubmit/handleSpeedtestSubmit) yang manggil
-        document.getElementById('form-...').submit(), bukan type="submit"
-        biasa. Step 5 submit ke customers.installation.pemasangan TANPA
-        menyelesaikan task/workflow; Step 6 baru terbuka setelah itu
-        (gerbang $pemasanganComplete) & submit ke customers.installation.speedtest
-        — SATU-SATUNYA titik penyelesaian pemasangan di alur wizard ini.
+        Submit-nya lewat JS (handlePemasanganSubmit/handleSpeedtestSubmit)
+        yang manggil document.getElementById('form-...').submit(), bukan
+        type="submit" biasa — supaya tombolnya bisa ditaruh di mana saja
+        dalam form (posisi DOM tombol gak ngaruh ke submit). Tombol "Aktivasi
+        Laporan Speedtest" ada DI DALAM panel step 5, di atas section
+        Perangkat Pasif / Material Terpakai; tombol "Simpan & Selesaikan
+        Pemasangan" (step 6) ada di footer BERSAMA. Step 5 submit ke
+        customers.installation.pemasangan TANPA menyelesaikan task/workflow;
+        Step 6 baru terbuka setelah itu (gerbang $pemasanganComplete) & submit
+        ke customers.installation.speedtest — SATU-SATUNYA titik penyelesaian
+        pemasangan di alur wizard ini.
         Lihat CustomerInstallationController::storePemasangan()/storeSpeedtest().
     --}}
     <div id="wizard-container" class="space-y-6">
@@ -254,14 +257,18 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <!-- Foto Rumah -->
                             <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
-                                @if($customer->latestSurvey?->house_photo)
+                                {{-- foto_publik() ikut memvalidasi filenya masih ada di disk: data survey lama
+                                     menyimpan nama file hash telanjang yang filenya sudah hilang, dan tanpa cek
+                                     itu blok ini merender <img> ke URL 404 alih-alih jatuh ke @else. --}}
+                                @php $fotoRumahUrl = foto_publik($customer->latestSurvey?->house_photo); @endphp
+                                @if($fotoRumahUrl)
                                     <div>
                                         <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto Rumah</span>
                                         <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                             <img class="max-h-32 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
-                                                 src="{{ asset('storage/' . $customer->latestSurvey->house_photo) }}"
+                                                 src="{{ $fotoRumahUrl }}"
                                                  alt="Preview Foto Rumah"
-                                                 onclick="window.open('{{ asset('storage/' . $customer->latestSurvey->house_photo) }}', '_blank')">
+                                                 onclick="window.open('{{ $fotoRumahUrl }}', '_blank')">
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
@@ -280,14 +287,15 @@
 
                             <!-- Foto ODP -->
                             <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
-                                @if($customer->latestSurvey?->survey_photo)
+                                @php $fotoOdpUrl = foto_publik($customer->latestSurvey?->survey_photo); @endphp
+                                @if($fotoOdpUrl)
                                     <div>
                                         <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto ODP Terdekat</span>
                                         <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                             <img class="max-h-32 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
-                                                 src="{{ asset('storage/' . $customer->latestSurvey->survey_photo) }}"
+                                                 src="{{ $fotoOdpUrl }}"
                                                  alt="Preview Foto ODP"
-                                                 onclick="window.open('{{ asset('storage/' . $customer->latestSurvey->survey_photo) }}', '_blank')">
+                                                 onclick="window.open('{{ $fotoOdpUrl }}', '_blank')">
                                         </div>
                                     </div>
                                     <span class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2 rounded-full border border-emerald-200 dark:border-emerald-800">
@@ -542,6 +550,28 @@
                                 </div>
                             </div>
 
+                            {{-- Tombol Aktivasi — sengaja ditaruh DI ATAS section Material Terpakai
+                                 (bukan di panel step 6 lagi). Tombol ini men-submit form-pemasangan
+                                 (seluruh step 5, termasuk field di bawahnya — posisi DOM tombol gak
+                                 ngaruh ke submit, attemptActivate() manggil .submit() form langsung).
+                                 Fase 6 (speedtest) TETAP terkunci sampai tombol ini ditekan & lolos
+                                 gerbang server (storePemasangan) — lihat attemptActivate() & goToStep().
+                                 Begitu $pemasanganComplete true, tombol diganti badge status —
+                                 sudah gak relevan ditekan lagi (form ini sekarang cuma edit ulang
+                                 data step 5, aktivasinya sudah kepakai). --}}
+                            <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
+                                @unless($pemasanganComplete)
+                                    <button type="button" onclick="attemptActivate()" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm">
+                                        <x-ui.icon name="zap" class="w-3 h-3" /> Aktivasi Laporan Speedtest
+                                    </button>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Tekan setelah Laporan Pemasangan &amp; Perangkat (step 5) lengkap untuk membuka Fase 6 (Laporan Speedtest).</p>
+                                @else
+                                    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                                        <x-ui.icon name="check" class="w-3 h-3" /> Sudah Diaktivasi — Fase 6 Terbuka
+                                    </div>
+                                @endunless
+                            </div>
+
                             <!-- Sub-section: Material Realita Terpakai -->
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
                                 <label class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Perangkat Pasif / Material Terpakai Realita <span class="text-rose-500">*</span></label>
@@ -578,7 +608,11 @@
                                         ['field' => 'contract_photo', 'icon' => 'file-text', 'label' => 'FOTO KONTRAK', 'hint' => 'Form Fisik Bertanda Tangan', 'cta' => 'Pilih Foto Kontrak', 'alt' => 'Preview Foto Kontrak'],
                                         ['field' => 'signature_photo', 'icon' => 'signature', 'label' => 'FOTO TTD PELANGGAN', 'hint' => 'Bukti Serah Terima', 'cta' => 'Pilih Foto TTD', 'alt' => 'Preview Foto TTD'],
                                     ] as $photo)
-                                        @php $existingPath = $installation->{$photo['field']} ?? null; @endphp
+                                        {{-- URL, bukan path: foto_publik() sekaligus menyaring baris yang path-nya
+                                             ada di DB tapi filenya sudah hilang di disk. Foto begitu harus
+                                             diperlakukan seperti belum pernah diunggah — termasuk untuk label
+                                             tombol & flag data-has-existing di bawah. --}}
+                                        @php $existingFotoUrl = foto_publik($installation->{$photo['field']} ?? null); @endphp
                                         <div class="border-2 border-dashed @error($photo['field']) border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative">
                                             {{-- Placeholder kosong — cuma tampil kalau belum ada foto tersimpan SAMA
                                                  SEKALI (belum pernah upload). Sekali sudah tersimpan, default view-nya
@@ -587,7 +621,7 @@
                                                  lalu redirect balik gak bikin technician kira foto yang sudah
                                                  keupload hilang (file input emang gak bisa direfill browser, tapi
                                                  foto yang SUDAH TERSIMPAN tetap harus keliatan). --}}
-                                            <div id="default-placeholder-{{ $photo['field'] }}" class="py-3 space-y-2 {{ $existingPath ? 'hidden' : '' }}">
+                                            <div id="default-placeholder-{{ $photo['field'] }}" class="py-3 space-y-2 {{ $existingFotoUrl ? 'hidden' : '' }}">
                                                 <div class="w-9 h-9 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-base border border-sky-200 dark:border-sky-800">
                                                     <x-ui.icon name="{{ $photo['icon'] }}" class="w-4 h-4" />
                                                 </div>
@@ -600,10 +634,10 @@
                                             {{-- Foto yang sudah tersimpan di server (upload sebelumnya) — beda dari
                                                  preview-container di bawah (itu preview file yang BARU dipilih di
                                                  browser, belum tentu tersubmit). --}}
-                                            @if($existingPath)
+                                            @if($existingFotoUrl)
                                                 <div id="existing-preview-{{ $photo['field'] }}" class="py-2 flex flex-col items-center justify-center">
                                                     <div class="relative inline-block w-full">
-                                                        <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ asset('storage/'.$existingPath) }}" alt="{{ $photo['alt'] }} (tersimpan)">
+                                                        <img class="max-h-28 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ $existingFotoUrl }}" alt="{{ $photo['alt'] }} (tersimpan)">
                                                     </div>
                                                     <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">✓ Sudah Tersimpan</span>
                                                 </div>
@@ -620,11 +654,11 @@
                                             </div>
 
                                             <div class="mt-2">
-                                                <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ $existingPath ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
+                                                <input type="file" name="{{ $photo['field'] }}" id="{{ $photo['field'] }}" accept="image/*" capture="environment" class="hidden" data-has-existing="{{ $existingFotoUrl ? 'true' : 'false' }}" onchange="onFileChange('{{ $photo['field'] }}')">
                                                 <label for="{{ $photo['field'] }}" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-1.5 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                                    {{ $existingPath ? 'Ganti Foto' : $photo['cta'] }}
+                                                    {{ $existingFotoUrl ? 'Ganti Foto' : $photo['cta'] }}
                                                 </label>
-                                                <span id="file-label-{{ $photo['field'] }}" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingPath ? 'Pakai foto tersimpan' : 'Belum ada file' }}</span>
+                                                <span id="file-label-{{ $photo['field'] }}" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingFotoUrl ? 'Pakai foto tersimpan' : 'Belum ada file' }}</span>
                                             </div>
                                         </div>
                                     @endforeach
@@ -648,21 +682,18 @@
                         </div>
 
                         @unless($pemasanganComplete)
-                            {{-- Default step 6: title+deskripsi (di atas) + satu tombol Aktivasi.
-                                 Tombol ini yang men-submit form-pemasangan (data step 5) — bukan
-                                 link balik ke step 5. Validasi required step 5 dicek di JS
-                                 (attemptActivate()); belum lengkap → Toast, gak submit. Server
-                                 (storePemasangan/storeSpeedtest) tetap jadi penegak gerbang yang
-                                 sesungguhnya. --}}
+                            {{-- Terkunci total sampai tombol Aktivasi (step 5, di atas section
+                                 Material Terpakai) ditekan & lolos gerbang server (storePemasangan).
+                                 Gak ada tombol di sini lagi — satu-satunya titik aktivasi ada di step 5. --}}
                             <div class="py-10 text-center bg-slate-50/70 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                                <div class="w-12 h-12 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-3">
-                                    <x-ui.icon name="zap" class="w-5 h-5" />
+                                <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-3">
+                                    <x-ui.icon name="lock" class="w-5 h-5" />
                                 </div>
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
-                                    Lengkapi dulu data wajib di <strong>Laporan Pemasangan &amp; Perangkat</strong> (step 5), lalu tekan tombol di bawah ini.
+                                    Fase 6 masih terkunci. Lengkapi <strong>Laporan Pemasangan &amp; Perangkat</strong> (step 5), lalu tekan tombol <strong>Aktivasi Laporan Speedtest</strong> di atas section Perangkat Pasif / Material Terpakai.
                                 </p>
-                                <button type="button" onclick="attemptActivate()" class="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm">
-                                    <x-ui.icon name="zap" class="w-3 h-3" /> Aktivasi Laporan Speedtest
+                                <button type="button" onclick="goToStep(5)" class="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-xs font-semibold cursor-pointer shadow-sm">
+                                    <x-ui.icon name="chevron-left" class="w-3 h-3" /> Kembali ke Step 5
                                 </button>
                             </div>
                         @else
@@ -772,8 +803,9 @@
                         </button>
 
                         {{-- Step 6: submit form-speedtest — SATU-SATUNYA titik penyelesaian pemasangan.
-                             Tombol "Aktivasi" (submit form-pemasangan) ada DI DALAM panel step 6
-                             sendiri (attemptActivate()), bukan di footer — lihat step-panel-6. --}}
+                             Tombol "Aktivasi" (submit form-pemasangan) ada DI DALAM panel step 5,
+                             di atas section Material Terpakai (attemptActivate()), bukan di footer
+                             — lihat step-panel-5. --}}
                         <button type="button" onclick="handleSpeedtestSubmit()" id="btn-submit" style="display: none;" class="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer focus:outline-none inline-flex items-center justify-center gap-1.5 shadow-sm">
                             <x-ui.icon name="send" class="w-3 h-3" /> Simpan &amp; Selesaikan Pemasangan
                         </button>
@@ -852,7 +884,7 @@
         document.getElementById('form-pemasangan').submit();
     }
 
-    // Tombol Aktivasi di panel step 6 (default/terkunci) manggil ini.
+    // Tombol Aktivasi di panel step 5 (di atas Material Terpakai) manggil ini.
     // Belum lengkap → Toast + gak submit apa-apa. Server (storePemasangan)
     // tetap menegakkan gerbang yang sama kalau ada yang lolos validasi klien.
     function attemptActivate() {
@@ -1141,18 +1173,22 @@
 
     /* Stepper Page Switcher */
     function goToStep(stepNumber) {
-        // Lompat langsung ke step 6 (nav sidebar / mobile stepper) tanpa step 5
-        // lengkap → Toast, TETAP di step sekarang. Begitu step 5 lengkap, boleh
-        // masuk step 6 (nampilin title+deskripsi+tombol Aktivasi) meski belum
-        // disubmit — attemptActivate() yang benar-benar mengaktivasi.
-        if (stepNumber === 6 && ! pemasanganComplete && currentActiveStep !== 6) {
+        // Fase 6 terkunci TOTAL sampai tombol Aktivasi (step 5) ditekan & lolos
+        // gerbang server (storePemasangan) — beda dari alur lama yang bolehin
+        // intip panel step 6 begitu field step 5 lengkap tapi belum disubmit.
+        // Sekarang tombol Aktivasi sendiri sudah pindah ke step 5, jadi gak ada
+        // lagi alasan buka step 6 sebelum pemasanganComplete true.
+        if (stepNumber === 6 && ! pemasanganComplete) {
             const missing = getMissingRequiredFields(5);
-            if (missing.length > 0) {
-                if (window.Toast) {
-                    window.Toast.warning('Laporan Pemasangan Belum Lengkap', 'Isi dulu Laporan Pemasangan & Perangkat (step 5): ' + missing.join(', '));
-                }
-                return;
+            if (window.Toast) {
+                window.Toast.warning(
+                    'Fase 6 Masih Terkunci',
+                    missing.length > 0
+                        ? 'Isi dulu Laporan Pemasangan & Perangkat (step 5): ' + missing.join(', ')
+                        : 'Tekan tombol Aktivasi di step 5 (atas section Material Terpakai) terlebih dahulu.'
+                );
             }
+            return;
         }
 
         document.getElementById('step-panel-' + currentActiveStep).classList.add('hidden');

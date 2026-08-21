@@ -107,7 +107,6 @@ samping dari menumpang event lain.
   "data": {
     "customer": {
       "cid": "C1X4ARQ000631",
-      "login_id": "PNG-RQ000631",
       "nama": "Masudah Yuni Fitri"
     },
     "pop":   { "code": "PNR-JTS", "name": "Jetis", "type": "cabang" },
@@ -115,7 +114,7 @@ samping dari menumpang event lain.
     "paket": { "code": "PKT-20M", "name": "Home 20 Mbps", "bandwidth": "20 Mbps", "harga_bulanan": "150000.00" },
     "perangkat": {
       "sn": "ZTEGC1234567", "odp": "ODP-JTS-04", "odp_port": "3",
-      "olt": "OLT-JTS-01", "vlan": "120"
+      "olt": "OLT-JTS-01/1/3", "vlan": "120"
     },
     "task": {
       "number": "TASK-2026-0184",
@@ -127,11 +126,19 @@ samping dari menumpang event lain.
 
 `harga_bulanan` adalah **string desimal**, sama seperti seluruh nominal di kedua API.
 
-`login_id` disertakan supaya sistem luar bisa merujuk pelanggan dengan identitas yang
-sama seperti portal. `cid` tetap dikirim karena itu yang tercetak di kwitansi dan
-dipakai staf, tapi **`cid` tidak cocok jadi kunci** — ia nullable untuk pelanggan yang
-belum aktif dan tidak punya unique constraint (lihat "Kenapa bukan cid" di bawah).
-Kunci pencocokan yang stabil adalah `login_id`.
+**`login_id` DI-OMIT dari payload** (keputusan implementasi 2026-08-20, beda dari
+rancangan awal di atas): tabel `customer_portal_accounts` (API 2) belum ada, jadi
+belum ada sumber data nyata untuk field ini. `cid` tetap dikirim — nullable untuk
+pelanggan yang belum aktif dan tidak punya unique constraint (lihat "Kenapa bukan
+cid" di bawah), tapi ia satu-satunya identitas yang dikirim untuk fase ini. Begitu
+API 2 jadi, `login_id` ditambahkan sebagai **perubahan payload versi baru** — bukan
+ditambal diam-diam ke payload yang sudah berjalan.
+
+`perangkat.olt` = gabungan `olt_number`/`olt_slot`/`olt_port` (`customer_technical_details`)
+dipisah `/`, bagian kosong di-skip — bukan `olt_number` polos. Fallback ke
+`customers.olt_code` kalau ketiganya kosong. Tidak ada preseden format gabungan lain
+di repo ini; kalau Website B butuh slot/port terpisah, itu perubahan payload
+tersendiri.
 
 Tidak ada `task.completed_at`: pada saat Aktivasi ditekan, task PSB memang belum
 selesai — penyelesaiannya terjadi di step 6. Mengirim kunci yang selalu `null` hanya
@@ -205,7 +212,7 @@ sudah disepakati: **Website B** (sistem provisioning) dan **Telegram Eksternal**
 (notifikasi + catatan untuk pihak luar).
 
 Keduanya bukan dua sistem terpisah. Satu event → payload dirakit **sekali** oleh
-presenter → satu baris `webhook_outbox` per endpoint → pengiriman independen dengan
+presenter → satu baris `webhook_outbox` per tujuan → pengiriman independen dengan
 retry masing-masing. Website B mati tidak menahan Telegram, dan sebaliknya.
 
 Yang berbeda hanyalah cara mengetuk pintunya:
@@ -218,11 +225,12 @@ Yang berbeda hanyalah cara mengetuk pintunya:
 | Verifikasi signature | wajib | **tidak mungkin** — Telegram tidak membaca header kita |
 | Sukses | 2xx | `ok: true` di body respons |
 
-Karena itu `webhook_endpoints` punya kolom `transport` dan `config`, dan presenter
-punya dua renderer di atas **satu** sumber data: `toJson()` untuk `http_json`,
-`toTelegramText()` untuk `telegram`. Bukan dua pipeline — satu outbox, dua adapter
-pengiriman. Kalau isi payload perlu field baru, ia ditambahkan di presenter dan kedua
-renderer ikut, sama seperti aturan `ReceiptPresenter`.
+Karena itu listener tahu dua tujuan tetap dari `config/webhooks.php` (bukan lagi
+tabel `webhook_endpoints` sejak rev. 8, `keputusan.md`), dan presenter punya dua
+renderer di atas **satu** sumber data: `toJson()` untuk `http_json`, `toTelegramText()`
+untuk `telegram`. Bukan dua pipeline — satu outbox, dua adapter pengiriman. Kalau isi
+payload perlu field baru, ia ditambahkan di presenter dan kedua renderer ikut, sama
+seperti aturan `ReceiptPresenter`.
 
 Telegram tidak menerima signature, jadi jaminan keasliannya berbeda dan lebih lemah:
 yang membuktikan pesan itu dari kita hanyalah bot yang mengirimnya. Itu memadai untuk
@@ -238,13 +246,13 @@ Repo ini sudah mengirim Telegram dari enam tempat — `CustomerInstallationContr
 sendiri, dan ia **tidak disentuh sama sekali** oleh rancangan ini.
 
 Yang berpasangan dengan webhook adalah **Telegram Eksternal**: saluran terpisah untuk
-pihak luar, hidup sebagai salah satu `webhook_endpoints`.
+pihak luar, tujuan tetap `telegram_external` di `config/webhooks.php`.
 
 | | Telegram Internal | Telegram Eksternal |
 |---|---|---|
 | Pembaca | Tim Whusnet | Pihak luar (mitra/vendor) |
 | Jalur | `TelegramBotService` inline di 6 tempat | `webhook_outbox`, transport `telegram` |
-| Kredensial | `config('services.telegram.*')` global | **per-endpoint**, disimpan di `webhook_endpoints.config` |
+| Kredensial | `config('services.telegram.*')` global (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`) | `config('webhooks.telegram_external')` (`TELEGRAM_EXTERNAL_BOT_TOKEN`/`TELEGRAM_EXTERNAL_CHAT_ID`) — env var **berbeda**, bukan lagi kolom DB sejak rev. 8 |
 | Dipicu | bermacam kejadian operasional | hanya event yang dilanggan |
 | Retry | tidak ada — galat ditelan ke log | ada, backoff sama dengan `http_json` |
 | Diubah task ini? | **tidak** | dibangun baru |
@@ -255,11 +263,11 @@ cuma punya satu `TELEGRAM_BOT_TOKEN` dan satu `TELEGRAM_CHAT_ID`. Kalau transpor
 pemisahan yang baru saja dibuat langsung batal, dan pihak luar berpotensi ikut membaca
 kabar operasional internal kalau mereka ditambahkan ke grup itu.
 
-Jadi endpoint bertransport `telegram` menyimpan `bot_token` dan `chat_id`-nya sendiri
-di `webhook_endpoints.config` (token ikut terenkripsi, sama perlakuan seperti
-`secret_encrypted`). `TelegramBotService` yang ada tidak dipakai ulang apa adanya —
-ia mengunci kredensial di konstruktor dari config global (`:15-18`). Adapter eksternal
-memerlukan token dan chat per-pengiriman.
+Jadi adapter `telegram` membaca `bot_token` dan `chat_id`-nya sendiri dari
+`config/webhooks.php` (nilainya dari env var terpisah, bukan dari
+`config('services.telegram.*')`). `TelegramBotService` yang ada tidak dipakai ulang
+apa adanya — ia mengunci kredensial di konstruktor dari config global (`:15-18`).
+Adapter eksternal memerlukan token dan chat sendiri.
 
 Karena keduanya terpisah penuh — bot berbeda, chat berbeda, pemicu berbeda — **tidak
 ada tabrakan**. Dua integrasi Telegram yang berjalan bersamaan bukan risiko teknis:
@@ -357,11 +365,12 @@ Pengiriman lewat outbox + job terantre (Horizon sudah terpasang). Retry backoff:
 1 menit → 5 menit → 30 menit → 2 jam → 6 jam, maksimal 8 percobaan — angka yang sama
 dengan §6.6.6 supaya tidak ada dua kebijakan retry di satu sistem.
 
-Setelah percobaan terakhir gagal, `webhook_endpoints.consecutive_failures` naik;
-melewati ambang, endpoint dinonaktifkan otomatis dan Owner diberi tahu. Endpoint mati
-yang terus dicoba selamanya hanya menumpuk antrean — tapi kegagalan **tidak boleh
-hilang diam-diam**, jadi baris outbox berstatus `failed` tetap tinggal sebagai daftar
-yang bisa direkonsiliasi.
+Sejak rev. 8 tidak ada lagi `is_active`/`consecutive_failures` di DB untuk dimatikan —
+tujuan tetap satu, tidak ada saklar per-tujuan. Kegagalan beruntun tetap harus terlihat:
+job pengirim mencatat count berurutan (mis. di cache atau log terstruktur) dan
+mengirim alert manual ke Owner setelah melewati ambang, tapi baris outbox tidak
+berhenti dicoba — kegagalan **tidak boleh hilang diam-diam**, jadi baris berstatus
+`failed` tetap tinggal sebagai daftar yang bisa direkonsiliasi.
 
 Urutan tidak dijamin, dan dengan Aktivasi yang bisa ditekan berulang itu bukan kasus
 teoretis: kalau penekanan pertama gagal lalu masuk backoff sementara penekanan kedua
@@ -382,20 +391,102 @@ Penerima wajib:
    yang kelihatan.
 3. Membandingkan dengan `hash_equals`, bukan `===`.
 
-**Secret disimpan terenkripsi simetris, BUKAN di-hash.** Ini perbedaan yang gampang
-salah dan mahal: HMAC menuntut kedua pihak memegang rahasia yang **sama**, jadi kita
-harus bisa membacanya kembali setiap kali menandatangani. `Hash::make()` di kolom ini
-membuat semua pengiriman gagal ditandatangani setelah endpoint dibuat, dan tidak bisa
-dipulihkan tanpa menerbitkan ulang secret ke semua konsumen. Kolomnya dinamai
-`secret_encrypted` justru supaya salah paham ini tidak terjadi. Plaintext hanya
-ditampilkan sekali, saat pembuatan.
+**Secret disimpan di `.env`, BUKAN di-hash.** HMAC menuntut kedua pihak memegang
+rahasia yang **sama**, jadi kita harus bisa membacanya kembali setiap kali
+menandatangani — plaintext di `.env` (tidak pernah masuk git) memenuhi itu, sama
+seperti kolom `encrypted` di DB pada rancangan sebelumnya, cuma sumbernya beda sejak
+rev. 8 (`keputusan.md`).
 
-Endpoint wajib HTTPS, didaftarkan manual oleh Owner, tidak ada self-service.
+URL tujuan wajib HTTPS, ditetapkan developer lewat `.env` + deploy — **tidak ada
+lagi pendaftaran lewat form Owner**, karena tidak ada lagi form. Ini juga berarti
+gap validasi SSRF yang sempat dicatat (rev. 7) sudah tidak relevan: tidak ada input
+pengguna yang jadi URL tujuan.
 
-Endpoint boleh diikat ke satu `pop_id`. Ini bukan kenyamanan: CLAUDE.md menyatakan
-setiap query pelanggan wajib lewat pembatasan POP, dan webhook adalah query pelanggan
-yang hasilnya dikirim keluar organisasi. Endpoint tanpa `pop_id` menerima seluruh
-cabang dan harus diperlakukan sebagai keputusan sadar.
+**Tidak ada lagi `pop_id` per endpoint.** Konsumen tunggal (Website B) menerima data
+seluruh cabang. Ini penyimpangan sadar dari aturan keras CLAUDE.md soal pembatasan POP
+di setiap query pelanggan — diterima untuk sekarang karena cuma ada satu konsumen;
+kalau nanti konsumen kedua butuh cabang berbeda, itu alasan pertama untuk membangun
+kembali mekanisme routing per cabang (`keputusan.md` §4).
+
+### Callback Hasil Provisioning (inbound) — fase terpisah, belum masuk implementasi
+
+**Kenapa dibutuhkan.** Tanpa arah balik, `installation.activated` cuma "tembak dan
+lupa" — Whusnet tidak pernah tahu provisioning di Website B benar-benar berhasil.
+Teknisi masih harus menelepon manual untuk memastikan layanan menyala. Ini item
+"paling bernilai berikutnya" di peta pengembangan (`keputusan.md` §4), dirinci di sini
+supaya tidak dirancang ulang dari nol saat dikerjakan.
+
+**Hanya berlaku untuk transport `http_json`.** Telegram Eksternal tidak bisa jadi
+pemanggil API balik ke kita — ia cuma penerima teks. Callback ini pasangan searah dari
+Website B (tujuan `http_json` di `config/webhooks.php`), bukan grup Telegram mana pun.
+
+**Endpoint**
+
+```
+POST /api/v1/installations/provisioning-callback
+```
+
+Bukan path-param `{cid}` — `cid` nullable dan tidak stabil, alasan sama seperti kenapa
+`login_id` dipilih jadi kunci di payload keluar. Identitas ada di body lewat
+`event_id`/`idempotency_key`, dicocokkan ke baris `webhook_outbox` yang pernah kita
+kirim.
+
+**Auth — kredensial baru, bukan numpang HMAC secret webhook.** Secret webhook dipakai
+satu arah: Whusnet menandatangani ke Website B. Arah balik butuh kredensial
+kebalikannya — Website B mengautentikasi ke Whusnet. Memakai secret yang sama berarti
+satu kebocoran mengompromikan dua arah sekaligus. Dipakai token bearer tetap,
+hardcode di `.env` (`WEBHOOK_WEBSITE_B_CALLBACK_TOKEN`) — ikut pivot rev. 8, bukan
+tabel — diverifikasi `hash_equals` terhadap hash yang dihitung di tempat.
+
+**Body**
+
+```json
+{
+  "event_id": "0f4a9b2e-7c31-4d5a-9f10-2b8e6c5a1d33",
+  "idempotency_key": "installation:8842:activation:3",
+  "status": "succeeded",
+  "reason": null,
+  "provider_reference": "WB-PROV-99213",
+  "occurred_at": "2026-08-18T14:40:00+07:00"
+}
+```
+
+- `event_id` + `idempotency_key` **wajib cocok** dengan baris `webhook_outbox` yang
+  pernah dikirim ke endpoint pemanggil. Tidak cocok → **404**, bukan diterima diam-diam
+  — mencegah callback palsu atau nyasar menempel ke pelanggan yang salah.
+- `status`: `succeeded` / `failed`. `reason` wajib kalau `failed`.
+- `provider_reference` nullable — ID internal Website B, untuk penelusuran silang.
+
+**Satu callback, satu aktivasi — terminal, tidak boleh flip-flop.** Setiap
+`idempotency_key` cuma boleh punya **satu** baris hasil final:
+
+- Percobaan kedua dengan `idempotency_key` sama dan isi **identik** (retry jaringan di
+  sisi Website B sendiri) → diterima diam-diam sebagai duplikat, tidak membuat baris
+  baru, balas 200.
+- Percobaan kedua dengan isi **berbeda** (mencoba mengubah hasil yang sudah final) →
+  **ditolak** (409), dicatat `rejected` dengan alasan `already_finalized`.
+
+**Dua level "gagal" — jangan disamakan, keduanya wajib tercatat:**
+
+| Level | Contoh | Status tercatat |
+|---|---|---|
+| **Gagal callback** (infra) — request ditolak sebelum isinya dianggap sah: token salah, `idempotency_key` tidak dikenal, sudah final (duplikat berbeda isi), timeout | 401/404/409 di gerbang kita | `rejected` + alasan (`invalid_token` / `unknown_event` / `already_finalized`) |
+| **Gagal provisioning** (bisnis) — callback sah diterima, isinya melaporkan kegagalan di sisi Website B | `status: "failed", reason: "VLAN conflict"` | `failed` |
+
+Satu tabel log, tiga nilai `status`: `succeeded` / `failed` / `rejected`. Prinsipnya:
+setiap request yang masuk **selalu** menghasilkan satu baris — diterima atau ditolak,
+tidak ada yang hilang tanpa jejak. Ini **log terpisah**
+(`installation_provisioning_callbacks`), bukan ditumpang ke `task` sebagai catatan
+utama; task/Telegram Internal cuma menerima mirror ringkas dari baris `succeeded`/
+`failed` (bukan `rejected`) supaya teknisi/NOC tahu tanpa membuka log mentah. Baris log
+inilah sumber kebenarannya, sama prinsipnya seperti `webhook_outbox` untuk arah keluar.
+
+**Pertanyaan yang masih terbuka sebelum ini bisa naik ke `rencana-implementasi.md`:**
+
+1. Bentuk final mirror ke task — catatan teks di histori task, atau kolom status
+   khusus? Belum diputuskan.
+2. Kegagalan bisnis (`status=failed`) memicu notifikasi aktif ke teknisi (mis. lewat
+   Telegram Internal), atau cukup tercatat pasif dan dilihat kalau dicek?
 
 ---
 

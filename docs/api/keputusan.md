@@ -22,6 +22,8 @@ Repo ini sudah punya pola yang sama di `docs/plan/kolektor/analisa-*.md` dan
 | 4 | 2026-08-19 | Fan-out dua transport; Telegram Internal vs Eksternal dipisah | Skenario Website B + Telegram |
 | 5 | 2026-08-19 | Hanya `InstallationActivated`; `installation.completed` dihapus dari kontrak | Keputusan pemilik produk |
 | 6 | 2026-08-19 | Log keputusan ini dibuat | Analisa sebelumnya belum tercatat |
+| 7 | 2026-08-20 | Callback Hasil Provisioning dirinci (endpoint, auth, log terpisah, idempotensi terminal); gap validasi SSRF di `webhook_endpoints.url` dicatat | Diskusi rancangan |
+| 8 | 2026-08-20 | **Dibalik**: `webhook_endpoints` (tabel + form admin) dicabut dari rancangan. Website B, Telegram Internal, dan Telegram Eksternal semuanya **hardcode** di `config/webhooks.php` + `.env`. Alasan: cuma ada 1 konsumen tiap transport sekarang — tabel+form dinamis untuk melayani konsumen yang belum ada adalah abstraksi sebelum dibutuhkan (CLAUDE.md: "Hindari abstraksi sebelum dibutuhkan"). Gap SSRF di rev. 7 (§9) jadi tidak relevan — URL tidak lagi diisi lewat form, cuma developer yang pegang lewat `.env` | Keputusan pemilik produk, permintaan sederhanakan |
 
 ---
 
@@ -82,8 +84,9 @@ GET /api/v1/installations?activated_since=2026-08-01T00:00:00%2B07:00&cursor=…
 
 - Isi respons **identik** dengan `data` di payload webhook — dirakit presenter yang
   sama. Kalau isinya berbeda, ia jadi sumber kebenaran kedua yang pasti menyimpang.
-- Auth: token klien per-konsumen, dibatasi ke `pop_id` yang sama dengan endpoint
-  webhook-nya.
+- Auth: token klien tetap, hardcode di `.env` — ikut pivot rev. 8. Tidak ada lagi
+  pembatas `pop_id` per-konsumen sejak routing per cabang dilepas (lihat §4);
+  konsumen tunggal ini menerima seluruh cabang.
 - Paginasi cursor, bukan offset — data bertambah selama halaman dibaca.
 - Rate limit sendiri; ini endpoint pemulihan, bukan pengganti webhook. Konsumen yang
   memanggilnya tiap menit sedang salah memakai.
@@ -95,14 +98,19 @@ jadi kebenaran.**
 
 ## 4. Peta pengembangan
 
-### Murah — strukturnya sudah menyiapkan tempat
+### Murah, tapi sejak rev. 8 tidak lagi nol-kode
+
+Sebelum rev. 8, tabel `webhook_endpoints` membuat baris-baris di bawah ini "nol kode".
+Setelah dicabut demi kesederhanaan (rev. 8), semuanya butuh **sedikit kode**, bukan
+nol — tapi tetap murah karena mekanisme inti (outbox, retry, HMAC, purge) tidak
+berubah:
 
 | Pengembangan | Yang perlu diubah |
 |---|---|
-| Event baru (`customer.suspended`, `customer.terminated`, `package.changed`, `device.replaced`) | Satu nilai di `webhook_endpoints.events` + satu listener. Outbox, retry, HMAC, purge tinggal dipakai |
-| Tujuan baru (WhatsApp, email, Slack, antrean cloud) | Satu adapter. Kolom `transport` sudah jadi titik cabangnya |
-| Konsumen baru | Satu baris `webhook_endpoints`. Nol kode |
-| Routing per cabang | Sudah ada — `pop_id` per endpoint |
+| Event baru (`customer.suspended`, `customer.terminated`, `package.changed`, `device.replaced`) | Satu listener baru + satu entri destinasi di `config/webhooks.php`. Outbox, retry, HMAC, purge tinggal dipakai |
+| Tujuan baru (WhatsApp, email, Slack, antrean cloud) | Satu adapter transport + satu entri config. `transport` di baris outbox sudah jadi titik cabangnya |
+| Konsumen baru (Website C, dst) | Satu entri config (`url`+`secret` di `.env`) **dan** satu pemanggilan eksplisit di listener — bukan cuma data, karena tidak ada lagi loop generik atas tabel |
+| Routing per cabang | **Dilepas di rev. 8.** Kalau dibutuhkan lagi, ini alasan pertama untuk membangun ulang tabel dinamis — jangan ditambal setengah-setengah di config |
 
 ### Paling bernilai berikutnya: arah balik
 
@@ -114,6 +122,20 @@ menyala, bukan dari menelepon orang.
 Di titik ini API 1 berubah dari satu arah jadi lengkap, dan ia butuh **endpoint masuk**
 yang diautentikasi — jadi lapisan REST dari §3 sudah terpakai. Dirancang terpisah saat
 dibutuhkan; jangan diselundupkan ke fase 1.
+
+**Rancangan sudah dirinci** (2026-08-20, permintaan diskusi): `POST
+/api/v1/installations/provisioning-callback`, kredensial terpisah dari secret HMAC
+(token bearer tetap, hardcode di `.env` — ikut pivot rev. 8, bukan tabel), log
+terpisah bukan ditumpang ke task (`installation_provisioning_callbacks`), satu
+callback terminal per aktivasi. Detail kontrak lengkap ada di `business-logic.md`
+bagian "Callback Hasil Provisioning", skema di `database-schema.md` §5. Belum masuk
+`rencana-implementasi.md` sebagai fase resmi — dua pertanyaan di §8 (#6, #7) masih
+harus dijawab dulu.
+
+**Hanya berlaku untuk `transport=http_json`.** Telegram Eksternal tidak bisa memanggil
+API balik ke kita — ia cuma penerima teks searah. Kalau nanti ada permintaan "Telegram
+juga lapor balik", itu bukan perluasan kecil: Telegram tidak punya cara mengautentikasi
+diri ke kita per-request, jadi kanal itu terstruktur read-only dari sisi konsumen.
 
 ### Butuh naik versi — jangan dianggap gratis
 
@@ -162,6 +184,7 @@ Bagian terpenting dokumen ini. Setiap baris pernah terlihat masuk akal.
 | **Telegram Eksternal memakai `config('services.telegram.*')`** | Satu bot token dan satu chat id global, dipakai enam pemanggilan internal. Pesan untuk pihak luar akan mendarat di grup internal — pemisahan batal seketika. Kredensial per-endpoint di `webhook_endpoints.config` |
 | **Telegram menerima setiap penekanan Aktivasi** | Batas Telegram ~20 pesan/menit per grup; membanjiri berarti pesan dibuang, bukan sekadar berisik. Transport `telegram` melewati kiriman yang teksnya tidak berubah (`skipped`); Website B tetap menerima semua |
 | **Memindahkan 6 pemanggilan Telegram Internal ke outbox** | Menyentuh empat modul sekaligus. Task tersendiri, bukan efek samping pekerjaan webhook |
+| **Tabel `webhook_endpoints` + form admin dinamis** (rev. 1-7) | Ditolak di rev. 8. Melayani konsumen yang belum ada — Website B satu-satunya, Telegram Eksternal satu-satunya — adalah abstraksi sebelum dibutuhkan. Diganti `config/webhooks.php` + `.env`, satu tujuan tetap per transport. Biaya menambah konsumen kedua kelak: satu entri config + satu pemanggilan eksplisit di listener, bukan migrasi ulang skema besar |
 
 ### API 2
 
@@ -226,3 +249,13 @@ untuk area yang sama.
 | 3 | Field `version` di payload ditambahkan sekarang? | Lihat §5. Gratis sekarang, mahal nanti |
 | 4 | Endpoint rekonsiliasi masuk fase 1 atau menyusul? | Lihat §3. Belum ada yang memintanya |
 | 5 | Beban merawat dua dokumen untuk satu portal (modul ini + QR §6.6) | Kalau mulai terasa, gabungkan — jangan biarkan keduanya menyimpang diam-diam |
+| 6 | Hasil provisioning ditulis kemana — catatan teks di histori task, atau kolom status khusus di task? | Belum diputuskan. Log `installation_provisioning_callbacks` tetap sumber kebenaran; ini cuma soal bentuk mirror-nya |
+| 7 | `status=failed` (bisnis) memicu notifikasi aktif ke teknisi (Telegram Internal), atau cukup tercatat pasif? | Belum diputuskan pemilik produk |
+
+---
+
+## 9. Gap ditemukan saat review
+
+| Gap | Risiko | Status |
+|---|---|---|
+| `webhook_endpoints.url` tidak divalidasi terhadap rentang IP privat/loopback/link-local | SSRF: kolom ini dipanggil server-side dari job antrean. Owner salah ketik atau disosial-rekayasa memasukkan URL internal (mis. `169.254.169.254` metadata cloud, `localhost`) — sistem kita sendiri yang memanggilnya, dari dalam jaringan kita | **Moot sejak rev. 8.** Tidak ada lagi form isian URL — tujuan hardcode di `.env`, cuma developer yang pegang. Tetap berlaku prinsip umum: developer yang isi `.env` tetap harus sadar jangan menaruh URL internal di sana, tapi ini bukan lagi permukaan serangan dari input pengguna |

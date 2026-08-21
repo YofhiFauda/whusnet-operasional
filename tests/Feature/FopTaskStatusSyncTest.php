@@ -258,4 +258,87 @@ class FopTaskStatusSyncTest extends TestCase
 
         $this->assertEquals(TaskStatus::DIBATALKAN->value, $fopTask->fresh()->status->value);
     }
+
+    /**
+     * Regresi bug: FOP set FopTask jadi Pending lewat papan /fop-tasks
+     * sebelumnya gak nembus ke Task eksekusi teknisi (beda dari DIBATALKAN
+     * yang sudah di-cascade), jadi Task tetap 'in_progress' di DB walau
+     * FopTask-nya sudah 'pending'.
+     */
+    public function test_setting_fop_task_to_pending_also_pends_linked_task(): void
+    {
+        [$task, $fopTask] = $this->makeLinkedTask('TASK-9213', 'in_progress');
+
+        $this->actingAs($this->fopUser)
+            ->putJson(route('fop-tasks.update', $fopTask), [
+                'status' => 'pending',
+                'pending_reason' => 'Menunggu material',
+                'client_request_date' => now()->addDay()->toDateString(),
+            ])
+            ->assertOk();
+
+        $task->refresh();
+        $this->assertEquals(TaskStatus::PENDING->value, $task->status->value);
+        $this->assertEquals('Menunggu material', $task->pending_reason);
+    }
+
+    /**
+     * Efek ikutan yang sebenarnya dikeluhkan sebagai bug: begitu Task ikut
+     * pindah ke Pending, teknisi yang sama harus bisa mulai task LAIN —
+     * sebelum fix, guard "sedang mengerjakan task lain" di TaskService::start()
+     * masih nemu task pertama seolah IN_PROGRESS dan nolak.
+     */
+    public function test_technician_can_start_another_task_after_fop_pends_current_one(): void
+    {
+        [$taskA, $fopTaskA] = $this->makeLinkedTask('TASK-9214', 'in_progress');
+
+        $this->actingAs($this->fopUser)
+            ->putJson(route('fop-tasks.update', $fopTaskA), [
+                'status' => 'pending',
+                'pending_reason' => 'Menunggu material',
+                'client_request_date' => now()->addDay()->toDateString(),
+            ])
+            ->assertOk();
+
+        $taskB = Task::create([
+            'task_number' => 'TASK-9215',
+            'pop_id' => $this->pop->id,
+            'task_type' => TaskType::MAINTENANCE->value,
+            'title' => 'Maintenance Rutin B',
+            'status' => 'terjadwal',
+            'scheduled_at' => now(),
+            'created_by' => $this->techUser->id,
+            'updated_by' => $this->techUser->id,
+        ]);
+        $taskB->teamMembers()->create(['user_id' => $this->techUser->id, 'role_in_task' => 'lead']);
+
+        $this->actingAs($this->techUser)
+            ->post(route('tasks.start', $taskB))
+            ->assertRedirect();
+
+        $this->assertEquals(TaskStatus::IN_PROGRESS->value, $taskB->fresh()->status->value);
+    }
+
+    public function test_setting_fop_task_to_pending_without_linked_task_does_not_error(): void
+    {
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-9216',
+            'task_date' => now(),
+            'category' => 'MTN',
+            'tugas' => 'Perbaikan',
+            'issue' => 'FO CUT',
+            'status' => 'draft',
+            'priority' => 'High',
+        ]);
+
+        $this->actingAs($this->fopUser)
+            ->putJson(route('fop-tasks.update', $fopTask), [
+                'status' => 'pending',
+                'pending_reason' => 'Menunggu material',
+                'client_request_date' => now()->addDay()->toDateString(),
+            ])
+            ->assertOk();
+
+        $this->assertEquals(TaskStatus::PENDING->value, $fopTask->fresh()->status->value);
+    }
 }

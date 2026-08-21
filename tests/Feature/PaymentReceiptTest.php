@@ -253,10 +253,10 @@ class PaymentReceiptTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('@page { margin: 0; }', false);
-        // Margin nol memindahkan jarak ke tepi kertas jadi tanggung jawab body.
+        $response->assertSee('margin: 0;', false);
+        // Margin nol memindahkan jarak ke tepi kertas jadi tanggung jawab body/page.
         // Tanpa ini kwitansi mepet tepi dan terpotong printer.
-        $response->assertSee('body { padding: 10mm 8mm; }', false);
+        $response->assertSee('padding: 4mm 4mm !important;', false);
     }
 
     /**

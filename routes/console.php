@@ -18,3 +18,6 @@ Schedule::command('check:countdown --minutes=60')->everyFiveMinutes();
 Schedule::command('billing:generate-monthly-invoices')->monthlyOn(1, '01:00');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
+// '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,
+// cuma tanggal 1) dan notifications:prune-read (00:30).
+Schedule::command('webhook-outbox:prune')->dailyAt('01:15');

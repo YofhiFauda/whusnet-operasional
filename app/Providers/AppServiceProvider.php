@@ -100,8 +100,18 @@ class AppServiceProvider extends ServiceProvider
             return "<?php echo \App\Helpers\FormatHelper::datetime($expression); ?>";
         });
 
-        // Force HTTPS jika diakses via proxy (seperti ngrok)
-        if (request()->server('HTTP_X_FORWARDED_PROTO') == 'https' || app()->environment('production')) {
+        // Skema HTTPS untuk URL yang dibuat DI LUAR konteks request — queue job,
+        // artisan command, notifikasi, tautan di email/Telegram. Di dalam request,
+        // skema sudah benar sendiri lewat trusted proxies (bootstrap/app.php) yang
+        // membaca X-Forwarded-Proto dari nginx / Cloudflare Tunnel, jadi JANGAN
+        // tambahkan lagi deteksi header di sini: versi lama memaksa https untuk
+        // SEMUA request begitu APP_ENV=production — termasuk akses langsung
+        // http://ip:8000 tanpa tunnel, yang lalu menghasilkan tautan https ke port
+        // yang tidak melayani TLS.
+        //
+        // Dipakai bareng APP_URL berskema https. Nilainya dibaca dari config,
+        // bukan env() langsung, supaya tetap benar setelah `config:cache`.
+        if (config('app.force_https')) {
             URL::forceScheme('https');
         }
 

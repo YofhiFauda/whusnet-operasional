@@ -1,8 +1,16 @@
 # Modul API Eksternal
 
 Rancangan lapisan API supaya Whusnet Operasional bisa diremote dan diintegrasikan
-dengan sistem lain. **Dokumen ini rancangan, bukan catatan fitur yang sudah jalan.**
-Belum ada satu baris kode API di repo per 2026-08-18.
+dengan sistem lain.
+
+**Status implementasi (2026-08-20):** API 1 (webhook pemasangan, Fase 1 di
+`rencana-implementasi.md`) **sudah diimplementasikan** — lihat
+`app/Events/InstallationActivated.php`, `app/Listeners/SendInstallationActivatedWebhooks.php`,
+`app/Services/Webhooks/InstallationWebhookPresenter.php`, `app/Jobs/SendWebhookOutboxJob.php`,
+`config/webhooks.php`. API 2 (portal pelanggan) dan Fase 6 (callback provisioning)
+**masih rancangan**, belum ada kode. Dokumen di modul ini tetap jadi rujukan kontrak
+— kalau ada beda antara kode dan dokumen, itu bug dokumentasi yang harus ditambal,
+bukan berarti dokumennya usang.
 
 | Berkas | Isi |
 |---|---|
@@ -12,11 +20,18 @@ Belum ada satu baris kode API di repo per 2026-08-18.
 | `flowchart.md` | Alur webhook dan alur auth portal |
 | `rencana-implementasi.md` | Fase, gerbang persetujuan, rencana test |
 | `keputusan.md` | **Kenapa jadi begini** — alternatif yang ditolak, alasan webhook vs REST, peta pengembangan, pertanyaan terbuka |
+| `panduan-konsumen.md` | **Untuk diserahkan ke Website B** — spek event, payload, cara verifikasi signature, contoh kode receiver (PHP/Node/Python) |
 
 Empat berkas pertama menjelaskan rancangan **seperti apa adanya**. `keputusan.md`
 menjelaskan **kenapa**, dan mencatat apa yang sudah ditolak beserta alasannya. Baca ia
 sebelum mengusulkan perubahan arah — kemungkinan besar usulan itu sudah pernah
 ditimbang.
+
+`panduan-konsumen.md` sengaja terpisah dari lima berkas lain karena **ia satu-satunya
+yang keluar organisasi**. Berkas lain memuat jalur kode internal
+(`app/Services/Webhooks/...`, nomor baris controller) dan alasan keputusan yang tidak
+perlu — dan tidak pantas — dibaca mitra luar. Kalau menambah sesuatu ke
+`panduan-konsumen.md`, tanya dulu: pantas dibaca orang luar?
 
 ## Hubungan dengan `docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §6.6
 
@@ -66,8 +81,8 @@ menyentuhnya.
 | Event | `installation.activated` — satu, tidak ada yang lain | — |
 | Lawan bicara | Website B (provisioning) + Telegram Eksternal | Portal, atas nama satu pelanggan |
 | Auth | HMAC-SHA256 per-request; Telegram: bot token | Client secret portal **+** bearer token pelanggan |
-| Identitas | `webhook_endpoints` terdaftar manual | `customer_portal_accounts.login_id` |
-| Pembatas data | `pop_id` opsional per endpoint | `customer_id` pemilik token |
+| Identitas | Tujuan tetap, hardcode di `config/webhooks.php` + `.env` (rev. 8, `keputusan.md`) | `customer_portal_accounts.login_id` |
+| Pembatas data | Tidak ada — konsumen tunggal menerima seluruh cabang | `customer_id` pemilik token |
 
 ### Webhook atau REST? Keduanya campuran, titik beratnya berlawanan
 
@@ -94,8 +109,8 @@ portal adalah aplikasi terpisah tanpa akses DB kita, jadi tanpa `invoice.updated
 tidak akan pernah tahu pembayaran sudah masuk sampai ada yang me-refresh.
 
 **Satu hal yang menghubungkan keduanya:** dua webhook itu memakai mesin yang sama —
-`webhook_endpoints` + `webhook_outbox`, retry dan backoff identik, cuma beda keluarga
-event. Bukan dua sistem webhook; satu sistem yang melayani dua modul. Itu sebabnya di
+`webhook_outbox`, retry dan backoff identik, cuma beda keluarga event dan tujuan.
+Bukan dua sistem webhook; satu sistem yang melayani dua modul. Itu sebabnya di
 `database-schema.md` keduanya ditaruh di satu tabel.
 
 Alasan lengkap pemilihan ini — termasuk hitungan biaya polling dan empat kelemahan
@@ -190,9 +205,10 @@ penjaganya sendiri: kepemilikan baris.
 4. **Jangan menaruh kredensial pelanggan di tabel `customers`.** Alasannya bukan
    kerapian — lihat `database-schema.md` bagian audit log.
 5. **Jangan mencampur token pelanggan dengan token staf di satu tabel.**
-6. **Payload webhook pemasangan memuat PII pelanggan.** Endpoint wajib HTTPS,
-   didaftarkan manual oleh Owner, log-nya punya kebijakan purge. Payload webhook
-   **portal** justru tidak boleh memuat PII sama sekali (§6.6.6).
+6. **Payload webhook pemasangan memuat PII pelanggan.** URL tujuan wajib HTTPS,
+   hardcode lewat `.env` (bukan form Owner sejak rev. 8, `keputusan.md`), log-nya
+   punya kebijakan purge. Payload webhook **portal** justru tidak boleh memuat PII
+   sama sekali (§6.6.6).
 7. **Jangan bocorkan catatan internal.** `tickets.catatan_teknis`,
    `payments.reject_reason`, `payments.note`, dan nama pegawai tidak keluar ke
    pelanggan. Daftar putih, bukan daftar hitam.

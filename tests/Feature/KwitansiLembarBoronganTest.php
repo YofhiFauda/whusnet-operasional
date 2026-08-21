@@ -45,7 +45,7 @@ class KwitansiLembarBoronganTest extends TestCase
     {
         parent::setUp();
 
-        $this->fixture = base_path('tests/Fixtures/kwitansi-lembar-8.pdf');
+        $this->fixture = base_path('tests/fixtures/kwitansi-lembar-8.pdf');
 
         if (! app(PdfTextNumberReader::class)->isAvailable()) {
             $this->markTestSkipped('pdftotext (poppler-utils) tidak terpasang di lingkungan ini.');
@@ -116,7 +116,7 @@ class KwitansiLembarBoronganTest extends TestCase
         $this->buatPembayaran('PAY-202601-0009');
 
         $path = 'receipts/2026/01/satuan.pdf';
-        $fixture = base_path('tests/Fixtures/kwitansi-satuan-teks.pdf');
+        $fixture = base_path('tests/fixtures/kwitansi-satuan-teks.pdf');
         Storage::disk('local')->put($path, file_get_contents($fixture));
 
         $receipt = PaymentReceipt::create([

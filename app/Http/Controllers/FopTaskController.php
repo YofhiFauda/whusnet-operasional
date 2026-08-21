@@ -526,6 +526,28 @@ class FopTaskController extends Controller
                 }
             }
 
+            // Pending dari sisi FOP juga harus nembus ke Task eksekusi teknisi —
+            // sebelumnya cuma DIBATALKAN yang di-cascade (lihat blok di atas), PENDING
+            // enggak, jadi Task tetap Terjadwal/Sedang Dikerjakan walau FopTask-nya
+            // sudah Pending, dan teknisi yang sama gagal mulai task LAIN karena guard
+            // "sedang mengerjakan task lain" di TaskService::start() masih nemu task
+            // ini seolah IN_PROGRESS.
+            if (isset($validated['status'])
+                && $validated['status'] === TaskStatus::PENDING->value
+                && $oldStatus !== TaskStatus::PENDING->value
+                && $fopTask->task_id
+            ) {
+                $linkedTask = $fopTask->task;
+                if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING])) {
+                    // Otoritasnya `fopPending` — ability yang sama dipakai tombol
+                    // "Pending" FOP di halaman Task (TaskController::pending()), cuma
+                    // beda entry point (papan /fop-tasks vs halaman Task).
+                    $this->authorize('fopPending', $linkedTask);
+
+                    app(TaskService::class)->syncPendingFromFopTask($linkedTask, auth()->user(), $validated['pending_reason']);
+                }
+            }
+
             if ($request->has('technicians')) {
                 $technicians = $validated['technicians'] ?? [];
                 $newTechnicianIds = collect($technicians)->sort()->values()->all();

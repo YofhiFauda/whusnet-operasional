@@ -328,6 +328,13 @@
 
             <div class="sep"></div>
 
+            <div class="qr">
+                <img src="{{ $qrByPayment[$payment->id] }}" alt="QR {{ $payment->payment_number }}">
+                <div class="num">{{ $payment->payment_number }}</div>
+            </div>
+
+            <div class="sep"></div>
+
             <div class="foot">
                 Kwitansi sah tanpa tanda tangan.<br>
                 Simpan sebagai bukti pembayaran.<br>

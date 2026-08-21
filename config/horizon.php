@@ -98,6 +98,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:webhooks' => 60,
     ],
 
     /*
@@ -236,6 +237,26 @@ return [
             'timeout' => 300,
             'nice' => 5,
         ],
+
+        // Antrean webhook keluar (API 1: installation.activated ke Website B
+        // + Telegram Eksternal). Dipisah dari `default` supaya retry webhook
+        // yang gagal (backoff sampai 6 jam, 8 percobaan) tidak menahan
+        // antrean broadcast realtime dashboard FOP. `tries` di level
+        // supervisor tetap 1 — retry sesungguhnya diatur SendWebhookOutboxJob
+        // sendiri ($tries=8), bukan Horizon.
+        'supervisor-webhooks' => [
+            'connection' => 'redis',
+            'queue' => ['webhooks'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => 60,
+            'nice' => 5,
+        ],
     ],
 
     'environments' => [
@@ -248,6 +269,9 @@ return [
             'supervisor-kwitansi' => [
                 'maxProcesses' => 4,
             ],
+            'supervisor-webhooks' => [
+                'maxProcesses' => 2,
+            ],
         ],
 
         'local' => [
@@ -256,6 +280,9 @@ return [
             ],
             'supervisor-kwitansi' => [
                 'maxProcesses' => 2,
+            ],
+            'supervisor-webhooks' => [
+                'maxProcesses' => 1,
             ],
         ],
     ],

@@ -27,7 +27,7 @@ class ImportLegacyTanpaBillingTest extends TestCase
 {
     use RefreshDatabase;
 
-    private string $fixturePath = 'tests/Fixtures/legacy-mini.sql';
+    private string $fixturePath = 'tests/fixtures/legacy-mini.sql';
 
     protected function setUp(): void
     {

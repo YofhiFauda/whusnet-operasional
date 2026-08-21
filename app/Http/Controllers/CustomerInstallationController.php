@@ -6,6 +6,7 @@ use App\Enums\MaterialKind;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
+use App\Events\InstallationActivated;
 use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
 use App\Models\Customer;
@@ -748,6 +749,14 @@ class CustomerInstallationController extends Controller
                     'ip_address' => $validated['ip_address'] ?? null,
                 ]
             );
+
+            // Satu-satunya titik pemicu API 1 (webhook pemasangan) — tombol
+            // Aktivasi Laporan Speedtest. Di dalam transaksi, sebelum commit:
+            // listener SendInstallationActivatedWebhooks cuma menulis baris
+            // webhook_outbox, HTTP-nya baru jalan setelah commit sukses. Kalau
+            // transaksi ini rollback, event ini pun batal — tidak ada baris
+            // outbox yang tertinggal. Lihat docs/api/business-logic.md.
+            InstallationActivated::dispatch($customer);
 
             DB::commit();
 

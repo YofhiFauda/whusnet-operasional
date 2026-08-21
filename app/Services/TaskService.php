@@ -374,6 +374,39 @@ class TaskService
         return $task->refresh();
     }
 
+    /**
+     * Sinkron status Task eksekusi jadi Pending sebagai efek ikutan dari FOP
+     * mengubah status FopTask ke Pending lewat papan /fop-tasks
+     * (`FopTaskController::update()`) — BUKAN dari tombol "Isi Laporan/Pending"
+     * teknisi (itu jalurnya `setPending()`).
+     *
+     * Beda dari `setPending()`: dipicu FOP (bukan teknisi anggota tim), bisa
+     * dari status Terjadwal ATAU In Progress (bukan cuma In Progress), dan
+     * TIDAK melepas tim — mirror pola cascade status-only yang dipakai
+     * `cancel()` di lokasi yang sama. Tanpa sinkron ini, Task tetap
+     * Terjadwal/Sedang Dikerjakan walau FopTask-nya sudah Pending, dan guard
+     * "teknisi lagi sibuk" di `start()` keliru nolak task LAIN yang mau
+     * dimulai teknisi yang sama karena masih nemu task ini seolah IN_PROGRESS.
+     */
+    public function syncPendingFromFopTask(Task $task, User $actor, string $reason): Task
+    {
+        if (in_array($task->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING], true)) {
+            return $task;
+        }
+
+        $task->update([
+            'status' => TaskStatus::PENDING->value,
+            'pending_reason' => $reason,
+            'updated_by' => $actor->id,
+        ]);
+
+        AuditLog::log($task, 'pending', ['status' => $task->getOriginal('status')], ['status' => TaskStatus::PENDING->value, 'pending_reason' => $reason]);
+
+        $this->notifyTeam($task, "Task ditangguhkan (pending) oleh FOP: {$reason}", 'pending');
+
+        return $task->refresh();
+    }
+
     // ─── Validasi Konflik ────────────────────────────────────────
 
     /**
