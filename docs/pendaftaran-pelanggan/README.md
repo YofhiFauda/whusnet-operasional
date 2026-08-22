@@ -10,6 +10,7 @@ Berikut adalah daftar dokumentasi yang berkaitan dengan proses onboarding:
 
 ## Scope Modul
 - **Registrasi Pelanggan Baru**: Input data awal, draft, kelengkapan berkas.
+- **Skip Survey (Sales)**: Role dengan permission `customers.registration.skip_survey` (default Sales) bisa lewat tahap survey lapangan — input data survey (ODP terdekat, estimasi kabel, tingkat kesulitan, foto rumah, foto ODP) + titik koordinat langsung di form registrasi. Pelanggan lompat langsung ke antrean ACC Admin (`waiting_acc`), gak pernah masuk antrean Survey teknisi. Lihat § Skip Survey di [`business-logic.md`](../customer-lifecycle/business-logic.md) dan [`flowchart.md`](flowchart.md).
 - **Survey Lapangan**: Proses survey oleh teknisi, pencatatan SLA/countdown.
 - **Verifikasi & Pemasangan**: Proses ACC instalasi, instalasi fisik, pencatatan data teknis (OLT, Port, ONU, IP).
 - **Verifikasi Akhir & Aktivasi**: Pengecekan akhir oleh admin, penetapan paket, harga, diskon, dan aktivasi billing.

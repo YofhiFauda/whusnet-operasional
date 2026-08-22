@@ -10,6 +10,7 @@ use App\Events\SurveyCompleted;
 use App\Events\SurveyStarted;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
+use App\Models\InternetPackage;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
@@ -25,6 +26,7 @@ use App\Support\SafeUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class CustomerSurveyController extends Controller
@@ -256,7 +258,20 @@ class CustomerSurveyController extends Controller
             $workToolService->resolveTaskForCustomer($customer, TaskType::SURVEY)
         );
 
-        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo'));
+        // Dropdown Paket Internet buat teknisi/surveyor koreksi paket yang salah
+        // dipilih saat registrasi awal — temuan lapangan (mis. ternyata butuh
+        // paket bisnis, bukan home) baru ketahuan pas survey, bukan pas daftar.
+        $internetPackages = InternetPackage::orderBy('name')->get();
+
+        // Foto Rumah/ODP yang sudah ke-upload dari attempt submit sebelumnya
+        // (lihat catatan panjang di store()) — dipakai buat pre-render preview
+        // supaya teknisi gak diminta pilih ulang foto yang sebenarnya udah beres,
+        // cuma gara-gara field lain (Step 4) yang gagal validasi.
+        $stagedPhotos = session("survey_report_photos.{$customer->id}", []);
+        $existingHousePhoto = isset($stagedPhotos['house_photo']) ? Storage::disk('public')->url($stagedPhotos['house_photo']) : null;
+        $existingSurveyPhoto = isset($stagedPhotos['survey_photo']) ? Storage::disk('public')->url($stagedPhotos['survey_photo']) : null;
+
+        return view('surveys.report', compact('customer', 'survey', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'internetPackages', 'existingHousePhoto', 'existingSurveyPhoto'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -289,13 +304,50 @@ class CustomerSurveyController extends Controller
             'Anda bukan anggota tim yang ditugaskan untuk survey pelanggan ini.'
         );
 
-        $validated = $request->validate([
+        // ── Upload dini Foto Rumah/ODP ──────────────────────────────────
+        // Form ini satu POST buat 4 step wizard sekaligus. Kalau validasi
+        // gagal gara-gara field di step LAIN (mis. Tingkat Kesulitan di Step
+        // 4), browser membuang isi <input type=file> begitu halaman reload —
+        // itu batasan keamanan browser, bukan sesuatu yang bisa diperbaiki
+        // dengan old()/withInput(). Makanya foto yang lolos validasi gambar
+        // langsung diupload & path-nya disimpan ke session SEBELUM validasi
+        // field lain jalan — begitu attempt berikutnya gagal lagi di step
+        // lain, foto yang sudah benar di Step 2 gak perlu diulang.
+        $request->validate([
+            'house_photo' => 'sometimes|image|max:2048',
+            'survey_photo' => 'sometimes|image|max:2048',
+        ]);
+
+        $stagedPhotosKey = "survey_report_photos.{$customer->id}";
+        $stagedPhotos = session($stagedPhotosKey, []);
+
+        foreach (['house_photo' => 'house', 'survey_photo' => 'odp'] as $field => $photoType) {
+            // Tombol "Hapus File" di Step 2 — teknisi sengaja mencabut foto
+            // yang sudah ke-stage, jangan dipakai ulang diam-diam.
+            if ($request->boolean($field.'_removed') && ! empty($stagedPhotos[$field])) {
+                Storage::disk('public')->delete($stagedPhotos[$field]);
+                unset($stagedPhotos[$field]);
+            }
+
+            if ($request->hasFile($field)) {
+                // Foto baru gantiin yang lama — buang stage sebelumnya biar gak numpuk sampah.
+                if (! empty($stagedPhotos[$field])) {
+                    Storage::disk('public')->delete($stagedPhotos[$field]);
+                }
+                $stagedPhotos[$field] = FileUploadService::uploadSurveyPhoto($request->file($field), $customer, $photoType);
+            }
+        }
+
+        session([$stagedPhotosKey => $stagedPhotos]);
+
+        $validator = validator($request->all(), [
             'survey_status' => 'required|string|in:pending,completed,failed',
+            // Koreksi Paket Internet dari lapangan — opsional, cuma dipakai
+            // kalau teknisi eksplisit ganti dropdown-nya.
+            'internet_package_id' => 'nullable|exists:internet_packages,id',
             'required_tools' => 'nullable|string',
             'cable_estimation_meter' => 'required_if:survey_status,completed|nullable|integer|min:0',
             'nearest_odp' => 'required_if:survey_status,completed|nullable|string',
-            'survey_photo' => 'required_if:survey_status,completed|nullable|image|max:2048',
-            'house_photo' => 'required_if:survey_status,completed|nullable|image|max:2048',
             'survey_note' => 'required_if:survey_status,failed|nullable|string',
             'difficulty_level' => 'required_if:survey_status,completed|nullable|in:MUDAH,SEDANG,SULIT',
             // Opsional — cuma diisi kalau pelanggan minta tanggal tertentu.
@@ -328,6 +380,30 @@ class CustomerSurveyController extends Controller
             'requested_installation_date.after_or_equal' => 'Tanggal request pemasangan tidak boleh sebelum hari ini.',
         ]);
 
+        // Wajib-ada foto sekarang dicek manual terhadap hasil staging (lewat
+        // after(), bukan throw terpisah) — biar kalau Step 2 DAN Step 4
+        // sama-sama belum lengkap, teknisi langsung liat semua errornya
+        // sekaligus dalam satu render, bukan gagal berulang satu-satu.
+        // required_if bawaan gak cukup di sini karena filenya bisa datang
+        // dari attempt submit SEBELUMNYA (sudah ke-upload & tersimpan di
+        // session), bukan cuma dari request saat ini.
+        $validator->after(function ($validator) use ($request, $stagedPhotos) {
+            if ($request->input('survey_status') !== 'completed') {
+                return;
+            }
+            if (empty($stagedPhotos['house_photo'])) {
+                $validator->errors()->add('house_photo', 'Foto rumah wajib diisi.');
+            }
+            if (empty($stagedPhotos['survey_photo'])) {
+                $validator->errors()->add('survey_photo', 'Foto ODP / jalur wajib diisi.');
+            }
+        });
+
+        $validated = $validator->validate();
+
+        $validated['house_photo'] = $stagedPhotos['house_photo'] ?? null;
+        $validated['survey_photo'] = $stagedPhotos['survey_photo'] ?? null;
+
         $difficulty = $validated['difficulty_level'] ?? null;
         $note = $difficulty ? ('Tingkat Kesulitan: '.$difficulty) : '';
         if (! empty($validated['survey_note'])) {
@@ -340,6 +416,11 @@ class CustomerSurveyController extends Controller
         // (task_materials), bukan kolom customer_surveys.
         $materialRows = $validated['materials'] ?? [];
         unset($validated['materials']);
+
+        // Koreksi paket internet — targetnya customers.internet_package_id +
+        // customer_services, bukan kolom customer_surveys.
+        $correctedPackageId = $validated['internet_package_id'] ?? null;
+        unset($validated['internet_package_id']);
 
         // Idem untuk checklist alat kerja → task_work_tools.
         $workToolRows = app(TaskWorkToolService::class)->rowsFromRequest(
@@ -386,15 +467,35 @@ class CustomerSurveyController extends Controller
             ]);
         }
 
-        if ($request->hasFile('survey_photo')) {
-            $validated['survey_photo'] = FileUploadService::uploadSurveyPhoto($request->file('survey_photo'), $customer, 'odp');
-        }
+        DB::transaction(function () use ($customer, $validated, $materialRows, $workToolRows, $workflowService, $correctedPackageId) {
+            // Koreksi Paket Internet dari lapangan — cuma jalan kalau teknisi
+            // benar-benar ganti dropdown-nya (beda dari paket yang sudah
+            // tersimpan). Diskon/PPN/biaya lain dipertahankan dari
+            // customer_services yang ada, cuma paket + snapshot + harga dasar
+            // yang di-refresh — teknisi gak dikasih kontrol atas nominal
+            // diskon/pajak lewat form ini.
+            if ($correctedPackageId && $correctedPackageId != $customer->internet_package_id) {
+                $package = InternetPackage::findOrFail($correctedPackageId);
+                $service = $customer->customerService()->first();
 
-        if ($request->hasFile('house_photo')) {
-            $validated['house_photo'] = FileUploadService::uploadSurveyPhoto($request->file('house_photo'), $customer, 'house');
-        }
+                $discount = (float) ($service->discount ?? 0);
+                $ppn = (float) ($service->ppn ?? 0);
+                $otherFee = (float) ($service->other_fee ?? 0);
+                $monthlyPrice = (float) $package->monthly_price;
+                $discountedPrice = max(0, $monthlyPrice - $discount);
+                $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
-        DB::transaction(function () use ($customer, $validated, $materialRows, $workToolRows, $workflowService) {
+                $customer->update(['internet_package_id' => $package->id]);
+                $customer->customerService()->updateOrCreate([], [
+                    'internet_package_id' => $package->id,
+                    'package_name_snapshot' => $package->name,
+                    'download_speed_snapshot' => isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null,
+                    'upload_speed_snapshot' => isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null,
+                    'monthly_price' => $monthlyPrice,
+                    'total_monthly_bill' => $totalBill,
+                ]);
+            }
+
             $survey = $customer->latestSurvey()->first();
 
             if (! $survey) {
@@ -510,6 +611,10 @@ class CustomerSurveyController extends Controller
                 $workflowService->transition($customer, WorkflowTransition::REJECTED, $survey->survey_note);
             }
         });
+
+        // Laporan berhasil tersimpan (foto sudah menempel ke customer_surveys) —
+        // staging sesi gak perlu lagi, apa pun statusnya (completed/failed/pending).
+        session()->forget($stagedPhotosKey);
 
         if ($validated['survey_status'] === 'failed') {
             return redirect(SafeUrl::resolveReturnTo($request->input('return_to'), 'surveys.queue'))

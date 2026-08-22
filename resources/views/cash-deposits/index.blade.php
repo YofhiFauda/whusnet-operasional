@@ -14,7 +14,9 @@
 --}}
 
 @section('content')
-<div class="space-y-6">
+    @include('partials.collector-realtime', ['channels' => ['cash-deposits'], 'audiens' => 'admin'])
+
+<div class="space-y-6" id="live-content">
     {{-- Page Header --}}
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>

@@ -11,12 +11,12 @@
     $jumlahPelanggan = $invoices->getCollection()->pluck('customer_id')->unique()->count();
 @endphp
 
-<div x-data="{ 
-    visitModalOpen: false, 
-    selectedCustomer: { id: null, name: '', cid: '' } 
-}" 
+<div x-data="{
+    visitModalOpen: false,
+    selectedCustomer: { id: null, name: '', cid: '' }
+}"
 @open-visit-modal.window="visitModalOpen = true; selectedCustomer = $event.detail"
-class="space-y-6">
+class="space-y-6" id="live-content">
 
     {{-- Page Header & Breadcrumbs --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -93,9 +93,9 @@ Notifikasi berjudul mengikuti statusnya:
 
 Kurang setor tetap tampil di worklist-nya sampai dilunasi.
 
-**Kalau Worklist-nya sedang terbuka, kabarnya sampai seketika** (2026-08-11) — toast *"Setoran DEP-2026-0004 sudah diperiksa kantor — Terverifikasi"*, plus bilah **Muat ulang** di atas halaman. Sebelumnya kolektor hanya melihat saldonya berubah sendiri tanpa penjelasan apa pun.
+**Kalau Worklist-nya sedang terbuka, kabarnya sampai seketika** (2026-08-11) — toast *"Setoran DEP-2026-0004 sudah diperiksa kantor — Terverifikasi"*. Sebelumnya kolektor hanya melihat saldonya berubah sendiri tanpa penjelasan apa pun.
 
-**Angkanya tidak berubah sendiri.** Bilah itu memberi kabar, bukan menambal layar — halaman yang menghitung uang tidak boleh mengganti angkanya saat orangnya sedang menghitung. Muat ulang tetap keputusan manusia.
+**Angkanya ikut berubah otomatis** (2026-08-21, sebelumnya cuma toast + bilah "Muat ulang" manual — dicabut atas permintaan eksplisit user, lihat `business-logic.md` §9). Halaman fetch-ulang dirinya sendiri & menambal isinya begitu kabar masuk, TANPA syarat "skip kalau lagi ada form kebuka" — kalau kolektor lagi ngisi form Kunjungan pas kabar masuk, isian yang belum disimpan bisa ketiban data fresh. Keputusan sadar, bukan bug.
 
 ---
 
@@ -121,7 +121,7 @@ Assign: centang pelanggan → pilih kolektor tujuan → **Assign Terpilih**. Dit
 | Setoran diverifikasi / dilunasi / dihapus buku | menyebut nomor setoran + status akhirnya |
 | Pembayaran ditolak | *"PAY-… milik Bayu ditolak — saldonya berkurang."* |
 
-Semuanya disertai bilah **Muat ulang**. Angka di layar **tidak** berubah sendiri — halaman yang menghitung uang tidak boleh mengganti patokan saat admin sedang menghitung uang fisik di meja.
+Semuanya menambal angka di layar secara otomatis (2026-08-21) — fetch-ulang halaman + ganti isinya begitu kabar masuk, gak ada bilah "Muat ulang" lagi. Halaman ini juga sekarang dengar setoran kas **admin sendiri** ke Owner (`App\Events\CashDepositUpdated`) — kalau setorannya diperiksa/ditutup selisih pas Worksheet lagi terbuka, ke-update sendiri.
 
 ### B-2. Detail kolektor — 4 tab
 

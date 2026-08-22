@@ -270,6 +270,8 @@ Disiarkan ke **dua kanal sekaligus**, satu per audiens:
 |---|---|---|
 | `collector-activity.{popId}` | admin (Worksheet index & detail) | `collector_worksheet.view` + POP scope lewat `EffectiveAccessService` |
 | `App.Models.User.{collectorId}` | kolektor (Worklist) | kanal yang sudah dipakai notifikasi — penerimanya persis satu orang |
+| `cash-deposits` (2026-08-21) | Owner/atasan (Setoran Kas) — `App\Events\CashDepositUpdated` | `cash_deposit.view`. Global, BUKAN per-POP: pemeriksanya sudah bypass scope POP |
+| `App.Models.User.{adminId}` (2026-08-21) | admin penyetor sendiri (Worksheet, setoran kasnya SENDIRI ke Owner) — `App\Events\CashDepositUpdated` | kanal generik yang sama, ditambahkan ke `activityChannels()` |
 
 > Kanalnya sempat bernama `collector-deposits.{popId}`, diganti begitu isinya melampaui setoran. Nama yang berbohong tentang isinya adalah utang yang menyesatkan orang berikutnya — sama kelasnya dengan `firstPageToPng()` yang cuma membaca halaman 1.
 
@@ -277,12 +279,13 @@ Disiarkan ke **dua kanal sekaligus**, satu per audiens:
 
 **`ShouldBroadcastNow`, bukan `ShouldBroadcast`/queue.** Alasannya sama dengan `AppNotification` (§6.3/§8) dan `NotificationsMarkedRead`: ini kabar tentang uang yang sedang dihitung dua orang di dua layar. Menggantungnya pada worker berarti menambah satu cara lagi untuk gagal diam-diam. Volumenya pun kecil — beberapa setoran per kolektor per hari — jadi tak ada alasan biaya untuk mengantre.
 
-**Payload SENGAJA tidak membawa saldo.** Dua alasan:
+**Payload SENGAJA tidak membawa saldo.** Saldo adalah angka turunan (§3) — menyiarkannya lewat payload melahirkan sumber kebenaran kedua yang gampang menyimpang dari `CollectorBalanceService`. Dijaga test `SetoranKolektorRealtimeTest::test_payload_tidak_membawa_saldo`.
 
-1. Saldo adalah angka turunan (§3). Menyiarkannya lewat payload melahirkan sumber kebenaran kedua yang gampang menyimpang dari `CollectorBalanceService`.
-2. Halaman ini menghitung **uang fisik**. Kalau saldo berubah dari 680.065 jadi 0 saat admin sedang menghitung uang di meja, dia meneruskan hitungan dengan patokan yang berubah tanpa sadar.
+**Perubahan 2026-08-21 — auto-tambal DOM, bukan cuma aba-aba lagi.** Sebelumnya event ini murni ABA-ABA: klien cuma nampilin toast + bilah "Muat ulang", penyegaran tetap keputusan manusia — alasannya, halaman ini menghitung **uang fisik**, dan angka yang berubah diam-diam saat admin sedang menghitung uang di meja berisiko dia meneruskan hitungan dengan patokan yang salah tanpa sadar.
 
-Karena itu event ini **aba-aba, bukan penambal DOM**: klien menampilkan toast + bilah "Muat ulang", dan penyegaran tetap keputusan manusia. Dijaga test `SetoranKolektorRealtimeTest::test_payload_tidak_membawa_saldo`.
+User (pemilik produk) diberi tahu risiko itu secara eksplisit, lalu **memilih mencabutnya** — minta SPA-like penuh, nol refresh manual/polling, "termasuk pas form kebuka" (ADHOC-45). Sekarang `partials/collector-realtime.blade.php` fetch-ulang halaman & tambal elemen `#live-content` otomatis tiap event masuk (pola sama `refreshFopTaskRow`/`refreshTaskCard`, ADHOC-44) — TANPA syarat "skip kalau modal/form lagi kebuka". Konsekuensinya: kalau admin lagi ngetik nominal di form yang ada di dalam `#live-content` pas event lain masuk (mis. kolektor lain baru setor), ketikannya bisa ketiban data fresh. Ini keputusan sadar yang diambil user, bukan regresi — kalau mau dibalik, ubah di `collector-realtime.blade.php` (titik tunggal, komentar di sana menjelaskan hal yang sama).
+
+Payload TETAP tidak membawa saldo (alasan §1 di atas gak berubah) — client menambal dengan fetch-ulang halaman, bukan menghitung dari payload event.
 
 Dispatch-nya menumpang `safelyNotify()` yang sama dengan notifikasi — kegagalan menyiarkan tidak boleh membatalkan setoran yang uangnya sudah pindah tangan.
 

@@ -6,7 +6,6 @@ use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\Permission;
 use App\Models\Task;
 use App\Observers\CustomerObserver;
 use App\Observers\FopTaskObserver;
@@ -115,26 +114,39 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Register Gates from permissions
-        try {
-            if (app()->runningInConsole() === false || app()->runningUnitTests()) {
-                $permissions = Permission::all();
-                foreach ($permissions as $permission) {
-                    if ($permission->code) {
-                        Gate::define($permission->code, function ($user) use ($permission) {
-                            return $user->hasPermission($permission->code);
-                        });
-                    }
-                    if ($permission->name) {
-                        Gate::define($permission->name, function ($user) use ($permission) {
-                            return $user->hasPermission($permission->name);
-                        });
-                    }
-                }
+        // Ability berbentuk kode permission (`feature.action`, SELALU ber-titik
+        // — lihat CLAUDE.md § RBAC) didelegasikan langsung ke
+        // User::hasPermission(). Dulu di sini ada loop `Permission::all()` yang
+        // bikin Gate::define() satu-satu per baris permission SEKALI saat app
+        // boot — dua masalah nyata:
+        // 1. Permission yang baru di-seed SETELAH boot (mis. lewat
+        //    `$this->seed()` di tengah test, app cuma di-boot sekali di awal
+        //    test) gak pernah punya Gate ability terdaftar → `@can(...)`
+        //    selalu false walau `hasPermission()` langsung sudah true persis
+        //    saat itu. Di request produksi beneran gak kelihatan (tiap
+        //    request = boot baru = query ulang), tapi bikin test flaky/salah
+        //    tanpa ada bug produksi.
+        // 2. Query `Permission::all()` di SETIAP boot, padahal gak pernah
+        //    dipakai buat apa pun selain daftar nama ability.
+        //
+        // GERBANG WAJIB: cuma ability yang mengandung '.' yang diperiksa di
+        // sini. Ability Policy (mis. `TaskPolicy::cancel`/`cancelViaFopTask`,
+        // dipanggil `Gate::allows('cancel', $task)`) SELALU kata tunggal tanpa
+        // titik — kalau ability apa pun diperiksa di sini, `Gate::before()`
+        // global ini short-circuit SEBELUM `TaskPolicy::before()` dapat giliran,
+        // dan wildcard '*' owner lolos nembus invarian SRV/PSB yang sengaja
+        // dikecualikan Policy-nya (regresi nyata, ketauan dari
+        // `FopTaskCancelCascadeAuthTest::test_owner_wildcard_cannot_bypass_survey_invariant`).
+        // Ability berbasis `permission->name` (label manusia) TIDAK pernah
+        // dipakai di satu pun `@can()`/`can()` di codebase ini (diverifikasi
+        // grep) — sengaja dilepas, bukan kelalaian.
+        Gate::before(function ($user, string $ability) {
+            if (! str_contains($ability, '.')) {
+                return null;
             }
-        } catch (\Exception $e) {
-            // Skip if table doesn't exist yet
-        }
+
+            return $user->hasPermission($ability) ? true : null;
+        });
 
         // View Composer for Sidebar Badges
         View::composer('layouts.app', function ($view) {

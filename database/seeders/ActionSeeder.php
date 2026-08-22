@@ -124,6 +124,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Visit',
                 'description' => 'Mencatat hasil kunjungan penagihan tanpa uang',
             ],
+            [
+                'code' => ActionCode::SKIP_SURVEY,
+                'name' => 'Skip Survey',
+                'description' => 'Melewati tahap survey lapangan saat registrasi, input data survey langsung',
+            ],
         ];
 
         foreach ($actions as $action) {

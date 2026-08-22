@@ -8,6 +8,12 @@ Berikut adalah interaksi antara pengguna (Admin / CS / Teknisi) dengan sistem da
 3. Klik tombol *Simpan & Lanjut Survey*.
 4. Pelanggan muncul di antrean *Pelanggan > Antrean Survey*.
 
+### Tahap 1b: Skip Survey (khusus role ber-izin `customers.registration.skip_survey`, default Sales)
+1. **User (Sales)** di Step 1 form Registrasi mencentang **"Skip Survey — Input Data Survey Langsung"**. Checkbox ini cuma muncul kalau user punya permission-nya — role lain gak lihat opsi ini sama sekali.
+2. Form memunculkan field data survey tambahan: *ODP Terdekat*, *Estimasi Kabel (Meter)*, *Tingkat Kesulitan*, *Foto Rumah*, *Foto ODP*. Titik koordinat (Latitude/Longitude) yang tadinya opsional ikut jadi wajib.
+3. User mengisi semua field wajib itu lalu *Simpan Registrasi*.
+4. Pelanggan **TIDAK** muncul di *Antrean Survey* sama sekali — langsung mendarat di *Antrean ACC Admin* (status `waiting_acc`), lanjut ke Tahap 3 di bawah.
+
 ## Tahap 2: Survey Lapangan
 1. **User (Teknisi/Admin)** membuka menu *Antrean Survey*.
 2. Memilih pelanggan yang mengantre, klik tombol *Mulai Survey*.

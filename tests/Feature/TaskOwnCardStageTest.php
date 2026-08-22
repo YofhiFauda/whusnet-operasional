@@ -88,7 +88,7 @@ class TaskOwnCardStageTest extends TestCase
         return $task;
     }
 
-    public function test_own_page_shows_customer_info_but_hides_detail_and_coordinates_while_terjadwal(): void
+    public function test_own_page_shows_customer_info_and_coordinates_but_hides_detail_while_terjadwal(): void
     {
         $customer = Customer::factory()->create(['pop_id' => $this->pop->id, 'status' => 'active']);
         $customer->customerAddress()->create([
@@ -103,9 +103,11 @@ class TaskOwnCardStageTest extends TestCase
         $response->assertOk();
         $response->assertSee($customer->full_name);
         $response->assertDontSee('Buka Detail');
-        $response->assertDontSee('Koordinat Lokasi');
-        $response->assertDontSee('-7.54321');
-        $response->assertDontSee('112.98765');
+        // Koordinat + tombol Maps sekarang tampil dari awal — teknisi gak perlu
+        // tekan Mulai dulu buat lihat lokasi tujuan.
+        $response->assertSee('Koordinat Lokasi');
+        $response->assertSee('-7.54321');
+        $response->assertSee('112.98765');
         $response->assertSee('Mulai Maintenance');
     }
 
@@ -130,7 +132,7 @@ class TaskOwnCardStageTest extends TestCase
         $response->assertSee('Maps');
     }
 
-    public function test_own_card_partial_shows_customer_info_but_hides_detail_and_coordinates_while_terjadwal(): void
+    public function test_own_card_partial_shows_customer_info_and_coordinates_but_hides_detail_while_terjadwal(): void
     {
         $customer = Customer::factory()->create(['pop_id' => $this->pop->id, 'status' => 'active']);
         $customer->customerAddress()->create([
@@ -145,9 +147,11 @@ class TaskOwnCardStageTest extends TestCase
         $response->assertOk();
         $response->assertSee($customer->full_name);
         $response->assertDontSee('Buka Detail');
-        $response->assertDontSee('Koordinat Lokasi');
-        $response->assertDontSee('-7.54321');
-        $response->assertDontSee('112.98765');
+        // Koordinat + tombol Maps sekarang tampil dari awal — teknisi gak perlu
+        // tekan Mulai dulu buat lihat lokasi tujuan.
+        $response->assertSee('Koordinat Lokasi');
+        $response->assertSee('-7.54321');
+        $response->assertSee('112.98765');
         // own-card.blade.php belum punya label spesifik per task_type di tombol
         // Mulai (beda dari own.blade.php) — di luar scope Task 11, cukup pastikan
         // tombol Mulai tetap tampil.

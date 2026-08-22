@@ -94,7 +94,7 @@
             <?php endif; ?>
 
             
-            <?php if($task->status->value !== 'terjadwal' && $lat && $lng): ?>
+            <?php if($lat && $lng): ?>
             <div class="mt-3 p-2.5 bg-surface-muted border border-border rounded-xl flex items-center justify-between gap-3" data-coordinate-card>
                 <div class="flex flex-col gap-0.5 min-w-0">
                     <span class="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Koordinat Lokasi</span>
@@ -119,21 +119,27 @@
             </div>
 
             
-            <?php if($task->status->value === 'in_progress' && $task->started_at): ?>
+            <?php
+                $slaDeadline = $task->slaDeadline();
+                $slaWindowStart = $task->slaWindowStart();
+            ?>
+            <?php if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending']) && $slaDeadline && $slaWindowStart): ?>
                 <?php
-                    $slaDeadlineIso = $task->started_at->addMinutes($task->sla_minutes)->toIso8601String();
+                    // Budget total buat threshold warna countdown: durasi asli slaWindowStart→deadline.
+                    // Survey pakai sisa hari sejak jam jadwal (variabel), tipe lain sla_minutes tetap.
+                    $totalSlaSeconds = max($slaWindowStart->diffInSeconds($slaDeadline), 60);
                 ?>
                 <div class="mt-3">
                     <?php if (isset($component)) { $__componentOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5 = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($slaDeadlineIso).'','totalSeconds' => $task->sla_minutes * 60,'label' => 'Sisa SLA']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.countdown-timer','data' => ['deadline' => ''.e($slaDeadline->toIso8601String()).'','totalSeconds' => $totalSlaSeconds,'label' => 'Sisa SLA']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
 <?php $component->withName('countdown-timer'); ?>
 <?php if ($component->shouldRender()): ?>
 <?php $__env->startComponent($component->resolveView(), $component->data()); ?>
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['deadline' => ''.e($slaDeadlineIso).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($task->sla_minutes * 60),'label' => 'Sisa SLA']); ?>
+<?php $component->withAttributes(['deadline' => ''.e($slaDeadline->toIso8601String()).'','total-seconds' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($totalSlaSeconds),'label' => 'Sisa SLA']); ?>
 <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
 <?php if (isset($__attributesOriginalb8d3d89751f3d81017aa8a59bd985fb5)): ?>
@@ -178,8 +184,8 @@
         <div class="flex items-center justify-between gap-2 mt-4 pt-3.5 border-t border-border">
             
             <div class="flex items-center gap-1.5 shrink-0">
-                <?php if($task->status->value !== 'terjadwal' && $lat && $lng): ?>
-                <a href="https://www.google.com/maps/search/?api=1&query=<?php echo e($lat); ?>,<?php echo e($lng); ?>" 
+                <?php if($lat && $lng): ?>
+                <a href="https://www.google.com/maps/search/?api=1&query=<?php echo e($lat); ?>,<?php echo e($lng); ?>"
                    target="_blank" 
                    title="Petunjuk Arah Maps"
                    class="inline-flex items-center justify-center gap-1.5 p-2.5 min-[426px]:px-3.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 active:scale-95 transition-all shadow-sm cursor-pointer font-ui">

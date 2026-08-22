@@ -48,4 +48,14 @@ enum ActionCode: string
      * pulang dengan tangan kosong.
      */
     case VISIT = 'visit';
+
+    /**
+     * Sales melewati tahap survey lapangan saat Registrasi Pelanggan —
+     * data survey (ODP terdekat, estimasi kabel, tingkat kesulitan, foto
+     * rumah/ODP, titik koordinat) diinput langsung di form registrasi.
+     * Pelanggan lompat ke antrean ACC Admin, gak pernah masuk antrean Survey
+     * teknisi. Permission sempit & terpisah dari `customers.create` biasa
+     * karena membuka tahap workflow, bukan cuma isi field pelanggan.
+     */
+    case SKIP_SURVEY = 'skip_survey';
 }

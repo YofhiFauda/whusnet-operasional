@@ -244,8 +244,18 @@ class CustomerController extends Controller
     {
         $validated = $request->validated();
 
+        // Skip Survey — CustomerRegistrationRequest::authorize() sudah nolak
+        // (403) kalau field ini truthy tapi actor gak punya permission
+        // customers.registration.skip_survey, jadi di titik ini boolean-nya
+        // sudah aman dipercaya.
+        $skipSurvey = (bool) ($validated['skip_survey'] ?? false);
+        unset($validated['skip_survey']);
+
         $validated['created_by'] = auth()->id();
-        $validated['status'] = 'waiting_survey';
+        // Skip Survey lompat langsung ke antrean ACC Admin — pelanggan gak
+        // pernah masuk antrean Survey teknisi sama sekali (lihat blok 5 di
+        // bawah yang di-skip kalau $skipSurvey).
+        $validated['status'] = $skipSurvey ? 'waiting_acc' : 'waiting_survey';
         $validated['updated_by'] = auth()->id();
 
         $statusMapping = [
@@ -255,6 +265,9 @@ class CustomerController extends Controller
             'rejected' => 'nonaktif',
             'waiting_survey' => 'survey',
             'surveyed' => 'survey',
+            // Skip Survey mendarat di sini langsung dari registrasi — treat
+            // sama kayak 'surveyed', survey-nya (versi Sales) sudah selesai.
+            'waiting_acc' => 'survey',
             'waiting_installation' => 'menunggu_pemasangan',
             'installed' => 'menunggu_pemasangan',
             'registered' => 'calon_pelanggan',
@@ -270,12 +283,21 @@ class CustomerController extends Controller
         $fotoKontrak = $request->file('foto_kontrak');
         unset($validated['foto_kontrak']);
 
+        // Data survey (Skip Survey) — bukan kolom customers, ditangani
+        // terpisah di blok 5 lewat CustomerSurvey::create().
+        $surveyPhoto = $request->file('survey_photo');
+        $nearestOdp = $validated['nearest_odp'] ?? null;
+        $cableEstimationMeter = $validated['cable_estimation_meter'] ?? null;
+        $difficultyLevel = $validated['difficulty_level'] ?? null;
+        $requestedInstallationDate = $validated['requested_installation_date'] ?? null;
+        unset($validated['survey_photo'], $validated['nearest_odp'], $validated['cable_estimation_meter'], $validated['difficulty_level'], $validated['requested_installation_date']);
+
         // Generate customer_code via POP sequence generator
         $pop = Pop::findOrFail($validated['pop_id']);
         $customerCode = $pop->generateRegistrationNumber();
         $validated['customer_code'] = $customerCode;
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak) {
+        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate) {
             // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
             // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
             // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
@@ -376,26 +398,56 @@ class CustomerController extends Controller
                 session()->flash('warning', 'Data pelanggan disimpan sebagai "'.ucwords(str_replace('_', ' ', $completenessResult['completeness_status'])).'", tetapi masih memerlukan data berikut agar Lengkap: '.implode(', ', $missingLabels));
             }
 
-            // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
-            //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan
-            //    /fop-tasks dibuka: dia anchor wajib task_materials &
-            //    task_work_tools, dan tanpa itu isian estimasi material serta
-            //    checklist alat di laporan survey hilang tanpa pesan error.
-            $year = date('Y');
-            $count = Task::whereYear('created_at', $year)->count() + 1;
-            Task::create([
-                'task_number' => sprintf('TASK-%s-%04d', $year, $count),
-                'task_type' => TaskType::SURVEY->value,
-                'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
-                'description' => null,
-                'pop_id' => $customer->pop_id,
-                'customer_id' => $customer->id,
-                'status' => TaskStatus::PENDING->value,
-                'created_by' => auth()->id() ?? 1,
-                'updated_by' => auth()->id() ?? 1,
-            ]);
+            if ($skipSurvey) {
+                // 5. Skip Survey — Sales sudah input data survey lengkap di form
+                //    registrasi. TIDAK ada Task/FopTask SURVEY yang lahir sama
+                //    sekali (gak ada teknisi yang perlu disurvei-tugaskan), dan
+                //    pelanggan langsung nangkring di antrean ACC Admin lewat
+                //    status waiting_acc yang sudah di-set di atas.
+                $surveyPhotoPath = null;
+                if ($surveyPhoto instanceof UploadedFile) {
+                    $surveyPhotoPath = FileUploadService::uploadSurveyPhoto($surveyPhoto, $customer, 'odp');
+                }
 
-            app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
+                $note = $difficultyLevel ? ('Tingkat Kesulitan: '.$difficultyLevel) : '';
+                $note .= ($note ? "\n" : '').'Catatan: Diinput oleh Sales saat Registrasi (Skip Survey).';
+
+                CustomerSurvey::create([
+                    'customer_id' => $customer->id,
+                    'survey_status' => 'completed',
+                    'nearest_odp' => $nearestOdp,
+                    'cable_estimation_meter' => $cableEstimationMeter,
+                    // uploadSurveyPhoto('house') di atas nulis ke folder yang sama
+                    // persis dipakai Laporan Survey teknisi — path-nya reuse, bukan
+                    // upload dobel.
+                    'house_photo' => $updates['foto_rumah'] ?? null,
+                    'survey_photo' => $surveyPhotoPath,
+                    'survey_note' => $note,
+                    'technician_id' => auth()->id(),
+                    'requested_installation_date' => $requestedInstallationDate,
+                ]);
+            } else {
+                // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
+                //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan
+                //    /fop-tasks dibuka: dia anchor wajib task_materials &
+                //    task_work_tools, dan tanpa itu isian estimasi material serta
+                //    checklist alat di laporan survey hilang tanpa pesan error.
+                $year = date('Y');
+                $count = Task::whereYear('created_at', $year)->count() + 1;
+                Task::create([
+                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                    'task_type' => TaskType::SURVEY->value,
+                    'title' => 'Survey Calon Pelanggan: '.$customer->full_name,
+                    'description' => null,
+                    'pop_id' => $customer->pop_id,
+                    'customer_id' => $customer->id,
+                    'status' => TaskStatus::PENDING->value,
+                    'created_by' => auth()->id() ?? 1,
+                    'updated_by' => auth()->id() ?? 1,
+                ]);
+
+                app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::SURVEY);
+            }
 
             return $customer;
         });

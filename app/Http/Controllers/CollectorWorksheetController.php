@@ -84,7 +84,15 @@ class CollectorWorksheetController extends Controller
             ? Pop::query()->pluck('id')->all()
             : $this->access->getAllowedPopIds($viewer);
 
-        return array_map(fn ($popId) => 'collector-activity.'.$popId, $popIds);
+        $channels = array_map(fn ($popId) => 'collector-activity.'.$popId, $popIds);
+
+        // Kanal pribadi viewer sendiri — dipakai App\Events\CashDepositUpdated
+        // buat ngasih tau ADMIN kalau setoran kasnya SENDIRI ke Owner/Bank baru
+        // diperiksa/ditutup selisih. Sudah teregistrasi generik di
+        // routes/channels.php (App.Models.User.{id}), gak perlu channel baru.
+        $channels[] = 'App.Models.User.'.$viewer->id;
+
+        return $channels;
     }
 
     public function index(Request $request): View

@@ -2,47 +2,42 @@
     Realtime SELURUH aktivitas kas kolektor — dipakai bersama Worksheet Admin
     (index & detail) dan Worklist Kolektor.
 
-    Mendengarkan dua event pada kanal yang sama:
+    Mendengarkan tiga event pada kanal yang sama:
       - `CollectorDepositUpdated`  → siklus setoran (diajukan…dihapus buku)
       - `CollectorActivityUpdated` → pembayaran dicatat/ditolak, rute berubah
+      - `CashDepositUpdated`       → setoran admin ke Owner/Bank diperiksa/ditutup selisih
+                                      (cuma relevan buat channel App.Models.User.{id} admin)
 
     Parameter:
       - `channels` : array nama private channel yang didengarkan.
-                     Admin  → ['collector-activity.{popId}', …]
+                     Admin  → ['collector-activity.{popId}', …, 'App.Models.User.{id}']
                      Kolektor → ['App.Models.User.{id}']
       - `audiens`  : 'admin' | 'kolektor' — menentukan bunyi pesannya.
+      - `patchContainerId` : id elemen yang di-fetch-ulang & ditambal otomatis
+                     tiap event masuk (default 'live-content').
 
-    Kenapa hanya memberi kabar, bukan menambal angka:
-    halaman ini menghitung UANG FISIK. Kalau saldo berubah sendiri saat admin
-    sedang menghitung uang di meja, dia melanjutkan hitungan dengan patokan yang
-    berubah tanpa sadar. Jadi event dipakai sebagai ABA-ABA — muat ulang adalah
-    keputusan manusia, bukan efek samping.
+    Riwayat keputusan (2026-08-21): sebelum ini halaman CUMA dikasih kabar
+    (toast + bar "Muat ulang" manual) — sengaja TIDAK menambal angka sendiri,
+    karena halaman ini menghitung UANG FISIK dan berubah diam-diam di tengah
+    hitungan admin dianggap berbahaya. User secara eksplisit minta itu dicabut
+    (SPA-like penuh, nol refresh manual/polling, "termasuk pas form kebuka") —
+    jadi sekarang auto-tambal SELALU jalan, gak ada pengecualian "skip kalau
+    modal/form lagi kebuka". Konsekuensinya: kalau admin lagi ngetik nominal di
+    form yang berada di dalam `patchContainerId` pas event lain masuk,
+    ketikannya bisa hilang tertimpa data fresh. Ini keputusan sadar, bukan bug
+    — kalau mau diubah lagi, ubah di sini (titik tunggal).
 --}}
-<div id="collector-realtime-bar"
-     class="hidden sticky top-2 z-40 flex items-center gap-2.5 px-4 py-2.5 rounded-xl shadow-sm
-            bg-sky-50 text-sky-900 border border-sky-200
-            dark:bg-sky-950/60 dark:text-sky-200 dark:border-sky-800">
-    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-    </svg>
-    <span id="collector-realtime-text" class="text-xs font-semibold"></span>
-    <button type="button" onclick="window.location.reload()"
-            class="ml-auto text-xs font-bold underline underline-offset-2 hover:opacity-80 cursor-pointer shrink-0">
-        Muat ulang
-    </button>
-</div>
-
+@php
+    $patchContainerId = $patchContainerId ?? 'live-content';
+@endphp
 @push('scripts')
 <script>
     (function () {
         const CHANNELS = @js($channels);
         const AUDIENS = @js($audiens);
+        const PATCH_CONTAINER_ID = @js($patchContainerId);
 
         if (! CHANNELS.length) return;
-
-        const bar = document.getElementById('collector-realtime-bar');
-        const text = document.getElementById('collector-realtime-text');
 
         function pesan(e) {
             const nominal = 'Rp' + Number(e.declared_amount || 0).toLocaleString('id-ID');
@@ -71,8 +66,7 @@
 
         /**
          * Aktivitas kas DI LUAR siklus setoran — pembayaran dicatat/ditolak dan
-         * perubahan rute. Semuanya mengubah angka orang lain, dan sebelum ini
-         * tak satu pun bersuara di halaman.
+         * perubahan rute.
          */
         function pesanAktivitas(e) {
             const siapa = AUDIENS === 'kolektor' ? 'Anda' : e.collector_name;
@@ -99,30 +93,59 @@
             }
         }
 
-        function tampilkan(isi, jenis, judul) {
-            if (text) text.textContent = isi + ' Angka di halaman ini belum ikut berubah.';
-            if (bar) bar.classList.remove('hidden');
-
-            if (window.Toast) {
-                window.Toast.show(jenis, judul, isi, 7000);
+        function pesanCashDeposit(e) {
+            switch (e.aksi) {
+                case 'diverifikasi': return `Setoran kas Anda ke kantor (${e.deposit_number}): ${e.status_label}.`;
+                case 'ditutup_selisih': return `Selisih setoran kas ${e.deposit_number} sudah ditutup kantor.`;
+                default: return `Setoran kas ${e.deposit_number} berubah.`;
             }
         }
 
-        function tangani(e) {
-            // Setoran menunggu verifikasi = pekerjaan yang menunggu orang,
-            // jadi warnanya beda dari sekadar kabar selesai.
-            const jenis = e.aksi === 'diajukan' && AUDIENS === 'admin' ? 'warning' : 'success';
+        /**
+         * Tambal otomatis — fetch ulang URL halaman ini, cari elemen ber-id
+         * PATCH_CONTAINER_ID di hasilnya, ganti elemen yang sama di halaman
+         * sekarang. Sama persis pola `refreshFopTaskRow()`/`refreshTaskCard()`
+         * (fop_tasks/index.blade.php, tasks/own.blade.php) — fetch + replace,
+         * BUKAN reload, BUKAN polling.
+         */
+        function tambalOtomatis() {
+            const current = document.getElementById(PATCH_CONTAINER_ID);
+            if (! current) return;
 
+            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then((res) => res.text())
+                .then((html) => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const fresh = doc.getElementById(PATCH_CONTAINER_ID);
+                    if (! fresh) return;
+
+                    current.replaceWith(fresh);
+                    if (window.Alpine) window.Alpine.initTree(fresh);
+                })
+                .catch(() => {
+                    // Diam-diam gagal — halaman tetap nampilin data lama, gak ganggu kerjaan.
+                });
+        }
+
+        function tampilkan(isi, jenis, judul) {
+            if (window.Toast) {
+                window.Toast.show(jenis, judul, isi, 6000);
+            }
+            tambalOtomatis();
+        }
+
+        function tangani(e) {
+            const jenis = e.aksi === 'diajukan' && AUDIENS === 'admin' ? 'warning' : 'success';
             tampilkan(pesan(e), jenis, 'Setoran kolektor');
         }
 
         function tanganiAktivitas(e) {
-            // Rute berkurang & pembayaran ditolak = sesuatu yang HILANG dari
-            // pihak yang menerima kabar; jangan dibungkus hijau seolah kabar
-            // baik.
             const buruk = e.aksi === 'pelanggan_dilepas' || e.aksi === 'pembayaran_ditolak';
-
             tampilkan(pesanAktivitas(e), buruk ? 'warning' : 'success', 'Aktivitas kolektor');
+        }
+
+        function tanganiCashDeposit(e) {
+            tampilkan(pesanCashDeposit(e), 'success', 'Setoran kas ke kantor');
         }
 
         function pasang() {
@@ -131,7 +154,8 @@
             CHANNELS.forEach(function (nama) {
                 window.Echo.private(nama)
                     .listen('.CollectorDepositUpdated', tangani)
-                    .listen('.CollectorActivityUpdated', tanganiAktivitas);
+                    .listen('.CollectorActivityUpdated', tanganiAktivitas)
+                    .listen('.CashDepositUpdated', tanganiCashDeposit);
             });
         }
 

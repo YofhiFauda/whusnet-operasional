@@ -266,6 +266,9 @@ class RolePermissionSeeder extends Seeder
                 'customers.failed.view',
                 'customers.create',
                 'customers.update',
+                // Skip Survey saat Registrasi — satu-satunya role yang dapat
+                // default. Role lain butuh ditambahkan manual lewat Role Matrix.
+                'customers.registration.skip_survey',
                 'customers.detail.identity.view',
                 'customers.detail.identity.update',
                 'customers.detail.address.view',

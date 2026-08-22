@@ -134,6 +134,13 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Skip Survey saat Registrasi — Sales input data survey langsung,
+        // pelanggan lompat ke antrean ACC Admin. Sempit & terpisah dari
+        // customers.create biasa (lihat ActionCode::SKIP_SURVEY).
+        'customers.registration' => [
+            ActionCode::SKIP_SURVEY->value,
+        ],
+
         'customers.detail.identity' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
@@ -464,6 +471,7 @@ return [
         'customers.detail.view' => 'Lihat Detail Pelanggan',
         'customers.terminated.view' => 'Lihat List Pelanggan Putus',
         'customers.failed.view' => 'Lihat List Pelanggan Gagal',
+        'customers.registration.skip_survey' => 'Skip Survey saat Registrasi (Input Data Survey Langsung)',
 
         // Modul Ticketing — tiap halaman punya permission sendiri, jadi
         // labelnya harus nyebut NAMA HALAMAN-nya biar di Role Matrix kelihatan

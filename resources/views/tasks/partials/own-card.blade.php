@@ -89,8 +89,8 @@
             </p>
             @endif
 
-            {{-- Coordinates display inside card when in progress --}}
-            @if($task->status->value !== 'terjadwal' && $lat && $lng)
+            {{-- Coordinates display: selalu tampil kalau data ada, gak nunggu task dimulai --}}
+            @if($lat && $lng)
             <div class="mt-3 p-2.5 bg-surface-muted border border-border rounded-xl flex items-center justify-between gap-3" data-coordinate-card>
                 <div class="flex flex-col gap-0.5 min-w-0">
                     <span class="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Koordinat Lokasi</span>
@@ -112,15 +112,22 @@
                 <span class="text-text-muted/80">&middot; SLA {{ $task->sla_minutes }} menit</span>
             </div>
 
-            {{-- Countdown timer if in progress --}}
-            @if($task->status->value === 'in_progress' && $task->started_at)
+            {{-- Countdown timer SLA — SURVEY jalan dari jam jadwal (gak nunggu
+                 status in_progress), tipe lain tetap nunggu started_at. --}}
+            @php
+                $slaDeadline = $task->slaDeadline();
+                $slaWindowStart = $task->slaWindowStart();
+            @endphp
+            @if(in_array($task->status->value, ['terjadwal', 'in_progress', 'pending']) && $slaDeadline && $slaWindowStart)
                 @php
-                    $slaDeadlineIso = $task->started_at->addMinutes($task->sla_minutes)->toIso8601String();
+                    // Budget total buat threshold warna countdown: durasi asli slaWindowStart→deadline.
+                    // Survey pakai sisa hari sejak jam jadwal (variabel), tipe lain sla_minutes tetap.
+                    $totalSlaSeconds = max($slaWindowStart->diffInSeconds($slaDeadline), 60);
                 @endphp
                 <div class="mt-3">
                     <x-countdown-timer
-                        deadline="{{ $slaDeadlineIso }}"
-                        :total-seconds="$task->sla_minutes * 60"
+                        deadline="{{ $slaDeadline->toIso8601String() }}"
+                        :total-seconds="$totalSlaSeconds"
                         label="Sisa SLA"
                     />
                 </div>
@@ -155,8 +162,8 @@
         <div class="flex items-center justify-between gap-2 mt-4 pt-3.5 border-t border-border">
             {{-- Left actions: Navigation and Phone --}}
             <div class="flex items-center gap-1.5 shrink-0">
-                @if($task->status->value !== 'terjadwal' && $lat && $lng)
-                <a href="https://www.google.com/maps/search/?api=1&query={{ $lat }},{{ $lng }}" 
+                @if($lat && $lng)
+                <a href="https://www.google.com/maps/search/?api=1&query={{ $lat }},{{ $lng }}"
                    target="_blank" 
                    title="Petunjuk Arah Maps"
                    class="inline-flex items-center justify-center gap-1.5 p-2.5 min-[426px]:px-3.5 rounded-xl border border-border bg-surface text-text-secondary hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-600 dark:hover:text-sky-400 hover:border-sky-200 dark:hover:border-sky-900/50 active:scale-95 transition-all shadow-sm cursor-pointer font-ui">

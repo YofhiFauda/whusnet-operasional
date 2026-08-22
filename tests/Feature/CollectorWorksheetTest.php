@@ -479,4 +479,23 @@ class CollectorWorksheetTest extends TestCase
 
         return $customer;
     }
+
+    /**
+     * Regresi realtime (2026-08-21): halaman ini harus berlangganan kanal
+     * pribadinya sendiri juga (`App.Models.User.{id}`), gak cuma
+     * `collector-activity.{popId}` — itu yang dipakai `CashDepositUpdated`
+     * buat ngasih tau admin kalau setoran kasnya SENDIRI ke Owner udah
+     * diperiksa, tanpa admin perlu reload Worksheet.
+     */
+    public function test_index_subscribes_to_own_personal_channel_for_cash_deposit_updates(): void
+    {
+        $pop = $this->createPop('HUB2');
+        $admin = $this->createAdmin($pop);
+
+        $response = $this->actingAs($admin)->get(route('collector-worksheet.index'));
+
+        $response->assertOk();
+        $response->assertSee('App.Models.User.'.$admin->id, false);
+        $response->assertSee('id="live-content"', false);
+    }
 }

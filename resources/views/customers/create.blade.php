@@ -246,15 +246,140 @@
 
                             <div class="grid grid-cols-2 gap-3 md:col-span-1">
                                 <div>
-                                    <label for="latitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Latitude</label>
-                                    <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="-7.86940">
+                                    <label for="latitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Latitude <span class="text-rose-500 hidden" id="latitude-required-mark">*</span></label>
+                                    <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('latitude') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="-7.86940">
+                                    @error('latitude')
+                                        <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                    @enderror
                                 </div>
                                 <div>
-                                    <label for="longitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Longitude</label>
-                                    <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="111.46210">
+                                    <label for="longitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Longitude <span class="text-rose-500 hidden" id="longitude-required-mark">*</span></label>
+                                    <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('longitude') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="111.46210">
+                                    @error('longitude')
+                                        <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                    @enderror
                                 </div>
                             </div>
                         </div>
+
+                        @can('customers.registration.skip_survey')
+                        {{-- Skip Survey — Sales lompat tahap survey lapangan, input data
+                             survey langsung di sini. Permission sempit
+                             (customers.registration.skip_survey), default cuma role Sales. --}}
+                        <div class="pt-4 mt-2 border-t border-slate-100 dark:border-slate-700/60">
+                            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" name="skip_survey" id="skip_survey" value="1" {{ old('skip_survey') ? 'checked' : '' }} onchange="toggleSkipSurvey()" class="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500 focus:ring-offset-0">
+                                <span>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">Skip Survey — Input Data Survey Langsung</span>
+                                    <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">Pelanggan langsung masuk antrean ACC Admin tanpa lewat tahap survey teknisi lapangan. Titik koordinat &amp; data survey di bawah wajib diisi sekarang.</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        {{-- Inline style, BUKAN class 'hidden': elemen ini juga pakai utility
+                             display 'grid', dan di Tailwind keduanya sama specificity — yang
+                             belakangan menang di stylesheet, jadi 'hidden' gak konsisten
+                             berefek. Inline style selalu menang, sama pola surveys/report.blade.php. --}}
+                        <div id="skip-survey-fields" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" style="display: {{ old('skip_survey') ? '' : 'none' }};">
+                            <div>
+                                <label for="nearest_odp" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ODP Terdekat <span class="text-rose-500">*</span></label>
+                                <input type="text" name="nearest_odp" id="nearest_odp" value="{{ old('nearest_odp') }}" class="w-full text-xs data-text px-3 py-2.5 border @error('nearest_odp') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: ODP-BBD-01">
+                                @error('nearest_odp')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div>
+                                <label for="cable_estimation_meter" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Estimasi Kabel (Meter) <span class="text-rose-500">*</span></label>
+                                <input type="number" name="cable_estimation_meter" id="cable_estimation_meter" min="0" value="{{ old('cable_estimation_meter') }}" class="w-full text-xs data-text px-3 py-2.5 border @error('cable_estimation_meter') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: 150">
+                                @error('cable_estimation_meter')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label for="difficulty_level" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tingkat Kesulitan <span class="text-rose-500">*</span></label>
+                                <select name="difficulty_level" id="difficulty_level" class="w-full text-xs font-sans px-3 py-2.5 border @error('difficulty_level') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled {{ old('difficulty_level') ? '' : 'selected' }}>Pilih Tingkat Kesulitan</option>
+                                    <option value="MUDAH" {{ old('difficulty_level') === 'MUDAH' ? 'selected' : '' }}>MUDAH</option>
+                                    <option value="SEDANG" {{ old('difficulty_level') === 'SEDANG' ? 'selected' : '' }}>SEDANG</option>
+                                    <option value="SULIT" {{ old('difficulty_level') === 'SULIT' ? 'selected' : '' }}>SULIT</option>
+                                </select>
+                                @error('difficulty_level')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label for="requested_installation_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Request Pemasangan</label>
+                                <input type="date" name="requested_installation_date" id="requested_installation_date" min="{{ now()->toDateString() }}" value="{{ old('requested_installation_date') }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('requested_installation_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Kosongkan jika pelanggan tidak meminta tanggal spesifik. Diisi hanya bila pelanggan minta dipasang di tanggal tertentu — task pemasangan menunggu sampai tanggal itu tiba.</span>
+                                @error('requested_installation_date')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Foto Rumah -->
+                            <div class="border-2 border-dashed @error('foto_rumah') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
+                                <div id="default-placeholder-foto_rumah" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                        <x-ui.icon name="house" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                </div>
+                                <div id="preview-container-foto_rumah" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-foto_rumah" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
+                                        <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <x-ui.icon name="x" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Foto Rumah
+                                    </label>
+                                    <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                @error('foto_rumah')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Foto ODP -->
+                            <div class="border-2 border-dashed @error('survey_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
+                                <div id="default-placeholder-survey_photo" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                        <x-ui.icon name="network" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO ODP / JALUR <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                </div>
+                                <div id="preview-container-survey_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-survey_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto ODP">
+                                        <button type="button" onclick="clearFile('survey_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <x-ui.icon name="x" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Foto ODP
+                                    </label>
+                                    <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                @error('survey_photo')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                        @endcan
                     </div>
 
                     <!-- STEP 2 PANEL: Layanan & Paket Internet -->
@@ -391,6 +516,33 @@
         2: 'layanan'
     };
 
+    // Field yang pindah jadi wajib di Step 1 begitu Skip Survey aktif —
+    // lat/long dari 'optional' data-diri, sisanya baru muncul lewat toggle.
+    const skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
+
+    /* Toggle Skip Survey — tampilkan/sembunyikan blok data survey & pindahkan
+       field-nya antara required/optional di formFields['data-diri']. */
+    function toggleSkipSurvey() {
+        const checkbox = document.getElementById('skip_survey');
+        const panel = document.getElementById('skip-survey-fields');
+        const enabled = !! (checkbox && checkbox.checked);
+
+        setElementVisible(panel, enabled);
+        setElementVisible(document.getElementById('latitude-required-mark'), enabled);
+        setElementVisible(document.getElementById('longitude-required-mark'), enabled);
+
+        formFields['data-diri'].required = formFields['data-diri'].required.filter(f => ! skipSurveyRequiredFields.includes(f));
+        formFields['data-diri'].optional = formFields['data-diri'].optional.filter(f => ! skipSurveyRequiredFields.includes(f));
+
+        if (enabled) {
+            formFields['data-diri'].required = formFields['data-diri'].required.concat(skipSurveyRequiredFields);
+        } else {
+            formFields['data-diri'].optional = formFields['data-diri'].optional.concat(['latitude', 'longitude']);
+        }
+
+        runLiveProgressUpdates();
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
@@ -407,10 +559,56 @@
             loadDistricts(oldCityId, oldDistrictId, oldVillageId);
         }
 
+        // Re-terapkan state Skip Survey kalau submit sebelumnya gagal validasi
+        // (redisplay old('skip_survey')) — panel & required list ikut nyala lagi.
+        if (document.getElementById('skip_survey')) {
+            toggleSkipSurvey();
+        }
+
         updateWizardButtons();
         runLiveProgressUpdates();
         updateLayananBreakdown();
     });
+
+    /* File Change & Preview Helper — dipakai Foto Rumah & Foto ODP (Skip Survey) */
+    function onFileChange(fieldId) {
+        const input = document.getElementById(fieldId);
+        const label = document.getElementById('file-label-' + fieldId);
+        const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
+        const previewContainer = document.getElementById('preview-container-' + fieldId);
+        const previewImg = document.getElementById('preview-img-' + fieldId);
+
+        if (input.files && input.files.length > 0) {
+            const file = input.files[0];
+            label.textContent = file.name;
+            input.setAttribute('data-populated', 'true');
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (previewImg) previewImg.src = e.target.result;
+                    if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                    setElementVisible(previewContainer, true);
+                };
+                reader.readAsDataURL(file);
+            }
+        } else {
+            label.textContent = "Belum ada file";
+            input.removeAttribute('data-populated');
+            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
+            setElementVisible(previewContainer, false);
+            if (previewImg) previewImg.src = '';
+        }
+        runLiveProgressUpdates();
+    }
+
+    function clearFile(fieldId) {
+        const input = document.getElementById(fieldId);
+        if (input) {
+            input.value = '';
+            onFileChange(fieldId);
+        }
+    }
 
     /* Dynamic Districts AJAX */
     function loadDistricts(cityId, selectedDistrictId = null, selectedVillageId = null) {
@@ -608,7 +806,14 @@
             internet_package_id: 'Paket Internet',
             jenis_kontrak: 'Jenis Kontrak',
             contract_period_months: 'Masa Kontrak',
-            discount_amount: 'Diskon'
+            discount_amount: 'Diskon',
+            latitude: 'Latitude',
+            longitude: 'Longitude',
+            nearest_odp: 'ODP Terdekat',
+            cable_estimation_meter: 'Estimasi Kabel',
+            difficulty_level: 'Tingkat Kesulitan',
+            foto_rumah: 'Foto Rumah',
+            survey_photo: 'Foto ODP'
         };
         return labels[field] || field;
     }

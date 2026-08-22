@@ -204,6 +204,18 @@ class FeatureSeeder extends Seeder
                 'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 4,
             ],
+            [
+                // Kemampuan sempit di dalam form Registrasi (bukan halaman
+                // sendiri) — Sales lompat tahap survey lapangan, isi data
+                // survey langsung. Sub-feature sendiri (bukan numpang
+                // customers.create) supaya bisa di-toggle independen lewat
+                // Role Matrix.
+                'parent_code' => 'customers',
+                'code' => 'customers.registration',
+                'name' => 'Registrasi — Skip Survey',
+                'type' => FeatureType::SUB_FEATURE,
+                'sort_order' => 5,
+            ],
         ];
 
         $subFeatureIds = [];

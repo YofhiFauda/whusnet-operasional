@@ -28,6 +28,7 @@ Lahir dari satu keluhan: *"Upload berkas, diproses, selesai — tidak ada apa pu
 3. **Jangan pernah melaporkan sukses tanpa memeriksa hasilnya.** `fetch()` wajib mengecek `res.ok` dan punya `.catch`. Pesan "Tersimpan." untuk penyimpanan yang gagal lebih berbahaya daripada layar diam — pengguna menutup halaman yakin datanya berubah.
 4. **Kegagalan penyegaran latar belakang tidak boleh dipendam.** Data basi yang tidak ditandai tak bisa dibedakan dari data yang memang belum berubah.
 5. **Halaman yang menampilkan UANG tidak boleh mengganti angkanya sendiri** dari event realtime. Beri kabar + tombol Muat ulang; penyegaran tetap keputusan manusia. Kalau saldo berubah saat admin sedang menghitung uang fisik, dia meneruskan hitungan dengan patokan yang berubah tanpa sadar.
+   → **Dikecualikan secara eksplisit (2026-08-21, ADHOC-45) buat Worksheet Admin, Setoran Kas, dan Worklist Kolektor** — user diberi tahu risiko di atas, lalu sengaja memilih SPA-like penuh (auto-tambal, nol refresh manual/polling) buat tiga halaman itu. Ketiganya sekarang fetch-ulang & menambal `#live-content` otomatis tiap event masuk, TANPA syarat "skip kalau form lagi kebuka" — lihat `docs/kolektor/business-logic.md` §9. Halaman UANG lain yang BELUM eksplisit diminta ubah tetap ikut aturan default di atas (kabar + Muat ulang manual).
 6. **Kegagalan koneksi realtime harus terlihat.** Ditangani terpusat oleh bilah di `layouts/app.blade.php` — halaman tidak perlu menanganinya sendiri.
 
 ---

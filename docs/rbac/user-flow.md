@@ -106,6 +106,7 @@ $this->authorize('viewAll', Task::class); // dipakai FopDashboardController, lih
 - Akses **Detail Pelanggan** via `customers.detail.view` (buat view identitas/alamat pelanggan yang bersangkutan)
 - **TIDAK punya** `customers.terminated.view` / `customers.failed.view` — list putus/gagal gak relevan buat sales
 - **TIDAK punya** `customers.detail.devices.view` / `customers.detail.installation.view` — data teknis gak perlu sales lihat
+- **PUNYA** `customers.registration.skip_survey` (2026-08-21) → di form Registrasi (`customers.create`) muncul checkbox **"Skip Survey"**; user role lain gak lihat checkbox ini sama sekali. Dicentang → lewati tahap survey teknisi, input data survey (ODP, koordinat, foto) langsung, pelanggan lompat ke `waiting_acc`. Detail: `docs/customer-lifecycle/business-logic.md` § Skip Survey.
 
 ### Helpdesk
 - Akses **List Data Pelanggan** via `customers.view`
@@ -130,3 +131,4 @@ $this->authorize('viewAll', Task::class); // dipakai FopDashboardController, lih
 | Lihat Detail Pelanggan (identitas/billing/dokumen) | `customers.detail.view` |
 | Isi data Perangkat & Pemasangan (fieldwork page) | `customers.detail.devices.view` OR `customers.detail.installation.view` |
 | Teknisi kerja lapangan tanpa lihat data pelanggan umum | Punya `customers.detail.devices.*` + `customers.detail.installation.*`, TANPA `customers.view`/`customers.detail.view` |
+| Lewati tahap survey saat Registrasi (Skip Survey) | `customers.registration.skip_survey` (default Sales) |

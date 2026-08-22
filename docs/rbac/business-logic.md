@@ -142,7 +142,29 @@ Misal nambah permission `customers.detail.sensitive_info.view` (buat admin lihat
 
 Setiap feature customer kini permission-nya **independent** — gak perlu hardcode redirect/filter di seeder level, bukan bundel satu string generik.
 
-## 9. Audit
+## 9. Skip Survey saat Registrasi — Permission Sempit di Dalam Satu Form (2026-08-21)
+
+Beda dari 4 permission di §8 (masing-masing = satu halaman), `customers.registration.skip_survey` menggerbangi satu **kemampuan** di dalam form Registrasi Pelanggan (`customers.create`/`customers.store`) — bukan halaman terpisah.
+
+| Permission | Kemampuan | Pemegang default |
+|------------|-----------|-------------------|
+| `customers.registration.skip_survey` | Lewati tahap survey lapangan saat registrasi — input data survey (ODP terdekat, estimasi kabel, tingkat kesulitan, foto rumah, foto ODP) + titik koordinat langsung di form, pelanggan lompat ke `waiting_acc` | Sales (lewat `RolePermissionSeeder`) |
+
+**Kenapa permission sendiri, bukan numpang `customers.create`:** siapa pun yang boleh registrasi pelanggan otomatis boleh lewat tahap survey kalau ini numpang `customers.create` — padahal "boleh daftar pelanggan" dan "boleh nge-skip verifikasi lapangan (titik koordinat + kondisi lokasi)" itu dua wewenang beda tingkat risiko. Pola sama dengan `customers.detail.devices.retrieve` (§ Larangan Keras 1 di `config/rbac.php`).
+
+**Gerbang dua lapis** (bukan cuma UI hide):
+1. `@can('customers.registration.skip_survey')` di `customers/create.blade.php` — sembunyikan checkbox & field data survey buat yang gak punya izin.
+2. `CustomerRegistrationRequest::authorize()` — nolak (403) kalau `skip_survey=1` dikirim tapi actor gak punya permission. Sengaja bukan `required_if` yang dilepas diam-diam: client yang maksa kirim `skip_survey=1` tanpa hak dapat error otorisasi yang jelas, bukan tetap lolos dengan validasi field survey yang membingungkan.
+
+**Feature/Action baru yang ditambahkan** (ikuti alur §8 "Nambah Permission Customer Baru"):
+- Sub-feature `customers.registration` (parent `customers`) — `FeatureSeeder`.
+- Action baru `ActionCode::SKIP_SURVEY` (`skip_survey`) — action generik (`VIEW`/`CREATE`/`UPDATE`) gak cukup mendeskripsikan "melewati satu tahap workflow", jadi action sendiri kayak `PAY`/`DEPOSIT`/`VISIT` milik modul Kolektor.
+- `config/rbac.php` → `allowed_actions['customers.registration'] = [ActionCode::SKIP_SURVEY->value]` + `permission_name_overrides`.
+- `RolePermissionSeeder::permissionsByRole['sales']` → tambah `customers.registration.skip_survey`.
+
+Detail alur bisnisnya (kenapa `waiting_acc` langsung, kenapa gak ada Task/FopTask SURVEY): `docs/customer-lifecycle/business-logic.md` § Skip Survey.
+
+## 10. Audit
 
 Semua perubahan RBAC diaudit:
 - `Role`, `Permission`, `Feature`, `Action` — trait `RecordsAuditLogs`, event `created`/`updated`/`deleted`.

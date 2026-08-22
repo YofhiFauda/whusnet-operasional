@@ -126,6 +126,17 @@ Broadcast::channel('teknisi.{user_id}', function ($user, $userId) {
  * disiarkan ke `App.Models.User.{id}` miliknya, yang otorisasinya sudah
  * terdefinisi di paling atas file ini.
  */
+/**
+ * Setoran Kas Admin → Owner/Bank (App\Events\CashDepositUpdated) — dipakai
+ * halaman Setoran Kas (`cash-deposits/index.blade.php`). Global, BUKAN
+ * per-POP: pemeriksa (`cash_deposit.view`) selalu Owner/atasan, yang sudah
+ * bypass scope POP sepenuhnya (CLAUDE.md § RBAC). Sisi admin penyetor
+ * mendengar lewat `App.Models.User.{id}` yang sudah generik di atas.
+ */
+Broadcast::channel('cash-deposits', function ($user) {
+    return $user->hasPermission('cash_deposit.view');
+});
+
 Broadcast::channel('collector-activity.{popId}', function ($user, $popId) {
     if (! $user->hasPermission('collector_worksheet.view')) {
         return false;

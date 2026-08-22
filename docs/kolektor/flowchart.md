@@ -100,7 +100,10 @@ pindah tangan.
 
         payload: aksi, deposit_number, status, declared, recorded, collector
         payload TIDAK memuat saldo — saldo angka turunan, klien hitung ulang
-        efek di layar: toast + bilah "Muat ulang". TIDAK menambal angka.
+        efek di layar (2026-08-21): toast + auto-tambal #live-content (fetch-
+        ulang halaman + replaceWith, TANPA syarat skip-kalau-form-kebuka —
+        sebelumnya cuma toast + bilah "Muat ulang" manual, dicabut atas
+        permintaan eksplisit user, lihat business-logic.md §9)
 ```
 
 Kenapa dua jalur, bukan satu: notifikasi in-app **bertahan** (masuk lonceng,
@@ -133,13 +136,37 @@ berbeda. Tiga kejadian yang sebelumnya mengubah angka orang lain tanpa suara:
         └─► CollectorActivityUpdated 'pelanggan_diassign'   (BARU)
                                      'pelanggan_dilepas'
 
-        efek di layar: toast + bilah "Muat ulang".
+        efek di layar (2026-08-21): toast + auto-tambal #live-content (sama
+        pola di atas — lihat business-logic.md §9).
         'pelanggan_dilepas' & 'pembayaran_ditolak' bertoast WARNING, bukan
         hijau — keduanya berarti ada yang HILANG dari penerima kabar.
 ```
 
 Yang paling berbahaya justru perubahan rute: pelanggan yang dilepas **setelah**
 kolektor berangkat berarti dia menagih orang yang bukan lagi tanggungannya.
+
+### Setoran Kas Admin → Owner/Bank (2026-08-21, baru — ADHOC-45)
+
+Satu tingkat DI ATAS setoran kolektor. Sebelumnya TIDAK broadcast apa pun —
+Setoran Kas (`cash-deposits/index.blade.php`) butuh reload manual buat lihat
+setoran baru/hasil pemeriksaan.
+
+```
+CashDepositService::submit()/verify()/writeOff()
+        │
+        └─► CashDepositUpdated (broadcast, ShouldBroadcastNow)
+              ├─ private-cash-deposits              → Setoran Kas (Owner/atasan)
+              └─ private-App.Models.User.{adminId}  → Worksheet Admin (penyetor sendiri)
+
+        aksi: diajukan | diverifikasi | ditutup_selisih
+        payload: aksi, deposit_number, status, pop_id, depositor
+        payload TIDAK memuat saldo — sama alasan CollectorDepositUpdated di atas
+        efek di layar: toast + auto-tambal #live-content (sama pola,
+        gak ada bilah "Muat ulang" — lihat business-logic.md §9)
+```
+
+Channel `cash-deposits` GLOBAL, bukan per-POP: pemeriksanya (`cash_deposit.view`)
+selalu Owner/atasan, yang sudah bypass scope POP (CLAUDE.md § RBAC).
 
 ---
 

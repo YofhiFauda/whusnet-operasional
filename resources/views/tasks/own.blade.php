@@ -308,7 +308,15 @@ function technicianNotifier() {
                     window.Echo.private(`teknisi.${userId}`)
                         .listen('TaskScheduled', (event) => {
                             this.handleTaskScheduled(event);
-                        });
+                        })
+                        // Task tim (2-3 orang) — kalau anggota LAIN yang mulai/selesaikan
+                        // task yang lagi ditampilkan di kartu, kartu itu harus ikut update
+                        // sendiri tanpa refresh manual. Reuse refreshTaskCard() yang sama
+                        // dipakai TaskScheduled(rescheduled/team_changed) di atas — kalau
+                        // kartunya belum ada di list (task baru buat user ini), otomatis
+                        // fallback nyuntik kartu baru (lihat refreshTaskCard()).
+                        .listen('TaskStarted', (event) => this.refreshTaskCard(event.id))
+                        .listen('TaskCompleted', (event) => this.refreshTaskCard(event.id));
                     return;
                 }
 

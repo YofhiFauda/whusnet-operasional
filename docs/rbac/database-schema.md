@@ -54,7 +54,7 @@ Migrasi: `2026_06_23_000002_create`.
 | Kolom | Tipe | Nullable | Keterangan |
 |-------|------|----------|------------|
 | `id` | bigint PK | | |
-| `code` | string, unique | | Enum `App\Enums\ActionCode` (19 aksi: `view`, `create`, `update`, `delete`, `import`, `export`, `print`, `approve`, `reject`, `activate`, `deactivate`, `assign`, `validate`, `cancel`, `upload`, `download`, `view_sensitive`, `update_sensitive`, `retrieve` — **baru 2026-07-20**, dipakai khusus `customers.detail.devices.retrieve` buat "Ambil Alat" di List Putus Langganan) |
+| `code` | string, unique | | Enum `App\Enums\ActionCode` (23 aksi: `view`, `create`, `update`, `delete`, `import`, `export`, `print`, `approve`, `reject`, `activate`, `deactivate`, `assign`, `validate`, `cancel`, `upload`, `download`, `view_sensitive`, `update_sensitive`, `retrieve` (2026-07-20, khusus `customers.detail.devices.retrieve` — "Ambil Alat" List Putus Langganan), `pay`/`deposit`/`visit` (modul Kolektor), `skip_survey` (2026-08-21, khusus `customers.registration.skip_survey` — Skip Survey saat Registrasi) |
 | `name` | string | | |
 | `description` | text | ✔ | |
 | `created_at`/`updated_at` | timestamp | | |

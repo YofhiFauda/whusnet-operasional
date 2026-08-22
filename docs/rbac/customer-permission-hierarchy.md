@@ -127,12 +127,13 @@ pemasangan                                                      OR install.view
 ```
 ✓ customers.view
 ✓ customers.detail.view (identitas/alamat)
+✓ customers.registration.skip_survey (2026-08-21 — lewati tahap survey saat registrasi, lihat business-logic.md §9)
 ✗ customers.terminated.view
 ✗ customers.failed.view
 ✗ customers.detail.devices.*
 ✗ customers.detail.installation.*
 ```
-**Reason:** sales kelola prospek/registered customer, bukan teknis/verifikasi/billing.
+**Reason:** sales kelola prospek/registered customer, bukan teknis/verifikasi/billing. `customers.registration.skip_survey` adalah kekecualian sempit: Sales boleh input data survey sendiri (ODP, koordinat, foto) saat pelanggan gak butuh survey lapangan beneran, tapi tetap gak dapat akses teknis/verifikasi lain.
 
 ---
 

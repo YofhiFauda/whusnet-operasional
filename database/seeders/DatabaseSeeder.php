@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);
+        $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
 
         // User::factory(10)->create();
 

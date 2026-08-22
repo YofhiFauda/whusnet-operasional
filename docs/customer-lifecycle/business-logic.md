@@ -6,7 +6,7 @@
 
 | Status | Transisi Valid Berikutnya |
 |--------|---------------------------|
-| `registered` | `waiting_survey`, `rejected` |
+| `registered` | `waiting_survey`, `waiting_acc` (2026-08-21 — khusus Skip Survey, lihat §3.1), `rejected` |
 | `waiting_survey` | `survey_in_progress`, `rejected` |
 | `survey_in_progress` | `waiting_acc`, `surveyed`, `rejected` |
 | `surveyed` | `waiting_acc`, `waiting_installation`, `rejected` |
@@ -21,7 +21,7 @@
 | `terminated` | *(final, tidak ada transisi keluar)* |
 | `rejected` | *(final, tidak ada transisi keluar)* |
 
-**Catatan penting:** registrasi (`CustomerController::store`) langsung set `status = 'waiting_survey'`, **melewati** `registered` — status `registered` di enum lebih sebagai state teoretis/starting point default (`$customer->status ?? 'registered'` di `CustomerWorkflowService`), bukan state yang benar-benar disinggahi di alur normal saat ini.
+**Catatan penting:** registrasi (`CustomerController::store`) langsung set `status = 'waiting_survey'` (normal) atau `status = 'waiting_acc'` (Skip Survey, §3.1), **melewati** `registered` — status `registered` di enum lebih sebagai state teoretis/starting point default (`$customer->status ?? 'registered'` di `CustomerWorkflowService`), bukan state yang benar-benar disinggahi di alur manapun saat ini. Edge `registered → waiting_acc` tetap didaftarkan di `allowedNextTransitions()` biar state machine-nya sah kalau suatu saat ada kode lain yang transisi eksplisit lewat `CustomerWorkflowService`, walau jalur Skip Survey sendiri nge-set status langsung di `Customer::create()` (customer belum ada baris buat ditransisikan lewat service).
 
 ## 2. Efek Samping Otomatis Tiap Transisi
 
@@ -38,6 +38,25 @@
 - `customer_status` (field terpisah, label operasional Bahasa Indonesia) di-mapping dari `status` lewat tabel statis di controller (e.g. `waiting_survey` → `survey`).
 - Nomor pelanggan (`customer_code`) di-generate dari sequence per-POP (`Pop::generateRegistrationNumber()`).
 - Foto KTP/rumah/kontrak diupload terpisah dari field lain, disimpan di `customers.foto_*` (redundant dengan `customer_addresses.house_photo`/`ktp_photo`/`contract_photo` — dua sumber sama, legacy duplikasi kolom).
+
+### 3.1 Skip Survey (2026-08-21)
+
+Role dengan permission `customers.registration.skip_survey` (default **Sales**, lihat `docs/rbac/business-logic.md` §9) bisa melewati Tahap 2 (Survey) sepenuhnya — input data survey langsung di form Registrasi, dipakai buat pelanggan yang sudah jelas titik & kondisi lokasinya tanpa perlu kunjungan teknisi terpisah.
+
+**Gerbang otorisasi dua lapis** (bukan cuma UI hide): `@can` sembunyikan checkbox di blade, dan `CustomerRegistrationRequest::authorize()` nolak 403 kalau `skip_survey=1` dikirim tanpa permission — supaya klien yang maksa gak lolos diam-diam dengan validasi field survey yang membingungkan.
+
+Begitu checkbox **"Skip Survey — Input Data Survey Langsung"** dicentang, field berikut jadi **wajib** (sama persis field wajib di Lapor Survey teknisi, `survey_status=completed`):
+- Latitude/Longitude (`customer_addresses`) — semula opsional di registrasi biasa.
+- ODP Terdekat, Estimasi Kabel (Meter), Tingkat Kesulitan.
+- Foto Rumah, Foto ODP — diupload lewat `FileUploadService::uploadSurveyPhoto()`, folder & disk sama persis jalur teknisi (`surveys/rumah` / `surveys/odp`, disk `public`).
+
+**Efek di `CustomerController::store()`:**
+1. `status` di-set `waiting_acc` langsung (bukan `waiting_survey`) — lompat `waiting_survey`/`survey_in_progress`/`surveyed` sepenuhnya.
+2. `CustomerSurvey` dibuat otomatis: `survey_status=completed`, `technician_id`=user Sales yang input (kolom ini generik "siapa yang mengisi", bukan eksklusif role teknisi), `survey_note` diberi tag `"Diinput oleh Sales saat Registrasi (Skip Survey)"` (plus `"Tingkat Kesulitan: …"` kalau diisi) — pola sama dengan `CustomerSurveyController::store()`. `started_at`/`completed_at`/`duration_minutes` dibiarkan kosong — gak ada kunjungan lapangan beneran yang perlu dicatat durasinya.
+3. **Task/FopTask SURVEY TIDAK dibuat sama sekali** — beda dari alur normal (§2 poin 2, auto-create Task) yang selalu bikin `Task`+`FopTask` kategori SURVEY. Gak ada teknisi yang perlu ditugaskan survei, jadi gak ada antrean yang perlu dibuat, dan gak ada anchor `task_materials`/`task_work_tools` (estimasi material dari Skip Survey memang di luar scope — beda dari Lapor Survey teknisi yang punya form estimasi alat).
+4. `customer_services.service_status` di-mapping `waiting_acc → 'survey'` (sama perlakuan dengan `surveyed`/`waiting_survey`).
+
+**Alur setelahnya sama persis pelanggan survey normal** — begitu di `waiting_acc`, masuk antrean ACC Admin (Tahap 3 di bawah), lanjut `waiting_installation` → provisioning `FopTask` PEMASANGAN via `FopTaskProvisioningService`, dst. Tidak ada percabangan khusus Skip Survey di tahap-tahap berikutnya.
 
 ## 4. Tahap 2 — Survey (`CustomerSurveyController`)
 

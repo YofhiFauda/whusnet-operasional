@@ -112,7 +112,7 @@ Sistem memisahkan secara mutlak antara **Role** (hak fungsi aksi/permission) dan
 
 ### 8. Sales
 *   **Fungsi:** Agen Penjualan Calon Pelanggan.
-*   **Hak Akses:** Menginput form registrasi calon pelanggan baru dan memantau status registrasinya sendiri.
+*   **Hak Akses:** Menginput form registrasi calon pelanggan baru dan memantau status registrasinya sendiri. **Skip Survey** (permission `customers.registration.skip_survey`, 2026-08-21): boleh melewati tahap survey lapangan asal input data survey lengkap (ODP terdekat, estimasi kabel, tingkat kesulitan, foto rumah, foto ODP) + titik koordinat langsung di form registrasi — pelanggan lompat langsung ke antrean ACC Admin.
 *   **Larangan Keras:** Tidak boleh melihat detail teknis jaringan pelanggan lain, tidak boleh mengakses menu penagihan/pembayaran, dan dilarang melihat laporan keuangan.
 
 ### 9. Admin POP

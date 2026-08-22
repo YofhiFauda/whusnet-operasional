@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\CashDepositChannel;
 use App\Enums\CashDepositStatus;
 use App\Enums\NotificationType;
+use App\Events\CashDepositUpdated;
 use App\Models\AuditLog;
 use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
@@ -118,6 +119,7 @@ class CashDepositService
         // setoran — pelajaran yang sama dengan jalur setoran kolektor: admin
         // tak boleh gagal menyerahkan uang cuma karena layanan kabar rusak.
         $this->safelyNotify(fn () => $this->notifyVerifiers($deposit, $admin, $sumberCount, $total));
+        $this->safelyNotify(fn () => CashDepositUpdated::dispatch($deposit, $admin, 'diajukan'));
 
         return $deposit;
     }
@@ -177,6 +179,7 @@ class CashDepositService
         });
 
         $this->safelyNotify(fn () => $this->notifyDepositorOnVerification($verified));
+        $this->safelyNotify(fn () => CashDepositUpdated::dispatch($verified, $verified->depositor, 'diverifikasi'));
 
         return $verified;
     }
@@ -231,6 +234,9 @@ class CashDepositService
             actionUrl: route('cash-deposits.index'),
             type: NotificationType::WARNING
         )));
+        if ($written->depositor) {
+            $this->safelyNotify(fn () => CashDepositUpdated::dispatch($written, $written->depositor, 'ditutup_selisih'));
+        }
 
         return $written;
     }

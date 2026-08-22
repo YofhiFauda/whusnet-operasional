@@ -56,7 +56,7 @@ Migrasi: `2026_06_11_130000_create` (dengan backfill data dari `customers`).
 | `customer_id` | FK, cascade delete | |
 | `full_address`, `province`, `city`, `district`, `village` | string/text | Snapshot teks (independen dari perubahan master wilayah) |
 | `city_id`, `district_id`, `village_id` | FK, nullOnDelete | |
-| `latitude`, `longitude` | decimal(10,7) | |
+| `latitude`, `longitude` | decimal(10,7) | Nullable di registrasi normal; **wajib** kalau Skip Survey aktif (`CustomerRegistrationRequest`: `required_if:skip_survey,1`) |
 | `house_photo`, `ktp_photo`, `contract_photo` | string | |
 
 ## Tabel `customer_services` (1:1)
@@ -90,7 +90,7 @@ Migrasi: `2026_06_13_104704_create` + `add_multi_surveyor_house_photo` + `2026_0
 | `customer_id` | FK, cascade delete | |
 | `survey_status` | string, default `pending` | `pending`/`completed`/`failed` |
 | `survey_date`, `start_time`, `end_time`, `started_at`, `completed_at`, `duration_minutes` | date/time | Timer mulai/selesai survey |
-| `technician_id` | FK users, nullOnDelete | Yang submit laporan |
+| `technician_id` | FK users, nullOnDelete | Yang submit laporan — teknisi survey normal, **atau user Sales** kalau baris ini hasil Skip Survey (§3.1 business-logic.md) |
 | `surveyor_2_id`, `surveyor_3_id` | FK users | Anggota tim survey lain (maks 3 tercatat) |
 | `surveyors` | string | Teks ringkas "Petugas Survey N - Nama" |
 | `fop_id` | | FOP/pembuat task terkait |
@@ -99,6 +99,8 @@ Migrasi: `2026_06_13_104704_create` + `add_multi_surveyor_house_photo` + `2026_0
 | `requested_installation_date` | date, nullable | Tanggal pemasangan yang diminta pelanggan. **Satu-satunya sumber kebenaran** — `fop_tasks.client_request_date` kategori PSB cuma turunannya. Kosong = "secepatnya" |
 | `survey_photo`, `house_photo` | string | Wajib diisi saat submit |
 | `survey_note` | text | Gabungan tingkat kesulitan + catatan bebas |
+
+**Skip Survey (2026-08-21):** baris `customer_surveys` bisa lahir langsung dari `CustomerController::store()` (bukan cuma `CustomerSurveyController`) — `survey_status=completed`, `technician_id`=user Sales, `survey_note` ber-tag "Diinput oleh Sales saat Registrasi (Skip Survey)". Kolom `started_at`/`completed_at`/`duration_minutes`/`survey_date`/`start_time`/`end_time` dibiarkan `NULL` (gak ada kunjungan lapangan yang perlu dicatat durasinya). `survey_photo`/`house_photo` tetap wajib, upload lewat helper yang sama (`FileUploadService::uploadSurveyPhoto()`).
 
 ## Tabel `customer_installations` (1:N)
 
