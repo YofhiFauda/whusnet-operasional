@@ -1,114 +1,6 @@
-# Flowchart — API Eksternal
+# Flowchart — API 2: Portal Pelanggan
 
-## 1. Webhook Pemasangan — dari tombol Aktivasi sampai sistem luar
-
-```mermaid
-flowchart TD
-    A1[Step 1-4 wizard: survei, jadwal, mulai pemasangan] --> A2[Step 5: Laporan Pemasangan & Perangkat<br/>isi SN, ODP, OLT, VLAN, foto, material]
-    A2 --> A[["Tombol AKTIVASI LAPORAN SPEEDTEST"]]
-    A --> B["CustomerInstallationController::storePemasangan()"]
-    B --> K{"DB::beginTransaction :661"}
-    K --> L["customer_technical_details :695<br/>router_or_ont_serial, odp_number, odp_port"]
-    K --> M["customer_devices :735<br/>serial_number — TANPA odp"]
-    K --> N[installation_status TETAP in_progress]
-    K --> O[Task PSB TIDAK diselesaikan]
-    K --> P["dispatch(InstallationActivated) — EVENT BARU"]
-    P --> PR[InstallationWebhookPresenter<br/>rakit data SEKALI]
-    PR --> H1[outbox: Website B<br/>transport=http_json]
-    PR --> H2[outbox: Telegram Eksternal<br/>transport=telegram]
-
-    H1 --> Q["COMMIT :751"]
-    H2 --> Q
-    Q --> Q2[Step 6 Laporan Speedtest terbuka]
-    Q2 -.->|"storeSpeedtest() — penyelesaian.<br/>TIDAK memicu webhook apa pun"| Q3[verification_admin]
-
-    Q -->|afterCommit| R[Worker Horizon]
-    R --> R1{transport?}
-    R1 -->|http_json| S1["toJson() + HMAC X-Whusnet-Signature<br/>POST ke URL konsumen"]
-    R1 -->|telegram| S0{Teks sama dengan<br/>kiriman terakhir?}
-    S0 -->|ya| SK[status=skipped]
-    S0 -->|tidak| S2["toTelegramText() + bot_token dari config endpoint<br/>POST api.telegram.org/sendMessage"]
-    S1 --> T{Berhasil?}
-    S2 --> T
-    T -->|ya| U[status=delivered, delivered_at]
-    T -->|tidak| V[attempts++, next_attempt_at, last_error]
-    V --> W{attempts >= 8?}
-    W -->|belum| R
-    W -->|habis| X[status=failed + consecutive_failures++]
-    X --> Y{Lewat ambang?}
-    Y -->|ya| Z[is_active=false + beri tahu Owner]
-    Y -->|tidak| AA[Berhenti untuk event ini]
-```
-
-Telegram **Internal** tidak muncul di diagram ini sama sekali — ia tetap berjalan
-inline lewat `TelegramBotService` di enam tempat yang sudah ada, tidak disentuh, dan
-tidak melewati outbox. Yang ada di sini hanya Telegram **Eksternal**.
-
-Lima hal yang menentukan benar-tidaknya alur ini:
-
-**Pemicunya tombol Aktivasi, bukan Mulai Pemasangan dan bukan penyelesaian laporan.**
-Pada titik inilah keenam data yang diminta — nama, POP, desa, paket, SN, ODP — sudah
-lengkap di database untuk pertama kalinya. Di tombol Mulai Pemasangan (`start()`)
-SN dan ODP belum ada; di `storeSpeedtest()` sudah terlambat.
-
-**Event `InstallationActivated` harus dibuat baru.** `storePemasangan()` tidak
-menyiarkan apa pun hari ini — `broadcast()` di controller ini hanya ada di `:101`,
-`:524`, dan `:873`. Ini satu-satunya bagian rancangan yang menuntut perubahan pada
-`CustomerInstallationController`.
-
-**Baris outbox ditulis di dalam transaksi, pengiriman terjadi setelah commit.**
-`storePemasangan()` memakai `DB::beginTransaction()` manual (`:661`) dengan commit di
-`:751`. Job yang berjalan sebelum commit membaca `customer_technical_details` yang
-belum tertulis, jadi SN dan ODP terkirim `null` padahal teknisi baru saja mengisinya.
-Kalau transaksi di-rollback, sistem luar sudah diberi tahu soal pemasangan yang tidak
-pernah tercatat.
-
-**Retry mengirim payload yang tersimpan, bukan merakit ulang.** Satu baris outbox =
-satu event; `attempts` dinaikkan di tempat. Merakit ulang dari model berarti percobaan
-ke-3 bisa membawa data yang sudah berubah, lalu dibuang penerima sebagai duplikat
-`event_id` — perubahan itu hilang tanpa jejak.
-
-**Kegagalan tidak boleh hilang diam-diam.** Baris `failed` tetap tinggal sebagai
-daftar rekonsiliasi. `delivered` yang dipruning 90 hari, bukan `failed`.
-
-**Pemilihan endpoint terjadi saat baris outbox dibuat.** Satu kejadian bisa punya
-banyak pelanggan endpoint; data dirakit **sekali** oleh presenter, satu baris outbox
-per endpoint, lalu tiap baris dirender dan diautentikasi menurut transport-nya
-sendiri. Website B mati tidak menahan Telegram, dan sebaliknya.
-
-**Dua transport sengaja berbeda perilaku pada Aktivasi berulang.** Website B menerima
-setiap penekanan — penekanan kedua sering membawa SN/ODP yang benar. Telegram melewati
-kiriman yang teksnya tidak berubah, karena kanal yang dibaca manusia punya batas
-sekitar 20 pesan/menit dan membanjirinya berarti membuang pesan, bukan sekadar berisik.
-
----
-
-## 2. Aktivasi ditekan berulang — kenapa `event_id` saja tidak cukup
-
-```mermaid
-flowchart LR
-    A[Tekan Aktivasi<br/>SN salah ketik] --> B["installation.activated<br/>event_id=E1<br/>idempotency_key=…:activation:1"]
-    B --> C{Kenapa ditekan lagi?}
-    C -->|"Teknisi ralat SN/ODP<br/>di layar yang sama"| E
-    C -->|"Verifikasi admin menolak<br/>→ revision_installation"| E[Tekan Aktivasi lagi<br/>SN/ODP diperbaiki]
-    E --> F["installation.activated<br/>event_id=E2<br/>idempotency_key=…:activation:2"]
-    F --> G{Penerima}
-    G -->|"pakai event_id saja"| H[Dua pemasangan terdaftar<br/>provisioning dobel, SN berbeda]
-    G -->|"pakai idempotency_key"| I[Upsert state pemasangan<br/>activation:2 menang]
-```
-
-`storePemasangan()` tidak mengunci apa pun setelah sukses — `updateOrCreate` di `:695`
-dan `:735` memang dirancang supaya teknisi bisa meralat. Ditambah alur revisi
-(`revision_installation` diterima di `:574`), penekanan berulang adalah **jalur
-normal**, bukan kasus tepi.
-
-`event_id` menjawab "apakah kiriman ini duplikat jaringan". `idempotency_key` menjawab
-"apakah event ini menggantikan yang sebelumnya". Keduanya dibutuhkan, dan keduanya
-punya aturan berbeda soal kapan nilainya sama.
-
----
-
-## 3. Portal — klaim akun, login, dan rotasi token
+## 1. Klaim akun, login, dan rotasi token
 
 ```mermaid
 flowchart TD
@@ -155,7 +47,7 @@ guna throttle hilang.
 
 ---
 
-## 4. Portal — pengambilan data dan penjaga kepemilikan
+## 2. Pengambilan data dan penjaga kepemilikan
 
 ```mermaid
 flowchart TD
@@ -182,7 +74,7 @@ Nomor milik pelanggan lain dijawab **404**, sama persis dengan nomor yang tidak 
 
 ---
 
-## 5. Status tiket — kenapa `tickets.status` tidak boleh dibaca langsung
+## 3. Status tiket — kenapa `tickets.status` tidak boleh dibaca langsung
 
 ```mermaid
 flowchart TD
@@ -216,7 +108,7 @@ siapa pun. `Ticket::isOrphan()` (`:83`) tetap memunculkannya di sisi internal.
 
 ---
 
-## 6. Kwitansi — dua bagian, dua mekanisme
+## 4. Kwitansi — dua bagian, dua mekanisme
 
 ```mermaid
 flowchart LR

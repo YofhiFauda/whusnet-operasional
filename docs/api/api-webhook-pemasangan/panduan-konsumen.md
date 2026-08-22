@@ -30,21 +30,21 @@ Gambaran lengkap dari nol sampai jalan — baca ini dulu sebelum ke bagian tekni
 [Teknisi tekan "Aktivasi" di sistem Whusnet]
                 │
                 ▼
-   [Pengirim (Website A)]  ────  POST + X-Whusnet-Signature  ────▶  [Penerima (Website B)]
+   [Whusnet (Pengirim)]  ────  POST + X-Whusnet-Signature  ────▶  [Website B (Penerima)]
                 │                                                    │
                 │◀─────────────────  200 OK  ───────────────────────┘
                 │
      (gagal/timeout? retry otomatis: 1m → 5m → 30m → 2j → 6j, maks 8x)
 ```
 
-**Pengirim (Website A) selalu yang memulai koneksi** (bertindak sebagai *client*).
-**Penerima (Website B) selalu yang menerima** (bertindak sebagai *server*). Arah ini
+**Whusnet selalu yang memulai koneksi** (bertindak sebagai *client*).
+**Website B selalu yang menerima** (bertindak sebagai *server*). Arah ini
 tetap — tidak pernah kebalik, tidak ada langkah di mana Anda memanggil balik
 ke Whusnet untuk event ini.
 
 ### Yang dibutuhkan dari tiap sisi
 
-| Dari Website A (Pengirim) (sudah siap, sudah diuji) | Dari Website B (Penerima) (perlu disiapkan) |
+| Dari Whusnet (sudah siap, sudah diuji) | Dari Website B (perlu disiapkan) |
 |---|---|
 | Kode pengirim: trigger event, susun payload, tanda tangani HMAC, antre & retry otomatis | Endpoint HTTPS publik yang menerima `POST` |
 | Secret HMAC — kami generate, diserahkan lewat jalur terpisah dari email | Logic verifikasi signature (§3) |
@@ -100,10 +100,10 @@ sampaikan ke kami; itu jadi perubahan versi payload baru, bukan sesuatu yang
 Anda ubah sendiri di sisi penerima.
 
 **Kenapa bukan kami yang bikin URL-nya di server Whusnet?**
-Karena Pengirim (Website A) yang mengirim (client), Penerima (Website B) yang menerima (server) — secara
+Karena Whusnet yang mengirim (client), Anda yang menerima (server) — secara
 teknis, alamat tujuan sebuah kiriman HTTP harus ada di server pihak yang
 menerima. Analoginya: Anda yang punya nomor telepon dan menentukan siapa yang
-boleh menelepon (verifikasi signature = caller ID); Pengirim (Website A) menyimpan nomor
+boleh menelepon (verifikasi signature = caller ID); Whusnet menyimpan nomor
 itu di kontak kami lalu menelepon begitu tombol ditekan. Nomor teleponnya
 secara fisik ada di tangan Anda — bukan sesuatu yang bisa kami buatkan dari
 sisi kami.
@@ -212,7 +212,8 @@ lama.
 
 **Field yang TIDAK PERNAH ada di payload ini** (jangan diasumsikan/ditunggu):
 `task.completed_at` (task belum selesai di titik ini — itu memang benar,
-bukan bug), nomor HP, alamat lengkap, NIK, koordinat, kredensial perangkat
+bukan bug), `login_id` (menyusul versi payload berikutnya begitu portal
+pelanggan jadi), nomor HP, alamat lengkap, NIK, koordinat, kredensial perangkat
 (`pppoe_password`, `wifi_password`).
 
 ## 6. Contoh kode penerima (receiver)
@@ -357,40 +358,3 @@ def receive_installation_webhook():
 
 Kendala teknis atau pertanyaan di luar cakupan dokumen ini: hubungi tim
 Whusnet Operasional lewat jalur yang sudah disepakati.
-
-## 9. Penjelasan paling gampang di pahami
-
-WEBHOOK_WEBSITE_B_URL = alamat lengkap route yang Website B siapkan di server mereka
- buat nerima kiriman kita. Bentuknya persis URL webhook.site yang kamu pakai kemarin
-, cuma ini nanti URL server production mereka sendiri.
-
-Yang harus disiapkan tim Website B:
-
-1. Bikin 1 route/endpoint di aplikasi mereka yang nerima method POST, misal:
-   https://provisioning.websitebeta.com/api/webhooks/whusnet-installation
-   (nama path bebas mereka tentuin, gak ada aturan baku dari kita — cuma harus https
-://).
-2. Aplikasi itu harus bisa diakses publik dari internet (bukan localhost, bukan alam
-at internal). Sama persis kayak kamu pake Cloudflare Tunnel buat expose Whusnet — me
-reka butuh cara serupa: server beneran dengan domain publik, atau tunnel kayak punya
- kamu kalau masih tahap uji.
-3. Endpoint itu harus:
-   - Terima body JSON.
-   - Baca header X-Whusnet-Signature: t=...,v1=....
-   - Hitung ulang HMAC-SHA256 pake secret yang kita kasih, cocokin ke v1 — buat mast
-iin kiriman beneran dari kita, bukan orang lain nyamar.
-   - Kalau valid → simpan data, balas status 2xx (200/201/dst).
-   - Kalau gak valid → tolak (401/403), status non-2xx bikin kita retry otomatis.
-4. Mereka generate/nentuin secret bareng kita (atau kita yang generate, tinggal kasi
-h ke mereka lewat jalur aman) — dipakai buat langkah verifikasi signature di atas.
-5. Setelah endpoint itu jadi & bisa diakses, mereka kasih kita:
-   - URL-nya → masuk ke WEBHOOK_WEBSITE_B_URL
-   - Secret yang disepakati → masuk ke WEBHOOK_WEBSITE_B_SECRET
-
-Baru kita isi .env kita sendiri, config:clear, dan siap — tombol Aktivasi bakal lang
-sung nembak ke URL itu.
-
-Analoginya: mereka bikin nomor telepon + siapa yang boleh nelpon (verifikasi caller
-ID = signature). Kita yang nyimpen nomor itu di kontak kita (.env), terus nelpon pas
- tombol ditekan. Nomor teleponnya fisik ada di HP mereka — bukan hal yang bisa kita
-bikinin dari sisi kita.

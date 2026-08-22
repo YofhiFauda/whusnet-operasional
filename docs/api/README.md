@@ -1,214 +1,131 @@
 # Modul API Eksternal
 
 Rancangan lapisan API supaya Whusnet Operasional bisa diremote dan diintegrasikan
-dengan sistem lain.
+dengan sistem lain. Modul ini dipecah **per API**, masing-masing folder sendiri —
+setiap API punya arah, model keamanan, dan siklus hidup sendiri, jadi dokumennya
+tidak dicampur dalam satu berkas raksasa.
 
-**Status implementasi (2026-08-20):** API 1 (webhook pemasangan, Fase 1 di
-`rencana-implementasi.md`) **sudah diimplementasikan** — lihat
-`app/Events/InstallationActivated.php`, `app/Listeners/SendInstallationActivatedWebhooks.php`,
-`app/Services/Webhooks/InstallationWebhookPresenter.php`, `app/Jobs/SendWebhookOutboxJob.php`,
-`config/webhooks.php`. API 2 (portal pelanggan) dan Fase 6 (callback provisioning)
-**masih rancangan**, belum ada kode. Dokumen di modul ini tetap jadi rujukan kontrak
-— kalau ada beda antara kode dan dokumen, itu bug dokumentasi yang harus ditambal,
-bukan berarti dokumennya usang.
+| Folder | Isi | Status |
+|---|---|---|
+| [`api-webhook-pemasangan/`](api-webhook-pemasangan/README.md) | **Webhook Pemasangan** — Whusnet → Website B + Telegram Eksternal, event `installation.activated` | **Sudah diimplementasikan** (2026-08-20) |
+| [`api-portal-pelanggan/`](api-portal-pelanggan/README.md) | **Portal Pelanggan** — REST `/api/customer-portal/*`, dikonsumsi aplikasi portal terpisah | Rancangan, belum ada kode |
+| [`api-pop-distribusi/`](api-pop-distribusi/README.md) | **Topologi Jaringan & Konfirmasi Assignment** — Website B baca referensi Mini POP/Distribusi, lalu konfirmasi assignment balik ke Whusnet | Rancangan, belum ada kode |
+
+Tiap folder API punya pola berkas yang sama:
 
 | Berkas | Isi |
 |---|---|
-| `README.md` (ini) | Prinsip lintas-API, versioning, envelope, auth, rate limit, larangan keras |
-| `business-logic.md` | Kontrak lengkap API 1 (webhook pemasangan) & API 2 (portal pelanggan) |
-| `database-schema.md` | Tabel & kolom baru beserta alasannya |
-| `flowchart.md` | Alur webhook dan alur auth portal |
-| `rencana-implementasi.md` | Fase, gerbang persetujuan, rencana test |
-| `keputusan.md` | **Kenapa jadi begini** — alternatif yang ditolak, alasan webhook vs REST, peta pengembangan, pertanyaan terbuka |
-| `panduan-konsumen.md` | **Untuk diserahkan ke Website B** — spek event, payload, cara verifikasi signature, contoh kode receiver (PHP/Node/Python) |
+| `README.md` | Ringkasan API itu — arah, event/endpoint, model keamanan |
+| `business-logic.md` | Kontrak lengkap: trigger, payload, aturan bisnis |
+| `database-schema.md` | Tabel & kolom, atau penegasan "tidak ada tabel baru" |
+| `keputusan.md` | **Kenapa jadi begini** — alternatif yang ditolak, riwayat revisi |
+| `rencana-implementasi.md` | Fase, status implementasi, rencana test |
 
-Empat berkas pertama menjelaskan rancangan **seperti apa adanya**. `keputusan.md`
-menjelaskan **kenapa**, dan mencatat apa yang sudah ditolak beserta alasannya. Baca ia
-sebelum mengusulkan perubahan arah — kemungkinan besar usulan itu sudah pernah
-ditimbang.
+`api-webhook-pemasangan/` tambah `flowchart.md` (diagram alur) dan `panduan-konsumen.md` (satu-satunya
+berkas yang **keluar organisasi**, diserahkan ke tim Website B). `api-portal-pelanggan/` juga punya
+`flowchart.md`.
 
-`panduan-konsumen.md` sengaja terpisah dari lima berkas lain karena **ia satu-satunya
-yang keluar organisasi**. Berkas lain memuat jalur kode internal
-(`app/Services/Webhooks/...`, nomor baris controller) dan alasan keputusan yang tidak
-perlu — dan tidak pantas — dibaca mitra luar. Kalau menambah sesuatu ke
-`panduan-konsumen.md`, tanya dulu: pantas dibaca orang luar?
+Baca `keputusan.md` di folder yang relevan **sebelum** mengusulkan perubahan arah —
+kemungkinan besar usulan itu sudah pernah ditimbang dan ditolak dengan alasan
+tercatat.
 
 ## Hubungan dengan `docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §6.6
 
-**Baca §6.6 lebih dulu kalau Anda menyentuh API 2.** Bagian itu (baris 804-1060) sudah
-menetapkan kontrak Portal Pelanggan untuk keempat fitur yang sama, dan sebagiannya
-**dikonfirmasi pemilik produk** — bukan usulan terbuka:
+**Baca §6.6 lebih dulu kalau Anda menyentuh `api-portal-pelanggan/`.** Bagian itu (baris 804-1060)
+sudah menetapkan kontrak Portal Pelanggan, dan sebagiannya **dikonfirmasi pemilik
+produk** — bukan usulan terbuka. `api-portal-pelanggan/business-logic.md` merinci dan melengkapinya,
+tidak menggantikannya. Kalau ada beda, §6.6 yang menang.
 
-- Portal adalah **aplikasi terpisah di domain berbeda**, tanpa kredensial DB
-  operasional (§6.6.1).
-- Login ID = `{prefix_pop}-{customer_code}`, bukan `cid` (§6.6.2).
-- Kredensial portal di tabel sendiri, PIN jadi kunci aktivasi (§6.6.5).
-- Notifikasi pembayaran lewat outbox + webhook, dipicu dari
-  `Invoice::recalculateFromPayments()` (§6.6.6).
-- Pemetaan status tiket ke bahasa pelanggan (§6.6.7).
+## Titik berangkat: fondasi API
 
-Dokumen ini berdiri sebagai modul sendiri karena API 1 (webhook pemasangan) sama
-sekali tidak dibahas di sana, dan karena pondasi API (`routes/api.php`, envelope,
-exception JSON, rate limiter) melayani keduanya. **Tapi ia tidak mengontradiksi
-§6.6.** Di setiap titik yang §6.6 sudah putuskan, dokumen ini mengikuti dan menunjuk
-ke sana. Kalau Anda menemukan perbedaan, §6.6 yang menang dan dokumen ini yang salah.
+Fakta yang berlaku lintas folder — baca sebelum menyentuh berkas mana pun:
 
-## Titik berangkat: sistem ini belum punya API
-
-Fakta yang harus dipahami sebelum membaca sisanya:
-
-- `routes/api.php` **tidak ada**. `bootstrap/app.php:9-14` cuma mendaftarkan `web`,
-  `commands`, `channels`, dan `health`.
-- Tidak ada Sanctum maupun Passport (`composer.json:8-17`).
-- `config/auth.php:40-45` cuma punya guard `web` → provider `users` → `App\Models\User`.
+- `routes/api.php` **tidak ada**. `bootstrap/app.php` cuma mendaftarkan `web`,
+  `commands`, `channels`, dan `health`. `api-webhook-pemasangan/` tidak butuh ini (murni outbound,
+  tidak ada endpoint masuk) — tapi `api-portal-pelanggan/` dan `api-pop-distribusi/` **butuh**, dan keduanya
+  belum dibangun.
+- Tidak ada Sanctum maupun Passport (`composer.json`).
+- `config/auth.php` cuma punya guard `web` → provider `users` → `App\Models\User`.
 - `App\Http\Resources` **tidak ada**. Tidak ada satu pun API Resource di repo.
 - Tidak ada rate limiter — `RateLimiter::for` nol hasil di seluruh `app/`.
 - Tidak ada `config/cors.php`.
-- `withExceptions()` di `bootstrap/app.php:20-22` **kosong**.
+- `withExceptions()` di `bootstrap/app.php` **kosong** — error di bawah `/api/*`
+  masih balik sebagai halaman HTML, bukan JSON.
 
-Route ber-prefix `/api/` yang sudah ada di `routes/web.php` (mis. `:580` pipeline FOP,
-`:670-673` lookup tiket, `:700-703` detail tiket JSON) adalah **AJAX internal beraut
-session** untuk Blade + Alpine. Bentuk responsnya ad-hoc, tanpa versi, tanpa envelope.
-Bukan pondasi yang bisa dipakai ulang untuk konsumen luar, dan rancangan ini tidak
-menyentuhnya.
+Route ber-prefix `/api/` yang sudah ada di `routes/web.php` (mis. pipeline FOP,
+lookup tiket) adalah **AJAX internal berauth session** untuk Blade + Alpine. Bentuk
+responsnya ad-hoc, tanpa versi, tanpa envelope. Bukan pondasi yang bisa dipakai ulang
+untuk konsumen luar.
 
-## Dua API, dua model keamanan
+## Tiga API, tiga model keamanan
 
-| | API 1 — Webhook Pemasangan | API 2 — Portal Pelanggan |
-|---|---|---|
-| Prefix | — (keluar) | `/api/customer-portal/*` |
-| Arah | **Keluar** (Whusnet mendorong) | **Masuk** (portal menarik) |
-| Event | `installation.activated` — satu, tidak ada yang lain | — |
-| Lawan bicara | Website B (provisioning) + Telegram Eksternal | Portal, atas nama satu pelanggan |
-| Auth | HMAC-SHA256 per-request; Telegram: bot token | Client secret portal **+** bearer token pelanggan |
-| Identitas | Tujuan tetap, hardcode di `config/webhooks.php` + `.env` (rev. 8, `keputusan.md`) | `customer_portal_accounts.login_id` |
-| Pembatas data | Tidak ada — konsumen tunggal menerima seluruh cabang | `customer_id` pemilik token |
+| | `api-webhook-pemasangan` — Webhook Pemasangan | `api-portal-pelanggan` — Portal Pelanggan | `api-pop-distribusi` — Topologi & Assignment |
+|---|---|---|---|
+| Prefix | — (keluar) | `/api/customer-portal/*` | `/api/v1/*` |
+| Arah | **Keluar** (Whusnet mendorong) | **Masuk** (portal menarik) | **Masuk** (Website B baca + tulis) |
+| Lawan bicara | Website B + Telegram Eksternal | Portal, atas nama satu pelanggan | Website B |
+| Auth | HMAC-SHA256 per-request; Telegram: bot token | Client secret portal **+** bearer token pelanggan | Token bearer (baca terpisah dari tulis) |
+| Identitas | Tujuan tetap, hardcode `config/webhooks.php` + `.env` | `customer_portal_accounts.login_id` | Token bearer hardcode `.env` |
 
-### Webhook atau REST? Keduanya campuran, titik beratnya berlawanan
+**Aturan lintas-API yang sama, satu kalimat: REST kalau ada yang bertanya, webhook
+kalau ada yang terjadi.** `api-webhook-pemasangan` berat ke webhook (kejadian: tombol Aktivasi
+ditekan). `api-portal-pelanggan` berat ke REST (pelanggan yang bertanya, kapan saja). `api-pop-distribusi`
+campuran: baca topologi = REST (Website B bertanya "apa saja pilihannya"), konfirmasi
+assignment = juga REST tapi dipicu keputusan Website B sendiri, bukan kejadian di
+Whusnet.
 
-| | API 1 — Pemasangan | API 2 — Portal Pelanggan |
-|---|---|---|
-| **Utama** | **Webhook** — `installation.activated` | **REST** — 13 endpoint `/api/customer-portal/*` |
-| **Pelengkap** | REST: 1 endpoint baca untuk rekonsiliasi | Webhook: 1 event `invoice.updated` |
-| Yang memulai | Whusnet | Portal (atas nama pelanggan) |
-| Pemicu | kejadian di lapangan | orang membuka halaman |
+Model keamanan berbeda ini disengaja. Untuk integrasi mesin-ke-mesin murni satu arah
+(`api-webhook-pemasangan`), signature per-request tidak menaruh rahasia statis di dalam permintaan.
+Portal (`api-portal-pelanggan`) butuh dua lapis karena mewakili satu pelanggan spesifik. `api-pop-distribusi`
+butuh dua kredensial terpisah (baca vs tulis) karena efeknya beda kelas risiko — baca
+topologi cuma expose struktur internal, tulis assignment mengubah CID pelanggan.
 
-**Aturannya satu kalimat: REST kalau ada yang bertanya, webhook kalau ada yang
-terjadi.**
+## Prinsip lintas-API (berlaku untuk ketiganya)
 
-**API 1 berat ke webhook** karena tidak ada yang bertanya. Mesin provisioning tidak
-tahu kapan teknisi menekan Aktivasi — kita yang harus memberi tahu. Satu event bisa
-punya beberapa tujuan sekaligus; Website B dan Telegram Eksternal adalah dua pelanggan
-dari event yang sama, dengan retry masing-masing. REST-nya cuma jaring pengaman: satu
-endpoint baca untuk konsumen yang mati lebih lama dari 8 kali retry, atau mitra baru
-yang butuh backfill. Bentuknya dirancang di `keputusan.md` §3, belum masuk fase.
-
-**API 2 berat ke REST** karena pelanggan yang membuka halaman — merekalah yang
-bertanya, dan mereka bertanya kapan saja. Webhook-nya cuma satu, dan itu bukan hiasan:
-portal adalah aplikasi terpisah tanpa akses DB kita, jadi tanpa `invoice.updated` ia
-tidak akan pernah tahu pembayaran sudah masuk sampai ada yang me-refresh.
-
-**Satu hal yang menghubungkan keduanya:** dua webhook itu memakai mesin yang sama —
-`webhook_outbox`, retry dan backoff identik, cuma beda keluarga event dan tujuan.
-Bukan dua sistem webhook; satu sistem yang melayani dua modul. Itu sebabnya di
-`database-schema.md` keduanya ditaruh di satu tabel.
-
-Alasan lengkap pemilihan ini — termasuk hitungan biaya polling dan empat kelemahan
-webhook yang diterima sadar — ada di `keputusan.md` §2.
-
-**Telegram Internal ≠ Telegram Eksternal.** Enam pemanggilan `TelegramBotService`
-inline yang sudah ada melayani tim sendiri dan **tidak disentuh**. Yang berpasangan
-dengan webhook adalah kanal eksternal terpisah, dengan bot dan chat sendiri.
-
-Model keamanan yang berbeda ini disengaja. Untuk integrasi mesin-ke-mesin, token
-bearer berumur panjang adalah satu rahasia statis yang, kalau bocor dari log atau
-proxy, langsung memberi akses penuh; signature per-request tidak menaruh rahasia di
-dalam permintaan sama sekali.
-
-Portal justru butuh **dua lapis** (§6.6.2): client secret membuktikan "ini portal
-resmi" dan berfungsi sebagai tuas darurat — cabut secret, seluruh portal mati
-seketika tanpa menyentuh akun pelanggan mana pun; token pelanggan membuktikan "ini
-pelanggan X". Portal tidak pernah memegang kunci yang bisa membaca semua pelanggan.
-
-## Prinsip lintas-API
-
-**1. Versioning.** API 1 dan pondasi memakai `/api/v1/`. API 2 memakai
+**1. Versioning.** `api-webhook-pemasangan` dan `api-pop-distribusi` memakai `/api/v1/`. `api-portal-pelanggan` memakai
 `/api/customer-portal/*` sesuai §6.6.4 — prefix itu sudah jadi kontrak yang dipegang
-tim portal, jadi jangan diseragamkan jadi `/api/v1/portal` hanya demi kerapian.
-Sekali sebuah path dipublikasikan, ia tidak berubah bentuk tanpa naik versi.
+tim portal, jangan diseragamkan demi kerapian. Sekali sebuah path dipublikasikan, ia
+tidak berubah bentuk tanpa naik versi.
 
 **2. Satu envelope, bukan tiga.** Sukses `{"data": ..., "meta": {...}}` lewat
 `JsonResource`. Galat `{"message": "...", "errors": {...}}` — bentuk bawaan Laravel.
-Karena `App\Http\Resources` masih kosong, pola ini dibangun dari nol di sini; jangan
-menyalin gaya ad-hoc dari controller web yang ada.
+Karena `App\Http\Resources` masih kosong, pola ini dibangun dari nol; jangan menyalin
+gaya ad-hoc dari controller web yang ada.
 
-**3. Exception harus dirender JSON.** `withExceptions()` masih kosong, jadi hari ini
-`ValidationException`, `AuthenticationException`, dan 404 semuanya balik sebagai
-halaman HTML.
+**3. Exception harus dirender JSON.** `withExceptions()` masih kosong — perlu diisi
+sebelum `api-portal-pelanggan`/`api-pop-distribusi` mulai dikerjakan.
 
 **4. Semua nominal adalah string desimal, bukan angka JSON.** `"150000.00"`, bukan
-`150000`. Ini bukan selera: repo punya `Money` dan `Invoice::recalculateFromPayments()`
-justru karena galat pembulatan pernah mengubah **cabang** lunas/sebagian, bukan cuma
-tampilan (§6.6.4). Float di JSON menghidupkan ulang kelas bug itu di seberang, di
-aplikasi yang tidak punya test kita.
+`150000`. Galat pembulatan pernah mengubah **cabang** lunas/sebagian di sistem ini,
+bukan cuma tampilan. Berlaku di semua API, termasuk `paket.harga_bulanan` di payload
+`api-webhook-pemasangan`.
 
-Berlaku untuk kedua API — termasuk `paket.harga_bulanan` di payload webhook, yang
-kalau kelak dipakai menghitung tagihan di sistem lain punya risiko yang sama.
+**5. Rate limit wajib, endpoint kredensial punya limiter sendiri.** Detail angka ada
+di `api-portal-pelanggan/business-logic.md` (satu-satunya yang sudah punya kredensial pelanggan
+sekarang).
 
-**5. Rate limit wajib, dan endpoint kredensial punya limiter sendiri.**
-
-| Limiter | Batas | Kunci |
-|---|---|---|
-| `customer-portal-auth` | 5 / 15 menit | (IP + `login_id`) |
-| `customer-portal-auth-ip` | 20 / 15 menit | IP saja |
-| `customer-portal-api` | 120 / menit | token + IP |
-| pengiriman webhook | backoff antrean | per endpoint |
-
-Dua limiter untuk kredensial, bukan satu. Kunci per-`login_id` saja **tidak menutup
-penyapuan**: satu percobaan untuk masing-masing dari 1.900 login ID memberi ember baru
-tiap kali, jadi seluruh daftar pelanggan satu cabang bisa disisir dari satu IP tanpa
-pernah menyentuh batas. Limiter per-IP-saja yang menghentikannya.
-
-Limiter API (120/menit) **tidak boleh** dipakai untuk `login`, `claim`, atau
-`me/password` — 120 percobaan kredensial per menit adalah brute force yang diizinkan.
-
-Rate limiter tinggal di cache, dan cache bisa di-flush. Karena itu hitungan kegagalan
-**juga** disimpan di DB (`customer_portal_accounts.failed_attempts` / `locked_until`),
-mengikuti alasan yang sama seperti lockout PIN di §6.5.4.
-
-**6. CORS.** Portal ada di domain berbeda, jadi tanpa `config/cors.php` semua
-panggilan dari browser diblokir. Whitelist origin portal **spesifik**, hanya untuk
-grup route `/api/customer-portal/*`. Bukan wildcard, dan tidak berlaku ke seluruh app
-— endpoint staf tetap same-origin.
+**6. CORS.** Cuma relevan buat `api-portal-pelanggan` (portal di domain berbeda, diakses browser).
+`api-webhook-pemasangan` dan `api-pop-distribusi` server-to-server, tidak lewat browser, tidak butuh CORS.
 
 **7. Urutan route statis dulu.** Aturan yang sudah ditandai eksplisit di
-`routes/web.php` berlaku sama di `routes/api.php`. `/me/payments/{payment_number}/receipt`
-didaftarkan sebelum `/me/payments/{payment_number}`.
+`routes/web.php` berlaku sama di `routes/api.php` begitu dibuat.
 
-**8. Middleware `permission` tidak berlaku di portal.**
-`app/Http/Middleware/CheckPermission.php:16-40` memanggil `auth()->check()` dan
-`auth()->user()` tanpa parameter guard, jadi terikat ke guard default. Dipakai di
-jalur portal, ia akan menanyakan permission pegawai kepada pelanggan. Portal punya
-penjaganya sendiri: kepemilikan baris.
+## Larangan keras lintas-API
 
-## Larangan keras
-
-1. **Jangan pernah menerima `customer_id` dari request di jalur portal.** Pemilik data
-   ditentukan oleh token, titik. Satu parameter yang lolos berarti pelanggan mana pun
-   bisa membaca tagihan pelanggan lain.
+1. **Jangan pernah menerima `customer_id` dari request di jalur portal (`api-portal-pelanggan`).**
+   Pemilik data ditentukan oleh token, titik.
 2. **Jangan campur POP scope dengan kepemilikan portal.**
-   `EffectiveAccessService::getAllowedPopIds()` mengembalikan array kosong untuk
-   ALL_POP — makna yang aman untuk pegawai, bencana kalau ditafsirkan sebagai "tanpa
-   filter" di portal. Jalur portal tidak memanggilnya sama sekali.
-3. **Dokumen milik orang lain dijawab 404, bukan 403.** 403 mengonfirmasi bahwa nomor
-   itu ada.
-4. **Jangan menaruh kredensial pelanggan di tabel `customers`.** Alasannya bukan
-   kerapian — lihat `database-schema.md` bagian audit log.
-5. **Jangan mencampur token pelanggan dengan token staf di satu tabel.**
-6. **Payload webhook pemasangan memuat PII pelanggan.** URL tujuan wajib HTTPS,
-   hardcode lewat `.env` (bukan form Owner sejak rev. 8, `keputusan.md`), log-nya
-   punya kebijakan purge. Payload webhook **portal** justru tidak boleh memuat PII
-   sama sekali (§6.6.6).
-7. **Jangan bocorkan catatan internal.** `tickets.catatan_teknis`,
-   `payments.reject_reason`, `payments.note`, dan nama pegawai tidak keluar ke
-   pelanggan. Daftar putih, bukan daftar hitam.
+   `EffectiveAccessService::getAllowedPopIds()` tidak dipanggil di jalur portal sama
+   sekali.
+3. **Dokumen/data milik pihak lain dijawab 404, bukan 403** — di seluruh API yang
+   punya konsep kepemilikan (`api-portal-pelanggan`, `api-pop-distribusi`).
+4. **Jangan menaruh kredensial pelanggan di tabel `customers`** (`api-portal-pelanggan`).
+5. **Jangan mencampur token pelanggan dengan token staf di satu tabel** (`api-portal-pelanggan`).
+6. **Payload webhook pemasangan (`api-webhook-pemasangan`) memuat PII pelanggan** — URL tujuan wajib
+   HTTPS, log-nya punya kebijakan purge. Payload webhook **portal** (`api-portal-pelanggan`) justru
+   tidak boleh memuat PII sama sekali.
+7. **Jangan bocorkan catatan internal** ke pihak luar mana pun — `catatan_teknis`,
+   `reject_reason`, `note`, nama pegawai. Daftar putih, bukan daftar hitam.
+8. **`api-pop-distribusi` menulis data sensitif (CID pelanggan)** — validasi Mini POP/Distribusi
+   harus reuse logic yang sudah ada di `CustomerNetworkAssignmentController`, jangan
+   menulis ulang aturan validasi yang berbeda.
