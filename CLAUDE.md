@@ -46,6 +46,21 @@ php artisan reverb:start
 php artisan horizon
 ```
 
+**Habis `composer require` paket baru, container `app` gak otomatis lihat package-nya.**
+`docker-compose.yml` mount `cache_data:/var/www/bootstrap/cache` — named volume
+TERPISAH yang menutupi `bootstrap/cache/` bind-mount host di path yang sama.
+`composer install`/`package:discover` yang jalan di HOST cuma nulis ke
+`bootstrap/cache/packages.php`/`services.php` versi HOST; isi volume `cache_data`
+di container tetap versi lama (beku dari sebelum package ditambah) — restart
+container & `package:discover` biasa di dalam container **tidak selalu** cukup
+menimpanya. Kalau abis `composer require` masih dapet
+`There are no commands defined in the "..." namespace` atau provider baru gak
+kepasang:
+```bash
+docker compose exec app rm -f bootstrap/cache/packages.php bootstrap/cache/services.php bootstrap/cache/config.php
+docker compose exec app php artisan package:discover --ansi
+```
+
 ## Arsitektur
 
 ### Pembagian layer

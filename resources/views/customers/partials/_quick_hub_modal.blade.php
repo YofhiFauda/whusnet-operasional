@@ -279,10 +279,6 @@
                             <span id="hub-tech-pppoe" class="font-mono font-bold text-slate-900 dark:text-white">-</span>
                         </div>
                         <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
-                            <span class="text-slate-400 text-[10px] block">IP Address</span>
-                            <span id="hub-tech-ip" class="font-mono font-bold text-sky-600 dark:text-sky-400">-</span>
-                        </div>
-                        <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 text-[10px] block">VLAN ID</span>
                             <span id="hub-tech-vlan" class="font-mono font-semibold text-slate-800 dark:text-slate-200">-</span>
                         </div>

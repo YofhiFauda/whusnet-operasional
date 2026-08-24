@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'test_upload',
     'test_download',
     'ssid',
-    'ip_address',
     'antenna_mac',
     'router_mac',
     'router_or_ont_serial',

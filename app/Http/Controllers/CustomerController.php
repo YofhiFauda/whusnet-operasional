@@ -567,7 +567,6 @@ class CustomerController extends Controller
 
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
-            'ip_address' => 'nullable|string|max:45',
             'odp_code' => 'nullable|string|max:50',
             'olt_code' => 'nullable|string|max:50',
             'vlan_id' => 'nullable|string|max:20',
@@ -1184,7 +1183,6 @@ class CustomerController extends Controller
             'due_date' => $latestInvoice && $latestInvoice->due_date ? $latestInvoice->due_date->format('d/m/Y') : null,
             'technical' => [
                 'pppoe_username' => $service?->pppoe_username ?? '-',
-                'ip_address' => $service?->ip_address ?? '-',
                 'onu_sn' => $device?->onu_sn ?? $device?->mac_address ?? '-',
                 'router_sn' => $device?->router_sn ?? '-',
                 'device_brand' => $device?->device_brand ?? '-',
@@ -1262,8 +1260,8 @@ class CustomerController extends Controller
                 'data' => [['RQ000001', 'PE000001', 'PK000001', 'IN000001', 'ACTIVE', 'Berhasil', 'ACTIVE', '2025-05-06', '', '', '', '', '', 'KABEL', '0', '', 'PPP-20M', 'bulanan', '10:00:00', 'Admin', '2025-05-05', '09:00:00', '09:30:00', 'Teknisi A', '2025-05-05 09:00:00', 'RQ000001', 'Tangga, Fiber', 'survey_rumah.jpg', 'Ada ODP dekat', '30', '2025-05-06', '10:00:00', '11:00:00', 'Teknisi B', 'pasang.jpg', 'Selesai pasang', '2025-05-06 10:00:00', 'RQ000001', '0', '']],
             ],
             'technical_details' => [
-                'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'ip_address', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo', 'passive_device', 'branch_number', 'pop_number', 'router_number', 'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'],
-                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '192.168.1.10', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '', 'FAT-01', 'CB001', 'WL0001', 'RTR-001', '-18.5', '-19.2', '2025-05-06', '11:00:00', '2.5', '12.0', '0.00', '95.0', '5']],
+                'headers' => ['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'test_upload', 'test_download', 'ssid', 'antenna_mac', 'router_mac', 'router_or_ont_serial', 'odp_number', 'odp_port', 'olt_port', 'wireless_signal', 'fiber_signal', 'location_source', 'note', 'speedtest_photo', 'form_photo', 'signed_form_photo', 'router_photo', 'cable_photo', 'passive_device', 'branch_number', 'pop_number', 'router_number', 'initial_attenuation', 'actual_attenuation', 'test_date', 'test_time', 'jitter_ms', 'latency_ms', 'packet_loss_percent', 'speed_conformity_percent', 'quality_score'],
+                'data' => [['REP000001', 'PE000001', 'RQ000001', 'FTTH', '20', '20', 'WHUSNET-BUDI', '', 'AA:BB:CC:DD:EE:FF', 'SN123456', 'ODP-SMN-001', '1', '1/1/1', '', '-18', 'Tiang 01', 'Data teknis legacy', '', '', '', '', '', 'FAT-01', 'CB001', 'WL0001', 'RTR-001', '-18.5', '-19.2', '2025-05-06', '11:00:00', '2.5', '12.0', '0.00', '95.0', '5']],
             ],
             'invoices' => [
                 'headers' => ['old_invoice_id', 'old_cost_id', 'old_customer_id', 'old_request_id', 'billing_period', 'issue_date', 'due_date', 'installation_fee', 'monthly_fee', 'other_fee', 'total_amount', 'status', 'prorate_amount', 'extra_cable_fee', 'extra_installation_fee', 'extra_pole_fee'],
@@ -1821,7 +1819,6 @@ class CustomerController extends Controller
                 'old_request_id' => $oldRequestId,
                 'connection_type' => trim((string) ($row['connection_type'] ?? 'FTTH')),
                 'ont_sn' => trim((string) ($row['router_or_ont_serial'] ?? $row['ont_sn'] ?? '')),
-                'ip_address' => trim((string) ($row['ip_address'] ?? '')),
                 'odp_code' => trim((string) ($row['odp_number'] ?? $row['odp_code'] ?? '')),
                 'olt_code' => trim((string) ($row['olt_port'] ?? $row['olt_code'] ?? '')),
                 'vlan_id' => trim((string) ($row['vlan_id'] ?? '')),
@@ -2485,7 +2482,6 @@ class CustomerController extends Controller
                         'test_upload' => $row['test_upload'] ?? null,
                         'test_download' => $row['test_download'] ?? null,
                         'ssid' => $row['ssid'] ?? null,
-                        'ip_address' => $row['ip_address'] ?? null,
                         'antenna_mac' => $row['antenna_mac'] ?? null,
                         'router_mac' => $row['router_mac'] ?? null,
                         'router_or_ont_serial' => $row['ont_sn'] ?? null,
@@ -2520,7 +2516,6 @@ class CustomerController extends Controller
                     $customer = Customer::findOrFail($customerId);
                     $customer->updateQuietly([
                         'ont_sn' => $row['ont_sn'] ?? null,
-                        'ip_address' => $row['ip_address'] ?? null,
                         'odp_code' => $row['odp_code'] ?? null,
                         'olt_code' => $row['olt_code'] ?? null,
                         'vlan_id' => $row['vlan_id'] ?? null,

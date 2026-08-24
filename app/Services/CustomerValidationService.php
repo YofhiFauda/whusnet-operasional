@@ -61,7 +61,6 @@ class CustomerValidationService
         'sales_code' => 'Kode Sales',
         'agent_code' => 'Kode Agent',
         'ont_sn' => 'ONT Serial Number',
-        'ip_address' => 'IP Address',
         'odp_code' => 'Kode ODP',
         'olt_code' => 'Kode OLT',
         'vlan_id' => 'VLAN ID',

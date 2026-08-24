@@ -482,11 +482,6 @@
                                         <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                     </div>
 
-                                    <div class="md:col-span-2">
-                                        <label for="ip_address" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">IP Address (Statik)</label>
-                                        <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $dev->ip_address ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="192.168.x.x">
-                                    </div>
-
                                     <div>
                                         <label for="wifi_ssid" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">SSID WiFi <span class="text-rose-500">*</span></label>
                                         <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="WHUSNET_Pelanggan">
@@ -508,27 +503,27 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
-                                            <label for="odp_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor ODP</label>
-                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $tech5->odp_number ?? $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ODP-01">
+                                            <label for="odp_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor ODP <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="odp_number" id="odp_number" value="{{ old('odp_number', $tech5->odp_number ?? $customer->latestSurvey->nearest_odp ?? '') }}" class="w-full text-xs data-text px-3 py-2 border @error('odp_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ODP-01">
                                         </div>
                                         <div>
-                                            <label for="odp_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port ODP</label>
-                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $tech5->odp_port ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Port 4">
+                                            <label for="odp_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port ODP <span class="text-rose-500">*</span></label>
+                                            <input type="text" name="odp_port" id="odp_port" value="{{ old('odp_port', $tech5->odp_port ?? '') }}" class="w-full text-xs data-text px-3 py-2 border @error('odp_port') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Port 4">
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
                                             <label for="olt_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor OLT</label>
-                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                         <div>
                                             <label for="olt_slot" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Slot OLT</label>
-                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_slot') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                         <div>
                                             <label for="olt_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port OLT</label>
-                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_port') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                     </div>
 
@@ -554,17 +549,20 @@
                                  (bukan di panel step 6 lagi). Tombol ini men-submit form-pemasangan
                                  (seluruh step 5, termasuk field di bawahnya — posisi DOM tombol gak
                                  ngaruh ke submit, attemptActivate() manggil .submit() form langsung).
-                                 Fase 6 (speedtest) TETAP terkunci sampai tombol ini ditekan & lolos
-                                 gerbang server (storePemasangan) — lihat attemptActivate() & goToStep().
-                                 Begitu $pemasanganComplete true, tombol diganti badge status —
-                                 sudah gak relevan ditekan lagi (form ini sekarang cuma edit ulang
-                                 data step 5, aktivasinya sudah kepakai). --}}
+                                 Syarat KLIK tombol ini (aktivasiRequiredFields, lihat JS) cuma
+                                 Informasi Perangkat Aktif + Nomor/Port ODP — Nomor/Slot/Port OLT
+                                 TIDAK wajib (opsional), begitu juga foto & material (ADHOC). Tapi
+                                 Fase 6 baru beneran kebuka kalau foto+material JUGA sudah tersimpan
+                                 ($pemasanganComplete, dihitung dari data tersimpan — lihat
+                                 report()); kalau belum, submit tetap berhasil (progres tersimpan)
+                                 tapi tombol ini TETAP tampil buat ditekan ulang nanti setelah
+                                 foto+material dilengkapi. --}}
                             <div class="pt-3 border-t border-slate-100 dark:border-slate-700/60">
                                 @unless($pemasanganComplete)
                                     <button type="button" onclick="attemptActivate()" class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors text-xs font-semibold cursor-pointer shadow-sm">
                                         <x-ui.icon name="zap" class="w-3 h-3" /> Aktivasi Laporan Speedtest
                                     </button>
-                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Tekan setelah Laporan Pemasangan &amp; Perangkat (step 5) lengkap untuk membuka Fase 6 (Laporan Speedtest).</p>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">Tekan setelah Informasi Perangkat Aktif &amp; Nomor/Port ODP terisi (OLT opsional). Foto &amp; Material Terpakai belum wajib di sini — lengkapi lalu tekan Aktivasi lagi untuk membuka Fase 6 (Laporan Speedtest).</p>
                                 @else
                                     <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
                                         <x-ui.icon name="check" class="w-3 h-3" /> Sudah Diaktivasi — Fase 6 Terbuka
@@ -884,31 +882,29 @@
         document.getElementById('form-pemasangan').submit();
     }
 
+    // Syarat tombol Aktivasi (ADHOC) — Informasi Perangkat Aktif + Nomor/Port
+    // ODP. OLT (Nomor/Slot/Port) SENGAJA opsional — banyak titik gak lewat
+    // OLT bernomor atau datanya belum diketahui saat pemasangan. Foto &
+    // material juga tidak dicek di sini: itu syarat buka Fase 6
+    // (formFields.pemasangan.required dipakai getMissingRequiredFields untuk
+    // indikator "Fase 5 Lengkap" & gerbang goToStep(6) — beda daftar, beda
+    // tujuan), bukan syarat menekan Aktivasi. Server (storePemasangan)
+    // menegakkan daftar yang sama persis kalau ada yang lolos validasi klien.
+    const aktivasiRequiredFields = [
+        'device_type', 'connection_mode', 'serial_number', 'wifi_ssid', 'wifi_password',
+        'odp_number', 'odp_port',
+    ];
+
     // Tombol Aktivasi di panel step 5 (di atas Material Terpakai) manggil ini.
-    // Belum lengkap → Toast + gak submit apa-apa. Server (storePemasangan)
-    // tetap menegakkan gerbang yang sama kalau ada yang lolos validasi klien.
     function attemptActivate() {
-        const missing = getMissingRequiredFields(5);
-        if (! hasAtLeastOneMaterialRow()) {
-            missing.push('Perangkat Pasif / Material Terpakai');
-        }
+        const missing = getMissingFieldsFrom(aktivasiRequiredFields);
         if (missing.length > 0) {
             if (window.Toast) {
-                window.Toast.warning('Laporan Pemasangan Belum Lengkap', 'Wajib diisi dulu: ' + missing.join(', '));
+                window.Toast.warning('Data Aktivasi Belum Lengkap', 'Wajib diisi dulu: ' + missing.join(', '));
             }
             return;
         }
         handlePemasanganSubmit();
-    }
-
-    // storePemasangan() server wajib minimal satu baris material terpakai
-    // (qty > 0). Dicek di sini juga — kalau lolos di browser tapi gagal di
-    // server, redirect-back bikin komponen material-rows Alpine re-init dari
-    // $materialRows ASLI (bukan input user), baris yang barusan diedit teknisi
-    // hilang. Gerbang klien ini nyegah technician sampai ke titik itu.
-    function hasAtLeastOneMaterialRow() {
-        const qtyInputs = document.querySelectorAll('#form-pemasangan [name^="materials"][name$="[qty]"]');
-        return Array.from(qtyInputs).some(el => parseFloat(el.value) > 0);
     }
 
     function handleSpeedtestSubmit() {
@@ -917,10 +913,15 @@
         document.getElementById('form-speedtest').submit();
     }
 
+    // "required" di sini = syarat "Fase 5 Lengkap" (indikator progress bar +
+    // step nav + gerbang goToStep(6)) — SEGALA field wajib server, termasuk
+    // foto & ODP. OLT tetap opsional (lihat aktivasiRequiredFields) — beda
+    // dari aktivasiRequiredFields (syarat tombol Aktivasi doang, subset lebih
+    // kecil) — lihat catatan di attemptActivate().
     const formFields = {
         'pemasangan': {
-            required: ['device_type', 'connection_mode', 'serial_number', 'wifi_ssid', 'wifi_password', 'installation_photo', 'contract_photo', 'signature_photo'],
-            optional: ['brand', 'model', 'mac_address', 'pppoe_username', 'pppoe_password', 'ip_address', 'odp_number', 'odp_port', 'olt_number', 'olt_slot', 'olt_port', 'vlan', 'router_number', 'initial_attenuation', 'installation_note']
+            required: ['device_type', 'connection_mode', 'serial_number', 'wifi_ssid', 'wifi_password', 'odp_number', 'odp_port', 'installation_photo', 'contract_photo', 'signature_photo'],
+            optional: ['brand', 'model', 'mac_address', 'pppoe_username', 'pppoe_password', 'olt_number', 'olt_slot', 'olt_port', 'vlan', 'router_number', 'initial_attenuation', 'installation_note']
         },
         'uji': {
             required: ['test_download', 'test_upload', 'speedtest_photo'],
@@ -1034,14 +1035,13 @@
         }
     }
 
-    // Dipakai runLiveProgressUpdates (indikator nav) DAN attemptActivate
-    // (gerbang klik tombol Aktivasi) — satu sumber kebenaran field wajib
-    // yang "sudah terisi di browser", biar dua tempat itu gak bisa beda jawaban.
-    function getMissingRequiredFields(step) {
-        const config = formFields[stepKeys[step]];
+    // Satu sumber kebenaran "field mana yang masih kosong di browser" —
+    // dipakai getMissingRequiredFields (per step, formFields.required) DAN
+    // attemptActivate (daftar aktivasiRequiredFields yang lebih kecil).
+    function getMissingFieldsFrom(fieldNames) {
         const missing = [];
 
-        config.required.forEach(field => {
+        fieldNames.forEach(field => {
             const el = document.getElementById(field);
             if (! el) {
                 missing.push(getLabelName(field));
@@ -1056,6 +1056,13 @@
         });
 
         return missing;
+    }
+
+    // Dipakai runLiveProgressUpdates (indikator nav "Fase 5 Lengkap") DAN
+    // goToStep (toast kenapa Fase 6 masih terkunci) — bukan attemptActivate,
+    // itu pakai aktivasiRequiredFields sendiri (subset lebih kecil).
+    function getMissingRequiredFields(step) {
+        return getMissingFieldsFrom(formFields[stepKeys[step]].required);
     }
 
     /* Live Stepper Auditor & Progress Calculator */
@@ -1161,6 +1168,11 @@
             serial_number: 'Serial Number',
             wifi_ssid: 'SSID WiFi',
             wifi_password: 'Password WiFi',
+            odp_number: 'Nomor ODP',
+            odp_port: 'Port ODP',
+            olt_number: 'Nomor OLT',
+            olt_slot: 'Slot OLT',
+            olt_port: 'Port OLT',
             installation_photo: 'Foto Pemasangan',
             contract_photo: 'Foto Kontrak',
             signature_photo: 'Foto TTD Pelanggan',

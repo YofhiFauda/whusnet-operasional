@@ -279,12 +279,20 @@
                                 ['path' => $survey->house_photo, 'title' => 'Foto Rumah Pelanggan', 'icon' => 'fa-house-user'],
                             ] as $photo)
                                 <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50 dark:bg-slate-900/40 text-center">
-                                    @if($photo['path'])
+                                    @php $url = foto_publik($photo['path']); @endphp
+                                    @if($url)
                                         <div class="h-32 rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-700">
-                                            <img src="{{ asset('storage/' . $photo['path']) }}" alt="{{ $photo['title'] }}" class="w-full h-32 object-cover">
+                                            <img src="{{ $url }}" alt="{{ $photo['title'] }}" class="w-full h-32 object-cover">
                                         </div>
                                         <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['title'] }}</span>
-                                        <a href="{{ asset('storage/' . $photo['path']) }}" target="_blank" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                        <a href="{{ $url }}" target="_blank" class="text-[10px] text-sky-600 font-bold hover:underline">Lihat Full Resolusi ↗</a>
+                                    @elseif($photo['path'])
+                                        <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
+                                            <i class="fa-solid fa-triangle-exclamation text-3xl mb-1 text-yellow-500"></i>
+                                            <span class="text-[10px] font-mono">FILE TIDAK ADA</span>
+                                        </div>
+                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">{{ $photo['title'] }}</span>
+                                        <span class="text-[10px] text-yellow-600 dark:text-yellow-400 font-semibold">Berkas hilang di penyimpanan</span>
                                     @else
                                         <div class="h-32 bg-slate-200 dark:bg-slate-700 rounded mb-2 flex flex-col items-center justify-center text-slate-500">
                                             <i class="fa-solid {{ $photo['icon'] }} text-3xl mb-1 text-slate-400"></i>

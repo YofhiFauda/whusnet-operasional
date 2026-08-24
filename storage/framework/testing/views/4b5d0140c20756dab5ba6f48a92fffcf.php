@@ -193,22 +193,26 @@
                     Dokumen & Foto
                 </h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <?php if($customer->foto_rumah): ?>
+                    <?php
+                        $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                        $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                    ?>
+                    <?php if($fotoRumahUrl): ?>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_rumah)); ?>" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_rumah)); ?>', 'Foto Rumah')">
+                        <img src="<?php echo e($fotoRumahUrl); ?>" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($fotoRumahUrl); ?>', 'Foto Rumah')">
                     </div>
                     <?php endif; ?>
-                    <?php if($customer->foto_kontrak): ?>
+                    <?php if($fotoKontrakUrl): ?>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Kontrak</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>', 'Foto Kontrak')">
+                        <img src="<?php echo e($fotoKontrakUrl); ?>" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($fotoKontrakUrl); ?>', 'Foto Kontrak')">
                     </div>
                     <?php endif; ?>
-                    <?php if(!$customer->foto_rumah && !$customer->foto_kontrak): ?>
+                    <?php if(!$fotoRumahUrl && !$fotoKontrakUrl): ?>
                     <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
                         <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi.</p>
+                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi, atau berkas tidak tersedia di penyimpanan.</p>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -334,24 +338,30 @@
                 'rows' => $surveyWorkTools,
             ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
+            <?php
+                $surveyPhotoUrl = foto_publik($survey->survey_photo);
+                $surveyHousePhotoUrl = foto_publik($survey->house_photo);
+            ?>
+            <?php if($surveyPhotoUrl || $surveyHousePhotoUrl): ?>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <?php if($survey->survey_photo): ?>
+                <?php if($surveyPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Lokasi / Survey</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="<?php echo e(asset('storage/' . $survey->survey_photo)); ?>" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $survey->survey_photo)); ?>', 'Foto Survey')">
+                        <img src="<?php echo e($surveyPhotoUrl); ?>" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($surveyPhotoUrl); ?>', 'Foto Survey')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($survey->house_photo): ?>
+                <?php if($surveyHousePhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Rumah</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="<?php echo e(asset('storage/' . $survey->house_photo)); ?>" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $survey->house_photo)); ?>', 'Foto Rumah')">
+                        <img src="<?php echo e($surveyHousePhotoUrl); ?>" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($surveyHousePhotoUrl); ?>', 'Foto Rumah')">
                     </div>
                 </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <?php if($isWaitingAccStage): ?>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>
@@ -474,7 +484,6 @@
                                 ['label' => 'Password PPPoE', 'value' => $device->pppoe_password ?? '-', 'mono' => true],
                                 ['label' => 'SSID WiFi', 'value' => $device->wifi_ssid ?? ($techDetail->ssid ?? '-')],
                                 ['label' => 'Password WiFi', 'value' => $device->wifi_password ?? '-'],
-                                ['label' => 'IP Address', 'value' => $device->ip_address ?? '-', 'mono' => true],
                             ];
                         ?>
                         <?php $__currentLoopData = $deviceFields; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $field): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -574,41 +583,48 @@
 
             
             <?php if($installation): ?>
+            <?php
+                $installationPhotoUrl = foto_publik($installation->installation_photo);
+                $contractPhotoUrl = foto_publik($installation->contract_photo);
+                $signaturePhotoUrl = foto_publik($installation->signature_photo);
+            ?>
+            <?php if($installationPhotoUrl || $contractPhotoUrl || $signaturePhotoUrl): ?>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <?php if($installation->installation_photo): ?>
+                <?php if($installationPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Pemasangan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->installation_photo)); ?>" 
+                        <img src="<?php echo e($installationPhotoUrl); ?>" 
                              alt="Foto Pemasangan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->installation_photo)); ?>', 'Foto Pemasangan')">
+                             onclick="openPhotoLightbox('<?php echo e($installationPhotoUrl); ?>', 'Foto Pemasangan')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($installation->contract_photo): ?>
+                <?php if($contractPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Kontrak</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->contract_photo)); ?>" 
+                        <img src="<?php echo e($contractPhotoUrl); ?>" 
                              alt="Foto Kontrak" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->contract_photo)); ?>', 'Foto Kontrak')">
+                             onclick="openPhotoLightbox('<?php echo e($contractPhotoUrl); ?>', 'Foto Kontrak')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($installation->signature_photo): ?>
+                <?php if($signaturePhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto TTD Pelanggan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->signature_photo)); ?>" 
+                        <img src="<?php echo e($signaturePhotoUrl); ?>" 
                              alt="Foto TTD Pelanggan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->signature_photo)); ?>', 'Foto TTD Pelanggan')">
+                             onclick="openPhotoLightbox('<?php echo e($signaturePhotoUrl); ?>', 'Foto TTD Pelanggan')">
                     </div>
                 </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -707,14 +723,14 @@
             </div>
 
             
-            <?php if($techDetail->speedtest_photo): ?>
+            <?php if($speedtestPhotoUrl = foto_publik($techDetail->speedtest_photo)): ?>
             <div>
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Hasil Speedtest</h4>
                 <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 inline-block">
-                    <img src="<?php echo e(asset('storage/' . $techDetail->speedtest_photo)); ?>"
+                    <img src="<?php echo e($speedtestPhotoUrl); ?>"
                          alt="Foto Speedtest"
                          class="max-h-64 max-w-full rounded-lg object-contain border border-border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                         onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $techDetail->speedtest_photo)); ?>', 'Foto Speedtest')">
+                         onclick="openPhotoLightbox('<?php echo e($speedtestPhotoUrl); ?>', 'Foto Speedtest')">
                 </div>
             </div>
             <?php endif; ?>

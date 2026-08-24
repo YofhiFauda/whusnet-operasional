@@ -209,7 +209,6 @@
             completenessPct: button.getAttribute('data-completeness-pct') || '0',
             completenessStatus: button.getAttribute('data-completeness-status') || 'Draft',
             pppoe: button.getAttribute('data-pppoe') || '-',
-            ip: button.getAttribute('data-ip') || '-',
             vlan: button.getAttribute('data-vlan') || '-',
             onu: button.getAttribute('data-onu') || '-',
             onuBrand: button.getAttribute('data-onu-brand') || '-',
@@ -293,7 +292,6 @@
         setElemText('hub-fin-due-date', selectedCustomerData.dueDate);
 
         setElemText('hub-tech-pppoe', selectedCustomerData.pppoe);
-        setElemText('hub-tech-ip', selectedCustomerData.ip);
         setElemText('hub-tech-vlan', selectedCustomerData.vlan);
         setElemText('hub-tech-bandwidth', selectedCustomerData.bandwidth);
         setElemText('hub-tech-onu', selectedCustomerData.onu);
@@ -408,7 +406,6 @@
 
                 if (data.technical) {
                     setElemText('hub-tech-pppoe', data.technical.pppoe_username || selectedCustomerData.pppoe);
-                    setElemText('hub-tech-ip', data.technical.ip_address || selectedCustomerData.ip);
                     setElemText('hub-tech-onu', data.technical.onu_sn || selectedCustomerData.onu);
                     setElemText('hub-tech-router', data.technical.router_sn || selectedCustomerData.router);
                     setElemText('hub-tech-distribution', data.technical.distribution || selectedCustomerData.distribution);
@@ -553,7 +550,6 @@
 Nama: ${selectedCustomerData.name} (${selectedCustomerData.code})
 POP: ${selectedCustomerData.pop}
 PPPoE: ${selectedCustomerData.pppoe}
-IP: ${selectedCustomerData.ip}
 ONU SN: ${selectedCustomerData.onu}
 Router SN: ${selectedCustomerData.router}
 ODP/Distribusi: ${selectedCustomerData.distribution}`;

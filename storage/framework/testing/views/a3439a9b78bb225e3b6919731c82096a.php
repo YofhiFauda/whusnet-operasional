@@ -1316,7 +1316,15 @@
 
                 popIds.forEach(popId => {
                     window.Echo.private('fop-tasks.' + popId)
-                        .listen('.FopTaskUpdated', (e) => this.refreshFopTaskRow(e.fop_task_id));
+                        .listen('.FopTaskUpdated', (e) => this.refreshFopTaskRow(e.fop_task_id))
+                        // Teknisi mulai/selesai task dari halamannya sendiri (bukan dari
+                        // papan ini) — TaskStarted/TaskCompleted (App\Events) sekarang ikut
+                        // disiarkan ke channel papan ini juga (lihat komentar
+                        // TaskStarted::broadcastOn()), biar papan gak perlu di-refresh
+                        // manual buat lihat status terbaru. `fop_task_id` bisa null kalau
+                        // task itu gak punya FopTask terhubung — abaikan diam-diam.
+                        .listen('TaskStarted', (e) => { if (e.fop_task_id) this.refreshFopTaskRow(e.fop_task_id); })
+                        .listen('TaskCompleted', (e) => { if (e.fop_task_id) this.refreshFopTaskRow(e.fop_task_id); });
                 });
             }
         };

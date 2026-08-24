@@ -243,7 +243,10 @@
                         <!-- Foto Rumah -->
                         <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
                             <input type="hidden" name="delete_foto_rumah" id="delete_foto_rumah" value="0">
-                            <div id="default-placeholder-foto_rumah" class="text-center py-4 @if($customer->foto_rumah) hidden @endif">
+                            @php
+                                $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                            @endphp
+                            <div id="default-placeholder-foto_rumah" class="text-center py-4 @if($fotoRumahUrl) hidden @endif">
                                 <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                                 </svg>
@@ -252,9 +255,9 @@
                             </div>
 
                             <!-- Preview Container -->
-                            <div id="preview-container-foto_rumah" class="@if(!$customer->foto_rumah) hidden @endif text-center py-2 flex flex-col items-center justify-center">
+                            <div id="preview-container-foto_rumah" class="@if(!$fotoRumahUrl) hidden @endif text-center py-2 flex flex-col items-center justify-center">
                                 <div class="relative inline-block">
-                                    <img id="preview-img-foto_rumah" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="{{ $customer->foto_rumah ? asset('storage/' . $customer->foto_rumah) : '' }}" alt="Preview Foto Rumah">
+                                    <img id="preview-img-foto_rumah" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="{{ $fotoRumahUrl ?? '' }}" alt="Preview Foto Rumah">
                                     <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -271,7 +274,11 @@
                                 </label>
                                 <span id="file-label-foto_rumah" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
                                     @if($customer->foto_rumah)
-                                        {{ basename($customer->foto_rumah) }}
+                                        @if($fotoRumahUrl)
+                                            {{ basename($customer->foto_rumah) }}
+                                        @else
+                                            [Berkas Tidak Ditemukan] {{ basename($customer->foto_rumah) }}
+                                        @endif
                                     @else
                                         Belum ada file dipilih
                                     @endif
@@ -282,7 +289,11 @@
                         <!-- Foto Kontrak -->
                         <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
                             <input type="hidden" name="delete_foto_kontrak" id="delete_foto_kontrak" value="0">
-                            <div id="default-placeholder-foto_kontrak" class="text-center py-4 @if($customer->foto_kontrak) hidden @endif">
+                            @php
+                                $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                                $isPdf = $customer->foto_kontrak && Str::endsWith(strtolower($customer->foto_kontrak), '.pdf');
+                            @endphp
+                            <div id="default-placeholder-foto_kontrak" class="text-center py-4 @if($fotoKontrakUrl) hidden @endif">
                                 <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
@@ -291,12 +302,12 @@
                             </div>
 
                             <!-- Preview Container -->
-                            <div id="preview-container-foto_kontrak" class="@if(!$customer->foto_kontrak) hidden @endif text-center py-2 flex flex-col items-center justify-center">
+                            <div id="preview-container-foto_kontrak" class="@if(!$fotoKontrakUrl) hidden @endif text-center py-2 flex flex-col items-center justify-center">
                                 <div class="relative inline-block">
-                                    <img id="preview-img-foto_kontrak" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm @if($customer->foto_kontrak && Str::endsWith(strtolower($customer->foto_kontrak), '.pdf')) hidden @endif" src="{{ $customer->foto_kontrak && !Str::endsWith(strtolower($customer->foto_kontrak), '.pdf') ? asset('storage/' . $customer->foto_kontrak) : '' }}" alt="Preview Foto Kontrak">
+                                    <img id="preview-img-foto_kontrak" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm @if($isPdf) hidden @endif" src="{{ !$isPdf ? $fotoKontrakUrl : '' }}" alt="Preview Foto Kontrak">
                                     
                                     <!-- PDF Icon Preview -->
-                                    <div id="preview-pdf-foto_kontrak" class="h-28 w-28 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center justify-center text-red-500 shadow-sm @if(!$customer->foto_kontrak || !Str::endsWith(strtolower($customer->foto_kontrak), '.pdf')) hidden @endif">
+                                    <div id="preview-pdf-foto_kontrak" class="h-28 w-28 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center justify-center text-red-500 shadow-sm @if(!$isPdf) hidden @endif">
                                         <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
@@ -319,7 +330,11 @@
                                 </label>
                                 <span id="file-label-foto_kontrak" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
                                     @if($customer->foto_kontrak)
-                                        {{ basename($customer->foto_kontrak) }}
+                                        @if($fotoKontrakUrl)
+                                            {{ basename($customer->foto_kontrak) }}
+                                        @else
+                                            [Berkas Tidak Ditemukan] {{ basename($customer->foto_kontrak) }}
+                                        @endif
                                     @else
                                         Belum ada file dipilih
                                     @endif
@@ -451,11 +466,6 @@
                         </div>
 
                         <div>
-                            <label for="ip_address" class="block mb-2 uppercase tracking-wide">IP ADDRESS DIAL-UP</label>
-                            <input type="text" name="ip_address" id="ip_address" value="{{ old('ip_address', $customer->ip_address) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10.200.45.10">
-                        </div>
-
-                        <div>
                             <label for="odp_code" class="block mb-2 uppercase tracking-wide">KODE / KOTAK ODP</label>
                             <input type="text" name="odp_code" id="odp_code" value="{{ old('odp_code', $customer->odp_code) }}" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: ODP-PON-024">
                         </div>
@@ -530,7 +540,7 @@
         },
         'operasional': {
             required: ['status'],
-            optional: ['ont_sn', 'ip_address', 'odp_code', 'olt_code', 'vlan_id']
+            optional: ['ont_sn', 'odp_code', 'olt_code', 'vlan_id']
         }
     };
 
@@ -904,7 +914,6 @@
             referral_customer_code: 'Ref Pelanggan',
             status: 'Status Awal',
             ont_sn: 'ONT SN',
-            ip_address: 'IP Dialup',
             odp_code: 'Kode ODP',
             olt_code: 'Kode OLT',
             vlan_id: 'VLAN ID'

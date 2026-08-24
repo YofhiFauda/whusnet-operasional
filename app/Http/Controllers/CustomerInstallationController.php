@@ -281,7 +281,6 @@ class CustomerInstallationController extends Controller
             'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
             'pppoe_username' => 'nullable|string|max:150',
             'pppoe_password' => 'nullable|string|max:150',
-            'ip_address' => 'nullable|string|max:50',
             'router_number' => 'nullable|string|max:50',
             'odp_number' => 'nullable|string|max:100',
             'odp_port' => 'nullable|string|max:50',
@@ -501,7 +500,6 @@ class CustomerInstallationController extends Controller
                     'connection_mode' => $validated['connection_mode'] ?? null,
                     'pppoe_username' => $validated['pppoe_username'] ?? null,
                     'pppoe_password' => $validated['pppoe_password'] ?? null,
-                    'ip_address' => $validated['ip_address'] ?? null,
                 ]
             );
 
@@ -591,20 +589,26 @@ class CustomerInstallationController extends Controller
         );
 
         $validated = $request->validate([
+            // Informasi Perangkat Aktif + Nomor/Port ODP — SATU-SATUNYA syarat
+            // wajib buat tombol Aktivasi (ADHOC). Nomor/Slot/Port OLT sengaja
+            // TETAP nullable — banyak titik gak lewat OLT bernomor. Foto &
+            // material juga sengaja TETAP nullable di sini: itu syarat buka
+            // Fase 6 (lihat gerbang $pemasanganComplete di report() &
+            // abort_unless di storeSpeedtest()), bukan syarat menyimpan Fase 5
+            // / menekan Aktivasi.
             'device_type' => 'required|string|in:modem,ont,onu,router,other',
             'brand' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
-            'serial_number' => 'nullable|string|max:100',
+            'serial_number' => 'required|string|max:100',
             'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
-            'wifi_ssid' => 'nullable|string|max:150',
-            'wifi_password' => 'nullable|string|max:150',
-            'connection_mode' => 'nullable|string|in:bridge,router,pppoe,static,dhcp,other',
+            'wifi_ssid' => 'required|string|max:150',
+            'wifi_password' => 'required|string|max:150',
+            'connection_mode' => 'required|string|in:bridge,router,pppoe,static,dhcp,other',
             'pppoe_username' => 'nullable|string|max:150',
             'pppoe_password' => 'nullable|string|max:150',
-            'ip_address' => 'nullable|string|max:50',
             'router_number' => 'nullable|string|max:50',
-            'odp_number' => 'nullable|string|max:100',
-            'odp_port' => 'nullable|string|max:50',
+            'odp_number' => 'required|string|max:100',
+            'odp_port' => 'required|string|max:50',
             'olt_number' => 'nullable|string|max:50',
             'olt_slot' => 'nullable|string|max:20',
             'olt_port' => 'nullable|string|max:50',
@@ -637,27 +641,12 @@ class CustomerInstallationController extends Controller
             return redirect()->back()->with('error', 'Data pemasangan belum dimulai — tekan "Start Proses" terlebih dahulu.');
         }
 
-        // Sama seperti gerbang "completed" di store(): tiga foto + minimal
-        // satu baris material adalah syarat wajib SEBELUM Laporan Speedtest
-        // boleh dibuka — di sinilah gerbang itu sebenarnya ditegakkan.
-        if (! $installation->installation_photo && ! $request->hasFile('installation_photo')) {
-            return redirect()->back()->withInput()->withErrors(['installation_photo' => 'Foto pemasangan lapangan wajib diunggah.']);
-        }
-        if (! $installation->contract_photo && ! $request->hasFile('contract_photo')) {
-            return redirect()->back()->withInput()->withErrors(['contract_photo' => 'Foto kontrak wajib diunggah.']);
-        }
-        if (! $installation->signature_photo && ! $request->hasFile('signature_photo')) {
-            return redirect()->back()->withInput()->withErrors(['signature_photo' => 'Foto tanda tangan pelanggan wajib diunggah.']);
-        }
-
-        $hasMaterial = collect($validated['materials'] ?? [])->contains(
-            fn ($row) => (float) ($row['qty'] ?? 0) > 0
-                && (! empty($row['item_id']) || trim((string) ($row['item_name'] ?? '')) !== '')
-        );
-        if (! $hasMaterial) {
-            return redirect()->back()->withInput()->withErrors(['materials' => 'Perangkat pasif terpakai wajib diisi minimal satu baris.']);
-        }
-
+        // Foto & material TIDAK menahan penyimpanan di sini (ADHOC — beda dari
+        // perilaku lama). Aktivasi sekarang boleh berhasil dengan data device +
+        // jaringan saja; kelengkapan foto+material cuma menentukan kapan Fase 6
+        // beneran kebuka ($pemasanganComplete di report(), abort_unless di
+        // storeSpeedtest()) — teknisi tetap harus balik tekan Aktivasi lagi
+        // setelah upload foto & catat material supaya Fase 6 kebuka.
         try {
             DB::beginTransaction();
 
@@ -746,7 +735,6 @@ class CustomerInstallationController extends Controller
                     'connection_mode' => $validated['connection_mode'] ?? null,
                     'pppoe_username' => $validated['pppoe_username'] ?? null,
                     'pppoe_password' => $validated['pppoe_password'] ?? null,
-                    'ip_address' => $validated['ip_address'] ?? null,
                 ]
             );
 
@@ -760,11 +748,24 @@ class CustomerInstallationController extends Controller
 
             DB::commit();
 
+            // Pesan sukses beda tergantung apakah foto+material sudah lengkap
+            // (Fase 6 kebuka) atau belum (Aktivasi tersimpan, tapi teknisi masih
+            // harus balik lagi upload foto & catat material). Hitung ulang di
+            // sini (bukan pakai $pemasanganComplete dari report(), request beda)
+            // — logika sama persis, lihat catatan di report().
+            $fase6Unlocked = $installation->installation_photo
+                && $installation->contract_photo
+                && $installation->signature_photo
+                && $installFopTask
+                && $installFopTask->materials()->terpakai()->exists();
+
             return redirect()->route('customers.installation.report', [
                 'customer' => $customer->id,
                 'return_to' => $request->input('return_to'),
                 'activated' => 1,
-            ])->with('success', 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.');
+            ])->with('success', $fase6Unlocked
+                ? 'Laporan Pemasangan & Perangkat tersimpan. Laporan Speedtest sudah bisa diisi.'
+                : 'Data Pemasangan & Perangkat tersimpan. Lengkapi foto & material terpakai lalu tekan Aktivasi lagi untuk membuka Laporan Speedtest.');
         } catch (\Exception $e) {
             DB::rollBack();
 

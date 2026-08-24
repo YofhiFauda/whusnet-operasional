@@ -52,7 +52,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'agent_code',
     'referral_customer_code',
     'ont_sn',
-    'ip_address',
     'odp_code',
     'olt_code',
     'vlan_id',

@@ -14,10 +14,13 @@ use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
 use Carbon\Carbon;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -51,6 +54,14 @@ class AppServiceProvider extends ServiceProvider
 
         // Register Policies
         Gate::policy(Task::class, TaskPolicy::class);
+
+        // Akses UI dokumentasi Scramble (/docs/api) di luar env local — bebas
+        // di local, tapi di production/staging cuma staf full-access
+        // (Owner/Admin) yang boleh buka. Bukan gerbang permission granular
+        // (RBAC matrix) karena ini dokumentasi teknis, bukan fitur bisnis —
+        // tanpa Gate ini RestrictedDocsAccess default-nya 403 SEMUA orang di
+        // luar local (dedoc/scramble), dokumen jadi gak bisa diakses staf pun.
+        Gate::define('viewApiDocs', fn ($user) => $user->hasFullAccess());
 
         // Centralized invoice/payment guards — applies to every insert path
         // (controllers, artisan commands, future API), not just one controller.
@@ -146,6 +157,29 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return $user->hasPermission($ability) ? true : null;
+        });
+
+        // API Baru — Topologi Jaringan & Konfirmasi Assignment
+        // (docs/api/api-pop-distribusi/, rencana-implementasi.md §"Keputusan
+        // resmi" #4). Endpoint #1 baca-saja, referensi jarang berubah →
+        // limiter longgar per token. Endpoint #2 nulis identitas pelanggan →
+        // jauh lebih ketat, di-key per token+IP (bukan token doang) supaya
+        // satu integrator yang IP-nya berganti-ganti tidak berbagi kuota
+        // dengan pemanggil lain yang kebetulan pegang token sama.
+        RateLimiter::for('pop-distribusi-read', function (Request $request) {
+            return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
+        });
+
+        RateLimiter::for('network-assignment-write', function (Request $request) {
+            return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
+        });
+
+        // Limiter TERPISAH dari network-assignment-write meski dua endpoint
+        // berbagi token tulis yang sama — dua bucket independen supaya
+        // rentetan gagal di satu endpoint gak ikut ngabisin kuota endpoint
+        // yang lain (keputusan.md §19).
+        RateLimiter::for('network-device-write', function (Request $request) {
+            return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
         });
 
         // View Composer for Sidebar Badges

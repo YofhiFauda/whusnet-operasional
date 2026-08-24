@@ -192,22 +192,26 @@
                     Dokumen & Foto
                 </h4>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    @if($customer->foto_rumah)
+                    @php
+                        $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                        $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                    @endphp
+                    @if($fotoRumahUrl)
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
-                        <img src="{{ asset('storage/' . $customer->foto_rumah) }}" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $customer->foto_rumah) }}', 'Foto Rumah')">
+                        <img src="{{ $fotoRumahUrl }}" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoRumahUrl }}', 'Foto Rumah')">
                     </div>
                     @endif
-                    @if($customer->foto_kontrak)
+                    @if($fotoKontrakUrl)
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Kontrak</span>
-                        <img src="{{ asset('storage/' . $customer->foto_kontrak) }}" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $customer->foto_kontrak) }}', 'Foto Kontrak')">
+                        <img src="{{ $fotoKontrakUrl }}" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoKontrakUrl }}', 'Foto Kontrak')">
                     </div>
                     @endif
-                    @if(!$customer->foto_rumah && !$customer->foto_kontrak)
+                    @if(!$fotoRumahUrl && !$fotoKontrakUrl)
                     <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
                         <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi.</p>
+                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi, atau berkas tidak tersedia di penyimpanan.</p>
                     </div>
                     @endif
                 </div>
@@ -333,24 +337,30 @@
                 'rows' => $surveyWorkTools,
             ])
 
+            @php
+                $surveyPhotoUrl = foto_publik($survey->survey_photo);
+                $surveyHousePhotoUrl = foto_publik($survey->house_photo);
+            @endphp
+            @if($surveyPhotoUrl || $surveyHousePhotoUrl)
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                @if($survey->survey_photo)
+                @if($surveyPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Lokasi / Survey</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="{{ asset('storage/' . $survey->survey_photo) }}" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $survey->survey_photo) }}', 'Foto Survey')">
+                        <img src="{{ $surveyPhotoUrl }}" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $surveyPhotoUrl }}', 'Foto Survey')">
                     </div>
                 </div>
                 @endif
-                @if($survey->house_photo)
+                @if($surveyHousePhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Rumah</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="{{ asset('storage/' . $survey->house_photo) }}" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $survey->house_photo) }}', 'Foto Rumah')">
+                        <img src="{{ $surveyHousePhotoUrl }}" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $surveyHousePhotoUrl }}', 'Foto Rumah')">
                     </div>
                 </div>
                 @endif
             </div>
+            @endif
 
             @if($isWaitingAccStage)
                 @can('customers.detail.installation.validate')
@@ -470,7 +480,6 @@
                                 ['label' => 'Password PPPoE', 'value' => $device->pppoe_password ?? '-', 'mono' => true],
                                 ['label' => 'SSID WiFi', 'value' => $device->wifi_ssid ?? ($techDetail->ssid ?? '-')],
                                 ['label' => 'Password WiFi', 'value' => $device->wifi_password ?? '-'],
-                                ['label' => 'IP Address', 'value' => $device->ip_address ?? '-', 'mono' => true],
                             ];
                         @endphp
                         @foreach($deviceFields as $field)
@@ -569,41 +578,48 @@
 
             {{-- Foto Pemasangan, Kontrak & TTD --}}
             @if($installation)
+            @php
+                $installationPhotoUrl = foto_publik($installation->installation_photo);
+                $contractPhotoUrl = foto_publik($installation->contract_photo);
+                $signaturePhotoUrl = foto_publik($installation->signature_photo);
+            @endphp
+            @if($installationPhotoUrl || $contractPhotoUrl || $signaturePhotoUrl)
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                @if($installation->installation_photo)
+                @if($installationPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Pemasangan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->installation_photo) }}" 
+                        <img src="{{ $installationPhotoUrl }}" 
                              alt="Foto Pemasangan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->installation_photo) }}', 'Foto Pemasangan')">
+                             onclick="openPhotoLightbox('{{ $installationPhotoUrl }}', 'Foto Pemasangan')">
                     </div>
                 </div>
                 @endif
-                @if($installation->contract_photo)
+                @if($contractPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Kontrak</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->contract_photo) }}" 
+                        <img src="{{ $contractPhotoUrl }}" 
                              alt="Foto Kontrak" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->contract_photo) }}', 'Foto Kontrak')">
+                             onclick="openPhotoLightbox('{{ $contractPhotoUrl }}', 'Foto Kontrak')">
                     </div>
                 </div>
                 @endif
-                @if($installation->signature_photo)
+                @if($signaturePhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto TTD Pelanggan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->signature_photo) }}" 
+                        <img src="{{ $signaturePhotoUrl }}" 
                              alt="Foto TTD Pelanggan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->signature_photo) }}', 'Foto TTD Pelanggan')">
+                             onclick="openPhotoLightbox('{{ $signaturePhotoUrl }}', 'Foto TTD Pelanggan')">
                     </div>
                 </div>
                 @endif
             </div>
+            @endif
             @endif
         </div>
 
@@ -701,14 +717,14 @@
             </div>
 
             {{-- Foto Speedtest --}}
-            @if($techDetail->speedtest_photo)
+            @if($speedtestPhotoUrl = foto_publik($techDetail->speedtest_photo))
             <div>
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Hasil Speedtest</h4>
                 <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 inline-block">
-                    <img src="{{ asset('storage/' . $techDetail->speedtest_photo) }}"
+                    <img src="{{ $speedtestPhotoUrl }}"
                          alt="Foto Speedtest"
                          class="max-h-64 max-w-full rounded-lg object-contain border border-border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                         onclick="openPhotoLightbox('{{ asset('storage/' . $techDetail->speedtest_photo) }}', 'Foto Speedtest')">
+                         onclick="openPhotoLightbox('{{ $speedtestPhotoUrl }}', 'Foto Speedtest')">
                 </div>
             </div>
             @endif

@@ -1297,6 +1297,18 @@
             polos: (nilai) => String(nilai ?? '').replace(/[^\d,-]/g, '').replace(',', '.'),
             /** Angka siap hitung; NaN kalau kosong/bukan angka. */
             angka: (nilai) => parseFloat(window.Rupiah.polos(nilai)),
+            /**
+             * Lucuti masking SEMUA kolom `[data-rupiah]` di satu form — dipakai
+             * pemanggil yang submit programatik (`form.submit()`), yang TIDAK
+             * memicu event `submit` sehingga listener capture-phase di bawah
+             * (yang biasanya menangani ini) tidak pernah jalan. Tanpa ini,
+             * server menerima "150.000,50" bukan "150000.50".
+             */
+            normalisasiForm: (form) => {
+                form.querySelectorAll('[data-rupiah]').forEach((input) => {
+                    input.value = window.Rupiah.polos(input.value);
+                });
+            },
         };
 
         const rapikan = (input) => {
@@ -1345,9 +1357,7 @@
         // (mis. pengumpul baris batch) membaca nilainya.
         document.addEventListener('submit', (e) => {
             if (!(e.target instanceof HTMLFormElement)) return;
-            e.target.querySelectorAll('[data-rupiah]').forEach((input) => {
-                input.value = window.Rupiah.polos(input.value);
-            });
+            window.Rupiah.normalisasiForm(e.target);
         }, true);
     })();
 </script>

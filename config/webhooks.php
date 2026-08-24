@@ -31,4 +31,20 @@ return [
         'chat_id' => env('TELEGRAM_EXTERNAL_CHAT_ID'),
     ],
 
+    /*
+    |----------------------------------------------------------------------
+    | Token API Baru — Topologi Jaringan & Konfirmasi Assignment (API masuk)
+    |----------------------------------------------------------------------
+    |
+    | Arah KEBALIKAN dari dua entri di atas — Website B yang connect ke sini,
+    | bukan Whusnet yang connect keluar (docs/api/api-pop-distribusi/README.md).
+    | Dua token TERPISAH sengaja: baca topologi (risiko rendah, cuma expose
+    | struktur internal) vs tulis assignment (mengubah CID pelanggan). Kalau
+    | token baca bocor, token tulis TETAP aman — lihat keputusan.md §5.
+    |
+    */
+
+    'pop_distribusi_read_token' => env('POP_DISTRIBUSI_READ_TOKEN'),
+    'network_assignment_write_token' => env('NETWORK_ASSIGNMENT_WRITE_TOKEN'),
+
 ];

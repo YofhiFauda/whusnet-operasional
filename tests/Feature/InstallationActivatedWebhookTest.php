@@ -299,6 +299,14 @@ class InstallationActivatedWebhookTest extends TestCase
 
         $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), array_merge([
             'device_type' => 'ont',
+            'connection_mode' => 'pppoe',
+            'wifi_ssid' => 'WHUSNET_TEST',
+            'wifi_password' => 'password123',
+            'odp_number' => 'ODP-01',
+            'odp_port' => '1',
+            'olt_number' => 'OLT-01',
+            'olt_slot' => '1',
+            'olt_port' => '1',
             'installation_photo' => UploadedFile::fake()->image('installation.jpg'),
             'contract_photo' => UploadedFile::fake()->image('contract.jpg'),
             'signature_photo' => UploadedFile::fake()->image('signature.jpg'),

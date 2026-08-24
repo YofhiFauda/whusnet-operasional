@@ -84,7 +84,6 @@ class CustomerRegistrationRequest extends FormRequest
 
             // Technical specs
             'ont_sn' => 'nullable|string|max:100',
-            'ip_address' => 'nullable|string|max:45',
             'odp_code' => 'nullable|string|max:50',
             'olt_code' => 'nullable|string|max:50',
             'vlan_id' => 'nullable|string|max:20',

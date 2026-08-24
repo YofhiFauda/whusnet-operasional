@@ -916,7 +916,6 @@ class RealDataMigrationTest extends TestCase
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'connection_type' => $row['JENIS'] ?: 'KABEL',
                 'ont_sn' => $row['SNROOTER_FIBER'] ?? '',
-                'ip_address' => $row['IPADDR'] ?? '',
                 'odp_code' => $row['NOMOR_ODP'] ?? '',
                 'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
                 'olt_code' => $oltCode,

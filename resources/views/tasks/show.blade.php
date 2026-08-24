@@ -602,9 +602,8 @@
                             </span>
                         </div>
                         <div class="bg-surface-muted border border-border rounded-xl p-3 shadow-xs">
-                            <span class="block text-[9px] text-text-muted font-bold uppercase tracking-wider font-ui mb-1 select-none">PPPoE User / IP Address</span>
+                            <span class="block text-[9px] text-text-muted font-bold uppercase tracking-wider font-ui mb-1 select-none">PPPoE User</span>
                             <span class="font-bold font-mono text-text-main text-xs block">{{ $device?->pppoe_username ?: '-' }}</span>
-                            <span class="text-[10px] font-mono text-sky-600 dark:text-sky-400 mt-0.5 block font-semibold">IP: {{ $device?->ip_address ?? $tech?->ip_address ?: '-' }}</span>
                         </div>
                     </div>
                 </div>
@@ -659,10 +658,6 @@
                         <div class="bg-surface-muted border border-border rounded-xl p-3 shadow-xs">
                             <span class="block text-[9px] text-text-muted font-bold uppercase font-ui select-none">SSID WiFi Eksisting</span>
                             <span class="text-xs font-bold font-mono text-text-main block mt-1">{{ $device?->wifi_ssid ?? $tech?->ssid ?: 'Standard / Default' }}</span>
-                        </div>
-                        <div class="bg-surface-muted border border-border rounded-xl p-3 shadow-xs">
-                            <span class="block text-[9px] text-text-muted font-bold uppercase font-ui select-none">IP Gateway Akses</span>
-                            <span class="text-xs font-bold font-mono text-text-main block mt-1">{{ $device?->ip_address ?? $tech?->ip_address ?: '192.168.1.1' }}</span>
                         </div>
                     </div>
                 </div>
@@ -775,7 +770,11 @@
                 </div>
                 @endif
 
-                @if($surveyReport?->survey_photo || $surveyReport?->house_photo)
+                @php
+                    $surveyPhotoUrl = $surveyReport ? foto_publik($surveyReport->survey_photo) : null;
+                    $surveyHousePhotoUrl = $surveyReport ? foto_publik($surveyReport->house_photo) : null;
+                @endphp
+                @if($surveyPhotoUrl || $surveyHousePhotoUrl)
                 <div x-data class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs select-none">
                     <div class="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-border bg-surface-muted">
                         <svg class="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -784,17 +783,17 @@
                         <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Foto Hasil Survey (ODP &amp; Rumah)</span>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5">
-                        @if($surveyReport->survey_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$surveyReport->survey_photo) }}', label: 'Foto ODP Survey' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$surveyReport->survey_photo) }}" alt="Foto ODP Survey" class="h-full w-full object-cover">
+                        @if($surveyPhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $surveyPhotoUrl }}', label: 'Foto ODP Survey' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $surveyPhotoUrl }}" alt="Foto ODP Survey" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto ODP Survey</span>
                             </div>
                         </button>
                         @endif
-                        @if($surveyReport->house_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$surveyReport->house_photo) }}', label: 'Foto Rumah Pelanggan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$surveyReport->house_photo) }}" alt="Foto Rumah Customer" class="h-full w-full object-cover">
+                        @if($surveyHousePhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $surveyHousePhotoUrl }}', label: 'Foto Rumah Pelanggan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $surveyHousePhotoUrl }}" alt="Foto Rumah Customer" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto Rumah Pelanggan</span>
                             </div>
@@ -864,7 +863,12 @@
                 </div>
                 @endif
 
-                @if($installReport?->installation_photo || $installReport?->contract_photo || $installReport?->signature_photo)
+                @php
+                    $installPhotoUrl = $installReport ? foto_publik($installReport->installation_photo) : null;
+                    $contractPhotoUrl = $installReport ? foto_publik($installReport->contract_photo) : null;
+                    $signaturePhotoUrl = $installReport ? foto_publik($installReport->signature_photo) : null;
+                @endphp
+                @if($installPhotoUrl || $contractPhotoUrl || $signaturePhotoUrl)
                 <div x-data class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs select-none">
                     <div class="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-border bg-surface-muted">
                         <svg class="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -873,25 +877,25 @@
                         <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Foto Hasil Pemasangan &amp; Berita Acara</span>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5">
-                        @if($installReport->installation_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$installReport->installation_photo) }}', label: 'Foto Bukti Pemasangan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$installReport->installation_photo) }}" alt="Foto Pemasangan" class="h-full w-full object-cover">
+                        @if($installPhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $installPhotoUrl }}', label: 'Foto Bukti Pemasangan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $installPhotoUrl }}" alt="Foto Pemasangan" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto Pemasangan</span>
                             </div>
                         </button>
                         @endif
-                        @if($installReport->contract_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$installReport->contract_photo) }}', label: 'Foto Kontrak / BA' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$installReport->contract_photo) }}" alt="Foto Kontrak/BA" class="h-full w-full object-cover">
+                        @if($contractPhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $contractPhotoUrl }}', label: 'Foto Kontrak / BA' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $contractPhotoUrl }}" alt="Foto Kontrak/BA" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto Kontrak / BA</span>
                             </div>
                         </button>
                         @endif
-                        @if($installReport->signature_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$installReport->signature_photo) }}', label: 'Foto Tanda Tangan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$installReport->signature_photo) }}" alt="Foto Tanda Tangan" class="h-full w-full object-cover">
+                        @if($signaturePhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $signaturePhotoUrl }}', label: 'Foto Tanda Tangan' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $signaturePhotoUrl }}" alt="Foto Tanda Tangan" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Tanda Tangan</span>
                             </div>
@@ -946,26 +950,30 @@
                 </div>
                 @endif
 
-                @if($maintenanceReport?->opm_photo || $maintenanceReport?->speedtest_photo)
+                @php
+                    $opmPhotoUrl = $maintenanceReport ? foto_publik($maintenanceReport->opm_photo) : null;
+                    $maintSpeedtestPhotoUrl = $maintenanceReport ? foto_publik($maintenanceReport->speedtest_photo) : null;
+                @endphp
+                @if($opmPhotoUrl || $maintSpeedtestPhotoUrl)
                 <div x-data class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs select-none">
                     <div class="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-border bg-surface-muted">
                         <svg class="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812-1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         </svg>
                         <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Foto OPM &amp; Speedtest</span>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5">
-                        @if($maintenanceReport->opm_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$maintenanceReport->opm_photo) }}', label: 'Foto OPM' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$maintenanceReport->opm_photo) }}" alt="Foto OPM" class="h-full w-full object-cover">
+                        @if($opmPhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $opmPhotoUrl }}', label: 'Foto OPM' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $opmPhotoUrl }}" alt="Foto OPM" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto OPM</span>
                             </div>
                         </button>
                         @endif
-                        @if($maintenanceReport->speedtest_photo)
-                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ asset('storage/'.$maintenanceReport->speedtest_photo) }}', label: 'Foto Speedtest' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
-                            <img src="{{ asset('storage/'.$maintenanceReport->speedtest_photo) }}" alt="Foto Speedtest" class="h-full w-full object-cover">
+                        @if($maintSpeedtestPhotoUrl)
+                        <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $maintSpeedtestPhotoUrl }}', label: 'Foto Speedtest' })" class="group relative block w-full rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                            <img src="{{ $maintSpeedtestPhotoUrl }}" alt="Foto Speedtest" class="h-full w-full object-cover">
                             <div class="absolute inset-0 flex items-end justify-center p-2 bg-slate-900/0 group-hover:bg-slate-900/60 backdrop-blur-0 group-hover:backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300">
                                 <span class="text-white text-[10px] font-bold text-center font-ui">Foto Speedtest</span>
                             </div>

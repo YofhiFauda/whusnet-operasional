@@ -114,7 +114,6 @@ class CustomerEditTest extends TestCase
             'referral_customer_code' => 'CID-UPD',
             'status' => 'active',
             'ont_sn' => 'ONT-UPD',
-            'ip_address' => '10.200.45.111',
             'odp_code' => 'ODP-UPD',
             'olt_code' => 'OLT-UPD',
             'vlan_id' => '1025',

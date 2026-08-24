@@ -125,16 +125,10 @@
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp {{ number_format($totalBill, 0, ',', '.') }}/bln (Nett)</span>
         </div>
         <div class="p-4 flex flex-col justify-center">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IP ADDRESS & PPPOE</span>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
             <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span>{{ $customer->ip_address ?? 'Belum Ada IP' }}</span>
-                @if($customer->ip_address)
-                <button type="button" onclick="copyText('{{ $customer->ip_address }}', 'IP Address')" class="text-slate-400 hover:text-sky-600 cursor-pointer" title="Salin IP">
-                    <i class="fa-regular fa-copy text-[10px]"></i>
-                </button>
-                @endif
+                <span>{{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
             </div>
-            <span class="text-[11px] font-mono text-slate-500 truncate">PPPoE: {{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
         </div>
         <div class="p-4 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
@@ -407,10 +401,6 @@
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->distribution->code ?? 'Belum di-assign' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">IP ADDRESS</span>
-                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->ip_address ?? '-' }}</span>
-                    </div>
-                    <div>
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">ONT SERIAL NUMBER</span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->ont_sn ?? '-' }}</span>
                     </div>
@@ -675,10 +665,6 @@
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">ONT Serial Number</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->ont_sn ?? 'Belum terpasang' }}</span>
-                            </div>
-                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">IP Address Dialed</span>
-                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->ip_address ?? 'Belum teralokasi' }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Nama Perangkat OLT</span>
@@ -1134,10 +1120,6 @@
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
                         <span class="text-slate-400">ONT Serial Number</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->router_or_ont_serial ?? '-' }}</span>
-                    </div>
-                    <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">IP Address Dialed</span>
-                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->ip_address ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
                         <span class="text-slate-400">Nomor ODP / Port</span>

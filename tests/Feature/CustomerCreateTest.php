@@ -74,7 +74,6 @@ class CustomerCreateTest extends TestCase
             'referral_customer_code' => 'CID-0002',
             'status' => 'registered',
             'ont_sn' => 'ONT-ZTE-TEST',
-            'ip_address' => '10.200.45.99',
             'odp_code' => 'ODP-PON-999',
             'olt_code' => 'OLT-ZTE-C320',
             'vlan_id' => '1024',
