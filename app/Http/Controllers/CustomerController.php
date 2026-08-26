@@ -252,10 +252,10 @@ class CustomerController extends Controller
         unset($validated['skip_survey']);
 
         $validated['created_by'] = auth()->id();
-        // Skip Survey lompat langsung ke antrean ACC Admin — pelanggan gak
-        // pernah masuk antrean Survey teknisi sama sekali (lihat blok 5 di
-        // bawah yang di-skip kalau $skipSurvey).
-        $validated['status'] = $skipSurvey ? 'waiting_acc' : 'waiting_survey';
+        // Skip Survey lompat langsung ke antrean Pemasangan — pelanggan gak
+        // pernah masuk antrean Survey teknisi maupun ACC Admin sama sekali
+        // (lihat blok 5 di bawah yang di-skip kalau $skipSurvey).
+        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'waiting_survey';
         $validated['updated_by'] = auth()->id();
 
         $statusMapping = [
@@ -265,8 +265,6 @@ class CustomerController extends Controller
             'rejected' => 'nonaktif',
             'waiting_survey' => 'survey',
             'surveyed' => 'survey',
-            // Skip Survey mendarat di sini langsung dari registrasi — treat
-            // sama kayak 'surveyed', survey-nya (versi Sales) sudah selesai.
             'waiting_acc' => 'survey',
             'waiting_installation' => 'menunggu_pemasangan',
             'installed' => 'menunggu_pemasangan',
@@ -426,6 +424,28 @@ class CustomerController extends Controller
                     'technician_id' => auth()->id(),
                     'requested_installation_date' => $requestedInstallationDate,
                 ]);
+
+                // Status pelanggan langsung waiting_installation (skip ACC juga),
+                // jadi titik normal yang bikin Task Pemasangan + FopTask anchor
+                // (CustomerWorkflowService::transition() saat ACC approve) gak
+                // pernah kepanggil di jalur ini. Bikin manual di sini, samain
+                // dengan blok non-skip di bawah biar antrean Pemasangan tetap
+                // konsisten kebentuk otomatis.
+                $year = date('Y');
+                $count = Task::whereYear('created_at', $year)->count() + 1;
+                Task::create([
+                    'task_number' => sprintf('TASK-%s-%04d', $year, $count),
+                    'task_type' => TaskType::PEMASANGAN->value,
+                    'title' => 'Pemasangan Baru: '.$customer->full_name,
+                    'description' => null,
+                    'pop_id' => $customer->pop_id,
+                    'customer_id' => $customer->id,
+                    'status' => TaskStatus::PENDING->value,
+                    'created_by' => auth()->id() ?? 1,
+                    'updated_by' => auth()->id() ?? 1,
+                ]);
+
+                app(FopTaskProvisioningService::class)->ensureForCustomer($customer, TaskType::PEMASANGAN);
             } else {
                 // 5. Sentralisasi Tiket: Auto-create Task antrean (Survey) + FopTask
                 //    anchor-nya. FopTask dibuat di sini, bukan menunggu papan

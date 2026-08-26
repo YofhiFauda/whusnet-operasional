@@ -113,6 +113,7 @@ class SendWebhookOutboxJob implements ShouldQueue
             $result = match ($row->destination) {
                 'website_b' => $this->sendHttpJson($row),
                 'telegram_external' => $this->sendTelegram($row, $presenter),
+                'customer_portal' => $this->sendPortalWebhook($row),
                 default => throw new RuntimeException("Tujuan webhook tidak dikenal: {$row->destination}"),
             };
         } catch (Throwable $e) {
@@ -206,6 +207,18 @@ class SendWebhookOutboxJob implements ShouldQueue
             return null;
         }
 
+        if ($destination === 'customer_portal') {
+            $config = config('webhooks.customer_portal');
+            $url = (string) ($config['url'] ?? '');
+            $secret = (string) ($config['secret'] ?? '');
+
+            if (! str_starts_with($url, 'https://') || $secret === '') {
+                return 'Konfigurasi webhooks.customer_portal tidak valid: url wajib https:// dan secret wajib diisi.';
+            }
+
+            return null;
+        }
+
         return null;
     }
 
@@ -246,6 +259,46 @@ class SendWebhookOutboxJob implements ShouldQueue
         // rotasi secret yang belum kelar di sisi sana), dan kesalahan setup
         // yang benar-benar mustahil sembuh sudah dijaring lebih awal oleh
         // configError(). Sisanya masuk retry normal.
+        return [
+            'success' => $response->successful(),
+            'status' => $response->status(),
+            'error' => $response->successful() ? null : Str::limit($response->body(), 500),
+            'permanent' => false,
+        ];
+    }
+
+    /**
+     * Skema 3 HEADER TERPISAH — BEDA dari sendHttpJson() (website_b) yang
+     * menggabung timestamp+signature jadi satu header
+     * `X-Whusnet-Signature: t=...,v1=...`. Portal (§6.6.6,
+     * docs/api/api-portal-pelanggan/) secara eksplisit minta header terpisah:
+     * `X-Whusnet-Event-Id`, `X-Whusnet-Timestamp`, `X-Whusnet-Signature`
+     * (HMAC-SHA256 murni atas `"{timestamp}.{body}"`, tanpa prefix `v1=`).
+     * Ini bukan ambiguitas — dua kontrak beda konsumen, jangan disamakan.
+     *
+     * @return array{success: bool, status: int, error: string|null, permanent: bool}
+     */
+    private function sendPortalWebhook(WebhookOutbox $row): array
+    {
+        $config = config('webhooks.customer_portal');
+        $rawBody = $this->buildSignedBody($row->payload);
+        $timestamp = now()->timestamp;
+        $signature = hash_hmac('sha256', "{$timestamp}.{$rawBody}", (string) $config['secret']);
+
+        $response = Http::timeout(15)
+            ->connectTimeout(5)
+            ->withHeaders([
+                'Content-Type' => 'application/json',
+                'X-Whusnet-Event-Id' => $row->event_id,
+                'X-Whusnet-Timestamp' => (string) $timestamp,
+                'X-Whusnet-Signature' => $signature,
+            ])
+            ->withBody($rawBody, 'application/json')
+            ->post((string) $config['url']);
+
+        // Sama alasan website_b — tidak ada klasifikasi permanen dari sisi
+        // kita, portal eksternal berhak punya downtime/deploy sesaat tanpa
+        // outbox-nya langsung dianggap gagal total.
         return [
             'success' => $response->successful(),
             'status' => $response->status(),

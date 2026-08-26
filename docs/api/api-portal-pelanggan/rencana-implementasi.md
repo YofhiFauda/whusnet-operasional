@@ -9,58 +9,148 @@ Seluruh rancangan berjalan di atas paket yang sudah terpasang: Horizon untuk ant
 `endroid/qr-code` (`composer.json:10`) untuk kartu ber-PIN kalau jalur klaim
 dikerjakan bersama modul QR. Tidak ada `composer require` sama sekali.
 
-## Fase 0 — Pondasi API (dipakai bareng semua API masuk)
+## Fase 0 — Pondasi API (dipakai bareng semua API masuk) — **SELESAI (2026-08-24)**
 
-Belum dikerjakan. Sama seperti yang dibutuhkan `api-pop-distribusi/`:
+`routes/api.php` + `withRouting(api: ...)` + `withExceptions()` JSON untuk `/api/*`
+**sudah ada duluan** lewat `api-pop-distribusi/` — Fase 0 modul ini cuma menambah yang
+belum ada:
 
-- Buat `routes/api.php`, daftarkan di `bootstrap/app.php` (`withRouting(api: ...)`).
-- Isi `withExceptions()` supaya request `/api/*` mendapat JSON.
-- `config/cors.php`: whitelist origin portal **spesifik**, hanya untuk grup
-  `/api/customer-portal/*`.
-- Daftarkan rate limiter: `customer-portal-auth`, `customer-portal-auth-ip`,
-  `customer-portal-api`.
-- Buat `App\Http\Resources` (direktori belum ada) + base Resource yang menetapkan
-  envelope `{data, meta}` dan **serialisasi nominal sebagai string desimal**.
+- Grup route baru `Route::prefix('customer-portal')` di `routes/api.php` (file yang
+  sama, bukan file terpisah — `withRouting` cuma nunjuk satu file api). Grup `v1` milik
+  `api-pop-distribusi` tidak disentuh.
+- `config/cors.php` (baru — repo belum pernah punya file ini): whitelist origin portal
+  **spesifik** dari env `PORTAL_ALLOWED_ORIGIN`, `paths` discope ke
+  `api/customer-portal/*` saja — route `api-pop-distribusi` (`api/v1/*`) tidak ikut kena.
+- 3 rate limiter di `AppServiceProvider::boot()`: `customer-portal-api` (120/menit,
+  attached ke grup route), `customer-portal-auth` (5/15menit per IP+login_id),
+  `customer-portal-auth-ip` (30/15menit per IP — angka dikonfirmasi user, gak ada di
+  dokumen manapun). Dua limiter auth didaftarkan sekarang, belum diattach ke route
+  nyata sampai Fase 2.
+- `App\Http\Resources\ApiResource` — base class baru, `with()` nyuntik `meta.generated_at`
+  (envelope `{data, meta}` gratis lewat mekanisme `JsonResource` bawaan Laravel), method
+  `money()` reuse `Money::decimalString()` (baru, di `app/Support/Money.php`) buat
+  serialisasi nominal sebagai string desimal — bukan `number_format(float,2)`.
 
-Selesai kalau: satu endpoint `GET /api/v1/ping` mengembalikan JSON, 404 di bawah
-`/api/*` juga JSON, dan preflight CORS dari origin portal lolos sementara origin lain
-ditolak.
+**Koreksi klaim dokumen ini yang sempat basi:** bagian Risiko di bawah sempat bilang
+"`RateLimiter::for` belum pernah ada di repo, gak ada pola yang bisa dicontoh" — itu
+keliru, 3 definisi udah ada duluan buat `api-pop-distribusi`
+(`AppServiceProvider.php:169-183`). Yang genuinely baru cuma `config/cors.php`.
 
-## Fase 2 — Kredensial & auth portal
+Selesai kalau: endpoint `GET /api/customer-portal/ping` mengembalikan JSON, 404 di bawah
+`/api/customer-portal/*` juga JSON, dan preflight CORS dari origin portal lolos sementara
+origin lain (dan route `api-pop-distribusi`) ditolak — **dibuktikan test**, lihat di bawah.
+`/ping` dipertahankan permanen sebagai health-check (bukan dibuang setelah Fase 2),
+tanpa proteksi token — datanya kosong, risiko disclosure nol.
 
-- `customer_portal_accounts`, `customer_portal_tokens`.
-- `Customer::portalAccount()` (`HasOne`).
-- Penerbitan `login_id` untuk pelanggan yang sudah ada + pencetakan kartu ber-PIN.
-- `POST /auth/claim`, `/auth/login`, `/auth/refresh`, `/auth/logout`,
-  `/auth/logout-all`, `PUT /me/password`, `GET /me`.
-- Middleware `X-Portal-Client` + client secret.
-- Pencabutan token via `CustomerObserver` saat pelanggan `terminated`.
+## Fase 2 — Kredensial & auth portal — **SELESAI SEBAGIAN (2026-08-25)**
 
-**Detail yang masih perlu dipastikan sebelum menulis migrasi:** `{prefix_pop}` di
-`login_id` merujuk `pops.registration_prefix` atau `pops.cid_prefix`? Keduanya ada
-(`app/Models/Pop.php:18-35`) dan §6.6.2 tidak menyebut kolomnya. Contoh di sana
-(`PNG-RQ000631`) berpasangan dengan `customer_code` berawalan RQ, yang menyiratkan
-prefix registrasi — tapi ini harus dikonfirmasi, bukan ditebak.
+**Selesai & full functional:**
+- `customer_portal_accounts`, `customer_portal_tokens` (migrasi + model,
+  tanpa `RecordsAuditLogs` — lihat database-schema.md §1).
+- `Customer::portalAccount()` (`HasOne`), `Customer::tickets()` (`HasMany`,
+  prasyarat Fase 3/4, ditambah sekalian).
+- `POST /auth/login`, `/auth/refresh` (rotasi + deteksi reuse → cabut semua
+  token), `/auth/logout`, `/auth/logout-all`, `PUT /me/password`, `GET /me`.
+- Middleware `portal_client` (`X-Portal-Client` + client secret,
+  `config('webhooks.portal_client_secret')`) dan `portal_token` (bearer
+  token per-pelanggan, DB lookup — middleware pertama di repo yang begitu).
+- Pencabutan token via `CustomerObserver` saat pelanggan `terminated`
+  (`WorkflowTransition::TERMINATED->value`).
+- Command `customers:backfill-portal-login-id` (penerbitan `login_id` massal)
+  dan `customers:portal-set-password-for-testing` (DEV ONLY, smoke-test
+  manual selama `/auth/claim` masih stub).
+- 14 file test, `tests/Feature/Api/CustomerPortal/`.
 
-## Fase 3 — Tagihan, pembayaran, kwitansi
+**`POST /auth/claim` — STUB (501), menunggu modul QR/PIN.** Verifikasi PIN
+butuh infrastruktur dari `docs/plan/qr-code/rancangan-qr-pelanggan-final.md`
+§7.6 (kartu fisik dicetak bareng token QR) — modul itu nol kode DAN nol
+keputusan operasional (threat-model ONT dalam/luar rumah, logistik cetak
+belum diputuskan pemilik produk). Keputusan user 2026-08-24: tahan endpoint
+ini sebagai stub, jangan bangun mekanisme PIN paralel yang menyimpang dari
+desain "PIN dibangkitkan bersama token QR". Rate limiter `customer-portal-auth`
++ `-auth-ip` tetap terpasang di route-nya.
+
+**Pencetakan kartu ber-PIN — di luar scope, ikut modul QR** (belum dikerjakan).
+
+**Dikonfirmasi 2026-08-24:** `{prefix_pop}` di `login_id` = `pops.registration_prefix`
+(bukan `cid_prefix`) — lihat `keputusan.md` §3 poin 1. `cid` sempat diusulkan ulang,
+ditolak lagi dengan alasan sama seperti §1: baru terbit saat pelanggan aktif, cuma
+index biasa (bukan unique).
+
+**Keputusan tambahan dikonfirmasi 2026-08-25** (angka yang tidak eksplisit di
+dokumen manapun sebelumnya):
+- Durasi lockout akun (`locked_until`, beda dari rate limiter request-level)
+  = 15 menit, mengikuti pola lockout PIN §6.5.4.
+- `GET /me` — alamat ditampilkan generic (desa/kecamatan), bukan alamat
+  detail/koordinat.
+- `POST /auth/logout` disamakan perilakunya dengan `/auth/logout-all` (cabut
+  semua token pelanggan itu) — access token tidak punya rantai ke refresh
+  pasangannya tanpa client mengirim `refresh_token` tambahan.
+- Daftar password umum di `StrongPortalPassword` — placeholder ~30 entri,
+  boleh ditinjau ulang kapan saja tanpa mengubah cara kerja rule.
+
+**Penyimpangan terdokumentasi:** validasi password "tidak boleh mengandung
+tanggal lahir" TIDAK diimplementasikan — `Customer` tidak punya kolom
+tanggal lahir sama sekali (dikonfirmasi grep nihil). `StrongPortalPassword`
+cuma cek `login_id` + nomor HP (primary + alternative).
+
+## Fase 3 — Tagihan, pembayaran, kwitansi — **SELESAI (2026-08-25)**
+
+**Nol migrasi** — semua tabel yang dibutuhkan (`invoices`, `payments`,
+`customer_balance_mutations`, `webhook_outbox`) sudah ada sejak sebelum Fase 3,
+dikonfirmasi eksplisit `database-schema.md`.
 
 - `GET /me/invoices`, `/me/invoices/{invoice_number}`, `/me/payments`,
-  `/me/payments/{payment_number}/receipt`, `/me/balance`.
-- Resource dengan daftar putih kolom; `overpay_amount` dan `billing_period` ikut
-  keluar, `reject_reason`/`note`/`proof_file` tidak.
-- Trait/base `ScopedToAuthenticatedCustomer`.
-- Kwitansi: `ReceiptPresenter` **dipangkas** — buang `penerima`, `penagih`, `catatan`;
-  tambahkan pendamping mentah `dibayar_raw` (string desimal) dan `tanggal_bayar_iso`.
-- Event `invoice.updated` ke `webhook_outbox` (tabel sama dengan `api-webhook-pemasangan`, lihat
-  `../api-webhook-pemasangan/database-schema.md`) dari `Invoice::recalculateFromPayments()`, state
-  penuh, tanpa PII.
+  `/me/payments/{payment_number}/receipt`, `/me/balance` — semua **selesai & full
+  functional**.
+- Resource (`app/Http/Resources/CustomerPortal/`): `InvoiceResource`,
+  `InvoiceDetailResource` (+ payments menempel), `PaymentResource`,
+  `PaymentReceiptResource`, `CustomerBalanceMutationResource` — daftar putih kolom
+  persis §2; `overpay_amount`, `billing_period`, dan `invoice_number` (dikonfirmasi
+  user 2026-08-25) ikut keluar, `reject_reason`/`note`/`proof_file`/`bank_name`/
+  `account_number` (dikonfirmasi user, default exclude) tidak.
+- Trait `ScopedToAuthenticatedCustomer` (`app/Http/Controllers/CustomerPortal/Concerns/`)
+  — satu-satunya titik resolve `customer_id` dari token, query selalu dibuka
+  terfilter dulu baru dicari nomor dokumennya (gagal aman, bukan bind-lalu-cek —
+  anti-pola yang ditemukan di `PaymentController::receipt` staf, sengaja tidak
+  dicontoh).
+- Kwitansi: `ReceiptPresenter` **dipangkas** — buang `penerima`, `penagih`, `catatan`,
+  `dicetak`; tambah pendamping mentah `dibayar_raw` (string desimal) dan
+  `tanggal_bayar_iso`.
+- `GET /me/balance` — saldo (`CustomerBalanceService::balance()`) + riwayat mutasi
+  ringkas (dikonfirmasi user 2026-08-25), paginasi 10/halaman, tanpa `pop_id`/
+  `created_by` (nama staf).
+- Listener `SendInvoiceUpdatedWebhook` (auto-discovery, `Invoice.php` **tidak
+  disentuh** — reuse `InvoiceStatusUpdated` yang sudah dispatch di
+  `recalculateFromPayments()`) → `webhook_outbox` destination `customer_portal`,
+  state penuh, tanpa PII. `SendWebhookOutboxJob` diperluas — skema 3 header
+  terpisah (`X-Whusnet-Event-Id`/`-Timestamp`/`-Signature`, BEDA dari format
+  gabungan `website_b`), sesuai §6.6.6 persis.
+- Config baru: `webhooks.customer_portal` (`PORTAL_WEBHOOK_URL`/`_SECRET`) — arah
+  OUTBOUND, beda dari `portal_client_secret` (INBOUND) Fase 2.
+- ~10 file test baru (`tests/Feature/Api/CustomerPortal/` + 2 file webhook di
+  `tests/Feature/`).
 
-## Fase 4 — Ticketing
+## Fase 4 — Ticketing — **SELESAI (2026-08-25)**
 
-- Relasi `Customer::tickets()`.
-- `GET /me/tickets`, `/me/tickets/{ticket_number}`.
-- Presenter status pelanggan bertumpu `Ticket::resolveStatus()` —
-  **bukan** `Ticket::statusLabel()`, yang membocorkan nama tim internal.
+- Relasi `Customer::tickets()` (ditambahkan Fase 2, dipakai di sini).
+- `GET /me/tickets`, `/me/tickets/{ticket_number}` — selesai & full functional.
+- `TicketPortalStatusPresenter` (`app/Support/CustomerPortal/`) — presenter status
+  pelanggan bertumpu `Ticket::resolveStatus()`, **bukan** `Ticket::statusLabel()`
+  yang membocorkan nama tim internal. **Urutan pengecekan kritis**: `handler`
+  dicek SEBELUM `status` — begitu `handler=FOP`, kolom `tickets.status` beku dan
+  tidak boleh dibaca. Dibuktikan test regresi eksplisit (tiket pasca-FOP yang
+  `status` kolomnya masih `open` tapi `FopTask` sudah `selesai` → tetap `selesai`).
+- `/me/tickets/{ticket_number}` — "detail tiket + riwayat" di daftar endpoint
+  diinterpretasikan sebagai bentuk sama dengan item `index()` (bukan riwayat
+  mentah `ticket_histories`, yang eksplisit haram §4 karena memuat nama pegawai).
+  Tidak ada `TicketDetailResource` terpisah.
+- Kode status portal (`value` di JSON) — `diterima`/`sedang_ditangani`/
+  `selesai`/`dibatalkan` — slug baru, dokumen cuma kasih label Indonesia.
+- `/me/tickets` tanpa filter (dokumen gak sebut filter apa pun, beda dari
+  invoices/payments).
+- 3 file test baru, termasuk `PortalTicketStatusMappingTest` yang membuktikan
+  seluruh baris tabel mapping flowchart.md §3.
 
 ## Fase 5 — Portal mengonsumsi API
 
@@ -123,8 +213,10 @@ Kalau di tengah implementasi muncul dorongan "sekalian saja taruh di `customers`
 lebih gampang", baca ulang bagian audit log di `database-schema.md` — jalur
 kebocorannya sudah ditelusuri sampai nomor barisnya.
 
-**Rate limit dan CORS pertama di repo.** Belum pernah ada `RateLimiter::for` maupun
-`config/cors.php` di codebase ini, jadi tidak ada pola yang bisa dicontoh.
+**CORS pertama di repo** (`config/cors.php` belum pernah ada sebelum Fase 0 modul ini —
+sekarang sudah dibuat, scoped `api/customer-portal/*`). `RateLimiter::for` **sudah ada
+polanya duluan** (3x untuk `api-pop-distribusi`, `AppServiceProvider.php:169-183`) — 3
+limiter portal mengikuti gaya yang sama, bukan pola baru.
 
 **Dua dokumen untuk satu portal.** Modul ini dan QR §6.6 membahas API yang sama dari
 sudut berbeda. Setiap perubahan keputusan di salah satunya harus tercermin di yang

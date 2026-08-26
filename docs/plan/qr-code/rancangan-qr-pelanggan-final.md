@@ -967,7 +967,7 @@ DB::transaction:
    Invoice::recalculateFromPayments()
         ├─ update paid_amount / remaining_amount / invoice_status
         ├─ InvoiceStatusUpdated::dispatch()     ← realtime internal (SUDAH ADA)
-        └─ INSERT portal_outbox                 ← BARU
+        └─ INSERT webhook_outbox                 ← BARU
 COMMIT
    ↓
 Worker Horizon (queue 'portal')
@@ -984,7 +984,7 @@ Worker Horizon (queue 'portal')
 1. HTTP di dalam transaksi menggantungkan transaksi selama portal lambat, dan kalau transaksi rollback, portal terlanjur diberi tahu soal pembayaran yang tidak jadi.
 2. Job tanpa baris DB: kalau job hilang (Redis di-flush, worker mati sebelum ack), tidak ada jejak apa pun untuk dikirim ulang. Outbox memberi daftar yang bisa direkonsiliasi — "event mana yang belum sampai" jadi pertanyaan yang punya jawaban.
 
-Tabel `portal_outbox`: `event_id` (uuid), `event_type`, `customer_id`, `payload_json`, `attempts`, `next_attempt_at`, `delivered_at`, `last_error`, `status`. Baris `delivered` dipruning 90 hari, ikut kebijakan retensi `qr_scan_logs` (§4.2).
+Tabel **`webhook_outbox`** (bukan tabel terpisah — sudah dibuat & dipakai bareng modul `api-webhook-pemasangan`, lihat `docs/api/api-webhook-pemasangan/database-schema.md` §2 untuk skema kolom lengkap). Baris `delivered` dipruning 90 hari, ikut kebijakan retensi `qr_scan_logs` (§4.2).
 
 **Payload berisi STATE penuh, bukan delta:**
 
@@ -1367,10 +1367,10 @@ Dipecah tiga; tiap bagian bisa dihentikan tanpa menyisakan setengah jadi.
 
 #### 5c — Push pasca-pembayaran (fitur #3)
 
-- Migration `portal_outbox` + penulisan baris di `Invoice::recalculateFromPayments()` (§6.6.6)
+- Tabel `webhook_outbox` sudah ada (migrasi `2026_08_20_100000_create_webhook_outbox_table.php`) — tinggal penulisan baris di `Invoice::recalculateFromPayments()` (§6.6.6)
 - Job pengirim di queue `portal` (Horizon) + backoff + status `failed` + alert
 - `PORTAL_WEBHOOK_SECRET` di `.env`, terpisah dari `QR_HMAC_SECRET`
-- Halaman monitor pengiriman + kirim-ulang manual (permission `portal_outbox.view`, lewat matrix role)
+- Halaman monitor pengiriman + kirim-ulang manual (permission `webhook_outbox.view`, lewat matrix role)
 - Command pruning baris `delivered` >90 hari
 
 **Test wajib:**
@@ -1462,12 +1462,12 @@ Ditolak di titik penerbitan, bukan diam-diam menghasilkan token dengan bahan HMA
 | 2026-08-07 | Tombol "Mulai Task" manual **tidak** dihapus | Sinyal/kamera/koordinat bisa gagal. `started_via` membuat jalur manual terlihat di dashboard |
 | 2026-08-07 | Radius absen 150 m (usulan, belum final) | GPS HP di area padat rutin meleset 50–100 m |
 | 2026-08-07 | **PIN 6 digit di-generate bersamaan QR** | HMAC membuktikan QR asli, PIN membuktikan siapa yang memindai |
-| 2026-08-07 | **PIN dicetak di kartu pelanggan, BUKAN di stiker ONT** | PIN di stiker = dua faktor jadi satu |
+| 2026-08-07 | ~~**PIN dicetak di kartu pelanggan, BUKAN di stiker ONT**~~ **DIUBAH 2026-08-25** | PIN di stiker = dua faktor jadi satu. Lihat baris 2026-08-25 — pemilik produk sadar & terima tradeoff-nya demi logistik cetak satu kali |
 | 2026-08-07 | **PIN disimpan sebagai bcrypt hash, tampil sekali** | Dump DB tidak membocorkan PIN |
 | 2026-08-07 | **`pin_hash` TIDAK masuk bahan HMAC** | Reset PIN mengubah signature → stiker mati |
 | 2026-08-07 | **PIN menggantikan gerbang 4 digit HP** | 4 digit HP bukan rahasia. Jalur lama tetap jalan sampai PIN tergelar merata |
 | 2026-08-07 | **PIN tidak dipakai untuk absen teknisi** | Melatih pelanggan menyebutkan PIN ke petugas = modus penipuan |
-| 2026-08-07 | **QR ada di KEDUA media, PIN hanya di kartu** | Pelanggan tak perlu keluar rumah; teknisi tak perlu minta kartu |
+| 2026-08-07 | ~~**QR ada di KEDUA media, PIN hanya di kartu**~~ **DIUBAH 2026-08-25** | Pelanggan tak perlu keluar rumah; teknisi tak perlu minta kartu. Lihat baris 2026-08-25 — dua media digabung jadi satu print |
 | 2026-08-07 | **Token terbit saat `WAITING_INSTALLATION`** | Kartu harus ikut berangkat bersama teknisi |
 | 2026-08-07 | **Penerbitan idempoten** | Instalasi bisa diulang; tanpa guard, PIN menumpuk |
 | 2026-08-07 | **`pin_must_change=true` — wajib ganti PIN saat login pertama** | Teknisi memegang PIN sebelum diserahkan; PIN cetak = aktivasi sekali pakai |
@@ -1515,6 +1515,8 @@ Ditolak di titik penerbitan, bukan diam-diam menghasilkan token dengan bahan HMA
 | 2026-08-14 | **Membuat tiket dari portal di luar cakupan Fase 5** | Jalur masuk tiket melewati penyaringan Helpdesk; membukanya mengubah alur tersinkron paling rawan di repo |
 | 2026-08-14 | **Nominal dikirim sebagai string desimal di JSON** | Float mengubah cabang lunas/sebagian, bukan cuma tampilan |
 | 2026-08-14 | **Stiker tetap menunjuk `/q1/` di Operasional, bukan langsung ke host portal** | Ganti host/vendor portal tidak boleh berarti cetak ulang seluruh stiker fisik |
+| 2026-08-25 | **Dua media (stiker ONT + kartu pelanggan) DIGABUNG jadi satu print, QR+PIN sama-sama tercetak di situ** | Instruksi langsung pemilik produk — hindari cetak dua kali di lapangan. **Tradeoff diterima sadar**: PIN di media yang sama dengan QR berarti siapa pun yang bisa memotret/memegang media itu dapat DUA faktor sekaligus (identitas + password pertama), bukan cuma satu — desain "dua faktor terpisah" di §6.5.1 efektif dilonggarkan. Mitigasi yang disarankan (belum diputuskan pemilik produk): PIN dicetak di bagian yang tertutup fisik (scratch-off/label sobek/lipatan tersegel) pada media gabungan itu, bukan tercetak polos terbuka seperti QR-nya |
+| 2026-08-25 | **Solusi cetak-jauh-dari-kantor: printer thermal PORTABLE, dibawa teknisi ke lokasi** — bukan cetak dulu di kantor sebelum berangkat | Kasus nyata: instalasi selesai, print belum dibawa, jarak ke kantor 40 km. **Catatan teknis penting, BELUM final dipilih**: printer *thermal DIRECT* (kayak struk kasir/POS, tanpa pita/ribbon) memang pudar sendiri dalam hitungan bulan kena panas/cahaya — TIDAK COCOK buat stiker permanen di ONT. Yang perlu dipakai printer *thermal TRANSFER* (pakai ribbon/pita, cetak ke label vinyl) — hasilnya awet, tahan panas/UV, versi portable-nya juga ada (dipakai kurir/logistik buat label pengiriman tahan lama). Belum ada keputusan merk/model — masuk checklist §7.6 |
 
 ### Alternatif yang dipertimbangkan dan ditolak
 

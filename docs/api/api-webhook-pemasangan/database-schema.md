@@ -52,9 +52,8 @@ enam pemanggilan internal; `telegram_external` di atas adalah env var **berbeda*
 Satu tabel untuk **dua keluarga event**: `installation.*` (API 1, ke sistem
 provisioning) dan `invoice.updated` (`api-portal-pelanggan/`, ke portal). Digabung karena
 mekanismenya identik sampai ke angka backoff-nya; dua tabel berarti dua worker, dua
-kebijakan retry, dua tempat mencari saat ada yang tidak sampai. Kalau nama
-`portal_outbox` lebih disukai untuk keluarga kedua saat `api-portal-pelanggan` diimplementasikan,
-itu keputusan penamaan, bukan perbedaan desain.
+kebijakan retry, dua tempat mencari saat ada yang tidak sampai. Nama final
+**`webhook_outbox`** (dikonfirmasi 2026-08-24) — draf lama QR (`portal_outbox`) sudah dikoreksi.
 
 | Kolom | Tipe | Catatan |
 |---|---|---|

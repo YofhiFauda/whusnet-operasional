@@ -103,6 +103,173 @@ sama begitu kartu ber-PIN sampai, bukan lewat password sementara yang diketik pe
 
 Semua butuh header `X-Portal-Client` + client secret, di samping bearer token.
 
+## Kontrak endpoint — request & response
+
+**Status: Fase 0-4 selesai** (`rencana-implementasi.md`), `/auth/claim` stub 501.
+Contoh di bawah diambil PERSIS dari kode yang jalan (`app/Http/Resources/CustomerPortal/`,
+`app/Http/Controllers/CustomerPortal/`) per 2026-08-25 — bukan rancangan, ini kontrak
+nyata. Kalau kode berubah dan bagian ini gak ikut diupdate, bagian ini yang basi.
+
+Header wajib SEMUA endpoint: `X-Portal-Client: <client secret>`. `/auth/login`,
+`/auth/claim`, `/auth/refresh` cukup itu. Sisanya (`/me*`) tambah
+`Authorization: Bearer <access_token>`.
+
+Envelope sukses endpoint DATA: `{"data": ..., "meta": {"generated_at": "<ISO-8601>"}}`
+(dari `ApiResource::with()`). Endpoint **auth** (`/auth/*`) dan `PUT /me/password`
+balikin objek flat (`{access_token, ...}` atau `{message}`), **BUKAN** envelope
+`{data,meta}` — dirancang beda karena bukan resource data.
+
+### Auth
+
+**`POST /auth/login`** — request `{"login_id": "PNG-RQ000631", "password": "..."}`.
+Response 200:
+```json
+{"access_token": "<64 karakter acak>", "refresh_token": "<64 karakter acak>", "token_type": "Bearer", "expires_in": 900}
+```
+Error: 401 `{"message": "Login ID atau password salah."}` (akun gak ada ATAU password
+salah — pesan SAMA PERSIS, gak boleh dibedakan); 423 `{"message": "Akun terkunci
+sementara, coba lagi nanti."}` (5x gagal, lockout 15 menit, DB-based); 429 (limiter
+`customer-portal-auth` 5/15menit per IP+login_id **dan** `customer-portal-auth-ip`
+30/15menit per IP).
+
+**`POST /auth/claim`** — STUB, SELALU 501:
+```json
+{"message": "Klaim akun portal belum tersedia — menunggu modul QR/PIN pelanggan."}
+```
+
+**`POST /auth/refresh`** — request `{"refresh_token": "..."}`. Response 200: sama
+bentuk `login`, `refresh_token` lama otomatis dicabut (rotasi). Error: 401
+`{"message": "Sesi tidak valid, silakan login ulang."}` — dipicu token gak ketemu,
+expired, ATAU **reuse** (refresh yang sudah kepakai dipakai lagi → cabut SEMUA token
+pelanggan itu, bukan cuma turunan token ini).
+
+**`POST /auth/logout`** / **`POST /auth/logout-all`** — butuh `Authorization: Bearer`.
+Response 200: `{"message": "Berhasil keluar."}` / `{"message": "Berhasil keluar dari
+semua perangkat."}`. Keduanya **persis sama efeknya** — cabut SEMUA token pelanggan
+itu (keputusan 2026-08-25, `rencana-implementasi.md` Fase 2 — access token gak punya
+rantai ke refresh pasangannya tanpa client kirim `refresh_token` tambahan).
+
+### Profil
+
+**`GET /me`** — response 200:
+```json
+{
+  "data": {
+    "login_id": "PNG-RQ000631", "full_name": "Budi Santoso", "status": "active",
+    "package": "Home 20 Mbps", "village": "Joresan", "district": "Mlarak",
+    "claimed_at": "2026-08-01T10:00:00+07:00"
+  },
+  "meta": {"generated_at": "2026-08-25T09:00:00+07:00"}
+}
+```
+
+**`PUT /me/password`** — request `{"current_password": "...", "new_password": "..."}`.
+Response 200: `{"message": "Password berhasil diganti."}`. Error: 422
+`{"message": "Password saat ini salah."}` atau error validasi Laravel standar
+(`new_password` <10 karakter / mengandung login_id-nomor HP / daftar password umum);
+429 (limiter sama seperti login). Efek: semua token LAIN dicabut, sesi pemanggil
+tetap hidup.
+
+### Tagihan
+
+**`GET /me/invoices`** — query opsional `?status=lunas&period=2026-08`, paginasi
+10/halaman. Item:
+```json
+{
+  "invoice_number": "INV-2026-08-000123",
+  "invoice_type": {"value": "bulanan", "label": "Tagihan Bulanan Rutin"},
+  "billing_period": "2026-08", "issue_date": "2026-08-01T00:00:00+07:00",
+  "due_date": "2026-08-15T00:00:00+07:00", "total_amount": "150000.00",
+  "paid_amount": "150000.00", "remaining_amount": "0.00",
+  "invoice_status": {"value": "lunas", "label": "Lunas"}
+}
+```
+`paid_amount`/`remaining_amount`/`invoice_status` dibaca apa adanya dari kolom,
+**tidak dihitung ulang**.
+
+**`GET /me/invoices/{invoice_number}`** — bentuk sama item index, **plus** key
+`payments` (array bentuk `PaymentResource`, lihat di bawah). 404 kalau nomor gak ada
+atau milik pelanggan lain.
+
+### Pembayaran
+
+**`GET /me/payments`** — query opsional `?status=ditolak&period=2026-08`, paginasi
+10/halaman. Item:
+```json
+{
+  "payment_number": "PAY-202608-0042", "payment_date": "2026-08-10T00:00:00+07:00",
+  "billing_period": "2026-08", "invoice_number": "INV-2026-08-000123",
+  "amount": "150000.00", "overpay_amount": "0.00", "payment_method": "cash",
+  "payment_status": {"value": "valid", "label": "Valid"}, "has_receipt": true
+}
+```
+Pembayaran `ditolak`: `payment_status.label` = `"belum terverifikasi — hubungi
+admin"` (bukan "Ditolak" mentah), `has_receipt: false`, `reject_reason` tidak pernah
+muncul. `bank_name`/`account_number` juga tidak pernah muncul (whitelist ketat).
+
+**`GET /me/payments/{payment_number}/receipt`** — dari `ReceiptPresenter::for()`
+dipangkas:
+```json
+{
+  "nomor": "PAY-202608-0042", "status": "Valid", "status_valid": true,
+  "keterangan_cicilan": null, "tanggal_bayar": "10/08/2026",
+  "tanggal_ditagih": "10/08/2026", "metode": "CASH", "pop": "Jetis",
+  "pelanggan": {"nama": "...", "cid": "...", "hp": "...", "alamat": "...", "alamat_baris": ["..."]},
+  "invoice": {"ada": true, "nomor": "INV-2026-08-000123", "periode": "2026-08", "paket": "Home 20 Mbps", "total": "Rp 150.000", "sisa": "Rp 0", "lunas": true},
+  "dibayar": "Rp 150.000", "lebih_bayar": null,
+  "dibayar_raw": "150000.00", "tanggal_bayar_iso": "2026-08-10T00:00:00+07:00"
+}
+```
+`penerima`/`penagih`/`catatan`/`dicetak` (ada di presenter asli) **tidak pernah**
+muncul. Binding by `payment_number` di query terfilter customer — **bukan**
+route-model-binding by `id` (404 kalau nomor gak ada/milik pelanggan lain).
+
+### Saldo
+
+**`GET /me/balance`**:
+```json
+{
+  "data": {
+    "balance": "50000.00",
+    "mutations": [
+      {"date": "2026-08-20T10:00:00+07:00", "type": "credit", "type_label": "Masuk", "amount": "50000.00", "note": "Lebih bayar dari PAY-202608-0042"}
+    ]
+  },
+  "meta": {"generated_at": "..."}
+}
+```
+`mutations` dipaginasi 10/halaman. `type_label`: `credit`→"Masuk", `debit`→"Keluar".
+`pop_id`/`created_by`/`payment_id`/`id` tidak pernah muncul.
+
+### Ticketing
+
+**`GET /me/tickets`** — tanpa filter, paginasi 10/halaman.
+**`GET /me/tickets/{ticket_number}`** — bentuk sama item index (bukan riwayat mentah
+— lihat §4). Item:
+```json
+{
+  "ticket_number": "TKT-2026-0045", "created_at": "2026-08-20T08:00:00+07:00",
+  "issue_category": "Internet Lambat", "detail_keluhan": "Internet lemot sejak kemarin.",
+  "status": {"value": "sedang_ditangani", "label": "Sedang Ditangani"},
+  "resolved_at": null
+}
+```
+`status` selalu objek `{value, label}` dari `TicketPortalStatusPresenter::resolve()` —
+`value`: `diterima`/`sedang_ditangani`/`selesai`/`dibatalkan`. `catatan_teknis`,
+`handler`/`status` mentah, `fop_task_id`, koordinat, snapshot perangkat, riwayat +
+nama pegawai tidak pernah muncul. 404 kalau nomor gak ada/milik pelanggan lain.
+
+### Error umum
+
+| Kode | Kapan |
+|---|---|
+| 401 | Client secret salah/gak ada (`X-Portal-Client`), token gak valid/expired, kredensial login salah |
+| 404 | Nomor dokumen (invoice/payment/ticket) gak ada ATAU milik pelanggan lain — sengaja sama, gak bisa dibedakan dari luar |
+| 422 | Validasi request gagal |
+| 423 | Akun terkunci (lockout 5x gagal login) |
+| 429 | Rate limit — `customer-portal-api` 120/menit (endpoint data), `customer-portal-auth`+`-auth-ip` (endpoint kredensial) |
+| 501 | `/auth/claim` — stub, menunggu modul QR/PIN |
+
 ## #1 — Ganti password
 
 `PUT /me/password` dengan `current_password` dan `new_password`.

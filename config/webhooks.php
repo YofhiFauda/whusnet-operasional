@@ -33,6 +33,25 @@ return [
 
     /*
     |----------------------------------------------------------------------
+    | Webhook Keluar — Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 3)
+    |----------------------------------------------------------------------
+    |
+    | Arah SAMA seperti website_b/telegram_external di atas (App ini →
+    | luar), BEDA dari portal_client_secret di bawah (itu arah MASUK,
+    | portal yang connect ke sini). Event 'invoice.updated', dikirim
+    | SendInvoiceUpdatedWebhook lewat webhook_outbox destination
+    | 'customer_portal' — literal ini sudah tertulis di komentar migrasi
+    | webhook_outbox (2026_08_20_100000_...), jangan diubah namanya.
+    |
+    */
+
+    'customer_portal' => [
+        'url' => env('PORTAL_WEBHOOK_URL'),
+        'secret' => env('PORTAL_WEBHOOK_SECRET'),
+    ],
+
+    /*
+    |----------------------------------------------------------------------
     | Token API Baru — Topologi Jaringan & Konfirmasi Assignment (API masuk)
     |----------------------------------------------------------------------
     |
@@ -46,5 +65,21 @@ return [
 
     'pop_distribusi_read_token' => env('POP_DISTRIBUSI_READ_TOKEN'),
     'network_assignment_write_token' => env('NETWORK_ASSIGNMENT_WRITE_TOKEN'),
+
+    /*
+    |----------------------------------------------------------------------
+    | Client Secret Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 2)
+    |----------------------------------------------------------------------
+    |
+    | Statis per environment — membuktikan "ini portal resmi", BUKAN
+    | kredensial per pelanggan (itu tabel customer_portal_tokens, beda
+    | lapis). Dicek EnsurePortalClientSecret lewat header X-Portal-Client,
+    | pola sama EnsurePopDistribusiReadToken (hash_equals, tanpa DB lookup).
+    | Tuas darurat: cabut nilai ini, seluruh portal mati seketika tanpa
+    | menyentuh token pelanggan (business-logic.md §Autentikasi).
+    |
+    */
+
+    'portal_client_secret' => env('PORTAL_CLIENT_SECRET'),
 
 ];

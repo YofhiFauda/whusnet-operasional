@@ -11,9 +11,9 @@ Semua di bawah ini **rancangan**. Belum ada satu migrasi pun yang dibuat.
 
 **`webhook_outbox` dipakai bareng, tidak didefinisikan ulang di sini.** Event
 `invoice.updated` memakai tabel yang sama dengan `api-webhook-pemasangan` — lihat
-`../api-webhook-pemasangan/database-schema.md` §2 untuk skema kolomnya. Kalau saat implementasi nama
-`portal_outbox` lebih disukai untuk keluarga event ini, itu keputusan penamaan,
-bukan perbedaan desain.
+`../api-webhook-pemasangan/database-schema.md` §2 untuk skema kolomnya. Nama final
+**`webhook_outbox`** (dikonfirmasi 2026-08-24) — sebutan `portal_outbox` di draf lama
+`docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §6.6.6 sudah dikoreksi mengikuti ini.
 
 **Tabel `customers` tidak diubah sama sekali.** Tidak ada tabel baru untuk tagihan,
 pembayaran, kwitansi, atau tiket. Semuanya dibaca dari struktur yang sudah ada.

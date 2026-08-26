@@ -182,6 +182,30 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
         });
 
+        // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 0). Tiga
+        // limiter beda kelas risiko — pola RateLimiter::for-nya sama seperti
+        // tiga di atas, bukan pola baru di repo.
+        RateLimiter::for('customer-portal-api', function (Request $request) {
+            return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
+        });
+
+        // Jauh lebih ketat dari customer-portal-api — endpoint kredensial
+        // (login/claim/ganti password, Fase 2) TIDAK BOLEH pakai limiter data
+        // biasa: 120 req/menit di situ setara brute-force yang diizinkan
+        // (business-logic.md §6.6.3). Belum diattach ke route nyata sampai
+        // Fase 2 — didaftarkan sekarang supaya namanya siap dipakai.
+        RateLimiter::for('customer-portal-auth', function (Request $request) {
+            return Limit::perMinutes(15, 5)->by($request->ip().'|'.$request->input('login_id'));
+        });
+
+        // Limiter KEDUA, murni per-IP tanpa login_id — menutup penyapuan
+        // banyak login_id dari satu IP yang tidak pernah menyentuh limiter
+        // di atas (keputusan.md §1: limiter keyed login_id+IP saja ditolak,
+        // "memberi ember baru untuk tiap login ID").
+        RateLimiter::for('customer-portal-auth-ip', function (Request $request) {
+            return Limit::perMinutes(15, 30)->by($request->ip());
+        });
+
         // View Composer for Sidebar Badges
         View::composer('layouts.app', function ($view) {
             $surveyCount = Customer::whereIn('status', ['waiting_survey', 'survey_in_progress'])->count();

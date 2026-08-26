@@ -26,7 +26,7 @@ tidak menggantikannya. Kalau ada beda, §6.6 yang menang.
 
 | Berkas | Isi |
 |---|---|
-| `business-logic.md` | Autentikasi, 4 kebutuhan fitur, kepemilikan data |
+| `business-logic.md` | Autentikasi, 4 kebutuhan fitur, kepemilikan data, **kontrak request/response tiap endpoint** (§"Kontrak endpoint") |
 | `database-schema.md` | `customer_portal_accounts`, `customer_portal_tokens` — plus rujukan ke `webhook_outbox` (didefinisikan di `../api-webhook-pemasangan/database-schema.md`, dipakai bareng) |
 | `flowchart.md` | Diagram klaim akun, login, refresh token, pengambilan data, status tiket, kwitansi |
 | `keputusan.md` | Alternatif yang ditolak (login `cid`, password di `customers`, Sanctum, dll), temuan review |

@@ -60,10 +60,11 @@ untuk area yang sama.
 
 ---
 
-## 3. Pertanyaan yang masih terbuka
+## 3. Pertanyaan yang sudah dijawab pemilik produk (2026-08-24)
 
-| # | Pertanyaan | Kenapa tidak ditebak |
+| # | Pertanyaan | Jawaban |
 |---|---|---|
-| 1 | `{prefix_pop}` di `login_id` = `pops.registration_prefix` atau `pops.cid_prefix`? | Keduanya ada (`app/Models/Pop.php:21-22`), §6.6.2 tidak menyebut kolomnya. Salah pilih = seluruh kartu pelanggan tercetak dengan login ID yang tidak cocok |
-| 2 | Nama pelanggan ikut di pesan Telegram Eksternal (`api-webhook-pemasangan`)? | Lintas-modul; keputusan produk yang sama juga relevan di sini karena login_id nanti masuk payload `api-webhook-pemasangan` |
-| 3 | Beban merawat dua dokumen untuk satu portal (modul ini + QR §6.6) | Kalau mulai terasa, gabungkan — jangan biarkan keduanya menyimpang diam-diam |
+| 1 | `{prefix_pop}` di `login_id` = `pops.registration_prefix` atau `pops.cid_prefix`? | **`registration_prefix`** — rancangan awal dipertahankan. `cid` sempat diusulkan ulang tapi ditolak lagi dengan alasan sama seperti §1: `cid` baru terbit saat pelanggan **aktif** (pra-aktivasi = `NULL`, padahal kartu login dicetak saat registrasi) dan cuma index biasa, bukan unique. `login_id` tetap `{registration_prefix}-{customer_code}`, mis. `PNG-RQ000631` — ada sejak registrasi, unique per POP. |
+| 2 | Nama pelanggan ikut di pesan Telegram Eksternal (`api-webhook-pemasangan`)? | **Boleh.** Payload `api-webhook-pemasangan` boleh membawa nama pelanggan (beda dari webhook `invoice.updated` di modul ini, yang tetap tanpa PII — lihat §2 poin 9 di atas). |
+| 3 | Beban merawat dua dokumen untuk satu portal (modul ini + QR §6.6) | **Bukan beban duplikasi — pembagian tanggung jawab yang disengaja.** QR (`docs/plan/qr-code/`) = jalur **akses** (identifikasi/klaim akun lewat pemindaian kartu). API Portal (modul ini) = jalur **penyajian data** (REST yang ditarik portal setelah pelanggan punya sesi). Dua dokumen tetap terpisah selama pembagian ini konsisten; gabungkan hanya kalau salah satu mulai mendefinisikan ulang tanggung jawab yang lain. |
+| 4 | Nama tabel outbox beda antar dokumen — QR §6.6.6 sebut `portal_outbox`, modul ini + `api-webhook-pemasangan` pakai `webhook_outbox` | **`webhook_outbox` menang** (dikonfirmasi 2026-08-24) — tabel ini **sudah nyata di kode** (`2026_08_20_100000_create_webhook_outbox_table.php`, `WebhookOutbox.php`), dipakai bareng event `installation.*` (API 1). `portal_outbox` di draf QR cuma rencana yang belum sempat dibangun; QR doc sudah dikoreksi mengikuti nama yang sudah diimplementasikan. |

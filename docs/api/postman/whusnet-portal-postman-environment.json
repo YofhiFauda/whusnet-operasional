@@ -1,0 +1,16 @@
+{
+  "id": "whusnet-postman-env",
+  "name": "Whusnet — Dev",
+  "values": [
+    { "key": "baseUrl", "value": "http://localhost/api/customer-portal", "type": "default", "enabled": true },
+    { "key": "baseUrlV1", "value": "http://localhost/api/v1", "type": "default", "enabled": true },
+    { "key": "portal_client_secret", "value": "", "type": "secret", "enabled": true },
+    { "key": "login_id", "value": "PNG-RQ000631", "type": "default", "enabled": true },
+    { "key": "password", "value": "", "type": "secret", "enabled": true },
+    { "key": "access_token", "value": "", "type": "secret", "enabled": true },
+    { "key": "refresh_token", "value": "", "type": "secret", "enabled": true },
+    { "key": "pop_distribusi_read_token", "value": "2UdLwS5yEqW9dQvXmfhX78lM57dAkF3XVhkONDgXmVOjXIGQmf1g1Ix2IuiCEdHb", "type": "secret", "enabled": true },
+    { "key": "network_assignment_write_token", "value": "kGO5Gq1qKsBpFbQCuoZgRmwYbRRHaG00gprUUzE1UCnwp3lGZPpKuiWKCGFqv8vL", "type": "secret", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}

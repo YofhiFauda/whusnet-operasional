@@ -3,6 +3,8 @@
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureNetworkAssignmentWriteToken;
 use App\Http\Middleware\EnsurePopDistribusiReadToken;
+use App\Http\Middleware\EnsurePortalClientSecret;
+use App\Http\Middleware\EnsurePortalCustomerToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +26,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // (keputusan.md §5).
             'pop_distribusi.read' => EnsurePopDistribusiReadToken::class,
             'network_assignment.write' => EnsureNetworkAssignmentWriteToken::class,
+            // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 2) —
+            // dua lapis kredensial TERPISAH sengaja: client secret portal
+            // (statis per environment) vs token per-pelanggan (DB lookup).
+            // Jangan digabung jadi satu middleware ber-if (keputusan.md §5).
+            'portal_client' => EnsurePortalClientSecret::class,
+            'portal_token' => EnsurePortalCustomerToken::class,
         ]);
 
         // Aplikasi SELALU berada di belakang proxy: nginx di depan PHP-FPM, dan

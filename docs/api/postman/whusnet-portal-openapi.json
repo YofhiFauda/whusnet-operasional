@@ -1,0 +1,2678 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Whusnet Operasional API",
+        "version": "0.0.1",
+        "description": "# Whusnet Operational API Documentation\n\nSelamat datang di **Dokumentasi Resmi Whusnet Operational API**. \n\nDokumen ini merupakan panduan teknis standar (*Official Technical Reference*) yang diterbitkan untuk mengatur integrasi antarsistem (*inbound API integration*) antara platform mitra/aplikasi eksternal dengan ekosistem infrastruktur **Whusnet**.\n\n---\n\n### **Ringkasan Sistem (System Overview)**\n\nWhusnet Operational API bertindak sebagai *gateway* komunikasi data *inbound* untuk memfasilitasi pertukaran data operasional secara *real-time*, transparan, dan terstruktur. API ini dirancang khusus untuk menangani alur kerja integrasi *PoP (Point of Presence)*, pemetaan topologi, hingga konfirmasi alokasi jaringan secara otomatis.\n\n---\n\n### **Modul Utama API**\n\n1. **PoP & Distribution Management**\n* **Get Mini PoP Topology:** Menyediakan visibilitas *real-time* terhadap hierarki, status perangkat, dan skema topologi Mini PoP yang terhubung.\n* **Confirm Network Assignment:** Memproses konfirmasi penugasan jaringan, sinkronisasi *port*, serta validasi alokasi *bandwidth/VLAN* secara otomatis dari sistem eksternal ke infrastruktur Whusnet.\n\n---\n\n### **Standar Integrasi & Keamanan**\n\n* **Base URL:** `{app-url}/api/v1`\n* **Format Data:** Semua *request* dan *response* menggunakan format **JSON** standar (`application/json`).\n* **Autentikasi:** Seluruh *endpoint* terlindungi oleh mekanis otorisasi *Bearer Token (JWT)*. Pastikan `Authorization Header` dilampirkan pada setiap panggilan API.\n* **HTTP Status Code Standard:**\n* `200 OK` \u2014 Permintaan berhasil diproses.\n* `400 Bad Request` \u2014 Format *payload* atau parameter input tidak valid.\n* `401 Unauthorized` \u2014 Kredensial atau token API tidak valid / kedaluwarsa.\n* `500 Internal Server Error` \u2014 Terjadi kesalahan internal pada server Whusnet.\n\n---\n\n> **Catatan Penting:** \n> Untuk arsitektur sistem tingkat lanjut, batasan tingkat layanan (*rate limiting*), serta rancangan alur *web-hook* lengkap, silakan merujuk pada **Dokumen Rancangan Arsitektur Jaringan Whusnet** resmi.\n"
+    },
+    "servers": [
+        {
+            "url": "https://safari-moon-profession-comedy.trycloudflare.com"
+        }
+    ],
+    "tags": [
+        {
+            "name": "PoP & Network Assignment",
+            "description": "Endpoint bagi sistem mitra untuk membaca struktur Mini POP dan Distribusi, serta mengonfirmasi penugasan jaringan pelanggan setelah proses pemasangan. Seluruh permintaan diautentikasi menggunakan token Bearer."
+        },
+        {
+            "name": "Portal Pelanggan",
+            "description": "Endpoint bagi aplikasi Portal Pelanggan (domain terpisah, tanpa kredensial DB operasional) untuk kredensial, tagihan, pembayaran, kwitansi, saldo, dan riwayat ticketing pelanggan. Semua permintaan WAJIB header `X-Portal-Client` (client secret statis); endpoint `/me/*` tambah `Authorization: Bearer <access_token>`."
+        }
+    ],
+    "paths": {
+        "/api/v1/pop-distribusi": {
+            "get": {
+                "operationId": "pop-distribusi.index",
+                "description": "Mengembalikan seluruh struktur Cabang POP, Mini POP, dan Distribusi\nyang tersedia dalam sistem. Gunakan endpoint ini untuk memperoleh kode\n`mini_pop_code` dan `distribution_code` yang valid sebelum\nmengonfirmasi penugasan jaringan pelanggan.\n\nData bersifat statis dan jarang berubah. Sistem mitra disarankan\nmenyimpan hasilnya secara lokal dan memperbarui secara berkala,\nalih-alih memanggil endpoint ini pada setiap proses pemasangan.",
+                "summary": "POP & Distribusi",
+                "tags": [
+                    "PoP & Network Assignment"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar topologi berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": [
+                                                {
+                                                    "pop_code": "PNR-JTS",
+                                                    "pop_name": "Jetis",
+                                                    "mini_pops": [
+                                                        {
+                                                            "code": "C1",
+                                                            "name": "Mini POP C1",
+                                                            "distributions": [
+                                                                {
+                                                                    "code": "A",
+                                                                    "name": "Distribusi A"
+                                                                },
+                                                                {
+                                                                    "code": "B",
+                                                                    "name": "Distribusi B"
+                                                                }
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "pop_code": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "pop_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "mini_pops": {
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "code": {
+                                                                            "type": [
+                                                                                "string",
+                                                                                "null"
+                                                                            ]
+                                                                        },
+                                                                        "name": {
+                                                                            "type": "string"
+                                                                        },
+                                                                        "distributions": {
+                                                                            "anyOf": [
+                                                                                {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                {
+                                                                                    "type": "array",
+                                                                                    "items": {
+                                                                                        "type": "object",
+                                                                                        "properties": {
+                                                                                            "code": {
+                                                                                                "type": "string"
+                                                                                            },
+                                                                                            "name": {
+                                                                                                "type": [
+                                                                                                    "string",
+                                                                                                    "null"
+                                                                                                ]
+                                                                                            }
+                                                                                        },
+                                                                                        "required": [
+                                                                                            "code",
+                                                                                            "name"
+                                                                                        ]
+                                                                                    }
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    },
+                                                                    "required": [
+                                                                        "code",
+                                                                        "name",
+                                                                        "distributions"
+                                                                    ]
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "pop_code",
+                                                    "pop_name",
+                                                    "mini_pops"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token akses tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Jumlah permintaan melebihi batas yang diizinkan (120 permintaan per menit).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PopDistribusiReadToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/installations/network-assignment": {
+            "post": {
+                "operationId": "installations.network-assignment",
+                "description": "Mengonfirmasi Mini POP dan Distribusi yang berlaku untuk seorang\npelanggan.\n\nPelanggan diidentifikasi melalui `idempotency_key` yang diterima pada\npayload webhook aktivasi pemasangan, bukan melalui ID internal\npelanggan.\n\nUntuk memperbarui kredensial PPPoE atau detail titik sambung OLT,\ngunakan `POST /api/v1/installations/network-device` setelah\npenugasan jaringan pelanggan ini dikonfirmasi.",
+                "summary": "Network Assignment",
+                "tags": [
+                    "PoP & Network Assignment"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "idempotency_key": {
+                                        "type": "string",
+                                        "description": "Kunci unik yang diterima pada payload webhook aktivasi pemasangan, digunakan untuk mengidentifikasi pelanggan.",
+                                        "examples": [
+                                            "installation:1938:activation:7"
+                                        ],
+                                        "maxLength": 100
+                                    },
+                                    "mini_pop_code": {
+                                        "type": "string",
+                                        "description": "Kode Mini POP.",
+                                        "examples": [
+                                            "D1"
+                                        ],
+                                        "maxLength": 20
+                                    },
+                                    "distribution_code": {
+                                        "type": "string",
+                                        "description": "Kode Distribusi.",
+                                        "examples": [
+                                            "X6A"
+                                        ],
+                                        "maxLength": 50
+                                    }
+                                },
+                                "required": [
+                                    "idempotency_key",
+                                    "mini_pop_code",
+                                    "distribution_code"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Penugasan berhasil dikonfirmasi. Kolom `cid` hanya disertakan apabila pelanggan sudah berstatus aktif dan memiliki identitas pelanggan final.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "mini_pop_code": "D1",
+                                            "distribution_code": "X6A"
+                                        },
+                                        {
+                                            "cid": "D001X6ARQ000025",
+                                            "mini_pop_code": "D1",
+                                            "distribution_code": "X6A"
+                                        }
+                                    ],
+                                    "properties": {
+                                        "mini_pop_code": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "distribution_code": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cid": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "perangkat": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "mini_pop_code",
+                                        "distribution_code",
+                                        "cid",
+                                        "perangkat"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Permintaan tidak dapat diproses \u2014 kode Mini POP/Distribusi tidak sesuai dengan Cabang POP pelanggan, atau status pelanggan belum memungkinkan penugasan jaringan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Errors overview."
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "description": "A detailed description of each field that failed validation.",
+                                            "additionalProperties": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "message",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token akses tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pelanggan tidak ditemukan untuk `idempotency_key` yang diberikan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Jumlah permintaan melebihi batas yang diizinkan (20 permintaan per menit).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "NetworkAssignmentWriteToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/installations/network-device": {
+            "post": {
+                "operationId": "installations.network-device",
+                "description": "Memperbarui kredensial PPPoE dan/atau detail titik sambung OLT untuk\nseorang pelanggan.\n\nPelanggan diidentifikasi melalui `idempotency_key` yang diterima pada\npayload webhook aktivasi pemasangan, bukan melalui ID internal\npelanggan. Pelanggan harus sudah memiliki Mini POP dan Distribusi\nyang tersimpan \u2014 konfirmasikan lebih dulu lewat\n`POST /api/v1/installations/network-assignment` apabila belum.\n\nObjek `perangkat` boleh diisi sebagian \u2014 kirim field yang sudah\ndiketahui, field yang tidak dikirim tidak akan menimpa nilai yang\nsudah tersimpan sebelumnya.",
+                "summary": "Network Device",
+                "tags": [
+                    "PoP & Network Assignment"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "perangkat": {
+                                        "type": "object",
+                                        "examples": [
+                                            {
+                                                "pppoe_username": "D1X6ARQ000025_BROTONEGARAN_SAMSUDIN",
+                                                "pppoe_password": "secretpassword123",
+                                                "olt_number": "3",
+                                                "olt_slot": "1",
+                                                "olt_port": "8",
+                                                "vlan": "301"
+                                            }
+                                        ],
+                                        "properties": {
+                                            "pppoe_username": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 150
+                                            },
+                                            "pppoe_password": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 150
+                                            },
+                                            "olt_number": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 50
+                                            },
+                                            "olt_slot": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 20
+                                            },
+                                            "olt_port": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 50
+                                            },
+                                            "vlan": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ],
+                                                "maxLength": 20
+                                            }
+                                        }
+                                    },
+                                    "idempotency_key": {
+                                        "type": "string",
+                                        "description": "Kunci unik yang diterima pada payload webhook aktivasi pemasangan, digunakan untuk mengidentifikasi pelanggan.",
+                                        "examples": [
+                                            "installation:1938:activation:7"
+                                        ],
+                                        "maxLength": 100
+                                    }
+                                },
+                                "required": [
+                                    "perangkat",
+                                    "idempotency_key"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Perangkat berhasil diperbarui. Objek `perangkat` pada respons memuat field yang barusan disimpan (tanpa `pppoe_password`, tidak pernah dikembalikan). Kolom `cid` hanya disertakan apabila pelanggan sudah berstatus aktif dan memiliki identitas pelanggan final.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "mini_pop_code": "D1",
+                                            "distribution_code": "X6A",
+                                            "perangkat": {
+                                                "pppoe_username": "D1X6ARQ000025_BROTONEGARAN_SAMSUDIN",
+                                                "olt_number": "3",
+                                                "olt_slot": "1",
+                                                "olt_port": "8",
+                                                "vlan": "301"
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "mini_pop_code": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "distribution_code": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cid": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "perangkat": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "mini_pop_code",
+                                        "distribution_code",
+                                        "cid",
+                                        "perangkat"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Permintaan tidak dapat diproses \u2014 objek `perangkat` kosong, atau pelanggan belum memiliki Mini POP/Distribusi tersimpan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Errors overview."
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "description": "A detailed description of each field that failed validation.",
+                                            "additionalProperties": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "message",
+                                        "errors"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token akses tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pelanggan tidak ditemukan untuk `idempotency_key` yang diberikan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Jumlah permintaan melebihi batas yang diizinkan (20 permintaan per menit).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "NetworkAssignmentWriteToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/auth/login": {
+            "post": {
+                "operationId": "customer-portal.auth.login",
+                "description": "`login_id` + password \u2192 pasangan access token (15 menit) dan refresh\ntoken (30 hari, rotating).",
+                "summary": "Login",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PortalLoginRequest"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "login_id": {
+                                                "type": "string",
+                                                "description": "Login ID pelanggan, format {registration_prefix}-{customer_code}.",
+                                                "examples": [
+                                                    "PNG-RQ000631"
+                                                ]
+                                            },
+                                            "password": {
+                                                "type": "string",
+                                                "description": "Password akun portal.",
+                                                "examples": [
+                                                    "Kuda-Nil-Rajin-88"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "login_id",
+                                            "password"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login berhasil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "access_token": "<64 karakter acak>",
+                                            "refresh_token": "<64 karakter acak>",
+                                            "token_type": "Bearer",
+                                            "expires_in": 900
+                                        }
+                                    ],
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "refresh_token": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string",
+                                            "const": "Bearer"
+                                        },
+                                        "expires_in": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "access_token",
+                                        "refresh_token",
+                                        "token_type",
+                                        "expires_in"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Login ID atau password salah \u2014 pesan SAMA PERSIS baik akun tidak ada maupun password salah, sengaja tidak dibedakan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Login ID atau password salah."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "423": {
+                        "description": "Akun terkunci sementara (5x gagal berturut-turut, lockout 15 menit).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Akun terkunci sementara, coba lagi nanti."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "429": {
+                        "description": "Jumlah percobaan melebihi batas (5/15menit per IP+login_id, atau 30/15menit per IP).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/auth/claim": {
+            "post": {
+                "operationId": "customer-portal.auth.claim",
+                "description": "Belum aktif \u2014 menunggu modul QR/PIN pelanggan\n(docs/plan/qr-code/rancangan-qr-pelanggan-final.md \u00a77.6). Modul itu\nnol kode DAN nol keputusan operasional (threat-model ONT, logistik\ncetak belum diputuskan pemilik produk) \u2014 keputusan user 2026-08-24:\nfondasi Fase 2 lain dibangun penuh, endpoint ini ditahan sebagai stub\nsampai modul QR/PIN kelar. Rate limiter TETAP terpasang di route\n(routes/api.php) supaya begitu diaktifkan nanti tidak lupa\nmemasangnya kembali. Selalu membalas 501.",
+                "summary": "Klaim akun (STUB)",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "501": {
+                        "description": "Belum tersedia \u2014 menunggu modul QR/PIN pelanggan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Klaim akun portal belum tersedia \u2014 menunggu modul QR/PIN pelanggan."
+                                        }
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Klaim akun portal belum tersedia \u2014 menunggu modul QR/PIN pelanggan."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/auth/refresh": {
+            "post": {
+                "operationId": "customer-portal.auth.refresh",
+                "description": "Menukar refresh token yang masih berlaku dengan pasangan token baru\n(rotasi sekali pakai). Refresh token yang SUDAH dipakai lalu dipakai\nlagi mencabut SEMUA token pelanggan itu \u2014 indikasi pencurian.",
+                "summary": "Refresh token",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PortalRefreshRequest"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "refresh_token": {
+                                                "type": "string",
+                                                "description": "Refresh token yang diterima dari /auth/login atau /auth/refresh sebelumnya.",
+                                                "examples": [
+                                                    "<64 karakter acak>"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "refresh_token"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Rotasi berhasil, pasangan token baru diterbitkan.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "access_token": "<64 karakter acak>",
+                                            "refresh_token": "<64 karakter acak>",
+                                            "token_type": "Bearer",
+                                            "expires_in": 900
+                                        }
+                                    ],
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "refresh_token": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string",
+                                            "const": "Bearer"
+                                        },
+                                        "expires_in": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "access_token",
+                                        "refresh_token",
+                                        "token_type",
+                                        "expires_in"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Sesi tidak valid \u2014 token tidak ditemukan, kedaluwarsa, atau reuse (sudah pernah dipakai sebelumnya).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Sesi tidak valid, silakan login ulang."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/auth/logout": {
+            "post": {
+                "operationId": "customer-portal.auth.logout",
+                "description": "Mencabut SEMUA token pelanggan itu \u2014 bukan cuma sesi pemanggil.\nAccess token tidak punya rantai ke refresh pasangannya tanpa client\nkirim refresh_token tambahan, jadi logout satu-sesi presisi butuh\nmekanisme lain; keputusan user 2026-08-24: samakan perilaku dengan\nlogout-all daripada membangun mekanisme itu sekarang.",
+                "summary": "Logout",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil keluar.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Berhasil keluar."
+                                        }
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Berhasil keluar."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/auth/logout-all": {
+            "post": {
+                "operationId": "customer-portal.auth.logout-all",
+                "description": "Mencabut SEMUA token pelanggan itu.",
+                "summary": "Logout semua perangkat",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil keluar dari semua perangkat.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Berhasil keluar dari semua perangkat."
+                                        }
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Berhasil keluar dari semua perangkat."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me": {
+            "get": {
+                "operationId": "customer-portal.me.show",
+                "description": "Nama, status layanan, paket aktif, alamat generic (desa/kecamatan \u2014\nbukan alamat detail/koordinat).",
+                "summary": "Profil ringkas",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Profil berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": {
+                                                "login_id": "PNG-RQ000631",
+                                                "full_name": "Budi Santoso",
+                                                "status": "active",
+                                                "package": "Home 20 Mbps",
+                                                "village": "Joresan",
+                                                "district": "Mlarak",
+                                                "claimed_at": "2026-08-01T10:00:00+07:00"
+                                            },
+                                            "meta": {
+                                                "generated_at": "2026-08-25T09:00:00+07:00"
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerPortalProfileResource"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "generated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "generated_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/password": {
+            "put": {
+                "operationId": "customer-portal.me.update-password",
+                "description": "`current_password` wajib. Sukses mencabut semua token LAIN (sesi\npemanggil tetap hidup).",
+                "summary": "Ganti password",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PortalUpdatePasswordRequest"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "current_password": {
+                                                "type": "string",
+                                                "description": "Password saat ini \u2014 wajib, sesi yang dicuri tidak cukup untuk mengambil alih akun permanen.",
+                                                "examples": [
+                                                    "Kuda-Nil-Rajin-88"
+                                                ]
+                                            },
+                                            "new_password": {
+                                                "type": "string",
+                                                "description": "Password baru, minimal 10 karakter, tidak boleh mengandung login_id/nomor HP, tidak boleh dari daftar password umum.",
+                                                "examples": [
+                                                    "Layang-Layang-Sore-42"
+                                                ],
+                                                "minLength": 10
+                                            }
+                                        },
+                                        "required": [
+                                            "current_password",
+                                            "new_password"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Password berhasil diganti.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Password berhasil diganti."
+                                        }
+                                    ],
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Password berhasil diganti."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Password saat ini salah, atau new_password tidak memenuhi syarat (< 10 karakter, mengandung login_id/nomor HP, atau daftar password umum).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Password saat ini salah."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Jumlah percobaan melebihi batas (limiter sama seperti login).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/invoices": {
+            "get": {
+                "operationId": "customer-portal.me.invoices.index",
+                "description": "`paid_amount`/`remaining_amount`/`invoice_status` dibaca apa adanya\ndari kolom, tidak dihitung ulang \u2014 `Invoice::recalculateFromPayments()`\nsatu-satunya sumber kebenaran.",
+                "summary": "Daftar tagihan",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter invoice_status.",
+                        "schema": {},
+                        "example": "lunas"
+                    },
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "description": "Filter billing_period, format Y-m.",
+                        "schema": {},
+                        "example": "2026-08"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daftar tagihan berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": [
+                                                {
+                                                    "invoice_number": "INV-2026-08-000123",
+                                                    "invoice_type": {
+                                                        "value": "bulanan",
+                                                        "label": "Tagihan Bulanan Rutin"
+                                                    },
+                                                    "billing_period": "2026-08",
+                                                    "issue_date": "2026-08-01T00:00:00+07:00",
+                                                    "due_date": "2026-08-15T00:00:00+07:00",
+                                                    "total_amount": "150000.00",
+                                                    "paid_amount": "150000.00",
+                                                    "remaining_amount": "0.00",
+                                                    "invoice_status": {
+                                                        "value": "lunas",
+                                                        "label": "Lunas"
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InvoiceResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/invoices/{invoiceNumber}": {
+            "get": {
+                "operationId": "customer-portal.me.invoices.show",
+                "description": "Bentuk sama seperti item daftar, plus daftar pembayaran yang\nmenempel.",
+                "summary": "Detail tagihan",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "parameters": [
+                    {
+                        "name": "invoiceNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detail tagihan berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/InvoiceDetailResource"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "required": [
+                                                        "payments"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "generated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "generated_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "invoice_number tidak ditemukan atau milik pelanggan lain \u2014 sengaja sama, tidak bisa dibedakan dari luar.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/payments": {
+            "get": {
+                "operationId": "customer-portal.me.payments.index",
+                "description": "`overpay_amount` dan `billing_period` selalu ikut keluar. Pembayaran\nditolak tetap tampil (tanpa reject_reason) \u2014 uang yang sudah\ndiserahkan tidak boleh lenyap dari layar tanpa penjelasan.",
+                "summary": "Riwayat pembayaran",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter payment_status.",
+                        "schema": {},
+                        "example": "valid"
+                    },
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "description": "Filter billing_period, format Y-m.",
+                        "schema": {},
+                        "example": "2026-08"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Riwayat pembayaran berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": [
+                                                {
+                                                    "payment_number": "PAY-202608-0042",
+                                                    "payment_date": "2026-08-10T00:00:00+07:00",
+                                                    "billing_period": "2026-08",
+                                                    "invoice_number": "INV-2026-08-000123",
+                                                    "amount": "150000.00",
+                                                    "overpay_amount": "0.00",
+                                                    "payment_method": "cash",
+                                                    "payment_status": {
+                                                        "value": "valid",
+                                                        "label": "Valid"
+                                                    },
+                                                    "has_receipt": true
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PaymentResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/payments/{paymentNumber}/receipt": {
+            "get": {
+                "operationId": "customer-portal.me.payments.receipt",
+                "description": "Turunan `ReceiptPresenter::for()` (sama dipakai cetak internal),\ndipangkas: `penerima`/`penagih`/`catatan`/`dicetak` (data pegawai)\ndibuang, ditambah `dibayar_raw` + `tanggal_bayar_iso`.",
+                "summary": "Isi kwitansi",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "parameters": [
+                    {
+                        "name": "paymentNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kwitansi berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PaymentReceiptResource"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "generated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "generated_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "payment_number tidak ditemukan atau milik pelanggan lain \u2014 sengaja sama, tidak bisa dibedakan dari luar.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/balance": {
+            "get": {
+                "operationId": "customer-portal.me.balance",
+                "description": "Saldo lebih-bayar pelanggan (dari `customer_balance_mutations`) +\nriwayat mutasi ringkas, dipaginasi.",
+                "summary": "Saldo & riwayat mutasi",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Saldo berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": {
+                                                "balance": "50000.00",
+                                                "mutations": [
+                                                    {
+                                                        "date": "2026-08-20T10:00:00+07:00",
+                                                        "type": "credit",
+                                                        "type_label": "Masuk",
+                                                        "amount": "50000.00",
+                                                        "note": "Lebih bayar dari PAY-202608-0042"
+                                                    }
+                                                ]
+                                            },
+                                            "meta": {
+                                                "generated_at": "2026-08-25T09:00:00+07:00"
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "balance": {
+                                                    "type": "string"
+                                                },
+                                                "mutations": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/CustomerBalanceMutationResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "balance",
+                                                "mutations"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "generated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "generated_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/tickets": {
+            "get": {
+                "operationId": "customer-portal.me.tickets.index",
+                "description": "Status lewat `TicketPortalStatusPresenter::resolve()` (BUKAN\n`Ticket::statusLabel()` \u2014 bocorin struktur organisasi internal).",
+                "summary": "Riwayat ticketing",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Riwayat ticketing berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": [
+                                                {
+                                                    "ticket_number": "TKT-2026-0045",
+                                                    "created_at": "2026-08-20T08:00:00+07:00",
+                                                    "issue_category": "Internet Lambat",
+                                                    "detail_keluhan": "Internet lemot sejak kemarin.",
+                                                    "status": {
+                                                        "value": "sedang_ditangani",
+                                                        "label": "Sedang Ditangani"
+                                                    },
+                                                    "resolved_at": null
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/TicketResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/me/tickets/{ticketNumber}": {
+            "get": {
+                "operationId": "customer-portal.me.tickets.show",
+                "description": "Bentuk sama seperti item daftar \u2014 bukan riwayat mentah\n(`ticket_histories`), itu eksplisit haram.",
+                "summary": "Detail tiket",
+                "tags": [
+                    "Portal Pelanggan"
+                ],
+                "parameters": [
+                    {
+                        "name": "ticketNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detail tiket berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TicketResource"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "generated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "generated_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Access token tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "ticket_number tidak ditemukan atau milik pelanggan lain \u2014 sengaja sama, tidak bisa dibedakan dari luar.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "PortalClientSecret": [],
+                        "PortalAccessToken": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-portal/ping": {
+            "get": {
+                "operationId": "customer-portal.ping",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "ok"
+                                                }
+                                            },
+                                            "required": [
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "PopDistribusiReadToken": {
+                "type": "http",
+                "description": "Token akses baca-saja untuk membaca struktur topologi Mini POP dan Distribusi.",
+                "scheme": "bearer"
+            },
+            "NetworkAssignmentWriteToken": {
+                "type": "http",
+                "description": "Token akses tulis untuk mengonfirmasi penugasan jaringan pelanggan.",
+                "scheme": "bearer"
+            },
+            "PortalClientSecret": {
+                "type": "apiKey",
+                "description": "Client secret portal, statis per environment \u2014 membuktikan \"ini portal resmi\". Dicek di SEMUA endpoint /api/customer-portal/auth/* dan /me/*, TIDAK di /ping.",
+                "in": "header",
+                "name": "X-Portal-Client"
+            },
+            "PortalAccessToken": {
+                "type": "http",
+                "description": "Access token pelanggan (15 menit, dari /auth/login atau /auth/refresh) \u2014 membuktikan \"ini pelanggan X\". TIDAK dipakai di /auth/login, /auth/claim, /auth/refresh (belum ada identitas pelanggan saat endpoint itu dipanggil).",
+                "scheme": "bearer"
+            }
+        },
+        "schemas": {
+            "CustomerBalanceMutationResource": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/CustomerBalanceMutationType"
+                    },
+                    "type_label": {
+                        "type": "string",
+                        "enum": [
+                            "Masuk",
+                            "Keluar"
+                        ]
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "Kolom `amount` di DB SELALU positif \u2014 arah ditentukan `type`,\nbukan tanda minus (database-schema.md, migrasi\ncustomer_balance_mutations). Dipertahankan positif di sini\njuga, konsisten sumbernya."
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "date",
+                    "type",
+                    "type_label",
+                    "amount",
+                    "note"
+                ],
+                "title": "CustomerBalanceMutationResource"
+            },
+            "CustomerBalanceMutationType": {
+                "type": "string",
+                "description": "Arah satu baris ledger [[CustomerBalanceMutation]]. `amount` di baris itu selalu disimpan positif \u2014 arahnya ditentukan kolom ini, bukan tanda minus, supaya `SUM(amount)` per tipe tidak pernah ambigu.\n",
+                "enum": [
+                    "credit",
+                    "debit"
+                ],
+                "title": "CustomerBalanceMutationType"
+            },
+            "CustomerPortalProfileResource": {
+                "type": "object",
+                "properties": {
+                    "login_id": {
+                        "type": "string"
+                    },
+                    "full_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "package": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "village": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "district": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "claimed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "login_id",
+                    "full_name",
+                    "status",
+                    "package",
+                    "village",
+                    "district",
+                    "claimed_at"
+                ],
+                "title": "CustomerPortalProfileResource"
+            },
+            "InvoiceDetailResource": {
+                "type": "object",
+                "properties": {
+                    "invoice_number": {
+                        "type": "string"
+                    },
+                    "invoice_type": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "enum": [
+                                    "Tagihan Awal (PSB)",
+                                    "Tagihan Bulanan Rutin",
+                                    "Tagihan Reaktivasi"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label"
+                        ]
+                    },
+                    "billing_period": {
+                        "type": "string"
+                    },
+                    "issue_date": {
+                        "type": "string"
+                    },
+                    "due_date": {
+                        "type": "string"
+                    },
+                    "total_amount": {
+                        "type": "string"
+                    },
+                    "paid_amount": {
+                        "type": "string"
+                    },
+                    "remaining_amount": {
+                        "type": "string"
+                    },
+                    "invoice_status": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "enum": [
+                                    "Belum Dibayar",
+                                    "Sebagian",
+                                    "Lunas",
+                                    "Batal"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label"
+                        ]
+                    },
+                    "payments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PaymentResource"
+                        }
+                    }
+                },
+                "required": [
+                    "invoice_number",
+                    "invoice_type",
+                    "billing_period",
+                    "issue_date",
+                    "due_date",
+                    "total_amount",
+                    "paid_amount",
+                    "remaining_amount",
+                    "invoice_status"
+                ],
+                "title": "InvoiceDetailResource"
+            },
+            "InvoiceResource": {
+                "type": "object",
+                "properties": {
+                    "invoice_number": {
+                        "type": "string"
+                    },
+                    "invoice_type": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "enum": [
+                                    "Tagihan Awal (PSB)",
+                                    "Tagihan Bulanan Rutin",
+                                    "Tagihan Reaktivasi"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label"
+                        ]
+                    },
+                    "billing_period": {
+                        "type": "string"
+                    },
+                    "issue_date": {
+                        "type": "string"
+                    },
+                    "due_date": {
+                        "type": "string"
+                    },
+                    "total_amount": {
+                        "type": "string"
+                    },
+                    "paid_amount": {
+                        "type": "string"
+                    },
+                    "remaining_amount": {
+                        "type": "string"
+                    },
+                    "invoice_status": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "enum": [
+                                    "Belum Dibayar",
+                                    "Sebagian",
+                                    "Lunas",
+                                    "Batal"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label"
+                        ]
+                    }
+                },
+                "required": [
+                    "invoice_number",
+                    "invoice_type",
+                    "billing_period",
+                    "issue_date",
+                    "due_date",
+                    "total_amount",
+                    "paid_amount",
+                    "remaining_amount",
+                    "invoice_status"
+                ],
+                "title": "InvoiceResource"
+            },
+            "PaymentReceiptResource": {
+                "type": "object",
+                "additionalProperties": {},
+                "title": "PaymentReceiptResource"
+            },
+            "PaymentResource": {
+                "type": "object",
+                "properties": {
+                    "payment_number": {
+                        "type": "string"
+                    },
+                    "payment_date": {
+                        "type": "string"
+                    },
+                    "billing_period": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "invoice_number": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "string"
+                    },
+                    "overpay_amount": {
+                        "type": "string"
+                    },
+                    "payment_method": {
+                        "type": "string"
+                    },
+                    "payment_status": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string",
+                                "enum": [
+                                    "belum terverifikasi \u2014 hubungi admin",
+                                    "Valid",
+                                    "Ditolak"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "value",
+                            "label"
+                        ]
+                    },
+                    "has_receipt": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "payment_number",
+                    "payment_date",
+                    "billing_period",
+                    "invoice_number",
+                    "amount",
+                    "overpay_amount",
+                    "payment_method",
+                    "payment_status",
+                    "has_receipt"
+                ],
+                "title": "PaymentResource"
+            },
+            "PortalLoginRequest": {
+                "type": "object",
+                "properties": {
+                    "login_id": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "login_id",
+                    "password"
+                ],
+                "title": "PortalLoginRequest"
+            },
+            "PortalRefreshRequest": {
+                "type": "object",
+                "properties": {
+                    "refresh_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "refresh_token"
+                ],
+                "title": "PortalRefreshRequest"
+            },
+            "PortalUpdatePasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "current_password": {
+                        "type": "string"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "minLength": 10
+                    }
+                },
+                "required": [
+                    "current_password",
+                    "new_password"
+                ],
+                "title": "PortalUpdatePasswordRequest"
+            },
+            "TicketResource": {
+                "type": "object",
+                "properties": {
+                    "ticket_number": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issue_category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "detail_keluhan": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "anyOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "value": {
+                                        "type": "string",
+                                        "const": "diterima"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "const": "Diterima"
+                                    }
+                                },
+                                "required": [
+                                    "value",
+                                    "label"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "value": {
+                                        "type": "string",
+                                        "const": "sedang_ditangani"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "const": "Sedang Ditangani"
+                                    }
+                                },
+                                "required": [
+                                    "value",
+                                    "label"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "value": {
+                                        "type": "string",
+                                        "const": "dibatalkan"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "const": "Dibatalkan"
+                                    }
+                                },
+                                "required": [
+                                    "value",
+                                    "label"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "value": {
+                                        "type": "string",
+                                        "const": "selesai"
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "const": "Selesai"
+                                    }
+                                },
+                                "required": [
+                                    "value",
+                                    "label"
+                                ]
+                            }
+                        ]
+                    },
+                    "resolved_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "ticket_number",
+                    "created_at",
+                    "issue_category",
+                    "detail_keluhan",
+                    "status",
+                    "resolved_at"
+                ],
+                "title": "TicketResource"
+            }
+        },
+        "responses": {
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ModelNotFoundException": {
+                "description": "Not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

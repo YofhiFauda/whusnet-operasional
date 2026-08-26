@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskType;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
@@ -110,7 +111,7 @@ class SalesSeederSkipSurveyScenarioTest extends TestCase
 
         $customer = Customer::where('full_name', 'Pelanggan Skip Survey Seeder')->firstOrFail();
 
-        $this->assertSame('waiting_acc', $customer->status);
+        $this->assertSame('waiting_installation', $customer->status);
         $this->assertDatabaseHas('customer_addresses', [
             'customer_id' => $customer->id,
             'latitude' => -7.86940,
@@ -122,7 +123,8 @@ class SalesSeederSkipSurveyScenarioTest extends TestCase
         $this->assertSame($sales->id, $survey->technician_id);
         $this->assertSame('ODP-BBD-77', $survey->nearest_odp);
 
-        $this->assertSame(0, Task::where('customer_id', $customer->id)->count());
-        $this->assertSame(0, FopTask::where('customer_id', $customer->id)->count());
+        $this->assertSame(0, Task::where('customer_id', $customer->id)->where('task_type', TaskType::SURVEY)->count());
+        $this->assertSame(1, Task::where('customer_id', $customer->id)->where('task_type', TaskType::PEMASANGAN)->count());
+        $this->assertSame(1, FopTask::where('customer_id', $customer->id)->count());
     }
 }

@@ -92,4 +92,17 @@ class MoneyTest extends TestCase
         $this->assertSame(0, Money::compare(1000, 1000.004));
         $this->assertSame(-1, Money::compare(999.99, 1000));
     }
+
+    public function test_decimalstring_untuk_serialisasi_api_portal_pelanggan(): void
+    {
+        // API portal (docs/api/api-portal-pelanggan/) wajib string desimal,
+        // bukan float JSON — number_format($float, 2) balik ke float dulu,
+        // itu sebabnya decimalString() dirakit langsung dari sen bulat.
+        $this->assertSame('150000.00', Money::decimalString(150000));
+        $this->assertSame('0.00', Money::decimalString(0));
+        $this->assertSame('0.00', Money::decimalString(null));
+        $this->assertSame('-5000.00', Money::decimalString(-5000));
+        $this->assertSame('50000.20', Money::decimalString(Money::sub(200000.55, 150000.35)));
+        $this->assertSame('0.01', Money::decimalString(0.005));
+    }
 }

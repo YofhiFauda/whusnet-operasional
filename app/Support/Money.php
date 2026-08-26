@@ -115,4 +115,19 @@ class Money
     {
         return static::fromCents(min(static::cents($a), static::cents($b)));
     }
+
+    /**
+     * Rupiah → string desimal presisi (`"150000.00"`), untuk serialisasi JSON API
+     * (docs/api/api-portal-pelanggan/). SENGAJA tidak lewat `number_format($float, 2)`
+     * — itu balik ke float dulu, persis kelas galat yang dihindari kelas ini. Dirakit
+     * langsung dari sen bulat (`intdiv`/`%`), bukan pembulatan kedua.
+     */
+    public static function decimalString(mixed $rupiah): string
+    {
+        $cents = static::cents($rupiah);
+        $negative = $cents < 0;
+        $abs = abs($cents);
+
+        return ($negative ? '-' : '').intdiv($abs, 100).'.'.str_pad((string) ($abs % 100), 2, '0', STR_PAD_LEFT);
+    }
 }

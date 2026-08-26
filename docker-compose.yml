@@ -380,45 +380,6 @@ services:
     networks:
       - app_network
 
-  # ─────────────────────────────────────────
-  #  CLOUDFLARE TUNNEL — HTTPS tanpa buka port
-  # ─────────────────────────────────────────
-  #
-  # OPSIONAL: tidak ikut `docker compose up` biasa karena pakai `profiles`.
-  #   docker compose --profile tunnel up -d cloudflared
-  #
-  # Menembak ke `nginx:80` lewat jaringan internal, jadi port 8000 di host
-  # tidak perlu diekspos ke internet sama sekali. TLS diputus di sisi
-  # Cloudflare; nginx tetap menerima HTTP polos dan menandai request aslinya
-  # https lewat X-Forwarded-Proto (lihat docker/nginx/default.conf).
-  #
-  # Dua mode:
-  #   1. Quick tunnel (default) — URL acak *.trycloudflare.com, ganti tiap
-  #      restart. Cek URL-nya: `docker compose logs -f cloudflared`.
-  #      URL berubah = APP_URL di .env ikut diganti, lalu `php artisan
-  #      config:clear`. Aset & Reverb TIDAK perlu di-build ulang: echo.js
-  #      memakai host halaman yang sedang dibuka.
-  #   2. Tunnel bernama (domain tetap) — di .env isi:
-  #        CLOUDFLARED_COMMAND=tunnel --no-autoupdate run --token <TOKEN>
-  #      Token dari dashboard Cloudflare Zero Trust; public hostname-nya
-  #      diarahkan ke `http://nginx:80`.
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: whusnet-cloudflared
-    restart: unless-stopped
-    profiles: ["tunnel"]
-    command: ${CLOUDFLARED_COMMAND:-tunnel --no-autoupdate --url http://nginx:80}
-    depends_on:
-      nginx:
-        condition: service_started
-    networks:
-      - app_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"
-
 networks:
   app_network:
     driver: bridge

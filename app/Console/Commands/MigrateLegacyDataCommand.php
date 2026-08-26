@@ -32,6 +32,10 @@ class MigrateLegacyDataCommand extends Command
      * JIKA INGIN MIGRASI DENGAN BILING LAMA
      * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman
      *
+     * 
+     * JIKA POP DAN MINI POP SUDAH DISI MAKA LAKUKAN COMMAND INI AGAR POP DAN MINI POP TIDAK TEMBAK DEFAULT
+     * docker compose exec app php artisan app:import-legacy-sql sand_db_sandya.sql --no-interaction
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --no-interaction
      *  */
     protected $signature = 'app:import-legacy-sql 
                         {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql} 
@@ -289,24 +293,34 @@ class MigrateLegacyDataCommand extends Command
             $legacyPop = $this->resolveLegacyPopForBranch($branchId, $legacyPopMap);
             $branchPop = $legacyPop['pop_model'];
             $miniSegment = $this->normalizeLegacyMiniPopSegment($row['kategori_perangkat_jaringan'] ?? null);
-            $miniPopCode = $legacyPop['pop_code'].$miniSegment;
             $distributionCode = strtoupper(trim((string) ($row['kode_kontrol_distribusi'] ?? '')));
             if ($distributionCode === '0') {
                 $distributionCode = '';
             }
 
-            $miniPop = Pop::firstOrCreate(
-                ['pop_code' => $miniPopCode],
-                [
-                    'code' => $miniPopCode,
-                    'name' => $miniPopCode,
-                    'type' => 'mini_pop',
-                    'parent_id' => $branchPop?->id,
-                    'status' => 'active',
-                    'registration_prefix' => 'RQ',
-                    'cid_prefix' => $legacyPop['pop_code'],
-                ]
-            );
+            if ($miniSegment !== null) {
+                $miniPopCode = $legacyPop['pop_code'].$miniSegment;
+                $miniPop = Pop::firstOrCreate(
+                    ['pop_code' => $miniPopCode],
+                    [
+                        'code' => $miniPopCode,
+                        'name' => $miniPopCode,
+                        'type' => 'mini_pop',
+                        'parent_id' => $branchPop?->id,
+                        'status' => 'active',
+                        'registration_prefix' => 'RQ',
+                        'cid_prefix' => $legacyPop['pop_code'],
+                    ]
+                );
+            } else {
+                // kategori_perangkat_jaringan = 0/kosong → belum di-assign
+                // Mini POP manapun. JANGAN bikin Mini POP rekaan — customer
+                // (dan Distribution di bawah) nempel langsung ke POP cabang,
+                // konsisten dengan Pop::resolveMiniPopSegment() yang memang
+                // mendefinisikan default "0" sebagai "belum di-assign".
+                $miniPopCode = $legacyPop['pop_code'];
+                $miniPop = $branchPop;
+            }
 
             if ($distributionCode !== '' && $distributionCode !== '0') {
                 $meta = $distribusiMetaMap[$distributionCode] ?? [];
@@ -548,7 +562,11 @@ class MigrateLegacyDataCommand extends Command
 
             $legacyBranchId = trim((string) ($row['IDCABANG'] ?? ''));
             $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
-            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'].'1');
+            // Fallback SAMA seperti bug di atas: kalau customer ini gak
+            // kebagian baris di $legacyMiniPopByCustomer (mis. tidak ada
+            // baris layanan sama sekali), jangan asumsikan Mini POP "1" —
+            // pakai POP cabang apa adanya (berarti "belum di-assign").
+            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? $legacyPop['pop_code'];
 
             // customer_code is only required to be unique WITHIN a branch (cid_prefix
             // differs per cabang, so the full CID stays unique even if two different
@@ -1724,13 +1742,23 @@ class MigrateLegacyDataCommand extends Command
         ];
     }
 
-    private function normalizeLegacyMiniPopSegment(mixed $value): string
+    /**
+     * `kategori_perangkat_jaringan` legacy: "0" = default/BELUM di-assign
+     * Mini POP manapun, "1"/"2"/dst = Mini POP asli nomor sekian (aturan
+     * bisnis dari pemilik produk, 2026-08-26). Kembalikan `null` untuk kasus
+     * "0"/kosong — JANGAN diubah jadi "1", itu bikin pelanggan yang belum
+     * di-assign malah nempel ke Mini POP 1 SUNGGUHAN (bug lama: CID
+     * `C0X4ARQ...` yang seharusnya "belum di-assign" berubah jadi
+     * ber-Mini-POP). Pemanggil yang memutuskan fallback ke POP cabang
+     * langsung saat hasilnya null — lihat pemakaian di bawah.
+     */
+    private function normalizeLegacyMiniPopSegment(mixed $value): ?string
     {
         $segment = strtoupper(trim((string) $value));
         $segment = preg_replace('/[^A-Z0-9]+/', '', $segment) ?: '';
 
         if ($segment === '' || $segment === '0') {
-            return '1';
+            return null;
         }
 
         $replaced = preg_replace('/^([A-Z]*)0+([1-9A-Z].*)?$/', '$1$2', $segment);
@@ -1739,7 +1767,7 @@ class MigrateLegacyDataCommand extends Command
         }
 
         if ($segment === '' || $segment === '0') {
-            return '1';
+            return null;
         }
 
         return $segment;

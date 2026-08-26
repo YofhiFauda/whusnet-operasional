@@ -18,15 +18,22 @@ return [
      * Multiple includes or wildcards → server defaults to / and paths stay full (/api/users).
      * Override with `servers`, or use Scramble::registerApi() for separate bases.
      */
-    // Sengaja 'api/v1', BUKAN 'api' polos — repo ini punya endpoint AJAX lama
-    // ber-prefix `api/...` di routes/web.php (mis. api/wilayah/cities,
-    // api/districts/{id}/villages, cascading dropdown wilayah) yang otentikasi
-    // sesi/cookie, BUKAN bearer token, dan bukan API eksternal yang dimaksud
-    // di sini. Matcher 'api' polos ikut menyeret semuanya ke dokumen yang
-    // sama seolah satu kontrak — membingungkan dan salah: dua model
-    // keamanan beda dicampur satu dokumen. 'api/v1' cuma cocok dua endpoint
-    // baru di routes/api.php (docs/api/api-pop-distribusi/).
-    'api_path' => 'api/v1',
+    // Sengaja 'api/v1' + 'api/customer-portal', BUKAN 'api' polos — repo ini
+    // punya endpoint AJAX lama ber-prefix `api/...` di routes/web.php (mis.
+    // api/wilayah/cities, api/districts/{id}/villages, cascading dropdown
+    // wilayah) yang otentikasi sesi/cookie, BUKAN bearer token, dan bukan API
+    // eksternal yang dimaksud di sini. Matcher 'api' polos ikut menyeret
+    // semuanya ke dokumen yang sama seolah satu kontrak — membingungkan dan
+    // salah: dua model keamanan beda dicampur satu dokumen.
+    //
+    // 'api/customer-portal' ditambah 2026-08-25 (dikonfirmasi user) — rute
+    // Portal Pelanggan (docs/api/api-portal-pelanggan/) sama-sama di
+    // routes/api.php, sama-sama bearer/token-based (bukan session), jadi
+    // gak melanggar alasan pemisahan di atas. Efek samping mengaktifkan
+    // beberapa includes: path di dokumen jadi FULL (/api/v1/... dan
+    // /api/customer-portal/...), bukan di-strip seperti waktu cuma 1 include
+    // — itu memang perilaku Scramble begitu >1 include, bukan bug.
+    'api_path' => ['include' => ['api/v1', 'api/customer-portal']],
 
     /*
      * Your API domain. By default, app domain is used. This is also a part of the default API routes

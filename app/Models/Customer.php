@@ -269,6 +269,31 @@ class Customer extends Model
     }
 
     /**
+     * Kredensial login portal pelanggan (docs/api/api-portal-pelanggan/,
+     * Fase 2). Password TIDAK menempel di sini — lihat docblock
+     * CustomerPortalAccount kenapa tabel terpisah.
+     *
+     * @return HasOne<CustomerPortalAccount, $this>
+     */
+    public function portalAccount(): HasOne
+    {
+        return $this->hasOne(CustomerPortalAccount::class);
+    }
+
+    /**
+     * Riwayat ticketing pelanggan ini (docs/api/api-portal-pelanggan/ Fase 4
+     * & Fase 2 prasyarat). Kolom `tickets.customer_id` sudah ada sejak lama
+     * (2026_07_23_000001_create_tickets_table.php) dengan restrictOnDelete
+     * — relasinya saja yang belum pernah ditulis sampai sekarang.
+     *
+     * @return HasMany<Ticket, $this>
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    /**
      * @return HasMany<CustomerSurvey, $this>
      */
     public function surveys(): HasMany

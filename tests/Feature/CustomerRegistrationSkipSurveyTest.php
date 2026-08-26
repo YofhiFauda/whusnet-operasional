@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskType;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerSurvey;
@@ -142,7 +143,7 @@ class CustomerRegistrationSkipSurveyTest extends TestCase
 
         $customer = Customer::where('full_name', 'Budi Skip Survey')->firstOrFail();
 
-        $this->assertSame('waiting_acc', $customer->status);
+        $this->assertSame('waiting_installation', $customer->status);
         $this->assertDatabaseHas('customer_addresses', [
             'customer_id' => $customer->id,
             'latitude' => -7.86940,
@@ -160,9 +161,13 @@ class CustomerRegistrationSkipSurveyTest extends TestCase
         $this->assertStringContainsString('Skip Survey', $survey->survey_note);
         $this->assertSame(now()->addDays(5)->toDateString(), $survey->requested_installation_date->toDateString());
 
-        // Gak ada Task/FopTask SURVEY yang lahir sama sekali.
-        $this->assertSame(0, Task::where('customer_id', $customer->id)->count());
-        $this->assertSame(0, FopTask::where('customer_id', $customer->id)->count());
+        // Gak ada Task/FopTask SURVEY yang lahir sama sekali, tapi Task/FopTask
+        // PEMASANGAN (PSB) langsung kebentuk — status pelanggan lompat
+        // langsung ke waiting_installation, jadi antrean Pemasangan mesti
+        // sudah tersedia begitu registrasi selesai.
+        $this->assertSame(0, Task::where('customer_id', $customer->id)->where('task_type', TaskType::SURVEY)->count());
+        $this->assertSame(1, Task::where('customer_id', $customer->id)->where('task_type', TaskType::PEMASANGAN)->count());
+        $this->assertSame(1, FopTask::where('customer_id', $customer->id)->count());
     }
 
     public function test_skip_survey_requires_coordinates_and_survey_fields(): void
