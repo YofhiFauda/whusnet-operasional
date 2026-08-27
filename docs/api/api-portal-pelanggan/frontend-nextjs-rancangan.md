@@ -319,26 +319,250 @@ rancangan"). Yang perlu diinget pas nulis TypeScript:
   `reject_reason` di pembayaran ditolak, dst — daftar lengkap di
   business-logic.md) **jangan diasumsikan ada** di tipe TypeScript.
 
-## Halaman yang dibutuhkan (peta ke endpoint)
+## Konvensi penyajian data — GLOBAL, berlaku semua halaman
 
-| Halaman | Endpoint dipanggil | Catatan |
-|---|---|---|
-| `/login` | `POST /auth/login` | — |
-| `/aktivasi` | `POST /auth/claim` | Form: login_id, pin, new_password |
-| `/dashboard` | `GET /me` + ringkasan tagihan/saldo | Bisa gabung 2-3 panggilan paralel di Server Component |
-| `/tagihan` | `GET /me/invoices` | Filter `status`, `period`; paginasi 10/hal |
-| `/tagihan/[nomor]` | `GET /me/invoices/{nomor}` | Termasuk `payments` yang menempel |
-| `/pembayaran` | `GET /me/payments` | Filter `status`, `period` |
-| `/pembayaran/[nomor]/kwitansi` | `GET /me/payments/{nomor}/receipt` | Layout cetak/PDF-friendly |
-| `/saldo` | `GET /me/balance` | Mutasi dipaginasi |
-| `/tiket` | `GET /me/tickets` | Tanpa filter |
-| `/tiket/[nomor]` | `GET /me/tickets/{nomor}` | Status `{value,label}` |
-| `/profil` | `GET /me`, `PUT /me/password` | Ganti password (`current_password`+`new_password`) |
+- **Uang**: parse string desimal (`"150000.00"`) → format `Rp 150.000` (locale
+  `id-ID`, `Intl.NumberFormat('id-ID', {style:'currency', currency:'IDR',
+  maximumFractionDigits:0})`). JANGAN simpen hasil parse sebagai state,
+  format on-render doang dari string aslinya.
+- **Tanggal**: ISO-8601 dari backend (`"2026-08-20T08:00:00+07:00"`) → format
+  lokal Indonesia (`20 Agustus 2026`, atau `20 Agt 2026` di tempat sempit
+  kayak tabel) pakai `Intl.DateTimeFormat('id-ID', {...})` atau `dayjs`
+  locale `id`. Konsisten satu cara format di seluruh app, jangan campur.
+- **Status → badge warna** (dari `{value, label}`, warna berdasarkan `value`,
+  teks dari `label`):
+  | `value` (invoice) | Warna | `value` (payment) | Warna | `value` (tiket) | Warna |
+  |---|---|---|---|---|---|
+  | `lunas` | Hijau | `valid` | Hijau | `selesai` | Hijau |
+  | `sebagian` | Kuning | `ditolak` | Abu (bukan merah — pesan `label` udah "belum terverifikasi") | `sedang_ditangani` | Biru |
+  | `belum_dibayar` | Merah | — | — | `diterima` | Kuning |
+  | `batal` | Abu | — | — | `dibatalkan` | Abu |
+- **Loading**: skeleton (blok abu-abu placeholder bentuk kartu/baris tabel),
+  BUKAN spinner polos di tengah layar — biar layout gak "lompat" pas data
+  masuk.
+- **Empty state**: ikon + 1 kalimat spesifik per konteks ("Belum ada
+  tagihan", bukan "Tidak ada data" generik di semua tempat).
+- **Error state** (network gagal / Laravel down, BEDA dari 401/404/422 yang
+  emang respons valid): banner "Tidak bisa terhubung ke server, coba lagi" +
+  tombol retry — jangan biarin halaman putih kosong.
+- **Responsive mobile-first**: pelanggan kemungkinan besar akses dari HP
+  (sama kayak asumsi `capture="environment"` di form foto staf, app ini).
+  List di HP = kartu bertumpuk, BUKAN tabel di-scroll horizontal.
 
-**Yang SENGAJA belum ada endpoint-nya** (jangan dibikin UI-nya dulu): bikin
-tiket dari Portal, upload bukti bayar, gateway pembayaran/QRIS — semua ini
-"ditahan" per keputusan dokumen QR (§0) & rencana API, di luar Fase 0-4 yang
-udah selesai.
+## Komponen shared — layout, navbar, sidebar
+
+Dua kelompok halaman butuh **layout beda total** — jangan dipaksa satu
+`layout.tsx` buat semuanya:
+
+### Layout tanpa nav (`/login`, `/aktivasi`)
+- Card tunggal di tengah layar, gak ada sidebar/navbar/menu apa pun.
+- Cuma logo/nama usaha di atas card + form. Pelanggan yang belum login gak
+  perlu (dan gak boleh) liat menu ke halaman yang butuh auth.
+- Route Handler + `middleware.ts` yang jamin dua halaman ini gak numpang
+  layout halaman berauth (lihat bagian "Auth & session" — grup route
+  terpisah, misal `app/(auth)/login/page.tsx` vs `app/(portal)/dashboard/page.tsx`).
+
+### Layout halaman berauth (`/dashboard`, `/tagihan`, dst)
+- **Desktop (≥768px)**: sidebar kiri tetap (fixed), konten di kanan.
+- **Mobile (<768px)**: sidebar HILANG, diganti bottom nav bar (ikon+label,
+  4-5 item paling sering dipakai) ATAU hamburger drawer dari navbar atas —
+  pilih SATU pola, jangan dua-duanya sekaligus (bikin bingung).
+
+**Sidebar** — isi menu (urutan sesuai frekuensi pemakaian, bukan abjad):
+```
+Dashboard
+Tagihan
+Pembayaran
+Saldo
+Tiket
+─────────────
+Profil
+Keluar (logout)
+```
+Item aktif (halaman yang lagi dibuka) dikasih highlight — pola umum: bandingin
+`usePathname()` ke href tiap link, styling beda kalau cocok.
+
+**Navbar atas** (tampil di SEMUA ukuran layar, isi beda dikit):
+- Kiri: nama usaha/logo (dan hamburger toggle kalau mobile pilih pola drawer)
+- Kanan: nama pelanggan (`full_name` dari `GET /me`, TARUH di layout server
+  component sekali, jangan tiap halaman manggil `/me` ulang cuma buat nama)
+  + tombol Keluar
+
+**Requirement yang perlu disepakati sebelum bangun** (bukan cuma teknis,
+keputusan produk):
+- Apakah "Keluar" di navbar = `logout` (sesi ini doang) atau `logout-all`
+  (semua perangkat)? Backend nyediain dua-duanya, efeknya SAMA PERSIS
+  sekarang (`business-logic.md` — keduanya cabut semua token), jadi gak ada
+  bedanya teknis pilih yang mana — tapi kalau nanti dibedain di backend,
+  tombol ini harus jelas maksudnya yang mana dari awal.
+- Notifikasi (lonceng ikon dsb) — **BELUM ada sumber datanya** (lihat bagian
+  "Yang SENGAJA belum ada endpoint-nya" — webhook realtime belum tentu
+  kepasang penerimanya). Jangan taruh ikon lonceng di navbar kalau belum
+  ada yang ngisi datanya — UI kosong yang keliatan "rusak"/belum jadi lebih
+  buruk daripada gak ada sama sekali.
+
+### Komponen reusable lain yang bakal kepakai di banyak halaman
+- `<StatusBadge value label />` — satu komponen, terima `{value, label}`
+  langsung dari response API, mapping warna internal (tabel warna di bagian
+  "Konvensi penyajian data" di atas). Dipakai tagihan/pembayaran/tiket —
+  JANGAN bikin 3 badge terpisah yang mirip-mirip.
+- `<Pagination meta onPageChange />` — satu komponen buat semua list
+  (tagihan/pembayaran/saldo-mutasi), baca `meta` paginasi dari Laravel
+  Resource apa adanya, jangan hitung ulang total halaman manual.
+- `<EmptyState icon text />`, `<ErrorBanner message onRetry />`,
+  `<SkeletonRows count />` — dipakai berulang di tiap halaman list/detail
+  (lihat "Konvensi penyajian data" § loading/empty/error).
+- `<MoneyDisplay value />`, `<DateDisplay value format="long|short" />` —
+  bungkus format uang/tanggal (lihat konvensi global) jadi komponen, BUKAN
+  fungsi util yang dipanggil manual tiap tempat — kalau formatnya berubah,
+  cukup ubah satu komponen.
+
+## Halaman yang dibutuhkan — spek per halaman
+
+### `/login`
+- **Data & sumber**: `POST /auth/login`.
+- **Tampilan**: form 2 field (`login_id`, `password`), tombol submit,
+  link ke `/aktivasi` ("Belum punya akun? Aktivasi di sini").
+- **State**: submit disabled+spinner pas loading; error 401/423/429 tampil
+  SATU banner generik di atas form (JANGAN highlight field mana yang
+  "salah" — pesannya emang sengaja gak dibedain, ikutin itu di UI juga).
+- **Requirement terbuka**: **belum ada endpoint "lupa password"** di backend
+  (Fase 0-4 gak mencakup ini) — kalau Portal butuh link "Lupa Password",
+  endpoint-nya harus diminta dibangun dulu di repo Laravel, jangan
+  diasumsikan ada.
+
+### `/aktivasi`
+- **Data & sumber**: `POST /auth/claim`.
+- **Tampilan**: form `login_id`, `pin` (input numeric 6 digit,
+  `inputMode="numeric"` `maxLength={6}`, idealnya 6 kotak terpisah gaya OTP
+  biar jelas ini beda dari password), `new_password` + `confirm_password`
+  (konfirmasi CUMA validasi sisi client, backend cuma terima `new_password`
+  tunggal).
+- **State**: 401 (generik, sama kayak login) · 409 ("Akun ini sudah pernah
+  diaktivasi" + tombol ke `/login`, BUKAN retry form yang sama) · 422
+  (list error per-field dari `errors.new_password`) · 423 ("PIN terkunci
+  sementara, coba lagi nanti" — TANPA hitung mundur presisi, backend gak
+  ngirim `retry_after` di endpoint ini).
+- **Requirement terbuka**: sama kayak login — kalau salah PIN berkali-kali
+  dan pelanggan gak bisa akses "lupa PIN", satu-satunya jalan sekarang
+  MINTA STAF reset PIN dari halaman `customers/{id}/qr` (app INI) — Portal
+  gak punya cara mandiri buat itu, perlu dicantumin di pesan UI ("hubungi
+  admin/CS" kalau lockout).
+
+### `/dashboard`
+- **Data & sumber**: `GET /me` + `GET /me/invoices?status=belum_dibayar`
+  (ambil buat kartu "tagihan jatuh tempo") + `GET /me/balance` (ambil field
+  `balance` doang). Panggil paralel (`Promise.all`) di Server Component,
+  bukan berurutan.
+- **Tampilan**: kartu profil ringkas (nama, status, paket), kartu tagihan
+  terdekat (kalau ada yang belum lunas — highlight due_date), kartu saldo,
+  shortcut ke `/tagihan` `/tiket`.
+- **Requirement terbuka**: `/me/invoices` gak punya param "urutkan by
+  jatuh tempo terdekat" — endpoint cuma difilter `status`/`period`,
+  sortnya default backend. Kalau butuh "tagihan PALING deket jatuh tempo"
+  presisi, frontend WAJIB sort ulang di sisi client dari hasil yang
+  kebaca, jangan asumsi item pertama array udah yang paling dekat.
+
+### `/tagihan` (list)
+- **Data & sumber**: `GET /me/invoices?status=..&period=..`, paginasi
+  10/halaman (dari Laravel, ikutin `meta`/link paginasi bawaan Resource).
+- **Tampilan**: tabel (desktop) — kolom No. Tagihan, Periode, Jatuh Tempo,
+  Total, Sisa, Status (badge); kartu bertumpuk (mobile) — No.Tagihan+badge
+  di atas, Total+Jatuh Tempo di bawah.
+- **Interaksi**: filter dropdown `status` (opsi: semua/lunas/sebagian/
+  belum_dibayar/batal), filter `period` (bulan-tahun, `<input type="month">`
+  cocok buat format `YYYY-MM` yang backend minta). Kontrol paginasi
+  prev/next + nomor halaman.
+- **State**: skeleton 5 baris pas loading; empty "Belum ada tagihan".
+
+### `/tagihan/[nomor]` (detail)
+- **Data & sumber**: `GET /me/invoices/{nomor}` — includes `payments`
+  (array) yang menempel.
+- **Tampilan**: header (No.Tagihan, badge status, Total/Dibayar/Sisa 3
+  angka besar berdampingan), tabel kecil daftar pembayaran yang udah masuk
+  ke tagihan ini (nomor pembayaran, tanggal, jumlah, status).
+- **State**: 404 → halaman "Tagihan tidak ditemukan" generik (JANGAN bilang
+  "atau ini bukan tagihan Anda" — itu ngebocorin info, ikutin sikap
+  anti-enumeration backend).
+
+### `/pembayaran` (list)
+- **Data & sumber**: `GET /me/payments?status=..&period=..`.
+- **Tampilan**: mirip tagihan — kolom No.Pembayaran, Tanggal, Metode,
+  Jumlah, Lebih Bayar (cuma tampil kalau `overpay_amount` > 0), Status.
+- **Aturan KHUSUS status `ditolak`**: `label` udah "belum terverifikasi —
+  hubungi admin" dari backend (BUKAN "Ditolak" mentah) — pakai `label`
+  apa adanya, JANGAN tulis ulang jadi "Gagal"/"Ditolak" sendiri. `has_receipt:
+  false` buat baris ini → tombol "Lihat Kwitansi" HARUS disembunyikan,
+  bukan cuma disabled.
+- **State**: sama pola tagihan (skeleton/empty/pagination).
+
+### `/pembayaran/[nomor]/kwitansi`
+- **Data & sumber**: `GET /me/payments/{nomor}/receipt`.
+- **Tampilan**: layout TERPISAH dari halaman lain — print-friendly (mirip
+  `print.blade.php` app ini): kop nama usaha, info pelanggan (nama, cid,
+  hp, alamat), ringkasan invoice terkait (nomor, periode, paket, total,
+  sisa), jumlah dibayar besar, lebih-bayar (kalau ada), tombol "Cetak"
+  (`window.print()`) yang disembunyikan di `@media print`.
+- **Field yang TIDAK PERNAH ada** (jangan bikin slot buat ini): `penerima`,
+  `penagih`, `catatan` — backend sengaja buang, jangan render `undefined`.
+
+### `/saldo`
+- **Data & sumber**: `GET /me/balance` — `balance` (angka tunggal) +
+  `mutations` (array, dipaginasi 10/halaman).
+- **Tampilan**: angka saldo besar di atas (format Rp), tabel/list mutasi di
+  bawah: tanggal, badge tipe (`credit`→"Masuk" hijau, `debit`→"Keluar"
+  merah), jumlah, catatan (`note`, bisa kosong).
+- **State**: empty "Belum ada mutasi saldo".
+
+### `/tiket` (list)
+- **Data & sumber**: `GET /me/tickets` — **TANPA filter/query param sama
+  sekali** (beda dari tagihan/pembayaran, dokumen sengaja gak sebut filter
+  buat ini).
+- **Tampilan**: list — No.Tiket, Kategori Keluhan (`issue_category`),
+  tanggal dibuat, badge status.
+- **Requirement terbuka**: kalau nanti dibutuhkan filter/cari tiket, itu
+  perlu backend ditambah dulu (query param baru) — jangan bikin filter
+  UI yang manggil param yang gak dikenal backend (bakal diabaikan diam-diam
+  atau 422, tergantung validasi Laravel).
+
+### `/tiket/[nomor]` (detail)
+- **Data & sumber**: `GET /me/tickets/{nomor}`.
+- **Tampilan**: kategori, `detail_keluhan` (teks panjang), badge status,
+  `resolved_at` (tampilin kalau ada, sembunyikan kalau `null`).
+- **Field yang TIDAK PERNAH ada**: riwayat/log tiket mentah, `catatan_teknis`,
+  nama pegawai yang nanganin, `handler`/nomor TFOP/TASK internal — jangan
+  bikin section "Riwayat" yang nunggu data yang emang gak dikirim.
+
+### `/profil`
+- **Data & sumber**: `GET /me` (tampil) + `PUT /me/password` (form ganti).
+- **Tampilan**: info read-only (login_id, nama, status, paket, desa,
+  kecamatan, tanggal klaim), form terpisah di bawahnya: `current_password`,
+  `new_password`, `confirm_password` (client-only match check).
+- **Requirement UX penting**: sukses ganti password → tampilkan pesan
+  eksplisit **"Sesi Anda di perangkat lain otomatis keluar"** (efek nyata
+  `PUT /me/password` — semua token LAIN dicabut, sesi yang manggil ini
+  tetap hidup) — jangan biarin pelanggan kaget kenapa HP lain ke-logout
+  sendiri tanpa penjelasan.
+
+## Yang SENGAJA belum ada endpoint-nya (jangan dibikin UI-nya dulu)
+
+- Bikin tiket dari Portal (cuma bisa lihat riwayat, belum bisa buat baru)
+- Upload bukti bayar
+- Gateway pembayaran/QRIS (bayar tetap manual transfer + lapor ke staf)
+- "Lupa password" mandiri (harus lewat CS/staf sampai ada endpoint-nya)
+- "Lupa PIN" mandiri (sama, lewat staf — reset PIN di app Operasional)
+- Filter/pencarian di halaman tiket
+- Notifikasi push/realtime (webhook `invoice.updated` ke Portal sudah ada
+  di sisi backend — `PORTAL_WEBHOOK_URL`/`_SECRET`, arah OUTBOUND — tapi
+  Portal BELUM tentu punya endpoint penerima. Kalau mau notifikasi
+  realtime beneran, itu pekerjaan TERPISAH: bikin endpoint penerima webhook
+  di Next.js + tentuin cara nyampein ke browser pelanggan (WebSocket/SSE/
+  polling), bukan otomatis kepakai cuma dari backend udah nge-`send`)
+
+Semua di atas "ditahan" per keputusan dokumen QR (§0) & rencana API — di
+luar Fase 0-4 yang udah selesai. Kalau requirement Portal butuh salah satu
+ini, itu **pekerjaan backend baru** dulu (repo ini), bukan sesuatu yang bisa
+disiasati murni di sisi Next.js.
 
 ## Environment variables (sisi Next.js, SERVER-ONLY)
 

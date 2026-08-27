@@ -1632,23 +1632,53 @@ class CustomerController extends Controller
                 $warnings[] = 'Kota/Kabupaten kosong; pelanggan akan masuk sebagai perlu dilengkapi.';
             }
 
+            // MigrateLegacyDataCommand nulis pop_code = kode Mini POP (kalau
+            // kategori_perangkat_jaringan legacy terisi) — BUKAN kode Cabang.
+            // customers.pop_id wajib Cabang POP (konsisten dengan alur registrasi
+            // manual & dropdown "Assign Mini POP" di show() yang nge-query
+            // `Pop::where('parent_id', $customer->pop_id)`); Mini POP-nya sendiri
+            // wajib masuk mini_pop_id, bukan menimpa pop_id. Tanpa ini pop_id
+            // ketiban record ber-type mini_pop, "Assign Mini POP" jadi kosong
+            // (parent_id-nya nyari anak dari Mini POP, bukan dari Cabang) dan
+            // pelanggan hasil migrasi selalu perlu di-assign Mini POP manual
+            // walau datanya sudah lengkap di dump legacy.
             $pop = null;
+            $branchPop = null;
+            $miniPop = null;
             if ($popCodeInput === '' && $popNameInput === '') {
                 $warnings[] = 'POP/Cabang kosong; pelanggan tetap diimport untuk review dan belum siap billing.';
             } else {
-                $pop = Pop::where('status', 'active')
-                    ->where(function ($q) use ($popCodeInput, $popNameInput) {
-                        if ($popCodeInput !== '') {
+                // Coba match berdasarkan kode PERSIS dulu (pop_code/code) — ini yang
+                // membedakan Cabang dari Mini POP-nya sendiri. `pop_name` di sheet SELALU
+                // nama Cabang (legacyPop['pop_name'] di MigrateLegacyDataCommand, apa pun
+                // kategori_perangkat_jaringan baris ini), jadi kalau nama disatukan ke query
+                // yang sama lewat orWhere, ia ikut mencocokkan record Cabang itu sendiri dan
+                // ->first() (tanpa ORDER BY, id Cabang selalu lebih kecil dari Mini POP anaknya)
+                // akan selalu balikin Cabang — Mini POP hasil kode yang lebih spesifik
+                // kekubur biar pun cocok juga. Makanya nama HANYA dipakai sebagai fallback
+                // saat kode sama sekali tidak ketemu, bukan dicampur dalam satu OR.
+                $pop = $popCodeInput !== ''
+                    ? Pop::where('status', 'active')
+                        ->where(function ($q) use ($popCodeInput) {
                             $q->where('pop_code', $popCodeInput)->orWhere('code', $popCodeInput);
-                        }
-                        if ($popNameInput !== '') {
-                            $q->orWhere('name', $popNameInput);
-                        }
-                    })
-                    ->first();
+                        })
+                        ->first()
+                    : null;
+
+                if (! $pop && $popNameInput !== '') {
+                    $pop = Pop::where('status', 'active')->where('name', $popNameInput)->first();
+                }
 
                 if (! $pop) {
                     $warnings[] = 'POP tidak ditemukan atau tidak aktif; pelanggan tetap diimport untuk review dan belum siap billing.';
+                } elseif ($pop->type === 'mini_pop') {
+                    $miniPop = $pop;
+                    $branchPop = $pop->parent_id ? Pop::find($pop->parent_id) : null;
+                    if (! $branchPop) {
+                        $warnings[] = 'Mini POP legacy tidak punya Cabang POP induk; pelanggan tetap diimport untuk review dan belum siap billing.';
+                    }
+                } else {
+                    $branchPop = $pop;
                 }
             }
 
@@ -1680,9 +1710,10 @@ class CustomerController extends Controller
                 'old_region_id' => $this->cleanLegacyValue($row['old_region_id'] ?? null),
                 'old_branch_id' => $this->cleanLegacyValue($row['old_branch_id'] ?? null),
                 'registration_date' => $this->normalizeLegacyDateTime($row['registration_date'] ?? null) ?? now()->format('Y-m-d H:i:s'),
-                'pop_id' => $pop?->id,
-                'pop_name' => $pop?->name,
-                'pop_code' => $pop?->pop_code,
+                'pop_id' => $branchPop?->id,
+                'pop_name' => $branchPop?->name,
+                'pop_code' => $branchPop?->pop_code,
+                'mini_pop_id' => $miniPop?->id,
                 'distribution_code' => $distributionCodeInput,
                 'city_id' => $cityId,
                 'district_id' => $districtId,
@@ -2200,6 +2231,7 @@ class CustomerController extends Controller
                     }
 
                     $pop = ! empty($row['pop_id']) ? Pop::find($row['pop_id']) : null;
+                    $miniPop = ! empty($row['mini_pop_id']) ? Pop::find($row['mini_pop_id']) : null;
                     $distribution = null;
                     $distributionCode = trim((string) ($row['distribution_code'] ?? ''));
                     if ($distributionCode === '0') {
@@ -2247,6 +2279,7 @@ class CustomerController extends Controller
                         'registration_date' => $row['registration_date'] ?? now()->format('Y-m-d'),
                         'registered_by_name' => $row['registered_by_name'] ?? null,
                         'pop_id' => $pop?->id,
+                        'mini_pop_id' => $miniPop?->id,
                         'distribution_id' => $distribution?->id,
                         'status' => 'registered', // Default, updated by service activation or mapping
                         'created_by' => auth()->id(),
