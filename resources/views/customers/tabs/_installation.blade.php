@@ -28,6 +28,19 @@
         <p class="text-[11px] text-slate-500 mt-0.5">Jadwal, tim teknisi, material terpakai, alat kerja, foto berita acara, dan metrik hasil pengujian layanan.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2 shrink-0">
+        {{-- Modal ringkas x-data-nya sendiri, jauh di bawah file ini
+             (dekat modal Isi Data Pemasangan) — komunikasi lewat window
+             event 'open-modal' (dipakai bareng <x-ui.modal>), BUKAN
+             manggil method Alpine lintas komponen (dua x-data terpisah,
+             gak saling lihat state). --}}
+        @can('customers.qr.view')
+            <button type="button" @click="window.dispatchEvent(new CustomEvent('open-modal', { detail: 'qr-peek' }))"
+                    class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
+                <i class="fa-solid fa-qrcode"></i>
+                QR Pelanggan
+            </button>
+        @endcan
+
         @can('customers.detail.installation.update')
             <button type="button" onclick="openTestReportModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
                 <i class="fa-solid fa-gauge-high"></i>
@@ -345,6 +358,74 @@
     </div>
 @endif
 
+@can('customers.qr.view')
+{{--
+    Modal ringkas QR (dipicu tombol "QR Pelanggan" di header tab ini) —
+    versi ciut dari halaman penuh customers.qr.show: SENGAJA nol Riwayat
+    PIN, nol Reset PIN, nol Cabut Token. Cuma "ada QR apa enggak" → gambar →
+    Terbitkan (kalau belum ada) → Cetak Stiker. Reset PIN/riwayat/cabut
+    tetap khusus halaman penuh (link "Kelola lengkap" di footer modal ini) —
+    aksi destruktif itu sengaja gak dibikin gampang ke-klik dari sini.
+--}}
+<div x-data="qrPeekModal('{{ route('customers.qr.status', $customer) }}', '{{ route('customers.qr.issue', $customer) }}')"
+     x-on:open-modal.window="$event.detail === 'qr-peek' && load()">
+    <x-ui.modal name="qr-peek" title="QR Pelanggan" maxWidth="sm">
+        <div class="min-h-[220px] flex flex-col items-center justify-center gap-3 text-center">
+            {{-- Loading --}}
+            <template x-if="loading">
+                <div class="flex flex-col items-center gap-2 py-8 text-text-muted">
+                    <svg class="animate-spin h-6 w-6 text-sky-500" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <span class="text-xs">Memuat status QR…</span>
+                </div>
+            </template>
+
+            {{-- Belum ada token --}}
+            <template x-if="!loading && !status.has_token">
+                <div class="flex flex-col items-center gap-3 py-6">
+                    <i class="fa-solid fa-qrcode text-4xl text-slate-300 dark:text-slate-600"></i>
+                    <p class="text-xs text-text-secondary">Pelanggan ini belum punya QR aktif.</p>
+                    @can('customers.qr.create')
+                        <button type="button" :disabled="issuing" @click="issue()"
+                                class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-xs font-semibold cursor-pointer">
+                            <span x-show="!issuing">Terbitkan QR</span>
+                            <span x-show="issuing" x-cloak>Menerbitkan…</span>
+                        </button>
+                    @endcan
+                </div>
+            </template>
+
+            {{-- Sudah ada token — QR fade+scale in, bukan langsung nongol polos --}}
+            <template x-if="!loading && status.has_token">
+                <div class="w-full flex flex-col items-center gap-2"
+                     x-transition:enter="transition ease-out duration-500"
+                     x-transition:enter-start="opacity-0 scale-90"
+                     x-transition:enter-end="opacity-100 scale-100">
+                    <img :src="status.qr_data_uri" alt="QR Pelanggan" class="w-36 h-36">
+                    <div class="font-bold uppercase text-sm text-text-main" x-text="status.customer.full_name"></div>
+                    <div class="text-xs font-mono text-text-muted" x-text="status.customer.customer_code + ' · ' + (status.customer.pop_name || '')"></div>
+                    <div class="text-xs font-mono font-bold text-sky-600" x-text="'Login ID: ' + (status.customer.portal_login_id || '—')"></div>
+                    <div class="text-[11px] text-text-muted pt-1" x-text="'Diterbitkan ' + status.issued_at + ' · ' + status.scan_count + 'x discan'"></div>
+                </div>
+            </template>
+        </div>
+
+        <x-slot name="footer">
+            <a :href="status.print_url" target="_blank" x-show="!loading && status.has_token"
+               class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold cursor-pointer">
+                Cetak Stiker
+            </a>
+            <a href="{{ route('customers.qr.show', $customer) }}"
+               class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+                Kelola Lengkap
+            </a>
+        </x-slot>
+    </x-ui.modal>
+</div>
+@endcan
+
 @can('fill_installation')
 <div id="installation-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
@@ -579,3 +660,58 @@
     </div>
 </div>
 @endcan
+
+<script>
+    // Dideklarasikan di partial ini (bukan customers/show.blade.php atau
+    // fieldwork.blade.php) — partial ini di-include di DUA halaman
+    // berbeda, taruh di sini sekali cukup, gak perlu didaftarin ulang di
+    // tiap halaman pemanggil.
+    function qrPeekModal(statusUrl, issueUrl) {
+        return {
+            loading: false,
+            issuing: false,
+            loaded: false,
+            status: { has_token: false, customer: {}, print_url: '#' },
+
+            async load() {
+                // Fetch ulang tiap modal dibuka (bukan cuma sekali) — token
+                // bisa saja baru diterbitkan dari halaman lain/tab lain
+                // sejak modal terakhir kebuka, status basi lebih buruk
+                // daripada nunggu fetch sebentar.
+                this.loading = true;
+                try {
+                    const res = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
+                    if (res.ok) {
+                        this.status = await res.json();
+                        this.loaded = true;
+                    }
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async issue() {
+                this.issuing = true;
+                try {
+                    const res = await fetch(issueUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                    });
+                    // issue() di controller bisa balas JSON (PIN baru
+                    // sekaligus terbit) ATAU redirect (token sudah ada) —
+                    // modal ringkas ini gak peduli PIN-nya, cukup re-fetch
+                    // status buat dapat qr_data_uri terbaru dalam bentuk
+                    // yang konsisten, bukan parse dua bentuk respons beda.
+                    if (res.ok || res.redirected) {
+                        await this.load();
+                    }
+                } finally {
+                    this.issuing = false;
+                }
+            },
+        };
+    }
+</script>

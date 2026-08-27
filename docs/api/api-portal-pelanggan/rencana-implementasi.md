@@ -42,7 +42,12 @@ origin lain (dan route `api-pop-distribusi`) ditolak — **dibuktikan test**, li
 `/ping` dipertahankan permanen sebagai health-check (bukan dibuang setelah Fase 2),
 tanpa proteksi token — datanya kosong, risiko disclosure nol.
 
-## Fase 2 — Kredensial & auth portal — **SELESAI SEBAGIAN (2026-08-25)**
+## Fase 2 — Kredensial & auth portal — **SELESAI (2026-08-26)**
+
+**Judul sempat "SELESAI SEBAGIAN"** karena `POST /auth/claim` masih stub 501
+menunggu modul QR/PIN (§6.5) kelar duluan — label ketinggalan diupdate begitu
+claim() diaktifkan 2026-08-26 (lihat catatan di bawah), padahal seluruh isi
+bagian ini sudah full functional & full tertest sejak saat itu.
 
 **Selesai & full functional:**
 - `customer_portal_accounts`, `customer_portal_tokens` (migrasi + model,
@@ -57,25 +62,54 @@ tanpa proteksi token — datanya kosong, risiko disclosure nol.
 - Pencabutan token via `CustomerObserver` saat pelanggan `terminated`
   (`WorkflowTransition::TERMINATED->value`).
 - Command `customers:backfill-portal-login-id` (penerbitan `login_id` massal)
-  dan `customers:portal-set-password-for-testing` (DEV ONLY, smoke-test
-  manual selama `/auth/claim` masih stub).
-- 14 file test, `tests/Feature/Api/CustomerPortal/`.
+  dan `customers:portal-set-password-for-testing` (DEV ONLY, smoke-test manual).
+- 14 file test, `tests/Feature/Api/CustomerPortal/` (+ `PortalClaimTest`
+  sejak `/auth/claim` aktif).
 
-**`POST /auth/claim` — STUB (501), menunggu modul QR/PIN.** Verifikasi PIN
-butuh infrastruktur dari `docs/plan/qr-code/rancangan-qr-pelanggan-final.md`
-§7.6 (kartu fisik dicetak bareng token QR) — modul itu nol kode DAN nol
-keputusan operasional (threat-model ONT dalam/luar rumah, logistik cetak
-belum diputuskan pemilik produk). Keputusan user 2026-08-24: tahan endpoint
-ini sebagai stub, jangan bangun mekanisme PIN paralel yang menyimpang dari
-desain "PIN dibangkitkan bersama token QR". Rate limiter `customer-portal-auth`
-+ `-auth-ip` tetap terpasang di route-nya.
+**`POST /auth/claim` — AKTIF sejak 2026-08-26** (sebelumnya stub 501,
+menunggu modul QR/PIN). Modul `docs/plan/qr-code/rancangan-qr-pelanggan-final.md`
+Fase 1 & 2 sudah jalan — `PortalAuthService::claim()` memverifikasi PIN lewat
+`CustomerQrTokenService::verifyPin()` (jalur SAMA dengan gerbang QR publik,
+§6.5.4), lalu menaikkan `customer_portal_accounts.status` dari `pending_claim`
+ke `active` dengan `password_hash` pilihan pelanggan sendiri. Akun `pending_claim`
+harus sudah ada duluan (lewat `customers:backfill-portal-login-id`) — endpoint
+ini TIDAK membuat baris akun dari nol, cuma mengaktifkannya. Rate limiter
+`customer-portal-auth` + `-auth-ip` (sudah terpasang sejak stub) tetap berlaku.
+Kartu fisik ber-PIN+Login ID (§7.1, §6.6.2) sudah dicetak lewat halaman staf
+`CustomerQrController::issue()`/`reissuePin()` — lihat `docs/plan/qr-code/`.
 
-**Pencetakan kartu ber-PIN — di luar scope, ikut modul QR** (belum dikerjakan).
+**Threat-model ONT & logistik cetak fisik** (§0, §7.6 dokumen QR) — status
+keputusan operasional itu TIDAK dicek ulang saat mengaktifkan `claim()` ini;
+kalau masih terbuka, tetap terbuka independen dari endpoint API-nya.
 
-**Dikonfirmasi 2026-08-24:** `{prefix_pop}` di `login_id` = `pops.registration_prefix`
-(bukan `cid_prefix`) — lihat `keputusan.md` §3 poin 1. `cid` sempat diusulkan ulang,
-ditolak lagi dengan alasan sama seperti §1: baru terbit saat pelanggan aktif, cuma
-index biasa (bukan unique).
+**DIREVISI 2026-08-26:** `{prefix_pop}` di `login_id` = `pops.cid_prefix` — bukan
+`registration_prefix` seperti keputusan 2026-08-24 semula. `registration_prefix`
+SENGAJA boleh sama di banyak POP (tanpa constraint unique) dan sudah jadi bagian
+pembentuk `customer_code` sendiri, jadi hasilnya prefix dobel (`RQ-RQ000004`) dan
+gak beneran unik global — ketahuan dari data migrasi legacy nyata. `cid_prefix`
+WAJIB unik per cabang, format `login_id` jadi `{cid_prefix}00{bare_registration_id}`
+(sama seperti `display_id` default pra-aktivasi). Lihat `keputusan.md` §3 poin 1.
+`cid` (kolom) tetap ditolak jadi basis `login_id` — alasan sama seperti §1: baru
+terbit saat pelanggan aktif, cuma index biasa (bukan unique).
+
+**Konsekuensi revisi ini BARU ketahuan 2026-08-26 lewat verifikasi HTTP manual
+terhadap DB dev sungguhan** (bukan test suite — test suite selalu bikin baris baru
+pakai formula terkini, jadi gak pernah ke-exercise baris LAMA): revisi
+`registration_prefix` → `cid_prefix` di atas mengubah HASIL formula, tapi baris
+`customer_portal_accounts` yang SUDAH dibuat sebelum revisi ini MASIH menyimpan
+`login_id` versi lama — sementara kartu yang staf cetak sekarang selalu
+`$customer->portal_login_id` (accessor, live, formula terkini). Data nyata: 99 dari
+100 akun di DB dev basi begini, `/auth/claim` gagal total kalau dicoba pakai
+login_id yang BENERAN tercetak (yang lama, gak pernah dicetak lagi, justru masih
+"jalan"). Fix: `customers:backfill-portal-login-id --resync` (baru) — resync CUMA
+baris `status=pending_claim` (belum ada kredensial nyata yang bergantung ke nilai
+lama), baris `status=active` SENGAJA dibiarkan basi kalau ada (pelanggan yang sudah
+klaim mungkin sudah tahu & pernah login pakai nilai lama itu — menimpanya diam-diam
+mengunci akun yang sudah aktif). Sudah dijalankan sekali terhadap DB dev
+(97 akun di-resync), 0 baris `pending_claim` basi tersisa. Test:
+`CustomersBackfillPortalLoginIdCommandTest` (+3 kasus), `PortalClaimTest`
+(+1 kasus — reproduksi bug persis: login_id basi berhasil klaim, login_id yang
+BENERAN tercetak malah gagal).
 
 **Keputusan tambahan dikonfirmasi 2026-08-25** (angka yang tidak eksplisit di
 dokumen manapun sebelumnya):

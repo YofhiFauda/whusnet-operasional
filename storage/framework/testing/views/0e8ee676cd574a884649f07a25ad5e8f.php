@@ -880,7 +880,18 @@
             // per POP ini (Gap #3).
             allowedPopIds: <?php echo json_encode($allowedPopIds, 15, 512) ?>,
 
+            // Prefill dari scan QR (QrTicketController — Fungsi B,
+            // docs/plan/qr-code/rancangan-qr-pelanggan-final.md §6.2). Bentuk
+            // objeknya SAMA PERSIS hasil lookup-customer (lihat
+            // TicketController::customerPayload()), jadi pick() yang sudah
+            // ada bisa langsung dipakai apa adanya — nol logic baru.
+            prefillCustomer: <?php echo json_encode($prefillCustomer ?? null, 15, 512) ?>,
+
             init() {
+                if (this.prefillCustomer) {
+                    this.pick(this.prefillCustomer);
+                    this.setFormOpen(true);
+                }
                 this.initEchoListeners();
                 const narrow = window.matchMedia('(max-width: 1023px)');
                 const updateNarrow = () => { this.narrowViewport = narrow.matches; };

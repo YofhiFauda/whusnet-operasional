@@ -7,6 +7,31 @@ use Carbon\Carbon;
 class FormatHelper
 {
     /**
+     * Samarkan nama pelanggan buat halaman publik tanpa auth (QR §6.1
+     * langkah 1 — "MASUDAH Y****** F*****"). Kata pertama tetap utuh (biar
+     * pelanggan yakin ini kartunya), kata berikutnya cuma huruf pertama +
+     * jumlah bintang TETAP (bukan mengikuti panjang asli) — panjang kata
+     * asli sendiri juga informasi yang gak perlu bocor ke siapa pun yang
+     * motret stikernya.
+     */
+    public static function maskName(?string $fullName): string
+    {
+        $words = array_values(array_filter(explode(' ', trim((string) $fullName))));
+
+        if ($words === []) {
+            return '';
+        }
+
+        $masked = [strtoupper($words[0])];
+
+        for ($i = 1; $i < count($words); $i++) {
+            $masked[] = mb_strtoupper(mb_substr($words[$i], 0, 1)).'*****';
+        }
+
+        return implode(' ', $masked);
+    }
+
+    /**
      * Format a number to Indonesian Rupiah (Rp).
      *
      * @param  float|int|string|null  $amount

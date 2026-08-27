@@ -69,4 +69,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request, Throwable $e) => $request->is('api/*') || $request->expectsJson()
         );
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+        // §6.5.4, §6.5.5b) — "PIN plaintext tidak pernah masuk session,
+        // cache, flash, atau log". Laravel default-nya CUMA mengecualikan
+        // password/password_confirmation/current_password dari
+        // withInput() saat validasi gagal — kalau field pin/hp_last4/
+        // new_pin lolos lewat $request->validate() biasa TANPA baris ini,
+        // validasi format yang gagal (mis. kurang dari 6 digit) bakal
+        // nge-flash PIN yang diketik ke session `_old_input`, persis yang
+        // dilarang dokumen. QrBillingController pakai nama field ini —
+        // didaftarkan global di sini (bukan per-controller) supaya
+        // pengaman ini tidak bisa lupa kepasang lagi kalau field serupa
+        // ditambah di tempat lain nanti.
+        $exceptions->dontFlash(['pin', 'hp_last4', 'new_pin', 'new_pin_confirmation', 'new_password']);
     })->create();

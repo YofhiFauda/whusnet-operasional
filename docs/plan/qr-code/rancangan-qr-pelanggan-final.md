@@ -838,7 +838,7 @@ App ini **tidak** menunggu portal selesai dibangun untuk mulai — Fase 5a (API 
 | **A — QR + PIN** | Pelanggan memindai stiker/kartu dari HP | Token QR + signature (§5) + PIN (§6.5.4) | Akses halaman tagihan; kalau akun portal sudah diklaim, sekaligus terbitkan token API |
 | **B — Login ID + password** | Pelanggan membuka portal langsung | `login_id` + password (§6.6.5) | Token API |
 
-**Login ID** = `{prefix_pop}-{customer_code}` (mis. `PNG-RQ000631`), dicetak di kartu pelanggan bersama PIN. Unik global **karena** `customer_code` cuma unik per POP (composite unique `(pop_id, customer_code)`) — prefix POP-lah yang melengkapinya. **Bukan `display_id`**: `display_id` berubah RQ↔CID seiring lifecycle (§2.1), jadi login ID yang memakainya akan basi begitu pelanggan aktif.
+**Login ID** = `{cid_prefix}00{bare_registration_id}` (mis. `PNG00RQ000631`, sama format-nya dengan `display_id` default pra-aktivasi), dicetak di kartu pelanggan bersama PIN. Unik global **karena** `customer_code` cuma unik per POP (composite unique `(pop_id, customer_code)`) — `cid_prefix` (WAJIB unik per cabang) yang melengkapinya, **bukan** `registration_prefix` (SENGAJA boleh sama di banyak POP — DIREVISI 2026-08-26, lihat `docs/api/api-portal-pelanggan/keputusan.md` §3 poin 1). **Bukan `display_id`**: `display_id` berubah RQ↔CID seiring lifecycle (§2.1), jadi login ID yang memakainya akan basi begitu pelanggan aktif — formula di atas sengaja tidak menyentuh kolom `cid`/status supaya tetap permanen.
 
 ```
 [1] Portal kirim kredensial pelanggan
@@ -920,7 +920,7 @@ Argumen tandingannya nyata dan tetap berlaku: dua kredensial = dua permukaan boc
 
 ```
 Portal → "Aktivasi Akun"
-   │  Login ID (PNG-RQ000631)  +  PIN 6 digit dari kartu
+   │  Login ID (PNG00RQ000631)  +  PIN 6 digit dari kartu
    ▼
 POST /api/customer-portal/auth/claim
    ├─ verifikasi PIN lewat jalur yang SAMA dengan §6.5.4
@@ -993,7 +993,7 @@ Tabel **`webhook_outbox`** (bukan tabel terpisah — sudah dibuat & dipakai bare
   "event_id": "b1f2…",
   "event": "invoice.updated",
   "occurred_at": "2026-08-14T09:12:33+07:00",
-  "customer": { "login_id": "PNG-RQ000631" },
+  "customer": { "login_id": "PNG00RQ000631" },
   "invoice": {
     "invoice_number": "INV-2026-08-000123",
     "invoice_status": "lunas",
@@ -1060,6 +1060,11 @@ Hanya tiket dengan `customer_id` = pemilik token.
 ---
 
 ## 7. Siklus hidup: dua media, satu QR
+
+> **Lihat §7.6 untuk revisi 2026-08-26** — halaman cetak ulang ("Stiker") sekarang
+> ikut memuat Login ID Portal (bukan cuma QR+nama+REQ ID+POP seperti diagram di
+> bawah). PIN tetap TIDAK pernah muncul di halaman reprintable — batasan teknis
+> (hash), bukan lagi cuma pilihan desain "dua faktor dua media".
 
 ### 7.1 Dua media — apa persisnya yang berbeda
 
@@ -1176,12 +1181,27 @@ Rotasi diikuti audit token mana yang masih memakai secret lama (bandingkan `cust
 
 ### 7.6 Halaman cetak
 
-`customers.qr.print` merender dua layout dari token yang sama:
+**REVISI 2026-08-26 (keputusan eksplisit user, dua kali ditegaskan):** rancangan
+awal di bawah ("dua layout terpisah, PIN cuma di Kartu") DIGANTI — `customers.qr.print`
+("Cetak Stiker") sekarang **satu** layout berisi QR + nama + REQ ID + POP + **Login ID
+Portal**, reprintable kapan pun. Login ID digabung karena BUKAN rahasia (kunci klaim
+akun, bukan bukti identitas). **PIN TETAP TIDAK ikut** — ini bukan lagi soal desain
+"dua faktor harus dua media" (§6.5.1 tetap benar argumennya), tapi keterbatasan
+TEKNIS: PIN disimpan HASH (bcrypt), begitu direspons sekali saat terbit/reset
+(modal `x-ui.modal` di halaman QR Pelanggan, lihat §10 Fase 2 revisi) plaintext-nya
+hilang dari sistem selamanya. Halaman cetak ulang (GET biasa, dibuka kapan saja)
+secara struktural TIDAK BISA menampilkan nilai yang sudah tidak ada di DB — satu-
+satunya cara membuatnya bisa adalah mengubah `pin_hash` jadi reversible (encrypt,
+bukan hash), yang berarti siapa pun dengan akses DB bisa membaca PIN semua
+pelanggan. Itu bukan bagian dari perubahan ini — kalau suatu saat diinginkan,
+itu keputusan keamanan terpisah yang harus diminta eksplisit.
+
+Rancangan awal (arsip, TIDAK lagi berlaku persis begini):
 
 | Layout | Isi | Pemakaian |
 |---|---|---|
-| **Stiker** | QR + nama + REQ ID + POP, **tanpa PIN, tanpa signature teks** | Grid siap potong, cetak massal per POP |
-| **Kartu** | QR + PIN + petunjuk pakai | Per pelanggan, hanya saat PIN diterbitkan (`no-store`) |
+| ~~**Stiker**~~ | ~~QR + nama + REQ ID + POP, tanpa PIN, tanpa signature teks~~ | Digabung dengan Login ID, lihat revisi di atas |
+| **Kartu** | QR + PIN + petunjuk pakai | Ditampilkan SEKALI lewat modal saat PIN diterbitkan/direset — bukan halaman terpisah lagi |
 
 **Label manusia di stiker pakai REQ ID, bukan CID.** REQ ID permanen; CID baru terisi setelah pelanggan aktif, sehingga label CID di stiker yang dicetak saat `WAITING_INSTALLATION` langsung basi.
 

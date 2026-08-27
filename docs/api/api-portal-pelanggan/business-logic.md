@@ -20,8 +20,10 @@ kenapa ada client secret di samping token pelanggan, dan kenapa kebutuhan #3
 
 ## Autentikasi
 
-**Login ID = `{prefix_pop}-{customer_code}`** (mis. `PNG-RQ000631`), dicetak di kartu
-pelanggan bersama PIN (§6.6.2).
+**Login ID = `{cid_prefix}00{bare_registration_id}`** (mis. `PNG00RQ000631`, sama
+format-nya dengan `display_id` default pra-aktivasi), dicetak di kartu pelanggan
+bersama PIN (§6.6.2). DIREVISI 2026-08-26 — dulu pakai `registration_prefix`, lihat
+`keputusan.md` §3 poin 1 kenapa itu salah.
 
 ### Kenapa bukan `cid`
 
@@ -39,10 +41,13 @@ titik yang keduanya berakhir buruk:
 - **Nullable.** Pelanggan yang belum aktif belum punya CID, padahal sudah punya
   tagihan pemasangan yang justru ingin ia lihat.
 
-`login_id` menutup keduanya: `customer_code` unik per POP, dan prefix POP-lah yang
-melengkapinya jadi unik global. Ia juga bukan `display_id` — `display_id` berubah
-RQ↔CID seiring lifecycle, jadi login ID yang memakainya akan basi begitu pelanggan
-aktif.
+`login_id` menutup keduanya: `customer_code` unik per POP, dan `cid_prefix`
+(WAJIB unik per cabang, `Rule::unique('pops','cid_prefix')->where('type','cabang')`)
+yang melengkapinya jadi unik global — BUKAN `registration_prefix`, yang SENGAJA
+boleh sama di banyak POP (DIREVISI 2026-08-26, lihat `keputusan.md` §3 poin 1). Ia
+juga bukan `display_id` — `display_id` berubah RQ↔CID seiring lifecycle, jadi login
+ID yang memakainya akan basi begitu pelanggan aktif; formula `login_id` di sini
+sengaja tidak menyentuh kolom `cid`/status supaya tetap permanen.
 
 ### Token
 
@@ -105,10 +110,12 @@ Semua butuh header `X-Portal-Client` + client secret, di samping bearer token.
 
 ## Kontrak endpoint — request & response
 
-**Status: Fase 0-4 selesai** (`rencana-implementasi.md`), `/auth/claim` stub 501.
-Contoh di bawah diambil PERSIS dari kode yang jalan (`app/Http/Resources/CustomerPortal/`,
-`app/Http/Controllers/CustomerPortal/`) per 2026-08-25 — bukan rancangan, ini kontrak
-nyata. Kalau kode berubah dan bagian ini gak ikut diupdate, bagian ini yang basi.
+**Status: Fase 0-4 selesai** (`rencana-implementasi.md`), `/auth/claim` AKTIF sejak
+2026-08-26 (modul QR/PIN pelanggan, `docs/plan/qr-code/rancangan-qr-pelanggan-final.md`
+Fase 2, sudah jalan). Contoh di bawah diambil PERSIS dari kode yang jalan
+(`app/Http/Resources/CustomerPortal/`, `app/Http/Controllers/CustomerPortal/`) per
+2026-08-26 — bukan rancangan, ini kontrak nyata. Kalau kode berubah dan bagian ini
+gak ikut diupdate, bagian ini yang basi.
 
 Header wajib SEMUA endpoint: `X-Portal-Client: <client secret>`. `/auth/login`,
 `/auth/claim`, `/auth/refresh` cukup itu. Sisanya (`/me*`) tambah
@@ -121,7 +128,7 @@ balikin objek flat (`{access_token, ...}` atau `{message}`), **BUKAN** envelope
 
 ### Auth
 
-**`POST /auth/login`** — request `{"login_id": "PNG-RQ000631", "password": "..."}`.
+**`POST /auth/login`** — request `{"login_id": "PNG00RQ000631", "password": "..."}`.
 Response 200:
 ```json
 {"access_token": "<64 karakter acak>", "refresh_token": "<64 karakter acak>", "token_type": "Bearer", "expires_in": 900}
@@ -132,10 +139,18 @@ sementara, coba lagi nanti."}` (5x gagal, lockout 15 menit, DB-based); 429 (limi
 `customer-portal-auth` 5/15menit per IP+login_id **dan** `customer-portal-auth-ip`
 30/15menit per IP).
 
-**`POST /auth/claim`** — STUB, SELALU 501:
-```json
-{"message": "Klaim akun portal belum tersedia — menunggu modul QR/PIN pelanggan."}
-```
+**`POST /auth/claim`** — AKTIF (2026-08-26). Request
+`{"login_id": "PNG00RQ000631", "pin": "482917", "new_password": "..."}`. Akun
+`customer_portal_accounts` HARUS sudah ada berstatus `pending_claim` (lihat
+`customers:backfill-portal-login-id`) — endpoint ini TIDAK membuat baris akun dari
+nol. PIN diverifikasi lewat jalur SAMA `CustomerQrTokenService::verifyPin()` yang
+dipakai gerbang QR publik (§6.5.4) — lockout 5x/15menit per token QR ikut berlaku,
+tidak ada jalur bypass kedua. Response 200: sama bentuk `login`. Error: 401
+`{"message": "Login ID atau PIN salah."}` (login_id gak ada, PIN salah, ATAU
+pelanggan belum punya token QR aktif — pesan SAMA PERSIS, gak boleh dibedakan);
+409 `{"message": "Akun ini sudah pernah diaktivasi — gunakan Lupa Password."}`
+(status akun sudah `active`); 423 `{"message": "PIN terkunci sementara, coba lagi
+nanti."}` (lockout PIN, bukan lockout akun); 429 (limiter sama seperti `login`).
 
 **`POST /auth/refresh`** — request `{"refresh_token": "..."}`. Response 200: sama
 bentuk `login`, `refresh_token` lama otomatis dicabut (rotasi). Error: 401
@@ -155,7 +170,7 @@ rantai ke refresh pasangannya tanpa client kirim `refresh_token` tambahan).
 ```json
 {
   "data": {
-    "login_id": "PNG-RQ000631", "full_name": "Budi Santoso", "status": "active",
+    "login_id": "PNG00RQ000631", "full_name": "Budi Santoso", "status": "active",
     "package": "Home 20 Mbps", "village": "Joresan", "district": "Mlarak",
     "claimed_at": "2026-08-01T10:00:00+07:00"
   },
@@ -266,9 +281,9 @@ nama pegawai tidak pernah muncul. 404 kalau nomor gak ada/milik pelanggan lain.
 | 401 | Client secret salah/gak ada (`X-Portal-Client`), token gak valid/expired, kredensial login salah |
 | 404 | Nomor dokumen (invoice/payment/ticket) gak ada ATAU milik pelanggan lain — sengaja sama, gak bisa dibedakan dari luar |
 | 422 | Validasi request gagal |
-| 423 | Akun terkunci (lockout 5x gagal login) |
+| 423 | Akun terkunci (lockout 5x gagal login), ATAU PIN terkunci (lockout 5x gagal di `/auth/claim` / gerbang QR publik) |
 | 429 | Rate limit — `customer-portal-api` 120/menit (endpoint data), `customer-portal-auth`+`-auth-ip` (endpoint kredensial) |
-| 501 | `/auth/claim` — stub, menunggu modul QR/PIN |
+| 409 | `/auth/claim` — akun sudah pernah diaktivasi |
 
 ## #1 — Ganti password
 

@@ -25,11 +25,20 @@
     $iconSize = $isCard ? 'w-5 h-5' : 'w-[18px] h-[18px]';
 @endphp
 <div class="flex items-center gap-2 {{ $isCard ? 'w-full' : 'justify-end' }}">
-    <button type="button" class="{{ $iconBtn }} hover:text-primary hover:border-primary" title="Generate/Lihat QR" aria-label="Generate atau lihat QR pelanggan" onclick="window.Toast.info('Mockup', 'Generate/Lihat QR')">
-        <svg class="{{ $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-        </svg>
-    </button>
+    {{-- Dulu mockup (`window.Toast.info('Mockup', ...)`) — disambungkan ke
+         modal ringkas QR sungguhan (docs/plan/qr-code/). URL status/terbitkan
+         DIRENDER SERVER-SIDE per baris (route()), bukan dirakit di JS dari
+         id pelanggan (ADHOC-20 langkah 3, pola sama openRejectModal). Modal-
+         nya SATU doang di halaman ini (banyak baris pelanggan) — makanya
+         lewat Alpine.store, bukan x-data lokal, lihat script bawah file. --}}
+    @can('customers.qr.view')
+        <button type="button" class="{{ $iconBtn }} hover:text-primary hover:border-primary" title="Generate/Lihat QR" aria-label="Generate atau lihat QR pelanggan"
+                onclick="openQrPeek('{{ route('customers.qr.status', $customer) }}', '{{ route('customers.qr.issue', $customer) }}', '{{ route('customers.qr.show', $customer) }}')">
+            <svg class="{{ $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+        </button>
+    @endcan
 
     @if ($customer->status === 'waiting_acc' || $customer->status === 'surveyed')
         @if ($canValidate)

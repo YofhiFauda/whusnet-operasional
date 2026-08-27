@@ -1043,7 +1043,7 @@ class CustomerController extends Controller
             ->limit(50)
             ->get();
 
-        // 2. Tasks & FopTasks untuk Riwayat Ticketing
+        // 2. Tasks, Tickets, & FopTasks untuk Riwayat Ticketing
         $customerTasks = $customer->tasks()
             ->with([
                 'teamMembers.user',
@@ -1054,7 +1054,22 @@ class CustomerController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Tiket Helpdesk/NOC/FOP pelanggan ini — SATU baris per tiket, dua
+        // rezim tampilan tergantung `handler` (lihat blok Ticket di view):
+        //  - handler=FOP        → dirender sebagai "Ticket FOP" (data dari fopTask).
+        //  - handler=HELPDESK/NOC → dirender sebagai "Ticket Helpdesk/NOC" (data tiket sendiri).
+        // Ticket::bucket()/statusLabel() sudah menangani dua rezim ini, dipakai ulang di view.
+        $customerTickets = $customer->tickets()
+            ->with(['fopTask.technicians', 'issueCategory', 'creator', 'pop'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // FopTask lama yang TIDAK berasal dari tiket (dibuat langsung dari
+        // /fop-tasks, bukan lewat Ticket::escalateToFop()) tetap tampil apa
+        // adanya. FopTask yang punya tiket sudah terwakili di $customerTickets
+        // di atas (sebagai "Ticket FOP") — jangan ditampilkan dobel di sini.
         $customerFopTasks = $customer->fopTasks()
+            ->whereDoesntHave('ticket')
             ->with(['technicians', 'village', 'pop'])
             ->orderBy('task_date', 'desc')
             ->get();
@@ -1076,6 +1091,7 @@ class CustomerController extends Controller
             'auditLogs',
             'statusLogs',
             'customerTasks',
+            'customerTickets',
             'customerFopTasks',
             'availableMiniPops',
             'availableDistributions'

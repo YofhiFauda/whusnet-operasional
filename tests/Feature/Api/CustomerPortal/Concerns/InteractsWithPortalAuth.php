@@ -25,9 +25,9 @@ trait InteractsWithPortalAuth
         config(['webhooks.portal_client_secret' => self::PORTAL_CLIENT_SECRET]);
     }
 
-    protected function seedPop(string $registrationPrefix = 'PNG'): Pop
+    protected function seedPop(string $cidPrefix = 'PNG'): Pop
     {
-        return Pop::factory()->create(['registration_prefix' => $registrationPrefix]);
+        return Pop::factory()->create(['cid_prefix' => $cidPrefix]);
     }
 
     /**
@@ -39,7 +39,7 @@ trait InteractsWithPortalAuth
 
         $customer = Customer::factory()->create(array_merge(['pop_id' => $pop->id], $customerOverrides));
 
-        $loginId = "{$pop->registration_prefix}-{$customer->customer_code}";
+        $loginId = $customer->portal_login_id;
 
         $account = CustomerPortalAccount::create([
             'customer_id' => $customer->id,

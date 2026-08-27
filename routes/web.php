@@ -15,6 +15,7 @@ use App\Http\Controllers\CustomerFailedController;
 use App\Http\Controllers\CustomerFieldworkController;
 use App\Http\Controllers\CustomerInstallationController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
+use App\Http\Controllers\CustomerQrController;
 use App\Http\Controllers\CustomerReportController;
 use App\Http\Controllers\CustomerSurveyController;
 use App\Http\Controllers\CustomerTerminatedController;
@@ -44,6 +45,9 @@ use App\Http\Controllers\PaymentBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
+use App\Http\Controllers\QrBillingController;
+use App\Http\Controllers\QrScanController;
+use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskMaintenanceController;
@@ -65,6 +69,52 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
+});
+
+// QR Pelanggan — dispatcher publik (docs/plan/qr-code/rancangan-qr-
+// pelanggan-final.md §5, Fase 1). SENGAJA di luar middleware `guest`
+// MAUPUN `auth` — satu URL melayani tamu (belum login) dan staf (login)
+// sekaligus, dibedakan lewat auth()->check() di dalam QrScanController.
+// Regex format base32 penuh (BUKAN charset ULID) menyaring sampah SEBELUM
+// satu query DB pun jalan.
+Route::middleware('throttle:qr-public')->group(function () {
+    Route::get('/q1/{code}', [QrScanController::class, 'dispatch'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.dispatch');
+
+    // Fungsi A — halaman tagihan publik (§6.1, Fase 2). Bisa diakses
+    // langsung (bookmark) TANPA lewat qr.dispatch dulu — QrBillingController
+    // meresolusi $code mandiri, bukan asumsi sudah tervalidasi.
+    Route::get('/q1/{code}/tagihan', [QrBillingController::class, 'show'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.billing');
+});
+
+// Limiter TERPISAH & lebih ketat dari qr-public baseline — endpoint ini
+// menerima kredensial (PIN/4-digit HP), bukan cuma baca (§10 Fase 2).
+Route::middleware('throttle:qr-billing-verify')->group(function () {
+    Route::post('/q1/{code}/tagihan/verifikasi', [QrBillingController::class, 'verify'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.billing.verify');
+
+    // Wajib ganti PIN cetak saat login pertama (§6.5.5b) — dua langkah
+    // (GET form + POST submit), keduanya di belakang limiter kredensial
+    // yang sama, bukan qr-public.
+    Route::get('/q1/{code}/tagihan/ganti-pin', [QrBillingController::class, 'changePinForm'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.billing.pin.change-form');
+    Route::post('/q1/{code}/tagihan/ganti-pin', [QrBillingController::class, 'changePinSubmit'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.billing.pin.change-submit');
+});
+
+// Hop KEDUA Fungsi B — di belakang middleware `auth` ASLI (bukan cuma
+// pengecekan di controller), defense-in-depth kalau cabang pertama di
+// QrScanController somehow ke-bypass (§6.2).
+Route::middleware('auth')->group(function () {
+    Route::get('/q1/{code}/tiket', [QrTicketController::class, 'create'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.ticket.create');
 });
 
 // Authenticated Admin Routes
@@ -154,6 +204,43 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:customers.detail.installation.activate')->group(function () {
         Route::post('/customers/{customer}/activate', [CustomerController::class, 'activate'])->name('customers.activate');
+    });
+
+    // QR Pelanggan — halaman staf lihat/cetak/terbitkan/cabut token
+    // (docs/plan/qr-code/rancangan-qr-pelanggan-final.md §5, §10 Fase 1).
+    // Empat permission TERPISAH (bukan numpang customers.update) — cabut
+    // lebih destruktif dari sekadar lihat, jadi harus bisa di-toggle
+    // independen lewat Role Matrix.
+    Route::middleware('permission:customers.qr.view')->group(function () {
+        Route::get('/customers/{customer}/qr', [CustomerQrController::class, 'show'])->name('customers.qr.show');
+        // JSON ringkas — dipakai modal ringkas di tab Pemasangan
+        // (_installation.blade.php), BUKAN pengganti halaman penuh
+        // customers.qr.show. Nol PIN di payload ini (modal ringkas gak
+        // punya UI Reset PIN sama sekali — itu tetap cuma di halaman penuh).
+        Route::get('/customers/{customer}/qr/status', [CustomerQrController::class, 'status'])->name('customers.qr.status');
+    });
+    Route::middleware('permission:customers.qr.print')->group(function () {
+        Route::get('/customers/{customer}/qr/cetak', [CustomerQrController::class, 'print'])->name('customers.qr.print');
+    });
+    Route::middleware('permission:customers.qr.create')->group(function () {
+        // Terbitkan QR + PIN BARENG (koreksi 2026-08-26, §6.5.3) — aman
+        // diklik berulang: token idempoten, PIN CUMA terbit kalau belum
+        // pernah ada. Lihat CustomerQrController::issue() docblock.
+        Route::post('/customers/{customer}/qr/terbitkan', [CustomerQrController::class, 'issue'])->name('customers.qr.issue');
+    });
+    Route::middleware('permission:customers.qr.cancel')->group(function () {
+        Route::post('/customers/{customer}/qr/cabut', [CustomerQrController::class, 'revoke'])->name('customers.qr.revoke');
+        // Reset PIN numpang permission `.cancel` (bukan `.create`) — ini
+        // aksi DESTRUKTIF ke PIN yang sudah dipegang pelanggan, wajib
+        // seketat mencabut token, bukan seringan menerbitkan yang baru.
+        // Gerbangnya sisi KLIEN (modal pratinjau, koreksi 2026-08-26 —
+        // bukan lagi field `verification_note` wajib) — lihat CustomerQrController.
+        Route::post('/customers/{customer}/qr/pin/reset', [CustomerQrController::class, 'reissuePin'])->name('customers.qr.pin.reissue');
+        // "Lupa Password" — pulihkan akun portal `active` (PortalAuthService::
+        // resetToPendingClaim() docblock kenapa ini TERPISAH dari reissuePin
+        // di atas, bukan digabung). Numpang permission `.cancel` yang sama —
+        // efeknya lebih berat (matiin password + cabut semua sesi portal).
+        Route::post('/customers/{customer}/qr/portal-akun/reset', [CustomerQrController::class, 'resetPortalAccount'])->name('customers.qr.portal-account.reset');
     });
 
     // Perangkat & Pemasangan — halaman TERPISAH dari Detail Pelanggan

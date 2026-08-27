@@ -1,8 +1,8 @@
 {
   "info": {
-    "_postman_id": "5859d6b5-0d4a-4281-94eb-432d9cff546e",
+    "_postman_id": "5698baa6-cec3-48df-abd6-f8c573b393b3",
     "name": "Whusnet Operasional API",
-    "description": "# Whusnet Operational API Documentation\n\nSelamat datang di **Dokumentasi Resmi Whusnet Operational API**. \n\nDokumen ini merupakan panduan teknis standar (*Official Technical Reference*) yang diterbitkan untuk mengatur integrasi antarsistem (*inbound API integration*) antara platform mitra/aplikasi eksternal dengan ekosistem infrastruktur **Whusnet**.\n\n---\n\n### **Ringkasan Sistem (System Overview)**\n\nWhusnet Operational API bertindak sebagai *gateway* komunikasi data *inbound* untuk memfasilitasi pertukaran data operasional secara *real-time*, transparan, dan terstruktur. API ini dirancang khusus untuk menangani alur kerja integrasi *PoP (Point of Presence)*, pemetaan topologi, hingga konfirmasi alokasi jaringan secara otomatis.\n\n---\n\n### **Modul Utama API**\n\n1. **PoP & Distribution Management**\n* **Get Mini PoP Topology:** Menyediakan visibilitas *real-time* terhadap hierarki, status perangkat, dan skema topologi Mini PoP yang terhubung.\n* **Confirm Network Assignment:** Memproses konfirmasi penugasan jaringan, sinkronisasi *port*, serta validasi alokasi *bandwidth/VLAN* secara otomatis dari sistem eksternal ke infrastruktur Whusnet.\n\n---\n\n### **Standar Integrasi & Keamanan**\n\n* **Base URL:** `{app-url}/api/v1`\n* **Format Data:** Semua *request* dan *response* menggunakan format **JSON** standar (`application/json`).\n* **Autentikasi:** Seluruh *endpoint* terlindungi oleh mekanis otorisasi *Bearer Token (JWT)*. Pastikan `Authorization Header` dilampirkan pada setiap panggilan API.\n* **HTTP Status Code Standard:**\n* `200 OK` — Permintaan berhasil diproses.\n* `400 Bad Request` — Format *payload* atau parameter input tidak valid.\n* `401 Unauthorized` — Kredensial atau token API tidak valid / kedaluwarsa.\n* `500 Internal Server Error` — Terjadi kesalahan internal pada server Whusnet.\n\n---\n\n> **Catatan Penting:** \n> Untuk arsitektur sistem tingkat lanjut, batasan tingkat layanan (*rate limiting*), serta rancangan alur *web-hook* lengkap, silakan merujuk pada **Dokumen Rancangan Arsitektur Jaringan Whusnet** resmi.\n",
+    "description": "# Whusnet Operational API Documentation\n\nSelamat datang di **Dokumentasi Resmi Whusnet Operational API**.\n\nDokumen ini merupakan panduan teknis standar (_Official Technical Reference_) yang diterbitkan untuk mengatur integrasi antarsistem (_inbound API integration_) antara platform mitra/aplikasi eksternal dengan ekosistem infrastruktur **Whusnet**.\n\n---\n\n### **Ringkasan Sistem (System Overview)**\n\nWhusnet Operational API bertindak sebagai _gateway_ komunikasi data _inbound_ untuk memfasilitasi pertukaran data operasional secara _real-time_, transparan, dan terstruktur. API ini dirancang khusus untuk menangani alur kerja integrasi _PoP (Point of Presence)_, pemetaan topologi, hingga konfirmasi alokasi jaringan secara otomatis.\n\n---\n\n### **Modul Utama API**\n\n1. **PoP & Distribution Management**\n    \n\n- **Get Mini PoP Topology:** Menyediakan visibilitas _real-time_ terhadap hierarki, status perangkat, dan skema topologi Mini PoP yang terhubung.\n    \n- **Confirm Network Assignment:** Memproses konfirmasi penugasan jaringan, sinkronisasi _port_, serta validasi alokasi _bandwidth/VLAN_ secara otomatis dari sistem eksternal ke infrastruktur Whusnet.\n    \n\n---\n\n### **Standar Integrasi & Keamanan**\n\n- **Base URL:** `{app-url}/api/v1`\n    \n- **Format Data:** Semua _request_ dan _response_ menggunakan format **JSON** standar (`application/json`).\n    \n- **Autentikasi:** Seluruh _endpoint_ terlindungi oleh mekanis otorisasi _Bearer Token (JWT)_. Pastikan `Authorization Header` dilampirkan pada setiap panggilan API.\n    \n- **HTTP Status Code Standard:**\n    \n- `200 OK` — Permintaan berhasil diproses.\n    \n- `400 Bad Request` — Format _payload_ atau parameter input tidak valid.\n    \n- `401 Unauthorized` — Kredensial atau token API tidak valid / kedaluwarsa.\n    \n- `500 Internal Server Error` — Terjadi kesalahan internal pada server Whusnet.\n    \n\n---\n\n> **Catatan Penting:**  \nUntuk arsitektur sistem tingkat lanjut, batasan tingkat layanan (_rate limiting_), serta rancangan alur _web-hook_ lengkap, silakan merujuk pada **Dokumen Rancangan Arsitektur Jaringan Whusnet** resmi.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "25586934"
   },
@@ -902,7 +902,45 @@
               "item": [
                 {
                   "name": "Login",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "const body = pm.response.json();\r",
+                          "if (body.access_token) { pm.environment.set(\"access_token\", body.access_token); }\r",
+                          "if (body.refresh_token) { pm.environment.set(\"refresh_token\", body.refresh_token); }\r",
+                          "pm.test(\"Simpan token ke environment\", function () {\r",
+                          "    pm.expect(pm.response.code).to.equal(200);\r",
+                          "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {},
+                        "requests": {}
+                      }
+                    }
+                  ],
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "POST",
                     "header": [
                       {
@@ -916,7 +954,7 @@
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"login_id\": \"string\",\n  \"password\": \"string\"\n}",
+                      "raw": "{\n  \"login_id\": \"{{login_id}}\",\n  \"password\": \"{{password}}\"\n}",
                       "options": {
                         "raw": {
                           "headerFamily": "json",
@@ -1035,7 +1073,7 @@
                         }
                       ],
                       "cookie": [],
-                      "body": "{\n  \"message\": \"string\"\n}"
+                      "body": "{\n  \"message\": \"Login ID atau password yang anda masukan salah.\"\n}"
                     },
                     {
                       "name": "Validation error",
@@ -1194,13 +1232,47 @@
                 {
                   "name": "Klaim akun (STUB)",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "POST",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n    \"login_id\": \"{{login_id}}\", \r\n    \"pin\": \"{{pin}}\", \r\n    \"new_password\": \"{{password}}\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
                     "url": {
                       "raw": "{{baseUrl}}/api/customer-portal/auth/claim",
                       "host": [
@@ -1260,7 +1332,44 @@
               "item": [
                 {
                   "name": "Refresh token",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "const body = pm.response.json();\r",
+                          "if (body.refresh_token) { pm.environment.set(\"refresh_token\", body.refresh_token); }\r",
+                          "pm.test(\"Simpan token ke environment\", function () {\r",
+                          "    pm.expect(pm.response.code).to.equal(200);\r",
+                          "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {},
+                        "requests": {}
+                      }
+                    }
+                  ],
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "POST",
                     "header": [
                       {
@@ -1270,11 +1379,16 @@
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"refresh_token\": \"string\"\n}",
+                      "raw": "{\n  \"refresh_token\": \"Test Refresh Token\"\n}",
                       "options": {
                         "raw": {
                           "headerFamily": "json",
@@ -1454,11 +1568,36 @@
                 {
                   "name": "Logout",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "POST",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
@@ -1512,7 +1651,7 @@
                       "body": "{\n  \"message\": \"Berhasil keluar.\"\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "POST",
                         "header": [
@@ -1545,76 +1684,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/auth/logout",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "auth",
-                            "logout"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/auth/logout",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "auth",
-                            "logout"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -1626,11 +1695,36 @@
                 {
                   "name": "Logout semua perangkat",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "POST",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
@@ -1684,7 +1778,7 @@
                       "body": "{\n  \"message\": \"Berhasil keluar dari semua perangkat.\"\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "POST",
                         "header": [
@@ -1717,76 +1811,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/auth/logout-all",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "auth",
-                            "logout-all"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "POST",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/auth/logout-all",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "auth",
-                            "logout-all"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -1802,7 +1826,44 @@
               "item": [
                 {
                   "name": "Ganti password",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [
+                          "const body = pm.response.json();\r",
+                          "if (body.new_password) { pm.environment.set(\"password\", body.new_password); }\r",
+                          "pm.test(\"Simpan token ke environment\", function () {\r",
+                          "    pm.expect(pm.response.code).to.equal(200);\r",
+                          "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {},
+                        "requests": {}
+                      }
+                    }
+                  ],
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "PUT",
                     "header": [
                       {
@@ -1812,11 +1873,16 @@
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "body": {
                       "mode": "raw",
-                      "raw": "{\n  \"current_password\": \"string\",\n  \"new_password\": \"stringstring\"\n}",
+                      "raw": "{\n  \"current_password\": \"TestPortal123!\",\n  \"new_password\": \"SandiPelanggan1\"\n}",
                       "options": {
                         "raw": {
                           "headerFamily": "json",
@@ -1889,7 +1955,7 @@
                       "body": "{\n  \"message\": \"Password berhasil diganti.\"\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "PUT",
                         "header": [
@@ -1936,104 +2002,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "PUT",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          },
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"current_password\": \"string\",\n  \"new_password\": \"stringstring\"\n}",
-                          "options": {
-                            "raw": {
-                              "headerFamily": "json",
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/password",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "password"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "PUT",
-                        "header": [
-                          {
-                            "key": "Content-Type",
-                            "value": "application/json"
-                          },
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "body": {
-                          "mode": "raw",
-                          "raw": "{\n  \"current_password\": \"string\",\n  \"new_password\": \"stringstring\"\n}",
-                          "options": {
-                            "raw": {
-                              "headerFamily": "json",
-                              "language": "json"
-                            }
-                          }
-                        },
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/password",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "password"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     },
                     {
                       "name": "Not found",
@@ -2190,16 +2158,41 @@
               "name": "invoices",
               "item": [
                 {
-                  "name": "{invoiceNumber}",
+                  "name": "Detail tagihan",
                   "item": [
                     {
                       "name": "Detail tagihan",
                       "request": {
+                        "auth": {
+                          "type": "apikey",
+                          "apikey": [
+                            {
+                              "key": "value",
+                              "value": "{{portalClientSecret}}",
+                              "type": "string"
+                            },
+                            {
+                              "key": "key",
+                              "value": "X-Portal-Client",
+                              "type": "string"
+                            },
+                            {
+                              "key": "in",
+                              "value": "header",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "method": "GET",
                         "header": [
                           {
                             "key": "Accept",
                             "value": "application/json"
+                          },
+                          {
+                            "key": "Authorization",
+                            "value": "Bearer {{access_token}}",
+                            "type": "text"
                           }
                         ],
                         "url": {
@@ -2217,7 +2210,7 @@
                           "variable": [
                             {
                               "key": "invoiceNumber",
-                              "value": "string"
+                              "value": "INV-IN000035-202211"
                             }
                           ]
                         },
@@ -2267,7 +2260,7 @@
                           "body": "{\n  \"data\": {\n    \"invoice_number\": \"INV-2026-08-000123\",\n    \"invoice_type\": {\n      \"value\": \"bulanan\",\n      \"label\": \"Tagihan Bulanan Rutin\"\n    },\n    \"billing_period\": \"2026-08\",\n    \"issue_date\": \"2026-08-01T00:00:00+07:00\",\n    \"due_date\": \"2026-08-15T00:00:00+07:00\",\n    \"total_amount\": \"150000.00\",\n    \"paid_amount\": \"150000.00\",\n    \"remaining_amount\": \"0.00\",\n    \"invoice_status\": {\n      \"value\": \"lunas\",\n      \"label\": \"Lunas\"\n    },\n    \"payments\": [\n      {\n        \"payment_number\": \"PAY-202608-0042\",\n        \"payment_date\": \"2026-08-10T00:00:00+07:00\",\n        \"billing_period\": \"2026-08\",\n        \"invoice_number\": \"INV-2026-08-000123\",\n        \"amount\": \"150000.00\",\n        \"overpay_amount\": \"0.00\",\n        \"payment_method\": \"cash\",\n        \"payment_status\": {\n          \"value\": \"valid\",\n          \"label\": \"Valid\"\n        },\n        \"has_receipt\": true\n      }\n    ]\n  },\n  \"meta\": {\n    \"generated_at\": \"2026-08-25T09:00:00+07:00\"\n  }\n}"
                         },
                         {
-                          "name": "Token tidak diberikan (Authorization header kosong).",
+                          "name": "Access token tidak disertakan atau tidak valid.",
                           "originalRequest": {
                             "method": "GET",
                             "header": [
@@ -2307,90 +2300,6 @@
                           ],
                           "cookie": [],
                           "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                        },
-                        {
-                          "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                          "originalRequest": {
-                            "method": "GET",
-                            "header": [
-                              {
-                                "key": "Accept",
-                                "value": "application/json"
-                              }
-                            ],
-                            "url": {
-                              "raw": "{{baseUrl}}/api/customer-portal/me/invoices/:invoiceNumber",
-                              "host": [
-                                "{{baseUrl}}"
-                              ],
-                              "path": [
-                                "api",
-                                "customer-portal",
-                                "me",
-                                "invoices",
-                                ":invoiceNumber"
-                              ],
-                              "variable": [
-                                {
-                                  "key": "invoiceNumber",
-                                  "value": "string"
-                                }
-                              ]
-                            }
-                          },
-                          "status": "Unauthorized",
-                          "code": 401,
-                          "_postman_previewlanguage": "json",
-                          "header": [
-                            {
-                              "key": "Content-Type",
-                              "value": "application/json"
-                            }
-                          ],
-                          "cookie": [],
-                          "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                        },
-                        {
-                          "name": "Token tidak valid atau sudah kedaluwarsa.",
-                          "originalRequest": {
-                            "method": "GET",
-                            "header": [
-                              {
-                                "key": "Accept",
-                                "value": "application/json"
-                              }
-                            ],
-                            "url": {
-                              "raw": "{{baseUrl}}/api/customer-portal/me/invoices/:invoiceNumber",
-                              "host": [
-                                "{{baseUrl}}"
-                              ],
-                              "path": [
-                                "api",
-                                "customer-portal",
-                                "me",
-                                "invoices",
-                                ":invoiceNumber"
-                              ],
-                              "variable": [
-                                {
-                                  "key": "invoiceNumber",
-                                  "value": "string"
-                                }
-                              ]
-                            }
-                          },
-                          "status": "Unauthorized",
-                          "code": 401,
-                          "_postman_previewlanguage": "json",
-                          "header": [
-                            {
-                              "key": "Content-Type",
-                              "value": "application/json"
-                            }
-                          ],
-                          "cookie": [],
-                          "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                         },
                         {
                           "name": "invoice_number tidak ditemukan atau milik pelanggan lain — sengaja sama, tidak bisa dibedakan dari luar.",
@@ -2441,11 +2350,36 @@
                 {
                   "name": "Daftar tagihan",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "GET",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
@@ -2461,14 +2395,14 @@
                       ],
                       "query": [
                         {
-                          "description": "Filter invoice_status.",
                           "key": "status",
-                          "value": "lunas"
+                          "value": "lunas",
+                          "description": "Filter invoice_status."
                         },
                         {
-                          "description": "Filter billing_period, format Y-m.",
                           "key": "period",
-                          "value": "2026-08"
+                          "value": "2026-08",
+                          "description": "Filter billing_period, format Y-m."
                         }
                       ]
                     },
@@ -2523,7 +2457,7 @@
                       "body": "{\n  \"data\": [\n    {\n      \"invoice_number\": \"INV-2026-08-000123\",\n      \"invoice_type\": {\n        \"value\": \"bulanan\",\n        \"label\": \"Tagihan Bulanan Rutin\"\n      },\n      \"billing_period\": \"2026-08\",\n      \"issue_date\": \"2026-08-01T00:00:00+07:00\",\n      \"due_date\": \"2026-08-15T00:00:00+07:00\",\n      \"total_amount\": \"150000.00\",\n      \"paid_amount\": \"150000.00\",\n      \"remaining_amount\": \"0.00\",\n      \"invoice_status\": {\n        \"value\": \"lunas\",\n        \"label\": \"Lunas\"\n      }\n    }\n  ]\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "GET",
                         "header": [
@@ -2568,100 +2502,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/invoices?status=lunas&period=2026-08",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "invoices"
-                          ],
-                          "query": [
-                            {
-                              "description": "Filter invoice_status.",
-                              "key": "status",
-                              "value": "lunas"
-                            },
-                            {
-                              "description": "Filter billing_period, format Y-m.",
-                              "key": "period",
-                              "value": "2026-08"
-                            }
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/invoices?status=lunas&period=2026-08",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "invoices"
-                          ],
-                          "query": [
-                            {
-                              "description": "Filter invoice_status.",
-                              "key": "status",
-                              "value": "lunas"
-                            },
-                            {
-                              "description": "Filter billing_period, format Y-m.",
-                              "key": "period",
-                              "value": "2026-08"
-                            }
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -2679,11 +2519,36 @@
                         {
                           "name": "Isi kwitansi",
                           "request": {
+                            "auth": {
+                              "type": "apikey",
+                              "apikey": [
+                                {
+                                  "key": "value",
+                                  "value": "{{portalClientSecret}}",
+                                  "type": "string"
+                                },
+                                {
+                                  "key": "key",
+                                  "value": "X-Portal-Client",
+                                  "type": "string"
+                                },
+                                {
+                                  "key": "in",
+                                  "value": "header",
+                                  "type": "string"
+                                }
+                              ]
+                            },
                             "method": "GET",
                             "header": [
                               {
                                 "key": "Accept",
                                 "value": "application/json"
+                              },
+                              {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}",
+                                "type": "text"
                               }
                             ],
                             "url": {
@@ -2702,7 +2567,7 @@
                               "variable": [
                                 {
                                   "key": "paymentNumber",
-                                  "value": "string"
+                                  "value": "PAY-6361f31b0fa"
                                 }
                               ]
                             },
@@ -2753,7 +2618,7 @@
                               "body": "{\n  \"data\": {\n    \"nomor\": \"PAY-202608-0042\",\n    \"status\": \"Valid\",\n    \"status_valid\": true,\n    \"keterangan_cicilan\": null,\n    \"tanggal_bayar\": \"10/08/2026\",\n    \"tanggal_ditagih\": \"10/08/2026\",\n    \"metode\": \"CASH\",\n    \"pop\": \"Jetis\",\n    \"pelanggan\": {\n      \"nama\": \"Budi Santoso\",\n      \"cid\": \"PNG0001234\",\n      \"hp\": \"081234567890\",\n      \"alamat\": \"Jl. Veteran No. 12, Joresan\",\n      \"alamat_baris\": [\n        \"Jl. Veteran No. 12, Joresan\"\n      ]\n    },\n    \"invoice\": {\n      \"ada\": true,\n      \"nomor\": \"INV-2026-08-000123\",\n      \"periode\": \"2026-08\",\n      \"paket\": \"Home 20 Mbps\",\n      \"total\": \"Rp 150.000\",\n      \"sisa\": \"Rp 0\",\n      \"lunas\": true\n    },\n    \"dibayar\": \"Rp 150.000\",\n    \"lebih_bayar\": null,\n    \"dibayar_raw\": \"150000.00\",\n    \"tanggal_bayar_iso\": \"2026-08-10T00:00:00+07:00\"\n  },\n  \"meta\": {\n    \"generated_at\": \"2026-08-25T09:00:00+07:00\"\n  }\n}"
                             },
                             {
-                              "name": "Token tidak diberikan (Authorization header kosong).",
+                              "name": "Access token tidak disertakan atau tidak valid.",
                               "originalRequest": {
                                 "method": "GET",
                                 "header": [
@@ -2794,92 +2659,6 @@
                               ],
                               "cookie": [],
                               "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                            },
-                            {
-                              "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                              "originalRequest": {
-                                "method": "GET",
-                                "header": [
-                                  {
-                                    "key": "Accept",
-                                    "value": "application/json"
-                                  }
-                                ],
-                                "url": {
-                                  "raw": "{{baseUrl}}/api/customer-portal/me/payments/:paymentNumber/receipt",
-                                  "host": [
-                                    "{{baseUrl}}"
-                                  ],
-                                  "path": [
-                                    "api",
-                                    "customer-portal",
-                                    "me",
-                                    "payments",
-                                    ":paymentNumber",
-                                    "receipt"
-                                  ],
-                                  "variable": [
-                                    {
-                                      "key": "paymentNumber",
-                                      "value": "string"
-                                    }
-                                  ]
-                                }
-                              },
-                              "status": "Unauthorized",
-                              "code": 401,
-                              "_postman_previewlanguage": "json",
-                              "header": [
-                                {
-                                  "key": "Content-Type",
-                                  "value": "application/json"
-                                }
-                              ],
-                              "cookie": [],
-                              "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                            },
-                            {
-                              "name": "Token tidak valid atau sudah kedaluwarsa.",
-                              "originalRequest": {
-                                "method": "GET",
-                                "header": [
-                                  {
-                                    "key": "Accept",
-                                    "value": "application/json"
-                                  }
-                                ],
-                                "url": {
-                                  "raw": "{{baseUrl}}/api/customer-portal/me/payments/:paymentNumber/receipt",
-                                  "host": [
-                                    "{{baseUrl}}"
-                                  ],
-                                  "path": [
-                                    "api",
-                                    "customer-portal",
-                                    "me",
-                                    "payments",
-                                    ":paymentNumber",
-                                    "receipt"
-                                  ],
-                                  "variable": [
-                                    {
-                                      "key": "paymentNumber",
-                                      "value": "string"
-                                    }
-                                  ]
-                                }
-                              },
-                              "status": "Unauthorized",
-                              "code": 401,
-                              "_postman_previewlanguage": "json",
-                              "header": [
-                                {
-                                  "key": "Content-Type",
-                                  "value": "application/json"
-                                }
-                              ],
-                              "cookie": [],
-                              "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                             },
                             {
                               "name": "payment_number tidak ditemukan atau milik pelanggan lain — sengaja sama, tidak bisa dibedakan dari luar.",
@@ -2933,15 +2712,40 @@
                 {
                   "name": "Riwayat pembayaran",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "GET",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
-                      "raw": "{{baseUrl}}/api/customer-portal/me/payments?status=valid&period=2026-08",
+                      "raw": "{{baseUrl}}/api/customer-portal/me/payments?status=valid&period=2022-11",
                       "host": [
                         "{{baseUrl}}"
                       ],
@@ -2953,14 +2757,14 @@
                       ],
                       "query": [
                         {
-                          "description": "Filter payment_status.",
                           "key": "status",
-                          "value": "valid"
+                          "value": "valid",
+                          "description": "Filter payment_status."
                         },
                         {
-                          "description": "Filter billing_period, format Y-m.",
                           "key": "period",
-                          "value": "2026-08"
+                          "value": "2022-11",
+                          "description": "Filter billing_period, format Y-m."
                         }
                       ]
                     },
@@ -3015,7 +2819,7 @@
                       "body": "{\n  \"data\": [\n    {\n      \"payment_number\": \"PAY-202608-0042\",\n      \"payment_date\": \"2026-08-10T00:00:00+07:00\",\n      \"billing_period\": \"2026-08\",\n      \"invoice_number\": \"INV-2026-08-000123\",\n      \"amount\": \"150000.00\",\n      \"overpay_amount\": \"0.00\",\n      \"payment_method\": \"cash\",\n      \"payment_status\": {\n        \"value\": \"valid\",\n        \"label\": \"Valid\"\n      },\n      \"has_receipt\": true\n    }\n  ]\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "GET",
                         "header": [
@@ -3060,100 +2864,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/payments?status=valid&period=2026-08",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "payments"
-                          ],
-                          "query": [
-                            {
-                              "description": "Filter payment_status.",
-                              "key": "status",
-                              "value": "valid"
-                            },
-                            {
-                              "description": "Filter billing_period, format Y-m.",
-                              "key": "period",
-                              "value": "2026-08"
-                            }
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/payments?status=valid&period=2026-08",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "payments"
-                          ],
-                          "query": [
-                            {
-                              "description": "Filter payment_status.",
-                              "key": "status",
-                              "value": "valid"
-                            },
-                            {
-                              "description": "Filter billing_period, format Y-m.",
-                              "key": "period",
-                              "value": "2026-08"
-                            }
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -3165,11 +2875,36 @@
                 {
                   "name": "Saldo & riwayat mutasi",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "GET",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
@@ -3223,7 +2958,7 @@
                       "body": "{\n  \"data\": {\n    \"balance\": \"50000.00\",\n    \"mutations\": [\n      {\n        \"date\": \"2026-08-20T10:00:00+07:00\",\n        \"type\": \"credit\",\n        \"type_label\": \"Masuk\",\n        \"amount\": \"50000.00\",\n        \"note\": \"Lebih bayar dari PAY-202608-0042\"\n      }\n    ]\n  },\n  \"meta\": {\n    \"generated_at\": \"2026-08-25T09:00:00+07:00\"\n  }\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "GET",
                         "header": [
@@ -3256,76 +2991,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/balance",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "balance"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/balance",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "balance"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -3335,16 +3000,41 @@
               "name": "tickets",
               "item": [
                 {
-                  "name": "{ticketNumber}",
+                  "name": "Detail Tiket",
                   "item": [
                     {
                       "name": "Detail tiket",
                       "request": {
+                        "auth": {
+                          "type": "apikey",
+                          "apikey": [
+                            {
+                              "key": "value",
+                              "value": "{{portalClientSecret}}",
+                              "type": "string"
+                            },
+                            {
+                              "key": "key",
+                              "value": "X-Portal-Client",
+                              "type": "string"
+                            },
+                            {
+                              "key": "in",
+                              "value": "header",
+                              "type": "string"
+                            }
+                          ]
+                        },
                         "method": "GET",
                         "header": [
                           {
                             "key": "Accept",
                             "value": "application/json"
+                          },
+                          {
+                            "key": "Authorization",
+                            "value": "Bearer {{access_token}}",
+                            "type": "text"
                           }
                         ],
                         "url": {
@@ -3362,7 +3052,7 @@
                           "variable": [
                             {
                               "key": "ticketNumber",
-                              "value": "string"
+                              "value": "TKT-2026-0001"
                             }
                           ]
                         },
@@ -3412,7 +3102,7 @@
                           "body": "{\n  \"data\": {\n    \"ticket_number\": \"TKT-2026-0045\",\n    \"created_at\": \"2026-08-20T08:00:00+07:00\",\n    \"issue_category\": \"Internet Lambat\",\n    \"detail_keluhan\": \"Internet lemot sejak kemarin.\",\n    \"status\": {\n      \"value\": \"sedang_ditangani\",\n      \"label\": \"Sedang Ditangani\"\n    },\n    \"resolved_at\": null\n  },\n  \"meta\": {\n    \"generated_at\": \"2026-08-25T09:00:00+07:00\"\n  }\n}"
                         },
                         {
-                          "name": "Token tidak diberikan (Authorization header kosong).",
+                          "name": "Access token tidak disertakan atau tidak valid.",
                           "originalRequest": {
                             "method": "GET",
                             "header": [
@@ -3452,90 +3142,6 @@
                           ],
                           "cookie": [],
                           "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                        },
-                        {
-                          "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                          "originalRequest": {
-                            "method": "GET",
-                            "header": [
-                              {
-                                "key": "Accept",
-                                "value": "application/json"
-                              }
-                            ],
-                            "url": {
-                              "raw": "{{baseUrl}}/api/customer-portal/me/tickets/:ticketNumber",
-                              "host": [
-                                "{{baseUrl}}"
-                              ],
-                              "path": [
-                                "api",
-                                "customer-portal",
-                                "me",
-                                "tickets",
-                                ":ticketNumber"
-                              ],
-                              "variable": [
-                                {
-                                  "key": "ticketNumber",
-                                  "value": "string"
-                                }
-                              ]
-                            }
-                          },
-                          "status": "Unauthorized",
-                          "code": 401,
-                          "_postman_previewlanguage": "json",
-                          "header": [
-                            {
-                              "key": "Content-Type",
-                              "value": "application/json"
-                            }
-                          ],
-                          "cookie": [],
-                          "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                        },
-                        {
-                          "name": "Token tidak valid atau sudah kedaluwarsa.",
-                          "originalRequest": {
-                            "method": "GET",
-                            "header": [
-                              {
-                                "key": "Accept",
-                                "value": "application/json"
-                              }
-                            ],
-                            "url": {
-                              "raw": "{{baseUrl}}/api/customer-portal/me/tickets/:ticketNumber",
-                              "host": [
-                                "{{baseUrl}}"
-                              ],
-                              "path": [
-                                "api",
-                                "customer-portal",
-                                "me",
-                                "tickets",
-                                ":ticketNumber"
-                              ],
-                              "variable": [
-                                {
-                                  "key": "ticketNumber",
-                                  "value": "string"
-                                }
-                              ]
-                            }
-                          },
-                          "status": "Unauthorized",
-                          "code": 401,
-                          "_postman_previewlanguage": "json",
-                          "header": [
-                            {
-                              "key": "Content-Type",
-                              "value": "application/json"
-                            }
-                          ],
-                          "cookie": [],
-                          "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                         },
                         {
                           "name": "ticket_number tidak ditemukan atau milik pelanggan lain — sengaja sama, tidak bisa dibedakan dari luar.",
@@ -3586,11 +3192,36 @@
                 {
                   "name": "Riwayat ticketing",
                   "request": {
+                    "auth": {
+                      "type": "apikey",
+                      "apikey": [
+                        {
+                          "key": "value",
+                          "value": "{{portalClientSecret}}",
+                          "type": "string"
+                        },
+                        {
+                          "key": "key",
+                          "value": "X-Portal-Client",
+                          "type": "string"
+                        },
+                        {
+                          "key": "in",
+                          "value": "header",
+                          "type": "string"
+                        }
+                      ]
+                    },
                     "method": "GET",
                     "header": [
                       {
                         "key": "Accept",
                         "value": "application/json"
+                      },
+                      {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}",
+                        "type": "text"
                       }
                     ],
                     "url": {
@@ -3644,7 +3275,7 @@
                       "body": "{\n  \"data\": [\n    {\n      \"ticket_number\": \"TKT-2026-0045\",\n      \"created_at\": \"2026-08-20T08:00:00+07:00\",\n      \"issue_category\": \"Internet Lambat\",\n      \"detail_keluhan\": \"Internet lemot sejak kemarin.\",\n      \"status\": {\n        \"value\": \"sedang_ditangani\",\n        \"label\": \"Sedang Ditangani\"\n      },\n      \"resolved_at\": null\n    }\n  ]\n}"
                     },
                     {
-                      "name": "Token tidak diberikan (Authorization header kosong).",
+                      "name": "Access token tidak disertakan atau tidak valid.",
                       "originalRequest": {
                         "method": "GET",
                         "header": [
@@ -3677,76 +3308,6 @@
                       ],
                       "cookie": [],
                       "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                    },
-                    {
-                      "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/tickets",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "tickets"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                    },
-                    {
-                      "name": "Token tidak valid atau sudah kedaluwarsa.",
-                      "originalRequest": {
-                        "method": "GET",
-                        "header": [
-                          {
-                            "key": "Accept",
-                            "value": "application/json"
-                          }
-                        ],
-                        "url": {
-                          "raw": "{{baseUrl}}/api/customer-portal/me/tickets",
-                          "host": [
-                            "{{baseUrl}}"
-                          ],
-                          "path": [
-                            "api",
-                            "customer-portal",
-                            "me",
-                            "tickets"
-                          ]
-                        }
-                      },
-                      "status": "Unauthorized",
-                      "code": 401,
-                      "_postman_previewlanguage": "json",
-                      "header": [
-                        {
-                          "key": "Content-Type",
-                          "value": "application/json"
-                        }
-                      ],
-                      "cookie": [],
-                      "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                     }
                   ]
                 }
@@ -3755,11 +3316,36 @@
             {
               "name": "Profil ringkas",
               "request": {
+                "auth": {
+                  "type": "apikey",
+                  "apikey": [
+                    {
+                      "key": "value",
+                      "value": "{{portalClientSecret}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "key",
+                      "value": "X-Portal-Client",
+                      "type": "string"
+                    },
+                    {
+                      "key": "in",
+                      "value": "header",
+                      "type": "string"
+                    }
+                  ]
+                },
                 "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
                     "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}",
+                    "type": "text"
                   }
                 ],
                 "url": {
@@ -3811,7 +3397,7 @@
                   "body": "{\n  \"data\": {\n    \"login_id\": \"PNG-RQ000631\",\n    \"full_name\": \"Budi Santoso\",\n    \"status\": \"active\",\n    \"package\": \"Home 20 Mbps\",\n    \"village\": \"Joresan\",\n    \"district\": \"Mlarak\",\n    \"claimed_at\": \"2026-08-01T10:00:00+07:00\"\n  },\n  \"meta\": {\n    \"generated_at\": \"2026-08-25T09:00:00+07:00\"\n  }\n}"
                 },
                 {
-                  "name": "Token tidak diberikan (Authorization header kosong).",
+                  "name": "Access token tidak disertakan atau tidak valid.",
                   "originalRequest": {
                     "method": "GET",
                     "header": [
@@ -3843,74 +3429,6 @@
                   ],
                   "cookie": [],
                   "body": "{\n  \"message\": \"Token tidak diberikan.\"\n}"
-                },
-                {
-                  "name": "Client portal tidak dikenali (header X-Portal-Client salah/tidak ada).",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [
-                      {
-                        "key": "Accept",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/customer-portal/me",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "customer-portal",
-                        "me"
-                      ]
-                    }
-                  },
-                  "status": "Unauthorized",
-                  "code": 401,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"message\": \"Client portal tidak dikenali.\"\n}"
-                },
-                {
-                  "name": "Token tidak valid atau sudah kedaluwarsa.",
-                  "originalRequest": {
-                    "method": "GET",
-                    "header": [
-                      {
-                        "key": "Accept",
-                        "value": "application/json"
-                      }
-                    ],
-                    "url": {
-                      "raw": "{{baseUrl}}/api/customer-portal/me",
-                      "host": [
-                        "{{baseUrl}}"
-                      ],
-                      "path": [
-                        "api",
-                        "customer-portal",
-                        "me"
-                      ]
-                    }
-                  },
-                  "status": "Unauthorized",
-                  "code": 401,
-                  "_postman_previewlanguage": "json",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json"
-                    }
-                  ],
-                  "cookie": [],
-                  "body": "{\n  \"message\": \"Token tidak valid atau sudah kedaluwarsa.\"\n}"
                 },
                 {
                   "name": "Not found",
@@ -4017,6 +3535,16 @@
       ]
     }
   ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
   "event": [
     {
       "listen": "prerequest",

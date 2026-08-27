@@ -59,6 +59,7 @@ class RolePermissionSeeder extends Seeder
                 'tickets.view', // Atasan cuma memantau — gak ikut ngirim tiket
                 'tickets.selesai.view',
                 'tickets.dibatalkan.view',
+                'qr_scan_logs.view', // Dashboard anomali scan QR (docs/plan/qr-code/)
                 'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
                 // Setoran Kas: atasan MEMERIKSA, tidak menyetor. `create`
                 // sengaja tak diberikan — atasan bukan pemegang kas, dan tanpa
@@ -122,6 +123,13 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.*',
                 'master_status_pelanggan.*',
                 'task.manage',
+                // QR Pelanggan (docs/plan/qr-code/) — admin penuh: lihat,
+                // terbitkan, cabut, cetak.
+                'customers.qr.view',
+                'customers.qr.create',
+                'customers.qr.cancel',
+                'customers.qr.print',
+                'qr_scan_logs.view',
             ],
 
             'noc' => [
@@ -198,6 +206,7 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
             ],
 
             'fop' => [
@@ -228,6 +237,8 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
             ],
 
             'teknisi' => [
@@ -256,6 +267,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.view',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
+                'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
             ],
 
             'sales' => [
@@ -317,6 +329,8 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'customers.qr.print', // Cetak stiker QR — pop_admin cetak buat cabangnya sendiri
             ],
         ];
 

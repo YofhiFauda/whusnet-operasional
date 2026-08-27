@@ -74,6 +74,39 @@ php artisan rbac:generate-permissions
 
 Alat bantu debugging saja — mencari policy yang terdaftar. Tidak menulis apa pun.
 
+### `customers:backfill-portal-login-id` — akun portal (`customer_portal_accounts`)
+
+**Sejak 2026-08-27 JARANG perlu dijalankan manual** — pembuatan akun
+`pending_claim` sekarang otomatis lewat `PortalAuthService::ensureAccountExists()`,
+dipanggil dari titik yang sama dengan penerbitan QR/PIN (`CustomerWorkflowService`
+saat `WAITING_INSTALLATION`, & manual dari halaman staf `/customers/{id}/qr`).
+Pelanggan BARU gak butuh command ini lagi.
+
+Masih perlu dijalankan kalau:
+
+- **Abis `migrate:fresh`/impor data legacy** yang QR/PIN-nya diterbitkan LEWAT
+  jalur lama (mis. seed manual, data lama sebelum hook otomatis dipasang) —
+  akun `pending_claim`-nya gak ikut lahir otomatis.
+- **`--resync`** — `login_id` sebagian akun `pending_claim` basi (formula lama
+  `registration_prefix`, direvisi ke `cid_prefix` 2026-08-26). Cuma nyentuh
+  baris `pending_claim`, baris `active` sengaja dibiarkan (lihat docblock
+  command).
+
+```bash
+docker compose exec app php artisan customers:backfill-portal-login-id --dry-run
+docker compose exec app php artisan customers:backfill-portal-login-id
+
+# kalau login_id basi (formula lama)
+docker compose exec app php artisan customers:backfill-portal-login-id --resync --dry-run
+docker compose exec app php artisan customers:backfill-portal-login-id --resync
+```
+
+Aman diulang — pelanggan yang sudah punya akun portal dilewati.
+
+Gejala kalau ini kelewat: `POST /api/customer-portal/auth/claim` balas 401
+generik `"Login ID atau PIN salah."` walau `login_id`+PIN yang dikirim BENAR
+— karena baris akunnya belum ada sama sekali (bukan salah kredensial).
+
 ---
 
 ## C. Migrasi data legacy — **urutannya wajib**

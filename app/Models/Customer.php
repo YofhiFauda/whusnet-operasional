@@ -294,6 +294,30 @@ class Customer extends Model
     }
 
     /**
+     * SEMUA token QR pelanggan ini seumur hidup, termasuk yang sudah dicabut
+     * (docs/plan/qr-code/rancangan-qr-pelanggan-final.md §4.1) — jangan
+     * dipakai buat cek "punya QR aktif?", pakai activeQrToken().
+     *
+     * @return HasMany<CustomerQrToken, $this>
+     */
+    public function qrTokens(): HasMany
+    {
+        return $this->hasMany(CustomerQrToken::class);
+    }
+
+    /**
+     * Invariant: maksimal satu baris `revoked_at IS NULL` per pelanggan,
+     * ditegakkan CustomerQrTokenObserver::creating() — relasi ini aman
+     * dipakai sebagai "token QR yang lagi berlaku".
+     *
+     * @return HasOne<CustomerQrToken, $this>
+     */
+    public function activeQrToken(): HasOne
+    {
+        return $this->hasOne(CustomerQrToken::class)->whereNull('revoked_at');
+    }
+
+    /**
      * @return HasMany<CustomerSurvey, $this>
      */
     public function surveys(): HasMany
@@ -431,6 +455,44 @@ class Customer extends Model
         }
 
         return $pop->resolveDisplayId($this);
+    }
+
+    /**
+     * Login ID portal pelanggan: `{cid_prefix}00{bare_registration_id}`
+     * (docs/api/api-portal-pelanggan/, docs/plan/qr-code/
+     * rancangan-qr-pelanggan-final.md §6.6.2) — format SAMA PERSIS dengan
+     * `display_id` default pra-aktivasi (`Pop::resolveDisplayId()`, mis.
+     * "C00RQ000004"), yang sudah dikenal pelanggan/staff dari halaman detail
+     * pelanggan. SENGAJA TIDAK memanggil `resolveDisplayId()` langsung:
+     * begitu pelanggan aktif dan CID sungguhan terbit, method itu beralih ke
+     * CID asli (segmen mini-POP/distribusi bisa beda) — login ID harus tetap
+     * PERMANEN sejak dicetak di kartu saat registrasi, tidak boleh ikut
+     * berubah kayak `display_id`. Karena rumus di sini tidak pernah menyentuh
+     * kolom `cid`/status, nilainya otomatis stabil selamanya begitu
+     * `customer_code` terbentuk — tidak perlu disimpan terpisah/di-freeze.
+     *
+     * `cid_prefix` dipakai — BUKAN `registration_prefix`. Percobaan pertama
+     * (2026-08-24) salah pakai `registration_prefix`: field itu SENGAJA
+     * boleh sama di banyak POP (ID_NUMBERING_RULES.md §4, tanpa constraint
+     * unique) dan sudah lebih dulu jadi bagian pembentuk `customer_code`
+     * sendiri (`Pop::generateRegistrationNumber()`) — hasilnya prefix dobel
+     * ("RQ-RQ000004") DAN gak beneran menjamin login_id unik global.
+     * `cid_prefix` sebaliknya WAJIB unik per cabang (`Rule::unique('pops',
+     * 'cid_prefix')->where('type', 'cabang')` di PopController), jadi
+     * disiplin per branch yang sama tetap kepakai lewat pewarisan mini-POP.
+     * Diperbaiki 2026-08-26.
+     *
+     * Null kalau POP belum punya `cid_prefix` terisi — caller wajib
+     * menangani null.
+     */
+    public function getPortalLoginIdAttribute(): ?string
+    {
+        $pop = $this->pop;
+        if (! $pop || ! $pop->cid_prefix) {
+            return null;
+        }
+
+        return sprintf('%s00%s', $pop->cid_prefix, $pop->extractBareRegistrationId($this->customer_code));
     }
 
     /**

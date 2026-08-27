@@ -47,7 +47,7 @@ class TicketController extends Controller
      * data awal server-side, auto-refresh lewat broadcast Reverb
      * (App\Events\TicketQueueUpdated, lihat worksheetJson()).
      */
-    public function create()
+    public function create(Request $request)
     {
         abort_unless(auth()->user()->hasPermission('tickets.create'), 403);
 
@@ -71,7 +71,35 @@ class TicketController extends Controller
             'initialTasks' => $this->worksheetTasks(),
             'worksheetTotalCount' => $this->worksheetTotalActiveCount(),
             'allowedPopIds' => Pop::forUser(auth()->user())->pluck('id'),
+            'prefillCustomer' => $this->resolvePrefillCustomer($request),
         ]);
+    }
+
+    /**
+     * Prefill pelanggan dari scan QR (QrTicketController — Fungsi B,
+     * docs/plan/qr-code/rancangan-qr-pelanggan-final.md §6.2). MURNI
+     * kenyamanan pengisian form: pakai `customerPayload()` yang SAMA dengan
+     * hasil lookup-customer biasa, supaya `selected` Alpine dapat bentuk
+     * objek yang identik dan seluruh logic yang sudah ada (cek duplikat,
+     * dst) langsung jalan tanpa modifikasi. `applyUserScope()` di sini
+     * menutup jalur staf menebak `customer_id` pelanggan luar POP-nya lewat
+     * query string — QrTicketController sudah memvalidasi scope juga
+     * (defense in depth, sama seperti §6.2 dua lapis auth).
+     */
+    private function resolvePrefillCustomer(Request $request): ?array
+    {
+        $customerId = $request->query('customer_id');
+
+        if (! $customerId) {
+            return null;
+        }
+
+        $customer = Customer::query()
+            ->applyUserScope()
+            ->with(['pop:id,name', 'village:id,name', 'internetPackage', 'customerDevice'])
+            ->find($customerId);
+
+        return $customer ? $this->customerPayload($customer) : null;
     }
 
     /**

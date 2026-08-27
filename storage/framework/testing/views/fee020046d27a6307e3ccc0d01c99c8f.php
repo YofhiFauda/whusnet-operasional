@@ -16,8 +16,14 @@
         </div>
 
         <?php
-            $totalTickets = $customerTasks->count() + $customerFopTasks->count();
+            $totalTickets = $customerTasks->count() + $customerTickets->count() + $customerFopTasks->count();
             $completedTickets = $customerTasks->filter(fn($t) => ($t->status->value ?? $t->status) === 'selesai')->count() +
+                                $customerTickets->filter(function ($tk) {
+                                    // Dua rezim "selesai" tergantung handler — lihat Ticket::bucket().
+                                    return $tk->handler === \App\Enums\TicketHandler::FOP
+                                        ? $tk->fopTask?->status === \App\Enums\TaskStatus::SELESAI
+                                        : $tk->status === \App\Enums\TicketHandlingStatus::CLOSED;
+                                })->count() +
                                 $customerFopTasks->filter(fn($t) => ($t->status->value ?? $t->status) === 'selesai')->count();
         ?>
 
@@ -229,7 +235,126 @@
                 </div>
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 
-            <!-- FOP Tasks / Legacy Field Tasks -->
+            <!-- Tickets (Helpdesk/NOC/FOP) -->
+            <?php $__currentLoopData = $customerTickets; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ticket): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <?php
+                    // Satu tiket, satu baris — regime tampilan ngikut handler
+                    // (sama seperti Ticket::bucket()/statusLabel()):
+                    //  - handler=FOP → sudah turun ke Ticketing FOP, tampil sebagai "TICKET FOP".
+                    //  - handler=HELPDESK/NOC → belum/tidak pernah ke FOP, tampil sebagai "TICKET HELPDESK/NOC".
+                    $isFop = $ticket->handler === \App\Enums\TicketHandler::FOP;
+                    $uniqueId = 'ticket_' . $ticket->id;
+                    $typeLabel = $ticket->type instanceof \App\Enums\TaskType ? $ticket->type->label() : ($ticket->type ?? 'Tiket');
+                    $assignedTeam = $isFop
+                        ? ($ticket->fopTask?->technicians->map(fn($t) => $t->name)->implode(', ') ?: 'Belum ditugaskan')
+                        : null;
+                ?>
+
+                <div class="border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-sm overflow-hidden transition-all hover:border-slate-300 dark:border-slate-600">
+                    <div onclick="toggleTicketHistory('<?php echo e($uniqueId); ?>')" class="p-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900/50 transition-colors cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 select-none">
+                        <div class="flex items-start md:items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center shrink-0 <?php echo e($isFop ? 'text-teal-600' : 'text-amber-600'); ?> font-mono text-[11px] font-bold">
+                                <svg class="w-4 h-4 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <?php if($isFop): ?>
+                                        <span class="font-mono font-bold text-xs text-teal-600"><?php echo e($ticket->fopTask?->task_number ?? $ticket->ticket_number); ?></span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border bg-teal-50/10 text-teal-500 border-teal-500/20">TICKET FOP</span>
+                                    <?php else: ?>
+                                        <span class="font-mono font-bold text-xs text-amber-600"><?php echo e($ticket->ticket_number); ?></span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50/10 text-amber-600 border-amber-500/20">TICKET <?php echo e(strtoupper($ticket->handler->label())); ?></span>
+                                    <?php endif; ?>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold border <?php echo e($ticket->statusBadgeClasses()); ?>"><?php echo e(strtoupper($ticket->statusLabel())); ?></span>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1"><?php echo e($typeLabel); ?> — <?php echo e($ticket->detail_keluhan ?? 'Tiket Pelanggan'); ?></h4>
+                                <?php if(!$isFop && $ticket->catatan_teknis): ?>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1"><?php echo e($ticket->catatan_teknis); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0 border-slate-200 dark:border-slate-700 text-xs">
+                            <div class="text-right">
+                                <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-medium"><?php echo e($isFop ? 'Teknisi Ditugaskan' : 'Ditangani Oleh'); ?></span>
+                                <span class="font-semibold text-slate-700 dark:text-slate-300"><?php echo e($isFop ? $assignedTeam : $ticket->handler->label()); ?></span>
+                                <span class="block text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                    <?php echo e($ticket->created_at ? \Carbon\Carbon::parse($ticket->created_at)->translatedFormat('d M Y') : '-'); ?>
+
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-400 font-bold text-xs shrink-0 bg-sky-50 dark:bg-sky-950/40 px-3 py-2 rounded-lg group hover:bg-sky-50/80 dark:bg-sky-950/40 transition-colors">
+                                <span>Lihat Riwayat</span>
+                                <svg id="arrow_<?php echo e($uniqueId); ?>" class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="<?php echo e($uniqueId); ?>" class="hidden border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 p-5 space-y-4">
+                        <div class="bg-white dark:bg-slate-800 p-5 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <h5 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-4 pb-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+                                <span class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <?php echo e($isFop ? 'Riwayat Penanganan Ticket FOP' : 'Riwayat Penanganan Ticket ' . $ticket->handler->label()); ?>
+
+                                </span>
+                                <?php if($isFop && $ticket->fop_task_id): ?>
+                                    <a href="<?php echo e(route('fop-tasks.history.show', $ticket->fop_task_id)); ?>" class="text-[11px] font-semibold text-sky-600 hover:underline normal-case">Lihat Detail FOP &rarr;</a>
+                                <?php else: ?>
+                                    <a href="<?php echo e(route('tickets.show', $ticket->id)); ?>" class="text-[11px] font-semibold text-sky-600 hover:underline normal-case">Lihat Detail Tiket &rarr;</a>
+                                <?php endif; ?>
+                            </h5>
+
+                            <div class="relative pl-5 border-l-2 border-sky-200 dark:border-sky-800 space-y-4 ml-1">
+                                <div class="relative">
+                                    <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-sky-600 border-2 border-white dark:border-slate-800"></div>
+                                    <div class="text-xs">
+                                        <span class="font-bold text-slate-900 dark:text-slate-100">Tiket Dibuat</span>
+                                        <p class="text-slate-500 dark:text-slate-400">Oleh <?php echo e($ticket->creator?->name ?? 'System'); ?> pada <?php echo e($ticket->created_at ? \Carbon\Carbon::parse($ticket->created_at)->translatedFormat('d M Y, H:i') : '-'); ?> WIB</p>
+                                    </div>
+                                </div>
+
+                                <?php if($isFop): ?>
+                                    <div class="relative">
+                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-teal-600 border-2 border-white dark:border-slate-800"></div>
+                                        <div class="text-xs">
+                                            <span class="font-bold text-slate-900 dark:text-slate-100">Turun ke Ticketing FOP</span>
+                                            <p class="text-slate-500 dark:text-slate-400">Status pengerjaan lapangan saat ini: <?php echo e($ticket->statusLabel()); ?></p>
+                                        </div>
+                                    </div>
+                                <?php elseif($ticket->status === \App\Enums\TicketHandlingStatus::CLOSED): ?>
+                                    <div class="relative">
+                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-emerald-600 border-2 border-white dark:border-slate-800"></div>
+                                        <div class="text-xs">
+                                            <span class="font-bold text-emerald-500">Selesai di <?php echo e($ticket->handler->label()); ?></span>
+                                            <p class="text-slate-500 dark:text-slate-400">Diselesaikan pada <?php echo e($ticket->resolved_at ? \Carbon\Carbon::parse($ticket->resolved_at)->translatedFormat('d M Y, H:i') : '-'); ?> WIB</p>
+                                        </div>
+                                    </div>
+                                <?php elseif($ticket->status === \App\Enums\TicketHandlingStatus::CANCELLED): ?>
+                                    <div class="relative">
+                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-rose-600 border-2 border-white dark:border-slate-800"></div>
+                                        <div class="text-xs">
+                                            <span class="font-bold text-rose-500">Dibatalkan di <?php echo e($ticket->handler->label()); ?></span>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="relative">
+                                        <div class="absolute -left-[25px] top-1 w-4 h-4 rounded-full bg-amber-500 border-2 border-white dark:border-slate-800"></div>
+                                        <div class="text-xs">
+                                            <span class="font-bold text-slate-900 dark:text-slate-100">Sedang ditangani <?php echo e($ticket->handler->label()); ?></span>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+
+            <!-- FOP Tasks / Legacy Field Tasks (bukan dari tiket) -->
             <?php $__currentLoopData = $customerFopTasks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ftask): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                 <?php
                     $uniqueId = 'foptask_' . $ftask->id;

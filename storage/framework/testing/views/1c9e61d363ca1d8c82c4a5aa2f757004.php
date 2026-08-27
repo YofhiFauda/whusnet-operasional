@@ -94,6 +94,13 @@
             Edit Profil
         </a>
 
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.qr.view')): ?>
+            <a href="<?php echo e(route('customers.qr.show', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                <i class="fa-solid fa-qrcode"></i>
+                QR Pelanggan
+            </a>
+        <?php endif; ?>
+
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
             <?php if($isActive && $customer->customerService): ?>
                 <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">

@@ -28,7 +28,7 @@ Tidak ada `personal_access_tokens`, dan karena itu **tidak ada dependensi Sanctu
 |---|---|---|
 | `id` | id | |
 | `customer_id` | FK `customers`, **unique** | Satu akun per pelanggan di fase ini |
-| `login_id` | string(64), **unique** | `{prefix_pop}-{customer_code}`, mis. `PNG-RQ000631` |
+| `login_id` | string(64), **unique** | `{cid_prefix}00{bare_registration_id}`, mis. `PNG00RQ000631` (DIREVISI 2026-08-26, dulu `{registration_prefix}-{customer_code}` — lihat `keputusan.md` §3 poin 1) |
 | `password_hash` | string(255) | bcrypt |
 | `password_changed_at` | timestamp nullable | |
 | `failed_attempts` | unsigned smallint, default 0 | |

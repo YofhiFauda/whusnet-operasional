@@ -186,6 +186,30 @@ return [
             ActionCode::DELETE->value,
         ],
 
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+        // §5, §10 Fase 1). `cancel` = "cabut token", bukan `manage` — bukan
+        // ActionCode yang valid di repo ini.
+        'customers.qr' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::CANCEL->value,
+            ActionCode::PRINT->value,
+        ],
+
+        // Absen teknisi via QR (Fase 3) — diseed sekarang biar matrix role
+        // sudah siap dipakai begitu Fase 3 mulai, TANPA route/enforcement
+        // aktif apa pun di Fase 1 ini. `attendance` bukan action code yang
+        // valid — pakai `create` (§5).
+        'tasks.qr_attendance' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Dashboard anomali scan QR (Fase 2/3) — permission diseed sekarang,
+        // halamannya sendiri belum dibangun di Fase 1.
+        'qr_scan_logs' => [
+            ActionCode::VIEW->value,
+        ],
+
         'invoices' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
@@ -472,6 +496,14 @@ return [
         'customers.terminated.view' => 'Lihat List Pelanggan Putus',
         'customers.failed.view' => 'Lihat List Pelanggan Gagal',
         'customers.registration.skip_survey' => 'Skip Survey saat Registrasi (Input Data Survey Langsung)',
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md)
+        'customers.qr.view' => 'Lihat Status Token QR Pelanggan',
+        'customers.qr.create' => 'Terbitkan Token QR Pelanggan',
+        'customers.qr.cancel' => 'Cabut Token QR Pelanggan',
+        'customers.qr.print' => 'Cetak Stiker QR Pelanggan',
+        'tasks.qr_attendance.create' => 'Absen Task via Scan QR (Fase 3)',
+        'qr_scan_logs.view' => 'Lihat Dashboard Anomali Scan QR',
 
         // Modul Ticketing — tiap halaman punya permission sendiri, jadi
         // labelnya harus nyebut NAMA HALAMAN-nya biar di Role Matrix kelihatan

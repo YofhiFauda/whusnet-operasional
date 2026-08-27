@@ -3,11 +3,13 @@
 namespace App\Providers;
 
 use App\Models\Customer;
+use App\Models\CustomerQrToken;
 use App\Models\FopTask;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Task;
 use App\Observers\CustomerObserver;
+use App\Observers\CustomerQrTokenObserver;
 use App\Observers\FopTaskObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
@@ -55,6 +57,16 @@ class AppServiceProvider extends ServiceProvider
         // Register Policies
         Gate::policy(Task::class, TaskPolicy::class);
 
+        // Secret kosong bikin hash_hmac() tetap menghasilkan nilai (dengan
+        // key string kosong) — kegagalannya DIAM-DIAM: semua QR ter-generate
+        // & tervalidasi normal, tapi signature-nya bisa dihitung siapa saja
+        // yang tahu rumusnya. Tolak boot di production daripada biarkan itu
+        // lolos ke produksi tanpa ada yang sadar (docs/plan/qr-code/
+        // rancangan-qr-pelanggan-final.md §3.3).
+        if (app()->isProduction() && blank(config('qr.secret'))) {
+            throw new \RuntimeException('QR_HMAC_SECRET wajib diisi di production — generate dengan `openssl rand -base64 32`.');
+        }
+
         // Akses UI dokumentasi Scramble (/docs/api) di luar env local — bebas
         // di local, tapi di production/staging cuma staf full-access
         // (Owner/Admin) yang boleh buka. Bukan gerbang permission granular
@@ -75,6 +87,12 @@ class AppServiceProvider extends ServiceProvider
         // verifikasi pelanggan sama tanpa saling tahu (docs/plan/analisa-
         // realtime-spa-operasional.md §2.1 no. 10).
         Customer::observe(CustomerObserver::class);
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md,
+        // Fase 1) — invariant "maksimal satu token aktif per pelanggan"
+        // ditegakkan di Observer, bukan cuma Service, supaya jalur artisan/
+        // tinker/import ikut terkunci.
+        CustomerQrToken::observe(CustomerQrTokenObserver::class);
 
         // Fase 5.2 — isi kolom nyata notifications.notification_type dari data['type']
         // saat notifikasi dibuat, dari SEMUA jalur (Notification::send, dsb),
@@ -204,6 +222,30 @@ class AppServiceProvider extends ServiceProvider
         // "memberi ember baru untuk tiap login ID").
         RateLimiter::for('customer-portal-auth-ip', function (Request $request) {
             return Limit::perMinutes(15, 30)->by($request->ip());
+        });
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+        // §10 Fase 1) — endpoint publik TANPA auth, jadi limiter per-IP
+        // adalah satu-satunya penjaga sebelum request sampai ke query DB.
+        // Baseline longgar (60/menit) karena satu HP bisa scan berkali-kali
+        // wajar (staf bolak-balik antar pelanggan); limiter PIN yang jauh
+        // lebih ketat menyusul di Fase 2 (§10), terpisah dari yang ini.
+        RateLimiter::for('qr-public', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
+
+        // Fase 2 (§6.1, §10) — endpoint verifikasi PIN/4-digit HP menerima
+        // KREDENSIAL, jauh lebih ketat dari baseline baca `qr-public`.
+        // `perHour(5)` per IP+kode adalah penyederhanaan sadar dari
+        // deskripsi dokumen "5 percobaan/15 menit, lalu blokir 1 jam" (dua
+        // tahap eskalasi) — Laravel `RateLimiter` stok cuma satu jendela
+        // rolling; 5 percobaan/jam sudah menutup maksud yang sama (5 coba
+        // lalu terkunci ~1 jam) tanpa custom logic dua tahap. Lockout
+        // PER-TOKEN yang lebih presisi (15 menit, §6.5.4) ada di kolom DB
+        // `pin_failed_attempts`/`pin_locked_until` — limiter ini cuma
+        // lapis KEDUA, menutup 1 IP mencoba banyak token berbeda paralel.
+        RateLimiter::for('qr-billing-verify', function (Request $request) {
+            return Limit::perHour(5)->by($request->ip().'|'.$request->route('code'));
         });
 
         // View Composer for Sidebar Badges
