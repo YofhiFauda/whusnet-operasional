@@ -131,6 +131,32 @@ Ada opsi `--without-billing` untuk mengimpor pelanggan/layanan/data teknis **tan
 tagihan & pembayaran legacy. Dipakai hanya pada skenario go-live "pelanggan saja" —
 lihat kelompok C-2. Untuk migrasi biasa, jangan dipakai.
 
+#### `--mini-pop-map` — kalau penomoran Mini POP legacy beda dengan Master POP asli
+
+Command menerjemahkan `kategori_perangkat_jaringan` di dump legacy jadi segmen
+Mini POP **apa adanya** (`1` → cari/bikin `<kode_cabang>1`, `2` → `<kode_cabang>2`,
+dst). Ini benar SELAMA penomoran lokal dump lama itu sudah selaras dengan
+penomoran Mini POP sungguhan di Cabang tujuan.
+
+Kalau tidak selaras — contoh: seluruh baris `sand_db_sandya.sql` bernilai
+`kategori_perangkat_jaringan=1`, tapi secara fisik itu harus jadi **D6** (karena
+D1–D5 di Cabang D/Siman sudah dipakai OLT lain, bukan D1) — pemetaan default
+akan salah bikin/menempel ke `D1`. Petakan dulu nomor legacy → segmen asli:
+
+```bash
+php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --mini-pop-map=1:6
+```
+
+Format `legacy:asli`, boleh banyak pasangan sekaligus kalau satu dump punya
+beberapa kategori yang semuanya perlu remap: `--mini-pop-map=1:6,2:7,3:8`.
+Kategori yang tidak disebut di peta tetap dipakai apa adanya (opsional,
+backward compatible — tanpa flag ini command jalan seperti biasa).
+
+**Cek dulu isi datanya sebelum menjalankan** — kalau satu dump ternyata punya
+beberapa Mini POP fisik berbeda yang perlu remap, semuanya harus masuk peta
+sekali jalan; kalau cuma sebagian yang dipetakan, sisanya ikut nempel ke
+segmen default yang salah.
+
 ### Langkah 2 — Lengkapi perangkat & pembayaran
 
 ```bash
