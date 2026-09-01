@@ -186,6 +186,22 @@ Efek sampingnya rapi: begitu `started`/`pending` punya nama, kembaran generiknya
 
 **Test:** `TaskStatusTimelineNoDuplicateTest` — 9 test (service tak lagi menulis `created`; baris bisnis menang atas `update` sedetik; perubahan status **tanpa** log bisnis tetap tampil — jaga agar peristiwa tidak hilang saat disaring; derau kosmetik disembunyikan; baris tetap ada di DB; `start()` menulis satu baris bernama; `pending` vs `report_deferred` dibedakan berikut alasannya; `update` generik dapat label Indonesia; halaman merender satu baris per aksi).
 | ADHOC-35 | **Redesign Tampilan HP/Mobile Worksheet Teknisi** — Worksheet (`/tasks-saya`) & Detail (`/tasks/{id}`) dioptimalkan penuh untuk mobile screen (HP), stats banner gradien gelap, slider filter horizontal, search klien, WhatsApp/Maps icon button (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-53 | **Task overdue nyangkut selamanya di papan FOP** — command `tasks:auto-pending-overdue` (00:05 harian): task `terjadwal`/`in_progress` yang `scheduled_at`-nya sudah lewat tapi belum `selesai` di-pending otomatis, lepas tim, sync ke FopTask (lihat detail di bawah) | Done — 2026-09-01 |
+
+#### ADHOC-53 — Task overdue nyangkut selamanya di papan FOP (2026-09-01)
+
+**Pemicu:** gap tercatat sejak analisa index database 2026-07-22 — "task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP besok" belum dikodekan. Task `terjadwal`/`in_progress` yang tanggal jadwalnya lewat tanpa pernah `selesai` nyangkut permanen di status lama: tidak muncul lagi di papan FOP buat di-assign ulang, dan `TaskService::start()` keliru masih menganggap teknisinya "sibuk".
+
+**Perbaikan:**
+- `TaskService::releaseTeamAndSetPending()` (baru, publik) — replikasi perilaku kanonis `TaskController::releaseTeamAndSetPending()` (lepas tim + set Pending + sync FopTask + rebuild jadwal tim), versi yang bisa dipanggil tanpa actor login. `updated_by`/`AuditLog.user_id` kosong menandai aksi sistem, bukan keputusan manusia.
+- `php artisan tasks:auto-pending-overdue` (baru) — cari `Task` berstatus `terjadwal`/`in_progress` dengan `scheduled_at` < hari ini, panggil method di atas per task.
+- `Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05')` di `routes/console.php`.
+
+**BUKAN** pengulangan `fop:reset-cancelled-tasks` yang dihapus ADHOC-34 (2026-08-13) — itu menghidupkan task `dibatalkan` (final) balik jadi `in_progress`. Arah command ini kebalikan: task yang **belum final** dipensiunkan ke `pending` (status yang memang berarti "butuh keputusan ulang"), bukan menimpa keputusan yang sudah final.
+
+**Catatan bagian kedua dari gap yang sama** ("SLA tidak berjalan untuk task terjadwal ke depan") — dicek ulang, ternyata sudah benar di kode: `Task::slaDeadline()` mengembalikan `null` sampai `started_at` terisi (tipe non-SURVEY), dan untuk SURVEY deadline-nya sendiri mengikuti `scheduled_at` (otomatis di masa depan kalau jadwalnya di masa depan). Catatan lama di dokumen ini tidak akurat — tidak ada perubahan kode di bagian ini.
+
+**Test:** `TaskAutoPendingOverdueTest` — 7 test (terjadwal & in_progress overdue jadi pending + lepas tim; hari ini/masa depan/tanpa `scheduled_at` tidak disentuh; `selesai`/`dibatalkan`/`pending` tidak disentuh; FopTask terkait ikut sync).
 
 #### ADHOC-35 — Redesign Tampilan HP/Mobile Worksheet Teknisi (2026-08-13)
 
@@ -1299,9 +1315,10 @@ import). 8 index operasional (`tasks`/`fop_tasks`/`notifications`/
   dipesan pelanggan untuk tanggal ke depan HARUS tetap tampil di papan FOP.
   Membatasi `task_date` akan menyembunyikannya. `orderByRaw` bertingkat di
   `FopTaskController::index()` karenanya masih memaksa filesort.
-- **Aturan bisnis baru yang belum dikodekan** (muncul dari keputusan 1.4):
-  task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP
-  besok, dan SLA tidak berjalan untuk task terjadwal ke depan. Butuh task sendiri.
+- ~~Aturan bisnis baru yang belum dikodekan (muncul dari keputusan 1.4): task
+  yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP besok~~
+  — **selesai, lihat ADHOC-53** (2026-09-01). Bagian SLA-nya dicek ulang saat
+  ADHOC-53 dan ternyata sudah benar di kode (tidak ada perubahan).
 - Migration index ditulis sebagai file tambahan
   (`2026_07_22_164035_add_performance_indexes_phase3.php`), bukan diedit ke
   migration `create_*` asalnya seperti saran §14 — supaya tidak mewajibkan

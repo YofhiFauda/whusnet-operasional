@@ -21,3 +21,9 @@ Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,
 // cuma tanggal 1) dan notifications:prune-read (00:30).
 Schedule::command('webhook-outbox:prune')->dailyAt('01:15');
+// '00:05' — begitu hari berganti, task yang tanggal jadwalnya kemarin (atau
+// lebih lama) tapi belum selesai di-pending & balik ke antrian FOP. Jangan
+// hidupkan lagi pola "reset ke in_progress" (lihat komentar
+// fop:reset-cancelled-tasks di atas, dihapus 2026-08-13) — arah command ini
+// SEBALIKNYA: melepas task yang belum final, bukan menghidupkan yang sudah.
+Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05');

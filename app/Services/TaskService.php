@@ -407,6 +407,75 @@ class TaskService
         return $task->refresh();
     }
 
+    /**
+     * Lepas tim + set Task jadi Pending — replikasi perilaku kanonis
+     * `TaskController::releaseTeamAndSetPending()` (dipakai `reschedule()`
+     * teknisi & `pending()` FOP), tapi versi yang bisa dipanggil TANPA actor
+     * login. Dipisah di sini (bukan manggil versi controller yang private
+     * & pakai `auth()->id()` langsung) supaya command sistem —
+     * `tasks:auto-pending-overdue`, jalan dari scheduler tanpa user — bisa
+     * pakai jalur yang SAMA PERSIS dengan pending manual, bukan reimplementasi
+     * kedua yang gampang menyimpang dari aslinya.
+     *
+     * $actorId null berarti aksi sistem — `updated_by`/`AuditLog.user_id`
+     * kosong menandakan bukan keputusan manusia, bukan bug.
+     */
+    public function releaseTeamAndSetPending(Task $task, string $reason, string $auditAction, ?int $actorId = null): Task
+    {
+        // Notif dikirim SEBELUM tim dilepas — delete pivot bikin query tim
+        // sesudahnya kosong (comment sama persis di versi controller).
+        $members = $task->teamMembers()->with('user')->get();
+        $url = route('tasks.show', $task->id);
+
+        foreach ($members as $member) {
+            if ($member->user) {
+                $member->user->notify(new AppNotification(
+                    title: 'Task Di-pending: '.$task->task_number,
+                    message: $reason,
+                    actionUrl: $url,
+                    type: NotificationType::WARNING
+                ));
+            }
+        }
+
+        DB::transaction(function () use ($task, $reason, $auditAction, $actorId) {
+            $oldValues = $task->toArray();
+
+            $task->update([
+                'status' => TaskStatus::PENDING->value,
+                'pending_reason' => $reason,
+                'updated_by' => $actorId,
+            ]);
+
+            $task->teamMembers()->delete();
+
+            AuditLog::log($task, $auditAction, $oldValues, $task->fresh()->toArray());
+
+            $fopTask = FopTask::where('task_id', $task->id)->first();
+
+            if ($fopTask) {
+                $fopOldValues = $fopTask->toArray();
+
+                $fopTask->technicians()->detach();
+                $fopTask->update([
+                    'status' => TaskStatus::PENDING->value,
+                    'pending_reason' => $reason,
+                    'team_id' => null,
+                ]);
+                $fopTask->manual_override_at = null;
+                $fopTask->save();
+
+                AuditLog::log($fopTask, $auditAction, $fopOldValues, $fopTask->fresh()->toArray());
+
+                if ($fopTask->task_date) {
+                    app(FopTaskTeamService::class)->rebuildTeamsForDate(Carbon::parse($fopTask->task_date));
+                }
+            }
+        });
+
+        return $task->refresh();
+    }
+
     // ─── Validasi Konflik ────────────────────────────────────────
 
     /**
