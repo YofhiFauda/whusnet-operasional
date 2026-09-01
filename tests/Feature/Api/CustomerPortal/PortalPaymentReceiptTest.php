@@ -115,4 +115,94 @@ class PortalPaymentReceiptTest extends TestCase
 
         $response->assertStatus(404);
     }
+
+    // ================= GET /receipt.pdf =================
+
+    public function test_kwitansi_pdf_bisa_dilihat_inline(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $invoice = $this->seedInvoice($seed['customer']);
+        $staf = User::factory()->create();
+        $this->seedPayment($invoice, [
+            'payment_number' => 'PAY-PDF-1',
+            'received_by' => $staf->id,
+            'note' => 'catatan kerja internal',
+        ]);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokens['access_token']))
+            ->get('/api/customer-portal/me/payments/PAY-PDF-1/receipt.pdf');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringContainsString('inline', $response->headers->get('content-disposition'));
+    }
+
+    public function test_kwitansi_pdf_dengan_download_true_jadi_attachment(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $invoice = $this->seedInvoice($seed['customer']);
+        $this->seedPayment($invoice, ['payment_number' => 'PAY-PDF-2']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokens['access_token']))
+            ->get('/api/customer-portal/me/payments/PAY-PDF-2/receipt.pdf?download=1');
+
+        $response->assertOk();
+        $this->assertStringContainsString('attachment', $response->headers->get('content-disposition'));
+        $this->assertStringContainsString('kwitansi-PAY-PDF-2.pdf', $response->headers->get('content-disposition'));
+    }
+
+    public function test_kwitansi_pdf_milik_pelanggan_lain_menghasilkan_404(): void
+    {
+        $seedA = $this->seedActivePortalCustomer();
+        $seedB = $this->seedActivePortalCustomer();
+        $invoiceB = $this->seedInvoice($seedB['customer']);
+        $this->seedPayment($invoiceB, ['payment_number' => 'PAY-PDF-MILIK-B']);
+
+        $tokensA = $this->loginAndGetTokens($seedA['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokensA['access_token']))
+            ->get('/api/customer-portal/me/payments/PAY-PDF-MILIK-B/receipt.pdf');
+
+        $response->assertStatus(404);
+    }
+
+    // ================= GET /receipt-view (modal "Lihat") =================
+
+    public function test_kwitansi_html_untuk_modal_tidak_memuat_toolbar_atau_data_pegawai(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $invoice = $this->seedInvoice($seed['customer']);
+        $staf = User::factory()->create();
+        $this->seedPayment($invoice, [
+            'payment_number' => 'PAY-VIEW-1',
+            'received_by' => $staf->id,
+            'note' => 'catatan kerja internal',
+        ]);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokens['access_token']))
+            ->get('/api/customer-portal/me/payments/PAY-VIEW-1/receipt-view');
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/html; charset=UTF-8');
+        $response->assertSee('PAY-VIEW-1', false);
+        $response->assertDontSee('Cetak Kwitansi', false);
+        $response->assertDontSee('Diterima oleh', false);
+        $response->assertDontSee('catatan kerja internal', false);
+    }
+
+    public function test_kwitansi_html_milik_pelanggan_lain_menghasilkan_404(): void
+    {
+        $seedA = $this->seedActivePortalCustomer();
+        $seedB = $this->seedActivePortalCustomer();
+        $invoiceB = $this->seedInvoice($seedB['customer']);
+        $this->seedPayment($invoiceB, ['payment_number' => 'PAY-VIEW-MILIK-B']);
+
+        $tokensA = $this->loginAndGetTokens($seedA['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokensA['access_token']))
+            ->get('/api/customer-portal/me/payments/PAY-VIEW-MILIK-B/receipt-view');
+
+        $response->assertStatus(404);
+    }
 }

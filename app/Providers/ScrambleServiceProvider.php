@@ -13,7 +13,9 @@ use Illuminate\Support\ServiceProvider;
  * (docs/api/api-pop-distribusi/ dan docs/api/api-portal-pelanggan/). Setiap
  * modul, token/kredensial TERPISAH (keputusan.md §5 untuk pop-distribusi;
  * business-logic.md §Autentikasi untuk portal — dua lapis, client secret +
- * token per-pelanggan) — bukan satu security scheme global, karena tiap
+ * token per-pelanggan; §5 "Staf/Kolektor (QR)" untuk `/tickets`+`/kolektor/*`
+ * — SUBJEK KETIGA, staf/kolektor, token one-shot terpisah lagi dari
+ * token pelanggan) — bukan satu security scheme global, karena tiap
  * pasangan token punya kelas risiko beda. `OpenApi::secure()` bawaan
  * Scramble menerapkan satu scheme ke SEMUA operation lewat
  * `$openApi->security` (dokumen-level), jadi di sini scheme didaftarkan
@@ -50,10 +52,24 @@ class ScrambleServiceProvider extends ServiceProvider
                 ->as('PortalAccessToken')
                 ->setDescription('Access token pelanggan (15 menit, dari /auth/login atau /auth/refresh) — membuktikan "ini pelanggan X". TIDAK dipakai di /auth/login, /auth/claim, /auth/refresh (belum ada identitas pelanggan saat endpoint itu dipanggil).');
 
+            // Staf/kolektor (2026-08-29, docs/plan/qr-code/
+            // analisa-unifikasi-qr-staff-portal.md §4) — SUBJEK BEDA dari
+            // pelanggan (`PortalAccessToken` di atas). One-shot, TTL 15
+            // menit, purpose-scoped (`tickets`/`kolektor`), diterbitkan
+            // `QrScanController` di Operasional saat redirect ke Portal —
+            // BUKAN dari `/auth/login`/`/auth/claim` seperti token
+            // pelanggan. Scheme TERPISAH SENGAJA — kalau disamakan dengan
+            // `PortalAccessToken`, dokumentasi bikin pembaca ngira endpoint
+            // staf butuh access_token pelanggan (salah subjek total).
+            $staffTokenScheme = SecurityScheme::http('bearer')
+                ->as('StaffPortalToken')
+                ->setDescription('Token one-shot staf/kolektor (TTL 15 menit, purpose-scoped tickets/kolektor) — dari redirect QrScanController di Operasional setelah scan QR di /scan-qr, BUKAN dari /auth/login. Beda total dari PortalAccessToken (itu punya pelanggan).');
+
             $openApi->components->addSecurityScheme($readScheme->schemeName, $readScheme);
             $openApi->components->addSecurityScheme($writeScheme->schemeName, $writeScheme);
             $openApi->components->addSecurityScheme($portalClientScheme->schemeName, $portalClientScheme);
             $openApi->components->addSecurityScheme($portalTokenScheme->schemeName, $portalTokenScheme);
+            $openApi->components->addSecurityScheme($staffTokenScheme->schemeName, $staffTokenScheme);
 
             // Tidak ada security default di level dokumen — tiap operation
             // wajib eksplisit set scheme-nya sendiri di bawah, supaya gak ada
@@ -97,9 +113,19 @@ class ScrambleServiceProvider extends ServiceProvider
                     || str_ends_with($path->path, '/auth/claim')
                     || str_ends_with($path->path, '/auth/refresh');
 
-                $requirement = $clientOnly
-                    ? [$portalClientScheme->schemeName => []]
-                    : [$portalClientScheme->schemeName => [], $portalTokenScheme->schemeName => []];
+                // Staf/kolektor (2026-08-29) — `/tickets` & `/kolektor/*`
+                // SUBJEKNYA STAF, bukan pelanggan. Dicek DULUAN sebelum
+                // fallback ke $portalTokenScheme di bawah — kalau kebalik
+                // urutannya, endpoint ini keburu ke-assign token pelanggan
+                // yang salah.
+                $isStaffPath = preg_match('#/customer-portal/tickets(/|$)#', $path->path) === 1
+                    || str_contains($path->path, '/customer-portal/kolektor/');
+
+                $requirement = match (true) {
+                    $clientOnly => [$portalClientScheme->schemeName => []],
+                    $isStaffPath => [$portalClientScheme->schemeName => [], $staffTokenScheme->schemeName => []],
+                    default => [$portalClientScheme->schemeName => [], $portalTokenScheme->schemeName => []],
+                };
 
                 foreach ($path->operations as $operation) {
                     $operation->addSecurity(new SecurityRequirement($requirement));

@@ -142,6 +142,46 @@ class PortalAuthService
     }
 
     /**
+     * Resolusi QR pelanggan → `login_id` + status akun, dipakai Portal
+     * (app terpisah) buat pre-fill halaman klaim begitu pelanggan scan QR
+     * (2026-08-27, keputusan: scan QR SELALU ke Portal, gerbang tagihan
+     * internal `QrBillingController` dicabut). SENGAJA gak minta PIN di
+     * sini — PIN tetap diverifikasi di `claim()`, method ini cuma bilang
+     * "QR ini punya siapa" (login_id BUKAN rahasia, sudah tercetak di kartu
+     * fisik yang sama).
+     *
+     * 4 kegagalan resolve token (§5, sama seperti `QrScanController`) SEMUA
+     * dijawab `not_found` identik — jangan bocorkan detail mana yang salah.
+     *
+     * @return array{outcome: 'success'|'not_found', login_id?: string, account_status?: string}
+     */
+    public function resolveQr(string $code): array
+    {
+        [$token, $signature] = array_pad(explode('.', $code, 2), 2, '');
+        $resolution = $this->qrTokens->resolve($token, $signature);
+
+        if ($resolution['status'] !== 'success') {
+            return ['outcome' => 'not_found'];
+        }
+
+        $customer = $resolution['qrToken']->customer;
+        $loginId = $customer?->portal_login_id;
+
+        if (! $customer || ! $loginId) {
+            return ['outcome' => 'not_found'];
+        }
+
+        return [
+            'outcome' => 'success',
+            'login_id' => $loginId,
+            // 'pending_claim' (belum) / 'active' (sudah) / null (akun belum
+            // pernah dibuat sama sekali — kasus jarang, biasanya
+            // ensureAccountExists() udah jalan bareng penerbitan QR).
+            'account_status' => $customer->portalAccount?->status,
+        ];
+    }
+
+    /**
      * @return array{outcome: 'success'|'invalid_credentials'|'locked', tokens?: array}
      */
     public function login(string $loginId, string $password, ?string $ip): array

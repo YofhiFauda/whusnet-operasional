@@ -560,6 +560,16 @@ Permission baru lewat `features` × `actions` (`PermissionGeneratorService`):
 
 ### 6.1 Fungsi A — Pembayaran (Fase 2)
 
+> **REVISI 2026-08-27 (keputusan eksplisit user) — seksi ini DICABUT.**
+> Gerbang tagihan publik (`QrBillingController`, dua-step disclosure di
+> bawah) dihapus total dari kode. Scan QR pelanggan (cabang tamu) sekarang
+> `redirect()->away()` ke **Portal Pelanggan** (app terpisah, Next.js),
+> bukan lagi ke halaman internal ini — lihat `QrScanController::dispatch()`
+> + endpoint baru `GET /api/customer-portal/qr/resolve`
+> (`docs/api/api-portal-pelanggan/business-logic.md` §"QR"). Isi seksi di
+> bawah DIPERTAHANKAN sebagai jejak keputusan (kenapa dulu dibangun begini),
+> BUKAN kontrak yang masih berlaku — jangan diimplementasikan ulang.
+
 Satu-satunya halaman **tanpa auth**. Posisi ONT (dalam/luar rumah) mempengaruhi takaran mitigasi — konfirmasi ke FOP sebelum implementasi. Rancangan ini mengasumsikan ONT bisa diakses orang yang tidak tinggal di rumah (tamu, teknisi, atau memang di luar).
 
 **Two-step disclosure:**

@@ -210,6 +210,29 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Scan QR Internal (staf) — 2026-08-27, resources/js/qr-scan.js.
+        // Cuma `.view` (buka halaman + pakai kamera) — bukan aksi CRUD.
+        'qr_scan' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Create tiket via QR → Portal (2026-08-29, docs/plan/qr-code/
+        // analisa-unifikasi-qr-staff-portal.md §1.4). TERPISAH dari
+        // `tickets.create` dashboard — channel Portal pakai token one-shot,
+        // risikonya beda. Role ber-`tickets.*` (helpdesk/noc/fop) sudah
+        // lolos otomatis lewat feature wildcard, tidak perlu baris tambahan.
+        'tickets.qr' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Catat pembayaran via QR → Portal (2026-08-29). TERPISAH dari
+        // `kolektor.pay` dashboard, sama alasan seperti `tickets.qr` di
+        // atas. Role `kolektor` TIDAK punya wildcard `kolektor.*` (sengaja),
+        // jadi permission ini wajib ditambah eksplisit di RolePermissionSeeder.
+        'kolektor.qr' => [
+            ActionCode::PAY->value,
+        ],
+
         'invoices' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
@@ -472,6 +495,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Batas Rantai Auto-Grant `view` — Channel QR/Portal Independen
+    |--------------------------------------------------------------------------
+    |
+    | Sub-fitur `*.qr` (`customers.qr`, `tickets.qr`, `kolektor.qr`) SECARA
+    | SENGAJA cuma menumpang struktur tree Fitur biar rapi di menu Role
+    | Matrix — bukan tab navigasi dashboard Operasional. Aksesnya datang
+    | dari alur scan QR / Portal Pelanggan (lihat QrScanController,
+    | StaffPortalTokenService), 100% terpisah dari halaman `tickets.view`
+    | atau `kolektor.view` di Operasional.
+    |
+    | Tanpa daftar ini, RoleManagementService::syncPermissions() tetap NAIK
+    | ke fitur induk (`tickets`, `kolektor`, `customers`) dan diam-diam ikut
+    | mencentang `.view` DASHBOARD OPERASIONAL induknya begitu permission
+    | `.qr` dicentang — mencampur dua channel akses yang harus independen.
+    | Contoh nyata: role Kolektor SEHARUSNYA bisa dapat `tickets.qr.create`
+    | (buat bikin tiket lewat QR) tanpa terpaksa ikut dapat `tickets.view`
+    | (akses penuh dashboard Ticketing Operasional).
+    |
+    | Beda dengan `view_autogrant_exempt` di atas — itu cuma melewati fitur
+    | ITU SENDIRI lalu tetap naik ke induknya. Daftar ini menghentikan
+    | rantai TOTAL begitu ketemu kode fiturnya: tidak menambah `.view`
+    | fitur ini MAUPUN fitur induk mana pun di atasnya.
+    */
+    'view_autogrant_chain_boundary' => [
+        'customers.qr',
+        'tickets.qr',
+        'kolektor.qr',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Permission Name Overrides (Label Kontekstual)
     |--------------------------------------------------------------------------
     |
@@ -504,6 +558,9 @@ return [
         'customers.qr.print' => 'Cetak Stiker QR Pelanggan',
         'tasks.qr_attendance.create' => 'Absen Task via Scan QR (Fase 3)',
         'qr_scan_logs.view' => 'Lihat Dashboard Anomali Scan QR',
+        // Scan QR internal (2026-08-27) — kamera DI DALAM app ini, bukan
+        // app scanner luar (lihat resources/js/qr-scan.js kenapa).
+        'qr_scan.view' => 'Buka Halaman Scan QR Internal (Staf)',
 
         // Modul Ticketing — tiap halaman punya permission sendiri, jadi
         // labelnya harus nyebut NAMA HALAMAN-nya biar di Role Matrix kelihatan

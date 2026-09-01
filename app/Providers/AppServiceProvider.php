@@ -204,6 +204,15 @@ class AppServiceProvider extends ServiceProvider
         // limiter beda kelas risiko — pola RateLimiter::for-nya sama seperti
         // tiga di atas, bukan pola baru di repo.
         RateLimiter::for('customer-portal-api', function (Request $request) {
+            // Lokal (dev): limiter DIMATIKAN — tes manual berulang-ulang dari
+            // Portal Next.js gak keblokir 429 gara-gara reload/testing.
+            // Staging/production TETAP kena limit normal, gak pernah kebawa
+            // (app()->environment() baca APP_ENV, bukan flag yang bisa lupa
+            // dicabut manual).
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
             return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
         });
 
@@ -213,6 +222,10 @@ class AppServiceProvider extends ServiceProvider
         // (business-logic.md §6.6.3). Belum diattach ke route nyata sampai
         // Fase 2 — didaftarkan sekarang supaya namanya siap dipakai.
         RateLimiter::for('customer-portal-auth', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
             return Limit::perMinutes(15, 5)->by($request->ip().'|'.$request->input('login_id'));
         });
 
@@ -221,6 +234,10 @@ class AppServiceProvider extends ServiceProvider
         // di atas (keputusan.md §1: limiter keyed login_id+IP saja ditolak,
         // "memberi ember baru untuk tiap login ID").
         RateLimiter::for('customer-portal-auth-ip', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
             return Limit::perMinutes(15, 30)->by($request->ip());
         });
 
@@ -231,22 +248,16 @@ class AppServiceProvider extends ServiceProvider
         // wajar (staf bolak-balik antar pelanggan); limiter PIN yang jauh
         // lebih ketat menyusul di Fase 2 (§10), terpisah dari yang ini.
         RateLimiter::for('qr-public', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
             return Limit::perMinute(60)->by($request->ip());
         });
 
-        // Fase 2 (§6.1, §10) — endpoint verifikasi PIN/4-digit HP menerima
-        // KREDENSIAL, jauh lebih ketat dari baseline baca `qr-public`.
-        // `perHour(5)` per IP+kode adalah penyederhanaan sadar dari
-        // deskripsi dokumen "5 percobaan/15 menit, lalu blokir 1 jam" (dua
-        // tahap eskalasi) — Laravel `RateLimiter` stok cuma satu jendela
-        // rolling; 5 percobaan/jam sudah menutup maksud yang sama (5 coba
-        // lalu terkunci ~1 jam) tanpa custom logic dua tahap. Lockout
-        // PER-TOKEN yang lebih presisi (15 menit, §6.5.4) ada di kolom DB
-        // `pin_failed_attempts`/`pin_locked_until` — limiter ini cuma
-        // lapis KEDUA, menutup 1 IP mencoba banyak token berbeda paralel.
-        RateLimiter::for('qr-billing-verify', function (Request $request) {
-            return Limit::perHour(5)->by($request->ip().'|'.$request->route('code'));
-        });
+        // qr-billing-verify DICABUT 2026-08-27 bareng QrBillingController
+        // (gerbang tagihan internal digantikan redirect ke Portal) — jangan
+        // dihidupkan lagi tanpa controller yang makainya.
 
         // View Composer for Sidebar Badges
         View::composer('layouts.app', function ($view) {

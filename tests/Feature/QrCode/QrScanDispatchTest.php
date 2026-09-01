@@ -13,6 +13,7 @@ use App\Models\UserRoleScopeTarget;
 use App\Services\CustomerQrTokenService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
+use Database\Seeders\QrFeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\TicketFeatureSeeder;
@@ -37,12 +38,13 @@ class QrScanDispatchTest extends TestCase
     {
         parent::setUp();
 
-        config(['qr.secret' => 'test-qr-hmac-secret-fase-1']);
+        config(['qr.secret' => 'test-qr-hmac-secret-fase-1', 'qr.portal_base_url' => 'https://portal.test']);
 
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);
         $this->seed(RoleSeeder::class);
         $this->seed(TicketFeatureSeeder::class);
+        $this->seed(QrFeatureSeeder::class); // tickets.qr.create / kolektor.qr.pay — WAJIB sebelum RolePermissionSeeder biar wildcard tickets.*/kolektor.* (kalau ada) ke-expand termasuk keduanya
         $this->seed(RolePermissionSeeder::class);
 
         $this->pop = Pop::create([
@@ -197,25 +199,39 @@ class QrScanDispatchTest extends TestCase
         ]);
     }
 
+    /**
+     * Koreksi 2026-08-29 (docs/plan/qr-code/analisa-unifikasi-qr-staff-portal.md)
+     * — staf ticketing SEKARANG diarahkan ke Portal (bukan lagi
+     * `qr.ticket.create` internal), bawa token one-shot `StaffPortalToken`
+     * di query string. Route `qr.ticket.create` TETAP ada buat non-QR
+     * (keputusan eksplisit user), cuma sudah tidak lagi jadi tujuan dispatch
+     * QR — dites terpisah kalau/ketika ada jalur manual yang memakainya.
+     */
     #[Test]
-    public function staf_dengan_permission_tickets_create_diarahkan_ke_form_tiket_terprefill(): void
+    public function staf_dengan_permission_tickets_qr_create_diarahkan_ke_portal_bawa_token_staf(): void
     {
         $service = app(CustomerQrTokenService::class);
         $token = $service->issue($this->customer);
         $signature = $service->signature($this->pop->id, $this->customer->customer_code, $token->token);
 
+        // helpdesk punya 'tickets.*' — otomatis lolos cek 'tickets.qr.create'
+        // lewat feature wildcard (EffectiveAccessService::userCan()).
         $staff = $this->scopedUser('helpdesk', $this->pop);
         $code = "{$token->token}.{$signature}";
 
         $dispatchResponse = $this->actingAs($staff)->get("/q1/{$code}");
-        $dispatchResponse->assertRedirect(route('qr.ticket.create', ['code' => $code]));
 
-        $ticketHopResponse = $this->actingAs($staff)->get(route('qr.ticket.create', ['code' => $code]));
-        $ticketHopResponse->assertRedirect(route('tickets.create', ['customer_id' => $this->customer->id]));
+        $dispatchResponse->assertRedirect();
+        $location = $dispatchResponse->headers->get('Location');
+        $this->assertStringStartsWith("https://portal.test/staff/tickets?code={$code}&staff_token=", $location);
 
-        $formResponse = $this->actingAs($staff)->get(route('tickets.create', ['customer_id' => $this->customer->id]));
-        $formResponse->assertOk();
-        $formResponse->assertViewHas('prefillCustomer', fn ($payload) => $payload['id'] === $this->customer->id);
+        $plaintext = substr($location, strpos($location, 'staff_token=') + strlen('staff_token='));
+        $this->assertDatabaseHas('staff_portal_tokens', [
+            'user_id' => $staff->id,
+            'customer_id' => $this->customer->id,
+            'purpose' => 'tickets',
+            'token_hash' => hash('sha256', $plaintext),
+        ]);
 
         $this->assertDatabaseHas('qr_scan_logs', [
             'customer_qr_token_id' => $token->id,
@@ -224,8 +240,14 @@ class QrScanDispatchTest extends TestCase
         ]);
     }
 
+    /**
+     * Koreksi 2026-08-27 — cabang tamu dulu redirect ke `qr.billing`
+     * (`QrBillingController`, DICABUT). Sekarang redirect KE PORTAL,
+     * `code` diteruskan lewat query string biar Portal bisa panggil balik
+     * `GET /api/customer-portal/qr/resolve` buat dapetin login_id.
+     */
     #[Test]
-    public function tamu_belum_login_diarahkan_ke_halaman_tagihan_bukan_404(): void
+    public function tamu_belum_login_diarahkan_ke_portal_bukan_404(): void
     {
         $service = app(CustomerQrTokenService::class);
         $token = $service->issue($this->customer);
@@ -233,16 +255,32 @@ class QrScanDispatchTest extends TestCase
         $code = "{$token->token}.{$signature}";
 
         $dispatchResponse = $this->get("/q1/{$code}");
-        $dispatchResponse->assertRedirect(route('qr.billing', ['code' => $code]));
-
-        $billingResponse = $this->get(route('qr.billing', ['code' => $code]));
-        $billingResponse->assertOk();
+        $dispatchResponse->assertRedirect("https://portal.test/klaim?code={$code}");
 
         $this->assertDatabaseHas('qr_scan_logs', [
             'customer_qr_token_id' => $token->id,
             'purpose' => 'payment',
             'result' => 'success',
         ]);
+    }
+
+    /**
+     * Guard eksplisit — kalau `PORTAL_BASE_URL` lupa diisi, tamu yang scan
+     * HARUS ketahuan lewat 500 gamblang, bukan 404 diam-diam yang keliatan
+     * seperti QR-nya sendiri yang rusak.
+     */
+    #[Test]
+    public function tamu_belum_login_500_kalau_portal_base_url_belum_dikonfigurasi(): void
+    {
+        config(['qr.portal_base_url' => null]);
+
+        $service = app(CustomerQrTokenService::class);
+        $token = $service->issue($this->customer);
+        $signature = $service->signature($this->pop->id, $this->customer->customer_code, $token->token);
+
+        $response = $this->get("/q1/{$token->token}.{$signature}");
+
+        $response->assertServerError();
     }
 
     #[Test]

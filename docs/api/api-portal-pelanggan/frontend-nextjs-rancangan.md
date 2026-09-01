@@ -60,14 +60,22 @@ panduan sisi Next.js.
    backend ngirim string desimal SENGAJA (`"150000.00"`) buat hindari
    floating-point error. Parse ke number CUMA pas mau format tampilan,
    jangan disimpen begitu.
-9. **JANGAN bikin UI buat fitur yang endpoint-nya belum ada** — bikin
-   tiket dari Portal, upload bukti bayar, gateway pembayaran/QRIS. Itu
-   ditahan sengaja (§0 dokumen QR), backend-nya belum ada, UI-nya bakal
-   manggil endpoint yang gak exist.
-10. **JANGAN expose route/UI publik "lihat tagihan" tanpa `Bearer` token**
-    di Portal ini — fitur "tamu lihat tagihan tanpa akun" itu **sudah ada**
-    di app satunya (`/q1/.../tagihan`, gerbang QR publik), BUKAN tanggung
-    jawab Portal. Portal ini cuma buat pelanggan yang UDAH punya akun.
+9. **JANGAN bikin UI buat fitur yang endpoint-nya belum ada** — upload bukti
+   bayar, gateway pembayaran/QRIS masih ditahan sengaja (§0 dokumen QR),
+   backend-nya belum ada. ~~Bikin tiket dari Portal~~ **KOREKSI 2026-08-29:
+   sudah ADA** (`POST /tickets`, `GET/POST /kolektor/*` — subjek STAF/
+   kolektor, bukan pelanggan, lihat `business-logic.md` §5 "Staf/Kolektor
+   (QR)"). Baris ini dibiarkan sebagai jejak keputusan lama, jangan dihapus
+   diam-diam kalau nanti larangan lain di sini juga jadi basi — tandai
+   koreksinya, seperti di sini.
+10. **JANGAN bikin halaman "lihat tagihan tanpa akun"** — koreksi 2026-08-27:
+    gerbang tagihan publik yang DULU ada di app satunya (`QrBillingController`)
+    **DICABUT total**, scan QR pelanggan sekarang emang masuk ke Portal
+    (`/klaim`, lihat bagian di bawah) — tapi tujuannya SELALU "bikin/lanjutin
+    akun", bukan "lihat tagihan tanpa login". Halaman `/klaim` itu sendiri
+    memang publik (belum ada `Bearer` di titik itu, wajar), tapi jangan
+    ditumpangi fitur lihat data finansial di situ — data tagihan tetap CUMA
+    lewat `/me/invoices` (butuh akun aktif + login).
 
 ## Pola arsitektur — BFF (Backend-for-Frontend), bukan SPA murni
 
@@ -294,6 +302,12 @@ Refresh (`/auth/refresh`) **gak butuh Route Handler publik sendiri** — dipangg
 INTERNAL oleh `lib/laravel-client.ts` pas nemu 401, gak pernah diekspos jadi
 endpoint yang client React manggil langsung.
 
+`GET /qr/resolve` (BARU, 2026-08-27) **juga gak butuh Route Handler sendiri**
+— dipanggil LANGSUNG dari Server Component halaman `/klaim` (`callLaravel()`
+tanpa `auth: true`, gak ada Bearer di titik itu), sama pola optimasi yang
+dipakai `(portal)/layout.tsx` buat `/me` (lihat "Auth & session" — hindari
+hop tambahan ke Route Handler sendiri kalau pemanggilnya Server Component).
+
 ## Kontrak tipe data — jangan tebak, kutip dari business-logic.md
 
 Semua bentuk response (nama field, tipe, kapan null) udah final &
@@ -431,7 +445,40 @@ keputusan produk):
   endpoint-nya harus diminta dibangun dulu di repo Laravel, jangan
   diasumsikan ada.
 
+### `/klaim` (BARU, 2026-08-27) — tujuan scan QR pelanggan
+- **Kenapa ada, beda dari `/aktivasi`**: sejak gerbang tagihan internal
+  (`QrBillingController`) dicabut, `QrScanController` cabang tamu redirect
+  KE SINI: `{PORTAL_BASE_URL}/klaim?code={token.sig}`. Halaman ini nge-
+  RESOLVE `code` itu dulu (`GET /qr/resolve`, panggil langsung dari Server
+  Component, lihat "Peta Route Handler") buat dapetin `login_id` + status
+  akun SEBELUM nampilin form — pelanggan gak perlu ngetik `login_id` manual
+  lagi kalau datengnya dari scan (beda dari `/aktivasi` yang diketik semua
+  manual, buat pelanggan yang gak scan/gak punya kartu di tangan).
+- **Data & sumber**: `GET /qr/resolve?code=` (server-side, dulu) →
+  `POST /auth/claim` (submit form, sama kayak `/aktivasi`).
+- **Alur tampilan** (tiga cabang dari hasil resolve):
+  1. `account_status: "pending_claim"` → tampilkan form klaim (sama field-nya
+     kayak `/aktivasi`: `login_id` READ-ONLY/prefilled, `pin`, `new_password`
+     + `confirm_password`).
+  2. `account_status: "active"` → JANGAN tampilin form klaim (bakal 409
+     kalau dipaksa) — redirect/tampilkan pesan "Akun ini sudah aktif" +
+     tombol ke `/login` (`login_id` ikut di-prefill kalau `/login` dibikin
+     nerima query param).
+  3. Resolve gagal (404, `code` invalid/kedaluwarsa/dicabut) → halaman
+     error generik "Kode QR tidak valid" — JANGAN detailin kenapa (pola
+     anti-enumeration yang sama di seluruh modul QR).
+- **State submit** (form claim): sama persis `/aktivasi` di bawah (401/409/
+  422/423) — dua halaman ini BOLEH share satu Client Component form, beda
+  cuma cara `login_id` keisi (manual vs prefilled) dan pembungkus di atasnya.
+- **Requirement terbuka**: `/login` belum tentu terima query param buat
+  prefill `login_id` — kalau mau alur "akun udah aktif → `/login` udah
+  keisi", itu perlu ditambah di halaman `/login` juga (kecil, tapi jangan
+  diasumsikan otomatis ada).
+
 ### `/aktivasi`
+- **Kapan dipakai**: pelanggan yang MASUK MANUAL ke Portal (bukan hasil
+  scan) dan mau aktivasi — jarang, tapi tetap disediakan (kartu ilang QR-nya
+  tapi Login ID+PIN masih ke-baca, dll). Alur UTAMA tetap `/klaim` (scan).
 - **Data & sumber**: `POST /auth/claim`.
 - **Tampilan**: form `login_id`, `pin` (input numeric 6 digit,
   `inputMode="numeric"` `maxLength={6}`, idealnya 6 kotak terpisah gaya OTP

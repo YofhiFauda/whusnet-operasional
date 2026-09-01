@@ -35,12 +35,15 @@ class KolektorLoginRedirectsToWorklistTest extends TestCase
         $role = Role::where('code', 'kolektor')->firstOrFail();
         $kolektor = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
 
-        // Role ini SENGAJA cuma punya permission bertema `kolektor.*` — tanpa
-        // dashboard.view (kondisi persis yang dulu bikin 403). `kolektor.pay`,
-        // `.deposit`, `.visit` menyusul di kolektor-2.0 dan tetap tak membuka
-        // halaman lain.
+        // Role ini SENGAJA gak punya dashboard.view (kondisi persis yang
+        // dulu bikin 403). Daftar di bawah dilengkapi seiring waktu:
+        // `kolektor.pay`/`.deposit`/`.visit` (kolektor 2.0), `qr_scan.view`+
+        // `kolektor.qr.pay` (scan QR → worklist, ADHOC-51/52),
+        // `tickets.qr.create` (lapor komplain via QR, 2026-08-29 — kolektor
+        // ketemu pelanggan langsung di lapangan) — tapi TETAP gak ada satu
+        // pun yang membuka halaman lain (dashboard.view/customers.view/dst).
         $this->assertEqualsCanonicalizing(
-            ['kolektor.view', 'kolektor.pay', 'kolektor.deposit', 'kolektor.visit'],
+            ['kolektor.view', 'kolektor.pay', 'kolektor.deposit', 'kolektor.visit', 'qr_scan.view', 'kolektor.qr.pay', 'tickets.qr.create'],
             $kolektor->role->permissions()->pluck('code')->toArray()
         );
 

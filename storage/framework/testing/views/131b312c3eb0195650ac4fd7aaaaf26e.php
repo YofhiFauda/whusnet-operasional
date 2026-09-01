@@ -762,6 +762,14 @@
                             <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Profil Saya
                         </button>
+                        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('qr_scan.view')): ?>
+                            
+                            <a href="<?php echo e(route('qr.scan.show')); ?>"
+                               class="w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                                <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4h4v4H4zM4 16h4v4H4zM16 4h4v4h-4zM4 10h4v4M10 4v4M14 14h6M10 10h4v4h-4zM16 16h4v4h-4z"/></svg>
+                                Scan QR
+                            </a>
+                        <?php endif; ?>
                         <div class="my-1 border-t border-slate-100 dark:border-slate-700/60"></div>
                         <button onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                                 class="w-full px-3 py-2 flex items-center gap-2.5 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors">

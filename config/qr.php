@@ -23,17 +23,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Rekening Tujuan Transfer (Fase 2 — tanpa gateway)
+    | Portal Pelanggan — tujuan redirect pemindai TAMU
     |--------------------------------------------------------------------------
     |
-    | Halaman tagihan publik (§6.1) menampilkan rekening ini + tombol Salin
-    | + tombol WhatsApp admin POP, TANPA integrasi payment gateway/QRIS —
-    | itu Fase 4, DITAHAN sampai ada perintah resmi (§0). Pencatatan
-    | pembayaran tetap manual lewat /payments.
+    | Keputusan 2026-08-27: scan QR pelanggan (tamu, belum login) SELALU
+    | diarahkan ke Portal (app terpisah), BUKAN lagi gerbang tagihan internal
+    | (`QrBillingController`, dicabut). `QrScanController` redirect ke
+    | "{portal_base_url}/klaim?code={code}" — Portal yang panggil balik
+    | `GET /api/customer-portal/qr/resolve` buat dapetin login_id.
+    | WAJIB diisi di production (tanpa ini, pemindai tamu ke-404 diam-diam —
+    | lihat guard di QrScanController).
     */
-    'bank_account' => [
-        'bank_name' => env('QR_BANK_NAME'),
-        'account_number' => env('QR_BANK_ACCOUNT_NUMBER'),
-        'account_holder' => env('QR_BANK_ACCOUNT_HOLDER'),
-    ],
+    'portal_base_url' => env('PORTAL_BASE_URL'),
 ];

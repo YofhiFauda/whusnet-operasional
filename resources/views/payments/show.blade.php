@@ -40,125 +40,194 @@
 {{-- Isi lembar ini berasal dari ReceiptPresenter, sumber yang sama dengan
      struk thermal (payments/receipt) dan kartu kolektor. Dulu tiap view
      membaca $payment sendiri-sendiri sehingga satu pembayaran tercetak beda
-     isi tergantung dari halaman mana tombolnya ditekan. --}}
-<div class="print-only p-8 bg-white text-slate-900 font-sans text-xs leading-normal">
-    <!-- Header Struk -->
-    <div class="flex justify-between items-start border-b pb-4 mb-4 border-slate-300">
-        <div>
-            <h1 class="text-xl font-black tracking-tight text-slate-900">WHUSNET OPERASIONAL</h1>
-            <p class="text-xs text-slate-600 font-medium">ISP Service Provider • POP {{ $kwitansi['pop'] }}</p>
-            <p class="text-[10px] text-slate-500 mt-0.5">Sistem Billing & Operasional Terpadu</p>
-        </div>
+     isi tergantung dari halaman mana tombolnya ditekan.
+
+     2026-09-01: layout disamain sama kwitansi PDF pelanggan (`.a4` di
+     `payments/receipt.blade.php`, dompdf) — gaya invoice bersih (Stripe/
+     Anthropic-style), bukan lagi kartu enterprise berwarna-warni. Beda dari
+     versi pelanggan: lembar ini INTERNAL (dilihat staf), jadi baris
+     "Diterima oleh"/"Kolektor"/"Catatan" tetap ada — versi pelanggan
+     sengaja membuangnya (lihat `$isCustomerCopy` di receipt.blade.php). --}}
+<div class="print-only px-16 py-12 bg-white text-zinc-900 font-sans text-[13px] leading-relaxed">
+
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-8">
+        <h1 class="text-[26px] font-bold text-zinc-900">Kwitansi</h1>
         <div class="text-right">
-            <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">KWITANSI PEMBAYARAN RESMI</h2>
-            <p class="font-mono text-xs font-bold text-slate-800">No: {{ $kwitansi['nomor'] }}</p>
+            <p class="text-sm font-bold uppercase tracking-wide text-zinc-900">Whusnet</p>
+            <p class="text-[11px] text-zinc-500">Internet Service Provider</p>
+        </div>
+    </div>
+
+    <!-- Meta -->
+    <table class="mb-7">
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">No. Kwitansi</td>
+            <td class="py-0.5">{{ $kwitansi['nomor'] }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Bayar</td>
+            <td class="py-0.5">{{ $kwitansi['tanggal_bayar'] }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Ditagih</td>
+            <td class="py-0.5">{{ $kwitansi['tanggal_ditagih'] }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Metode</td>
+            <td class="py-0.5">{{ $kwitansi['metode'] }}</td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Status</td>
             {{-- Warna status IKUT statusnya. Sebelumnya emerald tanpa syarat:
                  pembayaran DITOLAK pun tercetak hijau di kwitansi resmi. --}}
-            <p class="text-xs text-slate-600 mt-0.5">Status: <span class="font-bold uppercase {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">● {{ $kwitansi['status'] }}</span></p>
-            @if($kwitansi['keterangan_cicilan'])
-                <p class="text-[11px] text-slate-600 font-medium mt-0.5">{{ $kwitansi['keterangan_cicilan'] }}</p>
-            @endif
-        </div>
-    </div>
+            <td class="py-0.5 font-semibold {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">● {{ $kwitansi['status'] }}</td>
+        </tr>
+        @if($kwitansi['keterangan_cicilan'])
+            <tr>
+                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Keterangan</td>
+                <td class="py-0.5">{{ $kwitansi['keterangan_cicilan'] }}</td>
+            </tr>
+        @endif
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Area</td>
+            <td class="py-0.5">{{ $kwitansi['pop'] }}</td>
+        </tr>
+    </table>
 
-    <!-- Info Pelanggan & Transaksi Grid -->
-    <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">DITERIMA DARI PELANGGAN</p>
-            <p class="font-bold text-sm text-slate-900">{{ $kwitansi['pelanggan']['nama'] }}</p>
-            <p class="font-mono text-xs text-slate-700">CID: {{ $kwitansi['pelanggan']['cid'] }}</p>
-            <p class="text-slate-600 font-mono">No. HP: {{ $kwitansi['pelanggan']['hp'] }}</p>
-            <p class="text-slate-600 mt-1">Alamat: {!! implode('<br>', array_map('e', $kwitansi['pelanggan']['alamat_baris'])) !!}</p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-right space-y-1">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">RINCIAN TRANSAKSI</p>
-            <p><span class="text-slate-500">Tanggal Bayar:</span> <span class="font-semibold">{{ $kwitansi['tanggal_bayar'] }}</span></p>
-            <p><span class="text-slate-500">Tanggal Ditagih:</span> <span class="font-semibold">{{ $kwitansi['tanggal_ditagih'] }}</span></p>
-            <p><span class="text-slate-500">Metode Bayar:</span> <span class="font-semibold uppercase font-mono">{{ $kwitansi['metode'] }}</span></p>
-            <p><span class="text-slate-500">Kolektor/Kasir:</span> <span class="font-semibold">{{ $kwitansi['penagih'] }}</span></p>
-            <p><span class="text-slate-500">Ref Invoice:</span> <span class="font-mono font-bold text-slate-800">{{ $kwitansi['invoice']['nomor'] }}</span></p>
-        </div>
-    </div>
+    <!-- Pihak -->
+    <table class="w-full mb-7">
+        <tr>
+            <td class="w-1/2 align-top pr-6">
+                <p class="font-bold mb-1">Diterbitkan oleh</p>
+                <p class="font-bold">Whusnet Internet Service Provider</p>
+                <p>Grand Viola Townhouse No.3 Purbosuman</p>
+                <p>Kab. Ponorogo</p>
+            </td>
+            <td class="w-1/2 align-top">
+                <p class="font-bold mb-1">Ditagihkan kepada</p>
+                <p class="font-bold">{{ $kwitansi['pelanggan']['nama'] }}</p>
+                <p>CID {{ $kwitansi['pelanggan']['cid'] }}</p>
+                @foreach($kwitansi['pelanggan']['alamat_baris'] as $baris)
+                    <p>{{ $baris }}</p>
+                @endforeach
+                <p>{{ $kwitansi['pelanggan']['hp'] }}</p>
+            </td>
+        </tr>
+    </table>
 
-    <!-- Tabel Rincian -->
-    <table class="w-full text-left border-collapse text-xs mb-6">
+    <!-- Ringkasan -->
+    <p class="text-[17px] font-bold mb-5">{{ $kwitansi['dibayar'] }} dibayar pada {{ $kwitansi['tanggal_bayar'] }}</p>
+
+    <table class="w-full border-collapse">
         <thead>
-            <tr class="border-y border-slate-300 bg-slate-100 text-slate-700 uppercase font-semibold text-[10px]">
-                <th class="py-2.5 px-3">Deskripsi Pembayaran</th>
-                <th class="py-2.5 px-3 text-center">Metode</th>
-                <th class="py-2.5 px-3 text-right">Nominal Diterima</th>
+            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                <th class="text-left pb-2">Deskripsi</th>
+                <th class="text-right pb-2">Kuantitas</th>
+                <th class="text-right pb-2">Harga Satuan</th>
+                <th class="text-right pb-2">Jumlah</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-slate-200 font-medium">
-            <tr>
-                <td class="py-3 px-3">
+        <tbody>
+            <tr class="border-b border-zinc-100">
+                <td class="py-3 align-top">
                     {{-- Judul baris ikut keterangan cicilan. Dulu selalu
                          "Pelunasan Invoice" — cicilan sebagian pun tercetak
                          seolah tagihannya sudah lunas. --}}
-                    <p class="font-bold text-slate-900">{{ $kwitansi['keterangan_cicilan'] ?: 'Pembayaran' }} — Internet {{ $kwitansi['invoice']['paket'] }}</p>
-                    <p class="text-[11px] text-slate-500">No. Invoice: {{ $kwitansi['invoice']['nomor'] }} • Periode {{ $kwitansi['invoice']['periode'] }}</p>
+                    <p>{{ $kwitansi['keterangan_cicilan'] ?: 'Pembayaran' }} — Internet {{ $kwitansi['invoice']['paket'] }}</p>
+                    @if($kwitansi['invoice']['ada'])
+                        <p class="text-[11px] text-zinc-500 mt-0.5">No. Tagihan {{ $kwitansi['invoice']['nomor'] }} · Periode {{ $kwitansi['invoice']['periode'] }}</p>
+                    @endif
                 </td>
-                <td class="py-3 px-3 text-center font-mono uppercase">{{ $kwitansi['metode'] }}</td>
-                <td class="py-3 px-3 text-right font-mono font-bold">{{ $kwitansi['dibayar'] }}</td>
+                <td class="py-3 text-right align-top">1</td>
+                <td class="py-3 text-right align-top">{{ $kwitansi['invoice']['ada'] ? $kwitansi['invoice']['total'] : $kwitansi['dibayar'] }}</td>
+                <td class="py-3 text-right align-top">{{ $kwitansi['dibayar'] }}</td>
             </tr>
             @if($kwitansi['lebih_bayar'])
-            <tr>
-                <td class="py-3 px-3" colspan="2">
-                    <p class="text-slate-600 font-medium">Catatan Lebih Bayar (Deposit / Overpay Pelanggan)</p>
-                </td>
-                <td class="py-3 px-3 text-right font-mono font-bold text-sky-700">{{ $kwitansi['lebih_bayar'] }}</td>
+            <tr class="border-b border-zinc-100">
+                <td class="py-3 align-top text-zinc-500" colspan="3">Lebih Bayar (Deposit / Overpay Pelanggan)</td>
+                <td class="py-3 text-right align-top text-sky-700 font-semibold">{{ $kwitansi['lebih_bayar'] }}</td>
             </tr>
             @endif
         </tbody>
     </table>
 
-    <!-- Total Breakdown -->
-    <div class="flex justify-between items-start gap-6 text-xs border-t pt-4 border-slate-300">
-        <div class="space-y-1.5 max-w-xs">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">KETERANGAN & CATATAN</p>
+    <table class="w-full mb-8">
+        @if($kwitansi['invoice']['ada'])
+            <tr>
+                <td class="py-1 text-zinc-500">Total Tagihan</td>
+                <td class="py-1 text-right">{{ $kwitansi['invoice']['total'] }}</td>
+            </tr>
+        @endif
+        <tr class="font-bold border-t border-zinc-300 {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">
+            <td class="py-1 pt-2">Dibayar</td>
+            <td class="py-1 pt-2 text-right">{{ $kwitansi['dibayar'] }}</td>
+        </tr>
+        @if($kwitansi['invoice']['ada'])
+            <tr>
+                <td class="py-1 text-zinc-500">Sisa Tagihan</td>
+                <td class="py-1 text-right font-semibold {{ $kwitansi['invoice']['lunas'] ? 'text-emerald-700' : 'text-rose-700' }}">
+                    {{ $kwitansi['invoice']['sisa'] }} {{ $kwitansi['invoice']['lunas'] ? '(Lunas)' : '' }}
+                </td>
+            </tr>
+        @endif
+    </table>
+
+    <!-- Informasi Penagihan (internal, staf saja) -->
+    <p class="text-[15px] font-bold mb-3">Informasi Penagihan</p>
+
+    <table class="w-full mb-8">
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Diterima oleh</td>
+            <td class="py-0.5">{{ $kwitansi['penerima'] }}</td>
+        </tr>
+        @if($kwitansi['penagih'])
+            <tr>
+                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Kolektor/Penagih</td>
+                <td class="py-0.5">{{ $kwitansi['penagih'] }}</td>
+            </tr>
+        @endif
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Catatan</td>
             {{-- Catatan kosong tetap kosong. Kalimat "Tagihan Bulanan…" yang
                  dulu muncul sebagai fallback terbaca seperti catatan petugas,
                  padahal tak pernah ada yang menulisnya. --}}
             @if($kwitansi['catatan'])
-                <p class="text-[11px] text-slate-600 italic">"{{ $kwitansi['catatan'] }}"</p>
+                <td class="py-0.5 italic">"{{ $kwitansi['catatan'] }}"</td>
             @else
-                <p class="text-[11px] text-slate-400 italic">Tanpa catatan.</p>
+                <td class="py-0.5 italic text-zinc-400">Tanpa catatan.</td>
             @endif
-            <p class="text-[10px] text-slate-500">Kwitansi ini diterbitkan sistem billing WHUSNET dan sah tanpa tanda tangan.</p>
-            <p class="text-[10px] text-slate-400 mt-4">Dicetak otomatis pada: {{ $kwitansi['dicetak'] }} WIB</p>
-        </div>
+        </tr>
+    </table>
 
-        <div class="w-64 space-y-1.5 text-xs text-right">
-            @if($kwitansi['invoice']['ada'])
-            <div class="flex justify-between text-slate-600">
-                <span>Total Tagihan Invoice</span>
-                <span class="font-mono font-semibold">{{ $kwitansi['invoice']['total'] }}</span>
-            </div>
-            @endif
-            <div class="flex justify-between font-bold text-sm pt-1.5 border-t border-slate-300 {{ $kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700' }}">
-                <span>JUMLAH DIBAYAR</span>
-                <span class="font-mono">{{ $kwitansi['dibayar'] }}</span>
-            </div>
-            @if($kwitansi['lebih_bayar'])
-            <div class="flex justify-between text-sky-700">
-                <span>Lebih Bayar</span>
-                <span class="font-mono font-semibold">{{ $kwitansi['lebih_bayar'] }}</span>
-            </div>
-            @endif
-            @if($kwitansi['invoice']['ada'])
-            <div class="flex justify-between text-slate-600">
-                <span>Sisa Tagihan</span>
-                <span class="font-mono font-bold {{ $kwitansi['invoice']['lunas'] ? 'text-emerald-600' : 'text-rose-600' }}">
-                    {{ $kwitansi['invoice']['sisa'] }} {{ $kwitansi['invoice']['lunas'] ? '(Lunas)' : '' }}
-                </span>
-            </div>
-            @endif
-            <div class="pt-6">
-                <span class="text-[10px] text-slate-500 block">Diterima oleh Kasir / Admin:</span>
-                <span class="font-bold text-slate-900 block text-xs">{{ $kwitansi['penerima'] }}</span>
-            </div>
-        </div>
-    </div>
+    <!-- Riwayat Pembayaran -->
+    <p class="text-[15px] font-bold mb-3">Riwayat Pembayaran</p>
+
+    <table class="w-full border-collapse mb-8">
+        <thead>
+            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                <th class="text-left pb-2">Metode Pembayaran</th>
+                <th class="text-left pb-2">Tanggal</th>
+                <th class="text-right pb-2">Jumlah Dibayar</th>
+                <th class="text-right pb-2">No. Kwitansi</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="py-2.5">{{ $kwitansi['metode'] }}</td>
+                <td class="py-2.5">{{ $kwitansi['tanggal_bayar'] }}</td>
+                <td class="py-2.5 text-right">{{ $kwitansi['dibayar'] }}</td>
+                <td class="py-2.5 text-right">{{ $kwitansi['nomor'] }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Footer -->
+    <p class="text-[11px] text-zinc-500 border-t border-zinc-200 pt-4">
+        Kwitansi sah tanpa tanda tangan. Simpan sebagai bukti pembayaran.<br>
+        Dicetak: {{ $kwitansi['dicetak'] }}
+    </p>
+
 </div>
 
 <!-- SCREEN ONLY ENTERPRISE VIEW -->

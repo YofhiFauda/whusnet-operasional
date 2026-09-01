@@ -45,7 +45,7 @@ use App\Http\Controllers\PaymentBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
-use App\Http\Controllers\QrBillingController;
+use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
 use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
@@ -77,35 +77,15 @@ Route::middleware('guest')->group(function () {
 // sekaligus, dibedakan lewat auth()->check() di dalam QrScanController.
 // Regex format base32 penuh (BUKAN charset ULID) menyaring sampah SEBELUM
 // satu query DB pun jalan.
+//
+// Cabang tamu (Fungsi A lama, gerbang tagihan internal QrBillingController)
+// DICABUT 2026-08-27 — sekarang redirect ke Portal (app terpisah), lihat
+// QrScanController::dispatch(). Rute /q1/{code}/tagihan* dkk ikut hilang
+// bareng controller-nya, jangan dihidupkan sebagian.
 Route::middleware('throttle:qr-public')->group(function () {
     Route::get('/q1/{code}', [QrScanController::class, 'dispatch'])
         ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
         ->name('qr.dispatch');
-
-    // Fungsi A — halaman tagihan publik (§6.1, Fase 2). Bisa diakses
-    // langsung (bookmark) TANPA lewat qr.dispatch dulu — QrBillingController
-    // meresolusi $code mandiri, bukan asumsi sudah tervalidasi.
-    Route::get('/q1/{code}/tagihan', [QrBillingController::class, 'show'])
-        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
-        ->name('qr.billing');
-});
-
-// Limiter TERPISAH & lebih ketat dari qr-public baseline — endpoint ini
-// menerima kredensial (PIN/4-digit HP), bukan cuma baca (§10 Fase 2).
-Route::middleware('throttle:qr-billing-verify')->group(function () {
-    Route::post('/q1/{code}/tagihan/verifikasi', [QrBillingController::class, 'verify'])
-        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
-        ->name('qr.billing.verify');
-
-    // Wajib ganti PIN cetak saat login pertama (§6.5.5b) — dua langkah
-    // (GET form + POST submit), keduanya di belakang limiter kredensial
-    // yang sama, bukan qr-public.
-    Route::get('/q1/{code}/tagihan/ganti-pin', [QrBillingController::class, 'changePinForm'])
-        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
-        ->name('qr.billing.pin.change-form');
-    Route::post('/q1/{code}/tagihan/ganti-pin', [QrBillingController::class, 'changePinSubmit'])
-        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
-        ->name('qr.billing.pin.change-submit');
 });
 
 // Hop KEDUA Fungsi B — di belakang middleware `auth` ASLI (bukan cuma
@@ -115,6 +95,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/q1/{code}/tiket', [QrTicketController::class, 'create'])
         ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
         ->name('qr.ticket.create');
+
+    // Chooser (2026-08-29, docs/plan/qr-code/analisa-unifikasi-qr-staff-portal.md
+    // §"Ambiguitas dua permission sekaligus") — cuma kejalan kalau staf punya
+    // DUA-DUANYA tickets.qr.create & kolektor.qr.pay eligible buat pelanggan
+    // yang sama. `QrScanController::dispatch()` redirect ke sini, BUKAN
+    // Portal — halaman internal, satu klik, baru diteruskan ke Portal sesuai
+    // pilihan.
+    Route::get('/scan-qr/choose/{code}', [QrScanController::class, 'choose'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.scan.choose');
+
+    Route::post('/scan-qr/choose/{code}', [QrScanController::class, 'chooseConfirm'])
+        ->where('code', '[A-Z2-7]{26}\.[A-Z2-7]{10}')
+        ->name('qr.scan.choose.confirm');
 });
 
 // Authenticated Admin Routes
@@ -127,6 +121,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markRead');
     Route::post('/notifications/{id}/unread', [NotificationController::class, 'markAsUnread'])->name('notifications.markUnread');
+
+    // Scan QR Internal (2026-08-27) — kamera DI DALAM app, lihat
+    // QrInAppScanController docblock kenapa ini WAJIB terpisah dari
+    // QrScanController::dispatch() (yang tetap publik/tanpa permission).
+    Route::middleware('permission:qr_scan.view')->group(function () {
+        Route::get('/scan-qr', [QrInAppScanController::class, 'show'])->name('qr.scan.show');
+    });
 
     // Role & Permission Management
     Route::middleware('permission:roles.view|roles.update')->group(function () {

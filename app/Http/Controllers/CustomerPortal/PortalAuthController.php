@@ -158,6 +158,32 @@ class PortalAuthController extends Controller
         return response()->json(['message' => 'Berhasil keluar dari semua perangkat.']);
     }
 
+    /**
+     * Resolusi QR
+     *
+     * Dipanggil Portal (app terpisah) begitu pelanggan scan QR — cuma
+     * balikin `login_id` + status akun, buat pre-fill halaman klaim/login.
+     * TIDAK PERNAH minta/balikin PIN — itu tetap di `claim()`. 404 (bukan
+     * pesan detail) kalau kode gak valid, sama pola anti-enumeration
+     * `QrScanController`.
+     */
+    #[Response(200, description: 'QR valid.', examples: [['login_id' => 'PNG00RQ000631', 'account_status' => 'pending_claim']])]
+    #[Response(404, description: 'Kode QR tidak valid/kedaluwarsa/dicabut.')]
+    public function resolveQr(Request $request): JsonResponse
+    {
+        $code = (string) $request->query('code');
+        $result = $this->service->resolveQr($code);
+
+        if ($result['outcome'] !== 'success') {
+            return response()->json(['message' => 'Kode QR tidak valid.'], 404);
+        }
+
+        return response()->json([
+            'login_id' => $result['login_id'],
+            'account_status' => $result['account_status'],
+        ]);
+    }
+
     private function respondInvalidCredentials(): JsonResponse
     {
         return response()->json(['message' => 'Login ID atau password salah.'], 401);

@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureNetworkAssignmentWriteToken;
 use App\Http\Middleware\EnsurePopDistribusiReadToken;
 use App\Http\Middleware\EnsurePortalClientSecret;
 use App\Http\Middleware\EnsurePortalCustomerToken;
+use App\Http\Middleware\PortalStaffToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -32,6 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
             // Jangan digabung jadi satu middleware ber-if (keputusan.md §5).
             'portal_client' => EnsurePortalClientSecret::class,
             'portal_token' => EnsurePortalCustomerToken::class,
+            // Kredensial STAF/kolektor di jalur Portal (2026-08-29,
+            // docs/plan/qr-code/analisa-unifikasi-qr-staff-portal.md §4) —
+            // ber-parameter purpose ('tickets'/'kolektor'), lihat docblock
+            // PortalStaffToken kenapa token satu purpose tidak lolos di purpose lain.
+            'portal_staff_token' => PortalStaffToken::class,
         ]);
 
         // Aplikasi SELALU berada di belakang proxy: nginx di depan PHP-FPM, dan

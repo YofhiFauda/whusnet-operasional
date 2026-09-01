@@ -91,6 +91,7 @@ sama begitu kartu ber-PIN sampai, bukan lewat password sementara yang diketik pe
 
 | Metode | Path | Fungsi |
 |---|---|---|
+| GET | `/qr/resolve` | `code` (dari `/q1/{code}` QR) → `login_id` + status akun, TANPA PIN |
 | POST | `/auth/login` | `login_id` + password → access + refresh token |
 | POST | `/auth/claim` | `login_id` + PIN → tetapkan password pertama |
 | POST | `/auth/refresh` | refresh token → pasangan token baru (rotating) |
@@ -105,8 +106,14 @@ sama begitu kartu ber-PIN sampai, bukan lewat password sementara yang diketik pe
 | GET | `/me/balance` | saldo + mutasi |
 | GET | `/me/tickets` | riwayat ticketing |
 | GET | `/me/tickets/{ticket_number}` | detail tiket + riwayat |
+| POST | `/tickets` | **staf** create tiket (token `StaffPortalToken` purpose `tickets`, BUKAN Bearer pelanggan) |
+| GET | `/kolektor/worklist/{code}` | **kolektor** lihat invoice due 1 pelanggan (token purpose `kolektor`) |
+| POST | `/kolektor/payments` | **kolektor** catat pembayaran (token purpose `kolektor`) |
 
 Semua butuh header `X-Portal-Client` + client secret, di samping bearer token.
+Tiga baris terakhir (`/tickets`, `/kolektor/*`) SUBJEKNYA STAF, bukan
+pelanggan — Bearer-nya `StaffPortalToken` one-shot (§"Staf/Kolektor (QR)" di
+bawah), bukan `access_token` hasil `/auth/login`/`/auth/claim`.
 
 ## Kontrak endpoint — request & response
 
@@ -125,6 +132,26 @@ Envelope sukses endpoint DATA: `{"data": ..., "meta": {"generated_at": "<ISO-860
 (dari `ApiResource::with()`). Endpoint **auth** (`/auth/*`) dan `PUT /me/password`
 balikin objek flat (`{access_token, ...}` atau `{message}`), **BUKAN** envelope
 `{data,meta}` — dirancang beda karena bukan resource data.
+
+### QR
+
+**`GET /qr/resolve?code={token.sig}`** — BARU (2026-08-27, keputusan eksplisit
+user: scan QR pelanggan SELALU diarahkan ke Portal, gerbang tagihan internal
+`QrBillingController` DICABUT total). `QrScanController::dispatch()` cabang
+tamu sekarang `redirect()->away("{PORTAL_BASE_URL}/klaim?code={code}")` —
+Portal manggil endpoint ini pakai `code` yang sama buat dapetin `login_id`
+(prefill halaman klaim), TANPA minta/dapat PIN sama sekali (PIN tetap cuma
+diverifikasi di `/auth/claim`). Cuma butuh `X-Portal-Client`, TANPA Bearer
+(pelanggan belum punya sesi apa pun di titik ini). Response 200:
+```json
+{"login_id": "PNG00RQ000631", "account_status": "pending_claim"}
+```
+`account_status`: `"pending_claim"` (belum diklaim, arahkan ke form klaim),
+`"active"` (sudah, arahkan ke `/login`), atau `null` (akun belum pernah
+dibuat — jarang, biasanya `ensureAccountExists()` udah jalan bareng
+penerbitan QR). 404 `{"message": "Kode QR tidak valid."}` — 4 kegagalan
+resolve token (token gak ketemu/signature salah/dicabut/pop mismatch) SEMUA
+sama persis, pola anti-enumeration sama seperti `QrScanController`.
 
 ### Auth
 
@@ -469,6 +496,73 @@ Ditangani" sampai seseorang membereskannya, dan `Ticket::isOrphan()`
 
 Wajib ada test untuk tiket pasca-FOP yang sudah selesai. Baca
 `docs/ticketing/business-logic.md` sebelum menulis presenternya.
+
+## #5 — Staf/Kolektor (QR) — 2026-08-29
+
+**Subjek beda total dari §1-4 di atas.** Semua endpoint sebelumnya
+diautentikasi `Bearer <access_token>` milik PELANGGAN (`CustomerPortalToken`,
+lahir dari `/auth/login`/`/auth/claim`, refreshable 30 hari). Tiga endpoint
+di bawah ini diautentikasi `Bearer <staff_token>` milik STAF/kolektor
+Operasional (`StaffPortalToken`) — **beda tabel, beda model, TIDAK bisa
+saling dipakai.** Rancangan lengkap: `docs/plan/qr-code/
+analisa-unifikasi-qr-staff-portal.md`.
+
+**Asal token:** staf scan QR pelanggan lewat `/scan-qr` (in-app scanner,
+WAJIB sudah login Operasional) → `QrScanController::dispatch()` menerbitkan
+`staff_token` (one-shot, TTL 15 menit, purpose `tickets`/`kolektor`) →
+redirect ke Portal `/staff/tickets?code=&staff_token=` atau
+`/staff/kolektor?code=&staff_token=`. Portal **tidak pernah** menerbitkan
+atau menyimpan token ini sendiri — cuma meneruskannya per-request lewat
+header `Authorization`, **tidak disimpan cookie/session Next.js** (beda dari
+`access_token` pelanggan yang disimpan `iron-session` httpOnly).
+
+**`POST /tickets`** — request:
+```json
+{"type": "MTN", "detail_keluhan": "...", "priority": "Medium", "confirmed_duplicate": false}
+```
+`type`: `"MTN"` atau `"C-REQ"` saja (`TaskType::ticketValues()`). `priority`:
+`"low"`/`"Medium"`/`"High"`/`"Urgent"` (casing PERSIS gitu, bukan lowercase
+semua — ikut `FopTaskPriority` enum). Response 201:
+```json
+{"data": {"ticket_number": "TKT-2026-0123", "status": "open"}}
+```
+Error: 401 (token tidak ada/salah/kedaluwarsa/sudah dipakai/purpose salah);
+403 (staf tanpa permission `tickets.qr.create`, atau pelanggan di luar POP
+scope staf); **409** `{"message": "...", "existing_ticket_number": "TKT-..."}`
+— pelanggan masih punya tiket terbuka, **kirim ulang** dengan
+`confirmed_duplicate: true` buat tetap bikin baru (dedup guard, §1.2 dokumen
+rancangan). Token **TIDAK** ikut terkonsumsi kalau request gagal (401
+dikecualikan — itu emang token invalid) — staf boleh submit ulang pakai
+token yang sama.
+
+**`GET /kolektor/worklist/{code}`** — `{code}` SAMA PERSIS `code` dari query
+string redirect (bukan token baru). Response 200:
+```json
+{"data": {"customer": {"customer_code": "...", "full_name": "..."}, "invoices": [
+  {"id": 1, "invoice_number": "INV-...", "billing_period": "2026-08", "due_date": "2026-08-15", "remaining_amount": "150000.00"}
+]}}
+```
+`remaining_amount` string desimal (konvensi sama seluruh Portal — JANGAN
+parse ke float sebelum kirim balik). Error: 401 (sama seperti di atas); 403
+(pelanggan bukan tanggung jawab kolektor ini — `collector_id` gak cocok);
+404 (`code` gak cocok pelanggan yang tertaut ke token — cegah tukar `code`
+manual buat "pinjam" token).
+
+**`POST /kolektor/payments`** — bentuk request/response **IDENTIK**
+`POST /collector-worklist/pay` (dashboard Operasional,
+`docs/kolektor/business-logic.md`), reuse trait `RecordsCollectorBatch`
+apa adanya:
+```json
+{"idempotency_key": "<uuid>", "rows": [
+  {"invoice_id": 1, "amount": 150000, "payment_method": "cash", "collected_date": "2026-08-29"}
+]}
+```
+Response 200 `{"success": true, "message": "...", "processed": 1, "results": [...]}`
+atau `{"success": true, "already_processed": true, "batch_id": ...}` (replay
+idempotency key). Error 422 `{"success": false, "failures": [{"reason": "..."}]}`
+— baris di luar worklist/sudah lunas/nominal lebih dari sisa. Token
+dikonsumsi **HANYA** kalau `success:true` DAN `already_processed:false` —
+replay idempotency dan kegagalan validasi TIDAK menghanguskan token.
 
 ## Kepemilikan data — penjaga tunggal portal
 

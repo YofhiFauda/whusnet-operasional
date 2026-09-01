@@ -19,10 +19,10 @@ class RolePermissionSeeder extends Seeder
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
 
-            // Kolektor — DUA permission saja, sengaja tanpa `payments.create`
-            // (bayar invoice mana pun) dan tanpa `customers.view` (daftar
-            // pelanggan penuh). `kolektor.pay` cuma berlaku di rute worklist
-            // yang memaksa `collector_id = auth()->id()`.
+            // Kolektor — sengaja tanpa `payments.create` (bayar invoice mana
+            // pun) dan tanpa `customers.view` (daftar pelanggan penuh).
+            // `kolektor.pay` cuma berlaku di rute worklist yang memaksa
+            // `collector_id = auth()->id()`.
             //
             // Merevisi §B-8 no. 4 dokumen lama — lihat
             // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §8.
@@ -31,6 +31,18 @@ class RolePermissionSeeder extends Seeder
                 'kolektor.pay',
                 'kolektor.deposit',
                 'kolektor.visit',
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — shortcut catat pembayaran dari worklist sendiri
+                'kolektor.qr.pay', // Catat pembayaran via QR → Portal (2026-08-29) — permission TERPISAH dari kolektor.pay, lihat QrFeatureSeeder
+                // Lapor komplain via QR → Portal (2026-08-29, keputusan
+                // eksplisit user) — kolektor ketemu pelanggan langsung di
+                // lapangan pas nagih, sering dapet komplain di tempat.
+                // Digabung dengan kolektor.qr.pay: begitu kolektor scan
+                // pelanggan yang punya tagihan due, dispatch() otomatis
+                // dual-eligible → tampil chooser "Tagih Pembayaran"/"Lapor
+                // Komplain" (QrScanController::resolveEligibility()). TIDAK
+                // ngerubah tickets.create dashboard — kolektor tetap gak
+                // bisa buka Worksheet Helpdesk, cuma titik masuk QR ini.
+                'tickets.qr.create',
             ],
 
             'atasan' => [
@@ -130,6 +142,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.qr.cancel',
                 'customers.qr.print',
                 'qr_scan_logs.view',
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — resources/js/qr-scan.js
             ],
 
             'noc' => [
@@ -207,6 +220,7 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — shortcut bikin tiket dari QR pelanggan
             ],
 
             'fop' => [
@@ -239,6 +253,7 @@ class RolePermissionSeeder extends Seeder
                 'master_status_pelanggan.view',
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
+                'qr_scan.view', // Scan QR Internal (2026-08-27)
             ],
 
             'teknisi' => [
@@ -268,6 +283,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
                 'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
+                'qr_scan.view', // Scan QR Internal (2026-08-27)
             ],
 
             'sales' => [
