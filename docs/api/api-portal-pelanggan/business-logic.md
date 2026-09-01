@@ -215,7 +215,11 @@ tetap hidup.
 ### Tagihan
 
 **`GET /me/invoices`** — query opsional `?status=lunas&period=2026-08`, paginasi
-10/halaman. Item:
+10/halaman. Juga terima `exclude_status` (mis. `?exclude_status=lunas`) —
+additive, cuma kepakai kalau `status=` gak dikirim (`status` menang kalau
+dua-duanya ada). Dipakai halaman daftar tagihan Portal biar tagihan `lunas`
+gak dobel tampil sama `/me/payments` (riwayat pembayarannya sudah
+merepresentasikan itu). Item:
 ```json
 {
   "invoice_number": "INV-2026-08-000123",

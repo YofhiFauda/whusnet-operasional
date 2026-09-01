@@ -31,6 +31,7 @@ class PortalInvoiceController extends Controller
      * satu-satunya sumber kebenaran.
      */
     #[QueryParameter('status', description: 'Filter invoice_status.', example: 'lunas')]
+    #[QueryParameter('exclude_status', description: 'Kecualikan satu invoice_status dari hasil — dipakai halaman daftar tagihan Portal biar tagihan `lunas` gak dobel tampil (sudah lengkap direpresentasikan di /me/payments). Additive, TIDAK mengubah arti `status=` biasa — kirim salah satu, bukan dua-duanya.', example: 'lunas')]
     #[QueryParameter('period', description: 'Filter billing_period, format Y-m.', example: '2026-08')]
     #[Response(200, description: 'Daftar tagihan berhasil diambil.', examples: [[
         'data' => [[
@@ -53,6 +54,15 @@ class PortalInvoiceController extends Controller
         $status = $request->string('status')->toString();
         if ($status !== '' && in_array($status, array_column(InvoiceStatus::cases(), 'value'), true)) {
             $query->where('invoice_status', $status);
+        }
+
+        // `exclude_status` — dipakai list Portal (bukan detail/`show()`)
+        // biar tagihan `lunas` gak dobel tampil sama `/me/payments`. Cuma
+        // dibaca kalau `status=` gak dipakai — kirim keduanya sekaligus
+        // TIDAK didukung (`status` menang), lihat docblock parameter di atas.
+        $excludeStatus = $request->string('exclude_status')->toString();
+        if ($status === '' && $excludeStatus !== '' && in_array($excludeStatus, array_column(InvoiceStatus::cases(), 'value'), true)) {
+            $query->where('invoice_status', '!=', $excludeStatus);
         }
 
         $period = $request->string('period')->toString();

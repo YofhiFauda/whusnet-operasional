@@ -643,6 +643,7 @@ foreach ($features as $f) {
                                                data-parent-feature-id="<?php echo e($feature->parent_id ?? ''); ?>"
                                                data-permission-code="<?php echo e($perm->code); ?>"
                                                data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
+                                               data-independent-channel="<?php echo e(str_ends_with($feature->code, '.qr') ? 'true' : 'false'); ?>"
                                                onchange="handleCheckboxChange(this)"
                                                class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                       <?php echo e($isSensitive
@@ -728,6 +729,7 @@ foreach ($features as $f) {
                                                            data-parent-feature-id="<?php echo e($child->parent_id ?? ''); ?>"
                                                            data-permission-code="<?php echo e($perm->code); ?>"
                                                            data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
+                                                           data-independent-channel="<?php echo e(str_ends_with($child->code, '.qr') ? 'true' : 'false'); ?>"
                                                            onchange="handleCheckboxChange(this)"
                                                            class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                   <?php echo e($isSensitive
@@ -799,6 +801,7 @@ foreach ($features as $f) {
                                                                    data-parent-feature-id="<?php echo e($grandchild->parent_id ?? ''); ?>"
                                                                    data-permission-code="<?php echo e($perm->code); ?>"
                                                                    data-is-view="<?php echo e(str_ends_with($perm->code, '.view') || $perm->code === 'task.view.all' || $perm->code === 'task.view.own' ? 'true' : 'false'); ?>"
+                                                                   data-independent-channel="<?php echo e(str_ends_with($grandchild->code, '.qr') ? 'true' : 'false'); ?>"
                                                                    onchange="handleCheckboxChange(this)"
                                                                    class="perm-checkbox mt-0.5 rounded border-slate-300 dark:border-slate-600 transition-all focus:ring-2
                                                                           <?php echo e($isSensitive
@@ -934,8 +937,24 @@ foreach ($features as $f) {
         }
         
         checkboxes.forEach(cb => {
+            // Channel QR/Portal (`*.qr`, mis. `tickets.qr`, `kolektor.qr`) SENGAJA
+            // dilepas dari rantai dependensi "wajib centang .view induk dulu".
+            // Fitur `.qr` itu sub-fitur PENGELOMPOKAN menu (nempel di bawah
+            // `tickets`/`kolektor` biar rapi di UI), BUKAN tab navigasi yang
+            // butuh akses Lihat Data dashboard Operasional induknya — aksesnya
+            // datang dari scan QR/Portal Pelanggan, jalur terpisah total dari
+            // `tickets.view`/`kolektor.view`. Kalau tetap dirantai, role macam
+            // Kolektor jadi TERPAKSA dapat izin dashboard penuh (`tickets.view`)
+            // cuma buat bisa centang `tickets.qr.create` — mencampur channel
+            // Operasional dengan channel Portal/QR yang harus independen.
+            if (cb.dataset.independentChannel === 'true') {
+                cb.disabled = false;
+                cb.classList.remove('opacity-40', 'cursor-not-allowed');
+                return;
+            }
+
             const parentId = cb.dataset.parentFeatureId;
-            
+
             if (parentId) {
                 const parentViewActive = isFeatureViewChecked(parentId);
                 if (!parentViewActive) {
@@ -951,13 +970,16 @@ foreach ($features as $f) {
     }
 
     function handleCheckboxChange(changedCb) {
-        if (changedCb.checked) {
+        // Lihat catatan `data-independent-channel` di resolvePermissionDependencies()
+        // — centang aksi channel QR/Portal TIDAK boleh ikut memaksa-centang
+        // `.view` dashboard Operasional milik fitur induknya.
+        if (changedCb.checked && changedCb.dataset.independentChannel !== 'true') {
             let parentId = changedCb.dataset.parentFeatureId;
             const checkboxes = Array.from(document.querySelectorAll('.perm-checkbox'));
-            
+
             while (parentId) {
-                const parentViewCb = checkboxes.find(cb => 
-                    cb.dataset.featureId === parentId.toString() && 
+                const parentViewCb = checkboxes.find(cb =>
+                    cb.dataset.featureId === parentId.toString() &&
                     cb.dataset.isView === 'true'
                 );
                 if (parentViewCb && !parentViewCb.checked) {
@@ -968,7 +990,7 @@ foreach ($features as $f) {
                 }
             }
         }
-        
+
         resolvePermissionDependencies();
         updatePermCount();
     }

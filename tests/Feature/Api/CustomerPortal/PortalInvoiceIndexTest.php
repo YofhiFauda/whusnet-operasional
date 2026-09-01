@@ -58,6 +58,36 @@ class PortalInvoiceIndexTest extends TestCase
         $this->assertSame('INV-A', $response->json('data.0.invoice_number'));
     }
 
+    public function test_exclude_status_mengecualikan_satu_status(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $this->seedInvoice($seed['customer'], ['invoice_status' => InvoiceStatus::LUNAS->value, 'invoice_number' => 'INV-C', 'billing_period' => '2026-06']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value, 'invoice_number' => 'INV-D', 'billing_period' => '2026-07']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token'], '?exclude_status=lunas');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-D', $response->json('data.0.invoice_number'));
+    }
+
+    public function test_exclude_status_diabaikan_kalau_status_juga_dikirim(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        // status= menang — exclude_status jangan diam-diam nyaring hasil
+        // eksplisit yang diminta caller.
+        $this->seedInvoice($seed['customer'], ['invoice_status' => InvoiceStatus::LUNAS->value, 'invoice_number' => 'INV-E', 'billing_period' => '2026-06']);
+        $this->seedInvoice($seed['customer'], ['invoice_status' => InvoiceStatus::BELUM_DIBAYAR->value, 'invoice_number' => 'INV-F', 'billing_period' => '2026-07']);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->getInvoices($tokens['access_token'], '?status=lunas&exclude_status=lunas');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('INV-E', $response->json('data.0.invoice_number'));
+    }
+
     public function test_filter_period_membatasi_hasil(): void
     {
         $seed = $this->seedActivePortalCustomer();

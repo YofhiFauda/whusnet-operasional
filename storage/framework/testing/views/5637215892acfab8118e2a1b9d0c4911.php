@@ -141,11 +141,155 @@
 </div>
 
     
+
+    
+    <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.qr.view')): ?>
+        <?php if (isset($component)) { $__componentOriginal7762953202be6518eecd1cfbd075bf2f = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal7762953202be6518eecd1cfbd075bf2f = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.modal','data' => ['name' => 'qr-peek','title' => 'QR Pelanggan','maxWidth' => 'sm']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.modal'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'qr-peek','title' => 'QR Pelanggan','maxWidth' => 'sm']); ?>
+            <div class="min-h-[220px] flex flex-col items-center justify-center gap-3 text-center">
+                <template x-if="$store.qrPeek.loading">
+                    <div class="flex flex-col items-center gap-2 py-8 text-text-muted">
+                        <svg class="animate-spin h-6 w-6 text-sky-500" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span class="text-xs">Memuat status QR…</span>
+                    </div>
+                </template>
+
+                <template x-if="!$store.qrPeek.loading && !$store.qrPeek.status.has_token">
+                    <div class="flex flex-col items-center gap-3 py-6">
+                        <i class="fa-solid fa-qrcode text-4xl text-slate-300 dark:text-slate-600"></i>
+                        <p class="text-xs text-text-secondary">Pelanggan ini belum punya QR aktif.</p>
+                        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.qr.create')): ?>
+                            <button type="button" :disabled="$store.qrPeek.issuing" @click="$store.qrPeek.issue()"
+                                    class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white text-xs font-semibold cursor-pointer">
+                                <span x-show="!$store.qrPeek.issuing">Terbitkan QR</span>
+                                <span x-show="$store.qrPeek.issuing" x-cloak>Menerbitkan…</span>
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </template>
+
+                
+                <template x-if="!$store.qrPeek.loading && $store.qrPeek.status.has_token">
+                    <div class="w-full flex flex-col items-center gap-2"
+                         x-transition:enter="transition ease-out duration-500"
+                         x-transition:enter-start="opacity-0 scale-90"
+                         x-transition:enter-end="opacity-100 scale-100">
+                        <img :src="$store.qrPeek.status.qr_data_uri" alt="QR Pelanggan" class="w-36 h-36">
+                        <div class="font-bold uppercase text-sm text-text-main" x-text="$store.qrPeek.status.customer.full_name"></div>
+                        <div class="text-xs font-mono text-text-muted" x-text="$store.qrPeek.status.customer.customer_code + ' · ' + ($store.qrPeek.status.customer.pop_name || '')"></div>
+                        <div class="text-xs font-mono font-bold text-sky-600" x-text="'Login ID: ' + ($store.qrPeek.status.customer.portal_login_id || '—')"></div>
+                        <div class="text-[11px] text-text-muted pt-1" x-text="'Diterbitkan ' + $store.qrPeek.status.issued_at + ' · ' + $store.qrPeek.status.scan_count + 'x discan'"></div>
+                    </div>
+                </template>
+            </div>
+
+             <?php $__env->slot('footer', null, []); ?> 
+                <a :href="$store.qrPeek.status.print_url" target="_blank" x-show="!$store.qrPeek.loading && $store.qrPeek.status.has_token"
+                   class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold cursor-pointer">
+                    Cetak Stiker
+                </a>
+                <a :href="$store.qrPeek.manageUrl"
+                   class="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-surface-muted cursor-pointer">
+                    Kelola Lengkap
+                </a>
+             <?php $__env->endSlot(); ?>
+         <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $attributes = $__attributesOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__attributesOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal7762953202be6518eecd1cfbd075bf2f)): ?>
+<?php $component = $__componentOriginal7762953202be6518eecd1cfbd075bf2f; ?>
+<?php unset($__componentOriginal7762953202be6518eecd1cfbd075bf2f); ?>
+<?php endif; ?>
+    <?php endif; ?>
 </div>
 
 <script>
     function processToTimHandler() {
         return {};
+    }
+
+    // Modal ringkas QR (Alpine.store, bukan x-data — SATU modal dipakai
+    // gantian oleh banyak baris pelanggan di halaman ini, beda dari versi
+    // tab Pemasangan yang cuma 1 pelanggan per halaman). openQrPeek()
+    // dipanggil dari tombol tiap baris (queue-actions.blade.php) dengan
+    // URL yang SUDAH dirender server-side (route()) — bukan dirakit di sini.
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('qrPeek', {
+            loading: false,
+            issuing: false,
+            statusUrl: null,
+            issueUrl: null,
+            manageUrl: '#',
+            status: { has_token: false, customer: {}, print_url: '#' },
+
+            async load() {
+                if (!this.statusUrl) return;
+                this.loading = true;
+                try {
+                    const res = await fetch(this.statusUrl, { headers: { 'Accept': 'application/json' } });
+                    if (res.ok) {
+                        this.status = await res.json();
+                    }
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async issue() {
+                if (!this.issueUrl) return;
+                this.issuing = true;
+                try {
+                    const res = await fetch(this.issueUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                    });
+                    // Sama seperti versi tab Pemasangan — issue() bisa balas
+                    // JSON (PIN baru sekaligus) atau redirect (token sudah
+                    // ada), modal ringkas ini gak peduli isinya, cukup
+                    // re-fetch status via this.statusUrl yang sudah dipakai
+                    // buka modal ini (BUKAN dirakit dari issueUrl — dua URL
+                    // beda itu dua route() terpisah dari server, lihat
+                    // openQrPeek()).
+                    if (res.ok || res.redirected) {
+                        await this.load();
+                    }
+                } finally {
+                    this.issuing = false;
+                }
+            },
+        });
+    });
+
+    /**
+     * @param {string} statusUrl route('customers.qr.status', $customer)
+     * @param {string} issueUrl  route('customers.qr.issue', $customer)
+     * @param {string} manageUrl route('customers.qr.show', $customer) — "Kelola Lengkap"
+     */
+    function openQrPeek(statusUrl, issueUrl, manageUrl) {
+        const store = Alpine.store('qrPeek');
+        store.statusUrl = statusUrl;
+        store.issueUrl = issueUrl;
+        store.manageUrl = manageUrl;
+        store.status = { has_token: false, customer: {}, print_url: '#' };
+        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'qr-peek' }));
+        store.load();
     }
 
 <?php echo $__env->make('customers.partials._network_assignment_js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
