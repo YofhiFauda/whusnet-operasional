@@ -110,7 +110,7 @@ Murni cek permission (`fop_tasks.*`), gak ada cek `pop_id`. IDOR per-record terp
 
 ## Yang Sudah Benar (verifikasi, bukan asumsi)
 
-- `CustomerController::renderCustomerList`, `TicketController::index`, `InvoiceController::index`, `PaymentController::index`, `DashboardController` (`scopedCustomerQuery`/`scopedInvoiceQuery`/`scopedPaymentQuery`), `NocDashboardController`, `CustomerReportController`, `InvoiceReportController`, `PaymentReportController`, `FopDashboardController`, `NotificationController`, `CollectorController`, `TeknisiWorkloadService` — semua lewat `applyUserScope()`/`getAllowedPopIds()` yang digerbangi `hasAllPopAccess()` dengan benar.
+- `RendersCustomerList::renderCustomerList` (dipakai `CustomerController`/`CustomerTerminatedController`/`CustomerFailedController`), `TicketController::index`, `InvoiceController::index`, `PaymentController::index`, `DashboardController` (`scopedCustomerQuery`/`scopedInvoiceQuery`/`scopedPaymentQuery`), `NocDashboardController`, `CustomerReportController`, `InvoiceReportController`, `PaymentReportController`, `FopDashboardController`, `NotificationController`, `CollectorController`, `TeknisiWorkloadService` — semua lewat `applyUserScope()`/`getAllowedPopIds()` yang digerbangi `hasAllPopAccess()` dengan benar.
 - `Pop::scopeForUser()` dan `HasPopScope::scopeApplyUserScope()` — implementasi trait yang benar, jadi acuan pola yang harus diikuti di titik-titik yang bocor.
 - `routes/channels.php` untuk channel `tickets.{popId}`, `invoices.{popId}`, `customers.{popId}`, `fop-tasks.{popId}` — sudah pakai `EffectiveAccessService` dengan benar.
 

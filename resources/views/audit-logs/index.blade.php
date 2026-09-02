@@ -53,7 +53,7 @@
     <div class="overflow-x-auto">
         <table class="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-300">
             <thead>
-                <tr class="bg-slate-50/50 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-xs">
+                <tr class="">
                     <th class="px-6 py-3.5">WAKTU</th>
                     <th class="px-6 py-3.5">USER</th>
                     <th class="px-6 py-3.5">MODUL</th>

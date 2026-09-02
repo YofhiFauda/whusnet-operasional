@@ -86,12 +86,34 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 12,
             ],
             [
-                // Worklist read-only kolektor — permission SENDIRI, bukan
-                // `customers.view`. Kolektor cuma boleh baca pelanggan yang
-                // ter-assign ke dirinya sendiri (§B-8 no. 5), bukan seluruh
-                // daftar pelanggan yang `customers.view` bukakan.
+                // Halaman kerja KOLEKTOR sendiri — permission SENDIRI, bukan
+                // `customers.view`/`payments.create`. Kolektor cuma boleh baca
+                // & menagih pelanggan yang ter-assign ke dirinya sendiri.
                 'code' => 'kolektor',
                 'name' => 'Worklist Kolektor',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 12,
+            ],
+            [
+                // Halaman kerja ADMIN atas para kolektor. Dipisah dari
+                // 'kolektor' di atas karena beda audiens: yang satu dipakai
+                // kolektor di lapangan, yang satu dipakai admin di kantor.
+                // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9.
+                'code' => 'collector_worksheet',
+                'name' => 'Worksheet Admin (Kolektor)',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 12,
+            ],
+            [
+                // Setoran Kas Admin — satu tingkat DI ATAS setoran kolektor.
+                // Feature sendiri, sengaja tidak menumpang
+                // 'collector_worksheet': di sana admin yang memeriksa, di sini
+                // admin yang DIPERIKSA. Menumpang berarti tiap admin yang boleh
+                // memverifikasi kolektor otomatis boleh menutup setoran kasnya
+                // sendiri.
+                // docs/plan/kolektor/analisa-setoran-kas-admin.md §4.5.
+                'code' => 'cash_deposit',
+                'name' => 'Setoran Kas (Admin → Owner/Bank)',
                 'type' => FeatureType::ROOT,
                 'sort_order' => 12,
             ],
@@ -181,6 +203,18 @@ class FeatureSeeder extends Seeder
                 'name' => 'List Pelanggan Gagal',
                 'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 4,
+            ],
+            [
+                // Kemampuan sempit di dalam form Registrasi (bukan halaman
+                // sendiri) — Sales lompat tahap survey lapangan, isi data
+                // survey langsung. Sub-feature sendiri (bukan numpang
+                // customers.create) supaya bisa di-toggle independen lewat
+                // Role Matrix.
+                'parent_code' => 'customers',
+                'code' => 'customers.registration',
+                'name' => 'Registrasi — Skip Survey',
+                'type' => FeatureType::SUB_FEATURE,
+                'sort_order' => 5,
             ],
         ];
 

@@ -25,7 +25,6 @@ class CustomerDeviceController extends Controller
             'pppoe_password' => 'nullable|string|max:150',
             'wifi_ssid' => 'nullable|string|max:150',
             'wifi_password' => 'nullable|string|max:150',
-            'ip_address' => 'nullable|ip',
             'vlan_id' => 'nullable|integer|min:1|max:4094',
             'odp' => 'nullable|string|max:100',
             'odp_port' => 'nullable|string|max:50',
@@ -59,7 +58,6 @@ class CustomerDeviceController extends Controller
         if (! auth()->user()->hasPermission('customers.detail.devices.update_sensitive')) {
             unset($deviceValidated['pppoe_password']);
             unset($deviceValidated['wifi_password']);
-            unset($deviceValidated['ip_address']);
             unset($deviceValidated['vlan_id']);
             unset($techValidated['tech_vlan']);
         }

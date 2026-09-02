@@ -7,6 +7,7 @@ use App\Enums\InvoiceType;
 use App\Enums\PaymentStatus;
 use App\Events\InvoiceStatusUpdated;
 use App\Models\Concerns\RecordsAuditLogs;
+use App\Support\Money;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -174,16 +175,19 @@ class Invoice extends Model
             return;
         }
 
-        $paidAmount = round(
-            (float) $this->payments()->where('payment_status', PaymentStatus::VALID->value)->sum('amount'),
-            2
+        // SUM dikerjakan DB (decimal, eksak); Money menjaga hasilnya tetap
+        // eksak setelah masuk PHP. Yang dipertaruhkan bukan tampilan angkanya
+        // melainkan CABANGNYA: sisa −0,0000008 hasil galat float membuat
+        // tagihan yang sudah lunas tetap berstatus Sebagian.
+        $paidAmount = Money::of(
+            $this->payments()->where('payment_status', PaymentStatus::VALID->value)->sum('amount')
         );
 
-        $remainingAmount = max(0, round((float) $this->total_amount - $paidAmount, 2));
+        $remainingAmount = Money::atLeastZero(Money::sub($this->total_amount, $paidAmount));
 
         $status = match (true) {
-            $paidAmount <= 0 => InvoiceStatus::BELUM_DIBAYAR,
-            $remainingAmount <= 0 => InvoiceStatus::LUNAS,
+            Money::isZero($paidAmount) => InvoiceStatus::BELUM_DIBAYAR,
+            Money::isZero($remainingAmount) => InvoiceStatus::LUNAS,
             default => InvoiceStatus::SEBAGIAN,
         };
 

@@ -33,18 +33,44 @@
 - **Perubahan perilaku sejak Task 9:** dulu FOP bisa reopen `Cancel` → `Selesai` (atau status lain) lewat dropdown edit bebas. Modal edit sekarang **read-only** buat status tiket existing (cuma badge, gak ada dropdown — lihat § 9), jadi reopen manual dari `dibatalkan` **gak ada jalur UI lagi**. Ditambah `TaskObserver` SENGAJA skip sync begitu `FopTask.status = dibatalkan` (proteksi override, lihat § 9) — jadi kalaupun `Task` eksekusi terkait berubah status lagi, `FopTask` tetap nyangkut di `dibatalkan` sampai ada perubahan manual langsung ke DB. Edge case ini dicatat, bukan dikerjain ulang (di luar scope).
 - Status hidup di enum `App\Enums\TaskStatus` (6 nilai, SAMA persis punya `Task` — enum `FopTaskStatus` yang dulu 4 nilai UDAH DIHAPUS, unifikasi 2026-07-20).
 
-## 2. Auto-Sync Customer → FopTask (jalan tiap `GET /fop-tasks`)
+## 2. Pembuatan FopTask Survey/PSB (`FopTaskProvisioningService`, 2026-08-11)
+
+FopTask kategori Survey & PSB **tidak bisa dibuat manual** (`TaskType::autoOnlyValues()`) — satu-satunya jalur lahirnya adalah antrean pelanggan. Sejak 2026-08-11 pembuatannya ada di `FopTaskProvisioningService::ensureForCustomer(Customer, TaskType)` dan dipanggil dari **empat titik**, bukan lagi cuma saat papan dibuka:
+
+```
+FopTaskProvisioningService::ensureForCustomer()
+│
+├─ CustomerController::store()            → saat registrasi pelanggan (bareng Task SURVEY)
+├─ CustomerWorkflowService::transition()  → saat masuk waiting_survey / waiting_installation
+├─ CustomerSurveyController::store()      → jaring pengaman, tepat sebelum material & alat disimpan
+├─ CustomerInstallationController::store()→ idem, jalur pemasangan
+└─ FopTaskController::index()             → sapuan pelanggan lama yang terlanjur tak punya anchor
+```
+
+**Kenapa dipindah.** Sebelumnya pembuatan FopTask **hanya** jalan di `autoSyncAndCalculatePriority()`, yaitu saat ada yang membuka `GET /fop-tasks`. Padahal `task_materials` & `task_work_tools` wajib punya `fop_task_id`: teknisi yang mengisi Laporan Survey/Pemasangan sebelum papan itu dibuka kehilangan **seluruh** estimasi material dan checklist alatnya — dibuang oleh `if ($fopTask)` di kedua controller laporan, sementara laporannya sendiri tetap dilaporkan "berhasil disimpan". Di produksi gejalanya: 1791 survey, 1777 pemasangan, **0 baris** `task_materials` dan `task_work_tools`.
+
+Sifat service:
+
+- **Idempoten** — task yang sudah ada dan belum `selesai`/`dibatalkan` dipakai ulang, jadi aman dipanggil berkali-kali dalam satu alur.
+- **`lockForUpdate` di dalam transaksi** — dua request bersamaan (teknisi submit laporan pas FOP membuka papan) tidak melahirkan dua TFOP untuk pelanggan & kategori yang sama.
+- **Menolak kategori selain Survey/PSB** — MTN & C-REQ tetap cuma lahir lewat `TicketService::escalateToFop()`. Service ini bukan pintu belakangnya.
+- **Tanpa fallback `?? 1` untuk `village_id`/`pop_id`** — kedua kolom nullable; menembak id 1 yang belum tentu ada melempar FK error, dan di jalur simpan laporan itu berarti laporan teknisi gagal total.
+- Nomor TFOP digenerate `FopTaskProvisioningService::generateTaskNumber()`; `FopTaskController::generateTaskNumber()` (form manual) mendelegasikan ke sana. Format tetap wajib identik dengan `TicketService::generateFopTaskNumber()` — deretnya sama.
+
+Regresi dijaga `tests/Feature/SurveyReportMaterialLostWithoutFopTaskTest.php`.
+
+### 2b. Sapuan + kalkulasi prioritas (jalan tiap `GET /fop-tasks`)
 
 ```
 FopTaskController::autoSyncAndCalculatePriority()
 │
 ├─ 1. Customer status IN (calon_pelanggan, waiting_survey, registered)
 │     AND belum punya FopTask kategori Survey yang aktif (BUKAN selesai/dibatalkan)
-│     → buat FopTask baru, category=Survey, status=draft, priority=Medium (sementara)
+│     → ensureForCustomer(SURVEY) — status=draft, priority=Medium (sementara)
 │
 ├─ 2. Customer status IN (waiting_installation, waiting_installations, surveyed)
 │     AND belum punya FopTask kategori PSB yang aktif
-│     → buat FopTask baru, category=PSB, priority=Medium (sementara)
+│     → ensureForCustomer(PEMASANGAN) — priority=Medium (sementara)
 │       client_request_date ← customer.latestSurvey.requested_installation_date
 │
 ├─ 2b. Refresh client_request_date SEMUA FopTask PSB aktif (2026-07-31)

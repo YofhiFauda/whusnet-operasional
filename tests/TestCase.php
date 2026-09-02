@@ -12,6 +12,36 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 abstract class TestCase extends BaseTestCase
 {
     /**
+     * Paksa cache & session ke penyimpanan dalam-memori untuk SETIAP test.
+     *
+     * Bukan sekadar kerapian — ini menutup jebakan yang sudah dua kali menggigit
+     * repo ini. `phpunit.xml` menyetel `CACHE_STORE=array force="true"`, tapi
+     * `force` hanya menulis `putenv()` sementara `env()` Laravel membaca
+     * `$_SERVER` lebih dulu. Begitu ada yang menaruh `CACHE_STORE` di
+     * `docker-compose.yml`, nilai itu masuk `$_SERVER` dan MENANG — seluruh
+     * test lalu berbagi cache FILE yang persisten lintas run.
+     *
+     * Akibat nyatanya: `EffectiveAccessService` menyimpan izin per user di
+     * `user.{id}.permissions`. Satu run yang menjadikan user id 1 sebagai Owner
+     * meninggalkan `["*"]` di sana, dan run berikutnya melihat user biasa punya
+     * akses penuh — 9 test RBAC merah tanpa satu baris pun logika permission
+     * yang salah.
+     *
+     * Perbaikan akar masalahnya ada di `docker-compose.yml` (env runtime tak
+     * boleh diduplikasi di sana). Blok ini lapisan kedua: isolasi test tidak
+     * boleh bergantung pada seluk-beluk presedensi env.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'cache.default' => 'array',
+            'session.driver' => 'array',
+        ]);
+    }
+
+    /**
      * Helper to authenticate as an active admin/owner user in tests.
      */
     protected function loginAsAdmin(?User $user = null): User

@@ -1,5 +1,22 @@
 # DONE PARTIAL
 
+> ## ⚠️ SEBAGIAN DIREVISI oleh kolektor-2.0 (2026-08-08)
+>
+> Dua keputusan di dokumen ini **tidak berlaku lagi**. Baca
+> `docs/plan/kolektor/analisa-alur-kolektor-2.0.md` §8 sebelum memakai dokumen ini:
+>
+> - **§B-8 no. 4 & no. 5** — "kolektor tidak boleh input pembayaran", "UI kolektor
+>   read-only". DIREVISI: kolektor mencatat pembayarannya sendiri lewat
+>   `kolektor.pay` di `/collector-worklist`. Yang tetap: kolektor tak diberi
+>   `payments.create`, tak bisa membuka halaman admin, tak bisa menagih pelanggan
+>   di luar `collector_id`-nya.
+> - **§B-11 ⛔ "DILUAR SCOPE"** — Setoran/rekonsiliasi kas. DIREVISI: dihidupkan
+>   lagi di Fase 2 kolektor-2.0, dengan bentuk lebih ringan (`collector_deposits`).
+>
+> Sisa dokumen ini masih berlaku: model mental Tagihan/Pembayaran (§B-2), dua kolom
+> kolektor (§B-3), kelebihan bayar dikembalikan fisik (§B-8 no. 6),
+> `payment_date` vs `collected_date` (§B-8 no. 8).
+
 # Analisa Billing: Tagihan → Pembayaran → Kolektor & Setoran
 
 **Tanggal:** 2026-07-24
@@ -16,6 +33,7 @@
 >
 > 1. **Setoran Kolektor / rekonsiliasi kas** (§B-11, seluruh Fase 3 lama, terkait §D-9 no. 1 & no. 2 sebagian). Tanpa ini: kolektor tetap bisa input batch pembayaran banyak pelanggan sekaligus (tetap dibangun), tapi **tak ada lapis "declared kas vs recorded sistem"** — kalau kolektor kurang setor, itu ditangani di luar sistem (manual), bukan dideteksi otomatis.
 > 2. **Saldo kredit pelanggan / ledger kelebihan bayar** (§D-5, `payment_allocations` + `customer_credits`). Tanpa ini: keputusan asli §B-8.6 **berlaku lagi** — kelebihan bayar selalu dikembalikan fisik, tak ada saldo tersimpan di sistem.
+>    → **DI-OVERRIDE 2026-08-18** atas permintaan eksplisit user (fitur Metode Pembayaran + Saldo Pelanggan di Modal Bayar Invoice): saldo pelanggan **dihidupkan**, sebagai ledger append-only `customer_balance_mutations` (bukan `payment_allocations`/`customer_credits` seperti rancangan awal di §D-5). Lihat `app/Services/CustomerBalanceService.php`. Poin ini di §D-5/§B-8.6/baris 349 TIDAK lagi berlaku untuk saldo pelanggan — dipertahankan sebagai arsip, bukan dihapus.
 >
 > **Konsekuensi ke desain yang masih aktif:** batch kolektor (Fase 2) tetap butuh proteksi dobel-submit (idempotency) dan atomicity per sesi — kebutuhan itu **independen** dari Setoran. Solusinya disederhanakan jadi tabel ringan `payment_batches` (cuma untuk dedup + pengelompokan, tanpa `declared_total`/`variance`/status selisih) — lihat §A-7 #6 & Bagian E Fase 1/2 yang sudah diperbarui.
 >

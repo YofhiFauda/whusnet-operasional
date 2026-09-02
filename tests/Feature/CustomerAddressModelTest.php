@@ -42,7 +42,6 @@ class CustomerAddressModelTest extends TestCase
             'latitude' => -7.8694000,
             'longitude' => 111.4621000,
             'house_photo' => 'documents/simulasi/house_test.jpg',
-            'ktp_photo' => 'documents/simulasi/ktp_test.jpg',
             'contract_photo' => 'documents/simulasi/contract_test.pdf',
         ]);
 

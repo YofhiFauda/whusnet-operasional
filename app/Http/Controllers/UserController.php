@@ -9,11 +9,13 @@ use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\CollectorBalanceService;
 use App\Services\UserScopeManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
@@ -113,7 +115,7 @@ class UserController extends Controller
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
         ], [
             'name.required' => 'Nama user wajib diisi.',
             'email.required' => 'Email user wajib diisi.',
@@ -128,8 +130,11 @@ class UserController extends Controller
             'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
             'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
             'password.required' => 'Password user wajib diisi.',
-            'password.min' => 'Password user minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
+            'password.min' => 'Password user minimal 8 karakter.',
+            'password.mixed' => 'Password user wajib kombinasi huruf besar dan huruf kecil.',
+            'password.numbers' => 'Password user wajib mengandung minimal 1 angka.',
+            'password.symbols' => 'Password user wajib mengandung minimal 1 simbol (!@#$% dst).',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -200,7 +205,7 @@ class UserController extends Controller
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['nullable', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
         ], [
             'name.required' => 'Nama user wajib diisi.',
             'email.required' => 'Email user wajib diisi.',
@@ -214,8 +219,11 @@ class UserController extends Controller
             'scope_type.in' => 'Tipe scope tidak valid. Pilih Seluruh POP, Cabang POP, atau Distribusi POP.',
             'pop_ids.array' => 'Format POP yang dipilih tidak valid.',
             'pop_ids.*.exists' => 'Salah satu POP yang dipilih tidak ditemukan.',
-            'password.min' => 'Password user minimal 8 karakter.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
+            'password.min' => 'Password user minimal 8 karakter.',
+            'password.mixed' => 'Password user wajib kombinasi huruf besar dan huruf kecil.',
+            'password.numbers' => 'Password user wajib mengandung minimal 1 angka.',
+            'password.symbols' => 'Password user wajib mengandung minimal 1 simbol (!@#$% dst).',
         ]);
 
         $validator->after(function ($validator) use ($request, $user) {
@@ -250,6 +258,30 @@ class UserController extends Controller
                     $validator->errors()->add(
                         'status',
                         "Kolektor ini masih memegang {$assignedCount} pelanggan. Pindahkan/lepas dulu lewat layar Atur Kolektor sebelum menonaktifkan."
+                    );
+                }
+
+                // Guard uang (kolektor-2.0 §11.7): kolektor yang masih pegang
+                // kas atau masih punya kurang setor tak boleh dinonaktifkan.
+                // Tanpa ini, kolektor bertunggakan tinggal di-nonaktifkan dan
+                // angkanya lenyap dari semua daftar — padahal itu uang
+                // perusahaan yang belum kembali. Jalan keluar satu-satunya
+                // tetap: disetorkan/dilunasi, atau dihapus buku oleh Owner.
+                $balanceService = app(CollectorBalanceService::class);
+
+                $balance = $balanceService->balance($user);
+                if ($balance > 0) {
+                    $validator->errors()->add(
+                        'status',
+                        'Kolektor ini masih memegang saldo Rp'.number_format($balance, 0, ',', '.').' yang belum disetorkan. Setorkan & verifikasi dulu sebelum menonaktifkan.'
+                    );
+                }
+
+                $shortfall = $balanceService->outstandingShortfall($user);
+                if ($shortfall > 0) {
+                    $validator->errors()->add(
+                        'status',
+                        'Kolektor ini masih punya kurang setor Rp'.number_format($shortfall, 0, ',', '.').'. Lunasi lewat setoran berikutnya atau minta Owner menghapus bukunya dulu.'
                     );
                 }
             }

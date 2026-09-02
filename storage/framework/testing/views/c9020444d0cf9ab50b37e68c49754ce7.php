@@ -1,7 +1,6 @@
-<?php $__env->startSection('title', 'Daftar Pembayaran - Whusnet Operasional'); ?>
-<?php $__env->startSection('page_title', 'Daftar Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent_url', route('payments.index')); ?>
+<?php $__env->startSection('title', 'Riwayat Transaksi Pembayaran - Whusnet Operasional'); ?>
+<?php $__env->startSection('page_title', 'Riwayat Transaksi Pembayaran'); ?>
+
 
 <?php $__env->startSection('content'); ?>
 <div class="space-y-6">
@@ -10,7 +9,7 @@
     <!-- Naked Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Daftar Pembayaran</h1>
+            <h1 class="text-xl sm:text-2xl font-bold text-text-main tracking-tight">Riwayat Transaksi Pembayaran</h1>
             <p class="text-xs text-text-muted mt-1">
                 Seluruh riwayat transaksi pembayaran tagihan pelanggan ISP terhubung dengan Invoice & POP.
             </p>

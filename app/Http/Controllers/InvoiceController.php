@@ -6,6 +6,8 @@ use App\Enums\InvoiceStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Invoice;
 use App\Models\Pop;
+use App\Models\User;
+use App\Services\CustomerBalanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -148,7 +150,22 @@ class InvoiceController extends Controller
                 $invoice->customer->append('clean_address');
             }
 
-            return response()->json($invoice);
+            $payload = $invoice->toArray();
+
+            // Data untuk Modal Bayar (quick-payment-modal.blade.php): saldo
+            // pelanggan yang bisa dipakai + daftar kolektor buat metode
+            // Kolektor. Ditumpangkan di payload invoice yang sudah dipanggil
+            // modal itu — satu fetch, bukan endpoint tambahan.
+            $payload['customer_balance'] = $invoice->customer
+                ? app(CustomerBalanceService::class)->balance($invoice->customer)
+                : 0.0;
+
+            $payload['available_collectors'] = User::query()
+                ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
+                ->orderBy('name')
+                ->get(['id', 'name']);
+
+            return response()->json($payload);
         }
 
         return view('invoices.show', compact('invoice'));

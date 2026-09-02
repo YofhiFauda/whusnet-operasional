@@ -18,6 +18,7 @@ use App\Services\EffectiveAccessService;
 use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
 use App\Support\ReasonValidationRule;
+use App\Support\TaskAuditTimeline;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -208,7 +209,12 @@ class TaskController extends Controller
                 ->get();
         }
 
-        return view('tasks.show', compact('task', 'recentMaintenanceTasks'));
+        // Riwayat Perubahan Status disaring dulu — audit_logs punya dua lapis
+        // pencatat (trait model + log bisnis bernama), jadi kalau dirender apa
+        // adanya satu klik user tampil dua baris. Lihat App\Support\TaskAuditTimeline.
+        $statusTimeline = TaskAuditTimeline::for($task);
+
+        return view('tasks.show', compact('task', 'recentMaintenanceTasks', 'statusTimeline'));
     }
 
     /**

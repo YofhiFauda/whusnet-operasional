@@ -7,7 +7,7 @@ Sistem akses 3 dimensi: **Role** (siapa Anda), **Permission** (`{feature}.{actio
 | Dokumen | Isi |
 |---------|-----|
 | [business-logic.md](business-logic.md) | Aturan bisnis: hierarki role, siapa boleh kelola siapa, precedence permission, aturan scope POP, §8 customer permission hierarchy (2026-07-28) |
-| [customer-permission-hierarchy.md](customer-permission-hierarchy.md) | **[NEW 2026-07-28]** Detail segregasi permission customer: 4 halaman independen (List/Putus/Gagal/Detail) + fieldwork page teknisi, role mapping, migration path, testing |
+| [customer-permission-hierarchy.md](customer-permission-hierarchy.md) | **[2026-07-28, diperluas 2026-08-12]** Detail segregasi permission customer: 6 halaman independen (List/Putus/Gagal/Survey/Verifikasi/Detail) + fieldwork page teknisi, role mapping, migration path, testing |
 | [flowchart.md](flowchart.md) | Alur cek permission, generate permission, resolve scope POP, sync role-permission |
 | [user-flow.md](user-flow.md) | Langkah Owner/Admin kelola role, permission matrix, assign scope user, §5 customer list pages per role (2026-07-28) |
 | [database-schema.md](database-schema.md) | Tabel `roles`, `permissions`, `features`, `actions`, `user_role_scopes`, dll |

@@ -60,8 +60,8 @@ class UserAuditHardeningTest extends TestCase
             'role_id' => $teknisiRole->id,
             'scope_type' => 'selected_pop',
             'pop_ids' => [$popA->id],
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
         $createResponse->assertRedirect(route('users.index'));
@@ -87,8 +87,8 @@ class UserAuditHardeningTest extends TestCase
             'role_id' => $adminRole->id,
             'scope_type' => 'selected_pop',
             'pop_ids' => [$popB->id],
-            'password' => 'password456',
-            'password_confirmation' => 'password456',
+            'password' => 'Password456!',
+            'password_confirmation' => 'Password456!',
         ]);
 
         $updateResponse->assertRedirect(route('users.index'));

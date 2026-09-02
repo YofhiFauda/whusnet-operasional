@@ -24,8 +24,8 @@
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Tagihan berasal dari pelanggan aktif dan layanan pelanggan yang sudah tersimpan.</p>
     </div>
     <div class="flex items-center gap-2">
-        @if(auth()->user()->hasPermission('customers.update') || auth()->user()->hasPermission('payments.create'))
-            <a href="{{ route('collectors.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
+        @if(auth()->user()->hasPermission('collector_worksheet.view'))
+            <a href="{{ route('collector-worksheet.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md transition-colors text-xs font-semibold shadow-sm focus:outline-none">
                 Kolektor
             </a>
         @endif
@@ -142,6 +142,10 @@
                         $isInstallment = $invoice->invoice_status->value === 'sebagian'
                             && $invoice->payments->isNotEmpty();
                         $columnCount = 9;
+                        // Invoice TIDAK punya relasi latestPayment (itu cuma ada di
+                        // Customer) — ambil dari koleksi payments yang sudah dimuat
+                        // terurut payment_date ASC, jadi tinggal last().
+                        $latestInvoicePayment = $invoice->payments->last();
                     @endphp
                     <tr class="hover:bg-slate-50/45 dark:hover:bg-slate-700/25 transition-colors" id="invoice-row-{{ $invoice->id }}">
                         <td class="px-6 py-3.5 text-center text-slate-400 dark:text-slate-500 data-text">{{ ($invoices->currentPage() - 1) * $invoices->perPage() + $loop->iteration }}</td>
@@ -202,14 +206,17 @@
                                                 data-invoice-id="{{ $invoice->id }}"
                                                 data-invoice-number="{{ $invoice->invoice_number }}"
                                                 data-remaining="{{ (float) $invoice->remaining_amount }}"
-                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                {{-- Target POST dirender server-side; modal TIDAK boleh merakit
+                                                     `/invoices/${id}/payments` sendiri. ADHOC-20 langkah 3. --}}
+                                                data-payment-store-url="{{ route('invoices.payments.store', $invoice->id) }}"
+                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining), this.dataset.paymentStoreUrl)"
                                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors text-xs font-semibold cursor-pointer">
                                             {{ $invoice->invoice_status->value === 'sebagian' ? 'Bayar Cicil' : 'Bayar' }}
                                         </button>
                                     </span>
                                 @endcan
-                                @if(auth()->user()->hasPermission('payments.view') && $invoice->latestPayment)
-                                    <a href="{{ route('payments.receipt', $invoice->latestPayment->id) }}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-md transition-colors text-xs font-semibold" title="Cetak Struk Pembayaran Terakhir">
+                                @if($invoice->invoice_status->value === 'lunas' && auth()->user()->hasPermission('payments.view') && $latestInvoicePayment)
+                                    <a href="{{ route('payments.receipt', $latestInvoicePayment->id) }}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 rounded-md transition-colors text-xs font-semibold" title="Cetak Struk Pembayaran Terakhir">
                                         <svg class="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-5a2 2 0 00-2-2H5a2 2 0 00-2 2v5a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
                                         <span>Struk</span>
                                     </a>

@@ -74,7 +74,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'pppoe_password' => 'secret_pppoe',
             'wifi_ssid' => 'john_wifi',
             'wifi_password' => 'secret_wifi',
-            'ip_address' => '192.168.1.100',
             'vlan_id' => 100,
         ]);
 
@@ -132,7 +131,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
         $response->assertSee('********');
         $response->assertDontSee('secret_pppoe');
         $response->assertDontSee('secret_wifi');
-        $response->assertDontSee('192.168.1.100');
     }
 
     public function test_helpdesk_cannot_update_sensitive_fields()
@@ -143,7 +141,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'device_type' => 'router',
             'pppoe_password' => 'hacked_password',
             'wifi_password' => 'hacked_wifi',
-            'ip_address' => '10.0.0.1',
         ]);
 
         $response->assertRedirect();
@@ -152,7 +149,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
         $this->device->refresh();
         $this->assertEquals('secret_pppoe', $this->device->pppoe_password);
         $this->assertEquals('secret_wifi', $this->device->wifi_password);
-        $this->assertEquals('192.168.1.100', $this->device->ip_address);
     }
 
     public function test_teknisi_can_see_and_update_sensitive_fields()
@@ -166,7 +162,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('secret_pppoe');
         $response->assertSee('secret_wifi');
-        $response->assertSee('192.168.1.100');
 
         // Can update
         $response = $this->actingAs($teknisi)->post('/customers/'.$this->customer->id.'/device', [
@@ -175,7 +170,6 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
             'pppoe_password' => 'new_secret_pppoe',
             'wifi_ssid' => 'new_wifi',
             'wifi_password' => 'new_secret_wifi',
-            'ip_address' => '10.10.10.10',
         ]);
 
         $response->assertRedirect();
@@ -184,6 +178,5 @@ class CustomerDeviceSensitiveFieldTest extends TestCase
         $this->device->refresh();
         $this->assertEquals('new_secret_pppoe', $this->device->pppoe_password);
         $this->assertEquals('new_secret_wifi', $this->device->wifi_password);
-        $this->assertEquals('10.10.10.10', $this->device->ip_address);
     }
 }

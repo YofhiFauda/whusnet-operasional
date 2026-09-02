@@ -33,6 +33,14 @@
 
 <style>
     @media print {
+        /*
+         * Header/footer bawaan browser (tanggal, judul dokumen, URL
+         * localhost:8000/...) dicetak di KOTAK MARGIN halaman, di luar
+         * jangkauan selector mana pun. margin:0 menghapus kotaknya sekalian.
+         * Jarak ke tepi kertas ditanggung `.print-only.p-8` — jangan ikut
+         * dinolkan.
+         */
+        @page { margin: 0; }
         .no-print, header, sidebar, footer, nav, #toast, .modal, .mobile-action-bar { display: none !important; }
         .print-only { display: block !important; }
         .screen-only { display: none !important; }

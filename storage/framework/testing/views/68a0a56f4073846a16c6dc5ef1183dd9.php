@@ -50,6 +50,14 @@
                             <span class="text-slate-400 dark:text-slate-500">Jatuh Tempo</span>
                             <span id="qp-jatuh-tempo" class="font-mono text-slate-800 dark:text-slate-200 text-right">-</span>
                         </div>
+                        <div class="flex justify-between gap-4 py-1.5 border-b border-slate-100/50 dark:border-slate-800/60">
+                            <span class="text-slate-400 dark:text-slate-500">Metode Bayar</span>
+                            <span id="qp-summary-method" class="font-semibold text-slate-800 dark:text-slate-200 text-right">Cash</span>
+                        </div>
+                        <div class="flex justify-between gap-4 py-1.5 border-b border-slate-100/50 dark:border-slate-800/60">
+                            <span class="text-slate-400 dark:text-slate-500">Saldo Pelanggan</span>
+                            <span id="qp-summary-balance" class="font-mono font-semibold text-sky-700 dark:text-sky-400 text-right">Rp 0</span>
+                        </div>
                     </div>
 
                     <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-5 mb-3">Rincian Biaya</h4>
@@ -124,14 +132,39 @@
                                 class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                             <option value="cash">Cash</option>
                             <option value="transfer">Transfer</option>
+                            <option value="kolektor">Kolektor</option>
                             <option value="qris">QRIS</option>
                             <option value="lainnya">Lainnya</option>
                         </select>
                     </div>
 
+                    
+                    <div id="qp-transfer-fields" class="hidden space-y-3">
+                        <div>
+                            <label for="qp-bank-name" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Bank</label>
+                            <input type="text" id="qp-bank-name" placeholder="mis. BCA, BRI, Mandiri"
+                                   class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                        </div>
+                        <div>
+                            <label for="qp-account-number" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nomer Rekening</label>
+                            <input type="text" id="qp-account-number" placeholder="Nomer rekening tujuan/asal"
+                                   class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                        </div>
+                    </div>
+
+                    
+                    <div id="qp-collector-fields" class="hidden">
+                        <label for="qp-collector" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Kolektor</label>
+                        <select id="qp-collector"
+                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
+                            <option value="">Pilih kolektor...</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label for="qp-amount" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nominal Diterima dari Pelanggan</label>
-                        <input type="number" id="qp-amount" min="1" step="1" required
+                        
+                        <input type="text" inputmode="decimal" data-rupiah id="qp-amount" required
                                class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                         <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
                             Boleh diisi lebih besar dari sisa tagihan — kelebihannya otomatis tercatat sebagai lebih bayar.
@@ -152,17 +185,20 @@
                         </select>
                     </div>
 
-                    <div>
-                        <label for="qp-proof-file" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Bukti Pembayaran</label>
-                        <div class="relative flex items-center justify-center w-full border border-dashed border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 rounded-md px-3 py-4 hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
-                            <input type="file" id="qp-proof-file" accept="image/png, image/jpeg, image/jpg, application/pdf"
-                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                            <div class="text-center">
-                                <svg class="mx-auto h-6 w-6 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                                </svg>
-                                <span class="mt-1 block text-[10px] text-slate-500 dark:text-slate-400 font-medium" id="qp-file-name">Pilih atau Seret Foto/PDF (Maks. 2MB)</span>
-                            </div>
+                    
+                    <div id="qp-balance-block" class="hidden border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-md px-3 py-2.5 space-y-2">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-sky-800 dark:text-sky-300 font-semibold">Saldo Pelanggan Tersedia</span>
+                            <span id="qp-balance-available" class="font-mono font-bold text-sky-800 dark:text-sky-300">Rp 0</span>
+                        </div>
+                        <label class="flex items-center gap-2 text-[11px] text-sky-800 dark:text-sky-300 font-medium cursor-pointer">
+                            <input type="checkbox" id="qp-use-balance" class="rounded border-sky-300 text-sky-600 focus:ring-sky-500">
+                            Pakai saldo pelanggan untuk pembayaran ini
+                        </label>
+                        <div id="qp-use-balance-amount-wrap" class="hidden">
+                            <label for="qp-use-balance-amount" class="block text-[10px] font-bold text-sky-700 dark:text-sky-400 uppercase tracking-wider mb-1">Nominal Saldo Dipakai</label>
+                            <input type="text" inputmode="decimal" data-rupiah id="qp-use-balance-amount"
+                                   class="w-full px-3 py-2 border border-sky-200 dark:border-sky-500/30 rounded-md shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800">
                         </div>
                     </div>
 
@@ -190,18 +226,120 @@
     <?php $__env->startPush('scripts'); ?>
         <script>
             let qpInvoiceId = null;
+            // URL POST pencatatan pembayaran — SELALU dari server (data-payment-store-url
+            // di tombol Bayar, route('invoices.payments.store')). Modal ini dipakai dari
+            // dua halaman; merakit path sendiri berarti menduplikasi definisi route di
+            // klien dan, kalau nilainya kosong, POST uang ke URL halaman. ADHOC-20 langkah 3.
+            let qpPaymentStoreUrl = null;
             let qpRemainingAmount = 0;
             let qpNextInstallment = 1;
+            let qpCustomerBalance = 0;
+
+            const qpMethodLabels = { cash: 'Cash', transfer: 'Transfer Bank', kolektor: 'Kolektor', qris: 'QRIS', lainnya: 'Lainnya' };
+
+            /** Tampilkan/sembunyikan field pendukung sesuai metode dipilih,
+             *  dan geser `required` supaya field tersembunyi tak memblokir
+             *  submit (HTML5 validation tetap jalan atas field yang tampak). */
+            function qpToggleMethodFields() {
+                const method = document.getElementById('qp-payment-method').value;
+                const transferFields = document.getElementById('qp-transfer-fields');
+                const collectorFields = document.getElementById('qp-collector-fields');
+                const bankName = document.getElementById('qp-bank-name');
+                const accountNumber = document.getElementById('qp-account-number');
+                const collector = document.getElementById('qp-collector');
+
+                const isTransfer = method === 'transfer';
+                const isKolektor = method === 'kolektor';
+
+                transferFields.classList.toggle('hidden', !isTransfer);
+                bankName.required = isTransfer;
+                accountNumber.required = isTransfer;
+
+                collectorFields.classList.toggle('hidden', !isKolektor);
+                collector.required = isKolektor;
+
+                document.getElementById('qp-summary-method').textContent = qpMethodLabels[method] || method;
+            }
+
+            function qpPopulateCollectors(collectors) {
+                const select = document.getElementById('qp-collector');
+                select.innerHTML = '<option value="">Pilih kolektor...</option>';
+                (collectors || []).forEach((c) => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    select.appendChild(opt);
+                });
+            }
+
+            function qpApplyCustomerBalance(balance) {
+                qpCustomerBalance = parseFloat(balance) || 0;
+                document.getElementById('qp-summary-balance').textContent = qpFormatRupiah(qpCustomerBalance);
+
+                const block = document.getElementById('qp-balance-block');
+                block.classList.toggle('hidden', qpCustomerBalance <= 0);
+                document.getElementById('qp-balance-available').textContent = qpFormatRupiah(qpCustomerBalance);
+            }
+
+            /** Nominal saldo yang mau dipakai, dibatasi maks saldo tersedia. */
+            function qpUseBalanceAmount() {
+                if (!document.getElementById('qp-use-balance').checked) {
+                    return 0;
+                }
+
+                const raw = document.getElementById('qp-use-balance-amount').value;
+                const nilai = window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+
+                return isNaN(nilai) ? 0 : Math.min(nilai, qpCustomerBalance);
+            }
+
+            /** Saldo dipakai memotong langsung Nominal Diterima — cashier tak
+             *  perlu hitung manual "sisa tagihan minus saldo". Dipanggil tiap
+             *  saldo dipakai berubah (centang/nominal), BUKAN tiap Nominal
+             *  Diterima diketik manual (supaya tidak lawan input cashier). */
+            function qpApplyBalanceToAmount() {
+                const useBalance = qpUseBalanceAmount();
+                qpSetNominal(Math.max(0, qpRemainingAmount - useBalance));
+                qpRefreshInstallmentHint();
+            }
 
             function qpFormatRupiah(value) {
                 return 'Rp ' + Math.round(value).toLocaleString('id-ID');
+            }
+
+            /** Nilai nominal sebagai angka, apa pun bentuk maskingnya. */
+            function qpNominal() {
+                const raw = document.getElementById('qp-amount').value;
+
+                return window.Rupiah ? window.Rupiah.angka(raw) : parseFloat(raw);
+            }
+
+            /** Nilai untuk dikirim ke server: tanpa titik ribuan. */
+            function qpNominalPolos() {
+                const raw = document.getElementById('qp-amount').value;
+
+                return window.Rupiah ? window.Rupiah.polos(raw) : raw;
+            }
+
+            /** Isi ulang field dengan format ribuan. */
+            function qpSetNominal(nilai) {
+                // Sisa tagihan diisi APA ADANYA, tanpa dibulatkan: membulatkan
+                // sisa ber-sen berarti admin menyetujui nominal yang bukan sisa
+                // sebenarnya, dan bagian pecahannya diam-diam jadi lebih bayar.
+                const teks = String(nilai ?? '');
+                document.getElementById('qp-amount').value = window.Rupiah ? window.Rupiah.formatDariServer(teks) : teks;
             }
 
             function qpRefreshInstallmentHint() {
                 const installmentHint = document.getElementById('qp-installment-hint');
                 const settleHint = document.getElementById('qp-settle-hint');
                 const overpayHint = document.getElementById('qp-overpay-hint');
-                const amount = parseFloat(document.getElementById('qp-amount').value);
+                // Input bermasking ribuan: parseFloat('150.000') = 150, dan
+                // pratinjau cicilan/lebih bayar akan berbohong tanpa parser ini.
+                // Saldo yang dipakai ikut dihitung — pratinjau harus
+                // mencerminkan TOTAL yang menutup tagihan, sama seperti
+                // penghitungan server di PaymentService::record().
+                const amount = qpNominal() + qpUseBalanceAmount();
 
                 installmentHint.classList.add('hidden');
                 settleHint.classList.add('hidden');
@@ -237,8 +375,9 @@
                 }
             }
 
-            function openQuickPaymentModal(invoiceId, invoiceNumber, remainingAmount) {
+            function openQuickPaymentModal(invoiceId, invoiceNumber, remainingAmount, paymentStoreUrl) {
                 qpInvoiceId = invoiceId;
+                qpPaymentStoreUrl = paymentStoreUrl || null;
                 
                 // Show modal and reset loading/error state
                 document.getElementById('quick-payment-modal').classList.remove('hidden');
@@ -269,16 +408,22 @@
                 document.getElementById('qp-due').textContent = 'Rp ' + Math.round(remainingAmount).toLocaleString('id-ID');
                 
                 // Reset form fields
-                document.getElementById('qp-amount').value = Math.round(remainingAmount);
+                qpSetNominal(remainingAmount);
                 document.getElementById('qp-payment-date').value = new Date().toISOString().slice(0, 10);
                 document.getElementById('qp-payment-method').value = 'cash';
+                document.getElementById('qp-bank-name').value = '';
+                document.getElementById('qp-account-number').value = '';
                 document.getElementById('qp-allocation').value = 'Tagihan Bulanan';
                 document.getElementById('qp-note').value = '';
-                document.getElementById('qp-proof-file').value = '';
-                document.getElementById('qp-file-name').textContent = 'Pilih atau Seret Foto/PDF (Maks. 2MB)';
                 document.getElementById('qp-installment-hint').classList.add('hidden');
                 document.getElementById('qp-settle-hint').classList.add('hidden');
                 document.getElementById('qp-overpay-hint').classList.add('hidden');
+                document.getElementById('qp-use-balance').checked = false;
+                document.getElementById('qp-use-balance-amount').value = '';
+                document.getElementById('qp-use-balance-amount-wrap').classList.add('hidden');
+                qpApplyCustomerBalance(0);
+                qpPopulateCollectors([]);
+                qpToggleMethodFields();
                 qpRemainingAmount = remainingAmount;
                 qpNextInstallment = 1;
 
@@ -370,7 +515,10 @@
                     document.getElementById('qp-paid').textContent = 'Rp ' + Math.round(paidAmount).toLocaleString('id-ID');
                     document.getElementById('qp-due').textContent = 'Rp ' + Math.round(remainingAmountFromDb).toLocaleString('id-ID');
 
-                    document.getElementById('qp-amount').value = Math.round(remainingAmountFromDb);
+                    qpSetNominal(remainingAmountFromDb);
+
+                    qpApplyCustomerBalance(data.customer_balance);
+                    qpPopulateCollectors(data.available_collectors);
 
                     qpRemainingAmount = remainingAmountFromDb;
                     // Sama seperti PaymentController::create() — cuma hitung
@@ -394,24 +542,70 @@
             function closeQuickPaymentModal() {
                 document.getElementById('quick-payment-modal').classList.add('hidden');
                 qpInvoiceId = null;
+                qpPaymentStoreUrl = null;
             }
 
             document.getElementById('qp-amount')?.addEventListener('input', qpRefreshInstallmentHint);
 
-            // Sync file upload input text label
-            document.getElementById('qp-proof-file')?.addEventListener('change', function(e) {
-                const fileName = e.target.files[0]?.name || 'Pilih atau Seret Foto/PDF (Maks. 2MB)';
-                document.getElementById('qp-file-name').textContent = fileName;
+            document.getElementById('qp-payment-method')?.addEventListener('change', function () {
+                qpToggleMethodFields();
+                qpRefreshInstallmentHint();
             });
+
+            document.getElementById('qp-use-balance')?.addEventListener('change', function (e) {
+                const wrap = document.getElementById('qp-use-balance-amount-wrap');
+                wrap.classList.toggle('hidden', !e.target.checked);
+
+                if (e.target.checked) {
+                    // Default: pakai saldo semaksimal mungkin (dibatasi sisa
+                    // tagihan) — admin boleh menurunkannya manual.
+                    const max = Math.min(qpCustomerBalance, qpRemainingAmount);
+                    document.getElementById('qp-use-balance-amount').value =
+                        window.Rupiah ? window.Rupiah.formatDariServer(String(max)) : String(max);
+                } else {
+                    document.getElementById('qp-use-balance-amount').value = '';
+                }
+
+                // Nominal Diterima ikut terpotong sebesar saldo dipakai
+                // (atau balik ke sisa tagihan penuh kalau saldo dibatalkan).
+                qpApplyBalanceToAmount();
+            });
+
+            document.getElementById('qp-use-balance-amount')?.addEventListener('input', qpApplyBalanceToAmount);
 
             // Form Submit Handler
             document.getElementById('quick-payment-form')?.addEventListener('submit', function (e) {
                 e.preventDefault();
-                if (!qpInvoiceId) return;
+                if (!qpInvoiceId || !qpPaymentStoreUrl) return;
 
                 const submitBtn = document.getElementById('qp-submit-btn');
                 const errorBox = document.getElementById('qp-error');
                 errorBox.classList.add('hidden');
+
+                // Batas bawah dulu ditegakkan atribut `min` milik input number.
+                // Sejak kolomnya jadi teks bermasking, cek itu harus di sini —
+                // kalau tidak, nominal 0 baru ketahuan salah setelah bolak-balik
+                // ke server.
+                const nominal = qpNominal();
+                if (isNaN(nominal) || nominal < 1) {
+                    errorBox.textContent = 'Nominal wajib diisi minimal Rp 1.';
+                    errorBox.classList.remove('hidden');
+                    document.getElementById('qp-amount').focus();
+                    return;
+                }
+
+                const method = document.getElementById('qp-payment-method').value;
+                if (method === 'transfer' && (!document.getElementById('qp-bank-name').value.trim() || !document.getElementById('qp-account-number').value.trim())) {
+                    errorBox.textContent = 'Nama Bank dan Nomer Rekening wajib diisi untuk metode Transfer.';
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+                if (method === 'kolektor' && !document.getElementById('qp-collector').value) {
+                    errorBox.textContent = 'Pilih kolektor untuk metode Kolektor.';
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Menyimpan...';
 
@@ -420,9 +614,26 @@
                 // amount = TOTAL diterima dari pelanggan. Server yang
                 // memisah bagian penutup tagihan vs lebih bayar — lihat
                 // PaymentController::store().
-                payload.append('amount', document.getElementById('qp-amount').value);
+                // Dikirim tanpa titik ribuan. Modal ini submit lewat FormData,
+                // bukan event `submit`, jadi normalisasi global di
+                // layouts/app.blade.php tidak ikut jalan di sini.
+                payload.append('amount', qpNominalPolos());
                 payload.append('payment_date', document.getElementById('qp-payment-date').value);
-                payload.append('payment_method', document.getElementById('qp-payment-method').value);
+                payload.append('payment_method', method);
+
+                if (method === 'transfer') {
+                    payload.append('bank_name', document.getElementById('qp-bank-name').value);
+                    payload.append('account_number', document.getElementById('qp-account-number').value);
+                }
+
+                if (method === 'kolektor') {
+                    payload.append('collected_by', document.getElementById('qp-collector').value);
+                }
+
+                const useBalance = qpUseBalanceAmount();
+                if (useBalance > 0) {
+                    payload.append('use_balance_amount', useBalance);
+                }
 
                 // Format note: "[Alokasi Pembayaran] - [Catatan]"
                 const allocation = document.getElementById('qp-allocation').value;
@@ -430,13 +641,7 @@
                 const note = userNote ? allocation + ' - ' + userNote : allocation;
                 payload.append('note', note);
 
-                // Add proof file if present
-                const fileInput = document.getElementById('qp-proof-file');
-                if (fileInput.files.length > 0) {
-                    payload.append('proof_file', fileInput.files[0]);
-                }
-
-                fetch(`/invoices/${qpInvoiceId}/payments`, {
+                fetch(qpPaymentStoreUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -478,18 +683,27 @@
                         title: 'Pembayaran Tercatat',
                         message: data.message,
                         icon: 'success',
-                        buttons: [{
-                            text: 'Tutup', type: 'primary', onClick: () => {
-                                window.Dialog.close();
-                                // Listener yang berhasil update DOM-nya sendiri
-                                // memanggil preventDefault() — reload cuma jadi
-                                // fallback buat halaman yang belum tahu cara
-                                // patch barisnya (mis. tab Tagihan pelanggan).
-                                if (!handled) {
-                                    window.location.reload();
-                                }
+                        buttons: [
+                            {
+                                text: 'Cetak Struk', type: 'secondary', onClick: () => {
+                                    if (data.payment && data.payment.id) {
+                                        window.open(`/payments/${data.payment.id}/kwitansi`, '_blank');
+                                    }
+                                },
                             },
-                        }],
+                            {
+                                text: 'Tutup', type: 'primary', onClick: () => {
+                                    window.Dialog.close();
+                                    // Listener yang berhasil update DOM-nya sendiri
+                                    // memanggil preventDefault() — reload cuma jadi
+                                    // fallback buat halaman yang belum tahu cara
+                                    // patch barisnya (mis. tab Tagihan pelanggan).
+                                    if (!handled) {
+                                        window.location.reload();
+                                    }
+                                },
+                            },
+                        ],
                     });
                 })
                 .catch((err) => {

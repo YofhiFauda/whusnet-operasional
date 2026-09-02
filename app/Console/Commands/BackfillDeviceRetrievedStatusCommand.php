@@ -70,6 +70,7 @@ class BackfillDeviceRetrievedStatusCommand extends Command
             $customers = Customer::where('pop_id', $popId)
                 ->where('status', 'terminated')
                 ->whereIn('old_request_id', array_keys($putusByRequestId))
+                ->with('customerDevice')
                 ->get();
 
             $this->line('  PUTUS rows: '.count($putusByRequestId).' | Customer terminated cocok: '.$customers->count());

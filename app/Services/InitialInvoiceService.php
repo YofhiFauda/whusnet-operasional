@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CustomerService as CustomerServiceModel;
+use App\Support\Money;
 use Carbon\Carbon;
 
 /**
@@ -73,28 +74,33 @@ class InitialInvoiceService
 
         $prorateOverride = $fees['prorate_amount_override'] ?? null;
         if ($prorateOverride !== null && $prorateOverride !== '') {
-            $prorateAmount = max(0, (float) $prorateOverride);
+            $prorateAmount = Money::atLeastZero($prorateOverride);
         }
 
-        $installationFee = max(0, (float) ($fees['extra_installation_fee'] ?? 0));
-        $cableFee = max(0, (float) ($fees['extra_cable_fee'] ?? 0));
-        $poleFee = max(0, (float) ($fees['extra_pole_fee'] ?? 0));
-        $otherFee = max(0, (float) ($fees['other_fee'] ?? 0));
+        $installationFee = Money::atLeastZero($fees['extra_installation_fee'] ?? 0);
+        $cableFee = Money::atLeastZero($fees['extra_cable_fee'] ?? 0);
+        $poleFee = Money::atLeastZero($fees['extra_pole_fee'] ?? 0);
+        $otherFee = Money::atLeastZero($fees['other_fee'] ?? 0);
 
-        $subtotal = $prorateAmount + $installationFee + $cableFee + $poleFee + $otherFee;
-        $discount = max(0, (float) ($service->discount ?? 0));
+        // Lima komponen dijumlahkan sekaligus di ranah sen. Rantai penjumlahan
+        // float menumpuk galat, dan angka inilah yang dicetak di kwitansi
+        // pertama pelanggan — nominal yang tak sama dengan jumlah rinciannya
+        // adalah dokumen yang tidak bisa dipertanggungjawabkan.
+        $subtotal = Money::sum([$prorateAmount, $installationFee, $cableFee, $poleFee, $otherFee]);
+        $discount = Money::atLeastZero($service->discount ?? 0);
+        // PPN itu PERSEN, bukan rupiah — tidak lewat Money.
         $ppnRate = max(0, (float) ($service->ppn ?? 0));
 
-        $afterDiscount = max(0, $subtotal - $discount);
-        $ppnAmount = round($afterDiscount * ($ppnRate / 100), 2);
+        $afterDiscount = Money::atLeastZero(Money::sub($subtotal, $discount));
+        $ppnAmount = Money::of($afterDiscount * ($ppnRate / 100));
 
         // Nominal bulan berikutnya, dipakai kwitansi untuk menjawab pertanyaan
         // pelanggan yang paling sering ("bulan depan bayar berapa?") tanpa admin
         // perlu menghitung. Rumusnya sengaja dijaga identik dengan
         // GenerateMonthlyInvoicesCommand: harga paket - diskon, lalu PPN persen.
         // Tanpa prorata dan tanpa materai — keduanya hanya ada di tagihan awal.
-        $nextMonthAfterDiscount = max(0, $basePrice - $discount);
-        $nextMonthAmount = $nextMonthAfterDiscount + round($nextMonthAfterDiscount * ($ppnRate / 100), 2);
+        $nextMonthAfterDiscount = Money::atLeastZero(Money::sub($basePrice, $discount));
+        $nextMonthAmount = Money::add($nextMonthAfterDiscount, $nextMonthAfterDiscount * ($ppnRate / 100));
 
         return [
             'prorate_amount' => $prorateAmount,
@@ -108,7 +114,7 @@ class InitialInvoiceService
             'extra_cable_fee' => $cableFee,
             'extra_pole_fee' => $poleFee,
             'other_fee' => $otherFee,
-            'total_amount' => $afterDiscount + $ppnAmount,
+            'total_amount' => Money::add($afterDiscount, $ppnAmount),
             'next_month_amount' => $nextMonthAmount,
         ];
     }

@@ -3,22 +3,26 @@
 namespace App\Providers;
 
 use App\Models\Customer;
+use App\Models\CustomerQrToken;
 use App\Models\FopTask;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\Permission;
 use App\Models\Task;
 use App\Observers\CustomerObserver;
+use App\Observers\CustomerQrTokenObserver;
 use App\Observers\FopTaskObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
 use App\Policies\TaskPolicy;
 use Carbon\Carbon;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -53,6 +57,24 @@ class AppServiceProvider extends ServiceProvider
         // Register Policies
         Gate::policy(Task::class, TaskPolicy::class);
 
+        // Secret kosong bikin hash_hmac() tetap menghasilkan nilai (dengan
+        // key string kosong) — kegagalannya DIAM-DIAM: semua QR ter-generate
+        // & tervalidasi normal, tapi signature-nya bisa dihitung siapa saja
+        // yang tahu rumusnya. Tolak boot di production daripada biarkan itu
+        // lolos ke produksi tanpa ada yang sadar (docs/plan/qr-code/
+        // rancangan-qr-pelanggan-final.md §3.3).
+        if (app()->isProduction() && blank(config('qr.secret'))) {
+            throw new \RuntimeException('QR_HMAC_SECRET wajib diisi di production — generate dengan `openssl rand -base64 32`.');
+        }
+
+        // Akses UI dokumentasi Scramble (/docs/api) di luar env local — bebas
+        // di local, tapi di production/staging cuma staf full-access
+        // (Owner/Admin) yang boleh buka. Bukan gerbang permission granular
+        // (RBAC matrix) karena ini dokumentasi teknis, bukan fitur bisnis —
+        // tanpa Gate ini RestrictedDocsAccess default-nya 403 SEMUA orang di
+        // luar local (dedoc/scramble), dokumen jadi gak bisa diakses staf pun.
+        Gate::define('viewApiDocs', fn ($user) => $user->hasFullAccess());
+
         // Centralized invoice/payment guards — applies to every insert path
         // (controllers, artisan commands, future API), not just one controller.
         Invoice::observe(InvoiceObserver::class);
@@ -65,6 +87,12 @@ class AppServiceProvider extends ServiceProvider
         // verifikasi pelanggan sama tanpa saling tahu (docs/plan/analisa-
         // realtime-spa-operasional.md §2.1 no. 10).
         Customer::observe(CustomerObserver::class);
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md,
+        // Fase 1) — invariant "maksimal satu token aktif per pelanggan"
+        // ditegakkan di Observer, bukan cuma Service, supaya jalur artisan/
+        // tinker/import ikut terkunci.
+        CustomerQrToken::observe(CustomerQrTokenObserver::class);
 
         // Fase 5.2 — isi kolom nyata notifications.notification_type dari data['type']
         // saat notifikasi dibuat, dari SEMUA jalur (Notification::send, dsb),
@@ -100,31 +128,136 @@ class AppServiceProvider extends ServiceProvider
             return "<?php echo \App\Helpers\FormatHelper::datetime($expression); ?>";
         });
 
-        // Force HTTPS jika diakses via proxy (seperti ngrok)
-        if (request()->server('HTTP_X_FORWARDED_PROTO') == 'https' || app()->environment('production')) {
+        // Skema HTTPS untuk URL yang dibuat DI LUAR konteks request — queue job,
+        // artisan command, notifikasi, tautan di email/Telegram. Di dalam request,
+        // skema sudah benar sendiri lewat trusted proxies (bootstrap/app.php) yang
+        // membaca X-Forwarded-Proto dari nginx / Cloudflare Tunnel, jadi JANGAN
+        // tambahkan lagi deteksi header di sini: versi lama memaksa https untuk
+        // SEMUA request begitu APP_ENV=production — termasuk akses langsung
+        // http://ip:8000 tanpa tunnel, yang lalu menghasilkan tautan https ke port
+        // yang tidak melayani TLS.
+        //
+        // Dipakai bareng APP_URL berskema https. Nilainya dibaca dari config,
+        // bukan env() langsung, supaya tetap benar setelah `config:cache`.
+        if (config('app.force_https')) {
             URL::forceScheme('https');
         }
 
-        // Register Gates from permissions
-        try {
-            if (app()->runningInConsole() === false || app()->runningUnitTests()) {
-                $permissions = Permission::all();
-                foreach ($permissions as $permission) {
-                    if ($permission->code) {
-                        Gate::define($permission->code, function ($user) use ($permission) {
-                            return $user->hasPermission($permission->code);
-                        });
-                    }
-                    if ($permission->name) {
-                        Gate::define($permission->name, function ($user) use ($permission) {
-                            return $user->hasPermission($permission->name);
-                        });
-                    }
-                }
+        // Ability berbentuk kode permission (`feature.action`, SELALU ber-titik
+        // — lihat CLAUDE.md § RBAC) didelegasikan langsung ke
+        // User::hasPermission(). Dulu di sini ada loop `Permission::all()` yang
+        // bikin Gate::define() satu-satu per baris permission SEKALI saat app
+        // boot — dua masalah nyata:
+        // 1. Permission yang baru di-seed SETELAH boot (mis. lewat
+        //    `$this->seed()` di tengah test, app cuma di-boot sekali di awal
+        //    test) gak pernah punya Gate ability terdaftar → `@can(...)`
+        //    selalu false walau `hasPermission()` langsung sudah true persis
+        //    saat itu. Di request produksi beneran gak kelihatan (tiap
+        //    request = boot baru = query ulang), tapi bikin test flaky/salah
+        //    tanpa ada bug produksi.
+        // 2. Query `Permission::all()` di SETIAP boot, padahal gak pernah
+        //    dipakai buat apa pun selain daftar nama ability.
+        //
+        // GERBANG WAJIB: cuma ability yang mengandung '.' yang diperiksa di
+        // sini. Ability Policy (mis. `TaskPolicy::cancel`/`cancelViaFopTask`,
+        // dipanggil `Gate::allows('cancel', $task)`) SELALU kata tunggal tanpa
+        // titik — kalau ability apa pun diperiksa di sini, `Gate::before()`
+        // global ini short-circuit SEBELUM `TaskPolicy::before()` dapat giliran,
+        // dan wildcard '*' owner lolos nembus invarian SRV/PSB yang sengaja
+        // dikecualikan Policy-nya (regresi nyata, ketauan dari
+        // `FopTaskCancelCascadeAuthTest::test_owner_wildcard_cannot_bypass_survey_invariant`).
+        // Ability berbasis `permission->name` (label manusia) TIDAK pernah
+        // dipakai di satu pun `@can()`/`can()` di codebase ini (diverifikasi
+        // grep) — sengaja dilepas, bukan kelalaian.
+        Gate::before(function ($user, string $ability) {
+            if (! str_contains($ability, '.')) {
+                return null;
             }
-        } catch (\Exception $e) {
-            // Skip if table doesn't exist yet
-        }
+
+            return $user->hasPermission($ability) ? true : null;
+        });
+
+        // API Baru — Topologi Jaringan & Konfirmasi Assignment
+        // (docs/api/api-pop-distribusi/, rencana-implementasi.md §"Keputusan
+        // resmi" #4). Endpoint #1 baca-saja, referensi jarang berubah →
+        // limiter longgar per token. Endpoint #2 nulis identitas pelanggan →
+        // jauh lebih ketat, di-key per token+IP (bukan token doang) supaya
+        // satu integrator yang IP-nya berganti-ganti tidak berbagi kuota
+        // dengan pemanggil lain yang kebetulan pegang token sama.
+        RateLimiter::for('pop-distribusi-read', function (Request $request) {
+            return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
+        });
+
+        RateLimiter::for('network-assignment-write', function (Request $request) {
+            return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
+        });
+
+        // Limiter TERPISAH dari network-assignment-write meski dua endpoint
+        // berbagi token tulis yang sama — dua bucket independen supaya
+        // rentetan gagal di satu endpoint gak ikut ngabisin kuota endpoint
+        // yang lain (keputusan.md §19).
+        RateLimiter::for('network-device-write', function (Request $request) {
+            return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
+        });
+
+        // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 0). Tiga
+        // limiter beda kelas risiko — pola RateLimiter::for-nya sama seperti
+        // tiga di atas, bukan pola baru di repo.
+        RateLimiter::for('customer-portal-api', function (Request $request) {
+            // Lokal (dev): limiter DIMATIKAN — tes manual berulang-ulang dari
+            // Portal Next.js gak keblokir 429 gara-gara reload/testing.
+            // Staging/production TETAP kena limit normal, gak pernah kebawa
+            // (app()->environment() baca APP_ENV, bukan flag yang bisa lupa
+            // dicabut manual).
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(120)->by($request->bearerToken() ?? $request->ip());
+        });
+
+        // Jauh lebih ketat dari customer-portal-api — endpoint kredensial
+        // (login/claim/ganti password, Fase 2) TIDAK BOLEH pakai limiter data
+        // biasa: 120 req/menit di situ setara brute-force yang diizinkan
+        // (business-logic.md §6.6.3). Belum diattach ke route nyata sampai
+        // Fase 2 — didaftarkan sekarang supaya namanya siap dipakai.
+        RateLimiter::for('customer-portal-auth', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinutes(15, 5)->by($request->ip().'|'.$request->input('login_id'));
+        });
+
+        // Limiter KEDUA, murni per-IP tanpa login_id — menutup penyapuan
+        // banyak login_id dari satu IP yang tidak pernah menyentuh limiter
+        // di atas (keputusan.md §1: limiter keyed login_id+IP saja ditolak,
+        // "memberi ember baru untuk tiap login ID").
+        RateLimiter::for('customer-portal-auth-ip', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinutes(15, 30)->by($request->ip());
+        });
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+        // §10 Fase 1) — endpoint publik TANPA auth, jadi limiter per-IP
+        // adalah satu-satunya penjaga sebelum request sampai ke query DB.
+        // Baseline longgar (60/menit) karena satu HP bisa scan berkali-kali
+        // wajar (staf bolak-balik antar pelanggan); limiter PIN yang jauh
+        // lebih ketat menyusul di Fase 2 (§10), terpisah dari yang ini.
+        RateLimiter::for('qr-public', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(60)->by($request->ip());
+        });
+
+        // qr-billing-verify DICABUT 2026-08-27 bareng QrBillingController
+        // (gerbang tagihan internal digantikan redirect ke Portal) — jangan
+        // dihidupkan lagi tanpa controller yang makainya.
 
         // View Composer for Sidebar Badges
         View::composer('layouts.app', function ($view) {

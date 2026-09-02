@@ -218,6 +218,14 @@ class FopTaskDeleteRestrictionTest extends TestCase
 
     // ── UI: tombol Hapus disembunyikan/disable, tombol Detail Task ada ──
 
+    /**
+     * Yang dicek: form Hapus-nya tidak dirender — BUKAN sekadar URL-nya tidak muncul.
+     * `fop-tasks.destroy` dan `fop-tasks.update` berbagi URI yang sama (beda verb:
+     * DELETE vs PUT), dan sejak ADHOC-20 langkah 3 tombol Edit ikut merender URL
+     * update itu di markup (target PUT harus datang dari server, bukan dirakit di
+     * JS). Jadi assertDontSee(route('fop-tasks.destroy')) sekarang salah sasaran:
+     * ia akan gagal karena tombol EDIT, bukan karena tombol Hapus.
+     */
     public function test_table_disables_delete_button_for_survey_and_hides_form(): void
     {
         $fopTask = $this->makeSurveyTask();
@@ -225,7 +233,10 @@ class FopTaskDeleteRestrictionTest extends TestCase
         $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'));
 
         $response->assertOk();
-        $response->assertDontSee(route('fop-tasks.destroy', $fopTask), false);
+        $response->assertDontSee('Apakah Anda yakin ingin menghapus Task FOP ini?', false);
+        $response->assertDontSee('name="_method" value="DELETE"', false);
+        // URL update TETAP boleh (dan harus) ada — itu tombol Edit.
+        $response->assertSee(route('fop-tasks.update', $fopTask), false);
     }
 
     public function test_table_disables_delete_button_for_ticket_origin_task(): void
@@ -250,7 +261,10 @@ class FopTaskDeleteRestrictionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('batalkan lewat Cancel', false);
-        $response->assertDontSee(route('fop-tasks.destroy', $ticket->fop_task_id), false);
+        // Lihat catatan di test Survey di atas: destroy & update berbagi URI, jadi
+        // yang dicek adalah markup form Hapus-nya, bukan URL-nya.
+        $response->assertDontSee('Apakah Anda yakin ingin menghapus Task FOP ini?', false);
+        $response->assertDontSee('name="_method" value="DELETE"', false);
     }
 
     public function test_table_shows_detail_task_link(): void

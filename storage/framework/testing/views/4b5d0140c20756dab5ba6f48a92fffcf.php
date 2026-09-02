@@ -192,29 +192,27 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     Dokumen & Foto
                 </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <?php if($customer->foto_ktp): ?>
-                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto KTP</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_ktp)); ?>" alt="KTP" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_ktp)); ?>', 'Foto KTP')">
-                    </div>
-                    <?php endif; ?>
-                    <?php if($customer->foto_rumah): ?>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <?php
+                        $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                        $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                    ?>
+                    <?php if($fotoRumahUrl): ?>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_rumah)); ?>" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_rumah)); ?>', 'Foto Rumah')">
+                        <img src="<?php echo e($fotoRumahUrl); ?>" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($fotoRumahUrl); ?>', 'Foto Rumah')">
                     </div>
                     <?php endif; ?>
-                    <?php if($customer->foto_kontrak): ?>
+                    <?php if($fotoKontrakUrl): ?>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Kontrak</span>
-                        <img src="<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $customer->foto_kontrak)); ?>', 'Foto Kontrak')">
+                        <img src="<?php echo e($fotoKontrakUrl); ?>" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($fotoKontrakUrl); ?>', 'Foto Kontrak')">
                     </div>
                     <?php endif; ?>
-                    <?php if(!$customer->foto_ktp && !$customer->foto_rumah && !$customer->foto_kontrak): ?>
-                    <div class="col-span-3 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
+                    <?php if(!$fotoRumahUrl && !$fotoKontrakUrl): ?>
+                    <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
                         <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi.</p>
+                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi, atau berkas tidak tersedia di penyimpanan.</p>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -303,8 +301,9 @@
                         <span class="block text-sm font-mono font-bold text-text-main"><?php echo e($survey->cable_estimation_meter ?? '-'); ?> Meter</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Kebutuhan FOP / Tiang</span>
-                        <span class="block text-sm text-text-main"><?php echo e($survey->fop_id ?? '-'); ?></span>
+                        
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">FOP Penanggung Jawab</span>
+                        <span class="block text-sm text-text-main"><?php echo e($survey->fop->name ?? '-'); ?></span>
                     </div>
                     <?php if($survey->requested_installation_date): ?>
                     <div>
@@ -312,11 +311,13 @@
                         <span class="block text-sm font-mono font-bold text-text-main"><?php echo e(\App\Support\IndonesianDate::date($survey->requested_installation_date)); ?></span>
                     </div>
                     <?php endif; ?>
+                    <?php if($survey->required_tools): ?>
                     <div class="md:col-span-3">
                         
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alat Khusus / Kendala Peralatan</span>
-                        <p class="text-sm text-text-secondary whitespace-pre-wrap"><?php echo e($survey->required_tools ?? '-'); ?></p>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Kendala Peralatan</span>
+                        <p class="text-sm text-text-secondary whitespace-pre-wrap"><?php echo e($survey->required_tools); ?></p>
                     </div>
+                    <?php endif; ?>
                     <?php if($survey->survey_note): ?>
                     <div class="md:col-span-3 pt-4 border-t border-border mt-2">
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Surveyor</span>
@@ -326,24 +327,41 @@
                 </div>
             </div>
 
+            <?php echo $__env->make('verifications.partials.materials', [
+                'title' => 'Estimasi Material Hasil Survey',
+                'emptyText' => 'Surveyor tidak mencatat estimasi material.',
+                'rows' => $surveyMaterials,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            <?php echo $__env->make('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dicatat Surveyor',
+                'rows' => $surveyWorkTools,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
+            <?php
+                $surveyPhotoUrl = foto_publik($survey->survey_photo);
+                $surveyHousePhotoUrl = foto_publik($survey->house_photo);
+            ?>
+            <?php if($surveyPhotoUrl || $surveyHousePhotoUrl): ?>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <?php if($survey->survey_photo): ?>
+                <?php if($surveyPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Lokasi / Survey</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="<?php echo e(asset('storage/' . $survey->survey_photo)); ?>" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $survey->survey_photo)); ?>', 'Foto Survey')">
+                        <img src="<?php echo e($surveyPhotoUrl); ?>" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($surveyPhotoUrl); ?>', 'Foto Survey')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($survey->house_photo): ?>
+                <?php if($surveyHousePhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Rumah</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="<?php echo e(asset('storage/' . $survey->house_photo)); ?>" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $survey->house_photo)); ?>', 'Foto Rumah')">
+                        <img src="<?php echo e($surveyHousePhotoUrl); ?>" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('<?php echo e($surveyHousePhotoUrl); ?>', 'Foto Rumah')">
                     </div>
                 </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <?php if($isWaitingAccStage): ?>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.validate')): ?>
@@ -466,7 +484,6 @@
                                 ['label' => 'Password PPPoE', 'value' => $device->pppoe_password ?? '-', 'mono' => true],
                                 ['label' => 'SSID WiFi', 'value' => $device->wifi_ssid ?? ($techDetail->ssid ?? '-')],
                                 ['label' => 'Password WiFi', 'value' => $device->wifi_password ?? '-'],
-                                ['label' => 'IP Address', 'value' => $device->ip_address ?? '-', 'mono' => true],
                             ];
                         ?>
                         <?php $__currentLoopData = $deviceFields; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $field): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -481,6 +498,12 @@
                     </div>
                 </div>
             </div>
+
+            <?php echo $__env->make('verifications.partials.materials', [
+                'title' => 'Material Terpakai Saat Pemasangan',
+                'emptyText' => 'Tim pemasangan tidak mencatat material terpakai.',
+                'rows' => $installationMaterials,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
             
             
@@ -520,6 +543,11 @@
             </div>
             <?php endif; ?>
 
+            <?php echo $__env->make('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'rows' => $installationWorkTools,
+            ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
             
             <div class="mb-6">
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -555,41 +583,48 @@
 
             
             <?php if($installation): ?>
+            <?php
+                $installationPhotoUrl = foto_publik($installation->installation_photo);
+                $contractPhotoUrl = foto_publik($installation->contract_photo);
+                $signaturePhotoUrl = foto_publik($installation->signature_photo);
+            ?>
+            <?php if($installationPhotoUrl || $contractPhotoUrl || $signaturePhotoUrl): ?>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <?php if($installation->installation_photo): ?>
+                <?php if($installationPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Pemasangan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->installation_photo)); ?>" 
+                        <img src="<?php echo e($installationPhotoUrl); ?>" 
                              alt="Foto Pemasangan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->installation_photo)); ?>', 'Foto Pemasangan')">
+                             onclick="openPhotoLightbox('<?php echo e($installationPhotoUrl); ?>', 'Foto Pemasangan')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($installation->contract_photo): ?>
+                <?php if($contractPhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Kontrak</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->contract_photo)); ?>" 
+                        <img src="<?php echo e($contractPhotoUrl); ?>" 
                              alt="Foto Kontrak" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->contract_photo)); ?>', 'Foto Kontrak')">
+                             onclick="openPhotoLightbox('<?php echo e($contractPhotoUrl); ?>', 'Foto Kontrak')">
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if($installation->signature_photo): ?>
+                <?php if($signaturePhotoUrl): ?>
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto TTD Pelanggan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="<?php echo e(asset('storage/' . $installation->signature_photo)); ?>" 
+                        <img src="<?php echo e($signaturePhotoUrl); ?>" 
                              alt="Foto TTD Pelanggan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $installation->signature_photo)); ?>', 'Foto TTD Pelanggan')">
+                             onclick="openPhotoLightbox('<?php echo e($signaturePhotoUrl); ?>', 'Foto TTD Pelanggan')">
                     </div>
                 </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -688,14 +723,14 @@
             </div>
 
             
-            <?php if($techDetail->speedtest_photo): ?>
+            <?php if($speedtestPhotoUrl = foto_publik($techDetail->speedtest_photo)): ?>
             <div>
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Hasil Speedtest</h4>
                 <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 inline-block">
-                    <img src="<?php echo e(asset('storage/' . $techDetail->speedtest_photo)); ?>"
+                    <img src="<?php echo e($speedtestPhotoUrl); ?>"
                          alt="Foto Speedtest"
                          class="max-h-64 max-w-full rounded-lg object-contain border border-border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                         onclick="openPhotoLightbox('<?php echo e(asset('storage/' . $techDetail->speedtest_photo)); ?>', 'Foto Speedtest')">
+                         onclick="openPhotoLightbox('<?php echo e($speedtestPhotoUrl); ?>', 'Foto Speedtest')">
                 </div>
             </div>
             <?php endif; ?>
@@ -792,9 +827,9 @@
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         
-                                        <input type="number" step="0.01" name="extra_installation_fee" id="fv_extra_installation_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            value="<?php echo e(old('extra_installation_fee', $customer->internetPackage->installation_fee ?? 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
+                                            value="<?php echo e(old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0))); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
                                 </div>
                                 <div>
@@ -802,7 +837,7 @@
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         
-                                        <input type="number" step="0.01" name="other_fee" id="fv_other_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="other_fee" id="fv_other_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('other_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -811,7 +846,7 @@
                                     <label for="extra_cable_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">KABEL TAMBAHAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_cable_fee" id="fv_extra_cable_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_cable_fee" id="fv_extra_cable_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('extra_cable_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -820,7 +855,7 @@
                                     <label for="extra_pole_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">TAMBAHAN TIANG</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_pole_fee" id="fv_extra_pole_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_pole_fee" id="fv_extra_pole_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="<?php echo e(old('extra_pole_fee', 0)); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -832,7 +867,7 @@
                                 <div class="relative">
                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                     
-                                    <input type="number" step="0.01" min="0" name="prorate_amount_override" id="fv_prorate_amount"
+                                    <input type="text" inputmode="decimal" data-rupiah name="prorate_amount_override" id="fv_prorate_amount"
                                         class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                         value="<?php echo e(old('prorate_amount_override', '')); ?>" oninput="onProrateManualEdit()">
                                 </div>
@@ -1094,10 +1129,19 @@
         const discount = parseFloat(params.discount) || 0;
         const ppnRate = parseFloat(params.ppn) || 0;
 
-        const instFee = parseFloat(document.getElementById('fv_extra_installation_fee').value) || 0;
-        const cableFee = parseFloat(document.getElementById('fv_extra_cable_fee').value) || 0;
-        const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
-        const otherFee = parseFloat(document.getElementById('fv_other_fee').value) || 0;
+        // Kolom rupiah bermasking ribuan (data-rupiah): parseFloat('150.000')
+        // = 150, dan seluruh pratinjau kwitansi ikut salah. `params.*` di atas
+        // TIDAK dimasking — itu data-* dari server, bukan ketikan admin.
+        const angkaRupiah = (id) => {
+            const el = document.getElementById(id);
+
+            return (el && window.Rupiah ? window.Rupiah.angka(el.value) : parseFloat(el?.value)) || 0;
+        };
+
+        const instFee = angkaRupiah('fv_extra_installation_fee');
+        const cableFee = angkaRupiah('fv_extra_cable_fee');
+        const poleFee = angkaRupiah('fv_extra_pole_fee');
+        const otherFee = angkaRupiah('fv_other_fee');
 
         // Calculate Prorate (auto). Nilai final dipakai kwitansi diambil dari
         // input fv_prorate_amount — auto-filled di sini kecuali admin sudah
@@ -1174,9 +1218,12 @@
 
         // Auto-fill field prorata kecuali admin sudah edit manual (dirty).
         if (!prorateInput.dataset.dirty) {
-            prorateInput.value = autoProrateAmount;
+            // Ikut format ribuan supaya sama dengan kolom rupiah lain di form.
+            prorateInput.value = window.Rupiah
+                ? window.Rupiah.format(String(autoProrateAmount))
+                : autoProrateAmount;
         }
-        const prorateAmount = parseFloat(prorateInput.value) || 0;
+        const prorateAmount = angkaRupiah('fv_prorate_amount');
 
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di
@@ -1238,6 +1285,9 @@
                         { text: 'Batal', type: 'secondary' },
                         { text: 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
                             window.Dialog.close();
+                            // Submit programatik melewati listener `submit`
+                            // global — kolom biaya bermasking dibersihkan di sini.
+                            window.Rupiah?.normalisasiForm(verifyForm);
                             verifyForm.submit();
                         }}
                     ]

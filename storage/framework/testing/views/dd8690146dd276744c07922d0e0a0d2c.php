@@ -1,6 +1,6 @@
 <?php $__env->startSection('title', 'Detail Pembayaran ' . $payment->payment_number . ' - Whusnet Operasional'); ?>
 <?php $__env->startSection('page_title', 'Detail Pembayaran'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pembayaran'); ?>
+<?php $__env->startSection('breadcrumb_parent', 'Riwayat Transaksi Pembayaran'); ?>
 <?php $__env->startSection('breadcrumb_parent_url', route('payments.index')); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -15,6 +15,14 @@
 
 <style>
     @media print {
+        /*
+         * Header/footer bawaan browser (tanggal, judul dokumen, URL
+         * localhost:8000/...) dicetak di KOTAK MARGIN halaman, di luar
+         * jangkauan selector mana pun. margin:0 menghapus kotaknya sekalian.
+         * Jarak ke tepi kertas ditanggung `.print-only.p-8` — jangan ikut
+         * dinolkan.
+         */
+        @page { margin: 0; }
         .no-print, header, aside, #sidebar-backdrop, #toastContainer, .modal-backdrop, nav, footer { display: none !important; }
         .print-only { display: block !important; }
         .screen-only { display: none !important; }
@@ -27,105 +35,184 @@
 </style>
 
 <!-- PRINT ONLY A4 KWITANSI PEMBAYARAN SHEET -->
-<div class="print-only p-8 bg-white text-slate-900 font-sans text-xs leading-normal">
-    <!-- Header Struk -->
-    <div class="flex justify-between items-start border-b pb-4 mb-4 border-slate-300">
-        <div>
-            <h1 class="text-xl font-black tracking-tight text-slate-900">WHUSNET OPERASIONAL</h1>
-            <p class="text-xs text-slate-600 font-medium">ISP Service Provider • POP <?php echo e($payment->pop->name ?? 'Kantor Pusat'); ?></p>
-            <p class="text-[10px] text-slate-500 mt-0.5">Sistem Billing & Operasional Terpadu</p>
-        </div>
+
+<div class="print-only px-16 py-12 bg-white text-zinc-900 font-sans text-[13px] leading-relaxed">
+
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-8">
+        <h1 class="text-[26px] font-bold text-zinc-900">Kwitansi</h1>
         <div class="text-right">
-            <h2 class="text-base font-bold text-slate-900 uppercase tracking-wide">KWITANSI PEMBAYARAN RESMI</h2>
-            <p class="font-mono text-xs font-bold text-slate-800">No: <?php echo e($payment->payment_number); ?></p>
-            <p class="text-xs text-slate-600 mt-0.5">Status: <span class="font-bold uppercase text-emerald-700">● <?php echo e($payment->payment_status->label()); ?></span></p>
-            <?php if($installmentContext): ?>
-                <p class="text-[11px] text-slate-600 font-medium mt-0.5"><?php echo e($installmentContext['settles'] ? 'Melunasi Tagihan' : 'Cicilan Ke-'.$installmentContext['number']); ?></p>
-            <?php endif; ?>
+            <p class="text-sm font-bold uppercase tracking-wide text-zinc-900">Whusnet</p>
+            <p class="text-[11px] text-zinc-500">Internet Service Provider</p>
         </div>
     </div>
 
-    <!-- Info Pelanggan & Transaksi Grid -->
-    <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">DITERIMA DARI PELANGGAN</p>
-            <p class="font-bold text-sm text-slate-900"><?php echo e($payment->customer->full_name ?? '-'); ?></p>
-            <p class="font-mono text-xs text-slate-700">CID: <?php echo e($payment->customer->cid ?? $payment->customer->customer_code ?? '-'); ?></p>
-            <p class="text-slate-600 font-mono">No. HP: <?php echo e($payment->customer->primary_phone ?? $payment->customer->phone ?? '-'); ?></p>
-            <p class="text-slate-600 mt-1">Alamat: <?php echo e($payment->customer->address ?? '-'); ?></p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-right space-y-1">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">RINCIAN TRANSAKSI</p>
-            <p><span class="text-slate-500">Tanggal Bayar:</span> <span class="font-semibold"><?php echo e(optional($payment->payment_date)->format('d/m/Y')); ?></span></p>
-            <p><span class="text-slate-500">Metode Bayar:</span> <span class="font-semibold uppercase font-mono"><?php echo e(strtoupper($payment->payment_method)); ?></span></p>
-            <p><span class="text-slate-500">Kolektor/Kasir:</span> <span class="font-semibold"><?php echo e($payment->collector ? $payment->collector->name : 'Direct (Kasir POP ' . ($payment->pop->name ?? '-') . ')'); ?></span></p>
-            <p><span class="text-slate-500">Ref Invoice:</span> <span class="font-mono font-bold text-slate-800"><?php echo e($payment->invoice->invoice_number ?? '-'); ?></span></p>
-        </div>
-    </div>
+    <!-- Meta -->
+    <table class="mb-7">
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">No. Kwitansi</td>
+            <td class="py-0.5"><?php echo e($kwitansi['nomor']); ?></td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Bayar</td>
+            <td class="py-0.5"><?php echo e($kwitansi['tanggal_bayar']); ?></td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Tanggal Ditagih</td>
+            <td class="py-0.5"><?php echo e($kwitansi['tanggal_ditagih']); ?></td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Metode</td>
+            <td class="py-0.5"><?php echo e($kwitansi['metode']); ?></td>
+        </tr>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Status</td>
+            
+            <td class="py-0.5 font-semibold <?php echo e($kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700'); ?>">● <?php echo e($kwitansi['status']); ?></td>
+        </tr>
+        <?php if($kwitansi['keterangan_cicilan']): ?>
+            <tr>
+                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Keterangan</td>
+                <td class="py-0.5"><?php echo e($kwitansi['keterangan_cicilan']); ?></td>
+            </tr>
+        <?php endif; ?>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Area</td>
+            <td class="py-0.5"><?php echo e($kwitansi['pop']); ?></td>
+        </tr>
+    </table>
 
-    <!-- Tabel Rincian -->
-    <table class="w-full text-left border-collapse text-xs mb-6">
+    <!-- Pihak -->
+    <table class="w-full mb-7">
+        <tr>
+            <td class="w-1/2 align-top pr-6">
+                <p class="font-bold mb-1">Diterbitkan oleh</p>
+                <p class="font-bold">Whusnet Internet Service Provider</p>
+                <p>Grand Viola Townhouse No.3 Purbosuman</p>
+                <p>Kab. Ponorogo</p>
+            </td>
+            <td class="w-1/2 align-top">
+                <p class="font-bold mb-1">Ditagihkan kepada</p>
+                <p class="font-bold"><?php echo e($kwitansi['pelanggan']['nama']); ?></p>
+                <p>CID <?php echo e($kwitansi['pelanggan']['cid']); ?></p>
+                <?php $__currentLoopData = $kwitansi['pelanggan']['alamat_baris']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $baris): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <p><?php echo e($baris); ?></p>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                <p><?php echo e($kwitansi['pelanggan']['hp']); ?></p>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Ringkasan -->
+    <p class="text-[17px] font-bold mb-5"><?php echo e($kwitansi['dibayar']); ?> dibayar pada <?php echo e($kwitansi['tanggal_bayar']); ?></p>
+
+    <table class="w-full border-collapse">
         <thead>
-            <tr class="border-y border-slate-300 bg-slate-100 text-slate-700 uppercase font-semibold text-[10px]">
-                <th class="py-2.5 px-3">Deskripsi Pembayaran</th>
-                <th class="py-2.5 px-3 text-center">Metode</th>
-                <th class="py-2.5 px-3 text-right">Nominal Diterima</th>
+            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                <th class="text-left pb-2">Deskripsi</th>
+                <th class="text-right pb-2">Kuantitas</th>
+                <th class="text-right pb-2">Harga Satuan</th>
+                <th class="text-right pb-2">Jumlah</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-slate-200 font-medium">
-            <tr>
-                <td class="py-3 px-3">
-                    <p class="font-bold text-slate-900">Pelunasan Invoice Internet <?php echo e($payment->invoice->internetPackage->name ?? 'Layanan ISP'); ?></p>
-                    <p class="text-[11px] text-slate-500">No. Invoice: <?php echo e($payment->invoice->invoice_number ?? '-'); ?> • Periode <?php echo e($payment->invoice->billing_period ?? '-'); ?></p>
+        <tbody>
+            <tr class="border-b border-zinc-100">
+                <td class="py-3 align-top">
+                    
+                    <p><?php echo e($kwitansi['keterangan_cicilan'] ?: 'Pembayaran'); ?> — Internet <?php echo e($kwitansi['invoice']['paket']); ?></p>
+                    <?php if($kwitansi['invoice']['ada']): ?>
+                        <p class="text-[11px] text-zinc-500 mt-0.5">No. Tagihan <?php echo e($kwitansi['invoice']['nomor']); ?> · Periode <?php echo e($kwitansi['invoice']['periode']); ?></p>
+                    <?php endif; ?>
                 </td>
-                <td class="py-3 px-3 text-center font-mono uppercase"><?php echo e($payment->payment_method); ?></td>
-                <td class="py-3 px-3 text-right font-mono font-bold">Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?></td>
+                <td class="py-3 text-right align-top">1</td>
+                <td class="py-3 text-right align-top"><?php echo e($kwitansi['invoice']['ada'] ? $kwitansi['invoice']['total'] : $kwitansi['dibayar']); ?></td>
+                <td class="py-3 text-right align-top"><?php echo e($kwitansi['dibayar']); ?></td>
             </tr>
-            <?php if((float) $payment->overpay_amount > 0): ?>
-            <tr>
-                <td class="py-3 px-3" colspan="2">
-                    <p class="text-slate-600 font-medium">Catatan Lebih Bayar (Deposit / Overpay Pelanggan)</p>
-                </td>
-                <td class="py-3 px-3 text-right font-mono font-bold text-sky-700">Rp <?php echo e(number_format((float) $payment->overpay_amount, 0, ',', '.')); ?></td>
+            <?php if($kwitansi['lebih_bayar']): ?>
+            <tr class="border-b border-zinc-100">
+                <td class="py-3 align-top text-zinc-500" colspan="3">Lebih Bayar (Deposit / Overpay Pelanggan)</td>
+                <td class="py-3 text-right align-top text-sky-700 font-semibold"><?php echo e($kwitansi['lebih_bayar']); ?></td>
             </tr>
             <?php endif; ?>
         </tbody>
     </table>
 
-    <!-- Total Breakdown -->
-    <div class="flex justify-between items-start gap-6 text-xs border-t pt-4 border-slate-300">
-        <div class="space-y-1.5 max-w-xs">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">KETERANGAN & CATATAN</p>
-            <p class="text-[11px] text-slate-600 italic">"<?php echo e($payment->note ?: 'Tagihan Bulanan. Struk ini adalah bukti pembayaran sah yang dikeluarkan oleh sistem billing WHUSNET.'); ?>"</p>
-            <p class="text-[10px] text-slate-400 mt-4">Dicetak otomatis pada: <?php echo e(now()->format('d/m/Y H:i')); ?> WIB</p>
-        </div>
+    <table class="w-full mb-8">
+        <?php if($kwitansi['invoice']['ada']): ?>
+            <tr>
+                <td class="py-1 text-zinc-500">Total Tagihan</td>
+                <td class="py-1 text-right"><?php echo e($kwitansi['invoice']['total']); ?></td>
+            </tr>
+        <?php endif; ?>
+        <tr class="font-bold border-t border-zinc-300 <?php echo e($kwitansi['status_valid'] ? 'text-emerald-700' : 'text-rose-700'); ?>">
+            <td class="py-1 pt-2">Dibayar</td>
+            <td class="py-1 pt-2 text-right"><?php echo e($kwitansi['dibayar']); ?></td>
+        </tr>
+        <?php if($kwitansi['invoice']['ada']): ?>
+            <tr>
+                <td class="py-1 text-zinc-500">Sisa Tagihan</td>
+                <td class="py-1 text-right font-semibold <?php echo e($kwitansi['invoice']['lunas'] ? 'text-emerald-700' : 'text-rose-700'); ?>">
+                    <?php echo e($kwitansi['invoice']['sisa']); ?> <?php echo e($kwitansi['invoice']['lunas'] ? '(Lunas)' : ''); ?>
 
-        <div class="w-64 space-y-1.5 text-xs text-right">
-            <?php if($payment->invoice): ?>
-            <div class="flex justify-between text-slate-600">
-                <span>Total Tagihan Invoice</span>
-                <span class="font-mono font-semibold">Rp <?php echo e(number_format((float) $payment->invoice->total_amount, 0, ',', '.')); ?></span>
-            </div>
-            <?php endif; ?>
-            <div class="flex justify-between text-emerald-700 font-bold text-sm pt-1.5 border-t border-slate-300">
-                <span>JUMLAH DIBAYAR</span>
-                <span class="font-mono">Rp <?php echo e(number_format((float) $payment->amount, 0, ',', '.')); ?></span>
-            </div>
-            <?php if($payment->invoice): ?>
-            <div class="flex justify-between text-slate-600">
-                <span>Sisa Tagihan</span>
-                <span class="font-mono font-bold <?php echo e((float)$payment->invoice->remaining_amount > 0 ? 'text-rose-600' : 'text-emerald-600'); ?>">
-                    Rp <?php echo e(number_format((float) $payment->invoice->remaining_amount, 0, ',', '.')); ?> <?php echo e((float)$payment->invoice->remaining_amount == 0 ? '(Lunas)' : ''); ?>
+                </td>
+            </tr>
+        <?php endif; ?>
+    </table>
 
-                </span>
-            </div>
+    <!-- Informasi Penagihan (internal, staf saja) -->
+    <p class="text-[15px] font-bold mb-3">Informasi Penagihan</p>
+
+    <table class="w-full mb-8">
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Diterima oleh</td>
+            <td class="py-0.5"><?php echo e($kwitansi['penerima']); ?></td>
+        </tr>
+        <?php if($kwitansi['penagih']): ?>
+            <tr>
+                <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Kolektor/Penagih</td>
+                <td class="py-0.5"><?php echo e($kwitansi['penagih']); ?></td>
+            </tr>
+        <?php endif; ?>
+        <tr>
+            <td class="font-bold pr-4 whitespace-nowrap align-top py-0.5">Catatan</td>
+            
+            <?php if($kwitansi['catatan']): ?>
+                <td class="py-0.5 italic">"<?php echo e($kwitansi['catatan']); ?>"</td>
+            <?php else: ?>
+                <td class="py-0.5 italic text-zinc-400">Tanpa catatan.</td>
             <?php endif; ?>
-            <div class="pt-6">
-                <span class="text-[10px] text-slate-500 block">Diterima oleh Kasir / Admin:</span>
-                <span class="font-bold text-slate-900 block text-xs"><?php echo e($payment->receiver->name ?? 'System'); ?></span>
-            </div>
-        </div>
-    </div>
+        </tr>
+    </table>
+
+    <!-- Riwayat Pembayaran -->
+    <p class="text-[15px] font-bold mb-3">Riwayat Pembayaran</p>
+
+    <table class="w-full border-collapse mb-8">
+        <thead>
+            <tr class="border-b border-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                <th class="text-left pb-2">Metode Pembayaran</th>
+                <th class="text-left pb-2">Tanggal</th>
+                <th class="text-right pb-2">Jumlah Dibayar</th>
+                <th class="text-right pb-2">No. Kwitansi</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="py-2.5"><?php echo e($kwitansi['metode']); ?></td>
+                <td class="py-2.5"><?php echo e($kwitansi['tanggal_bayar']); ?></td>
+                <td class="py-2.5 text-right"><?php echo e($kwitansi['dibayar']); ?></td>
+                <td class="py-2.5 text-right"><?php echo e($kwitansi['nomor']); ?></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Footer -->
+    <p class="text-[11px] text-zinc-500 border-t border-zinc-200 pt-4">
+        Kwitansi sah tanpa tanda tangan. Simpan sebagai bukti pembayaran.<br>
+        Dicetak: <?php echo e($kwitansi['dicetak']); ?>
+
+    </p>
+
 </div>
 
 <!-- SCREEN ONLY ENTERPRISE VIEW -->

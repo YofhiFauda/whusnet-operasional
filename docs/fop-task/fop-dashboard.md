@@ -28,10 +28,22 @@ Data yang disiapkan (POP-scoped via `EffectiveAccessService` — user tanpa akse
    - `overdue_installation` — customer nunggu instalasi yang Task survey-nya `completed_at + 3 hari < now()`
 3. **`$teknisiList`** — semua user role `teknisi` (scoped POP), status `aktif`/`terjadwal`/`standby` + lokasi (alamat customer) kalau lagi ada Task in-progress.
 4. **`$activeTeams`** — legacy, **gak dipakai di blade** (dikonfirmasi lewat riset kode, lihat [analisa-sync-execution-task.md](analisa-sync-execution-task.md#3-logika-tombol--masukkan-ke-team--simptom-dari-bug-1-bukan-bug-terpisah)). Task yang punya >1 anggota tim (`teamMembers`), terjadwal/in-progress hari ini, dikelompokkan sebagai "Tim Gabungan" dengan nama diparsing dari prefix `[...]` di judul Task — variabel ini masih dihitung tapi gak pernah dirender, jadi harus diabaikan sebagai sumber kebenaran soal Team (pakai poin 5 di bawah).
-5. **`$activeFopTeams`** — sumber data Team yang BENERAN ditampilkan. Semua `FopTaskTeam` yang `isActive()` (POP-scoped), tiap team bawa list `FopTask` + status (fallback ke status Task eksekusi kalau ada) + progress percent + avatar inisial anggota. Sejak Task 1/2, ini query LANGSUNG ke DB tiap load — otomatis reflect hasil auto-team rebuild & switch teknisi tanpa cache/delay (dikonfirmasi lewat test, lihat [analisa-sync-execution-task.md](analisa-sync-execution-task.md)).
+5. **`$activeFopTeams`** — sumber data Team yang BENERAN ditampilkan. `FopTaskTeam` yang `isActive()` (POP-scoped), tiap team bawa list `FopTask` + status (fallback ke status Task eksekusi kalau ada) + progress percent + avatar inisial anggota. Sejak Task 1/2, ini query LANGSUNG ke DB tiap load — otomatis reflect hasil auto-team rebuild & switch teknisi tanpa cache/delay (dikonfirmasi lewat test, lihat [analisa-sync-execution-task.md](analisa-sync-execution-task.md)).
+
+   **Jendela tanggal (diperbaiki 2026-08-13).** Perbaikan 2026-07-22 memangkas papan jadi `work_date` = **hari ini saja** untuk membunuh query 300+ team per refresh (versi lama memuat SEMUA team beserta anaknya lalu memfilter di PHP). Itu kebablasan: tim yang sudah dijadwalkan di `/fop-tasks` **lenyap dari papan begitu ganti hari**, padahal task-nya masih hidup dan teknisinya masih melihatnya (`TaskController::index()` punya cabang overdue, papan tidak).
+
+   Aturan sekarang:
+   - `work_date` = hari ini → **selalu** tampil;
+   - `work_date` lampau → tampil **selama masih punya task aktif** (bukan `selesai`/`dibatalkan`), disaring di SQL lewat `whereHas` sehingga tim yang sudah rampung tidak ikut dimuat sama sekali — beban query yang dulu jadi alasan pembatasan tidak kembali;
+   - dibatasi `BOARD_MAX_PAST_DAYS` = **30 hari** ke belakang supaya papan tidak pelan-pelan berubah jadi arsip; lebih tua dari itu hanya lewat `/fop-tasks`;
+   - diurut `work_date` menaik — tanggal terlama di atas, karena tim yang harinya sudah lewat lebih perlu ditangani duluan.
+
+   Kartu tim sudah menampilkan `work_date`-nya sendiri, jadi tim dari tanggal lampau terbaca apa adanya tanpa perlu penanda tambahan.
+
+   Penjaga: `FopDashboardPastTeamsTest` (6 test).
 6. **`$pops`** — daftar POP untuk filter (opsional).
 
-Return: `view('fop.dashboard', compact('surveyQueue','stats','teknisiList','activeTeams','activeFopTeams','pops'))`.
+> Catatan: `fop:reset-cancelled-tasks` **sudah dihapus** (2026-08-13). Dulu ia mengubah task `dibatalkan` jadi `in_progress` tiap 00:01 tanpa memberi `task_date` baru — yang akan menjadikannya penghuni tetap papan sebagai tim lampau, di samping menghapus keputusan pembatalan tanpa jejak di riwayat tiket. **Pembatalan Task FOP bersifat final**; penundaan sehari lewat Pending atau ubah tanggal. Lihat `docs/RUNBOOK_COMMANDS.md` dan ADHOC-34 di `docs/TASKS.md`.
 
 ## View: `resources/views/fop/dashboard.blade.php`
 

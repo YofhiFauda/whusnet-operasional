@@ -10,10 +10,13 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerStatusLog;
 use App\Models\Task;
+use App\Services\CustomerPortal\PortalAuthService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use RuntimeException;
 
 class CustomerWorkflowService
 {
@@ -108,11 +111,60 @@ class CustomerWorkflowService
                             'updated_by' => Auth::id() ?? 1,
                         ]);
                     }
+
+                    // FopTask lahir bareng antreannya, bukan menunggu papan
+                    // /fop-tasks dibuka. Dia anchor wajib buat task_materials &
+                    // task_work_tools — kalau belum ada saat teknisi mengisi
+                    // laporan, estimasi material dan checklist alat dibuang senyap.
+                    app(FopTaskProvisioningService::class)->ensureForCustomer(
+                        $customer,
+                        TaskType::from($taskType)
+                    );
                 }
 
                 // S8.8-T005: Trigger notifikasi ke pelanggan setelah status Active
                 if ($nextStatus->value === 'active') {
                     SendCustomerActivationNotification::dispatch($customer, Auth::id());
+                }
+
+                // QR + PIN pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+                // §7.2, Fase 2) — titik penerbitan resmi: begitu pelanggan
+                // masuk WAITING_INSTALLATION, admin cetak stiker+kartu lalu
+                // teknisi bawa ke lokasi. issue() sendiri IDEMPOTEN (§7.2
+                // "sudah punya token aktif? BERHENTI, pakai yang lama"),
+                // tapi PIN TIDAK — issuePin() SELALU menghasilkan PIN baru.
+                // Makanya PIN cuma diterbitkan kalau issue() BENAR-BENAR
+                // membuat token baru (wasRecentlyCreated) — instalasi yang
+                // diulang (WorkflowTransition.php:37-40) tidak boleh
+                // menerbitkan PIN kedua yang mematikan kartu lama.
+                if ($nextStatus->value === 'waiting_installation') {
+                    try {
+                        $qrTokens = app(CustomerQrTokenService::class);
+                        $token = $qrTokens->issue($customer, Auth::user());
+
+                        if ($token->wasRecentlyCreated) {
+                            $qrTokens->issuePin($token, Auth::user());
+                        }
+
+                        // Kartu yang bakal dicetak dari sini punya login_id +
+                        // PIN — akun `customer_portal_accounts` (pending_claim)
+                        // WAJIB sudah ada di titik yang sama, kalau tidak
+                        // `/auth/claim` gagal 401 generik begitu pelanggan
+                        // coba pakai kartunya (gejala nyata 2026-08-27, akun
+                        // portal sebelumnya HANYA lahir lewat command backfill
+                        // manual — lihat docblock `PortalAuthService::ensureAccountExists()`).
+                        app(PortalAuthService::class)->ensureAccountExists($customer);
+                    } catch (RuntimeException $e) {
+                        // customer_code/pop_id belum lengkap saat transisi ini
+                        // seharusnya jarang (keduanya wajib sejak registrasi),
+                        // tapi kegagalannya TIDAK BOLEH menggagalkan transisi
+                        // workflow inti. Admin bisa terbitkan manual belakangan
+                        // dari halaman QR pelanggan begitu datanya lengkap.
+                        Log::warning('QR/PIN auto-issue gagal saat WAITING_INSTALLATION', [
+                            'customer_id' => $customer->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
 

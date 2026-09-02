@@ -134,6 +134,13 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Skip Survey saat Registrasi — Sales input data survey langsung,
+        // pelanggan lompat ke antrean ACC Admin. Sempit & terpisah dari
+        // customers.create biasa (lihat ActionCode::SKIP_SURVEY).
+        'customers.registration' => [
+            ActionCode::SKIP_SURVEY->value,
+        ],
+
         'customers.detail.identity' => [
             ActionCode::VIEW->value,
             ActionCode::UPDATE->value,
@@ -179,6 +186,53 @@ return [
             ActionCode::DELETE->value,
         ],
 
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md
+        // §5, §10 Fase 1). `cancel` = "cabut token", bukan `manage` — bukan
+        // ActionCode yang valid di repo ini.
+        'customers.qr' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::CANCEL->value,
+            ActionCode::PRINT->value,
+        ],
+
+        // Absen teknisi via QR (Fase 3) — diseed sekarang biar matrix role
+        // sudah siap dipakai begitu Fase 3 mulai, TANPA route/enforcement
+        // aktif apa pun di Fase 1 ini. `attendance` bukan action code yang
+        // valid — pakai `create` (§5).
+        'tasks.qr_attendance' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Dashboard anomali scan QR (Fase 2/3) — permission diseed sekarang,
+        // halamannya sendiri belum dibangun di Fase 1.
+        'qr_scan_logs' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Scan QR Internal (staf) — 2026-08-27, resources/js/qr-scan.js.
+        // Cuma `.view` (buka halaman + pakai kamera) — bukan aksi CRUD.
+        'qr_scan' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Create tiket via QR → Portal (2026-08-29, docs/plan/qr-code/
+        // analisa-unifikasi-qr-staff-portal.md §1.4). TERPISAH dari
+        // `tickets.create` dashboard — channel Portal pakai token one-shot,
+        // risikonya beda. Role ber-`tickets.*` (helpdesk/noc/fop) sudah
+        // lolos otomatis lewat feature wildcard, tidak perlu baris tambahan.
+        'tickets.qr' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Catat pembayaran via QR → Portal (2026-08-29). TERPISAH dari
+        // `kolektor.pay` dashboard, sama alasan seperti `tickets.qr` di
+        // atas. Role `kolektor` TIDAK punya wildcard `kolektor.*` (sengaja),
+        // jadi permission ini wajib ditambah eksplisit di RolePermissionSeeder.
+        'kolektor.qr' => [
+            ActionCode::PAY->value,
+        ],
+
         'invoices' => [
             ActionCode::VIEW->value,
             ActionCode::CREATE->value,
@@ -197,11 +251,72 @@ return [
             ActionCode::REJECT->value,
         ],
 
-        // Worklist read-only kolektor (docs/plan/analisa-billing-tagihan-
-        // pembayaran-kolektor.md §B-8 no. 5) — permission sendiri, cuma VIEW.
-        // Kolektor TIDAK diberi payments.create sama sekali (§B-8 no. 4).
+        // Worklist Kolektor — halaman kerja kolektor sendiri.
+        //
+        // VIEW: baca pelanggan yang ter-assign ke dirinya (bukan
+        // `customers.view` penuh).
+        // PAY: mencatat pembayaran dari worklist-nya sendiri. Kolektor TETAP
+        // TIDAK diberi `payments.create` — itu kewenangan bayar invoice mana
+        // pun; `kolektor.pay` cuma invoice pelanggan miliknya, lewat rute yang
+        // memaksa `collector_id = auth()->id()`.
+        //
+        // Merevisi §B-8 no. 4 dokumen lama ("kolektor tak boleh input
+        // pembayaran") — lihat docs/plan/kolektor/analisa-alur-kolektor-2.0.md §8.
         'kolektor' => [
             ActionCode::VIEW->value,
+            ActionCode::PAY->value,
+            // Menyetorkan hasil tagihan ke admin (Fase 2). Terpisah dari PAY
+            // supaya hak memegang kas bisa dicabut tanpa mencabut hak menagih.
+            ActionCode::DEPOSIT->value,
+            // Mencatat kunjungan tanpa hasil (Fase 3). Diberikan bersama VIEW —
+            // mencabutnya berarti mematikan satu-satunya kontrol anti-fraud
+            // modul ini, jadi jangan dilepas tanpa alasan kuat.
+            ActionCode::VISIT->value,
+        ],
+
+        // Worksheet Admin — halaman admin untuk mengelola kolektor: daftar
+        // kolektor, assign/lepas pelanggan, dan (Fase 2) cross check setoran.
+        // Feature SENDIRI, bukan numpang `customers.update`/`payments.create`:
+        // halaman ini punya audiens & kewenangan yang beda dari dua-duanya,
+        // dan harus bisa dimatikan per-role tanpa mencabut hak edit pelanggan
+        // atau hak bayar di halaman Tagihan.
+        //
+        // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §9, §14.1.
+        'collector_worksheet' => [
+            ActionCode::VIEW->value,
+            ActionCode::ASSIGN->value,
+            // Cross check & tutup setoran. Pakai VALIDATE yang sudah ada —
+            // konsisten dengan `payments.validate`; jangan bikin action
+            // `verify` baru yang artinya sama persis.
+            ActionCode::VALIDATE->value,
+            // Hapus buku selisih = titik kerugian diakui. Permission SENDIRI,
+            // sengaja TIDAK diberikan ke `admin` di RolePermissionSeeder —
+            // admin yang memverifikasi tak boleh sekaligus menutup kerugian
+            // yang dia temukan sendiri. Owner lolos lewat wildcard `*`.
+            ActionCode::APPROVE->value,
+            // Kwitansi (Fase 4). Cetak & upload dipisah dari VALIDATE karena
+            // ini sumbu DOKUMEN, bukan sumbu kas: staf yang mengurus arsip
+            // kwitansi tak otomatis berwenang menutup setoran, dan sebaliknya.
+            ActionCode::PRINT->value,
+            ActionCode::UPLOAD->value,
+        ],
+
+        // Setoran Kas Admin — uang kolektor yang sudah diverifikasi + tunai
+        // yang diterima di loket, diteruskan ke owner/bank.
+        // docs/plan/kolektor/analisa-setoran-kas-admin.md §4.5.
+        'cash_deposit' => [
+            ActionCode::VIEW->value,
+            // Menyetorkan saldo kas sendiri. Terpisah dari VIEW supaya hak
+            // memegang kas bisa dicabut tanpa mencabut hak membaca posisinya.
+            ActionCode::CREATE->value,
+            // Memeriksa & menutup setoran kas orang lain — Owner & atasan.
+            // Pakai VALIDATE yang sudah ada, konsisten dengan
+            // `collector_worksheet.validate`.
+            ActionCode::VALIDATE->value,
+            // Menutup selisih kas (kerugian ATAU kelebihan diakui). Permission
+            // sendiri, sengaja TIDAK diberikan bersama VALIDATE — pemeriksa
+            // tak boleh sekaligus menutup selisih yang dia temukan sendiri.
+            ActionCode::APPROVE->value,
         ],
 
         'reports' => [
@@ -357,6 +472,60 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fitur yang DIKECUALIKAN dari auto-grant `view`
+    |--------------------------------------------------------------------------
+    |
+    | RoleManagementService::syncPermissions() otomatis ikut mencentang
+    | `{feature}.view` setiap kali ada permission anak yang dicentang —
+    | masuk akal untuk hampir semua fitur: percuma memberi hak "ubah" tanpa
+    | hak "lihat" halamannya.
+    |
+    | Tidak berlaku di sini. Pada `cash_deposit`, `view` BUKAN "halaman yang
+    | sama tapi baca saja": ia pandangan PEMERIKSA — posisi kas admin mana pun
+    | dalam scope, antrean pemeriksaan, dan rincian sumber sampai nama
+    | pelanggan. Admin cukup `create` (menyetor + riwayat sendiri di Worksheet
+    | Admin). Tanpa pengecualian ini, mencentang "Setor" diam-diam memberi
+    | admin pandangan yang justru sengaja dipisahkan darinya.
+    |
+    | docs/plan/kolektor/analisa-setoran-kas-admin.md §10.
+    */
+    'view_autogrant_exempt' => [
+        'cash_deposit',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Batas Rantai Auto-Grant `view` — Channel QR/Portal Independen
+    |--------------------------------------------------------------------------
+    |
+    | Sub-fitur `*.qr` (`customers.qr`, `tickets.qr`, `kolektor.qr`) SECARA
+    | SENGAJA cuma menumpang struktur tree Fitur biar rapi di menu Role
+    | Matrix — bukan tab navigasi dashboard Operasional. Aksesnya datang
+    | dari alur scan QR / Portal Pelanggan (lihat QrScanController,
+    | StaffPortalTokenService), 100% terpisah dari halaman `tickets.view`
+    | atau `kolektor.view` di Operasional.
+    |
+    | Tanpa daftar ini, RoleManagementService::syncPermissions() tetap NAIK
+    | ke fitur induk (`tickets`, `kolektor`, `customers`) dan diam-diam ikut
+    | mencentang `.view` DASHBOARD OPERASIONAL induknya begitu permission
+    | `.qr` dicentang — mencampur dua channel akses yang harus independen.
+    | Contoh nyata: role Kolektor SEHARUSNYA bisa dapat `tickets.qr.create`
+    | (buat bikin tiket lewat QR) tanpa terpaksa ikut dapat `tickets.view`
+    | (akses penuh dashboard Ticketing Operasional).
+    |
+    | Beda dengan `view_autogrant_exempt` di atas — itu cuma melewati fitur
+    | ITU SENDIRI lalu tetap naik ke induknya. Daftar ini menghentikan
+    | rantai TOTAL begitu ketemu kode fiturnya: tidak menambah `.view`
+    | fitur ini MAUPUN fitur induk mana pun di atasnya.
+    */
+    'view_autogrant_chain_boundary' => [
+        'customers.qr',
+        'tickets.qr',
+        'kolektor.qr',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Permission Name Overrides (Label Kontekstual)
     |--------------------------------------------------------------------------
     |
@@ -380,6 +549,18 @@ return [
         'customers.detail.view' => 'Lihat Detail Pelanggan',
         'customers.terminated.view' => 'Lihat List Pelanggan Putus',
         'customers.failed.view' => 'Lihat List Pelanggan Gagal',
+        'customers.registration.skip_survey' => 'Skip Survey saat Registrasi (Input Data Survey Langsung)',
+
+        // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md)
+        'customers.qr.view' => 'Lihat Status Token QR Pelanggan',
+        'customers.qr.create' => 'Terbitkan Token QR Pelanggan',
+        'customers.qr.cancel' => 'Cabut Token QR Pelanggan',
+        'customers.qr.print' => 'Cetak Stiker QR Pelanggan',
+        'tasks.qr_attendance.create' => 'Absen Task via Scan QR (Fase 3)',
+        'qr_scan_logs.view' => 'Lihat Dashboard Anomali Scan QR',
+        // Scan QR internal (2026-08-27) — kamera DI DALAM app ini, bukan
+        // app scanner luar (lihat resources/js/qr-scan.js kenapa).
+        'qr_scan.view' => 'Buka Halaman Scan QR Internal (Staf)',
 
         // Modul Ticketing — tiap halaman punya permission sendiri, jadi
         // labelnya harus nyebut NAMA HALAMAN-nya biar di Role Matrix kelihatan
@@ -396,5 +577,23 @@ return [
         'noc_worksheet.masuk.view' => '[Nonaktif] Tab Ticket Masuk — dilebur ke Worksheet NOC',
         'noc_worksheet.diproses.view' => '[Nonaktif] Tab Ticket Diproses — dilebur ke Worksheet NOC',
         'noc_dashboard.view' => 'Lihat Halaman Dashboard NOC',
+
+        // Modul Kolektor — dua halaman, dua audiens (analisa-alur-kolektor-2.0
+        // §9). Labelnya nyebut halamannya biar di Role Matrix kelihatan mana
+        // yang lagi di-toggle: halaman admin atau halaman kolektor.
+        'kolektor.view' => 'Lihat Worklist Kolektor (pelanggan sendiri)',
+        'kolektor.pay' => 'Catat Pembayaran dari Worklist Sendiri',
+        'kolektor.deposit' => 'Setor Hasil Tagihan ke Admin',
+        'kolektor.visit' => 'Catat Kunjungan Tanpa Hasil (tidak ada orang/menolak/janji)',
+        'collector_worksheet.view' => 'Akses Halaman Worksheet Admin (Kolektor)',
+        'collector_worksheet.assign' => 'Assign / Lepas Pelanggan ke Kolektor',
+        'collector_worksheet.validate' => 'Cross Check & Verifikasi Setoran Kolektor',
+        'collector_worksheet.approve' => 'Hapus Buku Selisih Setoran (kerugian diakui)',
+        'collector_worksheet.print' => 'Cetak Kwitansi Pembayaran (ber-QR)',
+        'collector_worksheet.upload' => 'Upload & Cocokkan Kwitansi',
+        'cash_deposit.view' => 'Akses Halaman Setoran Kas (Admin)',
+        'cash_deposit.create' => 'Menyetorkan Kas ke Owner / Bank',
+        'cash_deposit.validate' => 'Periksa & Tutup Setoran Kas Admin',
+        'cash_deposit.approve' => 'Tutup Selisih Setoran Kas (kerugian/kelebihan diakui)',
     ],
 ];

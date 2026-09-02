@@ -232,7 +232,7 @@ class InvoiceStatusUpdatedBroadcastTest extends TestCase
 
         Event::fake([InvoiceStatusUpdated::class]);
 
-        $response = $this->actingAs($admin)->postJson(route('collector-batch.store', $kolektor->id), [
+        $response = $this->actingAs($admin)->postJson(route('payment-batches.store', $kolektor->id), [
             'idempotency_key' => 'test-key-'.random_int(1000, 9999),
             'rows' => [[
                 'invoice_id' => $invoice->id,

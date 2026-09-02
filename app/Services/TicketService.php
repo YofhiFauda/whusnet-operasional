@@ -11,6 +11,7 @@ use App\Enums\TicketHandler;
 use App\Enums\TicketHandlingStatus;
 use App\Enums\TicketHistoryAction;
 use App\Events\TicketQueueUpdated;
+use App\Exceptions\DuplicateTicketException;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDevice;
@@ -48,11 +49,29 @@ class TicketService
      * @param  UploadedFile[]  $attachments
      * @param  array{technicians?: int[], task_date?: string|null}  $assignment  Cuma dihonor kalau $fopOrigin true
      * @param  bool  $fopOrigin  Submit langsung dari halaman Task FOP — lihat docblock kelas
+     * @param  bool  $enforceDuplicateGuard  Tolak (409-worthy `RuntimeException`) kalau pelanggan
+     *                                       masih punya tiket terbuka dan `$confirmedDuplicate`
+     *                                       false. Default OFF — dashboard `/tickets/create` TIDAK
+     *                                       berubah perilakunya. Diaktifkan cuma di endpoint QR →
+     *                                       Portal (docs/plan/qr-code/
+     *                                       analisa-unifikasi-qr-staff-portal.md §1.2) supaya staf
+     *                                       yang scan berulang gak numpuk tiket duplikat ke
+     *                                       Helpdesk — mengubah ini jadi default ON butuh review
+     *                                       terpisah (banyak test dashboard sengaja bikin >1 tiket
+     *                                       per pelanggan).
+     * @param  bool  $confirmedDuplicate  Staf sudah lihat tiket lama & tetap pilih bikin baru.
      * @return array{ticket: Ticket, conflicts: array}
      */
-    public function create(array $data, User $actor, array $attachments = [], array $assignment = [], bool $fopOrigin = false): array
-    {
-        $result = DB::transaction(function () use ($data, $actor, $attachments, $assignment, $fopOrigin) {
+    public function create(
+        array $data,
+        User $actor,
+        array $attachments = [],
+        array $assignment = [],
+        bool $fopOrigin = false,
+        bool $enforceDuplicateGuard = false,
+        bool $confirmedDuplicate = false,
+    ): array {
+        $result = DB::transaction(function () use ($data, $actor, $attachments, $assignment, $fopOrigin, $enforceDuplicateGuard, $confirmedDuplicate) {
             /** @var Customer $customer */
             $customer = Customer::query()
                 ->applyUserScope($actor)
@@ -72,6 +91,14 @@ class TicketService
                 throw ValidationException::withMessages([
                     'customer_id' => 'Pelanggan ini belum punya POP/Cabang — lengkapi dulu data pelanggannya sebelum buat tiket.',
                 ]);
+            }
+
+            if ($enforceDuplicateGuard && ! $confirmedDuplicate) {
+                $openTicket = $this->findOpenTicket($customer->id);
+
+                if ($openTicket) {
+                    throw new DuplicateTicketException($openTicket);
+                }
             }
 
             $type = TaskType::from($data['type']);
@@ -585,18 +612,20 @@ class TicketService
     }
 
     /**
-     * Cuma field non-sensitif — SN/MAC/PPPoE sengaja gak ikut, itu dikunci
-     * permission customers.detail.devices.view_sensitive di modul Pelanggan.
+     * Identitas perangkat di tiket = SERIAL NUMBER (keputusan produk
+     * 2026-08-13). Teknisi lapangan mencocokkan alat dengan SN, bukan dengan
+     * merek/tipe — "ZTE F609" ada di ratusan rumah, SN cuma satu.
+     *
+     * KONSEKUENSI YANG DISADARI: SN termasuk field sensitif yang di modul
+     * Pelanggan dikunci `customers.detail.devices.view_sensitive`, sedangkan
+     * nilai ini dibekukan ke `tickets.customer_device` dan terbaca oleh SEMUA
+     * yang boleh membuka tiket (helpdesk/NOC/FOP). Jadi gate itu memang tidak
+     * berlaku di Ticketing. Jangan "perbaiki" dengan diam-diam mengembalikan
+     * brand/model — kalau kebijakan berubah, kembalikan utuh berikut gate-nya.
      */
     private function deviceSummary(?CustomerDevice $device): ?string
     {
-        if (! $device) {
-            return null;
-        }
-
-        $parts = array_filter([$device->brand, $device->model, $device->device_type]);
-
-        return $parts ? implode(' ', $parts) : null;
+        return $device?->serial_number ?: null;
     }
 
     /**
@@ -670,6 +699,34 @@ class TicketService
             'size' => $file->getSize(),
             'uploaded_by' => $actor->id,
         ]);
+    }
+
+    /**
+     * Tiket "terbuka" buat keperluan dedup (§1.2 dokumen di atas) —
+     * approksimasi `Ticket::holderRoles()`: selama `handler` BUKAN FOP,
+     * `status` kolom sendiri (TicketHandlingStatus) yang otoritatif. Begitu
+     * `handler` FOP, kolom `status` sudah tidak dipakai lagi buat bucket
+     * (lihat docblock `TicketHandlingStatus`) — jadi "terbuka" diturunkan
+     * dari status FopTask-nya (bukan `selesai`/`dibatalkan`).
+     */
+    private function findOpenTicket(int $customerId): ?Ticket
+    {
+        return Ticket::query()
+            ->where('customer_id', $customerId)
+            ->where(function ($query) {
+                $query->where(function ($q) {
+                    $q->where('handler', '!=', TicketHandler::FOP->value)
+                        ->where('status', TicketHandlingStatus::OPEN->value);
+                })->orWhere(function ($q) {
+                    $q->where('handler', TicketHandler::FOP->value)
+                        ->whereHas('fopTask', fn ($f) => $f->whereNotIn('status', [
+                            TaskStatus::SELESAI->value,
+                            TaskStatus::DIBATALKAN->value,
+                        ]));
+                });
+            })
+            ->latest('id')
+            ->first();
     }
 
     private function generateTicketNumber(): string

@@ -72,7 +72,6 @@ class CustomerDeviceTest extends TestCase
                 'pppoe_password' => 'secret-pppoe',
                 'wifi_ssid' => 'WHUSNET-001',
                 'wifi_password' => 'secret-wifi',
-                'ip_address' => '192.168.1.10',
                 'vlan_id' => 100,
                 'odp' => 'ODP-DEV-01',
                 'odp_port' => '1',
@@ -136,7 +135,6 @@ class CustomerDeviceTest extends TestCase
             'pppoe_password' => 'router-secret',
             'wifi_ssid' => 'WHUSNET-ROUTER',
             'wifi_password' => 'wifi-secret',
-            'ip_address' => '10.10.10.2',
             'vlan_id' => 200,
             'odp' => 'ODP-DEV-02',
             'odp_port' => '2',
@@ -193,7 +191,6 @@ class CustomerDeviceTest extends TestCase
             'pppoe_password' => 'hidden-pppoe',
             'wifi_ssid' => 'WHUSNET-CS',
             'wifi_password' => 'hidden-wifi',
-            'ip_address' => '192.168.100.1',
             'connection_mode' => 'bridge',
         ]);
 
@@ -223,7 +220,6 @@ class CustomerDeviceTest extends TestCase
             'old_request_id' => 'RQ000716',
             'connection_type' => 'KABEL',
             'router_or_ont_serial' => 'ZICG10237307',
-            'ip_address' => 'SMN_RQ000716@PurnamaAyuLestari',
             'odp_number' => '236 sandia',
             'odp_port' => '6 sandia',
             'olt_port' => 'Olt sandia',
@@ -239,12 +235,11 @@ class CustomerDeviceTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Data Perangkat Migrasi');
         $response->assertSee('ZICG10237307');
-        $response->assertSee('SMN_RQ000716@PurnamaAyuLestari');
         $response->assertSee('Data ini tampil dari detail teknis migrasi karena tabel perangkat pelanggan belum terisi.');
         $response->assertDontSee('Belum ada data perangkat');
     }
 
-    public function test_invalid_mac_and_ip_are_rejected(): void
+    public function test_invalid_mac_is_rejected(): void
     {
         $pop = $this->createPop('DEV5');
         $technician = $this->createUserWithRole('Teknisi');
@@ -255,11 +250,10 @@ class CustomerDeviceTest extends TestCase
             ->post(route('customers.device.store', $customer->id), [
                 'device_type' => 'ont',
                 'mac_address' => 'invalid-mac',
-                'ip_address' => '999.999.999.999',
             ]);
 
         $response->assertStatus(302);
-        $response->assertSessionHasErrors(['mac_address', 'ip_address']);
+        $response->assertSessionHasErrors(['mac_address']);
         $this->assertDatabaseMissing('customer_devices', [
             'customer_id' => $customer->id,
         ]);

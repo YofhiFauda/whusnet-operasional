@@ -24,10 +24,31 @@ class MigrateLegacyDataCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'app:import-legacy-sql 
-                        {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql} 
-                        {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)} 
-                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}';
+
+    /**
+     * JIKA INGIN MIGRASI TANPA BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --without-billing
+     *
+     * JIKA INGIN MIGRASI DENGAN BILING LAMA
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman
+     *
+     *
+     * JIKA POP DAN MINI POP SUDAH DISI MAKA LAKUKAN COMMAND INI AGAR POP DAN MINI POP TIDAK TEMBAK DEFAULT
+     * docker compose exec app php artisan app:import-legacy-sql sand_db_sandya.sql --no-interaction
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --no-interaction
+     *
+     * JIKA NOMOR kategori_perangkat_jaringan LEGACY BEDA DENGAN NOMOR MINI POP
+     * SUNGGUHAN DI CABANG TUJUAN (mis. dump ini semuanya kategori=1 tapi
+     * secara fisik harus jadi Mini POP D6, bukan D1 — karena D1..D5 sudah
+     * dipakai OLT lain di Cabang D yang sama):
+     * php artisan app:import-legacy-sql sand_db_sandya.sql --branch-code=D --branch-name=Siman --mini-pop-map=1:6
+     *  */
+    protected $signature = 'app:import-legacy-sql
+                        {file? : The path to the legacy sql dump. Default: sand_db_sandya.sql}
+                        {--branch-code= : Tentukan Kode Cabang POP target (contoh: C, D)}
+                        {--branch-name= : Tentukan Nama Cabang POP target (contoh: Jetis, Siman)}
+                        {--without-billing : Impor pelanggan/layanan/data teknis saja, tanpa tagihan & pembayaran legacy}
+                        {--mini-pop-map= : Peta ulang nomor kategori_perangkat_jaringan LEGACY (khusus per-dump) ke segmen Mini POP SUNGGUHAN di Master POP, format "1:6,2:7". Wajib dipakai kalau dump berasal dari instalasi/cabang lama yang penomoran OLT-nya sendiri (mis. selalu mulai dari 1) tidak sama dengan penomoran Mini POP nyata di bawah Cabang tujuan (mis. dump ini semuanya harus jadi Mini POP D6, bukan D1). Kategori yang tidak disebut di peta ini tetap dipakai apa adanya.}';
 
     /**
      * The console command description.
@@ -213,6 +234,7 @@ class MigrateLegacyDataCommand extends Command
 
         $overrideCode = $this->option('branch-code');
         $overrideName = $this->option('branch-name');
+        $miniPopSegmentMap = $this->parseMiniPopSegmentMap($this->option('mini-pop-map'));
 
         // Create POPs from the legacy cabang table so this command can migrate
         // multiple branches from any dump with the same schema.
@@ -279,24 +301,45 @@ class MigrateLegacyDataCommand extends Command
             $legacyPop = $this->resolveLegacyPopForBranch($branchId, $legacyPopMap);
             $branchPop = $legacyPop['pop_model'];
             $miniSegment = $this->normalizeLegacyMiniPopSegment($row['kategori_perangkat_jaringan'] ?? null);
-            $miniPopCode = $legacyPop['pop_code'].$miniSegment;
+            // Nomor kategori_perangkat_jaringan legacy itu penomoran lokal
+            // punya instalasi lama sendiri (biasanya mulai dari "1"), BUKAN
+            // nomor Mini POP sungguhan di Master POP tujuan — dua cabang lama
+            // yang sama-sama nyimpen "1" bisa berarti dua OLT fisik yang beda
+            // sama sekali. --mini-pop-map memetakan nomor legacy itu ke
+            // segmen Mini POP asli SEBELUM dipakai bikin/cari Pop, supaya
+            // dump yang di-assign "1" tapi secara fisik itu Mini POP D6 gak
+            // malah bikin (atau nempel ke) "D1" yang salah.
+            if ($miniSegment !== null && isset($miniPopSegmentMap[$miniSegment])) {
+                $miniSegment = $miniPopSegmentMap[$miniSegment];
+            }
             $distributionCode = strtoupper(trim((string) ($row['kode_kontrol_distribusi'] ?? '')));
             if ($distributionCode === '0') {
                 $distributionCode = '';
             }
 
-            $miniPop = Pop::firstOrCreate(
-                ['pop_code' => $miniPopCode],
-                [
-                    'code' => $miniPopCode,
-                    'name' => $miniPopCode,
-                    'type' => 'mini_pop',
-                    'parent_id' => $branchPop?->id,
-                    'status' => 'active',
-                    'registration_prefix' => 'RQ',
-                    'cid_prefix' => $legacyPop['pop_code'],
-                ]
-            );
+            if ($miniSegment !== null) {
+                $miniPopCode = $legacyPop['pop_code'].$miniSegment;
+                $miniPop = Pop::firstOrCreate(
+                    ['pop_code' => $miniPopCode],
+                    [
+                        'code' => $miniPopCode,
+                        'name' => $miniPopCode,
+                        'type' => 'mini_pop',
+                        'parent_id' => $branchPop?->id,
+                        'status' => 'active',
+                        'registration_prefix' => 'RQ',
+                        'cid_prefix' => $legacyPop['pop_code'],
+                    ]
+                );
+            } else {
+                // kategori_perangkat_jaringan = 0/kosong → belum di-assign
+                // Mini POP manapun. JANGAN bikin Mini POP rekaan — customer
+                // (dan Distribution di bawah) nempel langsung ke POP cabang,
+                // konsisten dengan Pop::resolveMiniPopSegment() yang memang
+                // mendefinisikan default "0" sebagai "belum di-assign".
+                $miniPopCode = $legacyPop['pop_code'];
+                $miniPop = $branchPop;
+            }
 
             if ($distributionCode !== '' && $distributionCode !== '0') {
                 $meta = $distribusiMetaMap[$distributionCode] ?? [];
@@ -538,7 +581,11 @@ class MigrateLegacyDataCommand extends Command
 
             $legacyBranchId = trim((string) ($row['IDCABANG'] ?? ''));
             $legacyPop = $this->resolveLegacyPopForBranch($legacyBranchId, $legacyPopMap);
-            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? ($legacyPop['pop_code'].'1');
+            // Fallback SAMA seperti bug di atas: kalau customer ini gak
+            // kebagian baris di $legacyMiniPopByCustomer (mis. tidak ada
+            // baris layanan sama sekali), jangan asumsikan Mini POP "1" —
+            // pakai POP cabang apa adanya (berarti "belum di-assign").
+            $miniPopCode = $legacyMiniPopByCustomer[$row['IDPENGGUNA']] ?? $legacyPop['pop_code'];
 
             // customer_code is only required to be unique WITHIN a branch (cid_prefix
             // differs per cabang, so the full CID stays unique even if two different
@@ -600,7 +647,6 @@ class MigrateLegacyDataCommand extends Command
                 'city' => $row['KOTA'] ?? '',
                 'latitude' => $lat,
                 'longitude' => $lon,
-                'foto_ktp' => $row['FOTOKTP'] ?? '',
                 'foto_rumah' => $fotoRumah ?? '',
                 'foto_kontrak' => $fotoKontrak ?? '',
                 'sales_code' => $salesCode,
@@ -888,7 +934,6 @@ class MigrateLegacyDataCommand extends Command
                 'old_request_id' => $row['IDPERMINTAAN'] ?? '',
                 'connection_type' => $row['JENIS'] ?: 'KABEL',
                 'ont_sn' => $ontSn,
-                'ip_address' => $row['IPADDR'] ?? '',
                 'odp_code' => $row['NOMOR_ODP'] ?? '',
                 'odp_port' => $row['NOMOR_PORT_ODP'] ?? '',
                 'olt_code' => $oltCode,
@@ -1127,7 +1172,7 @@ class MigrateLegacyDataCommand extends Command
                     'invoice_type' => $type,
                     'billing_period' => $period,
                     'issue_date' => $issueDate,
-                    'due_date' => Carbon::parse($issueDate)->addDays(10)->format('Y-m-d'),
+                    'due_date' => $this->legacyDueDate($issueDate),
                     'total_amount' => $totalAmount,
                     'monthly_fee' => $isAwal ? null : $monthlyFee,
                     'extra_installation_fee' => $isAwal ? $installationFee : 0,
@@ -1331,13 +1376,32 @@ class MigrateLegacyDataCommand extends Command
             }
         }
 
+        // Riwayat tagihan legacy hanya menutup ~5% dari bulan-bulan yang benar-benar
+        // dilalui pelanggan: `biaya_tagihan` itu kontrak biaya per pemasangan (tanpa
+        // kolom periode), dan satu-satunya jejak per bulan (`apikeuangan_
+        // buktitransaksitagihan`) cuma berisi puluhan baris per bulan untuk ribuan
+        // pelanggan. Hasilnya riwayat yang bolong-bolong dan menyesatkan kalau dibaca
+        // sebagai tunggakan.
+        //
+        // Karena itu ada skenario go-live "pelanggan saja": tagihan berjalan
+        // diselesaikan manual di luar sistem, lalu sistem mulai bersih dari periode
+        // berikutnya lewat `billing:generate-monthly-invoices`. Harga langganan tetap
+        // ikut terimpor (`customer_services.monthly_price` dari `BIAYABULANAN`), jadi
+        // generator tetap punya dasar nominal. `activation_date` juga tidak bergantung
+        // pada sheet ini — sumbernya `prosedure_permintaan_wifi`/`riwayat_pelanggan`.
+        $withoutBilling = (bool) $this->option('without-billing');
+
+        if ($withoutBilling) {
+            $this->warn('--without-billing: '.count($invoicesSheet).' tagihan & '.count($paymentsSheet).' pembayaran legacy TIDAK diimpor.');
+        }
+
         $sheets = [
             'packages' => $packagesSheet,
             'customers' => $customersSheet,
             'services' => $servicesSheet,
             'technical_details' => $technicalSheet,
-            'invoices' => $invoicesSheet,
-            'payments' => $paymentsSheet,
+            'invoices' => $withoutBilling ? [] : $invoicesSheet,
+            'payments' => $withoutBilling ? [] : $paymentsSheet,
         ];
 
         // Ensure we are logged in as admin to have full access/audit logs
@@ -1523,6 +1587,32 @@ class MigrateLegacyDataCommand extends Command
         return $period.'-01';
     }
 
+    /**
+     * Jatuh tempo sebuah invoice legacy.
+     *
+     * Aturannya tanggal kalender tetap — tempo tanggal 10 — persis seperti
+     * GenerateMonthlyInvoicesCommand. Dulu di sini `addDays(10)`, sehingga
+     * seluruh tagihan bulanan hasil import jatuh tempo tanggal 11 sementara
+     * tagihan yang digenerate cron jatuh tempo tanggal 10: satu aturan bisnis,
+     * dua hasil, dan pelanggan yang sama bisa punya dua tanggal tempo berbeda
+     * cuma karena tagihannya berasal dari jalur yang berbeda.
+     *
+     * Invoice AWAL terbit di tanggal aktivasi, yang sering sudah lewat tanggal
+     * 10. Tempo tidak boleh mendahului terbit, jadi kasus itu digeser ke
+     * tanggal 10 bulan berikutnya.
+     */
+    private function legacyDueDate(string $issueDate): string
+    {
+        $issued = Carbon::parse($issueDate);
+        $due = $issued->copy()->day(10);
+
+        if ($due->lt($issued)) {
+            $due = $issued->copy()->addMonthNoOverflow()->day(10);
+        }
+
+        return $due->format('Y-m-d');
+    }
+
     private function resolveLegacyUserLabel(mixed $value, array $penggunaMap): string
     {
         $raw = trim((string) $value);
@@ -1671,13 +1761,23 @@ class MigrateLegacyDataCommand extends Command
         ];
     }
 
-    private function normalizeLegacyMiniPopSegment(mixed $value): string
+    /**
+     * `kategori_perangkat_jaringan` legacy: "0" = default/BELUM di-assign
+     * Mini POP manapun, "1"/"2"/dst = Mini POP asli nomor sekian (aturan
+     * bisnis dari pemilik produk, 2026-08-26). Kembalikan `null` untuk kasus
+     * "0"/kosong — JANGAN diubah jadi "1", itu bikin pelanggan yang belum
+     * di-assign malah nempel ke Mini POP 1 SUNGGUHAN (bug lama: CID
+     * `C0X4ARQ...` yang seharusnya "belum di-assign" berubah jadi
+     * ber-Mini-POP). Pemanggil yang memutuskan fallback ke POP cabang
+     * langsung saat hasilnya null — lihat pemakaian di bawah.
+     */
+    private function normalizeLegacyMiniPopSegment(mixed $value): ?string
     {
         $segment = strtoupper(trim((string) $value));
         $segment = preg_replace('/[^A-Z0-9]+/', '', $segment) ?: '';
 
         if ($segment === '' || $segment === '0') {
-            return '1';
+            return null;
         }
 
         $replaced = preg_replace('/^([A-Z]*)0+([1-9A-Z].*)?$/', '$1$2', $segment);
@@ -1686,10 +1786,55 @@ class MigrateLegacyDataCommand extends Command
         }
 
         if ($segment === '' || $segment === '0') {
-            return '1';
+            return null;
         }
 
         return $segment;
+    }
+
+    /**
+     * Parse `--mini-pop-map="1:6,2:7"` jadi `['1' => '6', '2' => '7']`.
+     * Kedua sisi dinormalisasi lewat aturan yang sama dengan
+     * `normalizeLegacyMiniPopSegment()` (uppercase, non-alnum dibuang) supaya
+     * key-nya konsisten dicocokkan ke hasil normalisasi kategori legacy.
+     * Pasangan yang tidak valid (tidak ada ":", atau salah satu sisi kosong)
+     * dilewati dengan warning, bukan bikin command gagal total.
+     *
+     * @return array<string, string>
+     */
+    private function parseMiniPopSegmentMap(?string $raw): array
+    {
+        $map = [];
+        if ($raw === null || trim($raw) === '') {
+            return $map;
+        }
+
+        foreach (explode(',', $raw) as $pair) {
+            $pair = trim($pair);
+            if ($pair === '') {
+                continue;
+            }
+
+            if (! str_contains($pair, ':')) {
+                $this->warn("--mini-pop-map: pasangan \"{$pair}\" diabaikan (format harus \"legacy:asli\", mis. \"1:6\").");
+
+                continue;
+            }
+
+            [$from, $to] = array_map('trim', explode(':', $pair, 2));
+            $fromKey = $this->normalizeLegacyMiniPopSegment($from);
+            $toKey = $this->normalizeLegacyMiniPopSegment($to);
+
+            if ($fromKey === null || $toKey === null) {
+                $this->warn("--mini-pop-map: pasangan \"{$pair}\" diabaikan (salah satu sisi kosong/nol setelah dinormalisasi).");
+
+                continue;
+            }
+
+            $map[$fromKey] = $toKey;
+        }
+
+        return $map;
     }
 
     private function normalizeLegacyPopCode(string $name, string $fallback = ''): string

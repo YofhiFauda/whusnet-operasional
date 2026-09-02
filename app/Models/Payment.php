@@ -6,6 +6,7 @@ use App\Enums\PaymentStatus;
 use App\Traits\HasPopScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +16,7 @@ class Payment extends Model
 
     protected $fillable = [
         'payment_number',
+        'idempotency_key',
         'old_payment_id',
         'old_transaction_id',
         'old_request_id',
@@ -23,11 +25,15 @@ class Payment extends Model
         'deposited_by_old',
         'invoice_id',
         'payment_batch_id',
+        'collector_deposit_id',
+        'cash_deposit_id',
         'customer_id',
         'pop_id',
         'payment_date',
         'collected_date',
         'payment_method',
+        'bank_name',
+        'account_number',
         'amount',
         'overpay_amount',
         'received_by',
@@ -110,6 +116,45 @@ class Payment extends Model
     }
 
     /**
+     * Setoran tempat payment ini sudah ikut diserahkan ke admin. `null` =
+     * uangnya masih di tangan kolektor — itulah definisi saldo kolektor
+     * (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §11.1).
+     *
+     * @return BelongsTo<CollectorDeposit, $this>
+     */
+    public function collectorDeposit(): BelongsTo
+    {
+        return $this->belongsTo(CollectorDeposit::class, 'collector_deposit_id');
+    }
+
+    /**
+     * Setoran kas admin yang menyerap pembayaran ini.
+     *
+     * Hanya terisi untuk pembayaran MANUAL di kantor (`collected_by` null).
+     * Pembayaran yang ditagih kolektor masuk kas lewat setoran kolektornya,
+     * bukan lewat kolom ini — menautkan keduanya membuat uang yang sama
+     * terhitung dua kali.
+     *
+     * @return BelongsTo<CashDeposit, $this>
+     */
+    public function cashDeposit(): BelongsTo
+    {
+        return $this->belongsTo(CashDeposit::class, 'cash_deposit_id');
+    }
+
+    /**
+     * Arsip kwitansi yang tercocokkan ke pembayaran ini. Sumbu DOKUMEN —
+     * ketiadaannya tidak berpengaruh apa pun pada status uang
+     * (docs/kolektor/business-logic.md § Kwitansi).
+     *
+     * @return HasMany<PaymentReceipt, $this>
+     */
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(PaymentReceipt::class);
+    }
+
+    /**
      * Get the customer associated with this payment.
      *
      * @return BelongsTo<Customer, $this>
@@ -150,6 +195,19 @@ class Payment extends Model
     public function collector(): BelongsTo
     {
         return $this->belongsTo(User::class, 'collected_by');
+    }
+
+    /**
+     * Baris ledger saldo pelanggan yang menyebut payment ini — sebagai
+     * SUMBER kredit (overpay) atau sebagai KONSUMEN debit (pemakaian
+     * saldo). Dua peran, satu kolom `payment_id`; dibedakan lewat `type`
+     * kalau perlu difilter salah satunya saja.
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function balanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
     }
 
     /**
@@ -279,6 +337,8 @@ class Payment extends Model
             'payment_date',
             'collected_date',
             'payment_method',
+            'bank_name',
+            'account_number',
             'amount',
             'overpay_amount',
             'received_by',

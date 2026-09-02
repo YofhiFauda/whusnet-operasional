@@ -26,13 +26,23 @@
         <env name="APP_FAKER_LOCALE" value="id_ID"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
+        <!--
+            force="true" WAJIB untuk semua koneksi yang keluar dari proses test.
+            Tanpa itu, env var level-OS dari docker-compose menang: `app` kini
+            menyetel QUEUE_CONNECTION=redis, sehingga test yang seharusnya
+            `sync` justru mendorong job ke Redis ASLI. Horizon lalu menjalankan
+            job berisi model yang di-serialize dengan koneksi `sqlite` test —
+            576 job gagal dengan SQLiteDatabaseDoesNotExistException sebelum ini
+            diperbaiki. Alasannya sama persis dengan catatan DB_* di
+            docker-compose.yml.
+        -->
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <env name="DB_CONNECTION" value="sqlite" force="true"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="DB_URL" value=""/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="VIEW_COMPILED_PATH" value="storage/framework/testing/views"/>
         <env name="PULSE_ENABLED" value="false"/>

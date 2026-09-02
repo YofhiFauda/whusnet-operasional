@@ -237,51 +237,14 @@
                         <p class="text-xs text-text-muted mt-1">Ubah lampiran dokumen pendukung pelanggan (opsional)</p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- Foto KTP -->
-                        <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
-                            <input type="hidden" name="delete_foto_ktp" id="delete_foto_ktp" value="0">
-                            <div id="default-placeholder-foto_ktp" class="text-center py-4 <?php if($customer->foto_ktp): ?> hidden <?php endif; ?>">
-                                <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M21 12h-6m6 4h-6" />
-                                </svg>
-                                <span class="block text-xs font-bold text-text-main mt-3">FOTO KTP</span>
-                                <span class="block text-[10px] text-text-muted mt-1">Format: JPG, PNG (Max 2MB)</span>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="preview-container-foto_ktp" class="<?php if(!$customer->foto_ktp): ?> hidden <?php endif; ?> text-center py-2 flex flex-col items-center justify-center">
-                                <div class="relative inline-block">
-                                    <img id="preview-img-foto_ktp" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="<?php echo e($customer->foto_ktp ? asset('storage/' . $customer->foto_ktp) : ''); ?>" alt="Preview Foto KTP">
-                                    <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
-                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <span class="block text-xs font-bold text-text-main mt-2">PREVIEW FOTO KTP</span>
-                            </div>
-
-                            <div class="mt-4">
-                                <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')" <?php if($customer->foto_ktp): ?> data-populated="true" <?php endif; ?>>
-                                <label for="foto_ktp" class="block w-full text-center bg-surface-muted border border-border hover:bg-surface-muted/80 text-text-secondary text-xs font-semibold py-2 px-3 rounded cursor-pointer transition-colors">
-                                    Pilih File
-                                </label>
-                                <span id="file-label-foto_ktp" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
-                                    <?php if($customer->foto_ktp): ?>
-                                        <?php echo e(basename($customer->foto_ktp)); ?>
-
-                                    <?php else: ?>
-                                        Belum ada file dipilih
-                                    <?php endif; ?>
-                                </span>
-                            </div>
-                        </div>
-
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Foto Rumah -->
                         <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
                             <input type="hidden" name="delete_foto_rumah" id="delete_foto_rumah" value="0">
-                            <div id="default-placeholder-foto_rumah" class="text-center py-4 <?php if($customer->foto_rumah): ?> hidden <?php endif; ?>">
+                            <?php
+                                $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                            ?>
+                            <div id="default-placeholder-foto_rumah" class="text-center py-4 <?php if($fotoRumahUrl): ?> hidden <?php endif; ?>">
                                 <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                                 </svg>
@@ -290,9 +253,9 @@
                             </div>
 
                             <!-- Preview Container -->
-                            <div id="preview-container-foto_rumah" class="<?php if(!$customer->foto_rumah): ?> hidden <?php endif; ?> text-center py-2 flex flex-col items-center justify-center">
+                            <div id="preview-container-foto_rumah" class="<?php if(!$fotoRumahUrl): ?> hidden <?php endif; ?> text-center py-2 flex flex-col items-center justify-center">
                                 <div class="relative inline-block">
-                                    <img id="preview-img-foto_rumah" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="<?php echo e($customer->foto_rumah ? asset('storage/' . $customer->foto_rumah) : ''); ?>" alt="Preview Foto Rumah">
+                                    <img id="preview-img-foto_rumah" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm" src="<?php echo e($fotoRumahUrl ?? ''); ?>" alt="Preview Foto Rumah">
                                     <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md hover:scale-105 transition-transform focus:outline-none" title="Hapus File">
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -309,8 +272,13 @@
                                 </label>
                                 <span id="file-label-foto_rumah" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
                                     <?php if($customer->foto_rumah): ?>
-                                        <?php echo e(basename($customer->foto_rumah)); ?>
+                                        <?php if($fotoRumahUrl): ?>
+                                            <?php echo e(basename($customer->foto_rumah)); ?>
 
+                                        <?php else: ?>
+                                            [Berkas Tidak Ditemukan] <?php echo e(basename($customer->foto_rumah)); ?>
+
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         Belum ada file dipilih
                                     <?php endif; ?>
@@ -321,7 +289,11 @@
                         <!-- Foto Kontrak -->
                         <div class="border border-border rounded-lg p-5 flex flex-col justify-between hover:border-primary/50 transition-colors shadow-sm relative">
                             <input type="hidden" name="delete_foto_kontrak" id="delete_foto_kontrak" value="0">
-                            <div id="default-placeholder-foto_kontrak" class="text-center py-4 <?php if($customer->foto_kontrak): ?> hidden <?php endif; ?>">
+                            <?php
+                                $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                                $isPdf = $customer->foto_kontrak && Str::endsWith(strtolower($customer->foto_kontrak), '.pdf');
+                            ?>
+                            <div id="default-placeholder-foto_kontrak" class="text-center py-4 <?php if($fotoKontrakUrl): ?> hidden <?php endif; ?>">
                                 <svg class="mx-auto h-10 w-10 text-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
@@ -330,12 +302,12 @@
                             </div>
 
                             <!-- Preview Container -->
-                            <div id="preview-container-foto_kontrak" class="<?php if(!$customer->foto_kontrak): ?> hidden <?php endif; ?> text-center py-2 flex flex-col items-center justify-center">
+                            <div id="preview-container-foto_kontrak" class="<?php if(!$fotoKontrakUrl): ?> hidden <?php endif; ?> text-center py-2 flex flex-col items-center justify-center">
                                 <div class="relative inline-block">
-                                    <img id="preview-img-foto_kontrak" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm <?php if($customer->foto_kontrak && Str::endsWith(strtolower($customer->foto_kontrak), '.pdf')): ?> hidden <?php endif; ?>" src="<?php echo e($customer->foto_kontrak && !Str::endsWith(strtolower($customer->foto_kontrak), '.pdf') ? asset('storage/' . $customer->foto_kontrak) : ''); ?>" alt="Preview Foto Kontrak">
+                                    <img id="preview-img-foto_kontrak" class="max-h-28 max-w-full rounded-lg object-contain border border-border shadow-sm <?php if($isPdf): ?> hidden <?php endif; ?>" src="<?php echo e(!$isPdf ? $fotoKontrakUrl : ''); ?>" alt="Preview Foto Kontrak">
                                     
                                     <!-- PDF Icon Preview -->
-                                    <div id="preview-pdf-foto_kontrak" class="h-28 w-28 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center justify-center text-red-500 shadow-sm <?php if(!$customer->foto_kontrak || !Str::endsWith(strtolower($customer->foto_kontrak), '.pdf')): ?> hidden <?php endif; ?>">
+                                    <div id="preview-pdf-foto_kontrak" class="h-28 w-28 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center justify-center text-red-500 shadow-sm <?php if(!$isPdf): ?> hidden <?php endif; ?>">
                                         <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                         </svg>
@@ -358,8 +330,13 @@
                                 </label>
                                 <span id="file-label-foto_kontrak" class="block text-[10px] text-text-muted text-center mt-2 font-mono truncate">
                                     <?php if($customer->foto_kontrak): ?>
-                                        <?php echo e(basename($customer->foto_kontrak)); ?>
+                                        <?php if($fotoKontrakUrl): ?>
+                                            <?php echo e(basename($customer->foto_kontrak)); ?>
 
+                                        <?php else: ?>
+                                            [Berkas Tidak Ditemukan] <?php echo e(basename($customer->foto_kontrak)); ?>
+
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         Belum ada file dipilih
                                     <?php endif; ?>
@@ -394,7 +371,8 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="discount_amount">DISKON PROMOSI (RP) <span class="text-red-500">*</span></label>
-                            <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', $customer->discount_amount)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
+                            
+                            <input type="text" inputmode="decimal" data-rupiah name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="<?php echo e(old('discount_amount', \App\Helpers\FormatHelper::rupiahInput($customer->discount_amount))); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10000">
                         </div>
 
                         <div>
@@ -404,7 +382,7 @@
 
                         <div>
                             <label class="block mb-2 uppercase tracking-wide" for="other_fee">BIAYA LAIN DI LUAR STANDAR (RP)</label>
-                            <input type="number" name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="<?php echo e(old('other_fee', $customer->customerService?->other_fee ?? 0)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 11000">
+                            <input type="text" inputmode="decimal" data-rupiah name="other_fee" id="other_fee" oninput="updateLayananBreakdown()" value="<?php echo e(old('other_fee', \App\Helpers\FormatHelper::rupiahInput($customer->customerService?->other_fee ?? 0))); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 11000">
                         </div>
                     </div>
 
@@ -489,11 +467,6 @@
                         </div>
 
                         <div>
-                            <label for="ip_address" class="block mb-2 uppercase tracking-wide">IP ADDRESS DIAL-UP</label>
-                            <input type="text" name="ip_address" id="ip_address" value="<?php echo e(old('ip_address', $customer->ip_address)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: 10.200.45.10">
-                        </div>
-
-                        <div>
                             <label for="odp_code" class="block mb-2 uppercase tracking-wide">KODE / KOTAK ODP</label>
                             <input type="text" name="odp_code" id="odp_code" value="<?php echo e(old('odp_code', $customer->odp_code)); ?>" class="w-full text-sm font-sans px-3 py-2 border border-border rounded-md bg-surface text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25" placeholder="Contoh: ODP-PON-024">
                         </div>
@@ -556,7 +529,7 @@
         },
         'dokumen': {
             required: [],
-            optional: ['foto_ktp', 'foto_rumah', 'foto_kontrak']
+            optional: ['foto_rumah', 'foto_kontrak']
         },
         'layanan': {
             required: ['internet_package_id', 'contract_period_months', 'discount_amount', 'tax_percent'],
@@ -568,7 +541,7 @@
         },
         'operasional': {
             required: ['status'],
-            optional: ['ont_sn', 'ip_address', 'odp_code', 'olt_code', 'vlan_id']
+            optional: ['ont_sn', 'odp_code', 'olt_code', 'vlan_id']
         }
     };
 
@@ -764,10 +737,14 @@
             basePrice = parseFloat(selectedOption.getAttribute('data-price')) || 0;
         }
 
-        const discount = parseFloat(discountInput.value) || 0;
+        // Diskon & biaya lain bermasking ribuan — parseFloat('10.000') = 10.
+        // `tax_percent` TIDAK dimasking (persen), jadi tetap parseFloat.
+        const angka = (el) => (el && window.Rupiah ? window.Rupiah.angka(el.value) : parseFloat(el ? el.value : 0)) || 0;
+
+        const discount = angka(discountInput);
         const taxPercent = parseFloat(taxInput.value) || 0;
         const otherFeeInput = document.getElementById('other_fee');
-        const otherFee = otherFeeInput ? (parseFloat(otherFeeInput.value) || 0) : 0;
+        const otherFee = angka(otherFeeInput);
 
         const taxable = Math.max(0, basePrice - discount);
         const tax = Math.round(taxable * (taxPercent / 100));
@@ -927,7 +904,6 @@
             village_id: 'Desa',
             latitude: 'Latitude',
             longitude: 'Longitude',
-            foto_ktp: 'Foto KTP',
             foto_rumah: 'Foto Rumah',
             foto_kontrak: 'Foto Kontrak',
             internet_package_id: 'Paket Internet',
@@ -939,7 +915,6 @@
             referral_customer_code: 'Ref Pelanggan',
             status: 'Status Awal',
             ont_sn: 'ONT SN',
-            ip_address: 'IP Dialup',
             odp_code: 'Kode ODP',
             olt_code: 'Kode OLT',
             vlan_id: 'VLAN ID'

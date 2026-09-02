@@ -2,6 +2,8 @@
 
 Siklus hidup pelanggan dari registrasi sampai aktif/berhenti: **Registrasi → Survey → Verifikasi Survey (proses ke Tim) → Pemasangan → Verifikasi Admin (Aktivasi) → Aktif → (Suspend/Terminate)**. State machine dikawal `CustomerWorkflowService`, tiap transisi tercatat immutable di `customer_status_logs`.
 
+**Skip Survey** (2026-08-21, permission `customers.registration.skip_survey`, default Sales): jalur pintas **Registrasi → Verifikasi Survey** langsung — Sales input data survey (ODP, koordinat, foto) di form registrasi, tahap Survey teknisi dilewati sepenuhnya. Lihat [business-logic.md §3.1](business-logic.md).
+
 ## Dokumen
 
 | Dokumen | Isi |
@@ -21,7 +23,7 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 |-------|------|-----------|
 | `customers` | Identitas + status master | Registrasi (Sales/Admin) |
 | `customer_addresses` | Alamat detail + foto rumah/KTP/kontrak | Registrasi |
-| `customer_surveys` | Hasil survey lapangan | Teknisi submit laporan survey |
+| `customer_surveys` | Hasil survey lapangan | Teknisi submit laporan survey — **atau Sales saat registrasi** kalau Skip Survey dipakai |
 | `customer_installations` | Hasil pemasangan | Teknisi submit laporan pemasangan |
 | `customer_technical_details` | Data teknis (ODP/OLT/VLAN/speedtest) | Teknisi submit laporan pemasangan |
 | `customer_devices` | Device pelanggan (modem/ONT, PPPoE, WiFi) | Teknisi submit laporan pemasangan (duplikat sebagian dari technical_details, legacy) |
@@ -34,6 +36,7 @@ Data pelanggan **tersebar di beberapa tabel per-fase** (bukan 1 tabel besar) —
 | Tahap | Aktor | Permission |
 |-------|-------|-----------|
 | Registrasi | Sales/Admin | `customers.create` |
+| Skip Survey saat Registrasi | Sales (default) | `customers.registration.skip_survey` |
 | Survey (mulai & lapor) | Teknisi | `customers.detail.survey.update` |
 | Proses survey ke Tim Pemasangan | FOP | `customers.detail.installation.validate` |
 | Pemasangan (mulai & lapor) | Teknisi | `customers.detail.installation.update` |

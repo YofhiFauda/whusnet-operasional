@@ -11,7 +11,6 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -59,11 +58,11 @@ class CustomerRegistrationTest extends TestCase
         $this->admin = User::factory()->create(['role_id' => $role->id]);
     }
 
-    public function test_registration_requires_ktp_and_nik_16_digits()
+    public function test_registration_requires_nik_16_digits()
     {
         Storage::fake('public');
 
-        // Missing KTP and NIK only 10 digits
+        // NIK cuma 10 digit
         $response = $this->actingAs($this->admin)->post('/customers', [
             'full_name' => 'John Doe',
             'identity_number' => '1234567890', // 10 digits
@@ -78,17 +77,14 @@ class CustomerRegistrationTest extends TestCase
             'internet_package_id' => $this->package->id,
             'contract_period_months' => 12,
             'status' => 'registered', // frontend will send this
-            // Missing foto_ktp
         ]);
 
-        $response->assertSessionHasErrors(['identity_number', 'foto_ktp']);
+        $response->assertSessionHasErrors(['identity_number']);
     }
 
     public function test_registration_success_with_valid_data()
     {
         Storage::fake('public');
-
-        $file = UploadedFile::fake()->image('ktp.jpg');
 
         $response = $this->actingAs($this->admin)->post('/customers', [
             'full_name' => 'John Doe',
@@ -104,7 +100,6 @@ class CustomerRegistrationTest extends TestCase
             'internet_package_id' => $this->package->id,
             'contract_period_months' => 12,
             'status' => 'registered', // from hidden field
-            'foto_ktp' => $file,
         ]);
 
         $this->assertDatabaseHas('customers', [
@@ -125,7 +120,6 @@ class CustomerRegistrationTest extends TestCase
     public function test_registration_cleans_formatted_nik()
     {
         Storage::fake('public');
-        $file = UploadedFile::fake()->image('ktp.jpg');
 
         $response = $this->actingAs($this->admin)->post('/customers', [
             'full_name' => 'Jane Doe',
@@ -140,7 +134,6 @@ class CustomerRegistrationTest extends TestCase
             'village_id' => $this->village->id,
             'internet_package_id' => $this->package->id,
             'contract_period_months' => 12,
-            'foto_ktp' => $file,
         ]);
 
         $response->assertSessionHasNoErrors();

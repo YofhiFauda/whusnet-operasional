@@ -8,6 +8,14 @@ Aktor: **Sales/Admin** (registrasi, terminasi), **Teknisi** (survey & pemasangan
 2. Submit (`POST /customers`) → sistem generate `customer_code` (sequence per-POP), status langsung `waiting_survey`.
 3. Pelanggan otomatis masuk antrean survey (`/surveys/queue`) — gak perlu langkah manual tambahan buat "kirim ke survey".
 
+### 1b. Skip Survey (2026-08-21, khusus role ber-izin `customers.registration.skip_survey` — default Sales)
+
+1. Di Step 1 form registrasi, centang **"Skip Survey — Input Data Survey Langsung"** (checkbox cuma muncul buat yang punya permission-nya).
+2. Muncul field tambahan: ODP Terdekat, Estimasi Kabel (Meter), Tingkat Kesulitan, Foto Rumah, Foto ODP — semua wajib. Latitude/Longitude yang tadinya opsional ikut jadi wajib.
+3. Submit → status langsung `waiting_acc` (skip `waiting_survey`/`survey_in_progress`/`surveyed` sepenuhnya). `CustomerSurvey` otomatis dibuat `completed`.
+4. Pelanggan **TIDAK PERNAH** muncul di `/surveys/queue` — langsung mendarat di `/verifications/queue` (antrean ACC Admin, §3 di bawah).
+5. Kirim `skip_survey=1` tanpa permission-nya → sistem tolak 403, bukan diam-diam diabaikan.
+
 ## 2. Teknisi — Proses Survey
 
 1. Buka `/surveys/queue`, cari pelanggan (search by nama/NIK/HP).
@@ -65,7 +73,7 @@ Setara Batalkan Survey (§2b), buat tahap Pemasangan:
 
 ### 5b. FOP/Admin — List Pelanggan Gagal & Kembalikan (baru 2026-07-20)
 
-1. Buka `/customers?status_group=failed` — tabel ringkas: CID, Nama, Alasan, Tanggal Ditolak, Action. **Diurut DESC berdasarkan Tanggal Ditolak** (baru 2026-07-20 — sebelumnya diurut `customer_code`).
+1. Buka `/customers/failed` — tabel ringkas: CID, Nama, Alasan, Tanggal Ditolak, Action. **Diurut DESC berdasarkan Tanggal Ditolak** (baru 2026-07-20 — sebelumnya diurut `customer_code`).
 2. **Detail** → buka halaman detail pelanggan seperti biasa.
 3. **Kembalikan** *(cuma muncul kalau status sebelum ditolak berhasil ditemukan dari audit log)* → konfirmasi → pelanggan balik ke status TEPAT SEBELUM ditolak (mis. ditolak dari `installation_in_progress` → balik ke situ lagi, BUKAN ke `waiting_survey`/awal alur). Teknisi/FOP lanjut kerjain dari titik itu, gak perlu registrasi ulang dari nol. Permission sama dengan Tolak/Approve/Revisi (`customers.detail.installation.validate`). Buat pelanggan hasil migrasi legacy, "status sebelum ditolak" di-default `registered` (data lama gak selalu jelas tahap persisnya).
 
@@ -85,7 +93,7 @@ Khusus pelanggan hasil **import legacy** yang di sistem lama udah aktif (bayar, 
 
 ### 6b. Admin/FOP — List Putus Langganan, Ambil Alat & Langganan Lagi (baru 2026-07-20)
 
-1. Buka `/customers?status_group=terminated` — tabel: ID, Nama, Kontrak (Sewa/Beli), Alasan Putus, Tanggal Pemutusan, **Status Alat** (badge "Sudah di Ambil"/"Belum di Ambil"), Action. **Diurut DESC berdasarkan Tanggal Pemutusan** (baru 2026-07-20 — sebelumnya diurut `customer_code`).
+1. Buka `/customers/terminated` — tabel: ID, Nama, Kontrak (Sewa/Beli), Alasan Putus, Tanggal Pemutusan, **Status Alat** (badge "Sudah di Ambil"/"Belum di Ambil"), Action. **Diurut DESC berdasarkan Tanggal Pemutusan** (baru 2026-07-20 — sebelumnya diurut `customer_code`).
 2. **Detail** — selalu ada, buka halaman detail pelanggan.
 3. **Ambil Alat** — cuma muncul kalau status alat masih "Belum di Ambil". Klik → konfirmasi → tandai alat pelanggan (`customer_devices.device_retrieved_at`) sudah diambil. Permission `customers.detail.devices.retrieve` *(dipisah dari `customers.update` 2026-07-20 — biar granular, gak numpang di permission edit-data-pelanggan generik; lihat [docs/rbac/business-logic.md § 3.1](../rbac/business-logic.md#31-langkah-nambah-permission-baru-fitur-existing--contoh-nyata-customersdetaildevicesretrieve))*.
 4. **Langganan Lagi** — selalu muncul (gak peduli status alat). Klik → konfirmasi → pelanggan **langsung aktif lagi** (`status=active`), TANPA lewat survey/verifikasi ulang (asumsi infrastruktur masih terpasang). Permission `customers.detail.installation.validate`.
@@ -95,6 +103,7 @@ Khusus pelanggan hasil **import legacy** yang di sistem lama udah aktif (bayar, 
 | Aksi | Permission |
 |------|------------|
 | Registrasi pelanggan | `customers.create` |
+| **Skip Survey saat Registrasi** *(baru 2026-08-21)* | `customers.registration.skip_survey` |
 | Mulai/lapor Survey | `customers.detail.survey.update` |
 | Lihat antrean Survey | `customers.detail.survey.view` |
 | **Batalkan Survey** | `customers.detail.survey.reject` |

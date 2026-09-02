@@ -22,7 +22,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'latitude',
     'longitude',
     'house_photo',
-    'ktp_photo',
     'contract_photo',
 ])]
 class CustomerAddress extends Model
@@ -33,7 +32,6 @@ class CustomerAddress extends Model
 
     protected array $auditHidden = [
         'house_photo',
-        'ktp_photo',
         'contract_photo',
     ];
 

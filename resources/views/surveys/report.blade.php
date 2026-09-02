@@ -234,42 +234,14 @@
                     <div id="step-panel-2" class="step-panel space-y-6 hidden">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
                             <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tinjau foto KTP dari registrasi, lalu unggah Foto Rumah dan Foto ODP / Jalur terdekat.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unggah Foto Rumah dan Foto ODP / Jalur terdekat.</p>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                            <!-- Foto KTP (Read Only dari Registrasi) -->
-                            <div class="border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/60 rounded-xl p-4 flex flex-col justify-between shadow-sm text-center">
-                                @if($customer->foto_ktp)
-                                    <div>
-                                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Foto KTP (Registrasi)</span>
-                                        <div class="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <img class="max-h-36 max-w-full rounded-lg object-contain mx-auto hover:scale-105 transition-transform cursor-pointer"
-                                                 src="{{ asset('storage/' . $customer->foto_ktp) }}"
-                                                 alt="Preview Foto KTP"
-                                                 onclick="window.open('{{ asset('storage/' . $customer->foto_ktp) }}', '_blank')">
-                                        </div>
-                                    </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-3 bg-emerald-50 dark:bg-emerald-950/40 py-1 px-2.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> Terlampir di System
-                                    </span>
-                                @else
-                                    <div class="py-4">
-                                        <div class="w-10 h-10 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center text-lg border border-slate-200 dark:border-slate-700">
-                                            <x-ui.icon name="id-card" class="w-4 h-4" />
-                                        </div>
-                                        <span class="block text-xs font-bold text-slate-700 dark:text-slate-300 mt-3 uppercase">Foto KTP Kosong</span>
-                                    </div>
-                                    <span class="inline-flex items-center justify-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-950/40 py-1 px-2.5 rounded-full border border-amber-200 dark:border-amber-800">
-                                        <x-ui.icon name="triangle-alert" class="w-3 h-3" /> Belum diunggah
-                                    </span>
-                                @endif
-                            </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                             <!-- Foto Rumah (Input Upload Baru) -->
                             <div class="border-2 border-dashed @error('house_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative group">
-                                <div id="default-placeholder-house_photo" class="py-4 space-y-2">
+                                <div id="default-placeholder-house_photo" class="py-4 space-y-2 {{ $existingHousePhoto ? 'hidden' : '' }}">
                                     <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
                                         <x-ui.icon name="house" class="w-4 h-4" />
                                     </div>
@@ -279,22 +251,25 @@
                                     </div>
                                 </div>
 
-                                <div id="preview-container-house_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                <div id="preview-container-house_photo" style="display: {{ $existingHousePhoto ? '' : 'none' }};" class="py-2 flex flex-col items-center justify-center">
                                     <div class="relative inline-block w-full">
-                                        <img id="preview-img-house_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
+                                        <img id="preview-img-house_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ $existingHousePhoto }}" alt="Preview Foto Rumah">
                                         <button type="button" onclick="clearFile('house_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
                                             <x-ui.icon name="x" class="w-3 h-3" />
                                         </button>
                                     </div>
-                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah {{ $existingHousePhoto ? 'Tersimpan' : 'Terpilih' }}</span>
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="house_photo" id="house_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('house_photo')">
+                                    <input type="file" name="house_photo" id="house_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('house_photo')" {{ $existingHousePhoto ? 'data-populated=true' : '' }}>
+                                    {{-- Ditandai '1' kalau teknisi eksplisit klik Hapus File — biar server gak
+                                         diam-diam pakai lagi foto yang barusan dicabut dari staging. --}}
+                                    <input type="hidden" name="house_photo_removed" id="house_photo_removed_flag" value="0">
                                     <label for="house_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        Pilih Foto Rumah
+                                        {{ $existingHousePhoto ? 'Ganti Foto Rumah' : 'Pilih Foto Rumah' }}
                                     </label>
-                                    <span id="file-label-house_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <span id="file-label-house_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">{{ $existingHousePhoto ? 'Sudah diunggah — klik untuk ganti' : 'Belum ada file' }}</span>
                                 </div>
 
                                 @error('house_photo')
@@ -304,7 +279,7 @@
 
                             <!-- Foto ODP (Input Upload Baru) -->
                             <div class="border-2 border-dashed @error('survey_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm flex flex-col justify-between relative group">
-                                <div id="default-placeholder-survey_photo" class="py-4 space-y-2">
+                                <div id="default-placeholder-survey_photo" class="py-4 space-y-2 {{ $existingSurveyPhoto ? 'hidden' : '' }}">
                                     <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
                                         <x-ui.icon name="network" class="w-4 h-4" />
                                     </div>
@@ -314,22 +289,23 @@
                                     </div>
                                 </div>
 
-                                <div id="preview-container-survey_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                <div id="preview-container-survey_photo" style="display: {{ $existingSurveyPhoto ? '' : 'none' }};" class="py-2 flex flex-col items-center justify-center">
                                     <div class="relative inline-block w-full">
-                                        <img id="preview-img-survey_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto ODP">
+                                        <img id="preview-img-survey_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="{{ $existingSurveyPhoto }}" alt="Preview Foto ODP">
                                         <button type="button" onclick="clearFile('survey_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
                                             <x-ui.icon name="x" class="w-3 h-3" />
                                         </button>
                                     </div>
-                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP {{ $existingSurveyPhoto ? 'Tersimpan' : 'Terpilih' }}</span>
                                 </div>
 
                                 <div class="mt-2">
-                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')" {{ $existingSurveyPhoto ? 'data-populated=true' : '' }}>
+                                    <input type="hidden" name="survey_photo_removed" id="survey_photo_removed_flag" value="0">
                                     <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        Pilih Foto ODP
+                                        {{ $existingSurveyPhoto ? 'Ganti Foto ODP' : 'Pilih Foto ODP' }}
                                     </label>
-                                    <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">{{ $existingSurveyPhoto ? 'Sudah diunggah — klik untuk ganti' : 'Belum ada file' }}</span>
                                 </div>
 
                                 @error('survey_photo')
@@ -340,22 +316,30 @@
                         </div>
                     </div>
 
-                    <!-- STEP 3 PANEL: Layanan & Paket (Read-Only) -->
+                    <!-- STEP 3 PANEL: Layanan & Paket -->
                     <div id="step-panel-3" class="step-panel space-y-6 hidden">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
                             <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Rincian paket layanan internet yang dipilih saat pendaftaran.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Paket layanan internet yang dipilih saat pendaftaran. Koreksi di sini kalau temuan lapangan gak cocok sama paket yang tercatat.</p>
                         </div>
 
                         <div class="bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200/60 dark:border-slate-700/60 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4 text-xs">
                             <div>
-                                <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Paket Internet</span>
-                                <span class="block text-sm font-bold text-slate-800 dark:text-slate-100">{{ $customer->internetPackage->package_code ?? '-' }} - {{ $customer->internetPackage->name ?? 'Belum Dipilih' }}</span>
+                                <label for="internet_package_id" class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Paket Internet</label>
+                                <select name="internet_package_id" id="internet_package_id" onchange="updateSurveyPackagePreview()" class="w-full text-xs data-text px-3 py-2.5 border @error('internet_package_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="">Belum Dipilih</option>
+                                    @foreach($internetPackages as $package)
+                                        <option value="{{ $package->id }}" data-price="{{ $package->monthly_price }}" {{ old('internet_package_id', $customer->internet_package_id) == $package->id ? 'selected' : '' }}>{{ $package->package_code }} - {{ $package->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('internet_package_id')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
 
                             <div>
                                 <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Biaya Bulanan Dasar</span>
-                                <span class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">Rp {{ number_format($customer->internetPackage->monthly_price ?? 0, 0, ',', '.') }}</span>
+                                <span id="survey_package_price_preview" class="block text-sm data-text font-bold text-slate-800 dark:text-slate-100">Rp {{ number_format($customer->internetPackage->monthly_price ?? 0, 0, ',', '.') }}</span>
                             </div>
 
                             <div class="pt-3 border-t border-slate-200/60 dark:border-slate-700/60 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -498,6 +482,17 @@
 
 @section('scripts')
 <script>
+    // Preview biaya bulanan dasar mengikuti pilihan dropdown Paket Internet
+    // (Step 3) — cuma tampilan, harga final tetap dihitung ulang server-side
+    // di CustomerSurveyController::store() pakai discount/ppn yang tersimpan.
+    function updateSurveyPackagePreview() {
+        const select = document.getElementById('internet_package_id');
+        const preview = document.getElementById('survey_package_price_preview');
+        const selected = select.options[select.selectedIndex];
+        const price = selected ? parseFloat(selected.dataset.price || '0') : 0;
+        preview.textContent = 'Rp ' + Math.round(price).toLocaleString('id-ID');
+    }
+
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
     const totalStepsCount = 4;
@@ -576,10 +571,16 @@
         const previewContainer = document.getElementById('preview-container-' + fieldId);
         const previewImg = document.getElementById('preview-img-' + fieldId);
 
+        // File baru dipilih (termasuk buat GANTI foto yang udah ke-stage
+        // sebelumnya) — batalkan flag "dihapus" biar server gak nganggap ini
+        // penghapusan.
+        const removedFlag = document.getElementById(fieldId + '_removed_flag');
+
         if (input.files && input.files.length > 0) {
             const file = input.files[0];
             label.textContent = file.name;
             input.setAttribute('data-populated', 'true');
+            if (removedFlag) removedFlag.value = '0';
 
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
@@ -602,6 +603,11 @@
 
     function clearFile(fieldId) {
         const input = document.getElementById(fieldId);
+        const removedFlag = document.getElementById(fieldId + '_removed_flag');
+        // Tandai "dihapus" — kalau field ini punya foto yang udah ke-stage di
+        // session (attempt submit sebelumnya), server perlu tahu supaya gak
+        // dipakai lagi diam-diam.
+        if (removedFlag) removedFlag.value = '1';
         if (input) {
             input.value = '';
             onFileChange(fieldId);

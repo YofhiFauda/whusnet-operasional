@@ -62,8 +62,8 @@ class UserCrudTest extends TestCase
             'role_id' => $role->id,
             'scope_type' => 'selected_pop',
             'pop_ids' => [$pop->id],
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ];
 
         $response = $this->post(route('users.store'), $payload);
@@ -78,7 +78,7 @@ class UserCrudTest extends TestCase
         $this->assertSame('active', $user->status->value);
         $this->assertSame($role->id, $user->role_id);
         $this->assertTrue($user->pops->contains($pop));
-        $this->assertTrue(Hash::check('password123', $user->password));
+        $this->assertTrue(Hash::check('Password123!', $user->password));
     }
 
     public function test_admin_can_update_basic_user_fields(): void
@@ -125,8 +125,8 @@ class UserCrudTest extends TestCase
             'role_id' => $adminRole->id,
             'scope_type' => 'selected_pop',
             'pop_ids' => [$popB->id],
-            'password' => 'new-password123',
-            'password_confirmation' => 'new-password123',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
         ]);
 
         $response->assertRedirect(route('users.index'));
@@ -141,6 +141,6 @@ class UserCrudTest extends TestCase
         $this->assertSame($adminRole->id, $user->role_id);
         $this->assertTrue($user->pops->contains($popB));
         $this->assertFalse($user->pops->contains($popA));
-        $this->assertTrue(Hash::check('new-password123', $user->password));
+        $this->assertTrue(Hash::check('NewPassword123!', $user->password));
     }
 }

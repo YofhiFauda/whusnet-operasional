@@ -92,6 +92,13 @@
             Edit Profil
         </a>
 
+        @can('customers.qr.view')
+            <a href="{{ route('customers.qr.show', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-colors text-xs font-semibold shadow-sm">
+                <i class="fa-solid fa-qrcode"></i>
+                QR Pelanggan
+            </a>
+        @endcan
+
         @can('invoices.create')
             @if($isActive && $customer->customerService)
                 <button type="button" onclick="openInvoiceModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm cursor-pointer">
@@ -125,16 +132,10 @@
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp {{ number_format($totalBill, 0, ',', '.') }}/bln (Nett)</span>
         </div>
         <div class="p-4 flex flex-col justify-center">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">IP ADDRESS & PPPOE</span>
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
             <div class="flex items-center gap-1.5 mt-1 font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">
-                <span>{{ $customer->ip_address ?? 'Belum Ada IP' }}</span>
-                @if($customer->ip_address)
-                <button type="button" onclick="copyText('{{ $customer->ip_address }}', 'IP Address')" class="text-slate-400 hover:text-sky-600 cursor-pointer" title="Salin IP">
-                    <i class="fa-regular fa-copy text-[10px]"></i>
-                </button>
-                @endif
+                <span>{{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
             </div>
-            <span class="text-[11px] font-mono text-slate-500 truncate">PPPoE: {{ $customer->customerTechnicalDetail->pppoe_username ?? ($customer->pppoe_username ?? '-') }}</span>
         </div>
         <div class="p-4 flex flex-col justify-center">
             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
@@ -168,7 +169,7 @@
         <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <div class="relative flex-1">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, KTP, Prorate, Tiang, Kontrak)..." 
+                <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, NIK, Prorate, Tiang, Kontrak)..."
                        class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
                 <button type="button" onclick="clearSearch()" id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
                     <i class="fa-solid fa-xmark"></i>
@@ -405,10 +406,6 @@
                     <div>
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">DISTRIBUSI ODP</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->distribution->code ?? 'Belum di-assign' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">IP ADDRESS</span>
-                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->ip_address ?? '-' }}</span>
                     </div>
                     <div>
                         <span class="block text-[9px] font-bold text-slate-400 uppercase">ONT SERIAL NUMBER</span>
@@ -677,10 +674,6 @@
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->ont_sn ?? 'Belum terpasang' }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">IP Address Dialed</span>
-                                <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->ip_address ?? 'Belum teralokasi' }}</span>
-                            </div>
-                            <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
                                 <span class="text-slate-400">Nama Perangkat OLT</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->olt_code ?? 'Belum diisi' }}</span>
                             </div>
@@ -944,7 +937,9 @@
                                                                 data-invoice-id="{{ $invoice->id }}"
                                                                 data-invoice-number="{{ $invoice->invoice_number }}"
                                                                 data-remaining="{{ (float) $invoice->remaining_amount }}"
-                                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining))"
+                                                                {{-- Target POST dirender server-side (ADHOC-20 langkah 3). --}}
+                                                                data-payment-store-url="{{ route('invoices.payments.store', $invoice->id) }}"
+                                                                onclick="openQuickPaymentModal(parseInt(this.dataset.invoiceId, 10), this.dataset.invoiceNumber, parseFloat(this.dataset.remaining), this.dataset.paymentStoreUrl)"
                                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer {{ $settled ? 'hidden' : '' }}">
                                                             Bayar
                                                         </button>
@@ -1088,7 +1083,7 @@
                     <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                         <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
                         <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Dokumen</h4>
-                        <p class="text-[11px] text-slate-500 mt-1">Dokumen KTP, rumah, kontrak, survey, dan foto pemasangan akan tampil di sini setelah diupload.</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Dokumen rumah, kontrak, survey, dan foto pemasangan akan tampil di sini setelah diupload.</p>
                     </div>
                 @endif
             @else
@@ -1132,10 +1127,6 @@
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
                         <span class="text-slate-400">ONT Serial Number</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->router_or_ont_serial ?? '-' }}</span>
-                    </div>
-                    <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">IP Address Dialed</span>
-                        <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->ip_address ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
                         <span class="text-slate-400">Nomor ODP / Port</span>
@@ -1216,7 +1207,9 @@
                         </div>
                         <div>
                             <label for="prorate_amount" class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tagihan Prorate (Opsional)</label>
-                            <input type="number" name="prorate_amount" id="prorate_amount" value="0" min="0" step="1" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
+                            {{-- data-rupiah butuh type="text"; batas nilai
+                                 ditegakkan validasi server. --}}
+                            <input type="text" inputmode="decimal" data-rupiah name="prorate_amount" id="prorate_amount" value="0" oninput="recalcInvoiceTotal()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-800 dark:text-slate-200">
                         </div>
                         <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                             <button type="button" onclick="closeInvoiceModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
@@ -1544,7 +1537,10 @@
 
     const BASE_NETT = {{ (float)$totalBill }};
     function recalcInvoiceTotal() {
-        const prorate = parseFloat(document.getElementById('prorate_amount')?.value || 0) || 0;
+        // Kolom prorata bermasking ribuan — parseFloat('50.000') = 50, dan
+        // pratinjau total tagihan akan berbohong tanpa parser ini.
+        const prorateEl = document.getElementById('prorate_amount');
+        const prorate = (prorateEl && window.Rupiah ? window.Rupiah.angka(prorateEl.value) : parseFloat(prorateEl?.value || 0)) || 0;
         const total   = BASE_NETT + prorate;
         const fmt = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
         const totalEl = document.getElementById('preview-total');

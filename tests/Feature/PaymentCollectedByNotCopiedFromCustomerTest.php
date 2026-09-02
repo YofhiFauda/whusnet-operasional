@@ -124,6 +124,8 @@ class PaymentCollectedByNotCopiedFromCustomerTest extends TestCase
         $response = $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
             'payment_date' => '2026-06-13',
             'payment_method' => 'transfer',
+            'bank_name' => 'BCA',
+            'account_number' => '1234567890',
             'amount' => 150000,
         ]);
 

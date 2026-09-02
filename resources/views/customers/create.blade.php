@@ -18,7 +18,7 @@
                 </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Masukkan data identitas calon pelanggan, wilayah pemasangan, foto dokumen KTP, dan paket layanan internet.
+                Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
             </p>
         </div>
 
@@ -60,18 +60,14 @@
 
         <!-- MOBILE RESPONSIVE STEPPER (Visible on < lg screens: 1 row x 3 items) -->
         <div class="lg:hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 shadow-sm">
-            <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="grid grid-cols-2 gap-2 text-center">
                 <button type="button" onclick="goToStep(1)" id="mobile-step-btn-1" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700 transition-all flex items-center justify-center gap-1.5 shadow-sm">
                     <span class="w-4 h-4 rounded-full bg-sky-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">1</span>
                     <span class="truncate text-[11px] font-semibold">1. Data Diri</span>
                 </button>
                 <button type="button" onclick="goToStep(2)" id="mobile-step-btn-2" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
                     <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">2</span>
-                    <span class="truncate text-[11px] font-semibold">2. KTP</span>
-                </button>
-                <button type="button" onclick="goToStep(3)" id="mobile-step-btn-3" class="py-2.5 px-2 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-all flex items-center justify-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[9px] font-bold flex items-center justify-center shrink-0">3</span>
-                    <span class="truncate text-[11px] font-semibold">3. Paket</span>
+                    <span class="truncate text-[11px] font-semibold">2. Paket</span>
                 </button>
             </div>
         </div>
@@ -110,25 +106,9 @@
                                     </span>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">2. Dokumen Lampiran</span>
+                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">2. Layanan &amp; Paket</span>
                                     <span id="step-nav-status-2" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Foto KTP</span>
-                                </div>
-                            </div>
-                        </button>
-
-                        <!-- Step 3 Navigation Card -->
-                        <button type="button" onclick="goToStep(3)" id="step-nav-3" class="w-full text-left p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-all group focus:outline-none">
-                            <div class="flex items-start gap-3">
-                                <div class="mt-0.5 shrink-0" id="step-nav-icon-3">
-                                    <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-900/40 border border-rose-200 dark:border-rose-700 flex items-center justify-center text-rose-600 dark:text-rose-400">
-                                        <x-ui.icon name="x" class="w-3 h-3" />
-                                    </span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <span class="block text-xs font-bold text-slate-900 dark:text-slate-100">3. Layanan &amp; Paket</span>
-                                    <span id="step-nav-status-3" class="text-[9px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 block mt-0.5">Belum Lengkap</span>
-                                    <span id="step-nav-missing-3" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Paket Internet, Jenis Kontrak, Masa Kontrak, Diskon</span>
+                                    <span id="step-nav-missing-2" class="text-[10px] text-slate-500 dark:text-slate-400 block mt-1 leading-relaxed">Wajib diisi: Paket Internet, Jenis Kontrak, Masa Kontrak, Diskon</span>
                                 </div>
                             </div>
                         </button>
@@ -266,70 +246,146 @@
 
                             <div class="grid grid-cols-2 gap-3 md:col-span-1">
                                 <div>
-                                    <label for="latitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Latitude</label>
-                                    <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="-7.86940">
+                                    <label for="latitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Latitude <span class="text-rose-500 hidden" id="latitude-required-mark">*</span></label>
+                                    <input type="text" name="latitude" id="latitude" value="{{ old('latitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('latitude') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="-7.86940">
+                                    @error('latitude')
+                                        <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                    @enderror
                                 </div>
                                 <div>
-                                    <label for="longitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Longitude</label>
-                                    <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="111.46210">
+                                    <label for="longitude" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Longitude <span class="text-rose-500 hidden" id="longitude-required-mark">*</span></label>
+                                    <input type="text" name="longitude" id="longitude" value="{{ old('longitude') }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('longitude') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="111.46210">
+                                    @error('longitude')
+                                        <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                    @enderror
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- STEP 2 PANEL: Dokumen Lampiran KTP -->
-                    <div id="step-panel-2" class="step-panel space-y-6 hidden">
-                        <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
-                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. UPLOAD DOKUMEN LAMPIRAN</h4>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Upload file foto KTP asli calon pelanggan untuk verifikasi identitas</p>
+                        @can('customers.registration.skip_survey')
+                        {{-- Skip Survey — Sales lompat tahap survey lapangan, input data
+                             survey langsung di sini. Permission sempit
+                             (customers.registration.skip_survey), default cuma role Sales. --}}
+                        <div class="pt-4 mt-2 border-t border-slate-100 dark:border-slate-700/60">
+                            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" name="skip_survey" id="skip_survey" value="1" {{ old('skip_survey') ? 'checked' : '' }} onchange="toggleSkipSurvey()" class="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500 focus:ring-offset-0">
+                                <span>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">Skip Survey — Input Data Survey Langsung</span>
+                                    <span class="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">Pelanggan langsung masuk antrean ACC Admin tanpa lewat tahap survey teknisi lapangan. Titik koordinat &amp; data survey di bawah wajib diisi sekarang.</span>
+                                </span>
+                            </label>
                         </div>
 
-                        <div class="max-w-xl mx-auto">
-                            <!-- Foto KTP Dropzone -->
-                            <div class="border-2 border-dashed @error('foto_ktp') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-2xl p-6 text-center transition-all shadow-sm relative group">
-                                <div id="default-placeholder-foto_ktp" class="py-6 space-y-3">
-                                    <div class="w-14 h-14 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-2xl border border-sky-200 dark:border-sky-800">
-                                        <x-ui.icon name="id-card" class="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">UPLOAD FOTO KTP <span class="text-rose-500">*</span></span>
-                                        <span class="block text-[11px] text-slate-400 dark:text-slate-500 mt-1">Format gambar JPG, PNG (Maksimal 2MB)</span>
-                                    </div>
-                                </div>
+                        {{-- Inline style, BUKAN class 'hidden': elemen ini juga pakai utility
+                             display 'grid', dan di Tailwind keduanya sama specificity — yang
+                             belakangan menang di stylesheet, jadi 'hidden' gak konsisten
+                             berefek. Inline style selalu menang, sama pola surveys/report.blade.php. --}}
+                        <div id="skip-survey-fields" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" style="display: {{ old('skip_survey') ? '' : 'none' }};">
+                            <div>
+                                <label for="nearest_odp" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">ODP Terdekat <span class="text-rose-500">*</span></label>
+                                <input type="text" name="nearest_odp" id="nearest_odp" value="{{ old('nearest_odp') }}" class="w-full text-xs data-text px-3 py-2.5 border @error('nearest_odp') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: ODP-BBD-01">
+                                @error('nearest_odp')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
 
-                                <!-- Preview Container -->
-                                <div id="preview-container-foto_ktp" style="display: none;" class="py-3 flex flex-col items-center justify-center">
-                                    <div class="relative inline-block">
-                                        <img id="preview-img-foto_ktp" class="max-h-48 max-w-full rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-md" src="" alt="Preview Foto KTP">
-                                        <button type="button" onclick="clearFile('foto_ktp')" class="absolute -top-3 -right-3 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus Foto KTP">
+                            <div>
+                                <label for="cable_estimation_meter" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Estimasi Kabel (Meter) <span class="text-rose-500">*</span></label>
+                                <input type="number" name="cable_estimation_meter" id="cable_estimation_meter" min="0" value="{{ old('cable_estimation_meter') }}" class="w-full text-xs data-text px-3 py-2.5 border @error('cable_estimation_meter') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="Contoh: 150">
+                                @error('cable_estimation_meter')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label for="difficulty_level" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tingkat Kesulitan <span class="text-rose-500">*</span></label>
+                                <select name="difficulty_level" id="difficulty_level" class="w-full text-xs font-sans px-3 py-2.5 border @error('difficulty_level') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                    <option value="" disabled {{ old('difficulty_level') ? '' : 'selected' }}>Pilih Tingkat Kesulitan</option>
+                                    <option value="MUDAH" {{ old('difficulty_level') === 'MUDAH' ? 'selected' : '' }}>MUDAH</option>
+                                    <option value="SEDANG" {{ old('difficulty_level') === 'SEDANG' ? 'selected' : '' }}>SEDANG</option>
+                                    <option value="SULIT" {{ old('difficulty_level') === 'SULIT' ? 'selected' : '' }}>SULIT</option>
+                                </select>
+                                @error('difficulty_level')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label for="requested_installation_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Request Pemasangan</label>
+                                <input type="date" name="requested_installation_date" id="requested_installation_date" min="{{ now()->toDateString() }}" value="{{ old('requested_installation_date') }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('requested_installation_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
+                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">Kosongkan jika pelanggan tidak meminta tanggal spesifik. Diisi hanya bila pelanggan minta dipasang di tanggal tertentu — task pemasangan menunggu sampai tanggal itu tiba.</span>
+                                @error('requested_installation_date')
+                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Foto Rumah -->
+                            <div class="border-2 border-dashed @error('foto_rumah') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
+                                <div id="default-placeholder-foto_rumah" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                        <x-ui.icon name="house" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                </div>
+                                <div id="preview-container-foto_rumah" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-foto_rumah" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto Rumah">
+                                        <button type="button" onclick="clearFile('foto_rumah')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
                                             <x-ui.icon name="x" class="w-3 h-3" />
                                         </button>
                                     </div>
-                                    <span class="block text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-3 flex items-center gap-1.5">
-                                        <x-ui.icon name="circle-check" class="w-3 h-3" /> File KTP Siap Diunggah
-                                    </span>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto Rumah Terpilih</span>
                                 </div>
-
-                                <div class="mt-4">
-                                    <input type="file" name="foto_ktp" id="foto_ktp" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_ktp')">
-                                    <label for="foto_ktp" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-5 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
-                                        <x-ui.icon name="upload" class="w-3 h-3" />
-                                        <span>Pilih File Gambar</span>
+                                <div class="mt-2">
+                                    <input type="file" name="foto_rumah" id="foto_rumah" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('foto_rumah')">
+                                    <label for="foto_rumah" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Foto Rumah
                                     </label>
-                                    <span id="file-label-foto_ktp" class="block text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2 font-mono truncate">Belum ada file dipilih</span>
+                                    <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
                                 </div>
+                                @error('foto_rumah')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                                @enderror
+                            </div>
 
-                                @error('foto_ktp')
-                                    <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
+                            <!-- Foto ODP -->
+                            <div class="border-2 border-dashed @error('survey_photo') border-rose-400 bg-rose-50/20 @else border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 @enderror hover:border-sky-500 dark:hover:border-sky-400 rounded-xl p-4 text-center transition-all shadow-sm">
+                                <div id="default-placeholder-survey_photo" class="py-4 space-y-2">
+                                    <div class="w-10 h-10 mx-auto rounded-full bg-sky-50 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg border border-sky-200 dark:border-sky-800">
+                                        <x-ui.icon name="network" class="w-4 h-4" />
+                                    </div>
+                                    <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO ODP / JALUR <span class="text-rose-500">*</span></span>
+                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Wajib Diisi (JPG, PNG)</span>
+                                </div>
+                                <div id="preview-container-survey_photo" style="display: none;" class="py-2 flex flex-col items-center justify-center">
+                                    <div class="relative inline-block w-full">
+                                        <img id="preview-img-survey_photo" class="max-h-32 max-w-full rounded-lg object-contain border border-slate-200 dark:border-slate-700 shadow-sm mx-auto" src="" alt="Preview Foto ODP">
+                                        <button type="button" onclick="clearFile('survey_photo')" class="absolute -top-2.5 -right-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:scale-110 transition-transform focus:outline-none cursor-pointer" title="Hapus File">
+                                            <x-ui.icon name="x" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                    <span class="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-2">✓ Foto ODP Terpilih</span>
+                                </div>
+                                <div class="mt-2">
+                                    <input type="file" name="survey_photo" id="survey_photo" accept="image/*" capture="environment" class="hidden" onchange="onFileChange('survey_photo')">
+                                    <label for="survey_photo" class="block w-full text-center bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-semibold py-2 px-3 rounded-lg cursor-pointer transition-colors shadow-sm focus:outline-none">
+                                        Pilih Foto ODP
+                                    </label>
+                                    <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                </div>
+                                @error('survey_photo')
+                                    <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
                                 @enderror
                             </div>
                         </div>
+                        @endcan
                     </div>
 
-                    <!-- STEP 3 PANEL: Layanan & Paket Internet -->
-                    <div id="step-panel-3" class="step-panel space-y-6 hidden">
+                    <!-- STEP 2 PANEL: Layanan & Paket Internet -->
+                    <div id="step-panel-2" class="step-panel space-y-6 hidden">
                         <div class="border-b border-slate-100 dark:border-slate-700/60 pb-3">
-                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">3. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
+                            <h4 class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">2. LAYANAN &amp; PAKET LAYANAN INTERNET</h4>
                             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pilih paket internet dan rincian parameter kontrak berlangganan</p>
                         </div>
 
@@ -371,7 +427,9 @@
 
                             <div>
                                 <label for="discount_amount" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Diskon Promosi (Rp) <span class="text-rose-500">*</span></label>
-                                <input type="number" name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="{{ old('discount_amount', 0) }}" min="0" class="w-full text-xs font-mono px-3 py-2.5 border @error('discount_amount') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="0">
+                                {{-- data-rupiah butuh type="text"; batas `min`
+                                     diganti validasi server. --}}
+                                <input type="text" inputmode="decimal" data-rupiah name="discount_amount" id="discount_amount" oninput="updateLayananBreakdown()" value="{{ old('discount_amount', 0) }}" class="w-full text-xs font-mono px-3 py-2.5 border @error('discount_amount') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors" placeholder="0">
                                 @error('discount_amount')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
                                 @enderror
@@ -440,16 +498,12 @@
 <script>
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;
-    const totalStepsCount = 3;
+    const totalStepsCount = 2;
 
     const formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
             optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
-        },
-        'dokumen': {
-            required: ['foto_ktp'],
-            optional: []
         },
         'layanan': {
             required: ['internet_package_id', 'jenis_kontrak', 'contract_period_months', 'discount_amount'],
@@ -459,9 +513,35 @@
 
     const stepKeys = {
         1: 'data-diri',
-        2: 'dokumen',
-        3: 'layanan'
+        2: 'layanan'
     };
+
+    // Field yang pindah jadi wajib di Step 1 begitu Skip Survey aktif —
+    // lat/long dari 'optional' data-diri, sisanya baru muncul lewat toggle.
+    const skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
+
+    /* Toggle Skip Survey — tampilkan/sembunyikan blok data survey & pindahkan
+       field-nya antara required/optional di formFields['data-diri']. */
+    function toggleSkipSurvey() {
+        const checkbox = document.getElementById('skip_survey');
+        const panel = document.getElementById('skip-survey-fields');
+        const enabled = !! (checkbox && checkbox.checked);
+
+        setElementVisible(panel, enabled);
+        setElementVisible(document.getElementById('latitude-required-mark'), enabled);
+        setElementVisible(document.getElementById('longitude-required-mark'), enabled);
+
+        formFields['data-diri'].required = formFields['data-diri'].required.filter(f => ! skipSurveyRequiredFields.includes(f));
+        formFields['data-diri'].optional = formFields['data-diri'].optional.filter(f => ! skipSurveyRequiredFields.includes(f));
+
+        if (enabled) {
+            formFields['data-diri'].required = formFields['data-diri'].required.concat(skipSurveyRequiredFields);
+        } else {
+            formFields['data-diri'].optional = formFields['data-diri'].optional.concat(['latitude', 'longitude']);
+        }
+
+        runLiveProgressUpdates();
+    }
 
     document.addEventListener("DOMContentLoaded", function() {
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
@@ -479,10 +559,56 @@
             loadDistricts(oldCityId, oldDistrictId, oldVillageId);
         }
 
+        // Re-terapkan state Skip Survey kalau submit sebelumnya gagal validasi
+        // (redisplay old('skip_survey')) — panel & required list ikut nyala lagi.
+        if (document.getElementById('skip_survey')) {
+            toggleSkipSurvey();
+        }
+
         updateWizardButtons();
         runLiveProgressUpdates();
         updateLayananBreakdown();
     });
+
+    /* File Change & Preview Helper — dipakai Foto Rumah & Foto ODP (Skip Survey) */
+    function onFileChange(fieldId) {
+        const input = document.getElementById(fieldId);
+        const label = document.getElementById('file-label-' + fieldId);
+        const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
+        const previewContainer = document.getElementById('preview-container-' + fieldId);
+        const previewImg = document.getElementById('preview-img-' + fieldId);
+
+        if (input.files && input.files.length > 0) {
+            const file = input.files[0];
+            label.textContent = file.name;
+            input.setAttribute('data-populated', 'true');
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (previewImg) previewImg.src = e.target.result;
+                    if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
+                    setElementVisible(previewContainer, true);
+                };
+                reader.readAsDataURL(file);
+            }
+        } else {
+            label.textContent = "Belum ada file";
+            input.removeAttribute('data-populated');
+            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
+            setElementVisible(previewContainer, false);
+            if (previewImg) previewImg.src = '';
+        }
+        runLiveProgressUpdates();
+    }
+
+    function clearFile(fieldId) {
+        const input = document.getElementById(fieldId);
+        if (input) {
+            input.value = '';
+            onFileChange(fieldId);
+        }
+    }
 
     /* Dynamic Districts AJAX */
     function loadDistricts(cityId, selectedDistrictId = null, selectedVillageId = null) {
@@ -543,55 +669,15 @@
             });
     }
 
-    /* File Change & Preview Helper */
-    function onFileChange(fieldId) {
-        const input = document.getElementById(fieldId);
-        const label = document.getElementById('file-label-' + fieldId);
-        const defaultPlaceholder = document.getElementById('default-placeholder-' + fieldId);
-        const previewContainer = document.getElementById('preview-container-' + fieldId);
-        const previewImg = document.getElementById('preview-img-' + fieldId);
-
-        if (input.files && input.files.length > 0) {
-            const file = input.files[0];
-            label.textContent = file.name;
-            input.setAttribute('data-populated', 'true');
-
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    if (previewImg) previewImg.src = e.target.result;
-                    if (defaultPlaceholder) defaultPlaceholder.classList.add('hidden');
-                    // Preview pakai inline style karena kontainernya juga ber-class 'flex'
-                    // — alasan sama seperti di setElementVisible().
-                    setElementVisible(previewContainer, true);
-                };
-                reader.readAsDataURL(file);
-            }
-        } else {
-            label.textContent = "Belum ada file dipilih";
-            input.removeAttribute('data-populated');
-            if (defaultPlaceholder) defaultPlaceholder.classList.remove('hidden');
-            setElementVisible(previewContainer, false);
-            if (previewImg) previewImg.src = '';
-        }
-        runLiveProgressUpdates();
-    }
-
-    function clearFile(fieldId) {
-        const input = document.getElementById(fieldId);
-        if (input) {
-            input.value = '';
-            onFileChange(fieldId);
-        }
-    }
-
     /* Live Layanan Billing Calculation */
     function updateLayananBreakdown() {
         const select = document.getElementById('internet_package_id');
         const discountInput = document.getElementById('discount_amount');
         
         let basePrice = 0;
-        let discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
+        // Kolom diskon bermasking ribuan — parseFloat('10.000') = 10, dan
+        // rincian harga di layar akan berbohong tanpa parser ini.
+        let discount = (discountInput && window.Rupiah ? window.Rupiah.angka(discountInput.value) : parseFloat(discountInput ? discountInput.value : 0)) || 0;
 
         if (select && select.selectedIndex >= 0) {
             const selectedOpt = select.options[select.selectedIndex];
@@ -717,11 +803,17 @@
             city_id: 'Kota',
             district_id: 'Kecamatan',
             village_id: 'Desa',
-            foto_ktp: 'Foto KTP',
             internet_package_id: 'Paket Internet',
             jenis_kontrak: 'Jenis Kontrak',
             contract_period_months: 'Masa Kontrak',
-            discount_amount: 'Diskon'
+            discount_amount: 'Diskon',
+            latitude: 'Latitude',
+            longitude: 'Longitude',
+            nearest_odp: 'ODP Terdekat',
+            cable_estimation_meter: 'Estimasi Kabel',
+            difficulty_level: 'Tingkat Kesulitan',
+            foto_rumah: 'Foto Rumah',
+            survey_photo: 'Foto ODP'
         };
         return labels[field] || field;
     }
@@ -733,7 +825,7 @@
         document.getElementById('step-panel-' + currentActiveStep).classList.remove('hidden');
 
         // Update mobile stepper buttons UI
-        for (let i = 1; i <= 3; i++) {
+        for (let i = 1; i <= totalStepsCount; i++) {
             const mBtn = document.getElementById('mobile-step-btn-' + i);
             if (mBtn) {
                 if (i === currentActiveStep) {

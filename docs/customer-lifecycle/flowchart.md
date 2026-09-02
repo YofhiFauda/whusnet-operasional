@@ -25,6 +25,8 @@ active ──┬──▶ suspended ──┬──▶ active (reaktivasi)
 
 Catatan: `terminated` via `CustomerTerminationController` **tidak lewat state machine ini** — bisa terjadi dari status manapun tanpa validasi (lihat [business-logic.md §8](business-logic.md#8-terminasi-layanan-customerterminationcontroller)).
 
+Catatan lain (2026-08-21): edge `registered → waiting_acc` di enum ada khusus buat **Skip Survey** (§2a) — di alur nyata gak lewat state machine ini juga (status di-set langsung di `Customer::create()`, bukan lewat `CustomerWorkflowService::transition()`), tapi edge-nya tetap didaftarkan biar sah kalau ada kode lain yang nanti transisi eksplisit dari `registered`.
+
 ## 2. Alur Registrasi → Survey
 
 ```
@@ -79,6 +81,41 @@ Task Survey → complete()
 transition → waiting_acc
 broadcast SurveyCompleted + notifikasi Telegram
 ```
+
+### 2a. Skip Survey — Sales input data survey langsung (baru 2026-08-21)
+
+```
+Sales isi form registrasi, centang "Skip Survey" (POST /customers)
+        │
+        ▼
+   punya permission customers.registration.skip_survey? ──tidak──▶ TOLAK (403,
+        │                                                           CustomerRegistrationRequest::authorize())
+        │ ya
+        ▼
+   latitude/longitude, ODP terdekat, estimasi kabel,
+   tingkat kesulitan, foto rumah, foto ODP semua terisi? ──tidak──▶ TOLAK (422, required_if:skip_survey,1)
+        │ ya
+        ▼
+Customer::create() — status = waiting_acc (LANGSUNG, skip waiting_survey/
+  survey_in_progress/surveyed sepenuhnya)
+customer_code di-generate dari Pop sequence (sama seperti alur normal)
+foto rumah diupload via FileUploadService::uploadSurveyPhoto() folder 'house'
+        │
+        ▼
+CustomerSurvey::create() — survey_status=completed, technician_id=user Sales,
+  nearest_odp/cable_estimation_meter dari input, survey_note diberi tag
+  "Diinput oleh Sales saat Registrasi (Skip Survey)"
+        │
+        ▼
+Task/FopTask kategori SURVEY TIDAK dibuat sama sekali (beda dari §6 auto-sync)
+        │
+        ▼
+Customer muncul LANGSUNG di antrean ACC Admin (/verifications/queue) — gak
+pernah mampir /surveys/queue sama sekali. Lanjut ke §3 seperti pelanggan
+survey normal.
+```
+
+Guard permission `customers.registration.skip_survey` dua lapis: `@can` sembunyikan checkbox+field di blade (`customers/create.blade.php`), DAN `CustomerRegistrationRequest::authorize()` — klien yang maksa kirim `skip_survey=1` tanpa permission dapat 403, bukan lolos dengan field survey yang jadi wajib padahal gak relevan.
 
 ### 2b. Batalkan Survey — sebelum/selagi dikerjakan (baru 2026-07-21)
 
@@ -334,3 +371,5 @@ Task::create() — status=pending
 ```
 
 Lihat [docs/fop-task/flowchart.md](../fop-task/flowchart.md) untuk detail lapis kedua ini.
+
+Catatan: target `waiting_acc` **tidak** termasuk di daftar ini — makanya Skip Survey (§2a) yang langsung set status `waiting_acc` gak pernah memicu auto-create Task/FopTask kategori SURVEY. Task/FopTask kategori PEMASANGAN tetap ke-trigger normal begitu customer nanti sampai `waiting_installation` (via ACC Admin, §3), gak ada percabangan khusus di sana.

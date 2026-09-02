@@ -20,10 +20,10 @@ class FileUploadServiceTest extends TestCase
         ]);
         $customer->id = 12;
 
-        $file = UploadedFile::fake()->image('ktp.jpg');
-        $path = FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'ktp');
+        $file = UploadedFile::fake()->image('rumah.jpg');
+        $path = FileUploadService::uploadCustomerRegistrationDoc($file, $customer, 'rumah');
 
-        $this->assertEquals('registrations/ktp/ktp_C00RQ00012_Budi Santoso.jpg', $path);
+        $this->assertEquals('surveys/rumah/rumah_C00RQ00012_Budi Santoso.jpg', $path);
         Storage::disk('public')->assertExists($path);
     }
 

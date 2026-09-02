@@ -48,6 +48,10 @@ class CustomerListFilterKeepsStatusGroupTest extends TestCase
         $response->assertStatus(200);
         // Form harus membawa status_group terminated agar submit tetap di grup ini.
         $response->assertSee('name="status_group" value="terminated"', false);
+        // ...dan action-nya tetap di route halaman ini, bukan dilempar ke
+        // /customers (List Pelanggan biasa) — termasuk form pemilih jumlah baris
+        // yang dulu hardcode action="/customers".
+        $response->assertDontSee('action="/customers"', false);
     }
 
     public function test_search_within_terminated_group_stays_scoped(): void

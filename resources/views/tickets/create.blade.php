@@ -159,7 +159,15 @@
             TicketController@store bercabang wantsJson(): fallback non-JS (mis.
             submit dari /fop-tasks) tetap PRG normal.
         --}}
-        <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+        {{-- action/method/@csrf dirender server-side walau jalur normalnya fetch()
+             di submitForm(). Tanpa ini form tidak punya target sama sekali: kalau
+             Alpine gagal boot (atau submitForm() melempar sebelum preventDefault),
+             browser POST ke URL halaman ini — /tickets/create yang cuma GET, jadi
+             tiket hilang tanpa jejak. Dengan target eksplisit, fallback-nya POST
+             beneran ke TicketController@store yang sudah bercabang wantsJson().
+             ADHOC-20 langkah 3. --}}
+        <form action="{{ route('tickets.store') }}" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+            @csrf
 
             <div class="flex-1 overflow-y-auto custom-scrollbar">
 
@@ -1089,7 +1097,18 @@
             // per POP ini (Gap #3).
             allowedPopIds: @json($allowedPopIds),
 
+            // Prefill dari scan QR (QrTicketController — Fungsi B,
+            // docs/plan/qr-code/rancangan-qr-pelanggan-final.md §6.2). Bentuk
+            // objeknya SAMA PERSIS hasil lookup-customer (lihat
+            // TicketController::customerPayload()), jadi pick() yang sudah
+            // ada bisa langsung dipakai apa adanya — nol logic baru.
+            prefillCustomer: @json($prefillCustomer ?? null),
+
             init() {
+                if (this.prefillCustomer) {
+                    this.pick(this.prefillCustomer);
+                    this.setFormOpen(true);
+                }
                 this.initEchoListeners();
                 const narrow = window.matchMedia('(max-width: 1023px)');
                 const updateNarrow = () => { this.narrowViewport = narrow.matches; };

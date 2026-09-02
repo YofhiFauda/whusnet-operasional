@@ -24,6 +24,851 @@ Current Task: S8.10-T003 (FOP Notification Dashboard)
 | ADHOC-15 | Detail Task teknisi: blok Laporan Pekerjaan Teknisi + Riwayat Task Saya + hapus fitur Foto Bukti + fix redirect `return_to` Laporan Survey/Pemasangan (lihat detail di bawah) | Done — 2026-08-06 |
 | ADHOC-16 | Pisah "catatan" yang tumpang tindih di Task eksekusi (`Issue/Keluhan` kecampur `catatan_teknis`/`notes`) — 3 sumber, 3 box terpisah (lihat detail di bawah) | Done — 2026-08-07 |
 | ADHOC-17 | Task teknisi: catat `completed_by` (siapa yang menyelesaikan & lapor) + tampilkan di detail task, gak lagi cuma keliatan admin/fop (lihat detail di bawah) | Done — 2026-08-07 |
+| ADHOC-18 | Kolektor 2.0 **Fase 1** — pisah Worksheet Admin vs Worklist Kolektor, kolektor mencatat pembayarannya sendiri, jendela tagih 7 hari (lihat detail di bawah) | Done — 2026-08-08 |
+| ADHOC-19 | Kolektor 2.0 **Fase 2** — Saldo (turunan) + Setoran + cross check + selisih & pelunasan lintas setoran + hapus buku Owner (lihat detail di bawah) | Done — 2026-08-08 |
+| ADHOC-20 | Bundle **Alpine.js lewat Vite**, lepas dari CDN jsdelivr + sisir target POST yang dirakit di klien (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-21 | Kolektor 2.0 **Fase 3** — Visit Log (kunjungan tanpa hasil) + laporan aging per kolektor (lihat detail di bawah) | Done — 2026-08-08 |
+| ADHOC-22 | **Perbaikan hasil review Kolektor 2.0 Fase 1–3** — seluruh 10 temuan ditutup (lihat detail di bawah) | Done — 2026-08-08 |
+| ADHOC-23 | **Dokumentasi modul Kolektor** — `docs/kolektor/` (README, business-logic, user-flow, flowchart, database-schema) mencakup Fase 1–3 + perbaikan #1–#9 & R1–R2 | Done — 2026-08-08 |
+| ADHOC-24 | Kolektor 2.0 **Fase 4** — kwitansi ber-QR, upload bulk, pencocokan otomatis + OCR cadangan + override manual (lihat detail di bawah) | Done — 2026-08-08 |
+| ADHOC-25 | **OCR kwitansi: hasil tebakan tak boleh jadi keputusan** — lubang dorman yang hidup saat `GEMINI_API_KEY` diisi (lihat detail di bawah) | **Terbuka** — dicatat 2026-08-08, **memblokir aktivasi OCR** |
+| ADHOC-26 | **Tagihan bulanan tak terbit + pencocokan kwitansi massal + queue/batas PHP** — `--period`, tempo tanggal 10 seragam, lapisan teks PDF jadi jalur utama, lembar borongan, idempotency jalur Tagihan, antrean `kwitansi`, kebocoran queue saat testing (lihat detail di bawah) | Done — 2026-08-11 |
+| ADHOC-27 | **Aksi selesai tapi layar diam** — panel progres kwitansi, indikator koneksi realtime global, sukses palsu SLA matrix, realtime setoran & aktivitas kas kolektor dua arah, + 9 test RBAC merah (cache bocor lewat env compose) (lihat detail di bawah) | Done — 2026-08-11 |
+| ADHOC-28 | **Material & alat teknisi hilang senyap** — FopTask Survey/PSB cuma lahir saat papan FOP dibuka, padahal jadi anchor wajib `task_materials`/`task_work_tools`; + halaman Verifikasi Admin menampilkan data yang benar-benar diinput (lihat detail di bawah) | Done — 2026-08-11 |
+| ADHOC-29 | **Satu pembayaran, tiga kwitansi berbeda isi** — struk thermal, lembar A4, dan kartu kolektor disatukan lewat `ReceiptPresenter`; header/footer bawaan browser dimatikan di semua halaman cetak (lihat detail di bawah) | Done — 2026-08-12 |
+| ADHOC-30 | **Nominal `150.000` dibaca 150 rupiah** — masking ribuan di seluruh kolom uang + normalisasi server `RupiahInput` di semua endpoint yang menerimanya (lihat detail di bawah) | Done — 2026-08-12 |
+| ADHOC-32 | **Kwitansi hilang senyap pada berkas banyak-halaman** — pembacaan berhenti di hasil pertama (QR: 1 nomor per berkas; teks: parsial menutup jalur cadangan). Berkas tetap berstatus "Cocok". Rancangan: baca **per halaman** + **himpunan yang diharapkan** dari konteks unggahan (sistem menyebut nomor yang belum ketemu). **Bug aktif, tidak menunggu Gemini.** Analisa: `analisa-operasional-ocr-gemini.md` §3A.4, rancangan §3D | **Terbuka** — ditemukan 2026-08-12 |
+| ADHOC-31 | **OCR Gemini: rate limit, cooldown & antisipasi galat** — rancangan operasional (rem, klasifikasi 429/503/401, cooldown, pagu harian) **+ tiga temuan berat**: seluruh berkas (data 200 pelanggan) terkirim ke pihak ketiga, prompt satu-nomor vs lembar 200-kwitansi, ketentuan data tier gratis. Plus mode bayangan & rencana gelar. Analisa: `docs/plan/kolektor/analisa-operasional-ocr-gemini.md` | **Terbuka** — dirancang 2026-08-12, implementasi menunggu keputusan D11–D13 |
+| ADHOC-33 | **Pelanggan Gagal & Putus masih menumpang satu Blade** — view sendiri per halaman + trait `RendersCustomerList` (lihat detail di bawah) | Done — 2026-08-12 |
+| ADHOC-34 | **Tim FOP hilang dari papan begitu ganti hari** — papan menampilkan tim lampau yang masih punya task aktif (maks 30 hari) + pecahan tunggakan di tabel beban teknisi + hapus `fop:reset-cancelled-tasks` (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-35 | **Riwayat Perubahan Status di Detail Task tampil dobel** — dua lapis pencatat audit; duplikat murni dicabut + timeline disaring `TaskAuditTimeline` (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-36 | **Pencarian pada Halaman Collector Worklist** — pencarian rute kerja berdasarkan Nama Lengkap, CID, atau No. Invoice (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-37 | **Jejak uang putus sesudah setoran kolektor diverifikasi** — modul **Setoran Kas** (admin → owner/bank): saldo kas turunan, rincian sumber per kolektor/pelanggan, titik nol data historis, Card Saldo di Worksheet Admin. Analisa & rancangan: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md) | Done — 2026-08-14 |
+| ADHOC-38 | **Metode Pembayaran + Saldo Pelanggan di Modal Bayar Invoice** — dropdown Cash/Transfer (field Nama Bank+No. Rekening)/Kolektor (pilih kolektor, saldo kolektor tetap derived); ledger `customer_balance_mutations` (saldo aktif dari lebih bayar, bisa dipakai sebagian di pembayaran berikutnya); Ringkasan Tagihan tambah Metode Bayar + Saldo Pelanggan; dialog sukses + tombol Cetak Struk. Meng-override keputusan §D-5 (saldo pelanggan DILUAR SCOPE) atas permintaan eksplisit user — lihat catatan override di [`docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md`](plan/analisa-billing-tagihan-pembayaran-kolektor.md). Rencana: [`docs/plan/metode-pembayaran-pada-modal-mighty-tower.md`](plan/metode-pembayaran-pada-modal-mighty-tower.md) | Done — 2026-08-18 |
+| ADHOC-39 | **Nav "Tagihan" vs "Pembayaran" dipisah by MEANING, bukan by fitur-asal** — "Tagihan" = kewajiban yang masih ada (Belum Lunas + Semua Tagihan). "Pembayaran" = histori uang masuk (Riwayat Transaksi + Lebih Bayar). "Tagihan Lunas" **dicabut dari nav** (bukan cuma dipindah) — begitu lunas itu bukan "tagihan" lagi. Route/controller/view `invoices.lunas`/`payments.*` semua TETAP ADA, cuma pintu masuknya diatur ulang. Copy usang di halaman Overpay ("bukan saldo ledger, diselesaikan manual") diperbaiki — sekarang benar-benar jadi saldo aktif sejak ADHOC-38. | Done — 2026-08-18 |
+| ADHOC-40 | **Rancangan API Eksternal** — (1) **webhook pemasangan** outbound: satu-satunya event `installation.activated`, dipicu tombol **"Aktivasi Laporan Speedtest"** (`storePemasangan()`) — titik pertama di mana keenam data (nama/POP/desa/paket/SN/ODP) lengkap. Butuh event baru `InstallationActivated`; outbox fan-out **dua transport**: `http_json` (Website B, HMAC) + `telegram` (Telegram **Eksternal**, kredensial per-endpoint — Telegram Internal 6 pemanggilan inline tidak disentuh); `idempotency_key` karena Aktivasi bisa ditekan berulang. (2) **portal pelanggan** — merinci kontrak QR §6.6 yang sudah dikonfirmasi pemilik produk (`login_id` `{prefix_pop}-{customer_code}`, `customer_portal_accounts` + `customer_portal_tokens` terpisah, klaim via PIN, kwitansi lewat `ReceiptPresenter` dipangkas, status tiket lewat `Ticket::resolveStatus()`, `invoice.updated` dari `Invoice::recalculateFromPayments()`). **Nol dependensi baru.** Dokumen: [`docs/api/`](api/README.md). Rev. 6 — + [`keputusan.md`](api/keputusan.md): alternatif ditolak, alasan webhook vs REST, peta pengembangan, 5 pertanyaan terbuka | **Rancangan** — 2026-08-19 |
+| ADHOC-41 | **Laporan Speedtest (step 6 wizard `installations.report`) terkunci sampai Laporan Pemasangan & Perangkat (step 5) diaktivasi** — wizard teknisi dipecah jadi dua submit terpisah: `storePemasangan()` (simpan device/material/3 foto wajib, TIDAK menyelesaikan task/workflow) lalu `storeSpeedtest()` (SATU-SATUNYA titik penyelesaian: task complete + transisi `verification_admin`). Gerbang dihitung dari data tersimpan (3 foto + material terpakai), bukan kolom baru. Route baru `customers.installation.pemasangan`/`customers.installation.speedtest`; `store()` lama TETAP ADA apa adanya (dipakai modal admin `_installation.blade.php`, tidak disentuh). Test: `InstallationSpeedtestActivationGateTest`. | Done — 2026-08-19 |
+| ADHOC-42 | **Webhook Telegram hilang diam-diam + retry membakar 6 jam untuk galat yang mustahil sembuh** (turunan ADHOC-40). Dua bug kode: (1) `WebhookOutbox::maxDeliveredActivationNumber()` tidak memfilter `destination` — satu penekanan Aktivasi menulis dua baris ber-`idempotency_key` sama, jadi Website B yang `delivered` #7 membuat baris Telegram #4/#5/#6 di-`skipped` "superseded" padahal Telegram belum pernah menerima apa pun (3 notifikasi hilang senyap di data nyata). (2) Telegram tidak punya guard konfigurasi seperti `website_b`, dan 401/403/404 Bot API ikut siklus retry 8x/6 jam — sekarang `configError()` mencakup dua tujuan dan galat permanen langsung `failed` (429/5xx tetap di-retry). Dua temuan operasional: `supervisor-webhooks` belum aktif karena Horizon boot sebelum `config/horizon.php` berubah, dan satu `queue:work --queue=webhooks` manual berumur 4,5 jam memegang `.env` lama (token Telegram kosong → 404 "Not Found") sambil rebutan antrean dengan Horizon. Test: `SendWebhookOutboxJobTest` (+5 kasus). | Done — 2026-08-20 |
+| ADHOC-43 | **Skip Survey saat Registrasi** — Sales (atau role lain yang diberi permission) bisa lewat tahap survey lapangan asal input data survey lengkap (ODP terdekat, estimasi kabel, tingkat kesulitan, foto rumah, foto ODP) + titik koordinat langsung di form registrasi. Permission baru `customers.registration.skip_survey` (`ActionCode::SKIP_SURVEY`, feature `customers.registration`) — default cuma role Sales di `RolePermissionSeeder`, digerbangi juga di `CustomerRegistrationRequest::authorize()` (403 kalau `skip_survey=1` tanpa permission, bukan validasi field survey yang membingungkan). Customer lahir langsung `status=waiting_acc` (skip `waiting_survey`/`survey_in_progress`/`surveyed` sepenuhnya) — `WorkflowTransition::REGISTERED` nambah edge ke `WAITING_ACC`. `CustomerSurvey` dibuat otomatis (`survey_status=completed`, `technician_id`=Sales, `survey_note` ber-tag "Skip Survey"). **Sengaja TIDAK ada Task/FopTask SURVEY yang lahir** — beda dari alur normal yang selalu auto-create keduanya. Alur pasca-`waiting_acc` (ACC Admin → `waiting_installation` → provisioning FopTask PEMASANGAN) sama persis dengan pelanggan survey normal, tidak disentuh. Test: `CustomerRegistrationSkipSurveyTest` (4 kasus: sukses, validasi wajib, 403 tanpa permission, regresi alur normal). **User demo:** `SalesSeeder` (baru, dipanggil dari `DatabaseSeeder`) — `sales@whusnet.com`/`password`, role `sales`, scope `all_pop`, permission `customers.registration.skip_survey` otomatis lewat `RolePermissionSeeder`. Test `SalesSeederSkipSurveyScenarioTest` (2 kasus) ngiket seeder ke skenario penuh — kalau seeder lupa assign role/scope/permission yang bener, ini yang gagal duluan. **Catatan operasional:** di DB yang sudah ada duluan (bukan `migrate:fresh --seed`), permission baru gak otomatis muncul — wajib re-run `FeatureSeeder`+`ActionSeeder`+`RolePermissionSeeder` lalu `EffectiveAccessService::clearCache($user)` buat user yang udah pernah login (permission di-cache). Diverifikasi manual di dev DB (docker `whusnet-app`) — `hasPermission()` sales balik `NO` sebelum re-seed, `YES` sesudahnya. **Dua bug UI ditemukan & diperbaiki pasca-implementasi:** (1) panel `skip-survey-fields` dirender `class="grid ... hidden"` — utility `hidden` dan `grid` sama-sama `display`, specificity sama, `hidden` kalah cascade → checkbox dicentang tapi panel gak pernah nongol. Fix: pindah ke inline `style="display:none"` (pola sama `surveys/report.blade.php`, sudah didokumentasikan sebelumnya tapi kelewat di sini). (2) `AppServiceProvider::boot()` sebelumnya `Gate::define()` satu-satu dari `Permission::all()` SEKALI saat app boot — permission baru yang di-seed pasca-boot (kasus nyata: test yang seeding di `setUp()`, juga DB lama yang belum di-`migrate:fresh`) gak pernah punya Gate ability terdaftar, jadi `@can()` salah walau `hasPermission()` langsung sudah benar. Diganti `Gate::before()` — delegasi semua ability ke `hasPermission()` langsung, gak perlu pre-registrasi, sekalian hapus query `Permission::all()` tiap boot. Ability berbasis nama manusia (`permission->name`) yang lama didefinisikan dilepas — diverifikasi grep gak dipakai di satu pun `@can()`. Ditambah **Tanggal Request Pemasangan** (opsional, sama seperti Lapor Survey teknisi) ke panel Skip Survey. Test tambahan: `test_skip_survey_panel_uses_inline_style_not_conflicting_hidden_class`, `test_skip_survey_rejects_past_requested_installation_date`, assert `requested_installation_date` di test sukses. **`Gate::before()` global sempat bikin regresi nyata saat full-suite run** (bukan cuma hipotesis) — `FopTaskCancelCascadeAuthTest::test_owner_wildcard_cannot_bypass_survey_invariant` gagal (expect 403, dapat 200): `Gate::before()` versi awal cek SEMUA ability tanpa syarat, jadi ability Policy kata-tunggal-tanpa-titik (`TaskPolicy::cancel`/`cancelViaFopTask`) ikut ke-short-circuit SEBELUM `TaskPolicy::before()` sempat jalan — wildcard `*` Owner nembus invarian SRV/PSB yang sengaja dikecualikan Policy itu (`in_array($ability, ['cancel','cancelViaFopTask'])`). Fix: `Gate::before()` cuma aktif kalau `$ability` mengandung `.` (bentuk kode permission `feature.action`, format tetap — lihat CLAUDE.md § RBAC) — ability Policy selalu kata tunggal, otomatis lolos gak disentuh. Ketauan justru karena full-suite dijalankan lengkap (bukan cuma file terkait), bukan dari baca kode. Regresi RBAC/Policy disapu penuh setelah fix (`RolePermissionMatrixTest`, `TicketingRbacTest`, `TaskFopActionsTest`, `TaskOwn*Test`, `FopTaskCancelCascadeAuthTest`, dll — 76 test) + full suite (`php artisan test`) — hijau semua kecuali kegagalan `Permission denied` `storage/framework/testing/disks/local` yang pre-existing (izin folder docker, gak terkait perubahan ini). | Done — 2026-08-21 |
+| ADHOC-44 | **Papan /fop-tasks & kartu Task Teknisi gak update realtime kalau perubahan status dipicu dari halaman LAIN** (bukan dari halaman itu sendiri) — user minta SPA-like, nol polling/refresh manual. Root cause: `TaskStarted`/`TaskCompleted` (`App\Events`, dipicu `TaskService::start()`/`complete()` — dipakai SEMUA tipe task: Survey/Pemasangan/Maintenance) cuma disiarkan ke channel `fop.{pop_id}` (Dashboard FOP doang). Papan `/fop-tasks` (channel `fop-tasks.{pop_id}`) cuma dengar `.FopTaskUpdated` — event itu cuma di-dispatch dari `FopTaskController` sendiri (edit lewat papan), gak pernah ke-trigger kalau teknisi start/lapor dari halaman Task-nya sendiri. Kartu Task Teknisi (`teknisi.{user_id}`) cuma dengar `TaskScheduled` — gak dengar status berubah kalau dipicu ANGGOTA TIM LAIN (task 1-3 orang, siapa pun boleh start/lapor — bukan cuma yang start, lihat diskusi sebelumnya). Fix: `TaskStarted`/`TaskCompleted::broadcastOn()` sekarang nyiarin ke TIGA channel sekaligus — `fop.{pop_id}` (gak berubah), `fop-tasks.{pop_id}` (baru), + `teknisi.{user_id}` per anggota tim (baru, pola sama persis `TaskScheduled`). Payload tambah `fop_task_id` (resolve `FopTask::where('task_id',...)`, null kalau gak ada FopTask terhubung) — dipakai papan nentuin baris mana yang di-refresh (beda dari `Task.id`). Frontend: `fop_tasks/index.blade.php` & `tasks/own.blade.php` nambah `.listen('TaskStarted'/'TaskCompleted', ...)` di subscription channel yang SUDAH ADA, reuse helper DOM-patch yang sudah ada (`refreshFopTaskRow()`/`refreshTaskCard()` — fetch partial HTML, ganti elemen, TANPA reload/polling). **Dashboard FOP sudah realtime sebelumnya** (listen `TaskStarted`/`TaskCompleted`/`Survey*`/`Installation*` di `fop.{pop_id}`) — gak disentuh, cuma dua target lain yang punya gap. Test: `TaskBroadcastingTest` +2 kasus (`test_task_start_broadcasts_to_fop_tasks_board_and_team_members`, `test_task_completed_payload_resolves_linked_fop_task_id`) — 7 test total, semua existing tetap hijau (channel `fop.{pop_id}` masih index `[0]` di array, urutan dipertahankan). | Done — 2026-08-21 |
+| ADHOC-45 | **Worksheet Admin, Setoran Kas, Worklist Kolektor — SPA-like penuh** (lanjutan ADHOC-44, modul kas kolektor). Temuan: Worksheet Admin & Worklist Kolektor SEBENARNYA sudah punya infra realtime (`partials/collector-realtime.blade.php`, dengar `CollectorDepositUpdated`/`CollectorActivityUpdated`) — tapi **sengaja** cuma nongolin toast + bar "Muat ulang" manual, alasan didokumentasikan di kode lama: halaman ini menghitung UANG FISIK, angka yang berubah diam-diam di tengah hitungan admin dianggap berbahaya. **User diberi tahu risiko ini secara eksplisit lalu memilih override penuh** ("auto-update SEMUA angka, termasuk pas form kebuka") — bukan keputusan yang diambil sepihak. Setoran Kas (`cash-deposits`) malah belum punya broadcast apa pun sama sekali, dibangun dari nol. **Perubahan:** (1) `partials/collector-realtime.blade.php` — bar+"Muat ulang" manual DICABUT, diganti auto-patch: tiap event masuk, `fetch(window.location.href)` ulang, ambil elemen ber-`id="live-content"` dari hasilnya, `replaceWith()` elemen yang sama di halaman sekarang + `Alpine.initTree()` (pola identik `refreshFopTaskRow`/`refreshTaskCard` ADHOC-44) — TANPA syarat "skip kalau modal/form lagi kebuka" (sesuai pilihan user; kalau admin lagi ngetik nominal di form yang ada di dalam `#live-content` pas event lain masuk, ketikannya bisa ketiban data fresh — keputusan sadar, didokumentasikan di komentar file). Toast tetap tampil sebagai kabar, cuma gak lagi wajib diklik buat lihat data baru. (2) Wrapper `id="live-content"` ditambahkan ke div konten utama `collector-worksheet/index.blade.php`, `show.blade.php`, `collector-worklist/index.blade.php`, `cash-deposits/index.blade.php` (4 halaman). (3) Event baru `App\Events\CashDepositUpdated` (`ShouldBroadcastNow`, pola sama `CollectorDepositUpdated`) — channel `cash-deposits` (global, gerbang `cash_deposit.view` di `routes/channels.php`, gak per-POP karena pemeriksanya Owner/atasan yang sudah bypass scope) + `App.Models.User.{depositor_id}` (kanal generik yang sudah ada). Dispatch di 3 titik `CashDepositService` (`submit()`→`diajukan`, `verify()`→`diverifikasi`, `writeOff()`→`ditutup_selisih`), dibungkus `safelyNotify()` yang sudah ada (gagal kirim kabar TIDAK boleh menggagalkan transaksi uang). (4) `CollectorWorksheetController::activityChannels()` nambah kanal pribadi viewer sendiri (`App.Models.User.{id}`) — biar admin dengar kabar setoran kasnya SENDIRI ke Owner tanpa reload Worksheet. Test baru: `CashDepositBroadcastingTest` (3 kasus: submit/verify/writeOff nyiarin ke channel yang benar), `CollectorWorksheetTest` +1 kasus (kanal pribadi + `id="live-content"` ke-render). Regresi disapu: `CashDepositVerificationTest`, `CollectorWorklist*Test`, `CollectorWorksheetTest`, `TaskBroadcastingTest`, `FopTaskCancelCascadeAuthTest` — 58 test, semua hijau. | Done — 2026-08-21 |
+| ADHOC-46 | **QR Pelanggan Fase 1 — Fondasi** (rancangan: [`docs/plan/qr-code/rancangan-qr-pelanggan-final.md`](plan/qr-code/rancangan-qr-pelanggan-final.md), di luar sprint aktif — dikerjakan atas permintaan eksplisit user). Fondasi HMAC + dispatcher + Fungsi B (ticketing prefill) — PIN/halaman tagihan (Fase 2) dan absen teknisi (Fase 3) BELUM disentuh. `config/qr.php` (`QR_HMAC_SECRET` wajib di production, guard di `AppServiceProvider::boot()`) + `Base32Helper` (RFC 4648, tanpa dependency). Migration `customer_qr_tokens` (token 128-bit acak + `signed_pop_id`/`signed_customer_code` dibekukan saat terbit, TANPA kolom PIN — menyusul Fase 2) + `qr_scan_logs` (semua scan tercatat termasuk gagal). `CustomerQrTokenService` (`issue`/`revoke`/`signature`/`verify`/`resolve`/`recordScan`, HMAC-SHA256 `pop_id|customer_code|token`, dukung rotasi `previous_secrets`). `CustomerQrTokenObserver::creating()` menegakkan invariant "maks 1 token aktif/pelanggan" dari SEMUA jalur (bukan cuma Service). `CustomerObserver` ditambah hook: pelanggan `terminated` atau `pop_id` berubah (re-homing) → token QR ikut tercabut otomatis (notifikasi admin POP masih TODO, kanal belum diputuskan). Dispatcher publik `GET /q1/{code}` (regex base32 `[A-Z2-7]{26}\.[A-Z2-7]{10}`, throttle `qr-public` 60/menit/IP) — 4 kegagalan (`token_not_found`/`bad_signature`/`token_revoked`/`pop_mismatch`) SEMUA 404 identik, detail cuma masuk log; tamu dapat placeholder tagihan (BUKAN 404 — QR-nya valid, cuma halaman Fase 2 belum ada); staf ber-`tickets.create` diarahkan 2-hop (`/q1/{code}` → `/q1/{code}/tiket`, hop kedua di belakang middleware `auth` ASLI, defense-in-depth) ke `tickets.create?customer_id=` yang prefill+lock field pelanggan (`TicketController::resolvePrefillCustomer()` reuse `customerPayload()` yang sama persis hasil lookup manual — Alpine `pick()` yang sudah ada dipakai apa adanya, **nol perubahan** ke `TicketService::create()`/alur sync Ticket↔FopTask↔Task). Halaman staf `customers/{customer}/qr` (lihat/terbitkan/cabut) + `/qr/cetak` (stiker QR+nama+REQ ID+POP, TANPA PIN/signature teks — `endroid/qr-code` versi existing `^5.1` dipakai apa adanya, SVG via `CustomerQrCodeRenderer` pola sama `ReceiptQrRenderer`; sempat ke-upgrade gak sengaja ke v6 saat `composer require`, di-revert). 6 permission baru lewat `PermissionGeneratorService` (`customers.qr.view/create/cancel/print`, `tasks.qr_attendance.create` & `qr_scan_logs.view` diseed sekarang meski enforcement-nya baru Fase 2/3) — `QrFeatureSeeder`, digrant sesuai tabel §5 dokumen (admin penuh; pop_admin view+print; helpdesk/fop view; fop+teknisi `qr_attendance.create`; owner/atasan/admin `qr_scan_logs.view`). Test: `tests/Feature/QrCode/CustomerQrTokenServiceTest.php` (7 kasus — signature deterministik & berubah per bahan, dua pelanggan beda POP `customer_code` sama → signature beda, issue idempoten, tolak `customer_code`/`pop_id` kosong, revoke idempoten, invariant satu-token-aktif dari jalur non-HTTP/tinker, verify terima secret lama saat rotasi) + `tests/Feature/QrCode/QrScanDispatchTest.php` (9 kasus — semua status kegagalan + body 404 identik, format invalid ditolak di level route tanpa query DB, `pop_mismatch` tetap kedeteksi walau `pop_id` diubah lewat query builder BYPASS Observer, out_of_scope 403, alur ticketing 2-hop penuh sampai `assertViewHas('prefillCustomer', ...)`, tamu dapat placeholder bukan 404, scan sukses menaikkan `scan_count`) — 17 test, 44 assertion, hijau. Regresi disapu: `TicketingTest`/`TicketingRbacTest`/`TicketCidDisplayTest` (74 test), `PermissionGeneratorServiceTest`, `PostTargetRenderedServerSideTest`, `PortalCustomerObserverDisablesPortalOnTerminatedTest` — semua hijau.
+**Perbaikan pasca-review (sesi sama, sebelum ditutup):** (1) `tests/Feature/QrCode/QrStaffPageSmokeTest.php` (3 kasus baru) — `CustomerQrController` (`show`/`issue`/`print`/`revoke`) sebelumnya NOL test HTTP sungguhan (cuma level Service/dispatcher publik), termasuk render SVG QR asli lewat `endroid/qr-code`; ketiganya hijau di percobaan pertama, gak ada bug ketemu tapi sebelumnya buta total. (2) **Race condition ditutup** — `CustomerQrTokenService::issue()`/`revoke()` sebelumnya cek-lalu-insert/update tanpa lock: dua `issue()` bersamaan buat pelanggan sama (TOCTOU) bisa lolos dua-duanya sebelum salah satu commit, invariant "1 token aktif" bisa jebol di skenario konkuren (`CustomerQrTokenObserver` tetap correct tapi query-nya sendiri gak locked). Fix: `issue()` dibungkus `DB::transaction()` + `Customer::whereKey()->lockForUpdate()` (kunci baris PELANGGAN, bukan token — belum ada baris token buat dikunci saat pelanggan belum pernah dapat QR), menyerialkan semua `issue()` pelanggan yang sama; `revoke()` dibungkus lock serupa pada baris token-nya sendiri biar dobel-klik "Cabut" gak saling timpa `revoke_reason`. Pola sama persis `TicketService::close()`/`cancel()` yang sudah ada di repo — bukan pola baru. Race sungguhan (multi-proses) gak ditest — repo ini juga gak punya presedennya buat `lockForUpdate()` manapun (dicek: grep `race`/`concurrent`/`bersamaan` ke test Ticket = nol hasil), diverifikasi lewat code review + 20 test existing tetap hijau setelah perubahan. — 20 test total, 55 assertion, hijau. | Done (Fase 1) — 2026-08-26, **Fase 2 (PIN + halaman tagihan) & Fase 3 (absen) belum dikerjakan** |
+| ADHOC-47 | **QR Pelanggan Fase 2 — PIN + Halaman Tagihan Publik** (lanjutan ADHOC-46, rancangan §6.1/§6.5/§10 Fase 2, di luar sprint aktif — permintaan eksplisit user). Migration TERPISAH `add_pin_columns_to_customer_qr_tokens_table` (pin_hash bcrypt, pin_issued_at/by, pin_version, pin_must_change, pin_first_used_at, pin_expires_at 90 hari, pin_failed_attempts/pin_locked_until — lockout DB, bukan cache). `CustomerQrTokenService` +5 method: `issuePin()` (random_int CSPRNG, tolak 000000/123456/6-digit-sama/berurutan via `isWeakPin()` — cek "tanggal lahir" di dokumen SENGAJA dilewati, `customers` gak punya kolom tanggal lahir sama sekali), `verifyPin()` (urutan persis §6.5.4: expired→locked→invalid/success, lockout 5x/15menit), `changePin()` (tolak sama-dengan-lama + pola lemah), `verifyLegacyPhoneSuffix()` (jalur 4-digit HP buat pelanggan belum punya PIN). **Penerbitan OTOMATIS** di `CustomerWorkflowService::transition()` saat masuk `waiting_installation` — `issue()` token idempoten via `wasRecentlyCreated`, PIN CUMA diterbitkan kalau token BENAR-BENAR baru (instalasi diulang tidak menerbitkan PIN kedua yang mematikan kartu lama); gagal (customer_code/pop_id kosong) di-catch & di-log, TIDAK menggagalkan transisi workflow inti. `QrBillingController` (publik, TANPA auth) — two-step disclosure: `show()` gerbang PIN/4-digit-HP (masking nama via `FormatHelper::maskName()`, jumlah bintang TETAP biar panjang kata asli gak bocor) kalau sesi belum verified, rincian tagihan penuh (invoice list + rekening+salin+WA admin POP dari `pops.pic_phone`, TANPA gateway/QRIS — itu Fase 4 yang ditahan) kalau sudah; `verify()` (limiter TERPISAH `qr-billing-verify`, `perHour(5)` per IP+kode — penyederhanaan sadar dari "5/15menit lalu blokir 1 jam" dua-tahap doc, didokumentasikan sebagai simplifikasi) memindahkan sesi via flag boolean/timestamp SCOPED PER TOKEN, PIN ITU SENDIRI TIDAK PERNAH masuk session. **Wajib ganti PIN cetak di pemakaian pertama** (§6.5.5b) — `pin_must_change=true` menahan di halaman `ganti-pin` (session flag `pending_change` terpisah dari flag "verified penuh", gak bisa dilompati langsung) sebelum tagihan kebuka. `QrScanController` guest branch diubah dari placeholder Fase 1 (view inline) jadi redirect ke `qr.billing` sungguhan — `resources/views/qr/billing-placeholder.blade.php` DIHAPUS (dead code). Halaman staf `CustomerQrController::issuePin()` — SENGAJA BUKAN pola PRG redirect (nol perubahan; dokumen eksplisit larang PIN masuk session/flash/cache/log), PIN dirender LANGSUNG di body respons POST + header `Cache-Control: no-store`/`X-Robots-Tag: noindex`, satu-satunya momen PIN plaintext pernah ada di luar `pin_hash`. Numpang permission `customers.qr.create` yang sama (dokumen gak mendefinisikan permission terpisah buat PIN). Test: `CustomerQrPinServiceTest` (9 kasus — hash bukan plaintext, reset PIN gak ubah token/signature, verify sukses reset percobaan, 5 gagal kunci & bertahan walau `Cache::flush()`, PIN kedaluwarsa ditolak walau PIN benar, fallback 4-digit HP, changePin tolak sama-lama & pola lemah, changePin sukses matikan wajib-ganti & gak ikut kedaluwarsa) + `QrBillingPageTest` (6 kasus HTTP — gerbang 4-digit HP end-to-end, wajib-ganti-PIN sebelum lihat tagihan, halaman ganti-PIN gak bisa dilompati langsung, lockout 5x bertahan ke percobaan ke-6 walau PIN benar, kode invalid 404, invoice pelanggan muncul di detail) + `CustomerWorkflowQrAutoIssueTest` (2 kasus — waiting_installation nerbitkan token+PIN otomatis, transisi berulang TIDAK nerbitkan token/PIN kedua) + `QrStaffPageSmokeTest` +2 kasus (terbitkan-PIN HTTP sungguhan dengan verifikasi PIN yang ke-render di body beneran cocok sama hash yang tersimpan — bukan cuma dipercaya kode; 404 kalau belum ada token aktif) — **17 test baru, 56 assertion, hijau**, total modul QR jadi 39 test/123 assertion. Regresi disapu: `CustomerInstallationTest`/`CustomerRegistrationSkipSurveyTest`/`SalesSeederSkipSurveyScenarioTest`/`SurveyInstallationQueueScopeTest`/`TaskFopActionsTest`/`FopDashboardProcessToTimTest` (32 test, jalur-jalur lain yang juga transisi ke `waiting_installation`) — semua hijau, hook auto-issue gak mengganggu alur existing.
+**Perbaikan pasca-review (sesi sama, sebelum ditutup):** (1) **PIN plaintext bocor ke session `_old_input` ditutup** — `$request->validate()` Laravel, KALAU gagal di validasi FORMAT (bukan business-logic `verifyPin()`), default-nya nge-flash SEMUA input ke session lewat `withInput()`; Laravel cuma mengecualikan `password`/`password_confirmation`/`current_password` dari daftar itu secara bawaan. Field `pin`/`hp_last4`/`new_pin`/`new_pin_confirmation` TIDAK ada di daftar itu — bug nyata, dibuktikan: matiin fix-nya sementara → test merah (PIN masuk `_old_input`), pasang lagi → hijau. Fix: `bootstrap/app.php` `$exceptions->dontFlash([...])` didaftarkan GLOBAL (bukan per-controller, biar gak lupa kepasang lagi kalau field serupa nambah nanti). Test baru: `QrBillingPageTest::pin_format_salah_tidak_pernah_masuk_old_input_session`. (2) **Race condition kelas sama seperti ADHOC-46 ketemu lagi di kode PIN baru** — `verifyPin()` cek-lalu-increment `pin_failed_attempts` tanpa lock: skrip brute-force paralel bisa bikin satu increment ke-skip (TOCTOU), lockout 5x bisa ditembus lebih dari 5 tebakan efektif. Fix: `issuePin()`/`verifyPin()`/`changePin()` ketiganya dibungkus `DB::transaction()` + `CustomerQrToken::whereKey()->lockForUpdate()`, pola identik `issue()`/`revoke()` (ADHOC-46). Ditemukan lewat self-review proaktif (bukan diminta ulang) setelah user tanya soal race condition di sesi sebelumnya — pola yang sama harus dicek ulang tiap kali nulis kode serupa, bukan cuma ditambal sekali. — 40 test total modul QR (termasuk 1 test regresi baru), 124 assertion, hijau. Full suite disapu ulang: 1586 passed (2 gagal `PaymentReceiptPrintTest` — pre-existing, DIKONFIRMASI tidak terkait: nol file yang disentuh task ini menyerempet receipt, string yang dicari test itu sudah gak ada di kode manapun sejak refactor ADHOC-29).
+**Koreksi kesalahan logic (laporan user 2026-08-26, bukan self-review):** (1) **QR + PIN sekarang diterbitkan BARENG dalam satu aksi** — versi sebelumnya salah paham §6.5.3 ("dipicu ... bukan aksi admin lepas"): staf harus klik "Terbitkan Token QR" LALU klik terpisah "Terbitkan PIN", dua langkah manual padahal dokumen jelas bilang satu paket. Fix: `CustomerQrController::issue()` sekarang menerbitkan token (idempoten) DAN auto-menerbitkan PIN kalau `pin_hash` masih kosong, satu tombol "Terbitkan QR + PIN" — aman diklik berulang karena PIN CUMA terbit sekali (gak pernah menimpa yang sudah ada). (2) **Reset PIN sekarang wajib verifikasi eksplisit** — sebelumnya "Terbitkan Ulang PIN" satu klik langsung nimpa PIN aktif tanpa konfirmasi apa pun; risiko nyata: klik gak sengaja mematikan PIN yang sudah dipegang pelanggan (§6.5.5 sendiri mensyaratkan admin verifikasi identitas 2 faktor SEBELUM reset). Fix: aksi reset dipecah jadi `reissuePin()` TERPISAH, permission dinaikkan ke `customers.qr.cancel` (setara mencabut token, bukan `.create`), route `/qr/pin/reset`, WAJIB field `verification_note` (dicatat ke `AuditLog` — bukan PIN-nya) + dialog konfirmasi eksplisit (pola sama "Cabut Token"). (3) **Login ID portal ditampilkan** — sebelumnya nol jejak `login_id` (§6.6.2: "dicetak di kartu pelanggan bersama PIN") di seluruh alur QR/PIN, padahal itu kredensial yang pelanggan butuh buat klaim akun portal belakangan. Fix: `Customer::getPortalLoginIdAttribute()` accessor baru (`{pop.registration_prefix}-{customer_code}`, null-safe kalau POP belum punya prefix — sama syarat yang sudah dicek `CustomersBackfillPortalLoginId`), ditampilkan di kartu PIN (`pin-issued.blade.php`) dan halaman status QR (`show.blade.php`). Test disapu ulang & ditambah: `QrStaffPageSmokeTest` — 2 kasus lama diganti (jalur PIN gabungan + jalur reset terpisah), +3 kasus baru (klik ulang gak menimpa PIN, reset wajib verification_note + audit log, Login ID muncul di kartu) — 43 test modul QR total, 139 assertion, hijau.
+**`PortalAuthController::claim()` diaktifkan (keputusan eksplisit user, sesi sama)** — sebelumnya stub 501 dari sesi Portal API terdahulu ("menunggu modul QR/PIN"), sekarang modul itu sudah jalan. `PortalAuthService::claim()` (method baru, `lockForUpdate()` pada baris `customer_portal_accounts` — pola sama `CustomerQrTokenService::issue()`): login_id → cari akun `pending_claim` → PIN diverifikasi lewat `CustomerQrTokenService::verifyPin()` YANG SAMA dipakai gerbang QR publik (lockout 5x/15menit ikut berlaku, gak ada jalur bypass kedua, sesuai §6.6.5) → sukses: `password_hash` diganti ke pilihan pelanggan sendiri, status `pending_claim`→`active`, `claimed_at` diisi, token API diterbitkan. Outcome 4 jenis dipetakan ke HTTP berbeda: `success`→200, `already_claimed`→409 ("gunakan Lupa Password"), `locked`→423 (lockout PIN, BUKAN lockout password akun), lainnya→401 generik (login_id gak ada/PIN salah/belum ada token QR AKTIF — SEMUA pesan sama, gak dibedakan, pola IDOR-safe yang sama dengan `login()`). `PortalClaimRequest` baru — validasi `pin` (`digits:6`) + `new_password` (`min:10` + `StrongPortalPassword` reuse rule yang sama `PortalUpdatePasswordRequest` pakai). Field `pin`/`new_password` ikut masuk daftar `dontFlash` global (`bootstrap/app.php`) yang sudah ada — meski endpoint JSON API secara struktural gak pernah flash session (`invalidJson()` Laravel, beda jalur dari `invalid()` yang dipakai `QrBillingController`), ditambahkan untuk konsistensi kalau field ini kepakai ulang di endpoint web nanti. Docs disinkronkan: `docs/api/api-portal-pelanggan/business-logic.md` + `rencana-implementasi.md` — status stub 501 dihapus, kontrak endpoint asli ditulis ulang. Test: `PortalClaimStubReturns501Test` DIHAPUS (mengetes perilaku yang sekarang sengaja diganti), diganti `PortalClaimTest` (6 kasus — klaim sukses+password ke-hash+account jadi active, klaim ulang setelah aktif 409, PIN salah 401 pesan identik dengan login_id gak ada, pelanggan belum punya token QR 401, password lemah 422, PIN terkunci 5x 423 dengan limiter portal dilonggarkan di test biar bukan numpang limiter API yg angkanya kebetulan sama) — hijau. Regresi disapu: seluruh `tests/Feature/Api/CustomerPortal/` (unaffected, `login()`/`refresh()`/`logout()` tidak disentuh) + `tests/Feature/QrCode/` — 122 test gabungan, 428 assertion, hijau.
+**Reset PIN dirombak lagi (koreksi kedua user, sesi sama)** — dialog "isi verification_note" yang baru ditambal ternyata dianggap gak perlu ("hilangkan saya"), dan pola "dialog → buka tab baru berisi halaman penuh" buat lihat PIN dianggap ambigu/bikin bingung. Diganti total: `verification_note` DICABUT dari `reissuePin()` (gerbangnya sekarang murni modal pratinjau sisi klien, bukan field wajib server-side). `CustomerQrController::issue()`/`reissuePin()` sekarang JSON response (bukan HTML/redirect) — dikonsumsi `fetch()` dari `show.blade.php` yang sekarang Alpine-driven (`x-data="qrPinPage()"`), buka `<x-ui.modal>` (komponen modal reusable yang sudah ada di repo, transisi bawaan) nampilin QR+nama+Login ID+PIN dengan animasi reveal (`x-transition`), tombol Cetak (`window.print()` di-scope ke `#pin-print-card` doang lewat `@media print`) + Selesai — TANPA reload/tab baru kecuali token itu BARU pertama kali kebentuk (kasus itu doang, reload dibutuhkan karena seluruh blok QR/dl belum pernah dirender PHP-nya). `resources/views/customers/qr/pin-issued.blade.php` (halaman penuh lama) DIHAPUS, gak dipakai lagi sama sekali.
+**Riwayat PIN ditambahkan** (diminta user: "Status PIN juga menampilkan riwayat") — BUKAN kolom/tabel baru, dibaca dari `AuditLog` yang sekarang ditulis di `CustomerQrTokenService::issuePin()` sendiri (dipindah dari controller — supaya SEMUA jalur pemicu PIN, termasuk hook otomatis `CustomerWorkflowService` saat WAITING_INSTALLATION, `$actor` null, ikut tercatat, bukan cuma jalur staf manual). `CustomerQrController::pinHistory()` — query `AuditLog` per token, action `pin_issued`/`pin_reissued`, ikut di payload JSON (biar modal+bagian "Status PIN" update tanpa request kedua) DAN di GET `show()` biasa (biar riwayat tetap muncul walau di-reload, bukan cuma hidup di state Alpine sesi itu).
+**Belum diputuskan — pertanyaan terbuka ke user:** apakah "Cetak Stiker" (`print.blade.php`, reprint kapan pun) SEHARUSNYA juga tampilkan Login ID+PIN — user pilih "gabung jadi satu cetakan" tapi belum jawab sub-pertanyaan teknisnya: PIN disimpan HASH (bcrypt), begitu direspons sekali pas terbit PIN plaintext-nya HILANG dari sistem selamanya, jadi "Cetak Stiker" yang reprintable kapan pun secara struktural TIDAK BISA nampilin PIN kecuali penyimpanan PIN diubah jadi reversible (encrypt, bukan hash) — regresi keamanan lebih besar dari yang sudah dijelaskan ke user (bukan cuma "sticker kefoto", tapi siapa pun akses DB bisa baca PIN semua pelanggan). `print.blade.php` BELUM diubah menunggu jawaban ini.
+Test disapu ulang: `QrStaffPageSmokeTest` — assertion HTML-scraping (`preg_match` regex nyari `<div class="pin">`) diganti baca payload JSON langsung (`$response->json('pin')`), 2 kasus lama diganti (tanpa `verification_note`, cek riwayat 2 baris terbaru-dulu) + 1 kasus baru (riwayat tetap muncul setelah reload biasa, bukan cuma di JSON) — 44 test modul QR total, 145 assertion, hijau. Full suite disapu ulang lagi setelahnya.
+**Cetak Stiker digabung dengan Login ID (keputusan final user, ditegaskan ulang)** — `customers.qr.print` (`print.blade.php`) sekarang satu layout QR+nama+REQ ID+POP+**Login ID Portal**, bukan dua layout terpisah. PIN TETAP TIDAK ikut di halaman ini — bukan lagi didasarkan cuma "§6.5.1 dua faktor harus dua media", tapi keterbatasan TEKNIS: `pin_hash` disimpan bcrypt, begitu direspons sekali (modal reveal) plaintext-nya hilang dari sistem selamanya, gak ada cara reprint-nya tanpa ubah penyimpanan jadi reversible (encrypt) — itu keputusan keamanan terpisah, TIDAK dieksekusi di sini, cuma didokumentasikan sebagai batasan. `docs/plan/qr-code/rancangan-qr-pelanggan-final.md` §7.1 & §7.6 diberi catatan REVISI 2026-08-26 (rancangan "dua layout" lama diberi strikethrough + dijelaskan kenapa diganti, bukan dihapus diam-diam — jejak keputusan tetap kebaca). Test `QrStaffPageSmokeTest` +1 assertion (Login ID muncul di respons cetak) — 44 test modul QR, 146 assertion, hijau.
+**PIN reversible DITOLAK, alasan konkret dikasih ke user (bukan cuma prinsip)** — user minta "PIN juga diberikan" di halaman reprint; dijelasin dengan skenario sisi-sisi ("pelanggan telepon kartu ilang") buat 2 opsi: (A) tetap hash + reset (sudah jalan) vs (B) reversible/encrypt (PIN sama muncul lagi kapan aja, tapi kebocoran DB = SEMUA PIN pelanggan kebaca sekaligus, bukan cuma yang direset). User pilih (A) eksplisit.
+**Ketauan alur Reset PIN eksisting cacat waktu "ngerjain Opsi A dengan benar"** — 2 celah nyata: (1) **field `verification_note` dicabut TANPA pengganti apa pun** — §6.5.5 tetap mensyaratkan admin verifikasi identitas pelanggan (NIK/alamat/pembayaran terakhir) SEBELUM reset, tapi safeguard itu hilang total waktu field-nya dicabut, gak ada yang gantiin. Fix: teks pengingat statis di atas tombol Reset PIN (BUKAN form field lagi, sesuai permintaan user — cuma mengingatkan, bukan memaksa lewat validasi server). (2) **Docblock kode BOHONG soal perilaku sendiri** — komentar bilang "modal pratinjau, PIN ditampilkan dulu baru staf menegaskan", padahal `resetPin()` yang sebenarnya langsung fetch+commit ke server begitu tombol diklik, TANPA konfirmasi apa pun sebelumnya (PIN lama mati SEKETIKA). Ini persis kekhawatiran awal user ("klik gak sengaja jadi masalah") yang MASIH belum ditutup meski sempat diklaim beres. Fix: `confirm()` native browser dipasang di `@click` tombol Reset PIN SEBELUM `resetPin()` dipanggil sama sekali — satu klik "Yakin?" tanpa form, PIN baru cuma di-generate setelah dikonfirmasi. Docblock modal diperbaiki biar sesuai kode sungguhan. Ditemukan lewat verifikasi ulang proaktif atas permintaan eksplisit user ("kerjakan dengan benar dan logis, jangan hanya selesai") — bukan laporan bug baru dari user, tapi audit ulang kode yang sudah "selesai" sebelumnya. Test baru: `QrStaffPageSmokeTest::halaman_show_mengingatkan_verifikasi_identitas_sebelum_reset_pin` — 45 test modul QR total, 148 assertion, hijau.
+**BUG NYATA DI DATA PRODUKSI-LIKE — ketemu lewat verifikasi HTTP MANUAL terhadap dev DB sungguhan (MySQL+curl), bukan cuma PHPUnit** — atas permintaan eksplisit user ("jangan hanya berdasarkan test hijau ... cek beneran"). Login real (session asli), issue token+PIN via HTTP nyata, reset PIN via HTTP nyata, verifikasi hasil LANGSUNG ke tabel MySQL (bukan lewat app) — semua kepindahan Reset PIN korek. TAPI nemu 1 hal PHPUnit gak pernah nangkep: **`customer_portal_accounts.login_id` basi buat 99/100 baris di DB dev.** Sebabnya: formula `login_id` direvisi sesi sebelumnya (`registration_prefix`→`cid_prefix`, `keputusan.md` §3 poin 1) SETELAH baris-baris itu dibuat — baris lama masih nyimpen format lama (`RQ-RQ000003`), padahal kartu yang staf cetak SEKARANG selalu tampilin `Customer::portal_login_id` (accessor, live, formula terkini — `C00RQ000003`). Efeknya nyata & dibuktikan lewat curl: `/auth/claim` pakai login_id yang BENERAN tercetak di kartu → 401 GAGAL; pakai login_id lama yang udah gak pernah dicetak lagi → 200 SUKSES. Ini kebalik dari yang seharusnya. PHPUnit gak pernah nemuin ini karena SEMUA test bikin baris baru pakai accessor terkini — skenario "baris lama, formula udah beda" gak pernah ke-exercise walau ratusan test hijau.
+**Fix:** `customers:backfill-portal-login-id` (command lama) dapat flag `--resync` baru — update `login_id` cuma buat baris `status=pending_claim` (belum ada kredensial nyata yang bergantung ke nilai lama, aman ditimpa) ke formula terkini; baris `status=active` (SUDAH pernah diklaim, mungkin pelanggan udah tau & pernah login pakai nilai lama) SENGAJA TIDAK disentuh — resync itu bakal jadi lockout, bukan perbaikan. Dijalankan sekali terhadap DB dev sungguhan: 97 akun `pending_claim` di-resync, 0 tersisa basi (dicek ulang). 2 akun `active` yang juga basi (termasuk 1 yang beneran punya `last_login_at` — pelanggan asli pernah pakai) sengaja DIBIARKAN. Diverifikasi ulang end-to-end via curl setelah fix: login_id yang tercetak SEKARANG untuk pelanggan lain yang kena bug ini → `/auth/claim` sukses (200 + token asli). Semua artefak verifikasi manual (user admin sementara, token/PIN/akun portal percobaan) dibersihkan dari DB dev setelahnya.
+Test baru: `CustomersBackfillPortalLoginIdCommandTest` +3 kasus (resync memperbarui baris basi, TIDAK menyentuh baris `active`, `--dry-run` gak nulis apa pun) + `PortalClaimTest` +1 kasus (reproduksi bug persis — login_id basi berhasil klaim, login_id yang BENERAN tercetak malah gagal) — 128 test gabungan (QrCode + CustomerPortal), 448 assertion, hijau. | Done (Fase 2 + aktivasi claim() + UX reset PIN dirombak 3x + Cetak Stiker digabung Login ID + bug login_id basi di data real ditemukan & ditambal) — 2026-08-26, **Fase 3 (absen) belum dikerjakan** |
+
+**PIN dibalik jadi reversible (keputusan (B) sebelumnya ditolak, sekarang perintah eksplisit user membalik lagi)** — `pin_hash` pindah dari bcrypt (buta permanen) ke `Crypt::encryptString()` (AES-256, `APP_KEY`), method baru `CustomerQrTokenService::revealPin()`. `/qr/cetak` (`print.blade.php`) sekarang nampilin PIN juga, bukan cuma QR+nama+POP+Login ID — bisa dibuka ulang kapan pun, gak lagi sekali-tampil doang di modal. Trade-off didokumentasikan eksplisit di docblock `issuePin()`/`print.blade.php`: siapa pun akses DB+`APP_KEY` bisa baca PIN semua pelanggan. Baris `pin_hash` lama (dibuat sebelum perubahan ini, masih format bcrypt) `revealPin()` balikin null — halaman cetak nunjukin "PIN belum tersedia, reset dari halaman QR Pelanggan" buat baris itu, bukan error. Test: `CustomerQrPinServiceTest` (2 kasus diganti — assert `Crypt::decryptString()` bukan `Hash::check()`) + `QrStaffPageSmokeTest` +2 kasus baru (PIN sama persis di dua kali buka halaman cetak, baris bcrypt lama gak bikin 500) — semua hijau. Label "Fase 2 — SELESAI SEBAGIAN" di `docs/api/api-portal-pelanggan/rencana-implementasi.md` diperbaiki ke "SELESAI" — isinya sendiri sudah full functional sejak `claim()` aktif, cuma judulnya ketinggalan diupdate.
+
+| ADHOC-49 | **Gerbang tagihan QR dicabut, scan QR pelanggan SEKARANG ke Portal** (keputusan eksplisit user, membalik arsitektur §6.1 dokumen QR). `QrScanController` cabang tamu dulu redirect ke `QrBillingController` (gerbang tagihan internal, dua-step disclosure PIN/4-digit-HP) — SEKARANG `redirect()->away("{PORTAL_BASE_URL}/klaim?code={code}")`, `QrBillingController` + 3 view `resources/views/qr/billing/*` DIHAPUS total (bukan dianggurin). Endpoint API baru `GET /api/customer-portal/qr/resolve?code=` (`PortalAuthService::resolveQr()` + `PortalAuthController::resolveQr()`) — resolve token QR yang SAMA (`CustomerQrTokenService::resolve()`) jadi `{login_id, account_status}`, TANPA PIN sama sekali (PIN tetap cuma diverifikasi di `/auth/claim`), dipanggil Portal buat pre-fill halaman klaim. Guard eksplisit di `QrScanController`: `PORTAL_BASE_URL` kosong → 500 gamblang ("belum dikonfigurasi"), BUKAN 404 diam-diam yang keliatan seperti QR-nya sendiri rusak. `config/qr.php` — `bank_account` (dead config, cuma dipakai gerbang lama) dihapus, `portal_base_url` baru; limiter `qr-billing-verify` (`AppServiceProvider`) dicabut, gak ada controller yang makai lagi. Test: `PortalQrResolveTest` (8 kasus baru — pending_claim/active/akun-belum-ada semua balikin login_id, PIN gak pernah di payload, 4 kegagalan resolve semua 404 identik, tanpa client secret 401) + `QrScanDispatchTest` (test tamu diganti dari assert redirect `qr.billing` jadi assert redirect Portal URL beneran, +1 kasus baru guard 500 kalau `PORTAL_BASE_URL` kosong) — `QrBillingPageTest` (6 kasus lama) DIHAPUS, fiturnya udah gak ada buat ditest. Diverifikasi REAL lewat HTTP terhadap dev server: `curl /q1/{code}` → 302 ke `http://localhost:3001/klaim?code=...` (bukan simulasi test doang), `GET /qr/resolve` real → `{"login_id":"C00RQ000004","account_status":"pending_claim"}` cocok data asli pelanggan #2, guard 500 dicoba beneran (kosongin `PORTAL_BASE_URL` di `.env` dev, `config:clear`, curl ulang → 500, lalu dipulihkan). Docs disinkronkan: `business-logic.md` (§QR baru), `frontend-nextjs-rancangan.md` (halaman `/klaim` baru dengan 3 cabang alur berdasar `account_status`, `/aktivasi` diperjelas jadi jalur sekunder buat pelanggan yang gak lewat scan), `rancangan-qr-pelanggan-final.md` §6.1 diberi catatan REVISI (dicabut, isi lama dipertahankan sebagai jejak keputusan bukan kontrak aktif). **Sisi Next.js (Portal, `d:\whusnet\portal-pelanggan`, di luar repo ini) DISELESAIKAN sesi yang sama**: `ClaimForm.tsx` diekstrak jadi komponen reusable (dulu inline di `/aktivasi`), halaman baru `/klaim` (Server Component, resolve `code` server-side lewat `callLaravel()` LANGSUNG — bukan lewat Route Handler sendiri, pola optimasi sama `(portal)/layout.tsx`) dengan 3 cabang (`pending_claim`→form ter-prefill, `active`→pesan+link `/login`, gagal→error generik), `proxy.ts` diupdate biar `/klaim` gak ke-redirect ke `/login`. Diverifikasi end-to-end REAL lewat rantai penuh: `curl /q1/{code}` (Laravel) → redirect → halaman `/klaim` (Portal, container Docker `portal-pelanggan-web-1` yang join network `whusnet-operasional_app_network` via `whusnet-nginx`, BUKAN lewat tunnel publik) → form ter-render dengan `login_id` asli. Ketemu 2 masalah infra nyata pas verifikasi (bukan dari kode QR): (a) container `app`+`nginx` OOM-crash (SIGKILL, exit 127) di tengah kerja, di-restart; (b) `.env.local` Portal sempat nunjuk tunnel Cloudflare yang udah mati, diperbaiki ke jalur internal Docker yang bener. | Done penuh (Laravel + Portal) — 2026-08-27 |
+| ADHOC-50 | **Scan QR Internal (staf) — halaman baru, gantikan asumsi app scanner/kamera pihak ketiga** (keputusan eksplisit user, lanjutan diskusi ADHOC-49). Akar masalah: cabang STAF `QrScanController::dispatch()` (shortcut bikin tiket, dulu juga customer detail) ditentukan `auth()->check()` — COOKIE SESI. App scanner/kamera pihak ketiga BUKA LINK DI WEBVIEW/BROWSER TERPISAH yang gak bawa cookie sesi Operasional, jadi staf yang scan lewat app luar SALAH KEBACA sebagai tamu. Fix: halaman baru `/scan-qr` (permission `qr_scan.view`, gerbang di dalam app — staf WAJIB login duluan buat sampai ke situ), kamera dibaca LANGSUNG di halaman (JS `resources/js/qr-scan.js`, entry Vite TERPISAH dari `app.js` biar library decode gak kekirim ke semua halaman), begitu QR pelanggan valid kebaca (divalidasi pola `/q1/{token}.{sig}` + origin sama — QR toko/produk lain ditolak) browser navigasi LANGSUNG ke URL itu DI TAB YANG SAMA (`window.location.href`) — cookie sesi ikut otomatis, NOL logic dispatch/resolve diduplikasi di sini. **Optimasi kecepatan** (diminta eksplisit): `BarcodeDetector` API native browser dicoba dulu (hardware-accelerated, Chrome/Edge/Android WebView), `jsqr` (npm, entry Vite terpisah) cuma FALLBACK buat browser yang gak dukung (Safari lama); frame di-downscale ke maks 480px sebelum decode jsQR (O(pixel), gambar kecil = jauh lebih cepat); loop dibatasi ~10 scan/detik (`requestAnimationFrame` + time-check) bukan tiap frame kamera 60fps — cukup kerasa instan tapi gak bakar CPU/baterai; kamera+loop STOP LANGSUNG begitu satu QR valid kebaca, juga di-`pagehide` (jangan nyala di background). RBAC: feature root baru `qr_scan` (action `view` doang, bukan CRUD), permission `qr_scan.view` di-grant ke admin/helpdesk/fop/teknisi (role yang beneran interaksi sama QR pelanggan). Link masuk: dropdown "Profil Saya" (`layouts/app.blade.php`), gerbang `@can('qr_scan.view')`. Test baru: `QrInAppScanPageTest` (7 kasus — 3 role ber-permission bisa buka, role tanpa permission 403, tamu redirect login, link MUNCUL di dropdown buat yang punya permission DAN TIDAK MUNCUL buat yang gak punya — pola regresi sama ADHOC-46 "tombol ada tapi gak ada jalan masuk"). Diverifikasi REAL lewat HTTP: login helpdesk asli → `/scan-qr` 200 + video element + bundle JS ter-build (`qr-scan-yRms8Te5.js`, terpisah dari `app-*.js`) kekirim beneran; dropdown dashboard ada link `href="https://localhost/scan-qr"`; login sales asli → `/scan-qr` 403. `npm run build` (`docker compose run --rm assets`) sukses, bundle `qr-scan.js` 132KB gzip 48KB — TERPISAH dari `app.js` (202KB), gak numpang ke semua halaman. **Belum dikerjakan** (di luar scope sesi ini, disinggung tapi ditahan): mindahin fitur "kirim tiket dari QR" (`tickets.create` shortcut) & "absen teknisi via QR" (Fase 3, belum ada sama sekali) supaya masuk lewat halaman ini juga, bukan lagi lewat `QrScanController::dispatch()` cabang staf yang lama — itu perubahan alur terpisah, perlu dibahas lagi kalau mau dieksekusi. | Done — 2026-08-27, **migrasi ticketing/absen ke jalur ini belum dikerjakan** |
+| ADHOC-51 | **Redesign Halaman Profil Pengguna (`/profile`)** — Tampilan profesional modern dengan dukungan penuh responsive mobile view, hero identity banner, integrasi detail RBAC & cakupan wilayah POP, riwayat aktivitas akun terkini, toggle show/hide password interaktif, live password strength meter & match indicator, copy clipboard, serta dark/light theme support. | Done — 2026-09-01 |
+| ADHOC-52 | **Unifikasi QR staf/kolektor → Portal Pelanggan (Fase 1 — Operasional)** (lanjutan ADHOC-50/51, rancangan `docs/plan/qr-code/analisa-unifikasi-qr-staff-portal.md`). Cabang staf-ticketing & kolektor `QrScanController::dispatch()` yang tadinya redirect internal (`qr.ticket.create`/`collector-worklist.index`) SEKARANG redirect ke Portal (app terpisah), bawa `StaffPortalToken` one-shot (TTL 15 menit, purpose-scoped `tickets`/`kolektor`, dikonsumsi cuma setelah aksi PENULISAN sukses). Permission BARU `tickets.qr.create`/`kolektor.qr.pay` — TERPISAH dari `tickets.create`/`kolektor.pay` dashboard (channel beda risiko). Endpoint API baru `POST /api/customer-portal/tickets` (middleware `portal_staff_token:tickets`, delegasi penuh ke `TicketService::create()`) dengan dedup guard baru (`enforceDuplicateGuard` param, opt-in — dashboard TIDAK berubah perilakunya) yang menolak 409 `DuplicateTicketException` kalau pelanggan masih punya tiket terbuka & belum `confirmed_duplicate`. Route `qr.ticket.create` internal DIPERTAHANKAN (keputusan eksplisit user) buat non-QR, cuma sudah bukan tujuan dispatch QR lagi. Test baru: `PortalStaffTicketStoreTest` (8 kasus), `QrScanDispatchTest`/`QrScanCollectorPaymentTest` diupdate ke perilaku baru. Fase 2a (2026-08-29, sesi lanjutan): endpoint `GET /api/customer-portal/kolektor/worklist/{code}` + `POST .../payments` (`PortalStaffKolektorController`) — `payments()` REUSE PENUH trait `RecordsCollectorBatch` (sama persis dipakai `CollectorPaymentController` dashboard), `worklist()` reuse `CollectorWorklistService::dueInvoices()` tersaring ke 1 pelanggan. Token dikonsumsi cuma kalau batch beneran diproses sukses (bukan idempotency replay, bukan 422). Test baru: `PortalStaffKolektorTest` (8 kasus). Fase 2b (2026-08-29, sesi lanjutan, repo `portal-pelanggan`): halaman `/staff/tickets` (`StaffTicketForm` — form + tampilan 409 duplikat + tombol "Tetap Buat Baru") dan `/staff/kolektor` (worklist di-resolve server-side + `StaffKolektorPaymentForm` — checklist invoice + nominal manual per baris). Route Handler proxy `api/staff/tickets`, `api/staff/kolektor/payments` — pola BFF sama endpoint pelanggan (`X-Portal-Client` di server, TIDAK PERNAH ke browser), bedanya `staff_token` dikirim per-request lewat body (BUKAN `iron-session` cookie — token itu one-shot punya staf, bukan sesi pelanggan). `ApiResult` (`laravel-client.ts`) ditambah field `raw` biar body error non-standar (409 `existing_ticket_number`) bisa diteruskan tanpa `as` yang nebak-nebak. Route group `(staff)` baru, layout kartu tunggal (pola sama `(auth)`). Tipe TS baru di `portal-api.ts`. Diverifikasi `tsc --noEmit` + `eslint` bersih (full `next build` gagal di sesi ini karena EPERM UNC path — batasan environment lokal, bukan kode; belum diverifikasi lewat browser asli). `docs/api/api-portal-pelanggan/business-logic.md` dapat §5 "Staf/Kolektor (QR)" (kontrak 3 endpoint), larangan #9 `frontend-nextjs-rancangan.md` dikoreksi (sudah gak berlaku). Bug ditemukan lewat uji coba user pasca-Fase 2, ditambal sesi yang sama: (1) `proxy.ts` Portal nolak `/staff/*` ke `/login` (whitelist gak diupdate pas Fase 2b) — fix tambah pengecualian `pathname.startsWith('/staff/')`. (2) Akun full-access yang eligible `tickets.qr.create` DAN `kolektor.qr.pay` sekaligus buat pelanggan yang sama selalu kelempar ke kolektor diam-diam (urutan `if`) — fix: `QrScanController::dispatch()` hitung eligibility dua-duanya, kalau ambigu redirect ke halaman baru `qr.scan.choose` (pilih eksplisit, internal Operasional), `chooseConfirm()` ulang semua cek dari nol. (3) Setelah #2 ditambal, owner tetap gak pernah ke chooser — cabang kolektor ternyata masih mensyaratkan `hasRole('kolektor')`. Sempat diubah jadi permission-only, tapi **DIBALIKIN** setelah ketemu `hasRole('kolektor')` juga dipakai 8+ titik lain di modul Kolektor 2.0 (termasuk endpoint TULIS `PortalStaffKolektorController::payments()`) sebagai gerbang identitas buat pembukuan kolektor (saldo/setoran/worklist) — BUKAN pengganti RBAC, lapis beda dari permission. Permission-only cuma di `QrScanController` doang bikin owner ke-route ke halaman kolektor lalu 403 pas submit. Final: `resolveEligibility()` balik ke `hasRole('kolektor') && hasPermission(...)`, konsisten sama sisa modul — owner memang gak pernah eligible kolektor lewat QR, itu benar & disengaja. File baru `resources/views/qr/scan-choose.blade.php`, route `GET/POST /scan-qr/choose/{code}`, test `QrScanAmbiguousPermissionTest` (7 kasus). Feature/permission baru (`tickets.qr`, `kolektor.qr`) sempat cuma ke-generate di test DB, lupa di-seed ke DB dev nyata — udah dijalanin manual (`db:seed --class=QrFeatureSeeder` + `RolePermissionSeeder`). (4) Dokumentasi Scramble endpoint staf salah: summary kosong/berantakan (docblock method gak ada judul pendek) + security scheme salah subjek (nunjuk token pelanggan, padahal staf token beda total) — fix docblock + scheme `StaffPortalToken` baru di `ScrambleServiceProvider`. (5) Kolektor dikasih `tickets.qr.create` (keputusan eksplisit user — kolektor ketemu pelanggan langsung di lapangan, sering dapet komplain pas nagih): scan pelanggan di worklist → chooser "Tagih Pembayaran"/"Lapor Komplain"; scan pelanggan DI LUAR worklist → tetap bisa lapor tiket (gak 403 lagi, ticketing emang gak dibatasi kepemilikan pelanggan). Detail: `docs/plan/qr-code/analisa-unifikasi-qr-staff-portal.md` §8-10. | Done (Fase 1 + 2a + 2b + 5 bug/perbaikan tambal) — 2026-08-29, **verifikasi `next build`/browser asli belum jalan (batasan environment sesi ini)** |
+| ADHOC-51 | **Kolektor scan QR pelanggan → langsung ke pencatatan pembayaran, tersaring ke worklist-nya sendiri** (keputusan eksplisit user, lanjutan ADHOC-50). Cabang baru `QrScanController::dispatch()` — kalau pemindai `hasRole('kolektor') && hasPermission('kolektor.pay')`: cek pelanggan itu ADA di worklist-nya (query SAMA persis `CollectorWorklistService::dueInvoices($user,$user)` yang dipakai `CollectorWorklistController::index()`, tinggal tambah filter `customer.id`) → redirect `collector-worklist.index?search={customer_code}`, REUSE fitur pencarian yang SUDAH ADA (bukan modal/auto-centang/auto-isi nominal baru — kolektor tetap input manual jumlah yang diterima, scan cuma bantu navigasi cepat ke baris yang bener). Pelanggan DI LUAR worklist-nya (beda kolektor, atau `collector_id` kosong) → **403 tegas** ("Pelanggan ini bukan tanggung jawab Anda"), TIDAK jatuh ke cabang lain manapun (ticketing/detail) — pilihan eksplisit user lewat `AskUserQuestion`, konsisten sama invarian yang sudah didokumentasikan di `CollectorWorklistController`: "tak bisa menyentuh pelanggan di luar collector_id-nya sendiri". RBAC: `qr_scan.view` ditambah ke role `kolektor` (kelewat pas ADHOC-50, cuma admin/helpdesk/fop/teknisi yang dikasih). Test baru: `QrScanCollectorPaymentTest` (4 kasus — scan pelanggan sendiri redirect ke worklist tersaring, scan pelanggan kolektor LAIN 403, scan pelanggan tanpa `collector_id` 403, staf NON-kolektor yang scan pelanggan yang KEBETULAN punya `collector_id` tetap jalan alur biasa/ticketing — cabang kolektor cuma aktif kalau PEMINDAI-nya kolektor). Diverifikasi REAL lewat HTTP: kolektor asli scan QR pelanggan miliknya sendiri → 302 ke `/collector-worklist?search=RQ997001` (bukan simulasi test doang); kolektor sama scan pelanggan `collector_id=null` → 403 beneran. 75 test modul QR total hijau (1 gagal pre-existing gak terkait, sudah ditandai sebelumnya). | Done — 2026-08-27 |
+| ADHOC-48 | **Tab Riwayat Ticketing Pelanggan: regime tampilan ngikut `handler` tiket** — permintaan eksplisit user, tiket helpdesk/NOC yang sudah turun ke Ticketing FOP wajib tercatat sebagai "Ticket FOP" (bukan lagi "Ticket Helpdesk/NOC"), tiket yang selesai/dibatalkan di Helpdesk/NOC (tidak pernah ke FOP) tetap "Ticket Helpdesk/NOC". Sebelumnya tab ini SAMA SEKALI tidak menampilkan model `Ticket` — cuma `Task` (teknisi) dan `FopTask` (field task legacy), jadi tiket yang selesai murni di Helpdesk/NOC tanpa pernah eskalasi TIDAK PERNAH muncul di riwayat pelanggan sama sekali. Fix: `CustomerController::show()` +query `$customerTickets` (`$customer->tickets()->with(['fopTask.technicians', ...])`), satu baris per tiket — `handler=FOP` dirender pakai data `fopTask` (nomor TFOP, badge "TICKET FOP", link ke `fop-tasks.history.show`), `handler=HELPDESK/NOC` dirender pakai data tiket sendiri (nomor TKT, badge "TICKET {HANDLER}", link ke `tickets.show`) — reuse `Ticket::statusLabel()`/`statusBadgeClasses()` yang sudah ada, bukan logic baru. `$customerFopTasks` (seksi "FOP Field Task" legacy) ditambah `whereDoesntHave('ticket')` supaya FopTask hasil eskalasi tiket TIDAK dobel tampil di dua seksi sekaligus. Test baru: `CustomerTicketingHistoryRegimeTest` (3 kasus — tiket selesai di Helpdesk tampil sebagai "TICKET HELPDESK", tiket dieskalasi ke FOP tampil sebagai "TICKET FOP" pakai nomor TFOP dan TIDAK dobel di seksi legacy, FopTask non-tiket tetap tampil seperti sebelumnya) — hijau. Regresi disapu: `TicketCancellationTest`, `FopTaskHistoryFollowsTicketDetailTest`, + seluruh test yang menyentuh route `customers.show` (77 test) — semua hijau. | Done — 2026-08-27 |
+
+#### ADHOC-39 — Nav Tagihan vs Pembayaran Dipisah by Meaning (2026-08-18) — **Done**
+
+**Pemicu:** permintaan user — Tagihan sudah punya Lunas/Belum Lunas, halaman "Pembayaran" berdiri sendiri dianggap redundan. Diskusi lanjut menyimpulkan: "Tagihan" (nama) harusnya cuma nampilin kewajiban yang MASIH ADA — begitu lunas, itu bukan "tagihan" lagi, itu riwayat pembayaran.
+
+**Analisa sebelum eksekusi:** riwayat pembayaran PER-INVOICE sudah ada di tab "Riwayat Pembayaran" `invoices/show.blade.php`. Yang perlu jadi pintu masuk terpisah cuma 2 (payment-level, bukan invoice-level, gak bisa jadi baris tabel invoice): daftar transaksi LINTAS-invoice + filter/stat (`payments.index`), dan tab Lebih Bayar (`payments.overpay`). `payments.show` (detail + audit log + tombol Tolak) dan `payments.receipt` (struk cetak) tetap halaman sendiri, sudah dilink dari tab Riwayat Pembayaran invoice — tidak disentuh.
+
+**Struktur nav final:** dua grup collapsible terpisah di sidebar (`resources/views/layouts/app.blade.php`).
+- **Tagihan** (`submenu-tagihan`, highlight `invoices*`): Tagihan Belum Lunas, Semua Tagihan. "Tagihan Lunas" DICABUT dari sini.
+- **Pembayaran** (`submenu-pembayaran`, highlight `payments*`, baru): Riwayat Transaksi Pembayaran (`payments.index`) — ganti peran "Pembayaran" lama SEKALIGUS "Tagihan Lunas" — dan Pembayaran Lebih/Overpay (`payments.overpay`).
+
+Breadcrumb disesuaikan: `payments.index` jadi puncak grupnya sendiri (tanpa `breadcrumb_parent`, sama pola `invoices.index`); `payments.overpay`/`payments.show` parent-nya "Riwayat Transaksi Pembayaran" → `payments.index`; `payments.create` (form input dari 1 invoice) tetap parent "Tagihan" → `invoices.index` karena kontekstual ke invoice asalnya, bukan histori.
+
+**Route `invoices.lunas` TIDAK dihapus** — cuma dicabut dari nav (hindari broken link kalau ada yang bookmark; test `InvoiceListTest` masih hit route-nya langsung).
+
+**Di luar scope:** `reports.payments.*` (laporan/export terpisah) dan `payment-receipts.*` (worksheet cetak massal kolektor) — beda concern, tidak disentuh. Component `components/layout/sidebar.blade.php` (dead code, tak dipakai satu halaman pun — diverifikasi via grep) sengaja tidak diikut-update.
+
+**Catatan sampingan (bukan bug dari task ini):** `PaymentReceiptTest`/`PaymentReceiptPrintTest` gagal di assertion `assertSee('STRUK PEMBAYARAN', ...)` — string itu memang tidak pernah ada di `payments/receipt.blade.php` maupun di manapun di codebase (diverifikasi grep). Pre-existing, tidak disentuh task ini.
+
+#### ADHOC-38 — Metode Pembayaran + Saldo Pelanggan di Modal Bayar Invoice (2026-08-18) — **Done**
+
+**Pemicu:** permintaan user — Modal Bayar di Invoice butuh metode Cash/Transfer/Kolektor dengan field pendukung masing-masing, dan pelanggan lebih bayar harus dapat saldo aktif yang bisa dipakai di pembayaran berikutnya.
+
+**Yang dibangun:**
+- `App\Enums\PaymentMethod` (cash/transfer/qris/kolektor/lainnya) — ganti literal array `in:cash,transfer,qris,lainnya` yang dulu tersebar.
+- Migration: `bank_name`+`account_number` di `payments`; tabel baru `customer_balance_mutations` (ledger append-only credit/debit, **bukan** kolom `customers.balance` — konsisten pola `CollectorBalanceService`/`AdminCashBalanceService` yang derived-only).
+- `App\Services\CustomerBalanceService` — `balance()`, `credit()`, `debit()` (lock saat dipakai), `reverseCreditForPayment()` (dipanggil `PaymentController::reject()`).
+- `App\Services\PaymentService::record()` — extract dari `PaymentController::recordPayment()`, tambah orkestrasi pakai-saldo + field kondisional per metode.
+- `InvoiceController::show()` JSON payload tambah `customer_balance` + `available_collectors` untuk modal.
+- `quick-payment-modal.blade.php` — dropdown Kolektor, field Transfer/Kolektor kondisional, blok Saldo Pelanggan, Ringkasan Tagihan tambah 2 baris, dialog sukses + tombol Cetak Struk (`window.open('/payments/{id}/kwitansi')`).
+- Cash → Saldo Admin sudah otomatis benar tanpa sentuh `AdminCashBalanceService` (filter `payment_method='cash' AND collected_by IS NULL` sudah ada).
+
+**Test baru:** `PaymentMethodKolektorTest`, `PaymentMethodTransferBankFieldsTest`, `CustomerBalanceCreditOnOverpayTest`, `CustomerBalanceDebitOnPaymentTest`, `CustomerBalanceServiceTest` (Unit) — semua lulus, plus regresi existing (`PaymentInputTest`, `PaymentCollectedByNotCopiedFromCustomerTest` disesuaikan menambahkan `bank_name`/`account_number` karena validasi Transfer sekarang wajib).
+
+**Di luar scope task ini:** `BackfillCustomerBalanceFromOverpay` (artisan command, dibuat tapi TIDAK dijalankan ke data produksi — butuh review manual finance dulu); UI `_quick_hub_modal.blade.php` & `payments/create.blade.php` belum ikut menampilkan opsi baru (backend sudah kompatibel lewat validasi bersama).
+
+#### ADHOC-37 — Saldo Kas Admin & Modul Setoran Kas (2026-08-14) — **Done**
+
+**Pemicu:** pertanyaan user — setoran kolektor yang sukses seharusnya masuk ke Saldo Admin, dan perlu modul Setoran Kas dengan rincian sumber uang yang jelas untuk atasan/Owner.
+
+**Temuan:** `CollectorDepositService::verify()` hanya mengubah status + menulis `declared_amount`/`difference`/audit. Tak ada apa pun yang mencatat uang masuk kas kantor (`saldo_admin`/`admin_balance` → nol hasil di seluruh repo). Pembayaran manual di kantor (`collected_by = NULL`) juga tak pernah masuk setoran apa pun.
+
+**Keputusan user:** saldo per admin (per user) · transfer/QRIS dipisah sebagai rekap saja, bukan kewajiban setor · verifikator Owner + atasan · selisih fase 1 dicatat + catatan wajib, penutupan hanya lewat hapus buku Owner.
+
+**Rancangan:** tabel `cash_deposits` (`SETKAS-{tahun}-{4}`) + kolom `cash_deposit_id` di `collector_deposits` & `payments` (bukan tabel pivot), enum `CashDepositStatus`, `AdminCashBalanceService` (saldo TURUNAN, tanpa kolom saldo), `CashDepositService`, feature permission baru `cash_deposit`.
+
+**Data historis — titik nol (§7):** satu baris sentinel `SETKAS-0000-0000` berstatus `saldo_awal` (terminal keras, `declared_amount` 0, `depositor_id` NULL) menyerap seluruh sumber lama lewat `cash_deposit_id`. Cutoff berbasis tanggal **ditolak** — ia menambah aturan kedua yang harus diulang di tiap query kas dan pasti ada yang lupa; backfill retroaktif **ditolak** — mengarang riwayat setoran bank yang tak pernah terjadi.
+
+**Terpasang:** enum `CashDepositStatus`/`CashDepositChannel`, 3 migrasi, model `CashDeposit` (+ `CollectorDeposit::cashReceivedByOffice()`), `AdminCashBalanceService` & `CashDepositService`, `CashDepositController` + 5 route, feature RBAC `cash_deposit` (admin/pop_admin menyetor; atasan memeriksa; Owner menutup selisih), halaman `/cash-deposits` + kartu saldo di Worksheet Admin + menu sidebar. **40 test hijau** (`AdminCashBalanceTest`, `CashDepositVerificationTest`, `CashLedgerZeroPointTest`).
+
+**Halaman dibersihkan (§12, 2026-08-18):** `/cash-deposits` jadi **murni lembar kerja penerima** — kartu posisi kas admin, rincian saldo belum disetor, dan pemilih `admin_id` dicabut (itu isi Worksheet Admin). Isinya kini: card analisa penerimaan · setoran masuk dari seluruh admin dalam scope (menunggu di atas, + filter) · rincian sumber per setoran sampai nama pelanggan · aksi verifikasi/tutup selisih/unduh bukti. `cashHolderIds()` dibuang sebagai kode mati. **54 test kas hijau.**
+
+**Koreksi alur (§11, 2026-08-18):** `/cash-deposits` adalah **worksheet PENERIMA** (Owner/atasan), bukan halaman penyetor. `OwnerCashBalanceService` menutup putusnya rantai uang di anak panah terakhir: sesudah Owner memeriksa, saldo benar-benar **pindah** dari admin ke Owner — tiga angka terpisah (Brankas tunai · Masuk Bank · Dalam Perjalanan). `OwnerCashBalanceTest` (9 test).
+
+**Dua tingkat rincian (§10, 2026-08-18):** `cash_deposit.view` dicabut dari admin/pop_admin — halaman `/cash-deposits` jadi pandangan **pemeriksa** (Owner/atasan): kas admin mana pun dalam scope, antrean pemeriksaan, rincian sampai nama pelanggan. Admin dapat pandangan **penyetor** di Worksheet Admin: kartu saldo + form setor + **Riwayat Setoran Kas Anda** (tanpa nama pelanggan/kolektor). Unduh bukti dibuka untuk keduanya, tapi penyetor dibatasi ke setorannya sendiri. **44 test kas hijau.**
+
+**Koreksi letak (§9, 2026-08-18):** aksi setor pindah ke **Worksheet Admin** — tombol + panel lipat di kartu "Kas Anda", simetris dengan kolektor yang menyetor dari halaman kerjanya sendiri. `/cash-deposits` jadi **arsip & pemeriksaan** (form setor dicabut). Redirect sesudah setor dipilih dari daftar tertutup di server lewat penanda `redirect_to`, bukan URL dari klien (open-redirect).
+
+Analisa, rumus saldo, risiko, daftar berkas & test: [`docs/plan/kolektor/analisa-setoran-kas-admin.md`](plan/kolektor/analisa-setoran-kas-admin.md).
+
+#### ADHOC-36 — Pencarian pada Halaman Collector Worklist (2026-08-13)
+
+**Pemicu:** Kebutuhan kolektor di lapangan untuk menyaring daftar rute kerja (worklist) berdasarkan Nama Lengkap, CID/Kode Pelanggan, atau Nomor Invoice.
+
+**Rincian Perubahan:**
+- **Controller `CollectorWorklistController`**: Menambahkan penanganan parameter query `search` dan menerapkan penyaringan `like` pada `invoice_number`, serta relasi customer (`full_name`, `cid`, `customer_code`). Meneruskan variabel `$search` ke view.
+- **View `collector-worklist.index`**: Menambahkan form pencarian modern yang responsif dan mendukung tema Light & Dark Mode. Menyediakan tombol reset saat pencarian aktif.
+- **Test `CollectorWorklistSearchTest`**: Membuat feature test lengkap untuk memastikan validasi pencarian berdasarkan nama, CID, nomor invoice, mempertahankan pagination query, serta menjaga data POP scope agar tidak bocor.
+
+#### ADHOC-35 — Riwayat Perubahan Status tampil dobel (2026-08-13)
+
+**Pemicu:** laporan user — satu aksi tampil dua baris di `tasks/{id}`.
+
+**Sebab:** `Task` punya DUA pencatat audit, dan keduanya menulis untuk aksi yang sama.
+
+```
+#16992 16:02:09  action=create   module="Task Management"   ← trait RecordsAuditLogs
+#16993 16:02:09  action=created  module="Task"              ← AuditLog::log() manual
+#17026 10:07:22  action=update   module="Task Management"   ← trait
+#17027 10:07:22  action=updated  module="Task"              ← manual
+```
+
+1. **Trait `RecordsAuditLogs`** (`app/Models/Task.php:17-21`, `$auditEvents = ['created','updated','deleted']`) menempel di event Eloquent → menangkap SEMUA jalur (service, controller, artisan, tinker) lengkap dengan kolom yang berubah.
+2. **`AuditLog::log()` manual** di `TaskService` & `TaskController`.
+
+Halaman Detail Task merender `$task->auditLogs` apa adanya, jadi dobelnya terlihat mentah. Pola yang persis dilarang CLAUDE.md untuk riwayat Ticket/FopTask ("satu aksi, dua riwayat, **satu penulis per sisi**") — hanya saja aturannya belum pernah ditulis untuk `audit_logs` Task.
+
+**Perbaikan, dua lapis:**
+
+1. **Duplikat murni dicabut.** `TaskService::create()` dan `update()` berhenti menulis `created`/`updated` — isinya sama persis dengan tulisan trait, dan tulisan trait lebih presisi (kolom yang benar-benar berubah, bukan snapshot penuh). Log manual yang **disisakan** hanya yang membawa makna bisnis: `completed`, `cancelled`, `reassigned`, `pending`, `reschedule`, `approved`, `rejected`.
+2. **Timeline disaring di penyajian** — `App\Support\TaskAuditTimeline` (dipakai `TaskController::show()`, dirender `$statusTimeline`):
+   - peristiwa bisnis bernama & `create` → selalu tampil;
+   - `update` yang menyentuh kolom bermakna (`status`, `scheduled_at`, `pending_reason`, `cancel_reason`, dst.) → tampil, **kecuali** ada baris bisnis dalam 5 detik yang sama yang sudah menceritakannya (yang bernama menang);
+   - `update` yang cuma derau mesin (prefix `[Team 1]` di `title` dari `rebuildTeamsForDate()`, `updated_by`) → disembunyikan.
+
+**Yang TIDAK dilakukan:** tidak ada baris `audit_logs` yang dihapus, termasuk data lama yang sudah terlanjur kembar. Menghapus jejak audit untuk merapikan tampilan justru merusak gunanya; halaman Audit Log tetap menampilkan semuanya.
+
+**Berkas:** `app/Support/TaskAuditTimeline.php` (baru), `TaskService::create()/update()`, `TaskController::show()`, `resources/views/tasks/show.blade.php`.
+
+**Lanjutan — aksi yang belum punya nama, diberi nama.** Filter di atas menyisakan satu kejanggalan: "Mulai Task" (dan Pending/Lapor Nanti lewat `TaskService`) tidak pernah menulis log bisnis, jadi jejaknya cuma baris generik trait dan tampil sebagai **"Update"** — peristiwa yang paling sering dilakukan teknisi justru yang paling tidak terbaca. Ditutup dengan:
+
+- `TaskService::start()` menulis `started`;
+- `TaskService::setPending()` menulis `pending` atau `report_deferred` — dua peristiwa berlawanan makna (kerja berhenti vs kerja selesai, laporan menyusul) yang di DB sama-sama berstatus `pending` dan cuma dibedakan flag, jadi namanya harus ditulis eksplisit;
+- alasan pending/lapor-nanti ikut ditampilkan di timeline (sebelumnya hanya alasan batal & tolak);
+- label timeline dipetakan ke bahasa Indonesia lewat `TaskAuditTimeline::label()` — "Mulai Dikerjakan", "Task Selesai", "Ditunda (Pending)", "Lapor Nanti", "Teknisi Diganti", dst. Baris `update` yang lolos filter diberi label spesifik dari kolom yang berubah ("Status Diubah" / "Jadwal Diubah"), bukan kata "Update" yang tidak menjelaskan apa pun.
+
+Efek sampingnya rapi: begitu `started`/`pending` punya nama, kembaran generiknya otomatis tersaring aturan yang sudah ada — tanpa aturan baru.
+
+**Test:** `TaskStatusTimelineNoDuplicateTest` — 9 test (service tak lagi menulis `created`; baris bisnis menang atas `update` sedetik; perubahan status **tanpa** log bisnis tetap tampil — jaga agar peristiwa tidak hilang saat disaring; derau kosmetik disembunyikan; baris tetap ada di DB; `start()` menulis satu baris bernama; `pending` vs `report_deferred` dibedakan berikut alasannya; `update` generik dapat label Indonesia; halaman merender satu baris per aksi).
+| ADHOC-35 | **Redesign Tampilan HP/Mobile Worksheet Teknisi** — Worksheet (`/tasks-saya`) & Detail (`/tasks/{id}`) dioptimalkan penuh untuk mobile screen (HP), stats banner gradien gelap, slider filter horizontal, search klien, WhatsApp/Maps icon button (lihat detail di bawah) | Done — 2026-08-13 |
+| ADHOC-53 | **Task overdue nyangkut selamanya di papan FOP** — command `tasks:auto-pending-overdue` (00:05 harian): task `terjadwal`/`in_progress` yang `scheduled_at`-nya sudah lewat tapi belum `selesai` di-pending otomatis, lepas tim, sync ke FopTask (lihat detail di bawah) | Done — 2026-09-01 |
+
+#### ADHOC-53 — Task overdue nyangkut selamanya di papan FOP (2026-09-01)
+
+**Pemicu:** gap tercatat sejak analisa index database 2026-07-22 — "task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP besok" belum dikodekan. Task `terjadwal`/`in_progress` yang tanggal jadwalnya lewat tanpa pernah `selesai` nyangkut permanen di status lama: tidak muncul lagi di papan FOP buat di-assign ulang, dan `TaskService::start()` keliru masih menganggap teknisinya "sibuk".
+
+**Perbaikan:**
+- `TaskService::releaseTeamAndSetPending()` (baru, publik) — replikasi perilaku kanonis `TaskController::releaseTeamAndSetPending()` (lepas tim + set Pending + sync FopTask + rebuild jadwal tim), versi yang bisa dipanggil tanpa actor login. `updated_by`/`AuditLog.user_id` kosong menandai aksi sistem, bukan keputusan manusia.
+- `php artisan tasks:auto-pending-overdue` (baru) — cari `Task` berstatus `terjadwal`/`in_progress` dengan `scheduled_at` < hari ini, panggil method di atas per task.
+- `Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05')` di `routes/console.php`.
+
+**BUKAN** pengulangan `fop:reset-cancelled-tasks` yang dihapus ADHOC-34 (2026-08-13) — itu menghidupkan task `dibatalkan` (final) balik jadi `in_progress`. Arah command ini kebalikan: task yang **belum final** dipensiunkan ke `pending` (status yang memang berarti "butuh keputusan ulang"), bukan menimpa keputusan yang sudah final.
+
+**Catatan bagian kedua dari gap yang sama** ("SLA tidak berjalan untuk task terjadwal ke depan") — dicek ulang, ternyata sudah benar di kode: `Task::slaDeadline()` mengembalikan `null` sampai `started_at` terisi (tipe non-SURVEY), dan untuk SURVEY deadline-nya sendiri mengikuti `scheduled_at` (otomatis di masa depan kalau jadwalnya di masa depan). Catatan lama di dokumen ini tidak akurat — tidak ada perubahan kode di bagian ini.
+
+**Test:** `TaskAutoPendingOverdueTest` — 7 test (terjadwal & in_progress overdue jadi pending + lepas tim; hari ini/masa depan/tanpa `scheduled_at` tidak disentuh; `selesai`/`dibatalkan`/`pending` tidak disentuh; FopTask terkait ikut sync).
+
+#### ADHOC-35 — Redesign Tampilan HP/Mobile Worksheet Teknisi (2026-08-13)
+
+**Pemicu:** Kebutuhan teknisi lapangan yang menggunakan HP untuk lembar kerja mereka. Tampilan worksheet dan detail sebelumnya kaku dan kurang responsif pada layar sentuh mobile.
+
+**Rincian Perubahan:**
+- **Worksheet `/tasks-saya`**: Menambahkan Alpine.js `taskWorksheet()` untuk filter kategori, pengurutan prioritas/waktu, dan pencarian instan di sisi klien. Panel statistik diganti dengan banner gradien premium modern, tabs filter berbentuk slider horizontal, dan select box pengurutan. Urutan penampilan kartu diatur secara terstruktur (Sedang Dikerjakan berada di paling atas, di bawahnya Lapor Nanti, lalu dilanjutkan dengan list task belum dikerjakan / Terjadwal).
+- **Card `own-card.blade.php`**: Dihias dengan sudut rounded-2xl, status accent bar kiri, serta meletakkan tombol WhatsApp & Maps sebagai tombol ikon persegi di sebelah kiri. Tombol utama (Mulai Task, Isi Laporan) dibuat berukuran besar dan thumb-friendly. Maps & info sensitif disembunyikan sebelum tugas berstatus aktif (status terjadwal digate).
+- **Riwayat `/tasks-saya/riwayat`**: Disinkronkan visual kartunya dengan worksheet utama.
+- **Detail Tugas `/tasks/{id}`**: Kisi metrik kaku diubah menjadi grid kartu terpisah ber-rounded-2xl. Informasi detail teknis dipisah menjadi kartu modular bertumpuk (stack) di HP dengan visualisasi ikon di setiap baris data.
+
+#### ADHOC-34 — Tim FOP hilang dari papan begitu ganti hari (2026-08-13)
+
+**Pemicu:** verifikasi browser pasca-migrasi Alpine. Papan FOP kosong padahal `/fop-tasks` menampilkan 2 tim yang sudah dijadwalkan. Bukan regresi Alpine: tim terakhir ber-`work_date` 12 Agustus, sementara papan dibatasi `work_date` = hari ini.
+
+**Akar masalah — perbaikan lama yang kebablasan.** Versi awal papan memuat SELURUH team yang pernah ada beserta anak-anaknya lalu memfilter di PHP; `FopTaskTeamService::rebuildTeamsForDate()` membuat team baru tiap tanggal kerja, jadi setelah setahun operasi itu 300+ team per refresh. Perbaikan 2026-07-22 memangkasnya jadi "hari ini saja" — beban query beres, tapi tim yang **sudah dijadwalkan** lenyap dari papan begitu lewat tengah malam, padahal task-nya masih hidup dan teknisinya masih melihatnya di Task Saya (`TaskController::index()` punya cabang overdue, papan tidak).
+
+**Perbaikan:** melonggarkan jendela tanggal papan, bukan menambah konsep baru.
+
+- `work_date` = hari ini → **selalu** tampil;
+- `work_date` lampau → tampil **selama masih punya task aktif** (bukan `selesai`/`dibatalkan`), disaring di SQL lewat `whereHas` — tim yang sudah rampung tidak ikut dimuat sama sekali, jadi beban query yang dulu jadi alasan pembatasan tidak kembali;
+- pagar `BOARD_MAX_PAST_DAYS` = 30 hari supaya papan tidak pelan-pelan berubah jadi arsip;
+- diurut `work_date` menaik — tanggal terlama di atas.
+
+Kartu tim sudah menampilkan `work_date`-nya sendiri, jadi tim dari tanggal lampau terbaca apa adanya tanpa penanda tambahan.
+
+> **Catatan proses.** Iterasi pertama saya kelebihan bangun: zona "Tertunda — belum ada tindakan" + daftar Pending terpisah + endpoint `reschedule-today`, dengan klasifikasi status efektif. User mengoreksi — kebutuhannya cuma "tim yang sudah dijadwalkan tetap tampil". Semua itu dibongkar (partial `_backlog`, variabel backlog di controller, route + method `rescheduleToToday`, `FopDashboardBacklogTest`) dan diganti pelonggaran query di atas. Yang **dipertahankan** dari iterasi itu cuma satu hal yang memang diminta terpisah: pecahan tunggakan di tabel beban teknisi.
+
+**Penyelarasan tabel beban teknisi.** `TeknisiWorkloadService::summarize()` ternyata **sudah** menghitung task overdue sejak commit `c54aa2c` (dugaan awal saya keliru — teknisi bertunggakan tidak pernah tampil "kosong"). Yang kurang cuma komposisinya: ditambah `overdue_count` lewat satu agregat (`SUM(CASE WHEN scheduled_at < hari ini …)`, tanpa query tambahan) dan badge "N tertunda" di sebelah "N Task" — "3 Task" hari ini dan "3 Task" sisa tiga hari lalu bukan beban yang sama, dan itu yang menentukan boleh-tidaknya teknisi dapat task baru.
+
+**Berkas:** `FopDashboardController` (jendela tanggal + `BOARD_MAX_PAST_DAYS`), `TeknisiWorkloadService`, `resources/views/fop/dashboard.blade.php` (badge tunggakan + teks empty-state).
+
+**Test:** `FopDashboardPastTeamsTest` — 6 test (tim lampau dengan task aktif tampil, tim hari ini tampil, tim lampau yang task-nya selesai/batal tidak tampil, tim >30 hari tidak tampil, task pending menjaga timnya tetap terlihat, badge tunggakan di tabel teknisi).
+
+**`fop:reset-cancelled-tasks` DIHAPUS** (keputusan user, 2026-08-13): pembatalan Task FOP bersifat **final**. Command itu mengubah task `dibatalkan` jadi `in_progress` tiap 00:01, dan cacatnya berlapis:
+
+- menghapus keputusan manusia tiap malam **tanpa jejak di riwayat tiket** — `FopTaskObserver` hanya menulis `ticket_histories` saat status *menjadi* `dibatalkan`, tidak saat dihidupkan lagi, jadi riwayat tiket berhenti di "dibatalkan" padahal task-nya hidup;
+- status tujuannya **palsu**: `in_progress` berarti teknisi sedang mengerjakan, padahal tidak ada;
+- `task_date` tidak diperbarui → task langsung jadi penghuni papan sebagai tim lampau;
+- Task eksekusi (`tasks`) tidak ikut disentuh → FopTask dan Task berbeda status, dua sumber kebenaran menyimpang;
+- tanpa batas umur — task yang dibatalkan berbulan-bulan lalu ikut terangkat.
+
+Penundaan sehari sudah punya jalurnya: **Pending** (alasan tercatat) atau ubah tanggal lewat Edit di `/fop-tasks`. Yang dihapus: `app/Console/Commands/ResetCancelledFopTasks.php` + baris `Schedule::command()` di `routes/console.php`. Test lama yang menegaskan perilaku itu diganti jadi penjaga arah sebaliknya: `FopTasksTest::test_cancelled_task_stays_cancelled_and_is_never_auto_revived()` — gagal kalau command semacam itu didaftarkan lagi. Runbook diperbarui.
+
+#### ADHOC-33 — Pelanggan Gagal & Putus: view sendiri, controller lepas dari `CustomerController` (2026-08-12)
+
+**Pemicu:** pertanyaan user — kenapa dua halaman ini belum punya berkas sendiri padahal RBAC-nya sudah dipisah?
+
+Route, permission, dan controller memang sudah terpisah sejak 2026-07-28 (`customers.terminated.view`, `customers.failed.view`). Yang tertinggal dua hal:
+
+1. **Tampilannya masih satu berkas.** `customers/index.blade.php` (2.178 baris) melayani ketiga halaman lewat cabang `@if($statusGroup === 'failed') … @elseif('terminated') … @else`. Mengubah satu kolom di halaman arsip berarti menyunting berkas yang sama dengan List Pelanggan. Lebih buruk: `$statusGroup` sudah **dipaksa dari controller**, tapi tetap dicabangkan lagi di Blade — dua sumber kebenaran untuk satu keputusan.
+2. **Dua controller arsip `extends CustomerController`** semata demi satu method protected, ikut mewarisi ~3.400 baris method tulis (store/update/destroy/import/aktivasi) yang bukan urusan halaman daftar.
+
+**Hasil:**
+
+| Berkas | Isi |
+| --- | --- |
+| `resources/views/customers/index.blade.php` (2.178 → 1.675 baris) | List Pelanggan + grup `survey`/`verification` |
+| `resources/views/customers/terminated.blade.php` (121) | Pelanggan Putus |
+| `resources/views/customers/failed.blade.php` (96) | Pelanggan Gagal |
+| `resources/views/customers/partials/_list_*.blade.php` | styles, header, stats, filters, pagination, density script — dipakai bertiga |
+| `app/Http/Controllers/Concerns/RendersCustomerList.php` | query + filter + pagination; parameter ketiga `$view` menentukan Blade yang dirender |
+
+`CustomerTerminatedController`/`CustomerFailedController` kini `extends Controller` + `use RendersCustomerList`.
+
+**Ikut diperbaiki:** form pemilih jumlah baris di footer pagination dulu `action="/customers"` hardcode — mengubah "Baris" dari halaman Putus/Gagal melempar user balik ke List Pelanggan. Sekarang `url()->current()`.
+
+**Sengaja dipertahankan:** hidden input `status_group` di form filter (grup `survey`/`verification` masih hidup sebagai `/customers?status_group=…` dan membutuhkannya), serta strip statistik + filter bar di ketiga halaman.
+
+**Test:** `CustomerListSeparateViewsTest` (5 test — `assertViewIs` per halaman, tabel arsip tidak bocor ke List, isolasi status, query string tidak bisa menimpa `$forcedStatusGroup`); `CustomerListFilterKeepsStatusGroupTest` ditambah assert `action="/customers"` sudah hilang.
+
+**Dokumentasi:** `docs/data-pelanggan/README.md` §4, `docs/rbac/customer-permission-hierarchy.md`.
+
+#### ADHOC-30 — Nominal bertitik dibaca 1.000× lebih kecil (2026-08-12)
+
+**Pemicu:** permintaan user supaya kolom pembayaran menerima penulisan `150.000`, bukan `150000`.
+
+Menelusurinya membuka lubang yang lebih serius dari sekadar kenyamanan mengetik: `150.000` **lolos** aturan validasi `numeric` sebagai **seratus lima puluh rupiah** — PHP membaca titik sebagai desimal Inggris. Tidak ada error, tidak ada peringatan. Nominal tersimpan 1.000 kali lebih kecil, invoice tetap "belum lunas", dan uangnya sudah diterima di dunia nyata. Selama kolomnya `type="number"` browser menahan titik, jadi lubang ini **dorman** — begitu masking ditambahkan (atau request datang dari luar form), lubangnya terbuka.
+
+**1. Normalisasi server — lapis yang wajib.** `App\Support\RupiahInput::parse()` dipanggil sebelum `validate()` di seluruh endpoint yang menerima nominal ketikan:
+
+| Endpoint | Field |
+|---|---|
+| `PaymentController@store` | `amount` |
+| `CollectorDepositController@verify` | `declared_amount`, `settlement_amount` |
+| `RecordsCollectorBatch::normalizeBatchAmounts()` → `PaymentBatchController`, `CollectorPaymentController` | `rows.*.amount` |
+| `Master\InternetPackageController` | `monthly_price`, `installation_fee` |
+| `CustomerRegistrationRequest`, `CustomerController@update` | `discount_amount`, `other_fee` |
+| `CustomerController@storeManualInvoice` | `prorate_amount`, `extra_*_fee` |
+| `CustomerVerificationController` | `extra_*_fee`, `other_fee`, `prorate_amount_override` |
+
+Parsernya sengaja konservatif: `150.000` / `Rp 1.500.000` / `150.000,50` dinormalkan, sementara `1.50`, `12.34.56`, `seratus ribu` **tidak ditebak** dan dibiarkan ditolak validator. Resep umum satu baris (`str_replace('.','')` tanpa syarat) justru merusak `150000.50` → `15000050`. Menebak nominal uang lebih berbahaya daripada menolaknya.
+
+**Kolom persen dikecualikan** — `tax_percent`, `ppn`, `discount_default` bernilai 0–100 dan tak pernah pakai pemisah ribuan; ikut memasking membuat `11` berisiko jadi `11.000`. Dikunci test.
+
+> Salah baca di **master paket** kelasnya berbeda dari salah baca di satu pembayaran: harga paket menular ke **setiap** tagihan yang lahir dari paket itu.
+
+**2. Masking layar.** Atribut `data-rupiah` + skrip di `layouts/app.blade.php` (tanpa build step). Kursor dikembalikan berdasarkan **jumlah digit** sebelum kursor, bukan indeks karakter — titik yang baru disisipkan menggeser indeks dan kursor akan meloncat saat menyunting bagian tengah.
+
+**3. Efek samping yang harus ikut ditutup.** Input jadi `type="text"`, sehingga `min`/`max` bawaan browser tidak berlaku lagi:
+
+| Tempat | Pengganti |
+|---|---|
+| tabel batch kolektor | `data-max` + `cbBarisValid()` |
+| modal Bayar Cepat | `qpNominal() < 1` sebelum submit |
+| sisanya | validasi server (`numeric|min:0`) |
+
+Semua pembaca nilai di sisi JS dipindah ke `window.Rupiah.angka()` — `parseFloat('150.000')` = 150, dan pratinjau cicilan, rincian harga layanan, serta kwitansi verifikasi akan berbohong tanpa itu. Modal Bayar Cepat mengirim lewat **FormData**, bukan event `submit`, jadi normalisasi global tidak menjangkaunya — nilainya dibersihkan eksplisit.
+
+**Test baru:** `RupiahInputTest` (unit, 16 kasus), `NominalRupiahBertitikDiterimaTest` (8 — jalur Tagihan, batch kolektor, verifikasi setoran, master paket, edit pelanggan, tagihan manual, plus penolakan ketikan tak dikenali). Suite penuh **1220 lulus, 0 gagal**.
+
+**5. Aritmetika uang dipindah ke sen bulat** (2026-08-12, penutup rangkaian ini). Kolom DB memang `decimal(12,2)` yang eksak, tapi begitu nilainya masuk PHP ia jadi float biner. Diukur langsung di repo: 1.000 baris × 33.333,33 menghasilkan 33.333.329,9999991469 (meleset −0,00000085), dan `0.1 + 0.2 === 0.3` bernilai FALSE.
+
+Yang dipertaruhkan bukan tampilan — semua angka dibulatkan 2 desimal sebelum tampil — melainkan **cabang keputusan**: `remaining <= 0` (Lunas vs Sebagian), `difference == 0` (Terverifikasi vs SELISIH), `overpay > 0` (lebih bayar hantu Rp0,000001 yang tak bisa diselesaikan siapa pun). Setoran pas yang salah ditandai selisih berarti kolektor ditagih uang yang sudah dia serahkan.
+
+`App\Support\Money` mengerjakan semua operasi di sen bulat lalu mengembalikan rupiah float, jadi tanda tangan pemanggil tidak berubah. Dipakai di `Invoice::recalculateFromPayments()`, `CollectorDeposit::computedAmount()`/`outstandingShortfall()`, `CollectorDepositService::verify()`, `CollectorBalanceService`, `CollectorPaymentService`, `PaymentController@store` (pemisahan lebih bayar), dan `InitialInvoiceService`.
+
+> **Epsilon karangan dihapus.** `abs($x) <= 0.001` sempat tersebar di beberapa tempat dengan angka yang bebas dipilih masing-masing (`+ 0.001` di satu baris, `<= 0.001` di baris lain). Sekarang perbandingannya eksak. Persen (`ppn`, `tax_percent`, `discount_default`) tetap float biasa — yang lewat `Money` cuma hasil perkaliannya.
+
+**Test:** `MoneyTest` (unit, 8 — termasuk bukti galat float yang dicegahnya).
+
+**6. Temuan review yang ditutup (2026-08-12).** Review `/code-review high` menemukan 6 cacat nyata di jahitan antara masking layar dan nilai server — semuanya diverifikasi ulang sebelum diperbaiki:
+
+| # | Cacat | Akibat |
+|---|---|---|
+| 1 | `formatAwal()` membuang titik tanpa syarat, padahal `old()` berisi bentuk mesin | `150000.50` tampil `15.000.050` — **100×**, dan langsung terkirim ulang saat simpan |
+| 2 | Blok masking ditaruh SESUDAH `@yield('scripts')` | `refreshHint()` awal di `payments/create` melihat `window.Rupiah` undefined → pratinjau cicilan salah sampai pengguna mengetik |
+| 3 | `updateTotalPreview()` di master paket create+edit masih `parseFloat` | pratinjau harga Rp 153 alih-alih Rp 153.180 — padahal pratinjau itu justru alat periksa sebelum simpan |
+| 4 | Prefill `number_format($v, 0, ...)` membuang sen | sisa 150.000,50 tampil 150.001 → ditolak "melebihi sisa tagihan"; baris tak bisa dibayar tanpa disunting manual |
+| 5 | `declared_amount` prefill dibulatkan | uang fisik benar terkirim dibulatkan → setoran ditandai SELISIH, kolektor ditagih uang yang sudah dia serahkan |
+| 6 | `cbApplyResults()` & `qpSetNominal()` mengisi `Math.round(...)` sementara `data-max` eksak | sesudah bayar sebagian, baris yang sama langsung ditolak validasi klien |
+
+Perbaikannya: `window.Rupiah.formatDariServer()` (mengenali titik desimal dengan aturan yang sama seperti `RupiahInput`), blok masking dipindah ke atas `@yield('scripts')`, dan `FormatHelper::rupiahInput()` sebagai satu-satunya cara memformat nilai bawaan.
+
+> Temuan ke-7 (`window.formatInputRupiah` tanpa pemanggil) **bukan cacat** — fungsinya memang disediakan untuk markup yang disisipkan setelah load; komentarnya yang mengklaim berlebihan, dan itu yang diperbaiki.
+
+**Test tambahan:** `RupiahInputPrefillTest` (unit, 8 — bolak-balik DB → layar → DB tanpa berubah nilai). Suite penuh **1236 lulus, 0 gagal**.
+
+#### ADHOC-29 — Satu pembayaran, tiga kwitansi berbeda isi (2026-08-12)
+
+**Pemicu:** user mencetak PAY-202608-0822 dari List Pembayaran dan dari Detail Pembayaran, lalu membandingkan dua PDF-nya — isinya berbeda. Ditambah header/footer bawaan browser (`8/12/26, 8:52 AM`, `localhost:8000/payments/2548/kwitansi`) ikut tercetak di kwitansi yang diserahkan ke pelanggan.
+
+**1. Header/footer browser dimatikan.** `@page { margin: 0; }` di empat halaman cetak (`payments/receipt`, `payments/show`, `invoices/show`, `collector-worksheet/receipt-print`). Teks itu hidup di **kotak margin halaman**, bukan di dokumen — tidak ada selector yang menjangkaunya, satu-satunya cara adalah menolkan margin. Jarak ke tepi kertas dipindah ke padding elemen (struk `6mm 5mm`, kartu kolektor `10mm 8mm`, dua lembar A4 sudah punya `p-8`); menghapusnya begitu saja membuat cetakan mepet tepi dan terpotong printer. Centang *Headers and footers* yang dinyalakan manual di dialog Chrome tetap menang atas CSS.
+
+**2. Isi disatukan.** `App\Services\Receipts\ReceiptPresenter` jadi satu-satunya sumber isi kwitansi; tiga view tinggal merangkai kunci yang sama dengan tata letaknya masing-masing. Sebelumnya tiap view membaca `$payment` sendiri:
+
+| Field | Thermal (dulu) | A4 (dulu) | Kartu kolektor (dulu) |
+|---|---|---|---|
+| Alamat & no. HP | ✗ | ✓ | ✗ |
+| Kolektor/penagih | ✗ | ✓ | ✓ |
+| Periode & paket | ✓ | sebagian | ✗ |
+| Lebih bayar | ✓ | ✓ | ✗ |
+
+Sekarang ketiganya memuat set yang sama. **Field baru ditambahkan di presenter, bukan di blade** — menambahkannya di satu view mengulang persis penyimpangan ini.
+
+**3. Dua cacat yang ketahuan saat menyatukan.**
+- Lembar A4 mencetak status dengan `text-emerald-700` **tanpa syarat**: pembayaran `ditolak` tampil hijau berbullet di dokumen berlabel "KWITANSI PEMBAYARAN RESMI".
+- Saat `note` kosong, A4 **mengarang** kalimat `"Tagihan Bulanan. Struk ini adalah bukti pembayaran sah…"` yang terbaca seperti catatan petugas. Judul baris rincian juga selalu "Pelunasan Invoice" walau pembayarannya cicilan sebagian — sekarang ikut `keterangan_cicilan`.
+
+**4. Alamat dipenggal dua baris.** `…RT. 002/RW. 002, Joresan` / `Kec. Mlarak, Kabupaten Ponorogo`. Penggalan hanya di penanda `Kec.`/`Kecamatan`; tanpa penanda alamat dibiarkan utuh — membelah di koma sembarang memisahkan nama jalan dari nomornya. Murni penyajian: `customers.address` tetap satu kolom teks bebas, tidak ada migrasi.
+
+**Test baru:** `KwitansiIsiSeragamAntarHalamanTest` (6), +2 regresi `@page` di `PaymentReceiptTest` & `PaymentReceiptPrintTest`.
+
+#### ADHOC-28 — Material & alat teknisi hilang senyap + Verifikasi Admin baca data nyata (2026-08-11)
+
+**Pemicu:** user melapor halaman `/verifications/{id}/admin` "tidak menampilkan data yang diinput, contoh alat". Perbaikan tampilan ternyata cuma setengah cerita — sumber datanya memang kosong.
+
+**Temuan (probe DB produksi lokal):** `surveys=1791`, `installations=1777`, `tasks=2`, **`fop_tasks=0`, `task_materials=0`, `task_work_tools=0`**.
+
+Rantainya:
+
+1. `task_materials` & `task_work_tools` wajib punya `fop_task_id` (`NOT NULL` + FK) — anchor-nya FopTask, bukan Customer atau Task.
+2. Task SURVEY/PEMASANGAN untuk pelanggan baru dibuat langsung lewat `Task::create()` di `CustomerController::store()` dan `CustomerWorkflowService::transition()`, **tanpa** FopTask. FopTask Survey/PSB cuma lahir di `FopTaskController::autoSyncAndCalculatePriority()` — yang hanya jalan saat ada yang membuka `GET /fop-tasks`.
+3. Di kedua controller laporan, sync material & alat dibungkus `if ($fopTask)`. Anchor null → seluruh isian teknisi **dibuang tanpa satu pun pesan error**, laporan tetap "berhasil disimpan".
+
+**Bagian 1 — Anchor dibuat di titik deterministik**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | `FopTaskProvisioningService::ensureForCustomer(Customer, TaskType)` | Idempoten; `lockForUpdate` dalam transaksi supaya dua request bersamaan tidak melahirkan dua TFOP |
+| 2 | Dipanggil dari registrasi pelanggan, transisi `waiting_survey`/`waiting_installation`, dan **jaring pengaman** di `CustomerSurveyController::store()` + `CustomerInstallationController::store()` | Jaring pengaman menutup semua jalur lain sekaligus — anchor dibuat, bukan dilewat |
+| 3 | Papan `/fop-tasks` memakai service yang sama | Dua blok `FopTask::create()` duplikat dihapus; loop tinggal jadi sapuan pelanggan lama |
+| 4 | `FopTaskController::generateTaskNumber()` delegasi ke service | Deret TFOP tidak lagi punya dua implementasi generator di satu file. Format tetap identik dengan `TicketService::generateFopTaskNumber()` |
+| 5 | Kategori selain SURVEY/PSB ditolak service | MTN & C-REQ tetap cuma lewat `TicketService::escalateToFop()` — service ini bukan pintu belakangnya |
+| 6 | Fallback `village_id ?? 1` / `pop_id ?? 1` dibuang | Kedua kolom nullable; menembak id 1 yang belum tentu ada melempar FK error, dan di jalur simpan laporan itu berarti laporan teknisi gagal total (ketahuan dari test pertama yang merah) |
+
+**Bagian 2 — Verifikasi Admin menampilkan data yang diinput**
+
+| # | Perubahan | Catatan |
+|---|---|---|
+| 1 | Tab Survey: "Estimasi Material Hasil Survey" + "Alat Kerja Dicatat Surveyor" | Partial `verifications/partials/{materials,work-tools}.blade.php` |
+| 2 | Tab Pemasangan: "Material Terpakai Saat Pemasangan" + "Alat Kerja Dipakai Tim Pemasangan" | Di atas tabel Estimasi vs Terpakai yang sudah ada |
+| 3 | Daftar baris **melengkapi**, bukan menggantikan tabel variance | Variance mengagregasi per barang dan membuang catatan per baris |
+| 4 | Blok tetap dirender walau kosong | "Tidak mencatat" ≠ "seksi tidak ada" — kebingungan itu yang memicu laporan ini |
+| 5 | `customer_surveys.fop_id` → nama FOP | Sebelumnya tampil mentah dengan label "Kebutuhan FOP / Tiang"; kolomnya menunjuk ke `users`, label & isinya tidak nyambung |
+| 6 | `required_tools` dilabeli "Catatan Kendala Peralatan" & disembunyikan kalau kosong | Menyamakan dengan label form laporan (peran barunya sejak ADHOC-13) |
+
+**Data lama tidak bisa dipulihkan** — material & alat itu tidak pernah masuk DB. Yang tersimpan cuma `required_tools`. Pelanggan yang masih di antrean survey/pemasangan akan dapat anchor otomatis; yang sudah lewat tahap tidak.
+
+**Test baru:** `SurveyReportMaterialLostWithoutFopTaskTest` (3), `VerificationAdminInputDataVisibilityTest` (3). Full suite **1169 passed, 15 skipped, 0 failed**.
+
+**Dokumentasi terkait:** `docs/fop-task/{README,flowchart}.md` §2, `docs/customer-lifecycle/business-logic.md` §4, §6, §7.
+
+**Catatan lingkungan:** `storage/framework/testing/disks` di mesin dev dimiliki `root` dan bikin ~24 test gagal di `Storage::fake()` (bukan regresi kode). Di-rename jadi `disks_broken_rootowned`; sisanya perlu dihapus manual dengan sudo.
+
+#### ADHOC-27 — Aksi selesai tapi layar diam (2026-08-11)
+
+**Pemicu:** user melapor "Upload berkas, diproses, selesai — tidak ada apa pun di halaman; tiba-tiba saldo kolektor terpotong." Saldo itu ternyata dari verifikasi setoran 61 detik sebelumnya, **bukan** dari unggahan. Tapi selama layarnya diam, kesimpulan itu wajar diambil siapa pun — yang salah UI-nya.
+
+Kelas masalahnya sama di beberapa tempat: pekerjaan pindah ke queue/realtime, layar tidak ikut bicara.
+
+**1. Panel progres kwitansi** — spinner + "Membaca kwitansi… N tersisa" + progress bar + tiga penghitung (Cocok/Antre/Perlu cek). Polling 2 dtk, berhenti sendiri saat antrean nol; selesai → toast + segarkan sekali. Endpoint `GET /payment-receipts/progress/{collector}`, memakai `PaymentReceipt::scopeForWorksheet()` yang SAMA dengan daftarnya — penghitung yang lebih longgar dari daftarnya membocorkan keberadaan berkas cabang lain lewat angka. Form unggah dapat ringkasan pilihan + tombol terkunci saat mengirim.
+
+**2. Indikator koneksi realtime (global)** — bilah di `layouts/app.blade.php`, menutup **sepuluh** layar yang bergantung Echo sekaligus. Ditaruh di layout, bukan `resources/js/echo.js`, supaya aktif tanpa `npm run build`. Tunda 8 detik (agar `connecting` yang wajar tidak berteriak) dan memeriksa keadaan awal (halaman yang dibuka saat server WS sudah mati tak pernah mengalami `state_change`).
+
+**3. Sukses palsu di `master/sla-timeline`** — simpan otomatis tanpa cek `res.ok`/`.catch`: 403/422/500 pun berakhir "Tersimpan.". Sekarang pesan galat diambil dari `message`/`errors`, toast merah, dan **nilai input dikembalikan**. `SlaTimelineGagalSimpanTest` mengunci kontrak response-nya.
+
+**4. Realtime setoran kolektor** — `App\Events\CollectorDepositUpdated`, satu event untuk seluruh siklus (`diajukan`/`diverifikasi`/`dilunasi`/`dihapus_buku`), disiarkan ke DUA kanal: `collector-activity.{popId}` (admin) dan `App.Models.User.{id}` (kolektor). **`ShouldBroadcastNow`** — kabar tentang uang tak boleh menunggu worker, konsisten dengan `AppNotification`. Payload **tanpa saldo**: saldo angka turunan, dan halaman yang menghitung uang fisik tidak boleh mengganti angkanya saat orangnya sedang menghitung. Ditambah notifikasi **hapus buku → kolektor** yang sebelumnya tidak ada sama sekali.
+
+**6. Realtime aktivitas kas di luar setoran** — `App\Events\CollectorActivityUpdated` pada kanal yang sama, empat aksi: `pembayaran_dicatat` (saldo NAIK, Worksheet dulu diam), `pembayaran_ditolak` (saldo TURUN), `pelanggan_diassign` & `pelanggan_dilepas` (rute berubah — sebelumnya **tanpa notifikasi sama sekali**, `grep -c notify` = 0 di `CollectorWorksheetController`). Ditambah notifikasi assign/lepas ke kolektor. Pembayaran tanpa `collected_by` sengaja **tidak** menyiarkan apa pun — uang kantor, tak ada saldo kolektor yang bergerak.
+
+> **Kanal diganti nama** `collector-deposits.{popId}` → `collector-activity.{popId}` begitu isinya melampaui setoran; ikut pula `depositChannels()` → `activityChannels()` dan partial `deposit-realtime` → `collector-realtime`. Route `collector-deposits.verify`/`.write-off` TIDAK berubah — itu route, bukan kanal.
+
+**Test tambahan:** `AktivitasKasKolektorRealtimeTest` (5).
+
+**7. Sembilan test RBAC merah — bukan bug permission, tapi cache bocor.** `EffectiveAccessServiceTest` (×5), `RolePermissionTest` (×2), `UserLegacyAdapterTest`, `MasterBarangPermissionGeneratedTest` sudah merah sejak sebelum sesi ini. Gejalanya menyesatkan: `userCan($user, 'invoices.create')` mengembalikan `true` untuk user yang cuma punya `invoices.view`, seolah resolusi permission-nya rusak.
+
+Penyebabnya `CACHE_STORE: file` di `docker-compose.yml`. Sama persis dengan kebocoran queue di poin 5: env compose mengisi `$_SERVER` dan mengalahkan `force="true"` di `phpunit.xml`, sehingga test memakai cache **file yang persisten lintas run**. `EffectiveAccessService` menyimpan izin di `user.{id}.permissions`; satu run yang menjadikan user id 1 sebagai Owner meninggalkan `["*"]` di sana, dan run berikutnya melihat user biasa punya akses penuh.
+
+Perbaikan: `CACHE_STORE`/`SESSION_DRIVER` dikeluarkan dari compose (nilainya dipindah ke `.env` supaya runtime tak berubah — tetap `file`), plus lapis kedua di `Tests\TestCase::setUp()` yang memaksa `cache.default`/`session.driver` ke `array`.
+
+**Hasil: suite penuh HIJAU — 1176 lulus, 0 gagal.** Pertama kalinya sepanjang sesi ini.
+
+**8. Satu pembayaran = satu dokumen kwitansi.** Versi pertama pemecahan lembar (poin 3) membiarkan ke-200 baris menunjuk PDF yang sama — daftar Berkas Kwitansi terbaca seperti 200 duplikat, dan membuka kwitansi pelanggan A menampilkan lembar berisi 8 pelanggan.
+
+**Ditempuh: tautan + regenerasi dari data** (opsi A, keputusan user 2026-08-12). Tiap baris di daftar Berkas Kwitansi punya dua tautan berbeda peran:
+
+| Tautan | Isi | Peran |
+|---|---|---|
+| **Kwitansi** | halaman cetak `payment-receipts.print` dengan `payment_ids[]` **satu id** | dokumen satuan pelanggan itu, dirender ulang dari `payments`/`invoices` |
+| **Lembar asal** | berkas PDF yang diunggah, apa adanya | bukti setoran — sidik `checksum` menempel di sini |
+
+Berkas unggahan dengan sengaja **tetap satu untuk seluruh lembar** (200 baris → 1 `path`). Duplikasinya bukan kesalahan data: itu memang satu lembar yang dipegang bersama 200 pembayaran, dan yang membedakan baris adalah `payment_id`, bukan berkasnya.
+
+> **Kenapa bukan dipotong.** Empat geometri pemotongan dicoba dan semuanya gagal presisi (titik tengah antar nomor, kata terdekat, deteksi celah, grid seragam) — tata letak cetakan tidak konsisten, dan potongan yang meleset menempelkan sebagian kwitansi orang lain ke pelanggan yang salah. Regenerasi dari data tidak punya kelas galat itu sama sekali: angkanya datang dari baris pembayarannya sendiri.
+>
+> **Jejak audit tetap utuh** — inilah alasan lembar asal TIDAK dibuang. Kalau suatu saat ditanya "pelanggan ini benar sudah bayar?", jawabannya bertumpu pada `payments` + `checksum` lembar yang diunggah, bukan pada gambar hasil crop. Potongan PNG adalah turunan; turunan tidak bisa jadi bukti atas dirinya sendiri.
+
+`ReceiptSheetSplitter`, kolom `source_path`, dan seluruh potongan PNG lama **dihapus** (709 baris dikembalikan menunjuk lembar asalnya).
+
+> **Bug yang hampir lolos di versi pemecahan (dicatat, kodenya sudah tiada):** percobaan pertama menghasilkan 200 baris tapi tetap 1 berkas, tanpa error apa pun. Penyebabnya `$potongan` tidak ikut di `use (...)` closure `DB::transaction` — undefined di dalam closure, `isset()` mengembalikan `false`, seluruh pemecahan berhenti bekerja secara senyap. Persis kelas kegagalan yang ADHOC-27 ada untuk memberantasnya, kali ini di kode sendiri.
+
+> **Jebakan kedua, di sisi operasional:** setelah kodenya benar dan test hijau, unggahan lewat UI TETAP menghasilkan satu berkas untuk 100 kwitansi. Bukan kodenya — **worker Horizon memuat kelas sekali saat start** dan sudah hidup 7 jam, sejak sebelum pemecah lembar ada. `tinker` dan test memakai proses baru sehingga selalu benar; aplikasi sungguhan memakai kode kemarin. Wajib `docker compose restart horizon` (atau `horizon:terminate`) setiap kali menyentuh kode yang dipakai job — dicatat di `docs/RUNBOOK_COMMANDS.md` §E.
+
+**5. `verifications/queue`** — baris meredup saat disegarkan; kegagalan tidak lagi dipendam (`// Diam-diam gagal`) melainkan bertoast, karena baris basi tak bisa dibedakan dari baris yang memang belum berubah — dan dua admin bisa memverifikasi pelanggan yang sama.
+
+> **Dua temuan saya yang ternyata SALAH**, dicatat supaya tidak ditelusuri ulang: `tickets/partials/detail-drawer` sudah punya skeleton + state gagal, dan `master/wilayah` sudah punya `treeLoading` + pesan galat. Keduanya benar apa adanya; penilaian awal berasal dari hitungan grep, bukan membaca kodenya.
+
+**Test baru:** `SetoranKolektorRealtimeTest` (4), `SlaTimelineGagalSimpanTest` (3), +3 di `PaymentReceiptTest` (progres & kebocoran berkas yatim).
+
+#### ADHOC-26 — Tagihan tak terbit, kwitansi massal, queue & batas PHP (2026-08-11)
+
+**Pemicu:** user melapor "sudah tanggal 10, tagihan tidak bertambah". Penelusuran menyeret lima area sekaligus.
+
+**1. Tagihan Juli–Agustus tidak pernah terbit.** Container `scheduler` mati saat `monthlyOn(1, '01:00')`. Menghidupkannya **tidak** menambal — tanggal 1 yang terlewat tidak diulang. Ditambah `billing:generate-monthly-invoices` dipatok `now()`, jadi bulan lampau mustahil dikejar.
+→ opsi `--period=YYYY-MM` (validasi ketat), tempo legacy `addDays(10)` → `day(10)` supaya tidak ada dua tanggal tempo untuk satu aturan. `docs/RUNBOOK_COMMANDS.md` §C langkah 5–7.
+
+**2. Riwayat billing legacy cuma menutup ~4,7%.** `biaya_tagihan` adalah kontrak biaya per pemasangan (tanpa kolom periode/status); satu-satunya jejak per bulan (`apikeuangan_buktitransaksitagihan`) berisi 9–127 baris/bulan untuk ~1.900 pelanggan; seluruh tabel jurnal kosong. 1.737 invoice vs 37.081 pelanggan-bulan. **Bukan bug importer — datanya memang tidak ada di dump.** Lahir opsi `app:import-legacy-sql --without-billing` + kelompok C-2 "go-live pelanggan saja" di runbook.
+
+**3. Kwitansi PDF tak pernah tercocokkan otomatis.** QR reader melewatkan non-gambar, OCR mati default ⇒ setiap PDF `FAILED`. Diperbaiki berlapis:
+- `PdfPageRasterizer` (poppler `pdftoppm`, bukan Imagick — Debian mematikan coder PDF di policy.xml), render **per halaman**, eskalasi 400 DPI untuk dokumen ≤3 halaman.
+- **Lapisan teks PDF jadi jalur utama** — 8/8 nomor vs 7/8 dari pemindaian QR, dan pada berkas nyata 200 kwitansi: teks 0,64 dtk & 100% akurat, QR halaman-penuh 37,2 dtk & **0%**.
+- **Satu lembar = 8 kwitansi**: unique `checksum` → `(checksum, payment_id)`, satu baris per nomor.
+- Urutan baca disatukan ke `ReceiptNumberExtractor::extractAll()`; enum dapat case `TEXT`.
+- `attachNumbers()` dibungkus satu transaksi: **16 dtk → 1,14 dtk** untuk 200 kwitansi.
+
+**4. Pengaman jalur Tagihan.** `payments.idempotency_key`, `payment_date` `before_or_equal:today`, dan `PaymentController@bulkStore` + route `invoices.payments.bulk-store` **dihapus** (yatim, tanpa UI/test, jaminannya menyimpang dari jalur kolektor).
+
+**5. Infrastruktur.** `procps`+`netcat-openbsd` (healthcheck worker yang selama ini palsu `unhealthy`), `poppler-utils`, queue seragam `redis`, antrean `kwitansi` terpisah dari `default`, `max_file_uploads` 20→100.
+
+> ⚠️ **Regresi yang lahir & ditutup di hari yang sama:** menaruh `QUEUE_CONNECTION` di `docker-compose.yml` membuat `php artisan test` mendorong job ke Redis asli (576 job gagal). `force="true"` di `phpunit.xml` **tidak cukup** — hanya menulis `putenv()`, sementara `env()` membaca `$_SERVER` lebih dulu. Aturannya sama dengan `DB_*`: jangan duplikasi env runtime di compose. Detail di `docs/RUNBOOK_COMMANDS.md` §E.
+
+**Test baru:** `TagihanBulananJatuhTempoTanggal10Test` (+3), `LegacyInvoiceJatuhTempoTanggal10Test`, `ImportLegacyTanpaBillingTest`, `KwitansiPdfDicocokkanOtomatisTest`, `KwitansiLembarBoronganTest`, `PembayaranTagihanTanpaDobelDanTanggalMasaDepanTest`, `MatchPaymentReceiptQueueTest`, +2 di `PaymentReceiptTest`.
+
+**Sisa terbuka:** eksekusi migrasi C-2 (destruktif, menunggu keputusan) dan **10 test RBAC gagal** (`EffectiveAccessServiceTest`, `RolePermissionTest`, `UserLegacyAdapterTest`, `MasterBarangPermissionGeneratedTest`, `SubscriptionStatusMasterTest`) — sudah gagal sebelum ADHOC-26, milik pekerjaan RBAC yang masih berjalan.
+
+#### ADHOC-25 — OCR kwitansi: hasil tebakan tak boleh jadi keputusan (TERBUKA)
+
+Analisa lengkap + rancangan antisipasi: **`docs/plan/kolektor/analisa-risiko-ocr-kwitansi.md`** (KEBENARAN).
+Sisi operasionalnya dipisah ke **`docs/plan/kolektor/analisa-operasional-ocr-gemini.md`** (rate limit,
+cooldown, klasifikasi galat, pagu harian) — lihat ADHOC-31.
+
+> ⚠️ **MEMBLOKIR pengisian `GEMINI_API_KEY`.** Lubangnya dorman selama OCR mati, dan hidup tepat
+> pada hari key diisi. Sesudah itu, tiap kwitansi yang salah tempel harus ditelusuri satu per satu.
+> **Rate limit tidak membuka blokir ini** — dua masalah berbeda: yang satu boros, yang ini salah.
+
+**Pemicu:** pertanyaan user — "kalau QR/OCR error tanpa sebab, bukankah itu jadi celah baru?"
+Instingnya benar, tapi bahayanya di tempat berlawanan.
+
+- **Kegagalan baca BUKAN celah** — fail-closed & berisik: status `FAILED`, berkas terpampang menunggu
+  manusia, tak ada yang otomatis terjadi, tak ada pembayaran berubah.
+- **Celahnya "berhasil tapi salah".** `PaymentReceiptService::match()` memperlakukan hasil OCR sama
+  persis dengan hasil QR — langsung `attach()`. Padahal OCR bisa salah baca satu digit; kalau nomor
+  hasil salah-baca itu **ada** di DB, ia lolos kedua gerbang (pola benar, payment memang ada) dan
+  **menempel diam-diam ke pembayaran pelanggan lain**. Statusnya hijau "Cocok", tanpa `last_error`.
+
+Kelas bug yang sama dengan dua kejadian sebelumnya di modul ini: **yang gejalanya menyerupai
+keberhasilan** — tak ada yang melaporkannya.
+
+**Prinsip yang dilanggar:** deterministik boleh memutuskan, probabilistik hanya boleh mengusulkan.
+QR membaca data yang sistem sendiri cetak (fakta); OCR menebak dari piksel (dugaan).
+
+**Rancangan antisipasi:** QR tetap otomatis; hasil OCR jadi **usulan** — `detected_number` di-prefill,
+nama pelanggan hasil tebakan ditampilkan, admin konfirmasi satu klik, `payment_id` tak pernah diisi
+mesin. Plus dua tambahan murah: hitung tingkat kegagalan per pengunggah, dan tonjolkan label
+`via Manual` supaya jalan keluar manual terlihat (menjawab kekhawatiran "sistemnya error" dipakai
+sebagai alasan).
+
+Empat keputusan menunggu (D1–D4 di dokumen), termasuk apakah kwitansi kelak dijadikan **kontrol** —
+jawaban itu mengubah keputusan "kwitansi menunggu kantor".
+
+#### ADHOC-24 — Kolektor 2.0 Fase 4: Kwitansi QR & OCR Cadangan (2026-08-08)
+
+Dokumentasi modul: `docs/kolektor/business-logic.md` §12, `flowchart.md` §8,
+`database-schema.md` (`payment_receipts`).
+
+**Sumbu dokumen dipisah dari sumbu kas.** Rancangan awal menggantung status verifikasi
+kolektor pada selesainya OCR; itu menyandera uang yang sudah dihitung dua orang di meja
+pada berkas gambar yang bisa gagal dibaca. Sekarang setoran terverifikasi tanpa menunggu
+kwitansi apa pun — dikunci test `test_deposit_verification_does_not_wait_for_any_receipt`.
+
+**QR jalur utama, bukan OCR.** Kwitansi dicetak sistem sendiri, jadi menyuruh model bahasa
+membaca ulang data yang kita tulis sendiri adalah biaya tanpa informasi baru. QR berisi
+`payment_number` polos (bukan URL — kertas tak boleh terikat domain), SVG, error correction
+**High** karena kertas kwitansi terlipat/kena air/difotokopi. Nomor juga dicetak sebagai
+**teks polos**: itu yang dibaca OCR saat QR sobek, dan dibaca manusia saat OCR pun gagal.
+
+**Dua gerbang sebelum mencocokkan:** pola `PAY-YYYYMM-NNNN`, lalu keberadaan payment-nya di
+DB. Nomor yang lolos pola tapi tak menunjuk pembayaran mana pun berakhir `MISMATCH`, tidak
+pernah dicocokkan asal — ini yang menahan QR salah cetak maupun halusinasi OCR.
+
+**OCR mati secara default.** Tanpa `GEMINI_API_KEY`, jalur itu dilewati dan berkas jatuh ke
+pencocokan manual. Fitur tetap utuh, tak ada biaya keluar sebelum diputuskan.
+
+**Yang ditambahkan:** tabel `payment_receipts`, enum `ReceiptStatus`/`ReceiptMatchMethod`,
+`PaymentReceiptService`, kontrak `ReceiptNumberReader` + driver QR/Gemini + `ReceiptNumberExtractor`,
+`ReceiptQrRenderer`, job `MatchPaymentReceipt` (queue, `tries=3`), `PaymentReceiptController`,
+halaman cetak, tab **Kwitansi** di Worksheet Admin, permission `collector_worksheet.print` &
+`.upload`, config `services.gemini`.
+
+**Dependency baru (disetujui user):** `endroid/qr-code:^5.1` (membuat QR, tanpa GD),
+`khanamiryan/qrcode-detector-decoder:^2.0` (membaca QR), + `bacon/bacon-qr-code`. Dipilih
+endroid `^5.1` bukan `^6` karena `^6` mensyaratkan PHP `^8.4` sementara `composer.json`
+menyatakan `^8.3`.
+
+**Batas yang belum tertutup & dicatat sadar:** `payment_number` baru ada setelah pembayaran
+tersimpan, jadi kwitansi dicetak sesudah kolektor submit — pelanggan tidak menerima apa pun
+di tempat. Ini arsip internal untuk sengketa, bukan bukti yang dipegang pelanggan seketika.
+
+**Review Fase 4 (11 temuan, semua ditutup 2026-08-08)** — rincian di
+`docs/plan/kolektor/review-fase-1-3.md`. Yang paling penting: **idempotency key sempat dipakai
+bersama antar-permintaan yang sedang jalan**, akibat langsung dari perbaikan review putaran
+sebelumnya. Kolektor menekan Bayar di baris A lalu baris B sebelum jawaban A tiba → keduanya
+mengirim key sama → B dijawab `already_processed` → toast hijau → **uang baris B tak pernah
+tercatat**. Sekarang key diturunkan dari tanda tangan barisnya. Pelajarannya: idempotency key
+mengidentifikasi ISI KIRIMAN, bukan sesi atau tab.
+
+#### ADHOC-22 — Perbaikan hasil review Kolektor 2.0 Fase 1–3 (SELESAI 2026-08-08)
+
+Analisa lengkap per temuan: **`docs/plan/kolektor/review-fase-1-3.md`** — mekanisme, dampak, usulan
+perbaikan, dan jebakan saat memperbaikinya. Baca itu dulu, jangan mulai dari ringkasan ini.
+
+Review diff Fase 1–3 (2026-08-08) menemukan 9 temuan terbuka. Semuanya sudah diverifikasi ulang
+terhadap kode; tidak ada yang gugur. **Kesepuluh temuan ada di luar jangkauan test yang ditulis
+bersama fiturnya** — 1080 test lulus dan tak satu pun menangkapnya. Tiap perbaikan wajib membawa test
+regresi bernama sesuai gejalanya.
+
+**P1 — ✅ SELESAI 2026-08-08** (1089 test lulus). Perbaikannya:
+- **#1** → gerbang POP *all-or-nothing* di `CollectorWorksheetController::show()`, ditopang
+  `CollectorBalanceService::isVisibleTo()` + `popFootprint()` (jejak POP dari pelanggan + payment +
+  setoran). Sengaja bukan "saring yang boleh": halaman ini menyajikan angka TOTAL, dan total yang
+  diam-diam disaring bukan menyembunyikan baris — ia berbohong, lalu admin menghitung uang fisik
+  dengan patokan salah. Sejalan dengan syarat verifikasi setoran §14.2.
+- **#2** → `notifyPopAdmins()` dikeluarkan dari wilayah `try` (batas transaksi & batas penanganan
+  error kini sejajar) dan kegagalannya ditelan + `report()`. Klien memakai ulang idempotency key
+  sampai sukses, jadi retry setelah gagal bukan batch baru.
+- **#3** → baris kunjungan `bayar` tak bisa ditimpa input manual; `payment_id`/`note` basi
+  dibersihkan saat hasil berubah. Larangan "bayar tak bisa diinput manual" kini utuh — sebelumnya
+  hanya melarang MEMBUAT, tidak melarang MENGHAPUS.
+
+Rincian asli temuan (dipertahankan sebagai konteks):
+1. **Kebocoran lintas POP di Worksheet Admin** — `show()` tak memeriksa kolektor masuk scope penonton;
+   `$balance`, `$outstandingShortfall`, dan daftar `$deposits` nol POP scope. `pop_admin` POP A bisa
+   membaca posisi kas & riwayat setoran kolektor POP B. Bagian lain halaman itu sudah di-scope, jadi
+   ini kelupaan, bukan desain — dan melanggar larangan keras CLAUDE.md.
+2. **Pembayaran dobel setelah notifikasi gagal** — `notifyPopAdmins()` jalan setelah transaksi commit
+   tapi masih di dalam `try/catch`; exception → `422 "Batch ditolak"` padahal payment tersimpan.
+   Front-end mint idempotency key baru tiap retry → cicilan terkredit dua kali.
+3. **Jejak kunjungan `bayar` bisa dihapus lewat input manual** — jalur manual menimpa baris `bayar`
+   dan meninggalkan `payment_id` basi. Menyerang jantung kontrol anti-fraud §12.
+
+**P2/P3 — ✅ SELESAI 2026-08-08** (1095 test lulus):
+- **#4** → `rows.*.collected_date` diberi `before_or_equal:today`, menyamakan aturan dengan jalur
+  kunjungan yang sudah menegakkannya.
+- **#5** → pelunasan divalidasi ulang terhadap baris yang SUDAH DIKUNCI, di dalam transaksi;
+  `applySettlement()` tak lagi mengunci salinan kedua. Menutup dua kasus: over-credit karena dua
+  verifikasi bersamaan, dan uang pelunasan mendarat di baris `DIHAPUS_BUKU` lalu lenyap.
+- **#6** → status baru `DepositStatus::LEBIH_SETOR`, terminal. Verify jadi tiga cabang
+  (`= 0` terverifikasi / `< 0` kurang setor / `> 0` lebih setor). Karena terminal, ia otomatis keluar
+  dari daftar pending, tak bisa dipilih untuk pelunasan, dan ditolak hapus buku — tiga gejala buntu
+  hilang sekaligus. Label `SELISIH` diubah jadi **"Kurang Setor"** karena "Selisih" jadi ambigu.
+- **#7** → `writeOff()` memakai `assertVerifierCanSeeAllPayments()`, guard POP sama dengan `verify()`.
+- **#8** → `withQueryString()` pada `$invoices` & `$assignedCustomers`.
+- **#9** → idempotency key setoran ditambah `Str::random(8)`.
+
+Rincian asli temuan P2/P3 ada di `docs/plan/kolektor/review-fase-1-3.md`.
+
+Catatan kebersihan repo: file `NUL` nyasar sudah dihapus. `storage/framework/testing/views/*.php`
+ter-track di git dan ikut tiap diff — mestinya di-gitignore, tapi menyentuh berkas bersama jadi butuh
+persetujuan dulu.
+
+#### ADHOC-21 — Kolektor 2.0 Fase 3: Visit Log & Laporan Aging (2026-08-08)
+
+Rancangan: `docs/plan/kolektor/analisa-alur-kolektor-2.0.md` §12.
+
+**Lubang yang ditutup.** Setoran (Fase 2) hanya menangkap *"laporan jujur, kas
+tidak jujur"*. Skenario *"laporan tidak jujur"* lolos 100%: kolektor menagih Ani
+100rb, tidak melaporkannya sama sekali, uang dikantongi — setoran cocok sempurna,
+status terverifikasi, invoice Ani tetap `belum_dibayar`, Ani merasa sudah bayar,
+sistem diam. Tanpa catatan kunjungan, "tidak ada baris" ambigu antara *belum
+didatangi* dan *didatangi lalu uangnya raib*.
+
+**Yang dibangun:** tabel `collector_visits` (collector, customer, pop, tanggal,
+hasil, tanggal janji, catatan, payment), enum `VisitResult`
+(`bayar`/`tidak_ada_orang`/`menolak`/`janji_bayar`), `CollectorVisitService`,
+`CollectorVisitController` + `POST /collector-worklist/visits`, permission
+`kolektor.visit`, panel input di Worklist, dan tab **Kunjungan** di Worksheet
+Admin berisi laporan aging + riwayat.
+
+**Aturan yang dikunci:**
+1. `bayar` **tidak bisa diinput manual** — hanya turunan payment yang benar-benar
+   tersimpan, ditulis di dalam transaksi pembayaran yang sama. Kalau boleh
+   diketik, tabel ini justru jadi alat menutupi lubang yang harus dia ungkap.
+2. Satu kunjungan = satu baris per pintu per hari (unique index). Bayar 3 tagihan
+   sekaligus tetap satu kunjungan; bayar sore menimpa "tidak ada orang" pagi.
+3. Pilihan pelanggan dibatasi ke worklist hari itu.
+4. `promised_date` dibuang untuk hasil selain `janji_bayar`.
+5. Tanggal kunjungan boleh mundur, tidak boleh maju.
+6. Dua lapis guard sama seperti jalur bayar: pelanggan milik kolektor itu DAN
+   dalam POP scope efektifnya.
+7. Aging diurutkan dari yang paling sering gagal; ≥3 kunjungan gagal ditandai.
+
+**Bug yang ketahuan saat implementasi:** `updateOrCreate` dengan `visited_at` di
+kunci pencarian tak pernah menemukan baris yang ada — kolom `DATE` vs atribut
+ber-cast `date` dibandingkan sebagai datetime penuh. Insert kedua menabrak unique
+index dan **seluruh transaksi pembayaran rollback**, jadi bayar banyak tagihan
+sekaligus gagal total. Diganti `whereDate` + `fill/save`. Test regresinya:
+`test_paying_several_invoices_of_one_customer_creates_a_single_visit`.
+
+Fase 4 (kwitansi QR/OCR) belum dikerjakan.
+
+#### ADHOC-20 — Bundle Alpine.js lewat Vite (langkah 1b, 2, 4 SELESAI 2026-08-13; langkah 3 terbuka)
+
+**Status per 2026-08-13:** Alpine sudah lepas dari CDN.
+
+| Langkah | Status |
+|---|---|
+| 1a. `npm i alpinejs` + plugin | Selesai (sudah ada sejak sebelumnya di `package.json`) |
+| 1b. `import Alpine` + plugin + `window.Alpine` + `Alpine.start()` di `resources/js/app.js` | **Selesai 2026-08-13** |
+| 2. Cabut tag CDN dari `layouts/app.blade.php` | **Selesai 2026-08-13** |
+| 3. Sisir halaman yang menyusun `action`/URL POST di klien | **Selesai 2026-08-13** — lihat tabel hasil sisir di bawah |
+| 4. `npm run build` masuk prosedur deploy | **Selesai 2026-08-13** — DUA jalur, lihat catatan di bawah |
+
+**Langkah 4 butuh dua jalur, bukan satu.** Tahap `assets` di `Dockerfile` (node:22-alpine →
+`npm ci && npm run build`, hasilnya disalin ke `public/build`) hanya menolong deploy berbasis
+**image murni**. Di `docker-compose.yml` service app & nginx bind-mount `./:/var/www`, dan
+bind-mount MENUTUPI isi image di path yang sama — `public/build` yang benar-benar dilayani nginx
+(`root /var/www/public`) selalu milik host. Karena itu ditambah service `assets` di compose:
+
+- jalan tiap `up`, `npm install` + `npm run build` ke direktori host yang ter-mount;
+- app & nginx `depends_on: assets: service_completed_successfully` — tanpa manifest Vite, halaman
+  ber-`@vite` langsung 500 (ViteException) dan seluruh interaksi Alpine mati, jadi build dijadikan
+  **syarat start**, bukan langkah manual yang bisa terlupakan;
+- jalan sebagai root lalu `chown -R $HOST_UID:$HOST_GID public/build node_modules
+  storage/framework/testing`. Ini memperbaiki direktori yang terlanjur milik root (peninggalan
+  proses docker) — user non-root tidak bisa menghapus isinya, sehingga Vite gagal `EACCES` saat
+  mengosongkan outDir dan `php artisan test` gagal `Permission denied` di setiap test yang
+  menyentuh unggahan berkas. Pola root+chown ini menyembuhkan keadaan yang sudah terlanjur **tanpa
+  sudo**, dan mengulanginya tiap build. Yang harus DIHINDARI: `docker compose exec app npm run
+  build` — container `app` jalan sebagai root dan tidak punya langkah chown, jadi justru
+  menciptakan masalahnya;
+- `HOST_UID`/`HOST_GID` didokumentasikan di `.env.example` (default 1000).
+
+Diverifikasi 2026-08-13: `docker compose config` lolos, `docker compose run --rm assets` sukses
+(`public/build` berubah dari root:root jadi yopi:yopi), lalu `npm run build` **dari host** juga
+sukses — jebakan EACCES-nya hilang. Tahap `Dockerfile` diuji terpisah lewat
+`docker build --target assets` (exit 0).
+
+Efek sampingan yang diharapkan: `x-collapse` di 6 titik (`roles/matrix`, `noc/worksheet`,
+`tickets/history`, `pop-tree-picker`) **hidup lagi** — plugin `@alpinejs/collapse` tidak pernah ada
+di bundle CDN. `@alpinejs/focus` ikut terdaftar untuk `x-trap` (belum dipakai). Bundle JS
+122 KB → 202 KB (gzip 67 KB), ganti satu request lintas-origin.
+
+Analisa lengkap + daftar verifikasi manual di browser: `docs/plan/navbar/analisa-alpine-cdn-ke-lokal.md`.
+
+**Verifikasi browser SELESAI 2026-08-13** — kesepuluh poin §5 lolos: Alpine core hidup, `x-collapse`
+beranimasi (plugin yang selama ini tidak pernah ada di bundel CDN), pola `alpine:init` di filter
+POP/Wilayah jalan, halaman login normal, console bersih tanpa "multiple instances", dan
+`window.Alpine.initTree()` terbukti masih mengikat ulang DOM yang diganti Echo di `/fop`,
+`/tasks-saya`, `/fop-tasks`. Tiga poin terakhir sempat tertunda karena papan FOP tidak menampilkan
+tim mana pun — baru bisa diuji setelah ADHOC-34.
+
+##### Langkah 3 — hasil sisir target aksi (2026-08-13)
+
+Aturan yang ditegakkan: **URL aksi yang mengubah data harus datang dari server** — `route()` di
+atribut `data-*`/`onclick`, atau field di respons JSON. Klien boleh MEMILIH di antara URL yang
+diberikan server, tapi tidak boleh MERAKIT path-nya.
+
+| Titik | Sebelum | Sesudah |
+|---|---|---|
+| `fop_tasks/index` modal Task | `:action="formAction"`, cabang edit merakit `url('/fop-tasks') + '/' + id` | URL update dikirim tombol Edit tiap baris (`route('fop-tasks.update')`); ketiga cabang kini URL server; ditambah penjaga `@submit` yang membatalkan submit kalau `action` kosong |
+| `tickets/create` | form tanpa `action`/`method`/`@csrf`, murni `fetch()` | `action`+`method`+`@csrf` dirender server-side sebagai fallback (controller sudah bercabang `wantsJson()`) |
+| `customers/index` Quick Hub — form pembayaran | `payForm.action = '/invoices/${invoice_id}/payments'` | `payment_store_url` dari `CustomerController::paymentInfo()` |
+| `customers/index` — modal Atur Jaringan | `form.action = '/customers/${id}/network-assignment'` | `data-network-update-url` + `data-network-data-url` di tombol |
+| `customers/index` — Detail & Terminasi dari hub | `'/customers/' + id` | `data-detail-url` |
+| `payments/partials/quick-payment-modal` | `fetch('/invoices/${qpInvoiceId}/payments')` | `data-payment-store-url` dari tombol Bayar (`invoices/index`, `customers/show`) |
+| `verifications/queue` — modal Tolak | `form.action = '/verifications/${id}/reject'`, form default `action=""` | URL dikirim tombol di `verifications/partials/queue-actions` |
+| `notifications/index` — tandai dibaca | `'/notifications/${id}/read'` / `/unread` | `data-url-read` + `data-url-unread` |
+| `components/notification-dropdown` | path literal di `fetch()` | `markReadUrlTemplate` + `markAllReadUrl` dirender `route()` |
+
+Yang **diperiksa dan sudah benar** (tidak diubah): `collector-worksheet/index` (assign — sudah
+server-side sejak ADHOC-18/22), `noc/worksheet` & `tickets/partials/archive` (URL dari
+`row.dataset.url*`), `tickets/show` (URL `route()` di `onclick`), `partials/collector-pay-script`
+(`CB_STORE_URL` dari controller), `roles/index` (base `route()`/`url()` dari Blade).
+
+Sisa yang **sengaja dibiarkan**: `fop_tasks/index` (`assign-to-team`, `destroy`, `row`),
+`fop/dashboard` (`switch-team`), `master/sla-timeline` — semuanya memakai basis Blade
+(`{{ url('/fop-tasks') }}`) lalu menempelkan id, jadi definisi path tetap hidup di satu tempat.
+Endpoint GET (pencarian wilayah/POP, `payment-info`, detail invoice) di luar cakupan langkah ini
+karena tidak mengubah data — kecuali `payment-info` yang ikut dipindah ke `data-*` supaya satu
+halaman tidak memakai dua gaya.
+
+Penjaga regresi: `PostTargetRenderedServerSideTest` — 3 test HTTP (URL benar-benar ter-render) +
+6 test pemindaian sumber Blade (pola literal yang sudah dicabut tidak boleh balik).
+
+> Catatan: `fop-tasks.destroy` dan `fop-tasks.update` **berbagi URI** (beda verb). Karena tombol
+> Edit sekarang merender URL update, assertion lama `assertDontSee(route('fop-tasks.destroy'))` di
+> `FopTaskDeleteRestrictionTest` jadi salah sasaran dan diganti jadi memeriksa markup form Hapus
+> (`data-confirm` + `name="_method" value="DELETE"`).
+
+**Kondisi sebelum perubahan ini:** `resources/views/layouts/app.blade.php:22` memuat Alpine dari
+CDN publik:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+```
+
+**Kenapa ini masalah — bukan teori, sudah kejadian.** Bug assign kolektor
+(2026-08-08): panel Worksheet Admin menyusun target POST form-nya lewat Alpine
+(`:action`). Waktu CDN tak termuat, atribut itu tak pernah dievaluasi,
+`form.action` jatuh ke URL halaman sendiri, dan assign gagal **tanpa pesan apa
+pun** — dialog konfirmasi tetap muncul karena itu skrip lokal, user klik "Ya",
+lalu tidak terjadi apa-apa. Sudah ditambal di modul kolektor dengan memindahkan
+target POST ke server-side (`collector-worksheet.assign-selected`), tapi
+**akar masalahnya masih ada untuk halaman lain** yang menaruh logika di Alpine.
+
+Risiko lain dari CDN: butuh internet keluar (deployment di jaringan internal ISP
+bisa tidak punya), versi tak terkunci (`3.x.x` = minor/patch bisa berubah
+sewaktu-waktu tanpa kita tahu), dan pihak ketiga jadi bagian dari rantai pasok.
+
+**Yang perlu dikerjakan nanti:**
+1. `npm i alpinejs` (versi dikunci di `package.json`), import + `Alpine.start()`
+   di `resources/js/app.js` — Vite 7 sudah ada di stack, tak ada tooling baru.
+2. Hapus tag CDN dari layout.
+3. Sisir halaman yang bergantung Alpine untuk **aksi yang mengubah data** —
+   khususnya yang menyusun `action`/URL di klien. Pola itu tetap salah walau
+   Alpine sudah lokal; target POST harus di-render server-side.
+4. Pastikan `npm run build` masuk prosedur deploy (kalau belum), karena setelah
+   ini Alpine tak lagi datang dari luar.
+
+**Catatan:** Alpine di-`defer`, jadi bug-nya intermiten dan bergantung jaringan —
+gampang dikira "kadang error, kadang tidak". Pertimbangkan itu waktu triase bug
+UI yang tidak bisa direproduksi.
+
+#### ADHOC-19 — Kolektor 2.0 Fase 2: Saldo, Setoran & Cross Check (2026-08-08)
+
+Rancangan: `docs/plan/kolektor/analisa-alur-kolektor-2.0.md` §11, §14.2.
+
+Menghidupkan kembali §B-11 dokumen lama yang sempat di-drop, dengan bentuk lebih
+ringan: `collector_deposits` + `payments.collector_deposit_id`, tanpa ledger.
+
+**Dua angka uang, sengaja tak pernah dijumlahkan:**
+- **Saldo Belum Disetor** — Σ payment VALID `collected_by = X` yang
+  `collector_deposit_id`-nya masih null. Wajib kembali 0 tiap setor.
+- **Kurang Setor** — Σ sisa kewajiban dari setoran berstatus `selisih`. TIDAK ikut
+  nol. Kalau digabung, "saldo 0" jadi ambigu: beres, atau nombok yang tak tercatat.
+
+Keduanya DITURUNKAN (`CollectorBalanceService`), tak ada kolom saldo. Konsekuensi
+yang diuji: payment di-reject ⇒ saldo turun sendiri tanpa koreksi manual.
+
+**Alur:** kolektor setor SELURUH saldo (tak ada setoran parsial) → status
+`menunggu_verifikasi`, saldo jadi 0 → admin hitung uang fisik → `difference =
+declared − (computed + settlement)` → 0 berarti `terverifikasi`, ≠ 0 berarti
+`selisih` + catatan WAJIB → ditutup lewat pelunasan di setoran berikutnya
+(`settles_deposit_id`, mendukung cicilan lewat `settled_amount`) atau hapus buku
+oleh Owner.
+
+**Pelunasan selisih = field terpisah, bukan dilebur ke uang fisik.** Kalau dilebur,
+setoran penutup tercatat "lebih setor" dan lahir selisih baru yang menggantung —
+laporan selisih tak pernah nol.
+
+**Guard yang dipasang:**
+1. Verifikator ≠ penyetor (berlaku juga untuk Owner).
+2. Admin wajib bisa melihat SELURUH payment setoran lewat POP scope — bukan cuma
+   `deposits.pop_id`, karena setoran bisa lintas POP untuk kolektor `pop_tree`.
+3. `PaymentController::reject()` menolak payment yang ada di setoran terverifikasi
+   — koreksi lewat pembayaran pembalik, setoran lama tak disentuh.
+4. `UserController::update()` menolak menonaktifkan kolektor yang masih pegang
+   saldo atau punya kurang setor terbuka.
+5. `collector_worksheet.approve` (hapus buku) tidak diberikan ke `admin` — matrix
+   admin pakai daftar eksplisit, bukan wildcard `collector_worksheet.*`.
+
+Semua transisi masuk `audit_logs` (module `kolektor`). Notifikasi: admin/pop_admin
+dapat "setoran menunggu verifikasi", kolektor dapat hasil verifikasinya.
+
+Fase 3 (visit log) & Fase 4 (kwitansi QR/OCR) belum dikerjakan.
+
+#### ADHOC-18 — Kolektor 2.0 Fase 1: pisah halaman + kolektor mencatat pembayarannya sendiri (2026-08-08)
+
+Rancangan final: `docs/plan/kolektor/analisa-alur-kolektor-2.0.md` (§9, §10, §14, §15).
+
+**Merevisi dua keputusan lama** di `docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md`:
+§B-8 no. 4 ("kolektor tak boleh input pembayaran") dan §B-11 ⛔ ("rekonsiliasi kas
+di luar scope"). Alasan lapangan: kolektor yang tahu persis siapa bayar berapa saat
+itu juga; menunda input ke admin bikin antrean + selisih ingatan.
+
+Yang dikerjakan Fase 1:
+- **Pisah halaman menurut audiens**, bukan menurut data. `/collector-worksheet`
+  (admin: daftar kolektor, panel pelanggan belum di-assign, cross check) vs
+  `/collector-worklist` (kolektor: pelanggan sendiri + catat pembayaran).
+  Konsekuensinya kolektor tak pernah membuka halaman admin, jadi role `kolektor`
+  tetap **tanpa** `payments.create` maupun `customers.update`.
+- **Rute kolektor tanpa parameter `{collector}`** (`POST /collector-worklist/pay`) —
+  kolektor diambil dari `auth()->user()`. Rute admin `POST /payment-batches/{collector}`
+  tetap ber-parameter karena digerbang `payments.create`. Kalau disatukan, kolektor A
+  bisa mencatat pembayaran atas nama kolektor B.
+- **Permission baru**: `kolektor.pay` (+ action `pay` di `ActionCode`/`ActionSeeder`),
+  feature `collector_worksheet` (`view`, `assign`).
+- **Jendela tagih** `config('billing.collector_due_window_days')` = 7. Seleksi per
+  pelanggan, tampilan per invoice: sekali masuk daftar, seluruh tunggakan pelanggan
+  itu ikut tampil. Worksheet Admin sengaja TANPA jendela.
+- **Lapis kedua POP scope** di worklist kolektor (`applyUserScope`) — assign lama tak
+  otomatis dibersihkan waktu kolektor dipindah cabang.
+- Logika batch pindah ke `CollectorPaymentService` + `CollectorWorklistService`;
+  dua controller tipis berbagi trait `RecordsCollectorBatch`.
+
+Bug yang ketahuan saat refactor: cek idempotency sempat jalan **sesudah** validasi
+baris, jadi submit ulang (klik dobel / retry jaringan) dijawab 422 "invoice sudah
+lunas" padahal pembayarannya berhasil. Urutannya dibalik — idempotency selalu
+mendahului validasi.
+
+Setelah deploy: jalankan seeder RBAC lalu `EffectiveAccessService::clearCache()`,
+kalau tidak permission baru tak kelihatan sampai cache kedaluwarsa.
+
+Fase 2 (saldo, `collector_deposits`, cross check bernilai), Fase 3 (visit log),
+Fase 4 (kwitansi QR/OCR) belum dikerjakan.
 
 #### ADHOC-17 — Kolom `completed_by` di Task + Riwayat Terbuka buat Anggota Tim (2026-08-07)
 
@@ -471,9 +1316,10 @@ import). 8 index operasional (`tasks`/`fop_tasks`/`notifications`/
   dipesan pelanggan untuk tanggal ke depan HARUS tetap tampil di papan FOP.
   Membatasi `task_date` akan menyembunyikannya. `orderByRaw` bertingkat di
   `FopTaskController::index()` karenanya masih memaksa filesort.
-- **Aturan bisnis baru yang belum dikodekan** (muncul dari keputusan 1.4):
-  task yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP
-  besok, dan SLA tidak berjalan untuk task terjadwal ke depan. Butuh task sendiri.
+- ~~Aturan bisnis baru yang belum dikodekan (muncul dari keputusan 1.4): task
+  yang tidak selesai hari ini wajib di-pending agar kembali ke papan FOP besok~~
+  — **selesai, lihat ADHOC-53** (2026-09-01). Bagian SLA-nya dicek ulang saat
+  ADHOC-53 dan ternyata sudah benar di kode (tidak ada perubahan).
 - Migration index ditulis sebagai file tambahan
   (`2026_07_22_164035_add_performance_indexes_phase3.php`), bukan diedit ke
   migration `create_*` asalnya seperti saran §14 — supaya tidak mewajibkan

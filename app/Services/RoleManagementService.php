@@ -24,6 +24,13 @@ class RoleManagementService
             $permissionsMap = $allPermissions->keyBy('id');
             $allFeatures = Feature::all()->keyBy('id');
             $viewOverrides = config('rbac.view_permission_overrides', []);
+            // Fitur yang `view`-nya BUKAN sekadar "halaman yang sama, baca
+            // saja" — lihat config/rbac.php > view_autogrant_exempt.
+            $viewExempt = config('rbac.view_autogrant_exempt', []);
+            // Channel QR/Portal (`*.qr`) — hentikan rantai TOTAL begitu
+            // ketemu, jangan naik ke induk. Lihat config/rbac.php >
+            // view_autogrant_chain_boundary.
+            $chainBoundary = config('rbac.view_autogrant_chain_boundary', []);
 
             $addedIds = [];
             foreach ($sanitizedPermissions as $permId) {
@@ -41,6 +48,28 @@ class RoleManagementService
                 // emang langsung anggota 'tasks.fop'.
                 $currentFeature = $perm->feature;
                 while ($currentFeature !== null) {
+                    // Channel QR/Portal: berhenti TOTAL, jangan naik ke induk
+                    // sama sekali. `tickets.qr`/`kolektor.qr`/`customers.qr`
+                    // cuma sub-fitur pengelompokan menu, bukan tab dashboard
+                    // Operasional — mencentang aksinya tidak boleh diam-diam
+                    // ikut mencentang `.view` fitur induk (`tickets.view` dst).
+                    if (in_array($currentFeature->code, $chainBoundary, true)) {
+                        break;
+                    }
+
+                    // Fitur yang dikecualikan: naik ke induknya tanpa
+                    // menambahkan `view` miliknya. Pada `cash_deposit`, `view`
+                    // adalah pandangan PEMERIKSA — memberikannya diam-diam
+                    // kepada admin yang cuma dicentang "Setor" membatalkan
+                    // pemisahan yang justru jadi tujuan fitur itu (§10).
+                    if (in_array($currentFeature->code, $viewExempt, true)) {
+                        $currentFeature = $currentFeature->parent_id !== null
+                            ? $allFeatures->get($currentFeature->parent_id)
+                            : null;
+
+                        continue;
+                    }
+
                     // Kode permission "view" ikut konvensi "{feature_code}.view",
                     // kecuali fitur yang didaftarkan di config/rbac.php > view_permission_overrides.
                     $viewCode = $viewOverrides[$currentFeature->code] ?? "{$currentFeature->code}.view";

@@ -85,6 +85,44 @@ class TagihanBulananJatuhTempoTanggal10Test extends TestCase
         $this->assertSame('2026-07-10', $invoice->due_date->format('Y-m-d'));
     }
 
+    public function test_periode_lampau_bisa_ditambal_lewat_opsi_period(): void
+    {
+        // Gejala aslinya: cron mati saat tanggal 1, bulan itu lewat, dan tagihannya
+        // tidak pernah terbit karena command dipatok bulan berjalan.
+        $customer = $this->createPelangganAktif();
+
+        $this->travelTo('2026-08-10 09:00:00');
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => '2026-07'])->assertExitCode(0);
+        $this->travelBack();
+
+        $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
+
+        $this->assertSame('2026-07', $invoice->billing_period);
+        $this->assertSame('2026-07-01', $invoice->issue_date->format('Y-m-d'));
+        $this->assertSame('2026-07-10', $invoice->due_date->format('Y-m-d'));
+    }
+
+    public function test_menambal_periode_yang_sudah_punya_tagihan_tidak_bikin_dobel(): void
+    {
+        $customer = $this->createPelangganAktif();
+
+        $this->travelTo('2026-08-10 09:00:00');
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => '2026-07'])->assertExitCode(0);
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => '2026-07'])->assertExitCode(0);
+        $this->travelBack();
+
+        $this->assertSame(1, Invoice::where('customer_id', $customer->id)->count());
+    }
+
+    public function test_period_format_salah_ditolak_tanpa_bikin_tagihan(): void
+    {
+        $customer = $this->createPelangganAktif();
+
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => '2026-7'])->assertExitCode(1);
+
+        $this->assertSame(0, Invoice::where('customer_id', $customer->id)->count());
+    }
+
     public function test_tempo_tanggal_10_juga_di_bulan_februari(): void
     {
         // Bulan pendek: offset hari gampang meleset, tanggal tetap 10.

@@ -102,6 +102,8 @@ class PaymentInputTest extends TestCase
         $response = $this->actingAs($finance)->post(route('invoices.payments.store', $invoice->id), [
             'payment_date' => '2026-06-13',
             'payment_method' => 'transfer',
+            'bank_name' => 'BCA',
+            'account_number' => '1234567890',
             'amount' => 150000,
             'proof_file' => UploadedFile::fake()->image('bukti.jpg'),
             'note' => 'Pembayaran penuh.',

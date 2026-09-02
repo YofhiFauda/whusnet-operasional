@@ -113,7 +113,6 @@ class CustomerImportTest extends TestCase
                     'old_request_id' => 'REQ-LEGACY-1',
                     'connection_type' => 'FTTH',
                     'router_or_ont_serial' => 'SN12345678',
-                    'ip_address' => '192.168.1.50',
                     'odp_code' => 'ODP-TST-01',
                     'odp_port' => '5',
                     'olt_code' => '1/1/2',
@@ -325,7 +324,6 @@ class CustomerImportTest extends TestCase
                     'old_request_id' => 'REQ-LEG2-1',
                     'connection_type' => 'FTTH',
                     'ont_sn' => 'SN87654321',
-                    'ip_address' => '192.168.2.100',
                     'odp_code' => 'ODP-TS2-05',
                     'odp_port' => '2',
                     'olt_code' => '1/1/3',
@@ -408,7 +406,6 @@ class CustomerImportTest extends TestCase
             'customer_id' => $customer->id,
             'old_report_id' => 'REP-LEG2-1',
             'router_or_ont_serial' => 'SN87654321',
-            'ip_address' => '192.168.2.100',
         ]);
 
         // Assert Invoice imported
@@ -433,7 +430,6 @@ class CustomerImportTest extends TestCase
         $showResponse->assertSee('Detail Teknis Lama');
         $showResponse->assertSee('REP-LEG2-1');
         $showResponse->assertSee('SN87654321');
-        $showResponse->assertSee('192.168.2.100');
     }
 
     public function test_legacy_status_and_payment_transaction_mapping_are_imported(): void
@@ -603,8 +599,8 @@ class CustomerImportTest extends TestCase
         $writer->addRow(['REQ-FILE-1', 'CUST-FILE-1', 'PKG-FILE-1', 'aktif', '2026-01-01', '2026-02-01']);
 
         $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('technical_details');
-        $writer->addHeader(['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'router_or_ont_serial', 'ip_address', 'odp_code', 'odp_port', 'olt_code', 'wireless_signal', 'fiber_signal', 'location_source', 'note']);
-        $writer->addRow(['REP-FILE-1', 'CUST-FILE-1', 'REQ-FILE-1', 'FTTH', 'SN12345678', '192.168.1.50', 'ODP-TST-01', '5', '1/1/2', '-15', '-19', 'POLE-01', 'Migrasi lancar']);
+        $writer->addHeader(['old_report_id', 'old_customer_id', 'old_request_id', 'connection_type', 'router_or_ont_serial', 'odp_code', 'odp_port', 'olt_code', 'wireless_signal', 'fiber_signal', 'location_source', 'note']);
+        $writer->addRow(['REP-FILE-1', 'CUST-FILE-1', 'REQ-FILE-1', 'FTTH', 'SN12345678', 'ODP-TST-01', '5', '1/1/2', '-15', '-19', 'POLE-01', 'Migrasi lancar']);
 
         $writer->addNewSheetAndMakeItCurrent()->nameCurrentSheet('invoices');
         $writer->addHeader(['old_invoice_id', 'old_customer_id', 'billing_period', 'total_amount', 'issue_date', 'due_date', 'status']);

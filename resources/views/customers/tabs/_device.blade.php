@@ -37,7 +37,6 @@
     $brandModel = trim(($device?->brand ?? '').' '.($device?->model ?? '')) ?: ($tech?->passive_device ?: null);
     $serialNumber = $device?->serial_number ?: ($tech?->router_or_ont_serial ?: $customer->ont_sn);
     $macAddress = $device?->mac_address ?: ($tech?->router_mac ?: $tech?->antenna_mac);
-    $ipAddress = $device?->ip_address ?: ($tech?->ip_address ?: $customer->ip_address);
     $vlanId = $device?->vlan_id ?: ($tech?->vlan ?: $customer->vlan_id);
     $ssid = $device?->wifi_ssid ?: $tech?->ssid;
     $odpCode = $device?->odp ?: ($tech?->odp_number ?: $customer->odp_code);
@@ -47,7 +46,7 @@
         : (($tech?->fiber_signal ?: $tech?->wireless_signal) ?: null);
     $technicalNote = $device?->technical_note ?: $tech?->note;
 
-    $isFallbackOnly = ! $device && ($tech || $customer->ont_sn || $customer->ip_address);
+    $isFallbackOnly = ! $device && ($tech || $customer->ont_sn);
     $hasAnyDeviceData = $device || $isFallbackOnly;
 
     // Material pasif yang benar-benar terpakai saat pemasangan.
@@ -103,10 +102,6 @@
                 <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1">
                     <span class="text-slate-400">MAC Address</span>
                     <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $macAddress ?: '-' }}</span>
-                </div>
-                <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1">
-                    <span class="text-slate-400">IP Address Dialed</span>
-                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $maskSensitive($ipAddress) }}</span>
                 </div>
                 <div class="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-700/50 py-1">
                     <span class="text-slate-400">Mode Koneksi</span>
@@ -406,10 +401,6 @@
                 <div>
                     <label for="wifi_password" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Password WiFi</label>
                     <input type="text" name="wifi_password" id="wifi_password" value="{{ $canViewSensitiveDeviceFields ? old('wifi_password', $device?->wifi_password) : '' }}" {{ ! $canViewSensitiveDeviceFields ? 'placeholder=********' : '' }} class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
-                </div>
-                <div>
-                    <label for="ip_address" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">IP Address</label>
-                    <input type="text" name="ip_address" id="ip_address" value="{{ $canViewSensitiveDeviceFields ? old('ip_address', $ipAddress) : '' }}" {{ ! $canViewSensitiveDeviceFields ? 'placeholder=********' : 'placeholder=192.168.1.1' }} class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200">
                 </div>
                 <div>
                     <label for="vlan_id" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">VLAN ID</label>

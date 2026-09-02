@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
 
 class Task extends Model
 {
@@ -144,16 +145,58 @@ class Task extends Model
     }
 
     /**
+     * Deadline SLA (wall-clock kapan laporan wajib rampung diinput).
+     *
+     * Khusus SURVEY: deadline SELALU akhir hari jadwal (23:59:59) di semua
+     * paket — laporan survey wajib diinput hari itu juga, gak peduli jam
+     * berapa FOP menjadwalkan atau jam berapa teknisi mulai. Beda dari
+     * `sla_minutes` (durasi kerja tetap dipakai TaskReport/conflict window),
+     * ini murni batas kalender. Tipe lain tetap pakai started_at + sla_minutes.
+     * Kecuali task di-pending atau ditolak, deadline ini gak bisa ditunda.
+     */
+    public function slaDeadline(): ?Carbon
+    {
+        if ($this->task_type === TaskType::SURVEY) {
+            return $this->scheduled_at?->copy()->endOfDay();
+        }
+
+        if (! $this->started_at || ! $this->sla_minutes) {
+            return null;
+        }
+
+        return $this->started_at->copy()->addMinutes($this->sla_minutes);
+    }
+
+    /**
+     * Titik mulai jendela SLA (buat hitung total budget countdown).
+     *
+     * Khusus SURVEY: mulai dari `scheduled_at` (jam yang FOP jadwalkan),
+     * BUKAN `started_at` — SLA-nya jalan sesuai jam jadwal, gak nunggu
+     * teknisi tekan tombol Mulai. Tipe lain tetap dari `started_at` karena
+     * deadline-nya sendiri (`slaDeadline()`) baru ada begitu task dimulai.
+     */
+    public function slaWindowStart(): ?Carbon
+    {
+        if ($this->task_type === TaskType::SURVEY) {
+            return $this->scheduled_at;
+        }
+
+        return $this->started_at;
+    }
+
+    /**
      * Apakah task melewati SLA.
      */
     public function isOverSla(): bool
     {
-        if (! $this->sla_minutes || ! $this->started_at) {
+        $deadline = $this->slaDeadline();
+
+        if (! $deadline) {
             return false;
         }
 
         $reference = $this->completed_at ?? now();
 
-        return $this->started_at->addMinutes($this->sla_minutes)->lt($reference);
+        return $deadline->lt($reference);
     }
 }

@@ -52,11 +52,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'agent_code',
     'referral_customer_code',
     'ont_sn',
-    'ip_address',
     'odp_code',
     'olt_code',
     'vlan_id',
-    'foto_ktp',
     'foto_rumah',
     'foto_kontrak',
     'created_by',
@@ -69,7 +67,6 @@ class Customer extends Model
     protected string $auditModule = 'Data Pelanggan';
 
     protected array $auditHidden = [
-        'foto_ktp',
         'foto_rumah',
         'foto_kontrak',
     ];
@@ -223,6 +220,19 @@ class Customer extends Model
     }
 
     /**
+     * Riwayat kunjungan kolektor — termasuk kunjungan yang tidak menghasilkan
+     * uang. Dipakai laporan aging untuk memunculkan pola "berulang tidak ada
+     * orang tapi tunggakannya menua"
+     * (docs/plan/kolektor/analisa-alur-kolektor-2.0.md §12).
+     *
+     * @return HasMany<CollectorVisit, $this>
+     */
+    public function collectorVisits(): HasMany
+    {
+        return $this->hasMany(CollectorVisit::class);
+    }
+
+    /**
      * @return HasOne<Invoice, $this>
      */
     public function latestInvoice(): HasOne
@@ -239,11 +249,72 @@ class Customer extends Model
     }
 
     /**
+     * Ledger saldo pelanggan (kredit lebih bayar, debit pemakaian). Jumlah
+     * saldo berjalan TIDAK disimpan di kolom Customer — selalu dihitung
+     * [[CustomerBalanceService::balance()]] dari baris-baris ini.
+     *
+     * @return HasMany<CustomerBalanceMutation, $this>
+     */
+    public function balanceMutations(): HasMany
+    {
+        return $this->hasMany(CustomerBalanceMutation::class);
+    }
+
+    /**
      * @return HasOne<Payment, $this>
      */
     public function latestPayment(): HasOne
     {
         return $this->hasOne(Payment::class)->latestOfMany('payment_date');
+    }
+
+    /**
+     * Kredensial login portal pelanggan (docs/api/api-portal-pelanggan/,
+     * Fase 2). Password TIDAK menempel di sini — lihat docblock
+     * CustomerPortalAccount kenapa tabel terpisah.
+     *
+     * @return HasOne<CustomerPortalAccount, $this>
+     */
+    public function portalAccount(): HasOne
+    {
+        return $this->hasOne(CustomerPortalAccount::class);
+    }
+
+    /**
+     * Riwayat ticketing pelanggan ini (docs/api/api-portal-pelanggan/ Fase 4
+     * & Fase 2 prasyarat). Kolom `tickets.customer_id` sudah ada sejak lama
+     * (2026_07_23_000001_create_tickets_table.php) dengan restrictOnDelete
+     * — relasinya saja yang belum pernah ditulis sampai sekarang.
+     *
+     * @return HasMany<Ticket, $this>
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    /**
+     * SEMUA token QR pelanggan ini seumur hidup, termasuk yang sudah dicabut
+     * (docs/plan/qr-code/rancangan-qr-pelanggan-final.md §4.1) — jangan
+     * dipakai buat cek "punya QR aktif?", pakai activeQrToken().
+     *
+     * @return HasMany<CustomerQrToken, $this>
+     */
+    public function qrTokens(): HasMany
+    {
+        return $this->hasMany(CustomerQrToken::class);
+    }
+
+    /**
+     * Invariant: maksimal satu baris `revoked_at IS NULL` per pelanggan,
+     * ditegakkan CustomerQrTokenObserver::creating() — relasi ini aman
+     * dipakai sebagai "token QR yang lagi berlaku".
+     *
+     * @return HasOne<CustomerQrToken, $this>
+     */
+    public function activeQrToken(): HasOne
+    {
+        return $this->hasOne(CustomerQrToken::class)->whereNull('revoked_at');
     }
 
     /**
@@ -384,6 +455,44 @@ class Customer extends Model
         }
 
         return $pop->resolveDisplayId($this);
+    }
+
+    /**
+     * Login ID portal pelanggan: `{cid_prefix}00{bare_registration_id}`
+     * (docs/api/api-portal-pelanggan/, docs/plan/qr-code/
+     * rancangan-qr-pelanggan-final.md §6.6.2) — format SAMA PERSIS dengan
+     * `display_id` default pra-aktivasi (`Pop::resolveDisplayId()`, mis.
+     * "C00RQ000004"), yang sudah dikenal pelanggan/staff dari halaman detail
+     * pelanggan. SENGAJA TIDAK memanggil `resolveDisplayId()` langsung:
+     * begitu pelanggan aktif dan CID sungguhan terbit, method itu beralih ke
+     * CID asli (segmen mini-POP/distribusi bisa beda) — login ID harus tetap
+     * PERMANEN sejak dicetak di kartu saat registrasi, tidak boleh ikut
+     * berubah kayak `display_id`. Karena rumus di sini tidak pernah menyentuh
+     * kolom `cid`/status, nilainya otomatis stabil selamanya begitu
+     * `customer_code` terbentuk — tidak perlu disimpan terpisah/di-freeze.
+     *
+     * `cid_prefix` dipakai — BUKAN `registration_prefix`. Percobaan pertama
+     * (2026-08-24) salah pakai `registration_prefix`: field itu SENGAJA
+     * boleh sama di banyak POP (ID_NUMBERING_RULES.md §4, tanpa constraint
+     * unique) dan sudah lebih dulu jadi bagian pembentuk `customer_code`
+     * sendiri (`Pop::generateRegistrationNumber()`) — hasilnya prefix dobel
+     * ("RQ-RQ000004") DAN gak beneran menjamin login_id unik global.
+     * `cid_prefix` sebaliknya WAJIB unik per cabang (`Rule::unique('pops',
+     * 'cid_prefix')->where('type', 'cabang')` di PopController), jadi
+     * disiplin per branch yang sama tetap kepakai lewat pewarisan mini-POP.
+     * Diperbaiki 2026-08-26.
+     *
+     * Null kalau POP belum punya `cid_prefix` terisi — caller wajib
+     * menangani null.
+     */
+    public function getPortalLoginIdAttribute(): ?string
+    {
+        $pop = $this->pop;
+        if (! $pop || ! $pop->cid_prefix) {
+            return null;
+        }
+
+        return sprintf('%s00%s', $pop->cid_prefix, $pop->extractBareRegistrationId($this->customer_code));
     }
 
     /**

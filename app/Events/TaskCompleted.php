@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Enums\TaskStatus;
+use App\Models\FopTask;
 use App\Models\Task;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -26,15 +27,25 @@ class TaskCompleted implements ShouldBroadcast
     }
 
     /**
-     * Get the channels the event should broadcast on.
+     * Get the channels the event should broadcast on. Sama pola & alasan
+     * persis `TaskStarted::broadcastOn()` — baca komentar di sana.
      *
      * @return array<int, Channel>
      */
     public function broadcastOn(): array
     {
-        return [
+        $this->task->loadMissing('teamMembers');
+
+        $channels = [
             new PrivateChannel('fop.'.$this->task->pop_id),
+            new PrivateChannel('fop-tasks.'.$this->task->pop_id),
         ];
+
+        foreach ($this->task->teamMembers as $member) {
+            $channels[] = new PrivateChannel('teknisi.'.$member->user_id);
+        }
+
+        return $channels;
     }
 
     public function broadcastWith(): array
@@ -47,6 +58,7 @@ class TaskCompleted implements ShouldBroadcast
             'title' => $this->task->title,
             'status' => $this->task->status instanceof TaskStatus ? $this->task->status->value : $this->task->status,
             'pop_id' => $this->task->pop_id,
+            'fop_task_id' => FopTask::where('task_id', $this->task->id)->value('id'),
             'completed_at' => $this->task->completed_at ? $this->task->completed_at->toIso8601String() : now()->toIso8601String(),
             'team_members' => $this->task->teamMembers->map(fn ($member) => [
                 'user_id' => $member->user_id,

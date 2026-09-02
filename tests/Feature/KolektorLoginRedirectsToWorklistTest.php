@@ -30,14 +30,22 @@ class KolektorLoginRedirectsToWorklistTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_kolektor_with_only_kolektor_view_permission_is_redirected_to_worklist_not_403(): void
+    public function test_kolektor_with_only_kolektor_permissions_is_redirected_to_worklist_not_403(): void
     {
         $role = Role::where('code', 'kolektor')->firstOrFail();
         $kolektor = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
 
-        // Pastikan role ini SENGAJA cuma punya kolektor.view (kondisi persis
-        // yang dilaporkan bikin 403) — matches seeded RolePermissionSeeder.
-        $this->assertEquals(['kolektor.view'], $kolektor->role->permissions()->pluck('code')->toArray());
+        // Role ini SENGAJA gak punya dashboard.view (kondisi persis yang
+        // dulu bikin 403). Daftar di bawah dilengkapi seiring waktu:
+        // `kolektor.pay`/`.deposit`/`.visit` (kolektor 2.0), `qr_scan.view`+
+        // `kolektor.qr.pay` (scan QR → worklist, ADHOC-51/52),
+        // `tickets.qr.create` (lapor komplain via QR, 2026-08-29 — kolektor
+        // ketemu pelanggan langsung di lapangan) — tapi TETAP gak ada satu
+        // pun yang membuka halaman lain (dashboard.view/customers.view/dst).
+        $this->assertEqualsCanonicalizing(
+            ['kolektor.view', 'kolektor.pay', 'kolektor.deposit', 'kolektor.visit', 'qr_scan.view', 'kolektor.qr.pay', 'tickets.qr.create'],
+            $kolektor->role->permissions()->pluck('code')->toArray()
+        );
 
         $response = $this->actingAs($kolektor)->get(route('dashboard'));
 

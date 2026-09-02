@@ -46,7 +46,7 @@
                 <div>
                     <label for="category" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Kategori <span class="text-rose-500">*</span></label>
                     <select id="category" name="category" class="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-slate-800 {{ $errors->has('category') ? 'border-rose-400 bg-rose-50 dark:bg-rose-900/20' : 'border-slate-300 dark:border-slate-600' }}">
-                        @foreach(\App\Models\internetPackage::CATEGORIES as $value => $label)
+                        @foreach(\App\Models\InternetPackage::CATEGORIES as $value => $label)
                             <option value="{{ $value }}" {{ old('category', $paket->category) === $value ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
                     </select>
@@ -88,7 +88,9 @@
                 </div>
                 <div>
                     <label for="monthly_price" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Harga Bulanan <span class="text-rose-500">*</span></label>
-                    <input type="number" min="0" id="monthly_price" name="monthly_price" value="{{ old('monthly_price', $paket->monthly_price) }}"
+                    {{-- data-rupiah butuh type="text" — input number menolak
+                         titik ribuan. Batas `min` diganti validasi server. --}}
+                    <input type="text" inputmode="decimal" data-rupiah id="monthly_price" name="monthly_price" value="{{ old('monthly_price', \App\Helpers\FormatHelper::rupiahInput($paket->monthly_price)) }}"
                            class="w-full px-3 py-2 border rounded-md text-sm {{ $errors->has('monthly_price') ? 'border-rose-400 bg-rose-50 dark:bg-rose-900/20' : 'border-slate-300 dark:border-slate-600' }}">
                     @error('monthly_price')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
@@ -112,7 +114,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
                     <label for="installation_fee" class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Biaya Pasang</label>
-                    <input type="number" min="0" id="installation_fee" name="installation_fee" value="{{ old('installation_fee', $paket->installation_fee) }}"
+                    <input type="text" inputmode="decimal" data-rupiah id="installation_fee" name="installation_fee" value="{{ old('installation_fee', \App\Helpers\FormatHelper::rupiahInput($paket->installation_fee)) }}"
                            class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm">
                 </div>
                 <div>
@@ -189,7 +191,10 @@
 @section('scripts')
 <script>
     function updateTotalPreview() {
-        const price = parseFloat(document.getElementById('monthly_price').value) || 0;
+        // Sama seperti halaman create: kolom harga bermasking ribuan. Di sini
+        // lebih terasa — nilainya sudah bermasking sejak halaman dimuat, jadi
+        // pratinjau salah tampil sebelum satu tombol pun ditekan.
+        const price = (window.Rupiah ? window.Rupiah.angka(document.getElementById('monthly_price').value) : parseFloat(document.getElementById('monthly_price').value)) || 0;
         const discount = parseFloat(document.getElementById('discount_default').value) || 0;
         const ppn = parseFloat(document.getElementById('ppn').value) || 0;
 

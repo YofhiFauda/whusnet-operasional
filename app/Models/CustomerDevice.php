@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'pppoe_password',
     'wifi_ssid',
     'wifi_password',
-    'ip_address',
     'vlan_id',
     'odp',
     'odp_port',

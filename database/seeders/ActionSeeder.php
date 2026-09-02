@@ -109,6 +109,26 @@ class ActionSeeder extends Seeder
                 'name' => 'Retrieve',
                 'description' => 'Mengambil kembali alat/aset dari pelanggan',
             ],
+            [
+                'code' => ActionCode::PAY,
+                'name' => 'Pay',
+                'description' => 'Mencatat pembayaran dari worklist kolektor sendiri',
+            ],
+            [
+                'code' => ActionCode::DEPOSIT,
+                'name' => 'Deposit',
+                'description' => 'Menyetorkan hasil tagihan kolektor ke admin',
+            ],
+            [
+                'code' => ActionCode::VISIT,
+                'name' => 'Visit',
+                'description' => 'Mencatat hasil kunjungan penagihan tanpa uang',
+            ],
+            [
+                'code' => ActionCode::SKIP_SURVEY,
+                'name' => 'Skip Survey',
+                'description' => 'Melewati tahap survey lapangan saat registrasi, input data survey langsung',
+            ],
         ];
 
         foreach ($actions as $action) {

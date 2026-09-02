@@ -91,7 +91,9 @@
         </div>
 
         
-        <form @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+        
+        <form action="<?php echo e(route('tickets.store')); ?>" method="POST" @submit.prevent="submitForm()" enctype="multipart/form-data" class="flex-1 flex flex-col min-h-0">
+            <?php echo csrf_field(); ?>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar">
 
@@ -878,7 +880,18 @@
             // per POP ini (Gap #3).
             allowedPopIds: <?php echo json_encode($allowedPopIds, 15, 512) ?>,
 
+            // Prefill dari scan QR (QrTicketController — Fungsi B,
+            // docs/plan/qr-code/rancangan-qr-pelanggan-final.md §6.2). Bentuk
+            // objeknya SAMA PERSIS hasil lookup-customer (lihat
+            // TicketController::customerPayload()), jadi pick() yang sudah
+            // ada bisa langsung dipakai apa adanya — nol logic baru.
+            prefillCustomer: <?php echo json_encode($prefillCustomer ?? null, 15, 512) ?>,
+
             init() {
+                if (this.prefillCustomer) {
+                    this.pick(this.prefillCustomer);
+                    this.setFormOpen(true);
+                }
                 this.initEchoListeners();
                 const narrow = window.matchMedia('(max-width: 1023px)');
                 const updateNarrow = () => { this.narrowViewport = narrow.matches; };

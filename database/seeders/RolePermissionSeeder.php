@@ -19,11 +19,30 @@ class RolePermissionSeeder extends Seeder
         $permissionsByRole = [
             'owner' => ['*'], // Owner gets all permissions
 
-            // Worklist read-only — SATU permission saja, sengaja tanpa
-            // payments.create/customers.view. docs/plan/analisa-billing-
-            // tagihan-pembayaran-kolektor.md §B-8 no. 4 & no. 5.
+            // Kolektor — sengaja tanpa `payments.create` (bayar invoice mana
+            // pun) dan tanpa `customers.view` (daftar pelanggan penuh).
+            // `kolektor.pay` cuma berlaku di rute worklist yang memaksa
+            // `collector_id = auth()->id()`.
+            //
+            // Merevisi §B-8 no. 4 dokumen lama — lihat
+            // docs/plan/kolektor/analisa-alur-kolektor-2.0.md §8.
             'kolektor' => [
                 'kolektor.view',
+                'kolektor.pay',
+                'kolektor.deposit',
+                'kolektor.visit',
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — shortcut catat pembayaran dari worklist sendiri
+                'kolektor.qr.pay', // Catat pembayaran via QR → Portal (2026-08-29) — permission TERPISAH dari kolektor.pay, lihat QrFeatureSeeder
+                // Lapor komplain via QR → Portal (2026-08-29, keputusan
+                // eksplisit user) — kolektor ketemu pelanggan langsung di
+                // lapangan pas nagih, sering dapet komplain di tempat.
+                // Digabung dengan kolektor.qr.pay: begitu kolektor scan
+                // pelanggan yang punya tagihan due, dispatch() otomatis
+                // dual-eligible → tampil chooser "Tagih Pembayaran"/"Lapor
+                // Komplain" (QrScanController::resolveEligibility()). TIDAK
+                // ngerubah tickets.create dashboard — kolektor tetap gak
+                // bisa buka Worksheet Helpdesk, cuma titik masuk QR ini.
+                'tickets.qr.create',
             ],
 
             'atasan' => [
@@ -52,7 +71,14 @@ class RolePermissionSeeder extends Seeder
                 'tickets.view', // Atasan cuma memantau — gak ikut ngirim tiket
                 'tickets.selesai.view',
                 'tickets.dibatalkan.view',
+                'qr_scan_logs.view', // Dashboard anomali scan QR (docs/plan/qr-code/)
                 'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
+                // Setoran Kas: atasan MEMERIKSA, tidak menyetor. `create`
+                // sengaja tak diberikan — atasan bukan pemegang kas, dan tanpa
+                // saldo sendiri dia mustahil jadi penyetor sekaligus pemeriksa.
+                // `approve` (menutup selisih) tetap Owner lewat wildcard `*`.
+                'cash_deposit.view',
+                'cash_deposit.validate',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
@@ -76,6 +102,27 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.*', // Access to all detail sections (termasuk customers.detail.view - Detail Pelanggan)
                 'invoices.*', // Ex: view, create, update, delete, cancel, print
                 'payments.*', // Ex: view, create, update, validate, reject, print
+                // Halaman admin atas kolektor. SENGAJA bukan wildcard `*`:
+                // `collector_worksheet.approve` (hapus buku selisih) khusus
+                // Owner — admin yang menemukan selisih tak boleh sekaligus
+                // menutup kerugiannya sendiri.
+                'collector_worksheet.view',
+                'collector_worksheet.assign',
+                'collector_worksheet.validate',
+                'collector_worksheet.print',
+                'collector_worksheet.upload',
+                // Setoran Kas: admin MENYETOR, tidak memeriksa. `validate` &
+                // `approve` sengaja tidak diberikan — pemeriksa setoran kas
+                // adalah Owner/atasan, dan admin yang memeriksa setorannya
+                // sendiri membuat cross check jadi tanda tangan di atas kertas
+                // sendiri.
+                //
+                // `view` juga TIDAK diberikan: halaman /cash-deposits adalah
+                // pandangan PEMERIKSA — posisi kas admin mana pun lintas POP,
+                // antrean pemeriksaan, dan rincian sampai tingkat pelanggan.
+                // Admin cukup melihat kas & riwayat SETORANNYA SENDIRI, dan itu
+                // sudah tersaji di Worksheet Admin lewat `create` (§10).
+                'cash_deposit.create',
                 'reports.*',
                 'audit_logs.view',
                 'audit_logs.export',
@@ -88,6 +135,14 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.*',
                 'master_status_pelanggan.*',
                 'task.manage',
+                // QR Pelanggan (docs/plan/qr-code/) — admin penuh: lihat,
+                // terbitkan, cabut, cetak.
+                'customers.qr.view',
+                'customers.qr.create',
+                'customers.qr.cancel',
+                'customers.qr.print',
+                'qr_scan_logs.view',
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — resources/js/qr-scan.js
             ],
 
             'noc' => [
@@ -164,6 +219,8 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'qr_scan.view', // Scan QR Internal (2026-08-27) — shortcut bikin tiket dari QR pelanggan
             ],
 
             'fop' => [
@@ -194,6 +251,9 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
+                'qr_scan.view', // Scan QR Internal (2026-08-27)
             ],
 
             'teknisi' => [
@@ -222,6 +282,8 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.view',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.download',
+                'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
+                'qr_scan.view', // Scan QR Internal (2026-08-27)
             ],
 
             'sales' => [
@@ -232,6 +294,9 @@ class RolePermissionSeeder extends Seeder
                 'customers.failed.view',
                 'customers.create',
                 'customers.update',
+                // Skip Survey saat Registrasi — satu-satunya role yang dapat
+                // default. Role lain butuh ditambahkan manual lewat Role Matrix.
+                'customers.registration.skip_survey',
                 'customers.detail.identity.view',
                 'customers.detail.identity.update',
                 'customers.detail.address.view',
@@ -265,12 +330,23 @@ class RolePermissionSeeder extends Seeder
                 'payments.validate',
                 'payments.reject',
                 'payments.print',
+                'collector_worksheet.view', // Cross check kolektor DALAM scope POP-nya
+                'collector_worksheet.assign',
+                'collector_worksheet.validate',
+                'collector_worksheet.print',
+                'collector_worksheet.upload',
+                // Sama seperti admin: pop_admin memegang kas cabangnya, jadi
+                // menyetor — bukan memeriksa, dan tidak membuka pandangan
+                // pemeriksa (§10).
+                'cash_deposit.create',
                 'reports.view',
                 'reports.export',
                 'tickets.*',
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
+                'customers.qr.print', // Cetak stiker QR — pop_admin cetak buat cabangnya sendiri
             ],
         ];
 

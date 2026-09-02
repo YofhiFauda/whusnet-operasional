@@ -15,6 +15,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class FopTasksTest extends TestCase
@@ -203,10 +204,32 @@ class FopTasksTest extends TestCase
         $this->assertNotNull($task->cancelled_at);
     }
 
-    public function test_console_command_resets_cancelled_tasks_the_next_day(): void
+    /**
+     * Pembatalan Task FOP itu KEPUTUSAN FINAL — tidak ada yang menghidupkannya
+     * kembali sendiri.
+     *
+     * Dulu ada `fop:reset-cancelled-tasks` (dijadwalkan tiap 00:01) yang mengubah
+     * task `dibatalkan` jadi `in_progress` keesokan harinya. Dihapus 2026-08-13
+     * (ADHOC-34) karena:
+     *   - ia menghapus keputusan manusia tiap malam tanpa jejak di riwayat tiket
+     *     (FopTaskObserver cuma menulis saat status MENJADI dibatalkan, bukan saat
+     *     dihidupkan lagi) — riwayat tiket berhenti di "dibatalkan" padahal
+     *     task-nya hidup;
+     *   - status tujuannya `in_progress` itu palsu: tidak ada teknisi yang sedang
+     *     mengerjakan;
+     *   - `task_date` tidak diperbarui, jadi task langsung jadi tunggakan lampau;
+     *   - Task eksekusi (`tasks`) tidak ikut disentuh → FopTask dan Task berbeda
+     *     status, dua sumber kebenaran yang menyimpang;
+     *   - tanpa batas umur: task yang dibatalkan berbulan-bulan lalu ikut terangkat.
+     *
+     * Penundaan sehari punya jalurnya sendiri: Pending (dengan alasan tercatat)
+     * atau ubah `task_date` lewat Edit / "Jadwalkan ke hari ini" di papan FOP.
+     *
+     * Test ini menjaga supaya command semacam itu tidak dihidupkan lagi diam-diam.
+     */
+    public function test_cancelled_task_stays_cancelled_and_is_never_auto_revived(): void
     {
-        // 1. Task cancelled yesterday (before today)
-        $yesterdayTask = FopTask::create([
+        $cancelledYesterday = FopTask::create([
             'task_number' => 'TFOP-2026-0003',
             'task_date' => now(),
             'category' => 'MTN',
@@ -219,10 +242,9 @@ class FopTasksTest extends TestCase
             'cancelled_at' => Carbon::yesterday(),
         ]);
 
-        // 2. Task cancelled today
-        $todayTask = FopTask::create([
+        $cancelledLongAgo = FopTask::create([
             'task_number' => 'TFOP-2026-0004',
-            'task_date' => now(),
+            'task_date' => now()->subDays(30),
             'category' => 'MTN',
             'tugas' => 'FO Cut 2',
             'village_id' => $this->village->id,
@@ -230,21 +252,23 @@ class FopTasksTest extends TestCase
             'issue' => 'LOS',
             'status' => 'dibatalkan',
             'priority' => 'High',
-            'cancelled_at' => Carbon::now(),
+            'cancelled_at' => Carbon::now()->subDays(30),
         ]);
 
-        $this->artisan('fop:reset-cancelled-tasks')->assertExitCode(0);
+        // Command penghidup-ulang harus benar-benar tidak ada lagi.
+        $this->assertArrayNotHasKey(
+            'fop:reset-cancelled-tasks',
+            Artisan::all(),
+            'fop:reset-cancelled-tasks dihapus 2026-08-13 — pembatalan Task FOP bersifat final.'
+        );
 
-        $yesterdayTask->refresh();
-        $todayTask->refresh();
+        $cancelledYesterday->refresh();
+        $cancelledLongAgo->refresh();
 
-        // Yesterday's cancelled task must be reset to in_progress
-        $this->assertEquals('in_progress', $yesterdayTask->status->value);
-        $this->assertNull($yesterdayTask->cancelled_at);
-
-        // Today's cancelled task must remain dibatalkan
-        $this->assertEquals('dibatalkan', $todayTask->status->value);
-        $this->assertNotNull($todayTask->cancelled_at);
+        $this->assertEquals('dibatalkan', $cancelledYesterday->status->value);
+        $this->assertNotNull($cancelledYesterday->cancelled_at);
+        $this->assertEquals('dibatalkan', $cancelledLongAgo->status->value);
+        $this->assertNotNull($cancelledLongAgo->cancelled_at);
     }
 
     public function test_can_delete_fop_task(): void

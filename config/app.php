@@ -56,6 +56,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Paksa Skema HTTPS
+    |--------------------------------------------------------------------------
+    |
+    | Hanya untuk URL yang dibuat di luar konteks request (queue, artisan,
+    | notifikasi). URL di dalam request sudah mengikuti X-Forwarded-Proto lewat
+    | trusted proxies di bootstrap/app.php. Nyalakan kalau aplikasi hanya
+    | dilayani lewat HTTPS (mis. di balik Cloudflare Tunnel).
+    |
+    */
+
+    'force_https' => (bool) env('FORCE_HTTPS', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

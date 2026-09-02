@@ -21,6 +21,7 @@ use App\Models\Village;
 use App\Notifications\AppNotification;
 use App\Services\CustomerWorkflowService;
 use App\Services\EffectiveAccessService;
+use App\Services\FopTaskProvisioningService;
 use App\Services\FopTaskTeamService;
 use App\Services\TaskService;
 use App\Support\ReasonValidationRule;
@@ -522,6 +523,28 @@ class FopTaskController extends Controller
                     $this->authorize('cancelViaFopTask', $linkedTask);
 
                     app(TaskService::class)->cancel($linkedTask, auth()->user(), $validated['cancel_reason'] ?? "Dibatalkan dari Task FOP {$fopTask->task_number}.");
+                }
+            }
+
+            // Pending dari sisi FOP juga harus nembus ke Task eksekusi teknisi —
+            // sebelumnya cuma DIBATALKAN yang di-cascade (lihat blok di atas), PENDING
+            // enggak, jadi Task tetap Terjadwal/Sedang Dikerjakan walau FopTask-nya
+            // sudah Pending, dan teknisi yang sama gagal mulai task LAIN karena guard
+            // "sedang mengerjakan task lain" di TaskService::start() masih nemu task
+            // ini seolah IN_PROGRESS.
+            if (isset($validated['status'])
+                && $validated['status'] === TaskStatus::PENDING->value
+                && $oldStatus !== TaskStatus::PENDING->value
+                && $fopTask->task_id
+            ) {
+                $linkedTask = $fopTask->task;
+                if ($linkedTask && ! in_array($linkedTask->status, [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::PENDING])) {
+                    // Otoritasnya `fopPending` — ability yang sama dipakai tombol
+                    // "Pending" FOP di halaman Task (TaskController::pending()), cuma
+                    // beda entry point (papan /fop-tasks vs halaman Task).
+                    $this->authorize('fopPending', $linkedTask);
+
+                    app(TaskService::class)->syncPendingFromFopTask($linkedTask, auth()->user(), $validated['pending_reason']);
                 }
             }
 
@@ -1259,21 +1282,14 @@ class FopTaskController extends Controller
                 $q->where('category', TaskType::SURVEY->value)->whereNotIn('status', [TaskStatus::SELESAI->value, TaskStatus::DIBATALKAN->value]);
             })->get();
 
-        foreach ($surveyCustomers as $c) {
-            $taskNumber = $this->generateTaskNumber();
+        // Pembuatannya ada di FopTaskProvisioningService — bukan ditulis ulang di
+        // sini. Registrasi pelanggan & transisi status sudah memanggil service
+        // yang sama, jadi loop ini tinggal jadi jaring pengaman untuk pelanggan
+        // lama yang terlanjur tidak punya anchor.
+        $provisioning = app(FopTaskProvisioningService::class);
 
-            FopTask::create([
-                'task_number' => $taskNumber,
-                'task_date' => now(),
-                'category' => TaskType::SURVEY,
-                'tugas' => $c->display_id.'_'.$c->full_name,
-                'village_id' => $c->village_id ?? 1,
-                'pop_id' => $c->pop_id ?? 1,
-                'customer_id' => $c->id,
-                'issue' => 'Auto-Sync dari antrean survey',
-                'status' => TaskStatus::DRAFT,
-                'priority' => FopTaskPriority::MEDIUM, // will be recalculated below
-            ]);
+        foreach ($surveyCustomers as $c) {
+            $provisioning->ensureForCustomer($c, TaskType::SURVEY);
         }
 
         // --- 2. Auto-Sync Installation ---
@@ -1286,21 +1302,7 @@ class FopTaskController extends Controller
             })->get();
 
         foreach ($installCustomers as $c) {
-            $taskNumber = $this->generateTaskNumber();
-
-            FopTask::create([
-                'task_number' => $taskNumber,
-                'task_date' => now(),
-                'category' => TaskType::PEMASANGAN,
-                'tugas' => $c->display_id.'_'.$c->full_name,
-                'village_id' => $c->village_id ?? 1,
-                'pop_id' => $c->pop_id ?? 1,
-                'customer_id' => $c->id,
-                'issue' => 'Auto-Sync dari antrean pemasangan',
-                'status' => TaskStatus::DRAFT,
-                'priority' => FopTaskPriority::MEDIUM, // will be recalculated below
-                'client_request_date' => $c->latestSurvey?->requested_installation_date,
-            ]);
+            $provisioning->ensureForCustomer($c, TaskType::PEMASANGAN);
         }
 
         // --- 2b. Refresh tanggal request pemasangan ---
@@ -1450,14 +1452,13 @@ class FopTaskController extends Controller
      * `SUBSTRING_INDEX`) biar portable — jalan di MySQL (prod) maupun SQLite
      * (test env), bukan cuma di salah satu driver.
      */
-    private function generateTaskNumber()
+    /**
+     * Nomor TFOP untuk form manual /fop-tasks. Didelegasikan ke
+     * FopTaskProvisioningService supaya deret yang sama tidak punya dua
+     * implementasi generator di file ini.
+     */
+    private function generateTaskNumber(): string
     {
-        $year = date('Y');
-        $lastNum = FopTask::where('task_number', 'like', "TFOP-{$year}-%")
-            ->pluck('task_number')
-            ->map(fn ($taskNumber) => (int) substr($taskNumber, strrpos($taskNumber, '-') + 1))
-            ->max() ?? 0;
-
-        return sprintf('TFOP-%s-%04d', $year, $lastNum + 1);
+        return app(FopTaskProvisioningService::class)->generateTaskNumber();
     }
 }

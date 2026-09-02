@@ -2,20 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\RendersCustomerList;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 /**
- * Halaman List Pelanggan Putus — route & permission (customers.terminated.view)
- * sendiri, terpisah dari List Data Pelanggan biasa (CustomerController::index()).
- * Extend CustomerController buat pakai ulang query builder+enrichment
- * (renderCustomerList()) tanpa duplikasi logic filter/pagination/wilayah yang
- * kompleks — bukan berarti controller ini "bagian dari" CustomerController,
- * cuma reuse method protected.
+ * Halaman List Pelanggan Putus — route, permission (customers.terminated.view),
+ * DAN view (customers/terminated.blade.php) sendiri, terpisah dari List Data
+ * Pelanggan biasa (CustomerController::index()).
+ *
+ * Pakai trait RendersCustomerList buat query/filter/pagination — bukan extend
+ * CustomerController seperti dulu: extend bikin halaman daftar ini mewarisi
+ * seluruh method tulis pelanggan (store/update/destroy/import) yang bukan
+ * urusannya.
  */
-class CustomerTerminatedController extends CustomerController
+class CustomerTerminatedController extends Controller
 {
-    public function index(Request $request)
+    use RendersCustomerList;
+
+    public function index(Request $request): View
     {
-        return $this->renderCustomerList($request, 'terminated');
+        return $this->renderCustomerList($request, 'terminated', 'customers.terminated');
     }
 }

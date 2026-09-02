@@ -191,29 +191,27 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     Dokumen & Foto
                 </h4>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    @if($customer->foto_ktp)
-                    <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto KTP</span>
-                        <img src="{{ asset('storage/' . $customer->foto_ktp) }}" alt="KTP" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $customer->foto_ktp) }}', 'Foto KTP')">
-                    </div>
-                    @endif
-                    @if($customer->foto_rumah)
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    @php
+                        $fotoRumahUrl = foto_publik($customer->foto_rumah);
+                        $fotoKontrakUrl = foto_publik($customer->foto_kontrak);
+                    @endphp
+                    @if($fotoRumahUrl)
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Rumah</span>
-                        <img src="{{ asset('storage/' . $customer->foto_rumah) }}" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $customer->foto_rumah) }}', 'Foto Rumah')">
+                        <img src="{{ $fotoRumahUrl }}" alt="Rumah" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoRumahUrl }}', 'Foto Rumah')">
                     </div>
                     @endif
-                    @if($customer->foto_kontrak)
+                    @if($fotoKontrakUrl)
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
                         <span class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Foto Kontrak</span>
-                        <img src="{{ asset('storage/' . $customer->foto_kontrak) }}" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $customer->foto_kontrak) }}', 'Foto Kontrak')">
+                        <img src="{{ $fotoKontrakUrl }}" alt="Kontrak" class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $fotoKontrakUrl }}', 'Foto Kontrak')">
                     </div>
                     @endif
-                    @if(!$customer->foto_ktp && !$customer->foto_rumah && !$customer->foto_kontrak)
-                    <div class="col-span-3 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
+                    @if(!$fotoRumahUrl && !$fotoKontrakUrl)
+                    <div class="col-span-2 bg-warning-bg border border-warning-border rounded-xl p-4 flex items-center gap-3">
                         <svg class="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi.</p>
+                        <p class="text-sm text-warning">Tidak ada dokumen atau foto yang diunggah saat registrasi, atau berkas tidak tersedia di penyimpanan.</p>
                     </div>
                     @endif
                 </div>
@@ -298,8 +296,10 @@
                         <span class="block text-sm font-mono font-bold text-text-main">{{ $survey->cable_estimation_meter ?? '-' }} Meter</span>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Kebutuhan FOP / Tiang</span>
-                        <span class="block text-sm text-text-main">{{ $survey->fop_id ?? '-' }}</span>
+                        {{-- customer_surveys.fop_id menunjuk ke users (FOP yang menugaskan),
+                             bukan kebutuhan tiang — dulu label & isinya tidak nyambung. --}}
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">FOP Penanggung Jawab</span>
+                        <span class="block text-sm text-text-main">{{ $survey->fop->name ?? '-' }}</span>
                     </div>
                     @if($survey->requested_installation_date)
                     <div>
@@ -307,12 +307,16 @@
                         <span class="block text-sm font-mono font-bold text-text-main">{{ \App\Support\IndonesianDate::date($survey->requested_installation_date) }}</span>
                     </div>
                     @endif
+                    @if($survey->required_tools)
                     <div class="md:col-span-3">
-                        {{-- Catatan alat kerja non-material. Material habis pakai ada di
-                             tabel Estimasi vs Terpakai di bawah. --}}
-                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Alat Khusus / Kendala Peralatan</span>
-                        <p class="text-sm text-text-secondary whitespace-pre-wrap">{{ $survey->required_tools ?? '-' }}</p>
+                        {{-- Teks bebas pendamping checklist alat kerja di bawah — label
+                             disamakan dengan form laporan survey supaya admin tahu ini
+                             field yang sama. Material habis pakai ada di tabel Estimasi
+                             vs Terpakai di tab Pemasangan. --}}
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Kendala Peralatan</span>
+                        <p class="text-sm text-text-secondary whitespace-pre-wrap">{{ $survey->required_tools }}</p>
                     </div>
+                    @endif
                     @if($survey->survey_note)
                     <div class="md:col-span-3 pt-4 border-t border-border mt-2">
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Catatan Surveyor</span>
@@ -322,24 +326,41 @@
                 </div>
             </div>
 
+            @include('verifications.partials.materials', [
+                'title' => 'Estimasi Material Hasil Survey',
+                'emptyText' => 'Surveyor tidak mencatat estimasi material.',
+                'rows' => $surveyMaterials,
+            ])
+
+            @include('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dicatat Surveyor',
+                'rows' => $surveyWorkTools,
+            ])
+
+            @php
+                $surveyPhotoUrl = foto_publik($survey->survey_photo);
+                $surveyHousePhotoUrl = foto_publik($survey->house_photo);
+            @endphp
+            @if($surveyPhotoUrl || $surveyHousePhotoUrl)
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                @if($survey->survey_photo)
+                @if($surveyPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Lokasi / Survey</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="{{ asset('storage/' . $survey->survey_photo) }}" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $survey->survey_photo) }}', 'Foto Survey')">
+                        <img src="{{ $surveyPhotoUrl }}" alt="Foto Survey" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $surveyPhotoUrl }}', 'Foto Survey')">
                     </div>
                 </div>
                 @endif
-                @if($survey->house_photo)
+                @if($surveyHousePhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Rumah</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center inline-block w-full">
-                        <img src="{{ asset('storage/' . $survey->house_photo) }}" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ asset('storage/' . $survey->house_photo) }}', 'Foto Rumah')">
+                        <img src="{{ $surveyHousePhotoUrl }}" alt="Foto Rumah" class="max-h-48 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90" onclick="openPhotoLightbox('{{ $surveyHousePhotoUrl }}', 'Foto Rumah')">
                     </div>
                 </div>
                 @endif
             </div>
+            @endif
 
             @if($isWaitingAccStage)
                 @can('customers.detail.installation.validate')
@@ -459,7 +480,6 @@
                                 ['label' => 'Password PPPoE', 'value' => $device->pppoe_password ?? '-', 'mono' => true],
                                 ['label' => 'SSID WiFi', 'value' => $device->wifi_ssid ?? ($techDetail->ssid ?? '-')],
                                 ['label' => 'Password WiFi', 'value' => $device->wifi_password ?? '-'],
-                                ['label' => 'IP Address', 'value' => $device->ip_address ?? '-', 'mono' => true],
                             ];
                         @endphp
                         @foreach($deviceFields as $field)
@@ -473,6 +493,12 @@
                     </div>
                 </div>
             </div>
+
+            @include('verifications.partials.materials', [
+                'title' => 'Material Terpakai Saat Pemasangan',
+                'emptyText' => 'Tim pemasangan tidak mencatat material terpakai.',
+                'rows' => $installationMaterials,
+            ])
 
             {{-- MATERIAL: ESTIMASI VS TERPAKAI --}}
             {{-- Selisih besar = estimasi survey meleset atau pemakaian tidak wajar.
@@ -513,6 +539,11 @@
             </div>
             @endif
 
+            @include('verifications.partials.work-tools', [
+                'title' => 'Alat Kerja Dipakai Tim Pemasangan',
+                'rows' => $installationWorkTools,
+            ])
+
             {{-- DATA JARINGAN / ODP / OLT --}}
             <div class="mb-6">
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -547,41 +578,48 @@
 
             {{-- Foto Pemasangan, Kontrak & TTD --}}
             @if($installation)
+            @php
+                $installationPhotoUrl = foto_publik($installation->installation_photo);
+                $contractPhotoUrl = foto_publik($installation->contract_photo);
+                $signaturePhotoUrl = foto_publik($installation->signature_photo);
+            @endphp
+            @if($installationPhotoUrl || $contractPhotoUrl || $signaturePhotoUrl)
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                @if($installation->installation_photo)
+                @if($installationPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Pemasangan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->installation_photo) }}" 
+                        <img src="{{ $installationPhotoUrl }}" 
                              alt="Foto Pemasangan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->installation_photo) }}', 'Foto Pemasangan')">
+                             onclick="openPhotoLightbox('{{ $installationPhotoUrl }}', 'Foto Pemasangan')">
                     </div>
                 </div>
                 @endif
-                @if($installation->contract_photo)
+                @if($contractPhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Kontrak</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->contract_photo) }}" 
+                        <img src="{{ $contractPhotoUrl }}" 
                              alt="Foto Kontrak" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->contract_photo) }}', 'Foto Kontrak')">
+                             onclick="openPhotoLightbox('{{ $contractPhotoUrl }}', 'Foto Kontrak')">
                     </div>
                 </div>
                 @endif
-                @if($installation->signature_photo)
+                @if($signaturePhotoUrl)
                 <div>
                     <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto TTD Pelanggan</h4>
                     <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 text-center">
-                        <img src="{{ asset('storage/' . $installation->signature_photo) }}" 
+                        <img src="{{ $signaturePhotoUrl }}" 
                              alt="Foto TTD Pelanggan" 
                              class="h-32 object-contain mx-auto rounded-lg shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                             onclick="openPhotoLightbox('{{ asset('storage/' . $installation->signature_photo) }}', 'Foto TTD Pelanggan')">
+                             onclick="openPhotoLightbox('{{ $signaturePhotoUrl }}', 'Foto TTD Pelanggan')">
                     </div>
                 </div>
                 @endif
             </div>
+            @endif
             @endif
         </div>
 
@@ -679,14 +717,14 @@
             </div>
 
             {{-- Foto Speedtest --}}
-            @if($techDetail->speedtest_photo)
+            @if($speedtestPhotoUrl = foto_publik($techDetail->speedtest_photo))
             <div>
                 <h4 class="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">Foto Hasil Speedtest</h4>
                 <div class="bg-surface-muted dark:bg-transparent border border-border rounded-xl p-4 inline-block">
-                    <img src="{{ asset('storage/' . $techDetail->speedtest_photo) }}"
+                    <img src="{{ $speedtestPhotoUrl }}"
                          alt="Foto Speedtest"
                          class="max-h-64 max-w-full rounded-lg object-contain border border-border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                         onclick="openPhotoLightbox('{{ asset('storage/' . $techDetail->speedtest_photo) }}', 'Foto Speedtest')">
+                         onclick="openPhotoLightbox('{{ $speedtestPhotoUrl }}', 'Foto Speedtest')">
                 </div>
             </div>
             @endif
@@ -798,9 +836,9 @@
                                         {{-- Prefill dari master paket, tapi tetap bisa diubah: pemasangan
                                              boleh digratiskan/promo. `?? 0` wajib — ada paket yang
                                              installation_fee-nya null (lihat InternetPackageSeeder). --}}
-                                        <input type="number" step="0.01" name="extra_installation_fee" id="fv_extra_installation_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_installation_fee" id="fv_extra_installation_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            value="{{ old('extra_installation_fee', $customer->internetPackage->installation_fee ?? 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                            value="{{ old('extra_installation_fee', \App\Helpers\FormatHelper::rupiahInput($customer->internetPackage->installation_fee ?? 0)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
                                 </div>
                                 <div>
@@ -809,7 +847,7 @@
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
                                         {{-- Hanya ada di tagihan awal, tidak pernah ikut tagihan bulanan.
                                              Default 0: tidak semua pemasangan pakai materai. --}}
-                                        <input type="number" step="0.01" name="other_fee" id="fv_other_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="other_fee" id="fv_other_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="{{ old('other_fee', 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -818,7 +856,7 @@
                                     <label for="extra_cable_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">KABEL TAMBAHAN</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_cable_fee" id="fv_extra_cable_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_cable_fee" id="fv_extra_cable_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="{{ old('extra_cable_fee', 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -827,7 +865,7 @@
                                     <label for="extra_pole_fee" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">TAMBAHAN TIANG</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled text-sm font-medium">Rp</span>
-                                        <input type="number" step="0.01" name="extra_pole_fee" id="fv_extra_pole_fee"
+                                        <input type="text" inputmode="decimal" data-rupiah name="extra_pole_fee" id="fv_extra_pole_fee"
                                             class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                             value="{{ old('extra_pole_fee', 0) }}" onkeyup="calculateFees()" onchange="calculateFees()">
                                     </div>
@@ -846,7 +884,7 @@
                                          aktivasi diganti lagi. Server tetap validasi >= 0 di
                                          InitialInvoiceService; kosongkan untuk kembali ke hasil
                                          hitung otomatis. --}}
-                                    <input type="number" step="0.01" min="0" name="prorate_amount_override" id="fv_prorate_amount"
+                                    <input type="text" inputmode="decimal" data-rupiah name="prorate_amount_override" id="fv_prorate_amount"
                                         class="w-full pl-9 text-sm px-3 py-2.5 border border-border rounded-lg bg-surface font-mono text-text-main focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                                         value="{{ old('prorate_amount_override', '') }}" oninput="onProrateManualEdit()">
                                 </div>
@@ -1116,10 +1154,19 @@
         const discount = parseFloat(params.discount) || 0;
         const ppnRate = parseFloat(params.ppn) || 0;
 
-        const instFee = parseFloat(document.getElementById('fv_extra_installation_fee').value) || 0;
-        const cableFee = parseFloat(document.getElementById('fv_extra_cable_fee').value) || 0;
-        const poleFee = parseFloat(document.getElementById('fv_extra_pole_fee').value) || 0;
-        const otherFee = parseFloat(document.getElementById('fv_other_fee').value) || 0;
+        // Kolom rupiah bermasking ribuan (data-rupiah): parseFloat('150.000')
+        // = 150, dan seluruh pratinjau kwitansi ikut salah. `params.*` di atas
+        // TIDAK dimasking — itu data-* dari server, bukan ketikan admin.
+        const angkaRupiah = (id) => {
+            const el = document.getElementById(id);
+
+            return (el && window.Rupiah ? window.Rupiah.angka(el.value) : parseFloat(el?.value)) || 0;
+        };
+
+        const instFee = angkaRupiah('fv_extra_installation_fee');
+        const cableFee = angkaRupiah('fv_extra_cable_fee');
+        const poleFee = angkaRupiah('fv_extra_pole_fee');
+        const otherFee = angkaRupiah('fv_other_fee');
 
         // Calculate Prorate (auto). Nilai final dipakai kwitansi diambil dari
         // input fv_prorate_amount — auto-filled di sini kecuali admin sudah
@@ -1196,9 +1243,12 @@
 
         // Auto-fill field prorata kecuali admin sudah edit manual (dirty).
         if (!prorateInput.dataset.dirty) {
-            prorateInput.value = autoProrateAmount;
+            // Ikut format ribuan supaya sama dengan kolom rupiah lain di form.
+            prorateInput.value = window.Rupiah
+                ? window.Rupiah.format(String(autoProrateAmount))
+                : autoProrateAmount;
         }
-        const prorateAmount = parseFloat(prorateInput.value) || 0;
+        const prorateAmount = angkaRupiah('fv_prorate_amount');
 
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di
@@ -1260,6 +1310,9 @@
                         { text: 'Batal', type: 'secondary' },
                         { text: 'Lanjutkan Aktivasi', type: 'primary', onClick: () => {
                             window.Dialog.close();
+                            // Submit programatik melewati listener `submit`
+                            // global — kolom biaya bermasking dibersihkan di sini.
+                            window.Rupiah?.normalisasiForm(verifyForm);
                             verifyForm.submit();
                         }}
                     ]

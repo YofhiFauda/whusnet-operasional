@@ -55,6 +55,26 @@ class PaymentReceiptPrintTest extends TestCase
         $response->assertSee('Rp 75.000', false);
     }
 
+    /**
+     * Struk yang dicetak untuk pelanggan tidak boleh membawa header/footer
+     * bawaan browser — di sana tercetak tanggal, judul dokumen, dan URL
+     * internal sistem. Teks itu hidup di kotak margin halaman; satu-satunya
+     * cara mematikannya adalah menolkan margin @page.
+     */
+    public function test_struk_menolak_header_footer_bawaan_browser(): void
+    {
+        $this->loginAsAdmin();
+        $pop = $this->createPop('POP-RCP-PG', 'RCPG', 'POP Struk Page');
+        $payment = $this->createPayment($pop, 'INV-202606-9010', 'PAY-202606-9010');
+
+        $response = $this->get(route('payments.receipt', $payment->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('@page { margin: 0; }', false);
+        // Jarak ke tepi kertas pindah ke struk-nya sendiri, bukan hilang.
+        $response->assertSee('padding: 6mm 5mm', false);
+    }
+
     public function test_receipt_blocked_for_user_outside_pop_scope(): void
     {
         $popLain = $this->createPop('POP-RCP-2', 'RCP2', 'POP Struk 2');

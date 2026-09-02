@@ -98,6 +98,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:webhooks' => 60,
     ],
 
     /*
@@ -197,6 +198,10 @@ return [
     */
 
     'defaults' => [
+        // Antrean cepat: event broadcast (dashboard FOP, task teknisi, status
+        // tagihan) dan notifikasi. Pekerjaan di sini hitungan milidetik, jadi
+        // `timeout` pendek justru pengaman — job yang menggantung lebih baik
+        // dipotong daripada menahan layar realtime orang lain.
         'supervisor-1' => [
             'connection' => 'redis',
             'queue' => ['default'],
@@ -210,6 +215,48 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+
+        // Antrean lambat: pembacaan kwitansi (pdftotext, lalu raster per
+        // halaman). Dipisah supaya upload bulk 100 berkas tidak menghadang
+        // antrean `default` — kalau digabung, dashboard realtime berhenti
+        // bergerak sampai tumpukan kwitansi habis, tanpa error apa pun.
+        //
+        // `timeout` di sini harus >= MatchPaymentReceipt::$timeout (240) dan
+        // keduanya harus < REDIS_QUEUE_RETRY_AFTER (360), kalau tidak job yang
+        // masih berjalan diambil worker kedua dan satu berkas dibaca dua kali.
+        'supervisor-kwitansi' => [
+            'connection' => 'redis',
+            'queue' => ['kwitansi'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 1,
+            'timeout' => 300,
+            'nice' => 5,
+        ],
+
+        // Antrean webhook keluar (API 1: installation.activated ke Website B
+        // + Telegram Eksternal). Dipisah dari `default` supaya retry webhook
+        // yang gagal (backoff sampai 6 jam, 8 percobaan) tidak menahan
+        // antrean broadcast realtime dashboard FOP. `tries` di level
+        // supervisor tetap 1 — retry sesungguhnya diatur SendWebhookOutboxJob
+        // sendiri ($tries=8), bukan Horizon.
+        'supervisor-webhooks' => [
+            'connection' => 'redis',
+            'queue' => ['webhooks'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => 60,
+            'nice' => 5,
+        ],
     ],
 
     'environments' => [
@@ -219,11 +266,23 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-kwitansi' => [
+                'maxProcesses' => 4,
+            ],
+            'supervisor-webhooks' => [
+                'maxProcesses' => 2,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-kwitansi' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-webhooks' => [
+                'maxProcesses' => 1,
             ],
         ],
     ],

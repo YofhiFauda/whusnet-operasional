@@ -1,0 +1,765 @@
+<title>ISP Portal Load Plan</title>
+<style>
+  :root {
+    --paper: #f3f5f6;
+    --paper-raise: #ffffff;
+    --ink: #16202b;
+    --muted: #5b6b76;
+    --line: #d8dde1;
+    --signal: #0e7c86;
+    --signal-soft: #e3f0f1;
+    --alert: #b8542a;
+    --alert-soft: #f7e9e1;
+    --good: #2f8f5b;
+    --good-soft: #e6f2ec;
+    --crit: #c23b3b;
+    --crit-soft: #fbe8e8;
+    --font-display: 'Archivo', 'Arial Narrow', sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #10171d;
+      --paper-raise: #172029;
+      --ink: #e7edf0;
+      --muted: #92a3ac;
+      --line: #263039;
+      --signal: #35c2ce;
+      --signal-soft: #17333368;
+      --alert: #e08f5c;
+      --alert-soft: #3a271b;
+      --good: #5cc192;
+      --good-soft: #163224;
+      --crit: #ea7373;
+      --crit-soft: #3a1e1e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #10171d;
+    --paper-raise: #172029;
+    --ink: #e7edf0;
+    --muted: #92a3ac;
+    --line: #263039;
+    --signal: #35c2ce;
+    --signal-soft: #17333368;
+    --alert: #e08f5c;
+    --alert-soft: #3a271b;
+    --good: #5cc192;
+    --good-soft: #163224;
+    --crit: #ea7373;
+    --crit-soft: #3a1e1e;
+  }
+
+  * { box-sizing: border-box; }
+  html { text-size-adjust: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+
+  a { color: var(--signal); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    nav.index { display: none; }
+  }
+
+  /* ---------- Masthead ---------- */
+  header.masthead {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 56px 0 40px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--signal);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--signal);
+    box-shadow: 0 0 0 3px var(--signal-soft);
+  }
+
+  h1.title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(32px, 4.4vw, 50px);
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    margin: 14px 0 12px;
+    text-wrap: balance;
+    max-width: 18ch;
+  }
+
+  .dek {
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Index rail ---------- */
+  nav.index {
+    position: sticky;
+    top: 32px;
+    padding-top: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  nav.index a {
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 13.5px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border-left: 2px solid transparent;
+  }
+  nav.index a:hover { color: var(--ink); background: var(--paper-raise); }
+  nav.index .idx-num { font-family: var(--font-mono); color: var(--signal); margin-right: 8px; }
+
+  main { min-width: 0; padding-top: 48px; }
+
+  section { margin-bottom: 68px; scroll-margin-top: 24px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+  .section-num {
+    font-family: var(--font-mono);
+    color: var(--signal);
+    font-size: 14px;
+  }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: -0.005em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 30px 0 10px;
+  }
+  .section-sub {
+    color: var(--muted);
+    max-width: 68ch;
+    margin: 10px 0 24px;
+    font-size: 15px;
+  }
+
+  p { max-width: 68ch; }
+  p.wide { max-width: none; }
+
+  ul.plain, ol.plain { max-width: 68ch; padding-left: 20px; }
+  ul.plain li, ol.plain li { margin-bottom: 6px; }
+
+  code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+  .callout {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--alert);
+    background: var(--alert-soft);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin: 18px 0;
+    max-width: 68ch;
+  }
+  .callout .callout-label {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--alert);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- Tables ---------- */
+  .table-scroll { overflow-x: auto; margin: 18px 0; border: 1px solid var(--line); border-radius: 10px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 14px;
+    background: var(--paper-raise);
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  th {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--paper);
+    font-weight: 600;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+  td.wrap-cell { white-space: normal; max-width: 260px; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .pill.good { background: var(--good-soft); color: var(--good); }
+  .pill.warn { background: var(--alert-soft); color: var(--alert); }
+  .pill.crit { background: var(--crit-soft); color: var(--crit); }
+  .pill.pattern { background: var(--signal-soft); color: var(--signal); }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 18px 0 28px;
+  }
+  .legend-item {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--paper-raise);
+  }
+  .legend-item .legend-shape {
+    display: flex; align-items: flex-end; gap: 3px; height: 26px; margin-bottom: 10px;
+  }
+  .legend-item .legend-shape i {
+    display: block; flex: 1; background: var(--signal); border-radius: 2px 2px 0 0; opacity: 0.85;
+  }
+  .legend-item h5 {
+    font-family: var(--font-display); font-size: 14.5px; margin: 0 0 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .legend-item p { font-size: 13px; color: var(--muted); margin: 0; max-width: none; }
+
+  /* ---------- Stage timeline ---------- */
+  .profile-card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper-raise);
+    padding: 20px 22px 22px;
+    margin: 18px 0 26px;
+  }
+  .profile-card h4 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    margin: 0 0 3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .profile-card .profile-goal { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; max-width: 60ch; }
+
+  .timeline {
+    display: flex;
+    align-items: stretch;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .stage {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    border-right: 1px solid var(--line);
+  }
+  .stage:last-child { border-right: none; }
+  .stage-fill {
+    width: 100%;
+    background: linear-gradient(180deg, var(--signal), color-mix(in srgb, var(--signal) 55%, var(--paper-raise)));
+    opacity: 0.85;
+  }
+  .stage-label {
+    position: absolute;
+    top: 6px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  .timeline-caption {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .vu-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .vu-badge {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--signal-soft);
+    color: var(--signal);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .vu-badge b { font-size: 13px; }
+
+  /* ---------- Session flow ---------- */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 68ch;
+    margin: 18px 0;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--signal);
+    justify-self: center;
+  }
+  .flow-step.branch .flow-dot { background: var(--muted); }
+  .flow-name { font-size: 14.5px; }
+  .flow-name .endpoint { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); display: block; margin-top: 1px; }
+  .flow-weight { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+  footer {
+    max-width: 1180px;
+    margin: 60px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font-mono);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<header class="masthead">
+  <div class="eyebrow"><span class="dot"></span> Performance test plan &middot; Portal Pelanggan API</div>
+  <h1 class="title">Load Testing at 5,000 &amp; 10,000 Pelanggan</h1>
+  <p class="dek">Skema pengujian performa untuk API Portal Pelanggan (auth, tagihan, pembayaran, saldo, ticketing) — profil beban, virtual user, durasi, dan ambang metrik, diturunkan dari perilaku nyata pelanggan ISP residensial dan konfigurasi rate limiter yang sudah berjalan di sistem.</p>
+  <div class="meta-row">
+    <span><b>Basis</b> 5.000 &amp; 10.000 pelanggan</span>
+    <span><b>Target</b> <code>/api/customer-portal/*</code></span>
+    <span><b>Tool</b> Postman Performance Testing</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="index">
+    <a href="#asumsi"><span class="idx-num">01</span>Asumsi</a>
+    <a href="#profil"><span class="idx-num">02</span>Load Profile</a>
+    <a href="#sesi"><span class="idx-num">03</span>Perilaku VU</a>
+    <a href="#limiter"><span class="idx-num">04</span>Rate Limiter</a>
+    <a href="#metrik"><span class="idx-num">05</span>Metrik &amp; Ambang</a>
+    <a href="#urutan"><span class="idx-num">06</span>Urutan Eksekusi</a>
+  </nav>
+
+  <main>
+
+    <section id="asumsi">
+      <div class="section-head"><span class="section-num">01</span><h2>Asumsi dasar</h2></div>
+      <p class="section-sub">5.000/10.000 itu <b style="color:var(--ink)">basis pelanggan terdaftar</b>, bukan concurrent user — portal ISP residensial gak pernah dibuka bareng-bareng oleh semua orang di luar momen tertentu. Konkurensi diturunkan dari basis lewat rasio di bawah, bisa disesuaikan begitu ada data pemakaian riil.</p>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Momen</th><th>Rasio dari basis</th><th class="num">5.000 → VU</th><th class="num">10.000 → VU</th><th>Kenapa</th></tr></thead>
+          <tbody>
+            <tr><td>Peak harian normal</td><td class="mono">5%</td><td class="num">250</td><td class="num">500</td><td class="wrap-cell">Cek tagihan/saldo pas jam pulang kerja (18–21 WIB) — pola utilitas, bukan media sosial</td></tr>
+            <tr><td>Lonjakan hari tagihan terbit</td><td class="mono">15%</td><td class="num">750</td><td class="num">1.500</td><td class="wrap-cell">Notifikasi tagihan otomatis nyampe hampir bersamaan → buka app serentak</td></tr>
+            <tr><td>Beban harian biasa (soak)</td><td class="mono">3%</td><td class="num">150</td><td class="num">300</td><td class="wrap-cell">Baseline non-puncak, dipertahankan lama buat nangkep leak/degradasi</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Bukan target bisnis</div>
+        <p>Rasio 5% / 15% / 3% itu <b>tebakan awal yang harus ditinjau ulang</b> begitu ada data akses log portal sungguhan (mis. dari Cloudflare/nginx access log setelah portal live beberapa minggu). Jangan dianggap SLA — anggap starting point yang bisa dikalibrasi.</p>
+      </div>
+    </section>
+
+    <section id="profil">
+      <div class="section-head"><span class="section-num">02</span><h2>Load profile</h2></div>
+      <p class="section-sub">Lima profil, tiap profil punya bentuk tahapan yang sama di basis 5.000 maupun 10.000 — cuma jumlah VU-nya beda 2×. Visual di bawah pakai angka basis 5.000; kolom 10.000 ada di tabel tiap kartu.</p>
+
+      <h3>Empat pola dasar — persis 4 pilihan Load Profile di Postman</h3>
+      <p>Postman (fitur <b style="color:var(--ink)">Performance Testing</b>, dibuka dari tombol Run collection → tab Performance) cuma nyediain 4 bentuk kurva ini — kebetulan pas persis buat 5 profil kita. Tiap kartu di bawah ditandai pill biru + field Postman yang perlu diisi.</p>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-shape"><i style="height:60%"></i><i style="height:60%"></i><i style="height:60%"></i><i style="height:60%"></i><i style="height:60%"></i></div>
+          <h5>Fixed</h5>
+          <p>VU tetap sepanjang durasi. Field Postman: <b class="mono" style="color:var(--ink)">Virtual users</b> saja.</p>
+        </div>
+        <div class="legend-item">
+          <div class="legend-shape"><i style="height:20%"></i><i style="height:40%"></i><i style="height:60%"></i><i style="height:80%"></i><i style="height:100%"></i></div>
+          <h5>Ramp Up</h5>
+          <p>Naik bertahap dari <b class="mono" style="color:var(--ink)">Initial load</b> ke <b class="mono" style="color:var(--ink)">Virtual users</b> (maksimum), lama naiknya diatur drag-handle.</p>
+        </div>
+        <div class="legend-item">
+          <div class="legend-shape"><i style="height:15%"></i><i style="height:15%"></i><i style="height:100%"></i><i style="height:15%"></i><i style="height:15%"></i></div>
+          <h5>Spike</h5>
+          <p>Naik dari <b class="mono" style="color:var(--ink)">Base load</b> ke maksimum lalu TURUN LAGI ke base — bentuknya udah otomatis, tinggal drag durasi lonjakannya.</p>
+        </div>
+        <div class="legend-item">
+          <div class="legend-shape"><i style="height:25%"></i><i style="height:70%"></i><i style="height:90%"></i><i style="height:90%"></i><i style="height:25%"></i></div>
+          <h5>Peak</h5>
+          <p>Naik dari <b class="mono" style="color:var(--ink)">Base load</b>, DITAHAN di maksimum, baru turun — mirip Spike tapi ada fase hold di puncak.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Cek dulu sebelum jalanin Spike/Stress</div>
+        <p>Postman gak nerbitin angka batas VU resmi — dokumennya cuma bilang run lokal "dibatasi resource sistem", run cloud "gak dibatasi resource sistemmu (didistribusi ke banyak mesin)", tapi tetap kena <b>batas plan Postman</b> (Free/Team/dst beda kuota). Angka <b>750–2.500 VU</b> di profil Spike/Stress kemungkinan besar <b>melebihi kuota plan yang situ pakai</b>. Cek dulu di Postman → Settings/Billing berapa VU maksimum akun situ, kalau lebih kecil dari tabel — turunin proporsional (mis. semua angka ÷4) atau jalanin Spike/Stress pakai tool lain (k6/Gatling) dan simpan Postman buat Fixed/Peak yang VU-nya lebih kecil.</p>
+      </div>
+
+      <div class="profile-card">
+        <h4>Smoke <span class="pill good">sanity</span> <span class="pill pattern">Fixed</span></h4>
+        <p class="profile-goal">Jalur endpoint hidup &amp; benar sebelum profil berat lain dijalankan. Gagal di sini = STOP, jangan lanjut ke profil berikutnya.</p>
+        <div class="timeline">
+          <div class="stage" style="flex:1"><div class="stage-label">flat</div><div class="stage-fill" style="height:20%"></div></div>
+        </div>
+        <div class="timeline-caption"><span>0:00</span><span>2 menit</span></div>
+        <div class="vu-badges"><span class="vu-badge">5k &amp; 10k basis → <b>3 VU</b></span></div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Tahap</th><th class="num">Durasi</th><th class="num">VU awal</th><th class="num">VU akhir</th></tr></thead>
+            <tbody>
+              <tr><td>Flat (konstan, tanpa ramp)</td><td class="num">2m</td><td class="num">3</td><td class="num">3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <h4>Peak Harian Normal <span class="pill good">load test</span> <span class="pill pattern">Peak</span></h4>
+        <p class="profile-goal">Baseline performa di kondisi ramai wajar — ini yang jadi acuan ambang metrik §05.</p>
+        <div class="timeline">
+          <div class="stage" style="flex:5"><div class="stage-label">ramp-up</div><div class="stage-fill" style="height:20%"></div></div>
+          <div class="stage" style="flex:20"><div class="stage-label">hold</div><div class="stage-fill" style="height:85%"></div></div>
+          <div class="stage" style="flex:5"><div class="stage-label">ramp-down</div><div class="stage-fill" style="height:20%"></div></div>
+        </div>
+        <div class="timeline-caption"><span>0:00</span><span>30 menit</span></div>
+        <div class="vu-badges">
+          <span class="vu-badge">5k → <b>250 VU</b> hold</span>
+          <span class="vu-badge">10k → <b>500 VU</b> hold</span>
+        </div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Tahap</th><th class="num">Durasi</th><th class="num">VU (basis 5k)</th><th class="num">VU (basis 10k)</th></tr></thead>
+            <tbody>
+              <tr><td>Ramp-up (0 → target)</td><td class="num">5m</td><td class="num">0 → 250</td><td class="num">0 → 500</td></tr>
+              <tr><td>Hold (steady)</td><td class="num">20m</td><td class="num">250</td><td class="num">500</td></tr>
+              <tr><td>Ramp-down (target → 0)</td><td class="num">5m</td><td class="num">250 → 0</td><td class="num">500 → 0</td></tr>
+              <tr><td><b>Total</b></td><td class="num"><b>30m</b></td><td class="num">—</td><td class="num">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <h4>Lonjakan Hari Tagihan <span class="pill warn">spike test</span> <span class="pill pattern">Spike</span></h4>
+        <p class="profile-goal">Ramp cepat meniru notifikasi massal — bukan pertumbuhan organik. Ambang metrik boleh melar sementara (§05), tapi 5xx/429 tak sengaja tetap nol.</p>
+        <div class="timeline">
+          <div class="stage" style="flex:2"><div class="stage-label">ramp</div><div class="stage-fill" style="height:15%"></div></div>
+          <div class="stage" style="flex:10"><div class="stage-label">hold</div><div class="stage-fill" style="height:95%"></div></div>
+          <div class="stage" style="flex:3"><div class="stage-label">turun</div><div class="stage-fill" style="height:20%"></div></div>
+        </div>
+        <div class="timeline-caption"><span>0:00</span><span>15 menit</span></div>
+        <div class="vu-badges">
+          <span class="vu-badge">5k → <b>750 VU</b> hold</span>
+          <span class="vu-badge">10k → <b>1.500 VU</b> hold</span>
+        </div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Tahap</th><th class="num">Durasi</th><th class="num">VU (basis 5k)</th><th class="num">VU (basis 10k)</th></tr></thead>
+            <tbody>
+              <tr><td>Ramp cepat (meniru notifikasi massal)</td><td class="num">2m</td><td class="num">0 → 750</td><td class="num">0 → 1.500</td></tr>
+              <tr><td>Hold (steady)</td><td class="num">10m</td><td class="num">750</td><td class="num">1.500</td></tr>
+              <tr><td>Ramp-down</td><td class="num">3m</td><td class="num">750 → 0</td><td class="num">1.500 → 0</td></tr>
+              <tr><td><b>Total</b></td><td class="num"><b>15m</b></td><td class="num">—</td><td class="num">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <h4>Soak / Endurance <span class="pill good">stability</span> <span class="pill pattern">Fixed</span></h4>
+        <p class="profile-goal">Beban sedang, lama — nangkep hal yang cuma muncul dari akumulasi: pertumbuhan tabel <code>customer_portal_tokens</code>, memory app, drift latency jam ke-1 vs jam terakhir.</p>
+        <div class="timeline">
+          <div class="stage" style="flex:5"><div class="stage-label">ramp</div><div class="stage-fill" style="height:15%"></div></div>
+          <div class="stage" style="flex:36"><div class="stage-label">hold — 3 jam</div><div class="stage-fill" style="height:55%"></div></div>
+          <div class="stage" style="flex:5"><div class="stage-label">turun</div><div class="stage-fill" style="height:15%"></div></div>
+        </div>
+        <div class="timeline-caption"><span>0:00</span><span>3 jam 10 menit</span></div>
+        <div class="vu-badges">
+          <span class="vu-badge">5k → <b>150 VU</b> hold</span>
+          <span class="vu-badge">10k → <b>300 VU</b> hold</span>
+        </div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table>
+            <thead><tr><th>Tahap</th><th class="num">Durasi</th><th class="num">VU (basis 5k)</th><th class="num">VU (basis 10k)</th></tr></thead>
+            <tbody>
+              <tr><td>Ramp-up</td><td class="num">5m</td><td class="num">0 → 150</td><td class="num">0 → 300</td></tr>
+              <tr><td>Hold (steady, endurance)</td><td class="num">180m</td><td class="num">150</td><td class="num">300</td></tr>
+              <tr><td>Ramp-down</td><td class="num">5m</td><td class="num">150 → 0</td><td class="num">300 → 0</td></tr>
+              <tr><td><b>Total</b></td><td class="num"><b>3j 10m</b></td><td class="num">—</td><td class="num">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <h4>Stress — Cari Titik Patah <span class="pill crit">breaking point</span> <span class="pill pattern">Ramp Up</span></h4>
+        <p class="profile-goal">Naik bertahap sampai ambang §05 dilanggar atau error rate meledak. VU di titik patah ITU SENDIRI yang jadi output pengujian — bukan angka yang perlu ditembus.</p>
+        <div class="timeline">
+          <div class="stage" style="flex:1"><div class="stage-label">1×</div><div class="stage-fill" style="height:35%"></div></div>
+          <div class="stage" style="flex:1"><div class="stage-label">2×</div><div class="stage-fill" style="height:50%"></div></div>
+          <div class="stage" style="flex:1"><div class="stage-label">3×</div><div class="stage-fill" style="height:68%"></div></div>
+          <div class="stage" style="flex:1"><div class="stage-label">4×</div><div class="stage-fill" style="height:85%"></div></div>
+          <div class="stage" style="flex:1"><div class="stage-label">5×</div><div class="stage-fill" style="height:100%"></div></div>
+        </div>
+        <div class="timeline-caption"><span>5 menit / step</span><span>berhenti begitu ambang dilanggar</span></div>
+        <div class="vu-badges">
+          <span class="vu-badge">5k → 250 → 500 → 750 → 1.000 → <b>1.250 VU</b></span>
+        </div>
+        <div class="vu-badges">
+          <span class="vu-badge">10k → 500 → 1.000 → 1.500 → 2.000 → <b>2.500 VU</b></span>
+        </div>
+        <div class="table-scroll" style="margin-top:14px">
+          <table>
+            <thead><tr><th class="num">Step</th><th class="num">Menit</th><th class="num">VU (basis 5k)</th><th class="num">VU (basis 10k)</th></tr></thead>
+            <tbody>
+              <tr><td class="num">1</td><td class="num">0–5</td><td class="num">250</td><td class="num">500</td></tr>
+              <tr><td class="num">2</td><td class="num">5–10</td><td class="num">500</td><td class="num">1.000</td></tr>
+              <tr><td class="num">3</td><td class="num">10–15</td><td class="num">750</td><td class="num">1.500</td></tr>
+              <tr><td class="num">4</td><td class="num">15–20</td><td class="num">1.000</td><td class="num">2.000</td></tr>
+              <tr><td class="num">5</td><td class="num">20–25</td><td class="num">1.250</td><td class="num">2.500</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:10px; font-size:13.5px; color:var(--muted)">Tiap step naik <b style="color:var(--ink)">tanpa ramp-down</b> ke step sebelumnya — VU baru NAMBAH di atas yang lama, bukan gantiin. Stop di step manapun begitu ambang §05 dilanggar; step itu yang dicatat sebagai titik patah, gak perlu lanjut ke step berikutnya.</p>
+      </div>
+
+      <h3>Cara isi form Performance Testing di Postman</h3>
+      <p>Buka collection → tombol <b style="color:var(--ink)">Run</b> → tab <b style="color:var(--ink)">Performance</b>. Tiap tabel tahap di atas tinggal dipetakan ke 4 field ini:</p>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Field Postman</th><th>Diisi dari</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Load Profile</td><td class="wrap-cell">Pill pattern di judul kartu (Fixed / Ramp Up / Spike / Peak)</td></tr>
+            <tr><td class="mono">Virtual users</td><td class="wrap-cell">Angka VU tertinggi di tabel tahap (kolom "VU akhir"/hold)</td></tr>
+            <tr><td class="mono">Initial load <span style="color:var(--muted)">(Ramp Up)</span> / Base load <span style="color:var(--muted)">(Spike, Peak)</span></td><td class="wrap-cell">Angka VU di tahap paling awal — <code>0</code> kalau tabelnya mulai dari nol</td></tr>
+            <tr><td class="mono">Test duration</td><td class="wrap-cell">Baris <b>Total</b> di tabel tahap, dikonversi ke <b>menit</b> (Postman cuma nerima menit, bukan jam)</td></tr>
+            <tr><td class="mono">Drag-handle ramp/spike/peak</td><td class="wrap-cell">Durasi tahap "ramp"/"spike"/"hold" — geser slider di grafik Postman sampai lebar tahapnya sesuai kolom Durasi</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="wide">Contoh nyata — <b style="color:var(--ink)">Peak Harian Normal, basis 5.000</b> (Load Profile = <b>Peak</b>):</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Field</th><th>Nilai</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Load Profile</td><td>Peak</td></tr>
+            <tr><td class="mono">Base load</td><td class="num">0</td></tr>
+            <tr><td class="mono">Virtual users</td><td class="num">250</td></tr>
+            <tr><td class="mono">Test duration</td><td class="num">30 menit</td></tr>
+            <tr><td class="mono">Drag-handle naik ke puncak</td><td>≈5 menit dari 30 (posisi handle kiri di ~17% panjang grafik)</td></tr>
+            <tr><td class="mono">Drag-handle turun dari puncak</td><td>≈5 menit terakhir dari 30 (posisi handle kanan di ~83%)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Buat basis 10.000, cukup <code>Virtual users</code> jadi <b>500</b> — field lain sama persis.</p>
+
+      <div class="callout">
+        <div class="callout-label">Profil Stress gak bisa 1 form</div>
+        <p>Load Profile <b>Ramp Up</b> Postman cuma punya SATU tahap naik terus-menerus (Initial load → Virtual users), bukan tangga 5-step berhenti-naik-berhenti kayak tabel Stress di atas. Cara paling deket: set <code>Initial load = 250</code> (5k) / <code>500</code> (10k), <code>Virtual users = 1.250</code> (5k) / <code>2.500</code> (10k), <code>Test duration = 25 menit</code>, drag-handle ramp dipanjangin hampir sepanjang durasi (naik halus, bukan bertangga). Kalau butuh tangga step yang persis, pisahin jadi 5 run Fixed berurutan dengan VU tabel step masing-masing.</p>
+      </div>
+    </section>
+
+    <section id="sesi">
+      <div class="section-head"><span class="section-num">03</span><h2>Perilaku satu virtual user</h2></div>
+      <p class="section-sub">Satu sesi VU meniru pelanggan buka app: login sekali, baca-baca, jarang nulis. Think time 2–8 detik antar aksi — <b style="color:var(--ink)">wajib ada</b>, tanpa ini test cuma ngukur rate limiter, bukan performa API (lihat §04).</p>
+
+      <div class="flow">
+        <div class="flow-step"><div class="flow-dot"></div><div class="flow-name">Login<span class="endpoint">POST /auth/login</span></div><div class="flow-weight">100% sesi, 1×</div></div>
+        <div class="flow-step"><div class="flow-dot"></div><div class="flow-name">Lihat profil<span class="endpoint">GET /me</span></div><div class="flow-weight">100% sesi, 1×</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Daftar tagihan<span class="endpoint">GET /me/invoices</span></div><div class="flow-weight">40% / loop</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Detail tagihan<span class="endpoint">GET /me/invoices/{n}</span></div><div class="flow-weight">25% / loop</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Riwayat pembayaran<span class="endpoint">GET /me/payments</span></div><div class="flow-weight">15% / loop</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Isi kwitansi<span class="endpoint">GET /me/payments/{n}/receipt</span></div><div class="flow-weight">8% / loop</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Saldo &amp; mutasi<span class="endpoint">GET /me/balance</span></div><div class="flow-weight">10% / loop</div></div>
+        <div class="flow-step branch"><div class="flow-dot"></div><div class="flow-name">Riwayat &amp; detail tiket<span class="endpoint">GET /me/tickets(/{n})</span></div><div class="flow-weight">7% / loop</div></div>
+        <div class="flow-step"><div class="flow-dot"></div><div class="flow-name">Ganti password<span class="endpoint">PUT /me/password</span></div><div class="flow-weight">0.1% sesi</div></div>
+        <div class="flow-step"><div class="flow-dot"></div><div class="flow-name">Akhiri sesi<span class="endpoint">70% tutup app diam-diam · 30% POST /auth/logout</span></div><div class="flow-weight">100% sesi</div></div>
+      </div>
+
+      <p>Loop aksi ber-bintang (branch) diulang <b>2–6×</b> per sesi dengan bobot di atas, dipisah think time. Sesi yang bertahan &gt;13 menit wajib memicu <code>POST /auth/refresh</code> otomatis (access token 15 menit) — relevan buat profil Soak, nyaris gak kejadian di profil pendek (Smoke/Peak/Spike).</p>
+
+      <h3>Sengaja di luar loop utama</h3>
+      <ul class="plain">
+        <li><code>POST /auth/claim</code> — gelombang provisioning awal (pelanggan baru klaim akun pertama kali), skenario terpisah, bukan bagian traffic harian steady.</li>
+        <li>bcrypt (<code>BCRYPT_ROUNDS=12</code>) bikin <code>/auth/login</code> &amp; <code>/auth/claim</code> inheren lebih lambat dari endpoint baca data — dievaluasi pakai ambang sendiri, jangan disamain sama <code>GET /me/*</code> (lihat §05).</li>
+      </ul>
+    </section>
+
+    <section id="limiter">
+      <div class="section-head"><span class="section-num">04</span><h2>Rate limiter yang sudah aktif</h2></div>
+      <p class="section-sub">Tiga limiter ini nempel di route sungguhan (<code>AppServiceProvider</code>) — kalau gak diperhitungkan, hasil load test cuma ngukur limiter-nya sendiri, bukan performa API.</p>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Limiter</th><th>Batas</th><th>Key</th><th>Endpoint</th></tr></thead>
+          <tbody>
+            <tr><td><code>customer-portal-api</code></td><td class="num mono">120/menit</td><td class="mono">per access token</td><td class="wrap-cell">Semua <code>/me/*</code></td></tr>
+            <tr><td><code>customer-portal-auth</code></td><td class="num mono">5 / 15 menit</td><td class="mono">IP + login_id</td><td class="wrap-cell"><code>/auth/login</code>, <code>/auth/claim</code></td></tr>
+            <tr><td><code>customer-portal-auth-ip</code></td><td class="num mono">30 / 15 menit</td><td class="mono">IP saja</td><td class="wrap-cell"><code>/auth/login</code>, <code>/auth/claim</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Wajib disiapkan sebelum profil apa pun jalan</div>
+        <p><b>Pre-provision token di fase setup, di luar jendela ukur.</b> Login tiap VU sekali di awal, cache token-nya, sesi ukur cuma pakai <code>/me/*</code> + refresh berkala. Kalau load generator jalan dari sedikit IP sumber (lazimnya begitu), 750–2.500 VU yang login serentak dalam satu jendela pasti nabrak <code>customer-portal-auth-ip</code> (30/15menit per IP) — itu limiter-nya kerja, bukan API-nya lambat.</p>
+        <p>Kapasitas endpoint auth itu sendiri diuji <b>terpisah</b>, skala kecil (≤25 VU, mengikuti angka limiter), bukan digabung ke profil Peak/Spike/Stress.</p>
+      </div>
+    </section>
+
+    <section id="metrik">
+      <div class="section-head"><span class="section-num">05</span><h2>Metrik &amp; ambang</h2></div>
+      <p class="section-sub">Ambang berlaku penuh di profil <b>Peak Harian Normal</b>; profil Spike boleh melar ×1.5 di kolom p95 selama error budget tetap dijaga.</p>
+
+      <h3>Latensi &amp; error, per kelas endpoint</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Kelas</th><th class="num">p50</th><th class="num">p95</th><th class="num">p99</th><th class="num">Error budget</th></tr></thead>
+          <tbody>
+            <tr><td>Baca data — <code>GET /me/*</code></td><td class="num">&lt;150ms</td><td class="num">&lt;400ms</td><td class="num">&lt;800ms</td><td class="num">&lt;1% 5xx</td></tr>
+            <tr><td>Auth — login/claim (bcrypt)</td><td class="num">&lt;300ms</td><td class="num">&lt;800ms</td><td class="num">&lt;1.500ms</td><td class="num">&lt;0.5% 5xx</td></tr>
+            <tr><td>Refresh token</td><td class="num">&lt;120ms</td><td class="num">&lt;350ms</td><td class="num">&lt;600ms</td><td class="num">&lt;0.5% 5xx</td></tr>
+            <tr><td>Tulis — logout/ganti password</td><td class="num">&lt;150ms</td><td class="num">&lt;400ms</td><td class="num">&lt;800ms</td><td class="num">&lt;0.5% 5xx</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="pill crit">Nol</span> di semua kelas: <code>429</code> ke VU yang gak sengaja melebihi limiter (bukan skenario negatif yang memang disengaja), dan <code>500</code> yang nyangkut lebih dari satu request berturut (indikasi crash, bukan slow query).</p>
+
+      <h3>Isian "Pass test if" di Postman</h3>
+      <p>Postman cuma punya 5 metrik buat kondisi lulus — gak ada p50, paling deket <code>p90</code>. Isi per profil pakai tabel §latensi di atas, contoh buat profil <b style="color:var(--ink)">Peak Harian Normal</b>:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Metric</th><th>Condition</th><th class="num">Value</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">p95 Response Time</td><td>is less than</td><td class="num">400 ms</td></tr>
+            <tr><td class="mono">p99 Response Time</td><td>is less than</td><td class="num">800 ms</td></tr>
+            <tr><td class="mono">Error %</td><td>is less than</td><td class="num">1%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Buat profil auth-berat (kalau dites terpisah sesuai §04), ganti Value jadi <code>800ms</code>/<code>1500ms</code> ngikutin baris "Auth" di tabel latensi. <code>Avg. Response Time</code> &amp; <code>Requests per second</code> tersedia juga sebagai Metric kalau situ mau tambah kondisi throughput minimum.</p>
+
+      <h3>Sinyal sistem — diamati bareng, bukan cuma HTTP</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Sinyal</th><th>Kenapa relevan buat modul ini</th><th>Kondisi sehat</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Query/request</td><td class="wrap-cell">N+1 di <code>invoices.with('payments')</code>, <code>tickets.with('fopTask')</code> dkk gak kelihatan dari latensi HTTP doang di beban rendah</td><td><span class="pill good">flat</span> gak naik seiring VU</td></tr>
+            <tr><td class="mono">customer_portal_tokens</td><td class="wrap-cell">Access+refresh diterbitkan tiap login/refresh — baris menumpuk kalau gak ada pruning token expired/revoked</td><td>tumbuh linear ke sesi aktif, bukan eksponensial ke total request</td></tr>
+            <tr><td class="mono">CPU app (bcrypt)</td><td class="wrap-cell">Cost factor 12 sengaja mahal — lonjakan CPU pas Spike/Stress wajar di endpoint auth, bukan berarti bug</td><td>korelasi lurus sama volume <code>/auth/login</code>, bukan endpoint lain</td></tr>
+            <tr><td class="mono">Horizon queue depth</td><td class="wrap-cell">Portal baca gak nyentuh queue langsung, tapi <code>invoice.updated</code> webhook outbox bisa ramai bareng hari tagihan</td><td>gak menumpuk &gt;beberapa menit di belakang</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="urutan">
+      <div class="section-head"><span class="section-num">06</span><h2>Urutan eksekusi &amp; kriteria lulus</h2></div>
+      <p class="section-sub">Urutan ini disengaja — Soak duluan sebelum Stress, supaya baseline "beban lama tapi wajar" gak tercemar sisa efek dari uji cari-titik-patah.</p>
+
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="num">Urutan</th><th>Profil</th><th>Lulus kalau</th></tr></thead>
+          <tbody>
+            <tr><td class="num mono">1</td><td>Smoke</td><td class="wrap-cell">Semua endpoint balas kode yang diharapkan, nol error</td></tr>
+            <tr><td class="num mono">2</td><td>Peak Harian Normal</td><td class="wrap-cell">Ambang §05 penuh terpenuhi di seluruh fase hold</td></tr>
+            <tr><td class="num mono">3</td><td>Soak</td><td class="wrap-cell">p95 jam terakhir gak melar &gt;10% dari jam pertama; <code>customer_portal_tokens</code> gak tumbuh gak wajar</td></tr>
+            <tr><td class="num mono">4</td><td>Lonjakan Hari Tagihan</td><td class="wrap-cell">Error budget §05 terjaga walau p95 melar ×1.5; nol 429 ke VU sah</td></tr>
+            <tr><td class="num mono">5</td><td>Stress</td><td class="wrap-cell">Degradasi bertahap (bukan crash mendadak); VU titik-patah tercatat sebagai output, dipakai buat kapasitas planning</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>Skema ini basis awal — kalibrasi rasio konkurensi §01 begitu ada data akses portal sungguhan.</footer>

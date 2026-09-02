@@ -34,7 +34,8 @@ class DatabaseSeeder extends Seeder
         $this->call(ItemFeatureSeeder::class); // Master Barang/Material
         $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
         $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.* ke-sync ke owner
+        $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1)
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
         $this->call(WorkToolSeeder::class); // Isi awal master alat kerja
@@ -42,6 +43,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(CustomerSeeder::class);
         // $this->call(MasterPopSeeder::class);
         $this->call(TechnicianSeeder::class);
+        $this->call(SalesSeeder::class); // User demo role Sales — buat coba Skip Survey saat Registrasi
 
         // User::factory(10)->create();
 

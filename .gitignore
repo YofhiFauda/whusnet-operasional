@@ -23,3 +23,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /storage/framework/testing/*
+
+# Scramble — OpenAPI spec regenerated via `php artisan scramble:export`, tidak
+# perlu dicommit. Cache-nya juga file-based, lihat config/scramble.php.
+/api.json

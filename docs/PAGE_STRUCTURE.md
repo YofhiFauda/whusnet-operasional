@@ -19,6 +19,18 @@ Sistem menggunakan layout berbasis **Sidebar Kiri** untuk navigasi utama (bukan 
 - **Sub-Menu:** Tampil hanya jika user memiliki permission `view` khusus pada sub-fitur bersangkutan.
 - **Empty State:** Jika user tidak memiliki hak akses sama sekali ke suatu rumpun fitur, modul navigasi tersebut disembunyikan sepenuhnya dari sidebar (tidak boleh dirender sebagai menu disable).
 
+### 2.2 Aturan Umpan Balik Aksi (ditambahkan 2026-08-11)
+
+Lahir dari satu keluhan: *"Upload berkas, diproses, selesai — tidak ada apa pun di halaman."* Sejak pekerjaan berat pindah ke queue dan sebagian data datang lewat broadcast, layar yang diam bukan lagi berarti "tidak terjadi apa-apa".
+
+1. **Aksi yang berjalan di latar belakang WAJIB punya penanda progres di halaman.** Redirect + flash saja tidak cukup kalau hasilnya baru muncul beberapa detik kemudian. Acuan: panel progres kwitansi di Worksheet Kolektor (polling, berhenti sendiri saat antrean nol).
+2. **Tombol yang memicu proses panjang harus terkunci selama proses.** Tanpa penanda, pengguna menekannya berulang kali — dan tidak semua endpoint punya pengaman idempotensi.
+3. **Jangan pernah melaporkan sukses tanpa memeriksa hasilnya.** `fetch()` wajib mengecek `res.ok` dan punya `.catch`. Pesan "Tersimpan." untuk penyimpanan yang gagal lebih berbahaya daripada layar diam — pengguna menutup halaman yakin datanya berubah.
+4. **Kegagalan penyegaran latar belakang tidak boleh dipendam.** Data basi yang tidak ditandai tak bisa dibedakan dari data yang memang belum berubah.
+5. **Halaman yang menampilkan UANG tidak boleh mengganti angkanya sendiri** dari event realtime. Beri kabar + tombol Muat ulang; penyegaran tetap keputusan manusia. Kalau saldo berubah saat admin sedang menghitung uang fisik, dia meneruskan hitungan dengan patokan yang berubah tanpa sadar.
+   → **Dikecualikan secara eksplisit (2026-08-21, ADHOC-45) buat Worksheet Admin, Setoran Kas, dan Worklist Kolektor** — user diberi tahu risiko di atas, lalu sengaja memilih SPA-like penuh (auto-tambal, nol refresh manual/polling) buat tiga halaman itu. Ketiganya sekarang fetch-ulang & menambal `#live-content` otomatis tiap event masuk, TANPA syarat "skip kalau form lagi kebuka" — lihat `docs/kolektor/business-logic.md` §9. Halaman UANG lain yang BELUM eksplisit diminta ubah tetap ikut aturan default di atas (kabar + Muat ulang manual).
+6. **Kegagalan koneksi realtime harus terlihat.** Ditangani terpusat oleh bilah di `layouts/app.blade.php` — halaman tidak perlu menanganinya sendiri.
+
 ---
 
 ## 3. Rancangan Halaman Konfigurasi RBAC

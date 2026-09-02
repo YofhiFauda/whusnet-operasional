@@ -36,6 +36,14 @@ class AuditDuplicateInvoicesCommand extends Command
      * suatu saat hasil ini diekspos lewat HTTP, wajib dibatasi
      * EffectiveAccessService::getAllowedPopIds() dulu.
      */
+
+    /**
+     * CONTOH DARI IMPLEMENTASINYA SEPERTI INI
+     * php artisan billing:generate-monthly-invoices --period=2026-07 --dry-run    //Untuk Generate Invoice di bulan tertentu
+     * php artisan billing:generate-monthly-invoices --period=2026-07               //Untuk Generate Invoice di bulan tertentu
+     * php artisan billing:generate-monthly-invoices --period=2026-08 --dry-run    //Untuk Generate Invoice di bulan tertentu
+     * php artisan billing:generate-monthly-invoices --period=2026-08               //Untuk Generate Invoice di bulan tertentu
+     */
     public function handle(): int
     {
         $period = $this->option('period');

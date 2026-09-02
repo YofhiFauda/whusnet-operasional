@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ScopeType;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
@@ -10,14 +11,20 @@ use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Worklist kolektor — read-only, cuma pelanggan ber-`collector_id = dirinya
- * sendiri` yang tunggak. Kolektor A tak boleh lihat pelanggan kolektor B
- * (docs/plan/analisa-billing-tagihan-pembayaran-kolektor.md §B-8 no. 5).
+ * Worklist kolektor — cuma pelanggan ber-`collector_id = dirinya sendiri`
+ * yang tunggak, dan cuma yang masuk POP scope efektifnya. Kolektor A tak
+ * boleh lihat pelanggan kolektor B.
+ *
+ * Sejak kolektor-2.0 halaman ini punya tombol bayar (§8) — yang dulu diuji
+ * sebagai "nol aksi" sekarang diuji sebaliknya, dan ditambah lapis kedua
+ * POP scope (§14.2 no. 4).
  */
 class CollectorWorklistScopeTest extends TestCase
 {
@@ -32,11 +39,27 @@ class CollectorWorklistScopeTest extends TestCase
         $this->package = InternetPackage::query()->firstOrFail();
     }
 
-    private function createKolektor(): User
+    /**
+     * Kolektor + POP scope-nya. Scope WAJIB diisi: worklist memakai
+     * `applyUserScope()`, dan repo ini deny-by-default — kolektor tanpa scope
+     * memang tidak melihat apa pun. Itu perilaku yang benar, bukan artefak
+     * test: user yang belum di-setup scope-nya tak boleh bocor lihat data.
+     */
+    private function createKolektor(?Pop $pop = null): User
     {
         $role = Role::where('code', 'kolektor')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
 
-        return User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        if ($pop) {
+            $scope = UserRoleScope::create([
+                'user_id' => $user->id,
+                'role_id' => $role->id,
+                'scope_type' => ScopeType::SELECTED_POP,
+            ]);
+            UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $pop->id]);
+        }
+
+        return $user;
     }
 
     private function createCustomerWithUnpaidInvoice(Pop $pop, string $code, ?int $collectorId, float $remaining = 100000): Customer
@@ -111,8 +134,8 @@ class CollectorWorklistScopeTest extends TestCase
             'status' => 'active',
         ]);
 
-        $kolektorA = $this->createKolektor();
-        $kolektorB = $this->createKolektor();
+        $kolektorA = $this->createKolektor($pop);
+        $kolektorB = $this->createKolektor($pop);
 
         $this->createCustomerWithUnpaidInvoice($pop, 'C-WL-A1', $kolektorA->id);
         $this->createCustomerWithUnpaidInvoice($pop, 'C-WL-B1', $kolektorB->id);
@@ -138,7 +161,7 @@ class CollectorWorklistScopeTest extends TestCase
             'status' => 'active',
         ]);
 
-        $kolektor = $this->createKolektor();
+        $kolektor = $this->createKolektor($pop);
         $this->createCustomerWithUnpaidInvoice($pop, 'C-WL-LUNAS', $kolektor->id, remaining: 0);
 
         $response = $this->actingAs($kolektor)->get(route('collector-worklist.index'));
@@ -147,28 +170,84 @@ class CollectorWorklistScopeTest extends TestCase
         $response->assertDontSee('Pelanggan C-WL-LUNAS');
     }
 
-    public function test_worklist_has_no_input_or_action_elements(): void
+    /**
+     * Kebalikan test lama "nol aksi": worklist sekarang punya input bayar,
+     * dan endpoint tujuannya WAJIB rute kolektor tanpa parameter. Kalau suatu
+     * saat halaman ini menunjuk `payment-batches/{collector}`, kolektor bisa
+     * ditipu mengirim id kolektor lain — itulah yang dijaga di sini.
+     */
+    public function test_worklist_exposes_pay_form_pointing_to_self_service_route(): void
     {
         $pop = Pop::create([
             'code' => 'POP-WL3',
             'pop_code' => 'WL3',
             'registration_prefix' => 'CY',
             'cid_prefix' => 'DY',
-            'name' => 'POP Worklist Nol Aksi',
+            'name' => 'POP Worklist Bayar',
             'type' => 'cabang',
             'status' => 'active',
         ]);
 
-        $kolektor = $this->createKolektor();
-        $this->createCustomerWithUnpaidInvoice($pop, 'C-WL-NOACT', $kolektor->id);
+        $kolektor = $this->createKolektor($pop);
+        $this->createCustomerWithUnpaidInvoice($pop, 'C-WL-PAY', $kolektor->id);
 
         $response = $this->actingAs($kolektor)->get(route('collector-worklist.index'));
 
         $response->assertOk();
-        // Nol elemen input/aksi TERKAIT PEMBAYARAN di konten worklist — bukan
-        // cek seluruh halaman (layout punya form/button lain: logout, dst).
-        $response->assertDontSee('cb-amount', false);
-        $response->assertDontSee('bulk-pay', false);
+        $response->assertSee('cb-amount', false);
+        $response->assertSee(route('collector-worklist.pay'), false);
+
+        // Rute admin (ber-{collector}) tak boleh muncul di halaman kolektor.
+        $response->assertDontSee(route('payment-batches.store', $kolektor->id), false);
         $response->assertDontSee(route('invoices.payments.store', 1), false);
+    }
+
+    /**
+     * Lapis kedua: `collector_id` cocok TAPI POP-nya di luar scope efektif
+     * kolektor. Terjadi kalau kolektor dipindah cabang sesudah assign — assign
+     * lama tak otomatis dibersihkan. Tanpa applyUserScope() di worklist,
+     * pelanggan cabang lama tetap kelihatan dan bisa ditagih.
+     */
+    public function test_worklist_hides_assigned_customer_outside_collector_pop_scope(): void
+    {
+        $popDalam = Pop::create([
+            'code' => 'POP-WL4',
+            'pop_code' => 'WL4',
+            'registration_prefix' => 'CZ',
+            'cid_prefix' => 'DZ',
+            'name' => 'POP Dalam Scope',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $popLuar = Pop::create([
+            'code' => 'POP-WL5',
+            'pop_code' => 'WL5',
+            'registration_prefix' => 'CQ',
+            'cid_prefix' => 'DQ',
+            'name' => 'POP Luar Scope',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        // Scope-nya disusun manual di bawah, jadi helper dipanggil tanpa POP.
+        $kolektor = $this->createKolektor();
+
+        // Scope efektif kolektor: cuma POP dalam.
+        $scope = UserRoleScope::create([
+            'user_id' => $kolektor->id,
+            'role_id' => $kolektor->role_id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $popDalam->id]);
+
+        $this->createCustomerWithUnpaidInvoice($popDalam, 'C-WL-IN', $kolektor->id);
+        $this->createCustomerWithUnpaidInvoice($popLuar, 'C-WL-OUT', $kolektor->id);
+
+        $response = $this->actingAs($kolektor)->get(route('collector-worklist.index'));
+
+        $response->assertOk();
+        $response->assertSee('Pelanggan C-WL-IN');
+        $response->assertDontSee('Pelanggan C-WL-OUT');
     }
 }

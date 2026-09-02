@@ -10,7 +10,7 @@
     </button>
 
     <div x-show="open" x-transition.opacity.duration.200ms style="display: none;" 
-         class="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+         class="fixed md:absolute md:right-0 md:left-auto md:w-80 left-4 right-4 top-16 md:top-auto mt-2 w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/60">
             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifikasi</h3>
             <button @click="markAllAsRead" x-show="unreadCount > 0" 
@@ -62,6 +62,14 @@ function notificationDropdown() {
         open: false,
         notifications: @json(auth()->user()->notifications()->take(10)->get()),
         unreadCount: {{ auth()->user()->unreadNotificationsCountCached() }},
+
+        // Endpoint POST dirender server-side dari definisi route, bukan ditulis
+        // ulang sebagai path literal di JS. `markReadUrlTemplate` memakai
+        // placeholder karena id notifikasinya baru diketahui di klien (bisa
+        // datang dari Echo, bukan cuma dari render awal) — yang penting BENTUK
+        // URL-nya tetap berasal dari routes/web.php. ADHOC-20 langkah 3.
+        markReadUrlTemplate: '{{ route('notifications.markRead', ['id' => '__ID__']) }}',
+        markAllReadUrl: '{{ route('notifications.markAllRead') }}',
         
         init() {
             // Komponen ini mount di layout global (tiap halaman) — kalau Alpine
@@ -142,7 +150,7 @@ function notificationDropdown() {
                 notif.read_at = new Date().toISOString();
                 this.unreadCount = Math.max(0, this.unreadCount - 1);
 
-                await fetch(`/notifications/${id}/read`, {
+                await fetch(this.markReadUrlTemplate.replace('__ID__', encodeURIComponent(id)), {
                     method: 'POST',
                     headers: this.socketHeaders()
                 });
@@ -153,7 +161,7 @@ function notificationDropdown() {
             this.notifications.forEach(n => n.read_at = new Date().toISOString());
             this.unreadCount = 0;
 
-            await fetch('/notifications/mark-all-read', {
+            await fetch(this.markAllReadUrl, {
                 method: 'POST',
                 headers: this.socketHeaders()
             });
