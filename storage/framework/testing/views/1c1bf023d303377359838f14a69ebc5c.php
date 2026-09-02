@@ -115,6 +115,7 @@ unset($__errorArgs, $__bag); ?>
 
         </label>
         <input id="password" name="password" type="password"
+               placeholder="Min. 8 karakter, huruf besar/kecil, angka & simbol"
                class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         <?php $__errorArgs = ['password'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');

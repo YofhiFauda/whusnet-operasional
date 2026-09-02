@@ -45,6 +45,7 @@ use App\Http\Controllers\PaymentBatchController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
 use App\Http\Controllers\QrTicketController;
@@ -121,6 +122,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markRead');
     Route::post('/notifications/{id}/unread', [NotificationController::class, 'markAsUnread'])->name('notifications.markUnread');
+
+    // Profil Saya — data diri sendiri, tanpa gerbang permission (aksi
+    // selalu ke akun auth()->user() sendiri, bukan user lain).
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     // Scan QR Internal (2026-08-27) — kamera DI DALAM app, lihat
     // QrInAppScanController docblock kenapa ini WAJIB terpisah dari

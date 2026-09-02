@@ -758,10 +758,10 @@
                             <p class="font-semibold text-slate-800 dark:text-slate-100"><?php echo e(Auth::user()->name ?? 'Administrator'); ?></p>
                             <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"><?php echo e(Auth::user()->email ?? 'admin@whusnet.net'); ?></p>
                         </div>
-                        <button class="w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                        <a href="<?php echo e(route('profile.show')); ?>" class="w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
                             <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Profil Saya
-                        </button>
+                        </a>
                         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('qr_scan.view')): ?>
                             
                             <a href="<?php echo e(route('qr.scan.show')); ?>"

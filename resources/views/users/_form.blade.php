@@ -71,6 +71,7 @@
             {{ $isEdit ? 'Password Baru' : 'Password' }}
         </label>
         <input id="password" name="password" type="password"
+               placeholder="Min. 8 karakter, huruf besar/kecil, angka & simbol"
                class="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
         @error('password')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
