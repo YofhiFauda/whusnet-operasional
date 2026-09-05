@@ -32,19 +32,29 @@
 
         @if(auth()->user()->hasPermission('customers.detail.survey.view'))
         <a href="{{ route('surveys.queue') }}" title="Antrean Survey"
-           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('surveys.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           class="flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('surveys.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-            <span x-show="sidebarOpen" class="truncate">Antrean Survey</span>
+            <div class="flex items-center gap-3 truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span x-show="sidebarOpen" class="truncate">Antrean Survey</span>
+            </div>
+            @if(isset($badge_survey_count) && $badge_survey_count > 0)
+                <span x-show="sidebarOpen" class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_survey_count }}</span>
+            @endif
         </a>
         @endif
         
         @if(auth()->user()->hasPermission('customers.detail.installation.view'))
         <a href="{{ route('verifications.queue') }}" title="Verifikasi & Instalasi"
-           class="flex items-center gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('verifications.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
+           class="flex items-center justify-between gap-3 px-3 py-2 rounded-md transition-colors {{ request()->routeIs('verifications.*') ? 'bg-primary-soft text-primary-hover font-semibold' : 'text-text-secondary hover:bg-surface-muted hover:text-text-main' }}"
            :class="{ 'justify-center px-0': !sidebarOpen }">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
-            <span x-show="sidebarOpen" class="truncate">Verifikasi & Instalasi</span>
+            <div class="flex items-center gap-3 truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+                <span x-show="sidebarOpen" class="truncate">Verifikasi & Instalasi</span>
+            </div>
+            @if(isset($badge_verification_count) && $badge_verification_count > 0)
+                <span x-show="sidebarOpen" class="bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_verification_count }}</span>
+            @endif
         </a>
         @endif
         @endif

@@ -57,6 +57,58 @@ class Pop extends Model
     }
 
     /**
+     * Kode `type` yang boleh punya Anak Gudang (ADHOC-54). `mini_pop`
+     * SENGAJA gak masuk — itu titik distribusi fisik (klaster ODC), bukan
+     * kantor cabang berstaf yang butuh gudang+admin gudang sendiri. Lihat
+     * docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis.md §29.1.
+     *
+     * @var list<string>
+     */
+    public const WAREHOUSE_TYPES = ['pusat', 'cabang'];
+
+    /**
+     * Konstanta dulu, bukan query — dipakai Service pas nulis
+     * `inventory_balances`/`inventory_transfers` buat MENOLAK mini_pop
+     * sebagai gudang sebelum baris kesimpan, bukan sesudahnya.
+     */
+    public function isWarehouse(): bool
+    {
+        return in_array($this->type, self::WAREHOUSE_TYPES, true);
+    }
+
+    /**
+     * `isPusat()`/`isCabang()` — dua dari `WAREHOUSE_TYPES` di atas, dipakai
+     * titik yang butuh cek SATU sisi spesifik (mis. RECEIVE cuma boleh di
+     * Pusat, ISSUE cuma boleh dari Cabang), beda dari `isWarehouse()` yang
+     * cek "salah satu dari dua-duanya". Ditambah karena 3 Service (`InventoryReceiveService`,
+     * `InventoryTransferService`, `InventoryIssueService`) sebelumnya
+     * masing-masing nulis `$pop->type !== 'pusat'`/`'cabang'` sendiri-sendiri
+     * — string literal gampang divergen/typo (ketauan audit 2026-09-02).
+     */
+    public function isPusat(): bool
+    {
+        return $this->type === 'pusat';
+    }
+
+    public function isCabang(): bool
+    {
+        return $this->type === 'cabang';
+    }
+
+    public function scopeWarehouse($query)
+    {
+        return $query->whereIn('type', self::WAREHOUSE_TYPES);
+    }
+
+    /**
+     * @return HasMany<InventoryBalance, $this>
+     */
+    public function inventoryBalances(): HasMany
+    {
+        return $this->hasMany(InventoryBalance::class);
+    }
+
+    /**
      * Get the parent POP.
      *
      * @return BelongsTo<Pop, $this>

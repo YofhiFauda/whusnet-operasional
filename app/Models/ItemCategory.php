@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EquipmentClass;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * dan `customer_technical_details.passive_device_type` menyimpannya sebagai
  * string snapshot. Karena itu code kategori bawaan tidak boleh berubah — lihat
  * `is_system`.
+ *
+ * `equipment_class` (ADHOC-54) — default level PERTAMA klasifikasi
+ * Aktif/Pasif, bisa di-override per-item lewat `Item::equipment_class_override`.
+ * Lihat `Item::getEffectiveEquipmentClassAttribute()`.
  */
 #[Fillable([
     'code',
@@ -22,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'default_unit',
     'is_active',
     'sort_order',
+    'equipment_class',
 ])]
 class ItemCategory extends Model
 {
@@ -45,6 +51,7 @@ class ItemCategory extends Model
         return [
             'is_system' => 'boolean',
             'is_active' => 'boolean',
+            'equipment_class' => EquipmentClass::class,
         ];
     }
 

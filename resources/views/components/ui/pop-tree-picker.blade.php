@@ -47,6 +47,27 @@
         </div>
     </div>
 
+    {{--
+        Peringatan "kecentang semua" (2026-09-04) — scope `selected_pop`
+        yang isinya SEMUA POP yang lagi ada itu KELIATAN sama efeknya
+        kayak `all_pop` hari ini, tapi beda struktural: POP BARU yang
+        dibuat besok TIDAK otomatis kecentang di sini (snapshot ID
+        eksplisit), beda dari `all_pop` yang gak difilter sama sekali
+        (`EffectiveAccessService::getAllowedPopIds()` — kosong = otomatis
+        nyakup POP baru selamanya). User yang nyentang semua lewat
+        "Pilih Semua" gampang gak sadar bedanya, padahal cabang baru
+        nanti bisa "hilang" diam-diam dari akses admin yang niatnya
+        emang full-access. Peringatan doang — gak ngeblok submit, staf
+        yang emang niatnya restrict SEMUA POP saat ini secara sadar
+        (jarang, tapi valid) tetap bisa lanjut.
+    --}}
+    <div x-show="allSelected()" x-cloak
+         class="mx-3 mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300">
+        ⚠ Semua POP yang ada saat ini kecentang — POP <strong>BARU</strong> nanti TIDAK otomatis ikut kesini.
+        Kalau maksudnya akses penuh permanen (termasuk cabang yang belum dibuat), pilih <strong>"Seluruh POP"</strong>
+        di atas, bukan menyeleksi manual semuanya di sini.
+    </div>
+
     {{-- Search --}}
     <div class="border-b border-border px-3 py-2">
         <div class="relative">
@@ -234,9 +255,23 @@ function popTreePicker(initialSelected) {
     return {
         selected: initialSelected.map(String),
         search: '',
+        totalCount: 0,
+
+        init() {
+            // Total checkbox di tree ini (semua level — root/child/grandchild)
+            // — dihitung sekali dari DOM yang udah di-render Blade, dipakai
+            // `allSelected()` buat deteksi "user nyentang literally semuanya".
+            this.totalCount = this.$el.querySelectorAll('input[type="checkbox"]').length;
+        },
 
         selectedCount() {
             return this.selected.length;
+        },
+
+        // Lihat komentar peringatan di markup atas — true kalau SEMUA
+        // checkbox (semua level) kecentang, bukan cuma root/Cabang doang.
+        allSelected() {
+            return this.totalCount > 0 && this.selected.length === this.totalCount;
         },
 
         // Apakah POP node terlihat berdasarkan search

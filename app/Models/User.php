@@ -66,6 +66,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Custody barang QUANTITY/BATCH yang lagi dipegang user ini sebagai
+     * teknisi (ADHOC-54). Cuma relasi query — FIFO consumption lintas baris
+     * itu tugas `InventoryService::consumeFromCustody()` (Fase Service).
+     */
+    public function technicianCustodies(): HasMany
+    {
+        return $this->hasMany(TechnicianCustody::class, 'technician_id');
+    }
+
+    /**
      * Check if the user has a specific role by code.
      */
     public function hasRole(string|array $roles): bool

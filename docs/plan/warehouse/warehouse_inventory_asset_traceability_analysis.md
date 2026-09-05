@@ -1421,8 +1421,9 @@ Tabel minimum fase 1 (bukan semua daftar §23):
 
 - `warehouses` — row per Pop `type` pusat/cabang, **reuse `pops.id` sebagai FK**, jangan bikin master lokasi terpisah kalau POP sudah cukup.
 - `inventory_balances` — `warehouse_id` + `item_id` (atau `serial_id`).
-- `inventory_transactions` — ledger RECEIVE/TRANSFER/ISSUE/RETURN/ADJUSTMENT, referensi `item_id` existing + `fop_task_id` kalau terkait task.
+- `inventory_transactions` — ledger RECEIVE/TRANSFER/ISSUE/RETURN/ADJUSTMENT/**TRANSFER_CUSTODY** (teknisi→teknisi langsung, gak nyentuh `inventory_balances` gudang — lihat `rancangan-ui.md` §3.6)/STOCK_OPNAME, referensi `item_id` existing + `fop_task_id` kalau terkait task.
 - `inventory_serials` — untuk item serialized: status + custodian/lokasi saat ini, menunjuk `customer_id`/`customer_technical_details` saat `INSTALLED` (bukan menyalin field device).
+- `technician_custody` — **tabel ke-5, nyusul dari `rancangan-ui.md` §3.8**: custody untuk item QUANTITY/BATCH (kabel per meter, RJ45 per pcs) yang gak tercakup `inventory_serials` (khusus serialized). Punya `lot_no` opsional + status vocabulary sendiri (`ISSUED`/`PARTIALLY_USED`/`RETURNED`/`CONSUMED`, beda dari status kanonik §15 doc advanced — lihat alasannya di `kontrol-anti-manipulasi.md` §7).
 - Permission baru `warehouse.*` di matrix existing, scope lewat `EffectiveAccessService`.
 
 **Fase 2 (tunda sampai ada kebutuhan riil):** stock request/approval formal, alert minimum/maximum stock, quarantine/repair RMA reference terstruktur, reporting/control tower dashboard (§20, §27 tetap relevan sebagai referensi ke depan, bukan syarat rilis pertama).

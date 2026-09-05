@@ -59,6 +59,18 @@ use App\Http\Controllers\TicketDibatalkanController;
 use App\Http\Controllers\TicketHistoryController;
 use App\Http\Controllers\TicketSelesaiController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\Warehouse\WarehouseAdjustmentController;
+use App\Http\Controllers\Warehouse\WarehouseController;
+use App\Http\Controllers\Warehouse\WarehouseCustodyController;
+use App\Http\Controllers\Warehouse\WarehouseHistoryController;
+use App\Http\Controllers\Warehouse\WarehouseIssueController;
+use App\Http\Controllers\Warehouse\WarehouseReassignController;
+use App\Http\Controllers\Warehouse\WarehouseReceiveController;
+use App\Http\Controllers\Warehouse\WarehouseReportController;
+use App\Http\Controllers\Warehouse\WarehouseStockController;
+use App\Http\Controllers\Warehouse\WarehouseStockRequestController;
+use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
+use App\Http\Controllers\Warehouse\WarehouseTransferController;
 use App\Models\City;
 use App\Models\District;
 use App\Models\Pop;
@@ -574,6 +586,120 @@ Route::middleware('auth')->group(function () {
         Route::get('/master/work-tools/{workTool}/edit', [WorkToolController::class, 'edit'])->name('master.work-tools.edit');
         Route::put('/master/work-tools/{workTool}', [WorkToolController::class, 'update'])->name('master.work-tools.update');
         Route::post('/master/work-tools/{workTool}/toggle', [WorkToolController::class, 'toggleStatus'])->name('master.work-tools.toggle');
+    });
+
+    // Gudang/Inventory (ADHOC-54) - Static Routes First
+    Route::middleware('permission:warehouse.view')->group(function () {
+        Route::get('/warehouse', [WarehouseController::class, 'index'])->name('warehouse.index');
+        // Management Stock (koreksi IA, 2026-09-03) — hub stok + titik masuk
+        // Receive/Transfer/Issue/Adjustment, reuse permission warehouse.view
+        // (cuma VIEW, sama kayak Dashboard) — lihat docblock WarehouseStockController.
+        Route::get('/warehouse/stock', [WarehouseStockController::class, 'index'])->name('warehouse.stock.index');
+        // Riwayat Mutasi (koreksi IA, 2026-09-03) — satu-satunya cara balik
+        // ke Transfer/Issue/Receive show() sebelumnya cuma lewat redirect
+        // pas create/konfirmasi; begitu ditinggal, dokumennya "hilang" gak
+        // ke-reach lagi (laporan user: list/detail tersembunyi).
+        Route::get('/warehouse/history', [WarehouseHistoryController::class, 'index'])->name('warehouse.history.index');
+    });
+
+    // Ambang Stok Rendah (2026-09-03) — reuse permission warehouse_adjustment.create,
+    // sama aktor yang udah boleh sentuh angka InventoryBalance (Penyesuaian/Opname).
+    Route::middleware('permission:warehouse_adjustment.create')->group(function () {
+        Route::get('/warehouse/stock/threshold/create', [WarehouseStockController::class, 'createThreshold'])->name('warehouse.stock.threshold.create');
+        Route::post('/warehouse/stock/threshold', [WarehouseStockController::class, 'storeThreshold'])->name('warehouse.stock.threshold.store');
+    });
+
+    // Barang Masuk (RECEIVE) — reuse permission warehouse_transfer.create,
+    // lihat docblock WarehouseReceiveController buat alasannya.
+    Route::middleware('permission:warehouse_transfer.create')->group(function () {
+        Route::get('/warehouse/receive/create', [WarehouseReceiveController::class, 'create'])->name('warehouse.receive.create');
+        Route::post('/warehouse/receive', [WarehouseReceiveController::class, 'store'])->name('warehouse.receive.store');
+        // Barang Masuk via Scan SN (Lacak Barang/SN — tab Single/Batch
+        // Assign) — SATU aksi backend yang sama buat dua-duanya (single
+        // scan-per-scan atau tempel banyak SN sekaligus), bedanya cuma cara
+        // daftar SN itu kekumpul di sisi klien. Lihat docblock
+        // `WarehouseReceiveController::storeScanned()`.
+        Route::post('/warehouse/receive/scan', [WarehouseReceiveController::class, 'storeScanned'])->name('warehouse.receive.store-scanned');
+    });
+
+    Route::middleware('permission:warehouse_transfer.create')->group(function () {
+        Route::get('/warehouse/transfers/available-stock', [WarehouseTransferController::class, 'availableStock'])->name('warehouse.transfers.available-stock');
+        Route::get('/warehouse/transfers/create', [WarehouseTransferController::class, 'create'])->name('warehouse.transfers.create');
+        Route::post('/warehouse/transfers', [WarehouseTransferController::class, 'store'])->name('warehouse.transfers.store');
+    });
+
+    Route::middleware('permission:warehouse_issue.create')->group(function () {
+        Route::get('/warehouse/issues/available-stock', [WarehouseIssueController::class, 'availableStock'])->name('warehouse.issues.available-stock');
+        Route::get('/warehouse/issues/create', [WarehouseIssueController::class, 'create'])->name('warehouse.issues.create');
+        Route::post('/warehouse/issues', [WarehouseIssueController::class, 'store'])->name('warehouse.issues.store');
+    });
+
+    // Gudang/Inventory - Dynamic Routes Last
+    Route::middleware('permission:warehouse_transfer.view')->group(function () {
+        Route::get('/warehouse/receive/{reference}', [WarehouseReceiveController::class, 'show'])->name('warehouse.receive.show');
+        Route::get('/warehouse/transfers/{transfer}', [WarehouseTransferController::class, 'show'])->name('warehouse.transfers.show');
+    });
+
+    Route::middleware('permission:warehouse_transfer.receive')->group(function () {
+        Route::post('/warehouse/transfers/{transfer}/receive', [WarehouseTransferController::class, 'receive'])->name('warehouse.transfers.receive');
+    });
+
+    Route::middleware('permission:warehouse_issue.view')->group(function () {
+        Route::get('/warehouse/issues/{reference}', [WarehouseIssueController::class, 'show'])->name('warehouse.issues.show');
+    });
+
+    Route::middleware('permission:warehouse_custody.view')->group(function () {
+        Route::get('/warehouse/custody', [WarehouseCustodyController::class, 'index'])->name('warehouse.custody.index');
+    });
+
+    Route::middleware('permission:warehouse_traceability.view')->group(function () {
+        Route::get('/warehouse/traceability', [WarehouseTraceabilityController::class, 'index'])->name('warehouse.traceability.index');
+    });
+
+    Route::middleware('permission:warehouse_adjustment.create')->group(function () {
+        Route::get('/warehouse/adjustments/balance/create', [WarehouseAdjustmentController::class, 'createBalance'])->name('warehouse.adjustments.balance.create');
+        Route::post('/warehouse/adjustments/balance', [WarehouseAdjustmentController::class, 'storeBalance'])->name('warehouse.adjustments.balance.store');
+        // Stock Opname (Fase 2 P1) — reuse permission warehouse_adjustment.create,
+        // sama aktor (staf gudang) yang boleh lapor rusak/hilang.
+        Route::get('/warehouse/adjustments/opname/create', [WarehouseAdjustmentController::class, 'createOpname'])->name('warehouse.adjustments.opname.create');
+        Route::post('/warehouse/adjustments/opname', [WarehouseAdjustmentController::class, 'storeOpname'])->name('warehouse.adjustments.opname.store');
+        Route::get('/warehouse/adjustments/custody/{custody}/create', [WarehouseAdjustmentController::class, 'createCustody'])->name('warehouse.adjustments.custody.create');
+        Route::post('/warehouse/adjustments/custody/{custody}', [WarehouseAdjustmentController::class, 'storeCustody'])->name('warehouse.adjustments.custody.store');
+        Route::get('/warehouse/adjustments/serial/{serial}/create', [WarehouseAdjustmentController::class, 'createSerial'])->name('warehouse.adjustments.serial.create');
+        Route::post('/warehouse/adjustments/serial/{serial}', [WarehouseAdjustmentController::class, 'storeSerial'])->name('warehouse.adjustments.serial.store');
+    });
+
+    Route::middleware('permission:warehouse_reassign.create')->group(function () {
+        Route::get('/warehouse/reassign/custody/{custody}/create', [WarehouseReassignController::class, 'createCustody'])->name('warehouse.reassign.custody.create');
+        Route::post('/warehouse/reassign/custody/{custody}', [WarehouseReassignController::class, 'storeCustody'])->name('warehouse.reassign.custody.store');
+        Route::get('/warehouse/reassign/serial/{serial}/create', [WarehouseReassignController::class, 'createSerial'])->name('warehouse.reassign.serial.create');
+        Route::post('/warehouse/reassign/serial/{serial}', [WarehouseReassignController::class, 'storeSerial'])->name('warehouse.reassign.serial.store');
+    });
+
+    // Laporan Gudang — agregat periodik (Fase 2 P2)
+    Route::middleware('permission:warehouse_report.view')->group(function () {
+        Route::get('/warehouse/reports', [WarehouseReportController::class, 'index'])->name('warehouse.reports.index');
+    });
+
+    // Permintaan Stok Cabang→Pusat (2026-09-03)
+    Route::middleware('permission:warehouse_stock_request.view')->group(function () {
+        Route::get('/warehouse/stock-requests', [WarehouseStockRequestController::class, 'index'])->name('warehouse.stock-requests.index');
+    });
+    Route::middleware('permission:warehouse_stock_request.create')->group(function () {
+        Route::get('/warehouse/stock-requests/create', [WarehouseStockRequestController::class, 'create'])->name('warehouse.stock-requests.create');
+        Route::post('/warehouse/stock-requests', [WarehouseStockRequestController::class, 'store'])->name('warehouse.stock-requests.store');
+    });
+    Route::middleware('permission:warehouse_stock_request.view')->group(function () {
+        Route::get('/warehouse/stock-requests/{stockRequest}', [WarehouseStockRequestController::class, 'show'])->name('warehouse.stock-requests.show');
+    });
+    Route::middleware('permission:warehouse_stock_request.approve')->group(function () {
+        Route::post('/warehouse/stock-requests/{stockRequest}/fulfill', [WarehouseStockRequestController::class, 'fulfill'])->name('warehouse.stock-requests.fulfill');
+    });
+    Route::middleware('permission:warehouse_stock_request.reject')->group(function () {
+        Route::post('/warehouse/stock-requests/{stockRequest}/reject', [WarehouseStockRequestController::class, 'reject'])->name('warehouse.stock-requests.reject');
+    });
+    Route::middleware('permission:warehouse_stock_request.cancel')->group(function () {
+        Route::post('/warehouse/stock-requests/{stockRequest}/cancel', [WarehouseStockRequestController::class, 'cancel'])->name('warehouse.stock-requests.cancel');
     });
 
     // Paket Internet Management - Static Routes First

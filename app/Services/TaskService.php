@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\NotificationType;
 use App\Enums\ScopeType;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Events\TaskCompleted;
@@ -14,6 +15,7 @@ use App\Models\AuditLog;
 use App\Models\CustomerInstallation;
 use App\Models\CustomerSurvey;
 use App\Models\FopTask;
+use App\Models\InventorySerial;
 use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
@@ -252,6 +254,26 @@ class TaskService
             $device = $task->customer?->customerDevice;
             if ($device && ! $device->device_retrieved_at) {
                 $device->update(['device_retrieved_at' => $task->completed_at]);
+            }
+
+            // Tutup siklus InventorySerial juga — sebelumnya cuma
+            // customer_devices (legacy) yang ke-update, InventorySerial
+            // permanen macet di INSTALLED walau device fisik udah balik ke
+            // gudang (gap ketauan lewat pertanyaan user, 2026-09-03). SN yang
+            // gak pernah lewat modul Inventory (data lama/manual, gak ada
+            // customer_id ke-set) otomatis diabaikan — query di bawah
+            // kosong, gak ada yang diloop.
+            $installedSerials = InventorySerial::query()
+                ->where('customer_id', $task->customer_id)
+                ->where('status', SerialStatus::INSTALLED->value)
+                ->get();
+
+            foreach ($installedSerials as $serial) {
+                app(InventoryReassignService::class)->returnInstalledSerialFromCustomer(
+                    $serial,
+                    "Pengambilan alat — Task {$task->task_number} (putus langganan).",
+                    $actor,
+                );
             }
         }
 

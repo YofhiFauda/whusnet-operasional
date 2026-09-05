@@ -82,6 +82,22 @@ class RolePermissionSeeder extends Seeder
                 'master_wilayah.view',
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
+                // Gudang/Inventory (ADHOC-54) — atasan MEMANTAU, tidak
+                // eksekusi transfer/issue (pola sama Setoran Kas: atasan
+                // `cash_deposit.validate`, bukan `.create`). `.view` doang di
+                // warehouse_transfer/warehouse_issue, TANPA `.create`/`.receive`.
+                'warehouse.view',
+                'warehouse_transfer.view',
+                'warehouse_issue.view',
+                'warehouse_custody.view',
+                'warehouse_traceability.view',
+                // Laporan agregat (Fase 2 P2) — persis kebutuhan atasan:
+                // pantau tren pergerakan & kerugian lintas cabang tanpa
+                // eksekusi transfer/issue.
+                'warehouse_report.view',
+                // Permintaan Stok — atasan MEMANTAU antrean, gak fulfill/tolak
+                // (itu keputusan operasional admin gudang Pusat).
+                'warehouse_stock_request.view',
             ],
 
             'admin' => [
@@ -143,6 +159,23 @@ class RolePermissionSeeder extends Seeder
                 'customers.qr.print',
                 'qr_scan_logs.view',
                 'qr_scan.view', // Scan QR Internal (2026-08-27) — resources/js/qr-scan.js
+                // Gudang/Inventory (ADHOC-54) — admin akses penuh operasional
+                // gudang (beda dari atasan yang cuma view/monitor di atas).
+                'warehouse.view',
+                'warehouse_transfer.*',
+                'warehouse_issue.*',
+                'warehouse_custody.view',
+                'warehouse_traceability.view',
+                'warehouse_adjustment.create',
+                'warehouse_reassign.create',
+                'warehouse_report.view', // Fase 2 P2 — laporan agregat, sama scope operasional penuh di atas.
+                // Permintaan Stok — admin Pusat yang fulfill/tolak permintaan
+                // cabang. `.create` juga diberi (admin bisa ajukan atas nama
+                // cabang kalau perlu, walau biasanya pop_admin yang inisiasi).
+                'warehouse_stock_request.view',
+                'warehouse_stock_request.create',
+                'warehouse_stock_request.approve',
+                'warehouse_stock_request.reject',
             ],
 
             'noc' => [
@@ -254,6 +287,17 @@ class RolePermissionSeeder extends Seeder
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
                 'qr_scan.view', // Scan QR Internal (2026-08-27)
+                // Gudang/Inventory (ADHOC-54) — read-only TERBATAS, BUKAN
+                // akses data gudang mentah. FOP TIDAK dapat Dashboard/Transfer/
+                // Issue/Ledger (rancangan-ui.md §1.3). Custody "lihat semua"
+                // discope ke teknisi dalam wilayahnya lewat POP scope existing
+                // (EffectiveAccessService), bukan permission terpisah.
+                // "Analisa material per fop_task_id" (kebutuhan WAJIB FOP)
+                // BUKAN permission baru — extend halaman Verifikasi Admin
+                // (ADHOC-28) yang permission-nya udah ada, ditambah pas Fase
+                // integrasi nanti.
+                'warehouse_custody.view',
+                'warehouse_traceability.view',
             ],
 
             'teknisi' => [
@@ -284,6 +328,15 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.documents.download',
                 'tasks.qr_attendance.create', // Absen task via scan QR (Fase 3, diseed sekarang)
                 'qr_scan.view', // Scan QR Internal (2026-08-27)
+                // task.view.own/task.execute SEHARUSNYA didaftarkan TaskFeatureSeeder
+                // (DatabaseSeeder baris 29), TAPI RolePermissionSeeder dipanggil LAGI
+                // sesudahnya (baris 39, buat sinkron permission ticket_*/warehouse*.*
+                // ke owner) — sync() di bawah full-replace permission tiap role yang
+                // terdaftar, jadi grant TaskFeatureSeeder ke Teknisi ke-wipe kalau
+                // gak didaftarkan eksplisit juga di sini. Ditemukan pas verifikasi
+                // ADHOC-54 (widget "Stok Saya" gak bisa diakses teknisi sama sekali).
+                'task.view.own',
+                'task.execute',
             ],
 
             'sales' => [
@@ -347,6 +400,28 @@ class RolePermissionSeeder extends Seeder
                 'master_status_pelanggan.view',
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'customers.qr.print', // Cetak stiker QR — pop_admin cetak buat cabangnya sendiri
+                // Gudang/Inventory (ADHOC-54) — pop_admin = "admin gudang
+                // cabang" (bukan role baru, role existing yang tinggal
+                // digrant). `warehouse_transfer` SENGAJA cuma `.view`+`.receive`
+                // — pop_admin gak boleh BUAT transfer (`.create` cuma admin/
+                // owner, Pusat yang inisiasi kirim), tapi WAJIB bisa konfirmasi
+                // terima kiriman ke cabangnya sendiri. `warehouse_issue.*`
+                // penuh — issue ke teknisi selalu terjadi di level cabang.
+                'warehouse.view',
+                'warehouse_transfer.view',
+                'warehouse_transfer.receive',
+                'warehouse_issue.*',
+                'warehouse_custody.view',
+                'warehouse_traceability.view',
+                'warehouse_adjustment.create', // lapor rusak/hilang/opname cabangnya sendiri
+                'warehouse_reassign.create', // reassign custody teknisi resign/cuti cabangnya sendiri
+                'warehouse_report.view', // laporan agregat, discope EffectiveAccessService ke cabangnya sendiri
+                // Permintaan Stok — pop_admin yang ajuin (cabangnya sendiri
+                // kehabisan barang) + boleh batalin punya sendiri kalau salah
+                // ketik. TANPA approve/reject — itu keputusan Pusat.
+                'warehouse_stock_request.view',
+                'warehouse_stock_request.create',
+                'warehouse_stock_request.cancel',
             ],
         ];
 

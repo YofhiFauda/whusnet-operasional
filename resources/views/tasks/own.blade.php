@@ -58,6 +58,35 @@
         </div>
     </div>
 
+    {{-- ══ Stok Saya (ADHOC-54, rancangan-ui.md §2.5) — barang yang lagi
+         dipegang, belum dipasang/dikembalikan. Embedded, bukan halaman/menu
+         terpisah — cuma punya sendiri, gak digerbangi permission. ═════ --}}
+    @if($myCustodies->isNotEmpty() || $mySerials->isNotEmpty())
+    <div class="bg-surface border border-border rounded-2xl p-4 shadow-xs">
+        <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-3 font-ui flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+            Stok Saya
+        </h3>
+        <div class="flex flex-wrap gap-2">
+            @foreach($mySerials as $serial)
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 text-[11px] font-ui">
+                <span class="font-semibold text-sky-700 dark:text-sky-300">{{ $serial->item->name }}</span>
+                <span class="font-mono text-sky-600 dark:text-sky-400">SN {{ $serial->serial_number }}</span>
+            </span>
+            @endforeach
+            @foreach($myCustodies as $custody)
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border text-[11px] font-ui">
+                <span class="font-semibold text-text-main">{{ $custody->item->name }}</span>
+                <span class="font-mono text-text-secondary">{{ rtrim(rtrim(number_format((float) $custody->qty_remaining, 2, ',', '.'), '0'), ',') }} {{ $custody->item->unit }}</span>
+                <span class="text-text-muted">· {{ $custody->ageLabel() }}</span>
+            </span>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- ══ Mobile Search and Sorting controls ════════════════════════ --}}
     <div class="flex flex-col sm:flex-row items-center gap-3">
         {{-- Search input --}}

@@ -454,8 +454,26 @@
                     <p class="font-medium text-slate-800 dark:text-slate-200">Jitter {{ $technicalDetail?->jitter_ms ?? '—' }}ms, Loss {{ $technicalDetail?->packet_loss_percent ?? '—' }}%</p>
                 </div>
                 @php
+                    // ADHOC-54 — gabungan Aktif (inventory_serials) + Pasif
+                    // (task_materials) per fop_task_id, sesuai §3.4 rancangan-ui.md.
+                    // Ditaruh DI SINI (bukan halaman Verifikasi Admin) karena FOP
+                    // gak punya `customers.detail.installation.validate` (itu
+                    // permission approval, bukan buat FOP) — halaman ini gerbangnya
+                    // `fop_tasks.view` yang FOP emang udah punya.
                     $materialTerpakai = $fopTask->materials()->terpakai()->orderBy('id')->get();
+                    $installedSerials = $fopTask->inventorySerials()->with('item')->get();
                 @endphp
+                @if($installedSerials->isNotEmpty())
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Aktif Terpasang (Gudang)</p>
+                    @foreach($installedSerials as $serial)
+                    <div class="flex justify-between border-b border-slate-100 dark:border-slate-700/50 py-1">
+                        <span class="text-slate-600 dark:text-slate-400">{{ $serial->item->name ?? '-' }}</span>
+                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">SN {{ $serial->serial_number }}</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
                 @if($materialTerpakai->isNotEmpty())
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-1">Perangkat Pasif Terpakai</p>

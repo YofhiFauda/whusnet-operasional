@@ -1097,6 +1097,22 @@ html {
   align-items: start;
 }
 
+/* ─────────────────────────────────────────────────────────
+   Barcode Camera Scanner — garis laser bolak-balik di dalam
+   bingkai persegi panjang pemandu 1D (`<x-warehouse.barcode-scanner>`,
+   dipakai Lacak Barang/SN tab Scan Masuk). Bingkainya sendiri LEBAR
+   (rasio ~5:2), beda dari kotak QR — barcode linear butuh area
+   horizontal, bukan persegi.
+   ───────────────────────────────────────────────────────── */
+@keyframes barcode-scanline {
+  0%, 100% { top: 8%; }
+  50% { top: 88%; }
+}
+
+.barcode-scanline {
+  animation: barcode-scanline 1.8s ease-in-out infinite;
+}
+
 /*
    Motion panel lipat/buka. Yang dianimasikan cuma `width` + `opacity`
    dengan kurva ease-in-out standar (tanpa overshoot) dan durasi yang SAMA

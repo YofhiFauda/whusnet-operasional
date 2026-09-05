@@ -462,8 +462,34 @@
                                         <input type="text" name="model" id="model" value="{{ old('model', $dev->model ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Contoh: F609 / HG8245H">
                                     </div>
 
-                                    <div>
-                                        <label for="serial_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) <span class="text-rose-500">*</span></label>
+                                    @php
+                                        // Dropdown custody jadi SATU-SATUNYA sumber SN kalau device ini
+                                        // ke-track Inventory (ADHOC, fix dual-SN yang gak nyambung ke
+                                        // installSerial()) — field teks manual cuma tampil kalau memang
+                                        // gak ada SN eligible, atau operator eksplisit balik ke "Tidak
+                                        // tercatat Gudang" (revisi data lama yang sudah punya SN manual).
+                                        $oldSelectedSerialId = old('selected_inventory_serial_id', $installation->selected_inventory_serial_id ?? null);
+                                        $showSerialManual = $eligibleSerials->isEmpty()
+                                            || (filled(old('serial_number', $dev->serial_number ?? '')) && empty($oldSelectedSerialId));
+                                    @endphp
+
+                                    @if($eligibleSerials->isNotEmpty())
+                                    <div class="md:col-span-2">
+                                        <label for="selected_inventory_serial_id" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Perangkat Aktif dari Gudang <span class="text-rose-500">*</span></label>
+                                        <select name="selected_inventory_serial_id" id="selected_inventory_serial_id" onchange="toggleSerialManual()" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                            <option value="" data-sn="">— Tidak tercatat Gudang / isi manual —</option>
+                                            @foreach($eligibleSerials as $serial)
+                                                <option value="{{ $serial->id }}" data-sn="{{ $serial->serial_number }}" @selected($oldSelectedSerialId == $serial->id)>
+                                                    {{ $serial->item->name }} — SN {{ $serial->serial_number }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Perangkat yang diambil lewat Gudang (custody Anda) — pilih di sini, SN yang tersimpan otomatis sama persis dengan yang diinstall. Pilih "Tidak tercatat Gudang" kalau device ini belum ke-track Inventory.</p>
+                                    </div>
+                                    @endif
+
+                                    <div id="serial-manual-wrap" class="{{ $showSerialManual ? '' : 'hidden' }}">
+                                        <label for="serial_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Serial Number (SN) @unless($eligibleSerials->isNotEmpty())<span class="text-rose-500">*</span>@endunless</label>
                                         <input type="text" name="serial_number" id="serial_number" value="{{ old('serial_number', $dev->serial_number ?? '') }}" class="w-full text-xs data-text px-3 py-2 border @error('serial_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="ZTEGC1234567">
                                     </div>
 
@@ -479,17 +505,17 @@
 
                                     <div>
                                         <label for="pppoe_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password PPPoE</label>
-                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <input type="text" name="pppoe_password" id="pppoe_password" value="{{ old('pppoe_password', $dev->pppoe_password ?? '') }}" class="w-full text-xs data-text px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Password PPPOE">
                                     </div>
 
                                     <div>
                                         <label for="wifi_ssid" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">SSID WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="WHUSNET_Pelanggan">
+                                        <input type="text" name="wifi_ssid" id="wifi_ssid" value="{{ old('wifi_ssid', $dev->wifi_ssid ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_ssid') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="SSID Pelanggan">
                                     </div>
 
                                     <div>
                                         <label for="wifi_password" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Password WiFi <span class="text-rose-500">*</span></label>
-                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $dev->wifi_password ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_password') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <input type="text" name="wifi_password" id="wifi_password" value="{{ old('wifi_password', $dev->wifi_password ?? '') }}" class="w-full text-xs font-sans px-3 py-2 border @error('wifi_password') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" placeholder="Password SSID Pelanggan">
                                     </div>
                                 </div>
                             </div>
@@ -513,19 +539,29 @@
                                     </div>
 
                                     <div class="grid grid-cols-3 gap-2">
-                                        <div>
-                                            <label for="olt_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Nomor OLT</label>
-                                            <input type="text" name="olt_number" id="olt_number" value="{{ old('olt_number', $tech5->olt_number ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <div class="min-w-0">
+                                            <label for="olt_number" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Nomor OLT</label>
+                                            <input type="text" name="olt_number" id="olt_number" 
+                                                value="{{ old('olt_number', $tech5->olt_number ?? '') }}" 
+                                                placeholder="1" 
+                                                class="w-full min-w-0 text-xs data-text px-2.5 py-2 border @error('olt_number') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
-                                        <div>
-                                            <label for="olt_slot" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Slot OLT</label>
-                                            <input type="text" name="olt_slot" id="olt_slot" value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_slot') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <div class="min-w-0">
+                                            <label for="olt_slot" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Slot OLT</label>
+                                            <input type="text" name="olt_slot" id="olt_slot" 
+                                                value="{{ old('olt_slot', $tech5->olt_slot ?? '') }}" 
+                                                placeholder="2" 
+                                                class="w-full min-w-0 text-xs data-text px-2.5 py-2 border @error('olt_slot') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
-                                        <div>
-                                            <label for="olt_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300">Port OLT</label>
-                                            <input type="text" name="olt_port" id="olt_port" value="{{ old('olt_port', $tech5->olt_port ?? '') }}" class="w-full text-xs data-text px-2.5 py-2 border @error('olt_port') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
+                                        <div class="min-w-0">
+                                            <label for="olt_port" class="block mb-1 font-bold uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-300 truncate">Port OLT</label>
+                                            <input type="text" name="olt_port" id="olt_port" 
+                                                value="{{ old('olt_port', $tech5->olt_port ?? '') }}" 
+                                                placeholder="3" 
+                                                class="w-full min-w-0 text-xs data-text px-2.5 py-2 border @error('olt_port') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20">
                                         </div>
                                     </div>
+
 
                                     <div class="grid grid-cols-2 gap-2">
                                         <div>
@@ -907,6 +943,33 @@
         handlePemasanganSubmit();
     }
 
+    // Dropdown custody (#selected_inventory_serial_id) jadi SATU-SATUNYA
+    // sumber SN begitu ada pilihan aktif — sinkron nilainya ke #serial_number
+    // (readonly, disembunyikan) supaya aktivasiRequiredFields/formFields di
+    // atas TETAP baca field yang sama seperti sebelumnya, gak perlu daftar
+    // required terpisah. Server (storePemasangan) tetap jadi penegak utama —
+    // ini cuma UX, lihat CustomerInstallationController::storePemasangan().
+    function toggleSerialManual() {
+        const select = document.getElementById('selected_inventory_serial_id');
+        const wrap = document.getElementById('serial-manual-wrap');
+        const input = document.getElementById('serial_number');
+        if (! wrap || ! input) {
+            return;
+        }
+
+        const chosenOption = select ? select.options[select.selectedIndex] : null;
+        const chosenSn = chosenOption ? chosenOption.dataset.sn : '';
+
+        if (select && chosenSn) {
+            input.value = chosenSn;
+            input.readOnly = true;
+            wrap.classList.add('hidden');
+        } else {
+            input.readOnly = false;
+            wrap.classList.remove('hidden');
+        }
+    }
+
     function handleSpeedtestSubmit() {
         // Timer berhenti tepat saat submit — completed_at harus mencerminkan itu.
         stopTimerAndGetCompletedAt();
@@ -935,6 +998,8 @@
     };
 
     document.addEventListener("DOMContentLoaded", function() {
+        toggleSerialManual();
+
         // Dua form terpisah sekarang (form-pemasangan, form-speedtest) — step 6
         // gak selalu ada di DOM (terkunci = cuma placeholder, querySelectorAll
         // aman dapat NodeList kosong).

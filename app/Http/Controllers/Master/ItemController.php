@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Master;
 
+use App\Enums\OwnershipMode;
+use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -50,8 +52,10 @@ class ItemController extends Controller
     public function create(): View
     {
         $categories = ItemCategory::active()->ordered()->get();
+        $trackingTypes = TrackingType::cases();
+        $ownershipModes = OwnershipMode::cases();
 
-        return view('master.items.create', compact('categories'));
+        return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -74,8 +78,11 @@ class ItemController extends Controller
             ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $item->item_category_id))
             ->ordered()
             ->get();
+        $trackingTypes = TrackingType::cases();
+        $ownershipModes = OwnershipMode::cases();
+        $trackingTypeLocked = $item->inventoryTransactions()->exists();
 
-        return view('master.items.edit', compact('item', 'categories'));
+        return view('master.items.edit', compact('item', 'categories', 'trackingTypes', 'ownershipModes', 'trackingTypeLocked'));
     }
 
     public function update(Request $request, Item $item): RedirectResponse
@@ -103,7 +110,15 @@ class ItemController extends Controller
      */
     private function validateItem(Request $request, ?Item $item = null): array
     {
-        return $request->validate([
+        // Barang yang udah punya pergerakan ledger (RECEIVE/TRANSFER/ISSUE dst)
+        // KUNCI tracking_type/ownership_mode-nya — ganti cara hitung stok
+        // barang yang udah py saldo/custody/SN berjalan bikin data yang ada
+        // gak konsisten sama definisi barunya (mis. SN yang udah kepegang
+        // teknisi tiba-tiba "bukan serialized lagi"). Barang baru (belum ada
+        // pergerakan) bebas dipilih.
+        $locked = $item && $item->inventoryTransactions()->exists();
+
+        $rules = [
             'code' => [
                 'required',
                 'string',
@@ -114,6 +129,25 @@ class ItemController extends Controller
             'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
-        ]);
+        ];
+
+        if (! $locked) {
+            $rules['tracking_type'] = ['required', Rule::enum(TrackingType::class)];
+            $rules['ownership_mode'] = ['nullable', Rule::enum(OwnershipMode::class)];
+        }
+
+        $validated = $request->validate($rules);
+
+        if (! $locked) {
+            // Qty/Batch gak relevan sama sumbu kepemilikan (cuma SERIALIZED yang
+            // bisa jadi Aset Perusahaan) — dipaksa installable biar gak ada
+            // kombinasi ganjil "kabel drum berstatus aset perusahaan".
+            $trackingType = TrackingType::from($validated['tracking_type']);
+            $validated['ownership_mode'] = $trackingType === TrackingType::SERIALIZED
+                ? ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value)
+                : OwnershipMode::INSTALLABLE->value;
+        }
+
+        return $validated;
     }
 }

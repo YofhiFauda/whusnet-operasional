@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'technicians',
     'assigned_at',
     'fop_id',
+    'selected_inventory_serial_id',
 ])]
 class CustomerInstallation extends Model
 {
@@ -89,5 +90,16 @@ class CustomerInstallation extends Model
     public function fop(): BelongsTo
     {
         return $this->belongsTo(User::class, 'fop_id');
+    }
+
+    /**
+     * Pointer DRAFT (ADHOC-54) — lihat komentar migration
+     * `add_selected_inventory_serial_id_to_customer_installations_table`.
+     *
+     * @return BelongsTo<InventorySerial, $this>
+     */
+    public function selectedInventorySerial(): BelongsTo
+    {
+        return $this->belongsTo(InventorySerial::class, 'selected_inventory_serial_id');
     }
 }

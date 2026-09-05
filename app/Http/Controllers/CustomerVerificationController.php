@@ -215,6 +215,15 @@ class CustomerVerificationController extends Controller
             ? $installationFopTask->materials()->terpakai()->orderBy('id')->get()
             : collect();
 
+        // Perangkat Aktif (ADHOC-54) — SENGAJA gak nyampur ke $installationMaterials
+        // di atas: unit SERIALIZED gak pernah masuk task_materials (§3.4
+        // rancangan-ui.md, FOP wajib liat gabungan Aktif+Pasif tapi dua
+        // sumber data beda). `inventory_serials` yang nunjuk fop_task_id ini
+        // yang jadi sumber "perangkat aktif apa yang dipasang di sini".
+        $installedSerials = $installationFopTask
+            ? $installationFopTask->inventorySerials()->with('item')->get()
+            : collect();
+
         // Checklist alat kerja diinput teknisi di form Survey DAN form Pemasangan,
         // tapi ditulis ke task_work_tools — bukan ke kolom customer_surveys /
         // customer_installations. Tanpa dibaca eksplisit di sini, halaman
@@ -233,6 +242,7 @@ class CustomerVerificationController extends Controller
             'materialVariance',
             'surveyMaterials',
             'installationMaterials',
+            'installedSerials',
             'surveyWorkTools',
             'installationWorkTools'
         ));

@@ -35,8 +35,10 @@ class DatabaseSeeder extends Seeder
         $this->call(ItemCategoryFeatureSeeder::class); // Master Kategori Barang
         $this->call(WorkToolFeatureSeeder::class); // Master Alat Kerja
         $this->call(QrFeatureSeeder::class); // QR Pelanggan (Fase 1)
-        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.* ke-sync ke owner
+        $this->call(WarehouseFeatureSeeder::class); // Gudang/Inventory (ADHOC-54, Fase 1)
+        $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/qr_scan_logs.*/warehouse*.* ke-sync ke owner
         $this->call(TicketIssueCategorySeeder::class); // DATA CONTOH — ganti sebelum go-live
+        $this->call(ItemCategorySeeder::class); // Kategori tambahan non-system (modem_ont, router_gateway) — sebelum ItemSeeder, dirujuk barangnya
         $this->call(ItemSeeder::class); // Isi awal master barang — tambah sisanya lewat Master Data
         $this->call(WorkToolSeeder::class); // Isi awal master alat kerja
 

@@ -73,6 +73,14 @@ unset($__defined_vars, $__key, $__value); ?>
     </div>
 
     
+    <div x-show="allSelected()" x-cloak
+         class="mx-3 mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300">
+        ⚠ Semua POP yang ada saat ini kecentang — POP <strong>BARU</strong> nanti TIDAK otomatis ikut kesini.
+        Kalau maksudnya akses penuh permanen (termasuk cabang yang belum dibuat), pilih <strong>"Seluruh POP"</strong>
+        di atas, bukan menyeleksi manual semuanya di sini.
+    </div>
+
+    
     <div class="border-b border-border px-3 py-2">
         <div class="relative">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -265,9 +273,23 @@ function popTreePicker(initialSelected) {
     return {
         selected: initialSelected.map(String),
         search: '',
+        totalCount: 0,
+
+        init() {
+            // Total checkbox di tree ini (semua level — root/child/grandchild)
+            // — dihitung sekali dari DOM yang udah di-render Blade, dipakai
+            // `allSelected()` buat deteksi "user nyentang literally semuanya".
+            this.totalCount = this.$el.querySelectorAll('input[type="checkbox"]').length;
+        },
 
         selectedCount() {
             return this.selected.length;
+        },
+
+        // Lihat komentar peringatan di markup atas — true kalau SEMUA
+        // checkbox (semua level) kecentang, bukan cuma root/Cabang doang.
+        allSelected() {
+            return this.totalCount > 0 && this.selected.length === this.totalCount;
         },
 
         // Apakah POP node terlihat berdasarkan search

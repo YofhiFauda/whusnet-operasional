@@ -549,7 +549,7 @@
                     <td>
                         <div class="a4-party-label">Ditagihkan kepada</div>
                         <div class="a4-party-name"><?php echo e($kwitansi['pelanggan']['nama']); ?></div>
-                        <div>CID <?php echo e($kwitansi['pelanggan']['cid']); ?></div>
+                        <div>CID: <?php echo e($kwitansi['pelanggan']['cid']); ?></div>
                         <?php $__currentLoopData = $kwitansi['pelanggan']['alamat_baris']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $baris): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <div><?php echo e($baris); ?></div>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -559,11 +559,6 @@
             </table>
 
             
-
-            <div class="a4-amount-line">
-                <?php echo e($kwitansi['dibayar']); ?> dibayar pada <?php echo e($kwitansi['tanggal_bayar']); ?>
-
-            </div>
 
             <table class="a4-items">
                 <thead>

@@ -187,6 +187,26 @@ class FileUploadService
     }
 
     /**
+     * 7. Bukti Fisik Klaim Kerugian Gudang (Fase 2 Prioritas 1,
+     * kontrol-anti-manipulasi.md §2) — foto kondisi barang rusak, BAP
+     * kehilangan, atau foto stock opname. Beda dari method lain di file ini:
+     * gak terikat `Customer` (klaim gudang berbasis Item/POP/teknisi, bukan
+     * pelanggan) — makanya nama file pakai timestamp+random, bukan
+     * identitas pelanggan.
+     * Aturan folder: warehouse/evidence/{type} (type: lost/damaged/opname)
+     */
+    public static function uploadWarehouseEvidence(UploadedFile $file, string $type): string
+    {
+        $ext = $file->getClientOriginalExtension();
+        $folder = 'warehouse/evidence/'.strtolower($type);
+        $baseName = strtolower($type).'_'.now()->format('Ymd_His');
+
+        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
+
+        return $file->storeAs($folder, $fileName, 'public');
+    }
+
+    /**
      * Pastikan nama file unik di folder storage disk public jika sudah ada file berformat sama.
      */
     private static function getUniqueFileName(string $folder, string $baseName, string $ext): string

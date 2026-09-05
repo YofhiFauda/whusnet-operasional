@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\NotificationType;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
+use App\Models\InventorySerial;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Services\CustomerWorkflowService;
@@ -125,7 +128,25 @@ class TaskController extends Controller
             ->take(5)
             ->values();
 
-        return view('tasks.own', compact('tasks', 'upcomingTasks'));
+        // "Stok Saya" (ADHOC-54, rancangan-ui.md §2.5) — SENGAJA embedded di
+        // sini, BUKAN halaman/permission terpisah: teknisi cuma boleh liat
+        // punya SENDIRI, discope `technician_id = auth()->id()` langsung di
+        // query, gak ada gerbang permission `warehouse_custody.view_own` yang
+        // dilewatin (keputusan eksplisit, lihat WarehouseFeatureSeeder).
+        $myCustodies = TechnicianCustody::query()
+            ->where('technician_id', $user->id)
+            ->active()
+            ->with('item')
+            ->orderBy('issued_at')
+            ->get();
+
+        $mySerials = InventorySerial::query()
+            ->where('current_technician_id', $user->id)
+            ->status(SerialStatus::ISSUED)
+            ->with('item')
+            ->get();
+
+        return view('tasks.own', compact('tasks', 'upcomingTasks', 'myCustodies', 'mySerials'));
     }
 
     /**

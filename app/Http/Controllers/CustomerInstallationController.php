@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
+use App\Enums\OwnershipMode;
+use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -11,13 +14,16 @@ use App\Events\InstallationCompleted;
 use App\Events\InstallationStarted;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
+use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\CustomerWorkflowService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\InventoryService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -189,8 +195,31 @@ class CustomerInstallationController extends Controller
         $customer->loadMissing(['customerDevice', 'customerTechnicalDetail', 'latestSurvey', 'internetPackage']);
 
         $materialService = app(TaskMaterialService::class);
-        $items = Item::active()->with('category')->orderBy('name')->get();
-        $itemCategories = ItemCategory::options();
+
+        // Split Aktif/Pasif (ADHOC-54, rancangan-ui.md §3.2-3.3) — form REALISASI
+        // (fase ini) dibatasi ke item PASIF doang; Perangkat Aktif dipilih lewat
+        // dropdown SN custody terpisah di bawah, bukan lewat picker material
+        // generik ini. Filter di PHP (bukan query DB) karena klasifikasi efektif
+        // butuh resolusi dua-level (`Item::getEffectiveEquipmentClassAttribute()`)
+        // yang gak bisa diterjemahkan jadi satu klausa where.
+        $items = Item::active()->with('category')->orderBy('name')->get()
+            ->filter(fn (Item $item) => $item->effective_equipment_class === EquipmentClass::PASIF)
+            ->values();
+        $itemCategories = ItemCategory::active()->ordered()->where('equipment_class', EquipmentClass::PASIF->value)->get();
+
+        // Dropdown "Perangkat Aktif" — SN yang lagi di custody anggota tim
+        // task ini, item-nya boleh dipasang ke pelanggan (bukan company_asset
+        // kayak OTDR). Kosong = wajar buat instalasi yang device-nya belum
+        // ke-track Inventory (mayoritas data existing) — field tetap opsional.
+        $teamTechnicianIds = $task?->teamMembers->pluck('user_id')->all() ?? [];
+        $eligibleSerials = $teamTechnicianIds === []
+            ? collect()
+            : InventorySerial::query()
+                ->whereIn('current_technician_id', $teamTechnicianIds)
+                ->where('status', SerialStatus::ISSUED->value)
+                ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
+                ->with('item')
+                ->get();
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
         // ulang / revisi) menang; kalau belum ada, pakai estimasi dari survey.
@@ -236,7 +265,7 @@ class CustomerInstallationController extends Controller
             && $installFopTask
             && $installFopTask->materials()->terpakai()->exists();
 
-        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete'));
+        return view('installations.report', compact('customer', 'installation', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'returnTo', 'pemasanganComplete', 'eligibleSerials'));
     }
 
     public function store(Request $request, Customer $customer, CustomerWorkflowService $workflowService)
@@ -599,7 +628,11 @@ class CustomerInstallationController extends Controller
             'device_type' => 'required|string|in:modem,ont,onu,router,other',
             'brand' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
-            'serial_number' => 'required|string|max:100',
+            // required_without selected_inventory_serial_id: begitu operator
+            // pilih SN dari custody Gudang, teks manual gak wajib diisi lagi
+            // (dropdown jadi satu-satunya sumber, lihat override di bawah) —
+            // manual cuma jadi fallback buat device yang belum ke-track Inventory.
+            'serial_number' => 'required_without:selected_inventory_serial_id|nullable|string|max:100',
             'mac_address' => ['nullable', 'string', 'max:17', 'regex:/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/'],
             'wifi_ssid' => 'required|string|max:150',
             'wifi_password' => 'required|string|max:150',
@@ -614,6 +647,12 @@ class CustomerInstallationController extends Controller
             'olt_port' => 'nullable|string|max:50',
             'vlan' => 'nullable|string|max:20',
             'initial_attenuation' => 'nullable|string|max:50',
+
+            // Draft pointer SN Perangkat Aktif dari custody (ADHOC-54) —
+            // OPSIONAL, cuma buat device yang ke-track Inventory. Aksi
+            // INSTALL sungguhan baru jalan di storeSpeedtest(), lihat
+            // komentar di sana.
+            'selected_inventory_serial_id' => 'nullable|integer|exists:inventory_serials,id',
 
             'installation_photo' => 'nullable|image|max:2048',
             'contract_photo' => 'nullable|image|max:2048',
@@ -635,6 +674,16 @@ class CustomerInstallationController extends Controller
             'work_tools_manual.*.tool_name' => 'nullable|string|max:100',
             'work_tools_manual.*.note' => 'nullable|string|max:255',
         ]);
+
+        // Dropdown custody (selected_inventory_serial_id) jadi SATU-SATUNYA
+        // sumber SN begitu dipilih — timpa apapun yang diketik manual di
+        // field teks. Mencegah dua sumber kebenaran: installSerial() di
+        // storeSpeedtest() jalan dari selected_inventory_serial_id, sementara
+        // customer_technical_details/customer_devices dulu nyimpen teks
+        // klien apa adanya — bisa beda dari SN yang beneran diinstall.
+        if (! empty($validated['selected_inventory_serial_id'])) {
+            $validated['serial_number'] = InventorySerial::findOrFail($validated['selected_inventory_serial_id'])->serial_number;
+        }
 
         $installation = $customer->installations()->latest()->first();
         if (! $installation) {
@@ -660,6 +709,9 @@ class CustomerInstallationController extends Controller
                 $installation->signature_photo = FileUploadService::uploadInstallationPhoto($request->file('signature_photo'), $customer, 'ttd');
             }
             $installation->installation_note = $validated['installation_note'] ?? null;
+            // Draft pointer doang — resubmit-safe, gak ada side effect ke
+            // inventory_serials di sini (cuma nunjuk, belum diinstall).
+            $installation->selected_inventory_serial_id = $validated['selected_inventory_serial_id'] ?? null;
 
             // Status TETAP in_progress di sini — completed baru ditetapkan di
             // storeSpeedtest(), begitu Laporan Speedtest ikut tersimpan.
@@ -873,6 +925,31 @@ class CustomerInstallationController extends Controller
                 ->whereIn('status', [TaskStatus::IN_PROGRESS->value, TaskStatus::PENDING->value])
                 ->latest('id')
                 ->first();
+
+            // Reconcile custody Gudang/Inventory (ADHOC-54) DI SINI — storeSpeedtest()
+            // itu SATU-SATUNYA titik penyelesaian pemasangan (ADHOC-41, gak bisa
+            // dipanggil dua kali buat customer yang sama karena status pelanggan
+            // udah pindah dari installation_in_progress/revision_installation
+            // begitu transaksi ini commit). Custody teknisi TIDAK boleh dipotong
+            // di storePemasangan() — itu bisa disubmit berkali-kali (edit foto,
+            // tambah material) sebelum beneran selesai, potong custody di situ
+            // bakal dobel-potong tiap resubmit. Lihat rancangan-ui.md §3.4/§3.7.
+            if ($task && $installFopTask && $task->teamMembers->isNotEmpty()) {
+                $teamTechnicians = User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
+
+                app(InventoryService::class)->reconcileMaterialsAgainstCustody($installFopTask, $customer, $teamTechnicians, auth()->user());
+
+                // Perangkat Aktif (ADHOC-54) — draft pointer dari storePemasangan()
+                // dieksekusi jadi INSTALL beneran DI SINI (sama alasan reconcile
+                // material di atas: titik penyelesaian tunggal, resubmit-safe).
+                // Field opsional — mayoritas instalasi belum punya device
+                // ke-track Inventory, gak wajib diisi.
+                if ($installation->selected_inventory_serial_id) {
+                    $serial = InventorySerial::findOrFail($installation->selected_inventory_serial_id);
+                    app(InventoryService::class)->installSerial($serial, $customer, $installFopTask, $teamTechnicians, auth()->user());
+                }
+            }
+
             if ($task) {
                 app(TaskService::class)->complete($task, auth()->user());
             }

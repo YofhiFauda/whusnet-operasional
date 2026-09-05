@@ -494,6 +494,10 @@
                 </div>
             </div>
 
+            @include('verifications.partials.installed-devices', [
+                'rows' => $installedSerials,
+            ])
+
             @include('verifications.partials.materials', [
                 'title' => 'Material Terpakai Saat Pemasangan',
                 'emptyText' => 'Tim pemasangan tidak mencatat material terpakai.',

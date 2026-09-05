@@ -129,6 +129,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Skip Survey',
                 'description' => 'Melewati tahap survey lapangan saat registrasi, input data survey langsung',
             ],
+            [
+                'code' => ActionCode::RECEIVE,
+                'name' => 'Receive',
+                'description' => 'Konfirmasi fisik penerimaan barang (Transfer gudang Pusat ke Cabang)',
+            ],
         ];
 
         foreach ($actions as $action) {

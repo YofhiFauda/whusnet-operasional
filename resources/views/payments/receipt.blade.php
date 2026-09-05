@@ -595,7 +595,7 @@
                     <td>
                         <div class="a4-party-label">Ditagihkan kepada</div>
                         <div class="a4-party-name">{{ $kwitansi['pelanggan']['nama'] }}</div>
-                        <div>CID {{ $kwitansi['pelanggan']['cid'] }}</div>
+                        <div>CID: {{ $kwitansi['pelanggan']['cid'] }}</div>
                         @foreach($kwitansi['pelanggan']['alamat_baris'] as $baris)
                             <div>{{ $baris }}</div>
                         @endforeach
@@ -607,10 +607,6 @@
             {{-- =====================================
                  RINGKASAN
                  ===================================== --}}
-
-            <div class="a4-amount-line">
-                {{ $kwitansi['dibayar'] }} dibayar pada {{ $kwitansi['tanggal_bayar'] }}
-            </div>
 
             <table class="a4-items">
                 <thead>

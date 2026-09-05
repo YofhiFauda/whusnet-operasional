@@ -306,6 +306,17 @@ class Customer extends Model
     }
 
     /**
+     * Unit SERIALIZED yang terpasang di pelanggan ini (ADHOC-54) — cuma
+     * traceability, BUKAN sumber kebenaran device terpasang. Sumber kebenaran
+     * tetap `customerTechnicalDetail` (SN modem, ODP, dst) — lihat §29.3
+     * warehouse_inventory_asset_traceability_analysis.md.
+     */
+    public function inventorySerials(): HasMany
+    {
+        return $this->hasMany(InventorySerial::class);
+    }
+
+    /**
      * Invariant: maksimal satu baris `revoked_at IS NULL` per pelanggan,
      * ditegakkan CustomerQrTokenObserver::creating() — relasi ini aman
      * dipakai sebagai "token QR yang lagi berlaku".

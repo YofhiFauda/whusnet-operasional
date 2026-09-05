@@ -58,4 +58,13 @@ enum ActionCode: string
      * karena membuka tahap workflow, bukan cuma isi field pelanggan.
      */
     case SKIP_SURVEY = 'skip_survey';
+
+    /**
+     * Konfirmasi FISIK "barang sudah nyampe" (Transfer Pusat→Cabang). SENGAJA
+     * bukan APPROVE: itu keputusan setuju/tolak berbasis kebijakan, ini
+     * pengakuan kejadian fisik oleh penerima sendiri (acknowledgment digital
+     * — docs/plan/warehouse/kontrol-anti-manipulasi.md §4), gak ada opsi
+     * "tolak seluruhnya", cuma partial-match kalau SN gak cocok.
+     */
+    case RECEIVE = 'receive';
 }

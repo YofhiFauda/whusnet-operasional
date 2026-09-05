@@ -57,6 +57,16 @@ $functionalCategories = [
         'badge' => 'bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800',
         'features' => ['dashboard', 'reports'],
     ],
+    'group_warehouse' => [
+        'title' => 'Gudang & Inventory',
+        'subtitle' => 'Distribusi barang dari Gudang Pusat ke Cabang, custody teknisi, dan pelacakan aset bernomor seri.',
+        'icon' => 'archive-box',
+        'badge' => 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+        'features' => [
+            'warehouse', 'warehouse_transfer', 'warehouse_issue',
+            'warehouse_custody', 'warehouse_traceability',
+        ],
+    ],
 ];
 
 // 2. Pemetaan Nama Ramah (Human-Friendly) & Deskripsi Fitur
@@ -98,6 +108,11 @@ $featureMeta = [
     'cash_deposit' => ['name' => 'Setoran Kas Admin ke Owner / Bank', 'desc' => 'Uang yang sudah diterima admin (dari setoran kolektor + pembayaran tunai di kantor) diteruskan ke Owner atau rekening bank, lalu diperiksa.'],
     'reports' => ['name' => 'Laporan Operasional & Keuangan', 'desc' => 'Laporan rekapitulasi pembayaran, piutang pelanggan, statistik aktivasi, dan cetak laporan.'],
     'audit_logs' => ['name' => 'Catatan Aktivitas Sistem (Audit Log)', 'desc' => 'Jejak audit keamanan yang mencatat seluruh aksi penting pengguna dalam sistem.'],
+    'warehouse' => ['name' => 'Dashboard & Ledger Gudang', 'desc' => 'Ringkasan stok tiap gudang, barang hampir habis, dan riwayat seluruh transaksi keluar-masuk barang.'],
+    'warehouse_transfer' => ['name' => 'Transfer Antar Gudang', 'desc' => 'Pengiriman barang dari Gudang Pusat ke Gudang Cabang, dan konfirmasi penerimaan fisik di cabang.'],
+    'warehouse_issue' => ['name' => 'Issue Barang ke Teknisi', 'desc' => 'Mengeluarkan barang dari gudang cabang untuk dibawa teknisi ke lapangan.'],
+    'warehouse_custody' => ['name' => 'Custody Barang di Tangan Teknisi', 'desc' => 'Melihat barang yang sedang dipegang tiap teknisi (belum dipasang/dikembalikan).'],
+    'warehouse_traceability' => ['name' => 'Pelacakan Aset (Asset Traceability)', 'desc' => 'Menelusuri riwayat lengkap satu barang bernomor seri, dari gudang sampai ke pelanggan.'],
 ];
 
 // 3. Pemetaan Aksi Hak Akses (Human-Friendly Action Labels, Badges & Deskripsi Fungsi)
@@ -124,6 +139,7 @@ $actionMetaMap = [
     'pay' => ['label' => 'Catat Pembayaran', 'desc' => 'Mencatat uang bayar yang diterima dari pelanggan.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
     'deposit' => ['label' => 'Setor Penagihan', 'desc' => 'Menyetorkan uang hasil penagihan ke kasir.', 'type' => 'write', 'badge' => 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'],
     'visit' => ['label' => 'Catat Kunjungan', 'desc' => 'Mencatat laporan hasil kunjungan lapangan.', 'type' => 'write', 'badge' => 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
+    'receive' => ['label' => 'Konfirmasi Terima', 'desc' => 'Dapat mengonfirmasi penerimaan fisik barang kiriman.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
 ];
 
 // 3b. Deskripsi PER KODE PERMISSION — sumbernya fungsi NYATA di modul

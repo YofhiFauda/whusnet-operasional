@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EquipmentClass;
 use App\Enums\MaterialKind;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkTool;
 use App\Services\FileUploadService;
+use App\Services\InventoryService;
 use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
@@ -39,8 +42,12 @@ class TaskMaintenanceController extends Controller
         // "MTN terakhir milik pelanggan ini" akan menempel ke task yang salah.
         $fopTask = $workToolService->resolveTaskFor($task);
 
-        $items = Item::active()->with('category')->orderBy('name')->get();
-        $itemCategories = ItemCategory::options();
+        // Split Aktif/Pasif (ADHOC-54) — form terpakai Maintenance dibatasi ke
+        // item PASIF, sama pola Laporan Pemasangan (rancangan-ui.md §3.2-3.3).
+        $items = Item::active()->with('category')->orderBy('name')->get()
+            ->filter(fn (Item $item) => $item->effective_equipment_class === EquipmentClass::PASIF)
+            ->values();
+        $itemCategories = ItemCategory::active()->ordered()->where('equipment_class', EquipmentClass::PASIF->value)->get();
         $materialRows = $fopTask
             ? $fopTask->materials()->terpakai()->orderBy('id')->get()->map(fn ($row) => [
                 'item_id' => $row->item_id,
@@ -146,6 +153,17 @@ class TaskMaintenanceController extends Controller
                     ),
                     auth()->id()
                 );
+
+                // Reconcile custody Gudang/Inventory (ADHOC-54) — SETELAH sync(),
+                // SEBELUM complete(). Beda dari Pemasangan (dua fase, resubmit-safe):
+                // Maintenance one-shot — sync()+complete() dalam SATU request yang
+                // gak bisa diulang (begitu task selesai, statusComplete policy
+                // nolak store() lagi) — jadi aman rekonsiliasi langsung di sini,
+                // gak perlu titik penyelesaian terpisah kayak storeSpeedtest().
+                if ($task->customer && $task->teamMembers->isNotEmpty()) {
+                    $teamTechnicians = User::whereIn('id', $task->teamMembers->pluck('user_id'))->get();
+                    app(InventoryService::class)->reconcileMaterialsAgainstCustody($fopTask, $task->customer, $teamTechnicians, auth()->user());
+                }
             }
 
             // Selesaikan task

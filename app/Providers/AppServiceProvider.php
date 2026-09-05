@@ -2,15 +2,18 @@
 
 namespace App\Providers;
 
+use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerQrToken;
 use App\Models\FopTask;
+use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Task;
 use App\Observers\CustomerObserver;
 use App\Observers\CustomerQrTokenObserver;
 use App\Observers\FopTaskObserver;
+use App\Observers\InventoryTransactionObserver;
 use App\Observers\InvoiceObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TaskObserver;
@@ -110,6 +113,13 @@ class AppServiceProvider extends ServiceProvider
         // Ticketing — tulis riwayat sisi Ticket saat Task FOP-nya dibatalkan,
         // dari jalur cancel mana pun.
         FopTask::observe(FopTaskObserver::class);
+
+        // Gudang/Inventory (ADHOC-54) — ledger append-only. Salah catat
+        // dilawan baris ADJUSTMENT baru, bukan edit/hapus baris lama, dari
+        // jalur mana pun (Service, artisan, tinker). Lihat docblock
+        // InventoryTransactionObserver buat batasan jalur yang TIDAK
+        // ketangkep (bulk update query builder/raw SQL).
+        InventoryTransaction::observe(InventoryTransactionObserver::class);
 
         // Register Blade Directives for formatting
         Blade::directive('rupiah', function ($expression) {
@@ -260,9 +270,53 @@ class AppServiceProvider extends ServiceProvider
         // dihidupkan lagi tanpa controller yang makainya.
 
         // View Composer for Sidebar Badges
-        View::composer('layouts.app', function ($view) {
-            $surveyCount = Customer::whereIn('status', ['waiting_survey', 'survey_in_progress'])->count();
-            $verificationCount = Customer::whereIn('status', ['surveyed', 'waiting_acc', 'waiting_installation', 'installation_in_progress', 'installed', 'verification_admin'])->count();
+        View::composer(['layouts.app', 'components.layout.sidebar', 'components.layout.app-shell'], function ($view) {
+            $surveyCount = 0;
+            $verificationCount = 0;
+
+            if (auth()->check()) {
+                $user = auth()->user();
+
+                if ($user->hasPermission('customers.detail.survey.view')) {
+                    $surveyQuery = Customer::applyUserScope($user)
+                        ->where(function ($q) {
+                            $q->where('status', 'waiting_survey')->orWhere('status', 'survey_in_progress');
+                        });
+
+                    if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+                        $surveyQuery->whereHas('tasks', function ($q) use ($user) {
+                            $q->where('task_type', TaskType::SURVEY->value)
+                                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
+                        });
+                    }
+
+                    $surveyCount = $surveyQuery->count();
+                }
+
+                if ($user->hasPermission('customers.detail.installation.view')) {
+                    $statuses = [
+                        'waiting_acc',
+                        'surveyed',
+                        'waiting_installation',
+                        'installation_in_progress',
+                        'revision_installation',
+                        'installed',
+                        'verification_admin',
+                    ];
+
+                    $verificationQuery = Customer::applyUserScope($user)
+                        ->whereIn('status', $statuses);
+
+                    if (! $user->hasFullAccess() && $user->hasRole('teknisi')) {
+                        $verificationQuery->whereHas('tasks', function ($q) use ($user) {
+                            $q->where('task_type', TaskType::PEMASANGAN->value)
+                                ->whereHas('teamMembers', fn ($tm) => $tm->where('user_id', $user->id));
+                        });
+                    }
+
+                    $verificationCount = $verificationQuery->count();
+                }
+            }
 
             $view->with('badge_survey_count', $surveyCount)
                 ->with('badge_verification_count', $verificationCount);

@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'item_type',
     'item_category_id',
     'item_name',
+    'lot_no',
     'qty',
     'unit',
     'unit_price_snapshot',

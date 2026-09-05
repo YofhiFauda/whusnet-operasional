@@ -446,6 +446,75 @@ return [
             ActionCode::UPDATE->value,
             ActionCode::DELETE->value,
         ],
+
+        // Modul Gudang/Inventory (ADHOC-54) — docs/plan/warehouse/rancangan-ui.md §1.2.
+        // `warehouse` root cuma VIEW (dashboard + ledger — §2.1/§2.9). Empat
+        // sub-feature action-nya SENGAJA sempit (bukan CRUD generik) —
+        // masing-masing satu aksi bisnis nyata, bukan create/update/delete
+        // resource biasa.
+        'warehouse' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'warehouse_transfer' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value, // Pusat kirim (§2.2)
+            ActionCode::RECEIVE->value, // Cabang konfirmasi terima (§2.3)
+        ],
+
+        'warehouse_issue' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value, // Cabang → Teknisi (§2.4)
+        ],
+
+        // SENGAJA cuma satu action (VIEW) — "lihat custody sendiri" TIDAK
+        // butuh permission terpisah sama sekali (embedded di halaman Task
+        // teknisi existing, discope `custodian=auth()->id()` di query, bukan
+        // digerbangi permission). §1.2/§3 rancangan-ui.md — jangan tambah
+        // action `view_own` ke sini, itu koreksi eksplisit yang sudah
+        // diputuskan (beda dari `task.view.own` yang exception, bukan pola
+        // reusable — lihat app/Enums/ActionCode.php).
+        'warehouse_custody' => [
+            ActionCode::VIEW->value,
+        ],
+
+        'warehouse_traceability' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Ketahuan kelewat pas nutup Fase 8 UI — InventoryAdjustmentService/
+        // InventoryReassignService udah jadi sejak Fase 6, tapi belum py
+        // permission (baru kepikiran begitu nulis controller/view-nya).
+        // Cuma CREATE — kontrol-anti-manipulasi.md §1 (revisi): TANPA gerbang
+        // approval berjenjang, monitoring berbasis status barang di ledger.
+        'warehouse_adjustment' => [
+            ActionCode::CREATE->value,
+        ],
+
+        'warehouse_reassign' => [
+            ActionCode::CREATE->value,
+        ],
+
+        // Fase 2 P2 (2026-09-03, fase-2-adaptasi-wms.md) — laporan agregat
+        // periodik (movement + kerugian per gudang/cabang). Cuma VIEW,
+        // read-only murni — data mentahnya udah tercatat di ledger, ini
+        // cuma nyusun ulang jadi angka per periode.
+        'warehouse_report' => [
+            ActionCode::VIEW->value,
+        ],
+
+        // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
+        // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
+        // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
+        // "punya sendiri" di Controller, bukan permission terpisah — pola
+        // sama kolektor.pay).
+        'warehouse_stock_request' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+            ActionCode::CANCEL->value,
+        ],
     ],
 
     /*

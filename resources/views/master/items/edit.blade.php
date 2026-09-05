@@ -15,7 +15,7 @@
 </div>
 
 <!-- Form Container -->
-<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
+<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}' }">
     @csrf
     @method('PUT')
 
@@ -87,6 +87,46 @@
                 @enderror
             </div>
         </div>
+
+        <div class="border-t border-slate-100 dark:border-slate-700/50 pt-4 mt-1">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Cara Lacak Stok</h3>
+            @if($trackingTypeLocked)
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Barang ini udah punya pergerakan gudang (Barang Masuk/Transfer/Issue) — cara lacak stok gak bisa diganti lagi, biar data yang udah jalan gak jadi gak konsisten.</p>
+            @else
+            <p class="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Pilih <strong>Bernomor Seri</strong> buat barang aktif (modem, ONT, router) — cuma barang berjenis ini yang muncul di dropdown SN Laporan Pemasangan.</p>
+            @endif
+        </div>
+
+        @if($trackingTypeLocked)
+        <div class="flex items-center gap-2">
+            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->tracking_type->label() }}</span>
+            @if($item->tracking_type->value === 'serialized')
+            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->ownership_mode->label() }}</span>
+            @endif
+        </div>
+        @else
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            @foreach($trackingTypes as $tt)
+            <label class="flex items-start gap-2 border rounded-md p-3 cursor-pointer transition-colors {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600' }}">
+                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'checked' : '' }} class="mt-0.5">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $tt->label() }}</span>
+            </label>
+            @endforeach
+        </div>
+        @error('tracking_type')
+            <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+        @enderror
+
+        <div x-show="trackingType === 'serialized'" x-cloak class="pt-2">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
+            <select name="ownership_mode" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                @foreach($ownershipModes as $om)
+                <option value="{{ $om->value }}" {{ old('ownership_mode', $item->ownership_mode->value) === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
+                @endforeach
+            </select>
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — gak pernah tercatat terpasang ke pelanggan, cuma dipinjam-pakaikan lalu wajib balik.</p>
+        </div>
+        @endif
 
         <!-- Submit Actions -->
         <div class="flex items-center gap-3 justify-end pt-5 border-t border-slate-100 dark:border-slate-700/50 mt-5">

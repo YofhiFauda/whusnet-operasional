@@ -580,6 +580,58 @@
             </div>
             <?php endif; ?>
 
+            
+            <?php if(auth()->user()->hasPermission('warehouse.view') || auth()->user()->hasPermission('warehouse_transfer.view') || auth()->user()->hasPermission('warehouse_issue.view') || auth()->user()->hasPermission('warehouse_custody.view') || auth()->user()->hasPermission('warehouse_traceability.view') || auth()->user()->hasPermission('warehouse_adjustment.create') || auth()->user()->hasPermission('warehouse_reassign.create') || auth()->user()->hasPermission('warehouse_report.view') || auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
+            <div>
+                <div class="sidebar-group-header">
+                    <p class="px-3 text-[10px] font-bold text-slate-400/90 dark:text-slate-500 uppercase tracking-widest mb-2 sidebar-text">Gudang &amp; Inventory</p>
+                    <div class="sidebar-divider hidden border-t border-slate-200/80 dark:border-slate-700/60 my-2.5 mx-2"></div>
+                </div>
+                <div class="space-y-1">
+                    <div class="space-y-1">
+                        <button onclick="toggleSubmenu('submenu-warehouse', 'chevron-warehouse')"
+                                title="Gudang"
+                                class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                                       <?php echo e(Request::is('warehouse*') ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-semibold' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-700/60 hover:text-slate-900 dark:hover:text-slate-50'); ?>">
+                            <div class="flex items-center gap-3 sidebar-item-content">
+                                <svg class="h-5 w-5 shrink-0 <?php echo e(Request::is('warehouse*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
+                                </svg>
+                                <span class="sidebar-text">Gudang</span>
+                            </div>
+                            <svg id="chevron-warehouse"
+                                 class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e(Request::is('warehouse*') ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-300 dark:text-slate-600'); ?>"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div id="submenu-warehouse"
+                             class="submenu-container <?php echo e(Request::is('warehouse*') ? 'is-open' : ''); ?>">
+                            <div class="submenu-inner mt-1 ml-3.5 pl-3 border-l border-slate-200/80 dark:border-slate-700/60 space-y-0.5 text-xs pr-1">
+                                
+                                <?php if(auth()->user()->hasPermission('warehouse.view')): ?>
+                                <a href="<?php echo e(route('warehouse.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Dashboard Gudang</a>
+                                <a href="<?php echo e(route('warehouse.stock.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/stock*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Kelola Stok</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_custody.view')): ?>
+                                <a href="<?php echo e(route('warehouse.custody.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Barang di Tangan Teknisi</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_traceability.view')): ?>
+                                <a href="<?php echo e(route('warehouse.traceability.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/traceability*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Lacak Barang / SN</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_report.view')): ?>
+                                <a href="<?php echo e(route('warehouse.reports.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/reports*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Laporan Gudang</a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
+                                <a href="<?php echo e(route('warehouse.stock-requests.index')); ?>" class="block py-1.5 px-3 rounded-md transition-colors <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20'); ?>">Permintaan Stok</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
         </nav>
 
         
