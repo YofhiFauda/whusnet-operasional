@@ -22,6 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+*:Zone.Identifier
+*Zone.Identifier*
 /storage/framework/testing/*
 
 # Scramble — OpenAPI spec regenerated via `php artisan scramble:export`, tidak
