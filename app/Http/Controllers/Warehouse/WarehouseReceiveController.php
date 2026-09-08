@@ -8,18 +8,19 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
+use App\Services\EffectiveAccessService;
 use App\Services\InventoryReceiveService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
 /**
- * Barang Masuk (RECEIVE) — titik masuk barang baru dari supplier ke Gudang
- * Pusat. Ketinggalan waktu Fase 8 UI pertama kali dibangun — `InventoryReceiveService`
- * udah ada sejak Fase 6, tapi gak pernah dipanggil controller manapun (ketauan
- * pas user tanya cara input 100 SN modem ZTE baru, 2026-09-02).
+ * Barang Masuk (RECEIVE) — titik masuk barang baru dari distributor ke
+ * Gudang Pusat. Ketinggalan waktu Fase 8 UI pertama kali dibangun —
+ * `InventoryReceiveService` udah ada sejak Fase 6, tapi gak pernah dipanggil
+ * controller manapun (ketauan pas user tanya cara input 100 SN modem ZTE
+ * baru, 2026-09-02).
  *
  * Permission REUSE `warehouse_transfer.create` (bukan feature baru) — RECEIVE
  * dan Transfer-dispatch sama-sama pekerjaan staf Gudang Pusat, jangan pecah
@@ -27,9 +28,13 @@ use InvalidArgumentException;
  */
 class WarehouseReceiveController extends Controller
 {
-    public function create(): View
+    public function create(EffectiveAccessService $access): View
     {
-        $pusatPops = Pop::query()->where('type', 'pusat')->orderBy('name')->get();
+        $pusatPops = Pop::query()
+            ->where('type', 'pusat')
+            ->when(! $access->hasAllPopAccess(auth()->user()), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds(auth()->user())))
+            ->orderBy('name')
+            ->get();
         $items = Item::active()->with('category')->orderBy('name')->get();
 
         return view('warehouse.receive.create', compact('pusatPops', 'items'));
@@ -61,60 +66,6 @@ class WarehouseReceiveController extends Controller
 
         return redirect()->route('warehouse.receive.show', $reference)
             ->with('success', "Barang masuk {$reference} tercatat di {$pusat->name}.");
-    }
-
-    /**
-     * Barang Masuk via Scan SN — dipanggil tab "Scan Masuk" (Single Assign
-     * & Batch Assign) di Lacak Barang/SN (`warehouse.traceability.index`).
-     * SATU aksi buat DUA tab itu: keduanya, secara data, sama persis —
-     * satu Gudang Pusat + satu model barang + daftar SN + satu harga
-     * satuan (semua unit dalam satu submit dianggap satu batch pembelian,
-     * harga sama). Bedanya cuma di sisi klien: Single scan-tambah satu-satu
-     * ke daftar, Batch tempel/scan banyak baris sekaligus — begitu sampai
-     * submit, bentuknya identik, jadi gak perlu dua endpoint terpisah.
-     *
-     * Reuse `InventoryReceiveService::receiveBatch()` dengan SATU baris
-     * (bukan `receiveSerialized()` langsung) — biar dapet `reference_number`
-     * (RCV-...) & bisa di-redirect PRG ke halaman Bon Penerimaan yang SAMA
-     * dipakai form manual (`warehouse.receive.show`), bukan bikin halaman
-     * hasil terpisah buat jalur scan.
-     */
-    public function storeScanned(Request $request, InventoryReceiveService $service): RedirectResponse
-    {
-        $validated = $request->validate([
-            'pop_id' => 'required|integer|exists:pops,id',
-            'item_id' => 'required|integer|exists:items,id',
-            'unit_price' => 'required|numeric|min:1',
-            'notes' => 'nullable|string|max:500',
-            'serial_numbers' => 'required|array|min:1',
-            'serial_numbers.*' => [
-                'required', 'string', 'max:100', 'distinct:ignore_case',
-                Rule::unique('inventory_serials', 'serial_number'),
-            ],
-        ]);
-
-        $pusat = Pop::findOrFail($validated['pop_id']);
-        $item = Item::findOrFail($validated['item_id']);
-        $actor = auth()->user();
-
-        if ($item->tracking_type !== TrackingType::SERIALIZED) {
-            return back()->withInput()->with('error', "Barang {$item->name} bukan tipe Bernomor Seri — gak bisa di-assign lewat scan SN.");
-        }
-
-        try {
-            $reference = $service->receiveBatch($pusat, [[
-                'item_id' => $item->id,
-                'serial_numbers' => $validated['serial_numbers'],
-                'unit_price' => (float) $validated['unit_price'],
-            ]], $actor, $validated['notes'] ?? null);
-        } catch (InvalidArgumentException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
-        }
-
-        $unitCount = count($validated['serial_numbers']);
-
-        return redirect()->route('warehouse.receive.show', $reference)
-            ->with('success', "Barang masuk {$reference} tercatat di {$pusat->name} — {$item->name} ({$unitCount} unit).");
     }
 
     public function show(string $reference): View

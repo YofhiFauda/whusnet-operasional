@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SerialStatus;
 use App\Models\InventoryBalance;
+use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
@@ -159,5 +161,76 @@ class WarehouseStockPageTest extends TestCase
         $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['pop_id' => $this->cabangB->id]));
 
         $response->assertOk()->assertDontSee('Cabang WS B');
+    }
+
+    /**
+     * 2026-09-07 — laporan user "modem input by SN gak masuk Kelola Stok".
+     * Akar masalah: `receiveSerialized()` cuma nulis `inventory_serials`,
+     * gak pernah nyentuh `inventory_balances` yang jadi SATU-SATUNYA sumber
+     * query halaman ini sebelumnya. Sekarang digabung — count(*) AVAILABLE
+     * per gudang+item dibungkus jadi baris InventoryBalance sintetis.
+     */
+    #[Test]
+    public function modem_serialized_yang_baru_diterima_muncul_di_kelola_stok(): void
+    {
+        $category = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $modem = Item::create(['code' => 'WS-MODEM', 'name' => 'Modem WS Test', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-SN-001', 'WS-SN-002', 'WS-SN-003'], 250000, $this->owner);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index'));
+
+        $response->assertOk()->assertSee('Modem WS Test');
+
+        $balances = $response->viewData('balances');
+        $modemRow = $balances->first(fn ($b) => $b->item_id === $modem->id && $b->pop_id === $this->pusat->id);
+
+        $this->assertNotNull($modemRow, 'Baris modem serialized wajib muncul di Kelola Stok');
+        $this->assertEquals(3.0, (float) $modemRow->qty, 'Qty = jumlah SN berstatus AVAILABLE');
+    }
+
+    #[Test]
+    public function threshold_serialized_tetap_kepake_buat_badge_stok_rendah(): void
+    {
+        $category = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $modem = Item::create(['code' => 'WS-MODEM-2', 'name' => 'Modem WS Rendah', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+
+        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-SN-010'], 250000, $this->owner);
+
+        // Threshold disimpan lewat storeThreshold() — reuse endpoint aslinya,
+        // bukan bikin InventoryBalance manual, biar test ini beneran nguji
+        // jalur yang staf pakai.
+        $this->actingAs($this->owner)->post(route('warehouse.stock.threshold.store'), [
+            'pop_id' => $this->pusat->id,
+            'item_id' => $modem->id,
+            'minimum_stock' => 5, // 1 SN < 5 → harus kebaca low stock
+        ]);
+
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['low_stock_only' => 1]));
+
+        $response->assertOk()->assertSee('Modem WS Rendah');
+    }
+
+    #[Test]
+    public function pop_admin_gak_lihat_modem_serialized_gudang_lain(): void
+    {
+        $category = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $modemA = Item::create(['code' => 'WS-MODEM-A', 'name' => 'Modem WS Cabang A', 'item_category_id' => $category->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+
+        InventorySerial::create([
+            'item_id' => $modemA->id,
+            'serial_number' => 'WS-SN-A-001',
+            'status' => SerialStatus::AVAILABLE->value,
+            'current_pop_id' => $this->cabangB->id,
+        ]);
+
+        $popAdminRole = Role::where('code', 'pop_admin')->firstOrFail();
+        $popAdminA = User::factory()->create(['role_id' => $popAdminRole->id]);
+        $scope = UserRoleScope::create(['user_id' => $popAdminA->id, 'role_id' => $popAdminRole->id, 'scope_type' => 'selected_pop']);
+        $scope->targets()->create(['pop_id' => $this->cabangA->id]);
+
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index'));
+
+        $response->assertOk()->assertDontSee('Modem WS Cabang A');
     }
 }

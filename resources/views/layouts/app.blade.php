@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50 dark:bg-slate-900">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-slate-50 dark:bg-slate-900 scroll-smooth">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -633,6 +633,11 @@
                                 @if(auth()->user()->hasPermission('warehouse.view'))
                                 <a href="{{ route('warehouse.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Dashboard Gudang</a>
                                 <a href="{{ route('warehouse.stock.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/stock*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Kelola Stok</a>
+                                {{-- Riwayat Mutasi (2026-09-07) — sebelumnya cuma reachable dari tab
+                                     x-warehouse.header, gak ada di sidebar utama sama sekali. --}}
+                                <a href="{{ route('warehouse.history.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/history*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Riwayat Mutasi</a>
+                                {{-- Scan Barang (2026-09-07, mode scan-first) --}}
+                                <a href="{{ route('warehouse.scan.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/scan*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Scan Barang</a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_custody.view'))
                                 <a href="{{ route('warehouse.custody.index') }}" class="block py-1.5 px-3 rounded-md transition-colors {{ Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : 'text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50/50 dark:hover:bg-sky-900/20' }}">Barang di Tangan Teknisi</a>
@@ -838,7 +843,7 @@
         </header>
 
         {{-- Main Dynamic Page Content --}}
-        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto">
+        <main class="flex-1 p-4 sm:p-6 lg:p-5 xl:p-8 overflow-y-auto scroll-smooth">
             @yield('content')
         </main>
     </div>

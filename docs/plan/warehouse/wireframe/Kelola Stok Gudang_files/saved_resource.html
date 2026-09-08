@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<!-- saved from url=(0253)https://ae5dbb3c-5641-4e10-ab51-96dd17f9f4c2.frame.claudeusercontent.com/_f/1788746609-b826/?__frame_t=K7-L3A4OeKmql1OdAngWkok_.dfd2098b-8d1c-45bd-bbf4-f41e268a10ca.352da5f9-7485-4abf-b8b9-464d9b38f424.1788750216&__frame_v=manifest.44244f2523adb29d.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><script>window.__FRAME_PREAMBLE={"v":1,"capabilities":{"artifact":"artifact.DfA2To-s.js","assets":"assets.8Gk803W0.js","comments":"comments.hEoja5zd.js","db":"db.h-3sndFg.js","downloads":"downloads.th1YuAIk.js","embed":"embed.eqL6deQM.js","endpoints":"endpoints.CfzSv5nM.js","mcp":"mcp.Bvma3qD7.js","network":"network.B5UA9Su4.js","permissions":"permissions.BNySkLV5.js","room":"room.VSdFwTE9.js","sample":"sample.BW2Uysoh.js","self":"artifact.DfA2To-s.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.-IAc0qoT.js","comments":"_comments.C-AkolIB.js","translate":"_translate.5HCW4BJh.js","ldx":"_ldx.6JS5dhCp.js"}</script><script>(function(){"use strict";var le=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,J=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked","style","title","alt","placeholder","lang","dir","role","tabindex","disabled","readonly","contenteditable","open","colspan","rowspan"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var We="http://www.w3.org/1999/xhtml",pe="http://www.w3.org/2000/svg",me=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),he=new Set(["script","style"]);function _e(e){const t=e.localName.toLowerCase();return e.namespaceURI==="http://www.w3.org/1999/xhtml"?!me.has(t):e.namespaceURI===pe?!he.has(t):!1}function I(e,t){return e===t||(e===160||e===32)&&(t===160||t===32)}function ve(e,t){const r=e.length,n=t.length;let a=0;for(;a<r&&a<n&&I(e.charCodeAt(a),t.charCodeAt(a));)a++;let s=0;for(;s<r-a&&s<n-a&&I(e.charCodeAt(r-1-s),t.charCodeAt(n-1-s));)s++;return{p:a,s}}function ye(e,t){const r=e.firstChild;if(e.childNodes.length!==1||r===null||r.nodeType!==Node.TEXT_NODE){e.textContent=t;return}const n=r.data,a=n.length,s=t.length,{p:c,s:i}=ve(n,t);c===a&&i===0&&a===s||r.replaceData(c,a-c-i,t.slice(c,s-i));const p=r.data,f=e.ownerDocument.getSelection?.()??null,v=f!==null&&f.rangeCount>0&&(f.anchorNode===r||f.focusNode===r)?{anchor:f.anchorNode,anchorOffset:f.anchorOffset,focus:f.focusNode,focusOffset:f.focusOffset}:null;let d=-1,y=-1;for(let _=0;_<p.length&&_<t.length;_++){const E=p.charCodeAt(_),T=t.charCodeAt(_);E!==T&&I(E,T)&&(d<0&&(d=_),y=_)}const w=d>=0;if(w&&r.replaceData(d,y-d+1,t.slice(d,y+1)),w&&v!==null&&v.anchor!==null&&v.focus!==null)try{f.setBaseAndExtent(v.anchor,v.anchorOffset,v.focus,v.focusOffset)}catch{}}var we=new Set(["html","head","body","frameset"]);function be(e){return e.namespaceURI==="http://www.w3.org/1999/xhtml"&&we.has(e.localName)}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e;if(typeof t.target!="string"||!ue.test(t.target)||t.text!==void 0&&typeof t.text!="string")return!1;if(t.attrsSet!==void 0){if(t.attrsSet===null||typeof t.attrsSet!="object")return!1;for(const[r,n]of Object.entries(t.attrsSet))if(!J.test(r)||typeof n!="string")return!1}if(t.attrsRemoved!==void 0){if(!Array.isArray(t.attrsRemoved))return!1;for(const r of t.attrsRemoved)if(typeof r!="string"||!J.test(r))return!1}return!0}function ge(e,t){if(e===null||typeof e!="object")return!1;const{seq:r,elements:n}=e;if(typeof r!="number"||!Number.isSafeInteger(r)||!Array.isArray(n)||n.length===0||n.length>64)return!1;for(let a=0;a<n.length;a++)if(!t(n[a]))return!1;return!0}function Ae(e){return e===null||typeof e!="object"?!1:ge(e.__frame_patch,Ee)}function Te(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function Re(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Le(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const r=t.theme;return typeof r=="string"&&le.includes(r)}var L=/^[\w.-]+\.js$/;function Se(e,t,r){return r?"inert":typeof t=="string"&&L.test(t)?e?[t]:"inert":e?"inert":"framed"}var Ke="frame_ldx_runtime",$e="script#an-form";function ke(){return{post(e,t){parent.postMessage(e,t)},on(e){const t=r=>{r.source===parent&&e(r.data,r.origin,r.isTrusted)};return addEventListener("message",t),()=>removeEventListener("message",t)}}}function Pe(){return{post:()=>{},on:()=>()=>{}}}var U="__frame_scroll",Oe=150,Ce=310,Me=160,je=3e4;function Ne(){let e=0,t=!1,r=!1,n=!1,a=0,s=null;const c=u=>{try{sessionStorage.setItem(U,JSON.stringify({y:u}))}catch{}},i=()=>{if(clearTimeout(e),s===null)return;const u=s;s=null,c(u)},p=()=>{if(t){t=!1;return}r=!0,s=scrollY,clearTimeout(e),e=setTimeout(i,Oe)};try{addEventListener("scroll",p,{passive:!0}),addEventListener("pagehide",i)}catch{}const f=()=>{let u;try{u=sessionStorage.getItem(U)}catch{return null}if(u===null)return null;let b;try{b=JSON.parse(u)}catch{b=null}const o=b?.y;if(!(typeof o=="number"&&Number.isFinite(o)&&o>=0)){try{sessionStorage.removeItem(U)}catch{}return null}return o};let v=!1;const d=u=>{try{const b=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),a=u,n=!0,clearTimeout(e),s=null,c(u);const o=scrollY;o!==b&&(t=!0),o!==u&&!v&&(v=!0,addEventListener("load",()=>{try{if(scrollY===o){const m=f();d(m!==null?m:a)}}catch{}},{once:!0}))}catch{}},y=()=>{try{return!!location.hash}catch{return!0}};let w=!1;const _=()=>{try{if(w||innerWidth>Ce||innerHeight>Me)return;w=!0;const u=Date.now(),b=()=>{try{removeEventListener("resize",b)}catch{}if(Date.now()-u>je||r||y())return;const o=f();d(o!==null?o:a)};addEventListener("resize",b)}catch{}};let E=!1,T=!1;return{restore(){if(E||(E=!0,y()))return;const u=f();u!==null&&(d(u),_())},promoted(){if(T||(T=!0,y()))return;const u=f();u!==null?(d(u),_()):n&&d(a)}}}function Be(e,t,r,n){let a=null;try{a=window.trustedTypes?.createPolicy("frame-runtime",{createScriptURL:p=>p})??null}catch{}const s=window.Worker,c=s?.prototype,i=Object.freeze({Worker:s,workerOn:c?.addEventListener,workerPost:c?.postMessage,workerTerminate:c?.terminate,fetch:window.fetch.bind(window),preventDefault:Event.prototype.preventDefault,policy:a,origins:t});r(e).then(p=>p?.bootTopLevel?p.bootTopLevel(i,n):n.settle()).catch(()=>n.settle())}var qe="modulepreload",Xe=function(e){return"/"+e},Ye={},De=function(t,r,n){let a=Promise.resolve();function s(c){const i=new Event("vite:preloadError",{cancelable:!0});if(i.payload=c,window.dispatchEvent(i),!i.defaultPrevented)throw c}return a.then(c=>{for(const i of c||[])i.status==="rejected"&&s(i.reason);return t().catch(s)})},Ie=window===top,Q=Object.getOwnPropertyDescriptor(window,"claude"),C=Se(Ie,window.__FRAME_PREAMBLE?.topLevel,Q?.writable===!1),x=typeof C=="object"&&C[0],h=x?Pe():ke();(function(){const e=Object.defineProperty,t=globalThis,r=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let n=0;for(let a=0;a<r.length;a++){const s=r[a];try{e(t,s,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[s]}catch{}try{e(t,s,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[s]=="function"&&n++}if(n&&C==="framed")try{h.post({__frame_rtc_lockdown_failed:n},"*")}catch{}})();var Ue=1e4,xe=2e3,ee=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function te(e){for(const t of ee)if(t.endsWith(":*"))try{const r=new URL(e);if(`${r.protocol}//${r.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var M=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),F=window.__FRAME_PREAMBLE?.transforms,z=window.__FRAME_PREAMBLE?.comments,H=window.__FRAME_PREAMBLE?.translate,W=window.__FRAME_PREAMBLE?.ldx;function S(e){return De(()=>import("/_runtime/"+e),void 0)}function re(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:q,hooks:N,pipe:()=>({wrap:(r,n)=>(...a)=>{try{return n(...a)}catch(s){return Promise.reject(s)}}})}}var j=null,A=null;function ne(e,t,r){try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var K=!1,N={editBefore:null,edit:null};function Fe(e,t,r=!1){const n=[];let a;if(r)try{N.editBefore?.(e)}catch{}for(const s of e.elements){const c=document.querySelector(`[data-id="${s.target}"]`);if(!c){a=s.target;break}if([...Object.keys(s.attrsSet??{}),...s.attrsRemoved??[]].some(i=>!de(i))){a=s.target;break}if(s.text!==void 0&&(!_e(c)||be(c))){a=s.target;break}for(const[i,p]of Object.entries(s.attrsSet??{}))if(!se(c,i)){try{c.setAttribute(i,p)}catch{}oe(c,i,p)}for(const i of s.attrsRemoved??[])se(c,i)||(c.removeAttribute(i),oe(c,i,null));typeof s.text=="string"&&ye(c,s.text),n.push(s.target)}if(r)try{N.edit?.(e.seq,n,a)}catch{}if(a!==void 0){h.post({__frame_patch_miss:{seq:e.seq}},t);return}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function oe(e,t,r){if(!(e instanceof HTMLInputElement))return;const n=t.toLowerCase();n==="checked"?e.checked=r!==null:n==="value"&&e.type!=="file"&&(e.value=r??"")}function se(e,t){const r=t.toLowerCase(),n=e;return r==="data-id"||(r==="value"||r==="checked")&&(n.__artifactSecret===!0||/^(password|hidden|file)$/.test(n.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${n.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,K=!0):K&&(delete t.dataset.theme,t.style.colorScheme="",K=!1)}var B=new Map;function ze(){let e;const t={u:new Promise(r=>{e=r}),r:r=>{t.done=!0,e(r)},done:!1,nulled:!1};return t}function $(){for(const e of B.values())e.done||(e.nulled=!0,e.r(null))}var He=Object.freeze(Object.assign(Object.create(null),{call:Function.prototype.call,apply:Function.prototype.apply,bind:Function.prototype.bind})),q=(e,t)=>{const r=B.get(e);if(!r||r.done){r?.nulled&&A&&h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:e}},A);return}const n=typeof t=="function"?Object.setPrototypeOf(t,He):Object.assign(Object.create(null),t);typeof n.then=="function"&&delete n.then,r.r(Object.freeze(n))};function ie(){const e=Q?.value??{};ne(window,"claude",e);for(const t of Object.keys(M)){if(e[t]!==void 0){ne(e,t,e[t]);continue}B.set(t,ze())}if(e.use===void 0){const t=r=>{if(typeof r!="string"||!Object.hasOwn(M,r))return Promise.resolve(null);const n=B.get(r);return n?n.u:Promise.resolve(e[r]??null)};try{Object.defineProperty(e,"use",{value:t,writable:!0,configurable:!0,enumerable:!1})}catch{}}}if(C==="framed"){const e=F&&L.test(F)?S(F).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const m=o.target,k=m&&m.closest?m.closest("a[href],area[href]"):null;if(!k)return;const O=k.getAttribute("href");if(!O)return;let R;try{R=new URL(O,document.baseURI)}catch{return}if((R.protocol==="http:"||R.protocol==="https:")&&R.origin!==location.origin){o.preventDefault();const P=(k.getAttribute("target")??"").toLowerCase(),g=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(P);h.post({__frame_nav:!0,url:R.href,newTab:g},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const r={},n=o=>{o.isTrusted&&(r.pointer=!0)},a=o=>{o.isTrusted&&(r.click=!0)};addEventListener("pointermove",n,{capture:!0,passive:!0}),addEventListener("click",a,{capture:!0,passive:!0});const s={cb:null};addEventListener("keydown",o=>s.cb?.(o),!0),e.then(o=>o?.installEscapeForward?.(s,m=>{A&&h.post(m,A)})),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",n,!0),removeEventListener("click",a,!0),o.wireEngagement?.(r))});let c=null;try{c=Ne()}catch{}ie();let i=null,p=null,f=0;const v=h.on((o,m)=>{te(m)&&Te(o)&&(i=o.__frame_init,A=m,v(),clearTimeout(f),p?.())});h.post({__frame_connect:!0},"*");const d=setTimeout,y=clearTimeout;let w=0;const _=()=>{try{h.post({__frame_alive:!0},"*")}catch{}w=d(_,xe)},E=()=>y(w);_(),addEventListener("load",E,{once:!0});const T=new Promise(o=>{p=o,f=setTimeout(()=>{v(),o()},Ue)}),u=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();u.then(()=>{try{c?.restore()}catch{}});const b={cb:null};h.on((o,m)=>{if(te(m)&&Re(o)){try{c?.promoted()}catch{}b.cb?.()}}),T.then(async()=>{if(!i||!A){$();return}ae(i.theme);const o=A;let m=!1,k=!1;h.on((l,Y,D)=>{if(Y!==o)return;Le(l)&&ae(l.__frame_theme.theme),Ae(l)&&Fe(l.__frame_patch,o,D);const G=l?.__fc_mode;G&&typeof G=="object"&&!m&&z&&L.test(z)&&(m=!0,S(z).then(Z=>Z.install?.(o,G.on===!0)).catch(()=>{}));const V=l?.__ft_cmd;V&&typeof V=="object"&&!k&&H&&L.test(H)&&(k=!0,S(H).then(Z=>Z.install?.(o,V)).catch(()=>{}))});const O=Object.keys(i.capabilities??{}).filter(l=>Object.hasOwn(M,l)).map(l=>[l,M[l]]).filter(l=>typeof l[1]=="string"&&L.test(l[1])),R=await Promise.allSettled(O.map(([,l])=>S(l))),P=await e,g=A;if(P?.buildBoot||h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),P?.buildBoot)try{j=P.buildBoot(i,P.TRANSFORMS??{},{shellOrigin:g,mount:q,hooks:N},l=>h.post({__frame_cap_telemetry:l},g))}catch{h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},g),j=re(i,g)}else j=re(i,g);const X=l=>h.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:l}},g),ce=j;R.forEach((l,Y)=>{const D=O[Y][0];if(l.status!=="fulfilled"){X(D);return}try{l.value?.install?.(ce)}catch{X(D)}}),$(),await u,E(),h.post({__frame_ready:!0},A),e.then(l=>l?.installSizeReporter?.(g,b)),ce.flags.has("frame_ldx_runtime")&&W&&L.test(W)&&document.querySelector("script#an-form")&&S(W).then(l=>l?.boot?.()).catch(()=>!1).then(l=>{l!==!0&&X("_ldx")})})}else x&&(ie(),Be(x,ee,S,{settle:$,mount:q}))})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Kelola Stok Gudang</title>
+<meta name="description" content="Prototipe interaktif halaman Kelola Stok — hub operasional gudang: cari, filter, dan eksekusi mutasi langsung dari tabel stok.">
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link rel="stylesheet" href="./css2">
+<style>
+  :root{
+    --bg:#f3f6f6; --surface:#ffffff; --surface-2:#eef3f3; --border:#d9e2e2;
+    --text:#131c1e; --text-muted:#5c7072; --text-faint:#8a9b9c;
+    --accent:#0d7d7a; --accent-ink:#ffffff; --accent-soft:#e0f1ef; --accent-soft-border:#b9dcd8;
+    --good:#1a7a45; --good-soft:#e4f4e9;
+    --warn:#a3650b; --warn-soft:#fbedd8;
+    --crit:#b23b2e; --crit-soft:#fbe6e2;
+    --transit:#8347b8; --transit-soft:#f1e7f9;
+    --shadow: 0 1px 2px rgba(20,30,31,.04), 0 8px 24px -12px rgba(20,30,31,.12);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+      --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+      --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+      --good:#5cc98a; --good-soft:#173226;
+      --warn:#e0a94f; --warn-soft:#332b16;
+      --crit:#ec8478; --crit-soft:#361f1c;
+      --transit:#c3a2e6; --transit-soft:#2a2035;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1516; --surface:#161f20; --surface-2:#1b2526; --border:#2a3536;
+    --text:#e7eeee; --text-muted:#98abac; --text-faint:#6d8081;
+    --accent:#4fd6ce; --accent-ink:#06201e; --accent-soft:#17302e; --accent-soft-border:#294a46;
+    --good:#5cc98a; --good-soft:#173226;
+    --warn:#e0a94f; --warn-soft:#332b16;
+    --crit:#ec8478; --crit-soft:#361f1c;
+    --transit:#c3a2e6; --transit-soft:#2a2035;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{background:var(--bg); color:var(--text); font-family:"IBM Plex Sans", system-ui, sans-serif; font-size:14px; line-height:1.5;}
+  h1,h2,h3{font-family:"Manrope", system-ui, sans-serif; text-wrap:balance; margin:0;}
+  code,.mono{font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  .num{font-variant-numeric:tabular-nums;}
+  button,select,input{font-family:inherit; font-size:inherit;}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+
+  .app{max-width:1400px; margin:0 auto; padding:20px 24px 64px;}
+
+  .topbar{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; padding-bottom:16px; margin-bottom:6px; border-bottom:1px solid var(--border);}
+  .topbar-id{display:flex; flex-direction:column; gap:2px;}
+  .eyebrow{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint); font-weight:600;}
+  .topbar-id h1{font-size:22px; font-weight:800;}
+  .mode-pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:5px 12px; border-radius:99px; margin-top:4px; width:fit-content;}
+  .mode-pill.pusat{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-soft-border);}
+  .mode-pill.cabang{background:var(--transit-soft); color:var(--transit); border:1px solid var(--transit);}
+
+  select.scope{
+    appearance:none; background:var(--surface); border:1px solid var(--border); color:var(--text);
+    padding:8px 34px 8px 12px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) calc(1em + 1px), calc(100% - 11px) calc(1em + 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat;
+  }
+  select.scope:disabled{opacity:.6; cursor:not-allowed;}
+
+  .qa-row{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding:14px 0 18px;}
+  .qa-bar{display:flex; gap:8px; flex-wrap:wrap;}
+  .qa-btn{display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 14px 8px 12px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; transition:border-color .15s, background .15s;}
+  .qa-btn:hover{border-color:var(--accent); background:var(--accent-soft);}
+  .qa-btn .plus{color:var(--accent); font-weight:800;}
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{display:grid; grid-template-columns:2fr 1.2fr 1.2fr 1.2fr; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:14px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint);}
+  .field input[type="search"], .field select{
+    background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; color:var(--text);
+  }
+  .field select{appearance:none; cursor:pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%), linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 14px) calc(1em - 1px), calc(100% - 9px) calc(1em - 1px);
+    background-size: 5px 5px, 5px 5px; background-repeat:no-repeat; padding-right:30px;
+  }
+  .status-seg{display:flex; gap:6px;}
+  .seg-btn{flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--text-muted); padding:8px 6px; border-radius:7px; font-weight:600; font-size:12.5px; cursor:pointer; text-align:center;}
+  .seg-btn.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+  .seg-btn.active.crit-active{background:var(--crit); border-color:var(--crit);}
+
+  /* ---------- Table ---------- */
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);}
+  table.stock{width:100%; border-collapse:collapse; min-width:980px;}
+  table.stock thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--surface-2); white-space:nowrap;}
+  table.stock td{padding:12px 14px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:top;}
+  table.stock tbody tr:last-child td{border-bottom:none;}
+  table.stock tbody tr:hover{background:var(--surface-2);}
+
+  .pop-tag{font-weight:700;}
+  .pop-tag .type{display:block; font-size:11px; font-weight:600; color:var(--text-faint); text-transform:uppercase; letter-spacing:.03em;}
+
+  .item-name{font-weight:700;}
+  .item-sub{color:var(--text-faint); font-size:11.5px; margin-top:2px;}
+
+  .track-badge{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.02em; padding:3px 9px; border-radius:6px; text-transform:uppercase; cursor:pointer; border:1px solid transparent; background:none;}
+  .track-badge.serialized{background:var(--accent-soft); color:var(--accent); border-color:var(--accent-soft-border);}
+  .track-badge.batch{background:var(--transit-soft); color:var(--transit); border-color:var(--transit);}
+  .track-badge.quantity{background:var(--surface-2); color:var(--text-muted); border-color:var(--border);}
+  .track-badge:hover{filter:brightness(0.97);}
+  .track-sub{display:block; color:var(--text-faint); font-size:11px; margin-top:4px;}
+
+  .health{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px;}
+  .health-dot{width:8px; height:8px; border-radius:50%;}
+  .health.aman .health-dot{background:var(--good);} .health.aman{color:var(--good);}
+  .health.kritis .health-dot{background:var(--crit);} .health.kritis{color:var(--crit);}
+  .health-sub{display:block; color:var(--text-faint); font-weight:500; font-size:11px; margin-top:3px;}
+
+  .qty-cell{font-weight:700;}
+  .qty-cell .unit{font-weight:500; color:var(--text-muted);}
+
+  .row-menu{position:relative;}
+  .kebab-btn{background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:6px 10px; cursor:pointer; font-weight:700; color:var(--text-muted); white-space:nowrap;}
+  .kebab-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .dropdown{position:absolute; right:0; top:calc(100% + 4px); background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); min-width:180px; z-index:20; padding:6px; display:flex; flex-direction:column; gap:2px;}
+  .dropdown[hidden]{display:none;}
+  .dropdown button{background:none; border:none; text-align:left; padding:8px 10px; border-radius:6px; font-size:13px; color:var(--text); cursor:pointer;}
+  .dropdown button:hover{background:var(--accent-soft); color:var(--accent);}
+
+  .table-foot{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font-size:12px; color:var(--text-faint); border-top:1px solid var(--border);}
+  .empty-state{padding:48px 20px; text-align:center; color:var(--text-faint);}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(10,16,17,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  .modal-backdrop[hidden]{display:none;}
+  .modal{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; display:flex; flex-direction:column; gap:12px; max-height:80vh; overflow-y:auto;}
+  .modal h3{font-size:16px;}
+  .modal p{font-size:13px; color:var(--text-muted); line-height:1.6;}
+  .modal .route{font-size:12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:8px 10px;}
+  .sn-list{display:flex; flex-direction:column; gap:4px; max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:7px; padding:8px;}
+  .sn-list div{font-size:12.5px; display:flex; justify-content:space-between; padding:4px 4px;}
+  .sn-list div .st{color:var(--good); font-weight:600; font-size:11px; text-transform:uppercase;}
+  .modal-close{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border:none; border-radius:7px; padding:8px 16px; font-weight:700; cursor:pointer;}
+
+  @media (max-width: 1080px){ .toolbar{grid-template-columns:1fr 1fr;} }
+  @media (max-width: 620px){ .toolbar{grid-template-columns:1fr;} table.stock{min-width:820px;} }
+</style>
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="topbar-id">
+      <span class="eyebrow">Modul Gudang · Whusnet Operasional</span>
+      <h1>Kelola Stok Gudang</h1>
+      <span class="mode-pill pusat" id="modePill">Mode: Semua Gudang (Nasional)</span>
+    </div>
+    <select class="scope" id="scopeSelect" aria-label="Simulasikan peran &amp; cakupan login">
+      <option value="all">👑 Owner / Admin — Semua POP</option>
+      <option value="pusat">🏢 Login sebagai Gudang Pusat</option>
+      <option value="siman">🏬 Login sebagai pop_admin — Cabang Siman</option>
+      <option value="babadan">🏬 Login sebagai pop_admin — Cabang Babadan</option>
+      <option value="kauman">🏬 Login sebagai pop_admin — Cabang Kauman</option>
+    </select>
+  </div>
+
+  <div class="qa-row">
+    <span class="eyebrow" style="color:var(--text-muted);">Tombol aksi cepat menyesuaikan peran login</span>
+    <div class="qa-bar" id="qaBar"><button class="qa-btn" data-modal="receive"><span class="plus">+</span> Terima Barang Baru</button><button class="qa-btn" data-modal="transfer"><span class="plus">+</span> Kirim Transfer ke Cabang</button><button class="qa-btn" data-modal="issue"><span class="plus">+</span> Serahkan ke Teknisi</button></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field">
+      <label for="searchInput">Cari Nama / SKU / Lot / SN</label>
+      <input type="search" id="searchInput" placeholder="Ketik untuk mencari…">
+    </div>
+    <div class="field">
+      <label for="popFilter">Gudang POP</label>
+      <select id="popFilter"><option value="all">Semua Gudang</option><option value="pusat">Gudang Pusat</option><option value="siman">Cabang Siman</option><option value="babadan">Cabang Babadan</option><option value="kauman">Cabang Kauman</option></select>
+    </div>
+    <div class="field">
+      <label for="trackFilter">Jenis Tracking</label>
+      <select id="trackFilter">
+        <option value="all">Semua Jenis</option>
+        <option value="SERIALIZED">Serialized</option>
+        <option value="BATCH">Batch / Lot</option>
+        <option value="QUANTITY">Quantity</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Status Stok</label>
+      <div class="status-seg" id="statusSeg">
+        <button class="seg-btn active" data-status="all">Semua</button>
+        <button class="seg-btn" data-status="aman">Aman</button>
+        <button class="seg-btn" data-status="kritis">Kritis ⚠️</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="stock">
+      <thead>
+        <tr>
+          <th>Gudang POP</th><th>Detail Barang</th><th>Jenis &amp; Lot</th><th>Status Stok</th><th>Qty Tersedia</th><th>Aksi Cepat</th>
+        </tr>
+      </thead>
+      <tbody id="stockBody"><tr><td><div class="pop-tag">Gudang Pusat<span class="type">Pusat</span></div></td><td><div class="item-name">ONT Huawei HG8245H5</div><div class="item-sub mono">SKU: ONT-HW-01</div><div class="item-sub">Kategori: ONT</div></td><td><div><button class="track-badge serialized" data-track-modal="1">SERIALIZED</button><span class="track-sub">85 SN siap</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 20 Unit · Opname: 3 hr lalu</span></div></td><td class="qty-cell num">85 <span class="unit">Unit</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="transfer" data-item="ONT Huawei HG8245H5">🚚 Kirim Transfer</button><button data-modal="issue" data-item="ONT Huawei HG8245H5">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="ONT Huawei HG8245H5">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="ONT Huawei HG8245H5">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Siman<span class="type">Cabang</span></div></td><td><div class="item-name">Dropcore 1 Core 1000M</div><div class="item-sub mono">SKU: DC-1C-01</div><div class="item-sub">Kategori: Kabel Fiber</div></td><td><div><button class="track-badge batch" data-track-modal="1">BATCH / LOT</button><span class="track-sub">Lot: LOT-2026-002</span></div></td><td><div><span class="health kritis"><span class="health-dot"></span>Kritis</span><span class="health-sub">Min: 500 Meter · Opname: —</span></div></td><td class="qty-cell num">150 <span class="unit">Meter</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="Dropcore 1 Core 1000M">📨 Minta Stok</button><button data-modal="issue" data-item="Dropcore 1 Core 1000M">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="Dropcore 1 Core 1000M">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="Dropcore 1 Core 1000M">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Babadan<span class="type">Cabang</span></div></td><td><div class="item-name">RJ45 Cat5e (Pack)</div><div class="item-sub mono">SKU: RJ45-5E-01</div><div class="item-sub">Kategori: Aksesori</div></td><td><div><button class="track-badge quantity" data-track-modal="1">QUANTITY</button><span class="track-sub">Non-serial</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 5 Pack · Opname: 12 hr lalu</span></div></td><td class="qty-cell num">12 <span class="unit">Pack</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="RJ45 Cat5e (Pack)">📨 Minta Stok</button><button data-modal="issue" data-item="RJ45 Cat5e (Pack)">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="RJ45 Cat5e (Pack)">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="RJ45 Cat5e (Pack)">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Gudang Pusat<span class="type">Pusat</span></div></td><td><div class="item-name">Patchcord SC-UPC 3M</div><div class="item-sub mono">SKU: PC-SC-03</div><div class="item-sub">Kategori: Aksesori</div></td><td><div><button class="track-badge quantity" data-track-modal="1">QUANTITY</button><span class="track-sub">Non-serial</span></div></td><td><div><span class="health kritis"><span class="health-dot"></span>Kritis</span><span class="health-sub">Min: 100 Pcs · Opname: 9 hr lalu</span></div></td><td class="qty-cell num">80 <span class="unit">Pcs</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="transfer" data-item="Patchcord SC-UPC 3M">🚚 Kirim Transfer</button><button data-modal="issue" data-item="Patchcord SC-UPC 3M">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="Patchcord SC-UPC 3M">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="Patchcord SC-UPC 3M">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Babadan<span class="type">Cabang</span></div></td><td><div class="item-name">ONT Huawei HG8245H5</div><div class="item-sub mono">SKU: ONT-HW-01</div><div class="item-sub">Kategori: ONT</div></td><td><div><button class="track-badge serialized" data-track-modal="1">SERIALIZED</button><span class="track-sub">2 SN siap</span></div></td><td><div><span class="health kritis"><span class="health-dot"></span>Kritis</span><span class="health-sub">Min: 20 Unit · Opname: 20 hr lalu</span></div></td><td class="qty-cell num">2 <span class="unit">Unit</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="ONT Huawei HG8245H5">📨 Minta Stok</button><button data-modal="issue" data-item="ONT Huawei HG8245H5">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="ONT Huawei HG8245H5">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="ONT Huawei HG8245H5">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Kauman<span class="type">Cabang</span></div></td><td><div class="item-name">Switch 8 Port TP-Link</div><div class="item-sub mono">SKU: SW-8P-01</div><div class="item-sub">Kategori: Perangkat Jaringan</div></td><td><div><button class="track-badge serialized" data-track-modal="1">SERIALIZED</button><span class="track-sub">59 SN siap</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 10 Unit · Opname: 6 hr lalu</span></div></td><td class="qty-cell num">59 <span class="unit">Unit</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="Switch 8 Port TP-Link">📨 Minta Stok</button><button data-modal="issue" data-item="Switch 8 Port TP-Link">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="Switch 8 Port TP-Link">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="Switch 8 Port TP-Link">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Gudang Pusat<span class="type">Pusat</span></div></td><td><div class="item-name">ONT ZTE F609</div><div class="item-sub mono">SKU: ONT-ZTE-01</div><div class="item-sub">Kategori: ONT</div></td><td><div><button class="track-badge serialized" data-track-modal="1">SERIALIZED</button><span class="track-sub">120 SN siap</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 30 Unit · Opname: 5 hr lalu</span></div></td><td class="qty-cell num">120 <span class="unit">Unit</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="transfer" data-item="ONT ZTE F609">🚚 Kirim Transfer</button><button data-modal="issue" data-item="ONT ZTE F609">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="ONT ZTE F609">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="ONT ZTE F609">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Siman<span class="type">Cabang</span></div></td><td><div class="item-name">RJ45 Cat5e (Pack)</div><div class="item-sub mono">SKU: RJ45-5E-01</div><div class="item-sub">Kategori: Aksesori</div></td><td><div><button class="track-badge quantity" data-track-modal="1">QUANTITY</button><span class="track-sub">Non-serial</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 5 Pack · Opname: 18 hr lalu</span></div></td><td class="qty-cell num">9 <span class="unit">Pack</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="RJ45 Cat5e (Pack)">📨 Minta Stok</button><button data-modal="issue" data-item="RJ45 Cat5e (Pack)">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="RJ45 Cat5e (Pack)">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="RJ45 Cat5e (Pack)">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Gudang Pusat<span class="type">Pusat</span></div></td><td><div class="item-name">Splicer Fusion (Alat)</div><div class="item-sub mono">SKU: TOOL-SPL-01</div><div class="item-sub">Kategori: Alat Kerja</div></td><td><div><button class="track-badge quantity" data-track-modal="1">QUANTITY</button><span class="track-sub">Non-serial</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 3 Unit · Opname: 22 hr lalu</span></div></td><td class="qty-cell num">6 <span class="unit">Unit</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="transfer" data-item="Splicer Fusion (Alat)">🚚 Kirim Transfer</button><button data-modal="issue" data-item="Splicer Fusion (Alat)">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="Splicer Fusion (Alat)">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="Splicer Fusion (Alat)">🎚 Atur Ambang (Threshold)</button></div></div></td></tr><tr><td><div class="pop-tag">Cabang Kauman<span class="type">Cabang</span></div></td><td><div class="item-name">Dropcore 1 Core 1000M</div><div class="item-sub mono">SKU: DC-1C-01</div><div class="item-sub">Kategori: Kabel Fiber</div></td><td><div><button class="track-badge batch" data-track-modal="1">BATCH / LOT</button><span class="track-sub">Lot: LOT-2026-004</span></div></td><td><div><span class="health aman"><span class="health-dot"></span>Aman</span><span class="health-sub">Min: 500 Meter · Opname: 2 hr lalu</span></div></td><td class="qty-cell num">620 <span class="unit">Meter</span></td><td><div class="row-menu"><button class="kebab-btn">⋮ Aksi ▾</button><div class="dropdown" hidden=""><button data-modal="request" data-item="Dropcore 1 Core 1000M">📨 Minta Stok</button><button data-modal="issue" data-item="Dropcore 1 Core 1000M">👷 Serahkan ke Teknisi</button><button data-modal="opname" data-item="Dropcore 1 Core 1000M">📋 Opname / Sesuaikan</button><button data-modal="threshold" data-item="Dropcore 1 Core 1000M">🎚 Atur Ambang (Threshold)</button></div></div></td></tr></tbody>
+    </table>
+    <div class="table-foot">
+      <span id="countLabel">Menampilkan 10 dari 10 Data Stok</span>
+      <span class="mono">Halaman 1 / 1</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden="">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">ONT ZTE F609 — Daftar Serial Number</h3>
+    <div id="modalBody"><p>Unit yang tersedia di Gudang Pusat:</p><div class="sn-list mono"><div><span>ZTEG12340001</span><span class="st">AVAILABLE</span></div><div><span>ZTEG12340002</span><span class="st">AVAILABLE</span></div><div><span>ZTEG12340003</span><span class="st">AVAILABLE</span></div><div><span>+ 117 unit lain, AVAILABLE</span></div></div><button class="modal-close" id="dynClose">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var POPS = {
+    pusat:   {label:"Gudang Pusat", type:"pusat"},
+    siman:   {label:"Cabang Siman", type:"cabang"},
+    babadan: {label:"Cabang Babadan", type:"cabang"},
+    kauman:  {label:"Cabang Kauman", type:"cabang"}
+  };
+
+  var STOCK = [
+    {pop:"pusat", name:"ONT Huawei HG8245H5", sku:"ONT-HW-01", cat:"ONT", track:"SERIALIZED", qty:85, min:20, unit:"Unit", opname:3,
+      sns:["HWTC12345678 · AVAILABLE","HWTC12345679 · AVAILABLE","HWTC12345680 · AVAILABLE","HWTC12345681 · AVAILABLE","HWTC12345682 · AVAILABLE","+ 80 unit lain, AVAILABLE"]},
+    {pop:"siman", name:"Dropcore 1 Core 1000M", sku:"DC-1C-01", cat:"Kabel Fiber", track:"BATCH", qty:150, min:500, unit:"Meter", opname:null,
+      lot:"LOT-2026-002", lotInfo:"1 drum, sisa 150 m dari 1.000 m awal — dipakai Issue ISS-20260907-000058"},
+    {pop:"babadan", name:"RJ45 Cat5e (Pack)", sku:"RJ45-5E-01", cat:"Aksesori", track:"QUANTITY", qty:12, min:5, unit:"Pack", opname:12},
+    {pop:"pusat", name:"Patchcord SC-UPC 3M", sku:"PC-SC-03", cat:"Aksesori", track:"QUANTITY", qty:80, min:100, unit:"Pcs", opname:9},
+    {pop:"babadan", name:"ONT Huawei HG8245H5", sku:"ONT-HW-01", cat:"ONT", track:"SERIALIZED", qty:2, min:20, unit:"Unit", opname:20,
+      sns:["HWTC87651000 · AVAILABLE","HWTC87651001 · AVAILABLE"]},
+    {pop:"kauman", name:"Switch 8 Port TP-Link", sku:"SW-8P-01", cat:"Perangkat Jaringan", track:"SERIALIZED", qty:59, min:10, unit:"Unit", opname:6,
+      sns:["TPSW90001 · AVAILABLE","TPSW90002 · AVAILABLE","TPSW90003 · AVAILABLE","+ 56 unit lain, AVAILABLE"]},
+    {pop:"pusat", name:"ONT ZTE F609", sku:"ONT-ZTE-01", cat:"ONT", track:"SERIALIZED", qty:120, min:30, unit:"Unit", opname:5,
+      sns:["ZTEG12340001 · AVAILABLE","ZTEG12340002 · AVAILABLE","ZTEG12340003 · AVAILABLE","+ 117 unit lain, AVAILABLE"]},
+    {pop:"siman", name:"RJ45 Cat5e (Pack)", sku:"RJ45-5E-01", cat:"Aksesori", track:"QUANTITY", qty:9, min:5, unit:"Pack", opname:18},
+    {pop:"pusat", name:"Splicer Fusion (Alat)", sku:"TOOL-SPL-01", cat:"Alat Kerja", track:"QUANTITY", qty:6, min:3, unit:"Unit", opname:22},
+    {pop:"kauman", name:"Dropcore 1 Core 1000M", sku:"DC-1C-01", cat:"Kabel Fiber", track:"BATCH", qty:620, min:500, unit:"Meter", opname:2,
+      lot:"LOT-2026-004", lotInfo:"1 drum, sisa 620 m dari 1.000 m awal"}
+  ];
+
+  STOCK.forEach(function(s){ s.health = s.qty <= s.min ? "kritis" : "aman"; });
+
+  function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!==undefined) e.innerHTML=html; return e; }
+  function fmt(n){ return n.toLocaleString("id-ID"); }
+
+  // ---------- Header: scope / role simulation ----------
+  var scopeSelect = document.getElementById("scopeSelect");
+  var modePill = document.getElementById("modePill");
+  var popFilter = document.getElementById("popFilter");
+  var qaBar = document.getElementById("qaBar");
+
+  var QA = {
+    pusat: [
+      {label:"Terima Barang Baru", modal:"receive"},
+      {label:"Kirim Transfer ke Cabang", modal:"transfer"},
+      {label:"Serahkan ke Teknisi", modal:"issue"}
+    ],
+    cabang: [
+      {label:"Ajukan Permintaan Stok", modal:"request"},
+      {label:"Konfirmasi Terima Transfer", modal:"confirm"},
+      {label:"Serah Teknisi", modal:"issue"}
+    ]
+  };
+
+  function currentRoleType(scope){
+    return scope === "pusat" || scope === "all" ? "pusat" : "cabang";
+  }
+
+  function renderHeader(scope){
+    var roleType = currentRoleType(scope);
+    modePill.className = "mode-pill " + roleType;
+    modePill.textContent = scope === "all" ? "Mode: Semua Gudang (Nasional)"
+      : scope === "pusat" ? "Mode: Gudang Pusat"
+      : "Mode: " + POPS[scope].label + " (terkunci)";
+
+    qaBar.innerHTML = "";
+    QA[roleType].forEach(function(a){
+      var btn = el("button", "qa-btn", "<span class='plus'>+</span> " + a.label);
+      btn.setAttribute("data-modal", a.modal);
+      qaBar.appendChild(btn);
+    });
+
+    // toolbar POP filter: locked for pop_admin, free choice for owner/admin/pusat
+    popFilter.innerHTML = "";
+    if(scope === "all" || scope === "pusat"){
+      popFilter.disabled = false;
+      popFilter.appendChild(el("option", "", "Semua Gudang"));
+      popFilter.children[0].value = "all";
+      Object.keys(POPS).forEach(function(k){
+        var o = el("option", "", POPS[k].label); o.value = k; popFilter.appendChild(o);
+      });
+      popFilter.value = "all";
+    } else {
+      popFilter.disabled = true;
+      var locked = el("option", "", POPS[scope].label + " (terkunci scope)");
+      locked.value = scope;
+      popFilter.appendChild(locked);
+      popFilter.value = scope;
+    }
+  }
+
+  // ---------- Filters + table ----------
+  var searchInput = document.getElementById("searchInput");
+  var trackFilter = document.getElementById("trackFilter");
+  var statusSeg = document.getElementById("statusSeg");
+  var stockBody = document.getElementById("stockBody");
+  var countLabel = document.getElementById("countLabel");
+
+  var state = {scope:"all", search:"", pop:"all", track:"all", status:"all"};
+
+  function matches(row){
+    if(state.pop !== "all" && row.pop !== state.pop) return false;
+    if(state.track !== "all" && row.track !== state.track) return false;
+    if(state.status !== "all" && row.health !== state.status) return false;
+    if(state.search){
+      var q = state.search.toLowerCase();
+      var hay = [row.name, row.sku, row.lot || "", (row.sns||[]).join(" ")].join(" ").toLowerCase();
+      if(hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  }
+
+  function trackBadge(row){
+    var cls = row.track.toLowerCase();
+    var label = row.track === "SERIALIZED" ? "SERIALIZED" : row.track === "BATCH" ? "BATCH / LOT" : "QUANTITY";
+    var sub = row.track === "SERIALIZED" ? fmt(row.qty) + " SN siap"
+      : row.track === "BATCH" ? "Lot: " + row.lot
+      : "Non-serial";
+    var wrap = el("div");
+    var badge = el("button", "track-badge " + cls, label);
+    badge.setAttribute("data-track-modal", "1");
+    wrap.appendChild(badge);
+    wrap.appendChild(el("span", "track-sub", sub));
+    return wrap;
+  }
+
+  function healthCell(row){
+    var wrap = el("div");
+    var h = el("span", "health " + row.health, "<span class='health-dot'></span>" + (row.health === "aman" ? "Aman" : "Kritis"));
+    wrap.appendChild(h);
+    var subText = "Min: " + fmt(row.min) + " " + row.unit;
+    if(row.opname !== null && row.opname !== undefined){
+      subText += " · Opname: " + row.opname + " hr lalu";
+    } else {
+      subText += " · Opname: —";
+    }
+    wrap.appendChild(el("span", "health-sub", subText));
+    return wrap;
+  }
+
+  function rowActions(row){
+    var wrap = el("div", "row-menu");
+    var btn = el("button", "kebab-btn", "⋮ Aksi ▾");
+    var menu = el("div", "dropdown");
+    menu.hidden = true;
+
+    var actions = [];
+    var roleType = currentRoleType(state.scope);
+    var isPusatRow = row.pop === "pusat";
+
+    if(roleType === "pusat" && isPusatRow){
+      actions = [
+        {label:"🚚 Kirim Transfer", modal:"transfer"},
+        {label:"👷 Serahkan ke Teknisi", modal:"issue"},
+        {label:"📋 Opname / Sesuaikan", modal:"opname"},
+        {label:"🎚 Atur Ambang (Threshold)", modal:"threshold"}
+      ];
+    } else {
+      actions = [
+        {label:"📨 Minta Stok", modal:"request"},
+        {label:"👷 Serahkan ke Teknisi", modal:"issue"},
+        {label:"📋 Opname / Sesuaikan", modal:"opname"},
+        {label:"🎚 Atur Ambang (Threshold)", modal:"threshold"}
+      ];
+    }
+
+    actions.forEach(function(a){
+      var b = el("button", "", a.label);
+      b.setAttribute("data-modal", a.modal);
+      b.setAttribute("data-item", row.name);
+      menu.appendChild(b);
+    });
+
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      document.querySelectorAll(".dropdown").forEach(function(d){ if(d !== menu) d.hidden = true; });
+      menu.hidden = !menu.hidden;
+    });
+
+    wrap.appendChild(btn); wrap.appendChild(menu);
+    return wrap;
+  }
+
+  function renderTable(){
+    var rows = STOCK.filter(matches);
+    stockBody.innerHTML = "";
+    if(rows.length === 0){
+      var tr = el("tr");
+      var td = el("td", "empty-state", "Tidak ada item cocok dengan filter ini.");
+      td.colSpan = 6;
+      tr.appendChild(td);
+      stockBody.appendChild(tr);
+    } else {
+      rows.forEach(function(row){
+        var tr = el("tr");
+
+        var tdPop = el("td");
+        var popWrap = el("div", "pop-tag", POPS[row.pop].label);
+        popWrap.appendChild(el("span", "type", POPS[row.pop].type === "pusat" ? "Pusat" : "Cabang"));
+        tdPop.appendChild(popWrap);
+
+        var tdItem = el("td");
+        tdItem.appendChild(el("div", "item-name", row.name));
+        tdItem.appendChild(el("div", "item-sub mono", "SKU: " + row.sku));
+        tdItem.appendChild(el("div", "item-sub", "Kategori: " + row.cat));
+
+        var tdTrack = el("td");
+        tdTrack.appendChild(trackBadge(row));
+        var badgeBtn = tdTrack.querySelector(".track-badge");
+        badgeBtn.addEventListener("click", function(){ openTrackModal(row); });
+
+        var tdHealth = el("td");
+        tdHealth.appendChild(healthCell(row));
+
+        var tdQty = el("td", "qty-cell num", fmt(row.qty) + " <span class='unit'>" + row.unit + "</span>");
+
+        var tdAction = el("td");
+        tdAction.appendChild(rowActions(row));
+
+        [tdPop, tdItem, tdTrack, tdHealth, tdQty, tdAction].forEach(function(td){ tr.appendChild(td); });
+        stockBody.appendChild(tr);
+      });
+    }
+    countLabel.textContent = "Menampilkan " + rows.length + " dari " + STOCK.length + " Data Stok";
+  }
+
+  // ---------- Modals ----------
+  var backdrop = document.getElementById("modalBackdrop");
+  var modalTitle = document.getElementById("modalTitle");
+  var modalBody = document.getElementById("modalBody");
+
+  var MODAL_COPY = {
+    receive: {title:"Terima Barang Baru", body:"<p>Formulir penerimaan barang dari distributor/vendor — validasi SN/MAC per unit, penomoran lot drum kabel fiber, referensi nomor DO/nota.</p><div class='route mono'>/warehouse/receive/create</div>"},
+    transfer: {title:"Kirim Transfer ke Cabang", body:"<p>Form transfer terisi otomatis dari item &amp; gudang asal yang dipilih. Kalau qty terkirim kurang dari yang diminta cabang, tiket Permintaan Stok terkait otomatis berstatus PARTIAL.</p><div class='route mono'>/warehouse/transfers/create</div>"},
+    issue: {title:"Serah Terima ke Teknisi", body:"<p>Mode mobile-first: scan SN modem beruntun via kamera, atau input meter untuk kabel &amp; aksesoris pasif.</p><div class='route mono'>/warehouse/issues/create</div>"},
+    request: {title:"Ajukan Permintaan Stok", body:"<p>Kirim tiket PST ke Gudang Pusat. Pemenuhan tetap lewat Transfer Antar Gudang, mendukung pengiriman bertahap (parsial).</p><div class='route mono'>/warehouse/stock-requests/create</div>"},
+    confirm: {title:"Konfirmasi Terima Transfer", body:"<p>Wajib cek fisik &amp; verifikasi tiap SN in-transit sebelum status transfer berubah jadi diterima. Cuma muncul untuk transfer yang tujuannya gudang cabang ini.</p><div class='route mono'>/warehouse/transfers/{id}/confirm</div>"},
+    opname: {title:"Opname / Sesuaikan Stok", body:"<p>Catat hasil hitung fisik. Selisih vs sistem otomatis jadi transaksi ADJUSTMENT. Rusak/Hilang/Scrapped wajib lampiran foto atau BAP (disimpan di disk privat).</p><div class='route mono'>/warehouse/adjustments/create</div>"},
+    threshold: {title:"Atur Ambang (Threshold)", body:"<p>Set batas minimum stok per item per gudang. Kalau qty tersedia turun sampai ke batas ini, item masuk daftar Peringatan Stok Rendah di dashboard.</p><div class='route mono'>/warehouse/thresholds/{item}</div>"}
+  };
+
+  function openModal(key){
+    var c = MODAL_COPY[key];
+    if(!c) return;
+    modalTitle.textContent = c.title;
+    modalBody.innerHTML = c.body + "<button class='modal-close' id='dynClose'>Tutup</button>";
+    backdrop.hidden = false;
+    document.getElementById("dynClose").addEventListener("click", closeModal);
+  }
+
+  function openTrackModal(row){
+    modalTitle.textContent = row.name + " — " + (row.track === "BATCH" ? "Info Lot" : row.track === "SERIALIZED" ? "Daftar Serial Number" : "Non-Serial");
+    var html = "";
+    if(row.track === "SERIALIZED"){
+      html += "<p>Unit yang tersedia di " + POPS[row.pop].label + ":</p><div class='sn-list mono'>";
+      row.sns.forEach(function(s){
+        var parts = s.split(" · ");
+        html += "<div><span>" + parts[0] + "</span>" + (parts[1] ? "<span class='st'>" + parts[1] + "</span>" : "") + "</div>";
+      });
+      html += "</div>";
+    } else if(row.track === "BATCH"){
+      html += "<p><strong class='mono'>" + row.lot + "</strong></p><p>" + row.lotInfo + "</p>";
+    } else {
+      html += "<p>Item non-serial, dilacak berdasar jumlah (qty) saja — tidak ada nomor seri per unit.</p>";
+    }
+    html += "<button class='modal-close' id='dynClose'>Tutup</button>";
+    modalBody.innerHTML = html;
+    backdrop.hidden = false;
+    document.getElementById("dynClose").addEventListener("click", closeModal);
+  }
+
+  function closeModal(){ backdrop.hidden = true; }
+
+  document.addEventListener("click", function(e){
+    var trigger = e.target.closest("[data-modal]");
+    if(trigger){ openModal(trigger.getAttribute("data-modal")); return; }
+    if(!e.target.closest(".dropdown") && !e.target.closest(".kebab-btn")){
+      document.querySelectorAll(".dropdown").forEach(function(d){ d.hidden = true; });
+    }
+    if(e.target === backdrop) closeModal();
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") closeModal(); });
+
+  // ---------- Wire up controls ----------
+  scopeSelect.addEventListener("change", function(e){
+    state.scope = e.target.value;
+    renderHeader(state.scope);
+    state.pop = popFilter.value;
+    renderTable();
+  });
+  popFilter.addEventListener("change", function(e){ state.pop = e.target.value; renderTable(); });
+  trackFilter.addEventListener("change", function(e){ state.track = e.target.value; renderTable(); });
+  searchInput.addEventListener("input", function(e){ state.search = e.target.value; renderTable(); });
+  statusSeg.addEventListener("click", function(e){
+    var b = e.target.closest(".seg-btn");
+    if(!b) return;
+    statusSeg.querySelectorAll(".seg-btn").forEach(function(x){ x.classList.remove("active","crit-active"); });
+    b.classList.add("active");
+    if(b.dataset.status === "kritis") b.classList.add("crit-active");
+    state.status = b.dataset.status;
+    renderTable();
+  });
+
+  renderHeader(state.scope);
+  renderTable();
+})();
+</script>
+
+</body></html>

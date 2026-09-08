@@ -2,42 +2,63 @@
 
 ## 1. Pemetaan Fitur & Hak Akses
 
-┌───────────────────────────┬───────────────┬────────────────────────────────────────────────────────────────────────┐
-│         Feature           │    Halaman    │                                Fungsi                                  │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse                 │ Dashboard &   │ Stat kartu stok, KPI, Riwayat Mutasi (semua transaksi lintas gudang)   │
-│                           │ Ledger        │                                                                        │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_transfer        │ Transfer      │ Pusat kirim barang ke Cabang (dispatch) + Cabang konfirmasi terima —   │
-│                           │ Antar Gudang  │ scan validasi / konfirmasi fisik                                       │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_issue           │ Serah Terima  │ Cabang kasih barang ke teknisi (Issue) — scan validasi                 │
-│                           │ ke Teknisi    │                                                                        │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_custody         │ Custody       │ Admin/gudang lihat barang di tangan SEMUA teknisi (Custody sendiri     │
-│                           │ Teknisi       │ teknisi ada di halaman Task-nya, tanpa permission terpisah)            │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_traceability    │ Lacak         │ Cari 1 SN → riwayat lengkap dari masuk sampai ke pelanggan —           │
-│                           │ Barang/SN     │ Single/Batch Assign via scan                                           │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_adjustment      │ Adjustment    │ Lapor Rusak/Hilang/Scrapped (wajib bukti foto/BAP) + Stock Opname      │
-│                           │ Stok          │                                                                        │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_reassign        │ Reassign      │ Pindahkan barang dari teknisi resign/cuti ke teknisi lain atau balikin │
-│                           │ Custody       │ ke gudang cabang                                                       │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_report          │ Laporan       │ Agregat periodik — Pergerakan Barang & Kerugian per gudang / bulan     │
-│                           │ Gudang        │                                                                        │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_stock_request   │ Permintaan    │ Cabang ajukan permintaan stok ke Pusat (tiket komunikasi/request —     │
-│                           │ Stok          │ pemenuhan tetap diteruskan ke Transfer Antar Gudang)                   │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_transfer.create │ Barang Masuk  │ Proses penerimaan barang masuk dari distributor/vendor ke Pusat/Cabang │
-│ (Receive)                 │ (Receive)     │ validasi SN/MAC, penomoran lot kabel fiber, dan referensi nota/DO      │
-├───────────────────────────┼───────────────┼────────────────────────────────────────────────────────────────────────┤
-│ warehouse_adjustment.     │ Ambang Stok   │ Pengaturan batas minimum stok per item & per gudang (Threshold)        │
-│ create (Threshold)        │ Rendah        │ untuk memicu peringatan restock dini                                   │
-└───────────────────────────┴───────────────┴────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────┬───────────────────────────────────────┬───────────────────────────────┬────────────────────────────────────────────────────────────────────────┐
+│   Feature Code (Teknis)   │     Nama Label Tampilan UI Asli       │      Route / URL Sistem       │                                Fungsi                                  │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse                 │ Dashboard & Mutasi                    │ `warehouse.index`             │ Stat kartu stok, KPI, Riwayat Mutasi (semua transaksi lintas gudang)   │
+│                           │                                       │ `/warehouse`                  │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_stock           │ Kelola Stok                           │ `warehouse.stock.index`       │ Hub saldo stok fisik per gudang, filter status stok, & aksi mutasi     │
+│                           │                                       │ `/warehouse/stock`            │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_history         │ Riwayat Mutasi                        │ `warehouse.history.index`     │ Buku besar audit append-only seluruh mutasi barang & bukti dokumen/BAP │
+│                           │                                       │ `/warehouse/history`          │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_transfer        │ Transfer Cabang                       │ `warehouse.transfers.create`  │ Pusat kirim barang ke Cabang (dispatch) + Cabang konfirmasi terima —   │
+│                           │                                       │ `/warehouse/transfers`        │ scan validasi / konfirmasi fisik                                       │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_issue           │ Serah ke Teknisi                      │ `warehouse.issues.create`     │ Cabang serahkan barang ke teknisi (Issue) — scan validasi kamera HP    │
+│                           │                                       │ `/warehouse/issues`           │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_custody         │ Barang di Tangan Teknisi              │ `warehouse.custody.index`     │ Monitoring material & perangkat yang sedang dibawa SEMUA teknisi       │
+│                           │                                       │ `/warehouse/custody`          │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_traceability    │ Lacak Barang / SN                     │ `warehouse.traceability.index`│ Cari 1 SN → riwayat lengkap siklus dari masuk hingga ke pelanggan     │
+│                           │                                       │ `/warehouse/traceability`     │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_adjustment      │ Penyesuaian Stok & Stock Opname       │ `warehouse.adjustments.*`     │ Lapor Rusak/Hilang (BAP foto) + Stock Opname fisik berkala             │
+│                           │                                       │ `/warehouse/adjustments`      │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_reassign        │ Alihkan Barang / Kembalikan ke Gudang │ `warehouse.reassign.*`        │ Pindahkan barang dari teknisi resign/cuti ke teknisi lain atau gudang  │
+│                           │                                       │ `/warehouse/reassign`         │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_report          │ Laporan                               │ `warehouse.reports.index`     │ Agregat periodik — Pergerakan Barang & Rekapitulasi Kerugian per bulan │
+│                           │                                       │ `/warehouse/reports`          │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_stock_request   │ Permintaan Stok                       │ `warehouse.stock-requests.*`  │ Cabang ajukan tiket permintaan stok ke Pusat (PST-YYYYMMDD-XXXXXX)     │
+│                           │                                       │ `/warehouse/stock-requests`   │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_receive         │ Barang Masuk                          │ `warehouse.receive.create`    │ Penerimaan barang baru dari distributor/vendor ke Pusat (Receive)      │
+│                           │                                       │ `/warehouse/receive`          │                                                                        │
+├───────────────────────────┼───────────────────────────────────────┼───────────────────────────────┼────────────────────────────────────────────────────────────────────────┤
+│ warehouse_threshold       │ Ambang Batas Stok Rendah              │ `warehouse.stock.threshold.*` │ Pengaturan batas minimum & maksimum stok per item & per gudang POP     │
+│                           │                                       │ `/warehouse/stock/threshold`  │                                                                        │
+└───────────────────────────┴───────────────────────────────────────┴───────────────────────────────┴────────────────────────────────────────────────────────────────────────┘
+
+> 💡 **Komentar Penyelarasan Nama Teknis vs Label Tampilan Asli (UI)**:
+> Seluruh fitur di atas **sudah ada dan aktif di dalam sistem**, dengan padanan istilah berikut:
+> 1. `warehouse_traceability` di antarmuka web bernama **"Lacak Barang / SN"** (`resources/views/warehouse/traceability/index.blade.php`).
+> 2. `warehouse_custody` di antarmuka web bernama **"Barang di Tangan Teknisi"** (`resources/views/warehouse/custody/index.blade.php`).
+> 3. `warehouse_adjustment` di antarmuka web dibagi menjadi 2 menu aksi: **"Penyesuaian Stok"** (koreksi delta / BAP) dan **"Stock Opname"** (hitung fisik) (`resources/views/warehouse/adjustments/`).
+> 4. `warehouse_reassign` di antarmuka web dapat diakses dari tombol aksi **"Alihkan Barang"** atau **"Kembalikan ke Gudang"** pada baris data custody teknisi (`resources/views/warehouse/reassign/`).
+> 5. `warehouse_threshold` di antarmuka web dapat diakses melalui opsi **"Atur Ambang"** pada kolom aksi tabel Kelola Stok (`resources/views/warehouse/stock/threshold.blade.php`).
+> 6. `warehouse_receive` di antarmuka web bernama **"Barang Masuk"** (`resources/views/warehouse/receive/create.blade.php`).
+
+> **Catatan penamaan permission**: `warehouse_receive` dan `warehouse_threshold` adalah *feature* mandiri (bukan aksi numpang di `warehouse_transfer`/`warehouse_adjustment`), format tetap `{feature}.{action}` — jadi `warehouse_receive.create`, `warehouse_threshold.manage`, dst. Digenerate lewat `PermissionGeneratorService`, bukan hardcode.
+
+> **Catatan scope gudang**: hanya 2 level — **Gudang Pusat** dan **Gudang Cabang (POP)**. Tidak ada Mini POP/`pop_tree` di modul ini — scope cukup `all_pop` (Pusat/Owner/Admin) atau `selected_pop` (Admin Cabang terkunci ke POP-nya).
+
+> **Catatan konfirmasi terima transfer**: tidak ada permission action terpisah (`warehouse_transfer.confirm`). Tombol "Konfirmasi Terima" digerbang oleh kombinasi: permission `warehouse_transfer` (view/manage) + scope POP tujuan (`EffectiveAccessService::getAllowedPopIds()`) + status transfer `in_transit` — pola sama seperti `assertActorOwnsTicket()` di Ticketing (ownership by state, bukan permission granular per transisi).
 
 ---
 
@@ -74,7 +95,7 @@
 │ │ 📥 Arus Barang Hari Ini (Inbound vs Outbound)│ │ ⚠️ Peringatan Stok Rendah (Kritis)          │ │
 │ │ • Masuk: +50 ONT, +2 Drum Kabel              │ │ • Dropcore 1 Core (Cabang Siman: Sisa 150m) │ │
 │ │ • Keluar: -12 ONT ke Teknisi                 │ │ • ONT Huawei (Cabang Babadan: Sisa 2 unit)  │ │
-│ │ • Transfer Aktif: TRF-2026-0012 (In-Transit) │ │ [Progress Bar Sisa vs Min] [Aksi Restock]   │ │
+│ │ • Transfer Aktif: TRF-20260905-000012 (In-Transit)│ │ [Progress Bar Sisa vs Min] [Aksi Restock]   │ │
 │ └──────────────────────────────────────────────┘ └─────────────────────────────────────────────┘ │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ ZONA 3: AUDIT & KONTROL INTERNAL (Grid 2 Kolom: 6 / 6)                                           │
@@ -121,7 +142,7 @@
 
 #### E. Zona 4: Riwayat Mutasi Terbaru
 * **Audit Trail**: Menggunakan tabel ledger append-only `inventory_transactions`.
-* **Navigasi Langsung**: Klik pada baris mutasi membuka dokumen terkait (`TRF-XXXX`, `ISS-XXXX`, atau halaman `Traceability` serial number terkait).
+* **Navigasi Langsung**: Klik pada baris mutasi membuka dokumen terkait (`TRF-YYYYMMDD-XXXXXX`, `ISS-YYYYMMDD-XXXXXX`, atau halaman `Traceability` serial number terkait).
 
 ---
 
@@ -223,7 +244,7 @@ Halaman **Riwayat Mutasi (`/warehouse/history`)** adalah **Buku Besar Inventori 
 ### 4.1 Prinsip Dasar & Integritas Ledger
 1. **Append-Only & Immutability**: Dilindungi oleh Observer di backend (`InventoryTransactionObserver`), setiap perubahan stok wajib menghasilkan baris transaksi baru.
 2. **Directional Tracking (Asal ➔ Tujuan)**: Setiap mutasi wajib memiliki entitas pengirim/asal (`from_pop_id` / `from_technician_id` / Supplier) dan entitas penerima/tujuan (`to_pop_id` / `to_technician_id` / Pelanggan).
-3. **Dokumentasi Terkait (*Source Reference*)**: Setiap baris mutasi terikat pada nomor dokumen sah (`TRF-XXXX`, `ISS-XXXX`, `DO/Invoice`).
+3. **Dokumentasi Terkait (*Source Reference*)**: Setiap baris mutasi terikat pada nomor dokumen sah (`TRF-YYYYMMDD-XXXXXX`, `ISS-YYYYMMDD-XXXXXX`, `DO/Invoice`).
 
 ---
 
@@ -240,7 +261,7 @@ Setiap baris transaksi mutasi mencantumkan:
 * **Aktor Pencatat**: Nama lengkap pengguna/petugas yang menginput transaksi ke sistem (`createdBy`).
 * **Nomor Referensi Dokumen**: Nomor dokumen acuan yang dapat diklik membuka halaman detail dokumen digital.
 * **Keterangan / Catatan**: Catatan peruntukan (misal: "Pasang Baru WO-102", "Restock Bulanan").
-* **Lampiran Bukti Fisik (*Evidence*)**: File foto barang/surat BAP untuk transaksi kerugian/penyesuaian stok.
+* **Lampiran Bukti Fisik (*Evidence*)**: File foto barang/surat BAP untuk transaksi kerugian/penyesuaian stok. Disimpan di disk **`local` (privat)**, bukan `public` — akses cuma lewat controller yang cek permission `warehouse_adjustment` + POP scope, sama pola kayak lampiran tiket (`TicketController::download()`). Jangan pindah ke disk public / bikin URL tebakan.
 
 ---
 
@@ -306,17 +327,22 @@ Setiap baris transaksi mutasi mencantumkan:
 Halaman **Permintaan Stok (`/warehouse/stock-requests`)** adalah saluran komunikasi formal berbasis tiket bagi Gudang Cabang untuk mengajukan penambahan stok material/perangkat ke Gudang Pusat ketika persediaan menipis atau untuk persiapan pekerjaan skala besar.
 
 ### 5.1 Alur Kerja & Siklus Status Permintaan Stok
-Permintaan stok **bukan mutasi saldo langsung**, melainkan permohonan yang harus disetujui dan dieksekusi melalui **Transfer Barang (`TRF-XXXX`)** oleh Gudang Pusat.
+Permintaan stok **bukan mutasi saldo langsung**, melainkan permohonan yang harus disetujui dan dieksekusi melalui **Transfer Barang (`TRF-YYYYMMDD-XXXXXX`)** oleh Gudang Pusat.
 
-* **Penomoran Global**: Format `REQ-YYYY-XXXX` (misal: `REQ-2026-0012`).
-* **Siklus Status (*State Machine*)**:
+* **Penomoran Global**: Format `PST-YYYYMMDD-XXXXXX` (misal: `PST-20260905-000012`). Prefix `PST` (Permintaan Stok) — sengaja bukan `REQ` biar gak ambigu dengan istilah generik "request" (request ID/log HTTP, dll).
+* **Siklus Status (*State Machine*)** — mendukung pemenuhan parsial (Pusat gak selalu bisa kirim full qty sekali jalan):
   ```text
-  [PENDING] ──(Pusat Setujui / Kirim Transfer)──> [FULFILLED] (Selesai)
+  [PENDING] ──(Pusat Kirim Transfer, qty < diminta)──> [PARTIAL] ──(Transfer susulan lunas semua qty)──> [FULFILLED] (Selesai)
+      │                                                     │
+      │                                                     └──(Pusat Tandai Cukup, sisa gak dikirim)──> [FULFILLED] (Selesai, parsial diterima)
       │
-      ├──(Pusat Tolak + Alasan Wajib)──────────> [REJECTED]  (Ditolak)
+      ├──(Pusat Kirim Transfer, qty = diminta penuh)──────────────────────────────────────────────────> [FULFILLED] (Selesai)
       │
-      └──(Pengaju Cabang Batal Sendiri)────────> [CANCELLED] (Dibatalkan)
+      ├──(Pusat Tolak + Alasan Wajib)──────────────────────────────────────────────────────────────────> [REJECTED]  (Ditolak)
+      │
+      └──(Pengaju Cabang Batal Sendiri, hanya saat masih PENDING)─────────────────────────────────────> [CANCELLED] (Dibatalkan)
   ```
+  Tiap transfer pemenuhan (`TRF-YYYYMMDD-XXXXXX`) tercatat sebagai baris tersendiri di riwayat `PST-XXXX` — qty terkirim per baris item request diakumulasi sampai terpenuhi atau ditandai cukup oleh Pusat.
 
 ---
 
@@ -339,20 +365,20 @@ Permintaan stok **bukan mutasi saldo langsung**, melainkan permohonan yang harus
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 🔍 FILTER STATUS & PENCARIAN                                                                     │
 │ ┌──────────────────────────────────────┬───────────────────────────────┬───────────────────────┐ │
-│ │ Status: Menunggu Diproses (Pending) ▼│ Cabang: Semua Gudang Cabang ▼ │ [Cari No Ref / Item..]│ │
+│ │ Status: Semua / Pending / Partial ▼ │ Cabang: Semua Gudang Cabang ▼ │ [Cari No Ref / Item..]│ │
 │ └──────────────────────────────────────┴───────────────────────────────┴───────────────────────┘ │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ 📋 TABEL ANTREAN PERMINTAAN STOK                                                                 │
 │ ┌──────────────┬──────────────┬──────────────┬────────────────────────┬──────────────┬─────────┐ │
 │ │ No. Request  │ Cabang       │ Pengaju      │ Rincian Barang Diminta │ Status       │ Waktu   │ │
 │ ├──────────────┼──────────────┼──────────────┼────────────────────────┼──────────────┼─────────┤ │
-│ │ REQ-2026-0012│ Cabang Siman │ Agus (Admin) │ • 10 Unit ONT Huawei   │ 🟡 PENDING   │ 05 Sep  │ │
+│ │ PST-20260905-000012│ Cabang Siman │ Agus (Admin) │ • 10 Unit ONT Huawei   │ 🟡 PENDING   │ 05 Sep  │ │
 │ │              │              │              │ • 2 Drum Dropcore 1C   │ (Menunggu)   │ 09:30   │ │
 │ ├──────────────┼──────────────┼──────────────┼────────────────────────┼──────────────┼─────────┤ │
-│ │ REQ-2026-0011│ Cabang Bbdn  │ Rian (Gudang)│ • 50 Pcs Patchcord SC  │ 🟢 FULFILLED │ 04 Sep  │ │
-│ │              │              │              │                        │ (Dipenuhi)   │ 14:15   │ │
+│ │ PST-20260904-000011│ Cabang Bbdn  │ Rian (Gudang)│ • 50 Pcs Patchcord SC  │ 🔵 PARTIAL   │ 04 Sep  │ │
+│ │              │              │              │ (30/50 pcs dikirim, sisa menyusul)      │ (Sebagian)   │ 14:15   │ │
 │ ├──────────────┼──────────────┼──────────────┼────────────────────────┼──────────────┼─────────┤ │
-│ │ REQ-2026-0010│ Cabang Kauman│ Doni (Admin) │ • 5 Unit Switch 8P     │ 🔴 REJECTED  │ 03 Sep  │ │
+│ │ PST-20260903-000010│ Cabang Kauman│ Doni (Admin) │ • 5 Unit Switch 8P     │ 🔴 REJECTED  │ 03 Sep  │ │
 │ │              │              │              │                        │ (Stok Pusat 0│ 11:00   │ │
 │ └──────────────┴──────────────┴──────────────┴────────────────────────┴──────────────┴─────────┘ │
 │                                                                                                  │
@@ -385,22 +411,24 @@ Permintaan stok **bukan mutasi saldo langsung**, melainkan permohonan yang harus
 #### C. Layar 3: Detail & Eksekusi Permintaan (`/warehouse/stock-requests/{id}`)
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [← Kembali ke Antrean]  Detail Permintaan #REQ-2026-0012                                         │
+│ [← Kembali ke Antrean]  Detail Permintaan #PST-20260905-000012                                   │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ Status  : 🟡 MENUNGGU DIPROSES (PENDING)                                                         │
 │ Pengaju : Agus (Admin Cabang Siman) — Diajukan: 05 Sep 2026, 09:30 WIB                           │
 │ Catatan : Restock kabel & ONT menipis di cabang siman untuk pasang baru minggu ini.              │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ 📦 RINCIAN BARANG YANG DIMINTA:                                                                  │
-│  1. ONT Huawei HG8245H5 : 10 Unit                                                                │
-│  2. Dropcore 1 Core     : 1.000 Meter (Lot: LOT-002)                                             │
+│ 📦 RINCIAN BARANG YANG DIMINTA (vs Sudah Dikirim):                                               │
+│  1. ONT Huawei HG8245H5 : 10 Unit diminta   — 0 Unit terkirim                                    │
+│  2. Dropcore 1 Core     : 1.000 Meter diminta (Lot: LOT-002) — 0 Meter terkirim                  │
 ├──────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ ⚡ AKSI TINDAKAN (Sesuai Role Aktor):                                                             │
 │                                                                                                  │
 │ [UNTUK ADMIN PUSAT / OWNER]:                                                                     │
 │   1. [ Tombol: 🚚 Buat Transfer Pengiriman ] ➔ Otomatis mengisi form Transfer Pusat ➔ Cabang     │
-│   2. [ Tombol: ✅ Tandai Sudah Dipenuhi ]    ➔ Menyelesaikan tiket status FULFILLED              │
-│   3. [ Tombol: ❌ Tolak Permintaan ]         ➔ Menampilkan input wajib alasan penolakan          │
+│                                                (qty terkirim < diminta ➔ status otomatis PARTIAL) │
+│   2. [ Tombol: ✅ Tandai Cukup / Selesai ]   ➔ Tutup tiket jadi FULFILLED walau qty belum penuh   │
+│   3. [ Tombol: ❌ Tolak Permintaan ]         ➔ Menampilkan input wajib alasan penolakan (hanya    │
+│                                                bisa saat status masih PENDING, belum ada kiriman) │
 │                                                                                                  │
 │ [UNTUK PENGAJU CABANG]:                                                                          │
 │   • [ Tombol: ⛔ Batalkan Permintaan ]       ➔ Hanya jika status masih PENDING                   │
@@ -412,8 +440,8 @@ Permintaan stok **bukan mutasi saldo langsung**, melainkan permohonan yang harus
 ### 5.4 Integrasi dengan Transfer Antar Gudang
 Ketika Admin Pusat meninjau permintaan stok yang valid:
 1. Admin Pusat menekan tombol **`[Buat Transfer Pengiriman]`**.
-2. Sistem otomatis membuka form `/warehouse/transfers/create` dengan data item, jumlah, dan gudang tujuan (Cabang) yang sudah terisi otomatis dari tiket `REQ-XXXX`.
-3. Setelah pengiriman fisik selesai dan transfer dibuat, status tiket otomatis ditandai `FULFILLED`.
+2. Sistem otomatis membuka form `/warehouse/transfers/create` dengan data item, jumlah, dan gudang tujuan (Cabang) yang sudah terisi otomatis dari tiket `PST-XXXX` — jumlah bisa diedit turun kalau Pusat cuma sanggup kirim sebagian.
+3. Setelah transfer dibuat: qty terkirim diakumulasi ke tiket `PST-XXXX`. Terkirim < diminta ➔ status `PARTIAL`; terkirim = diminta (bisa dari beberapa transfer bertahap) ➔ status otomatis `FULFILLED`. Pusat juga bisa menutup manual lewat `[Tandai Cukup / Selesai]` kalau sisa qty diputuskan gak akan dipenuhi.
 
 ---
 
@@ -590,7 +618,105 @@ Halaman **Serah Terima ke Teknisi (`/warehouse/issues/create`)** dirancang denga
 
 ### 7.4 Bukti Serah Terima & Digital Acknowledgment
 Setelah tombol simpan ditekan:
-1. Terbit nomor bukti resmi **`ISS-YYYY-XXXX`** (misal `ISS-2026-0042`).
+1. Terbit nomor bukti resmi **`ISS-YYYYMMDD-XXXXXX`** (misal `ISS-20260905-000042`).
 2. Saldo stok di Gudang Cabang otomatis terpotong pada ledger `inventory_transactions`.
 3. Status Serial Number berubah menjadi `ISSUED` dengan teknisi terkait sebagai *custodian*.
 4. Sistem menampilkan halaman bukti serah terima digital yang siap dicetak / dibagikan.
+
+---
+
+## 8. Rancangan & Spesifikasi Monitoring Barang di Tangan Teknisi (Technician Custody)
+
+Halaman **Barang di Tangan Teknisi (`/warehouse/custody`)** adalah **Pusat Pengawasan Akuntabilitas Lapangan**. Modul ini memungkinkan admin gudang dan pimpinan memantau seluruh perangkat aktif dan material pasif yang sedang dibawa oleh seluruh teknisi lapangan, memitigasi risiko barang mengendap (*hoarding*), serta menyediakan aksi cepat untuk pengalihan (*reassign*) saat teknisi resign/cuti atau pelaporan kerugian (BAP).
+
+### 8.1 Komponen & Struktur Layar
+1. **Toolbar Filter & Pencarian**:
+   * **Filter Teknisi Lapangan**: Dropdown nama teknisi yang memiliki barang aktif.
+   * **Filter Gudang Asal (POP)**: Menyaring cabang asal penyerahan material (khusus Admin Pusat).
+   * **Pencarian Cepat**: Input kata kunci nama barang, SKU, atau Serial Number.
+2. **Kartu KPI Ringkasan Lapangan (4 Metric Cards)**:
+   * **Perangkat Aktif (SN)**: Total unit ONT/Router/AP Wireless berstatus `ISSUED`.
+   * **Kabel Fiber Tergelar**: Total akumulasi sisa meter dropcore aktif di tangan teknisi.
+   * **Material Pasif**: Total batch aksesoris (patchcord, connector, rosette).
+   * **Teknisi Bertugas**: Jumlah personil teknisi yang sedang memegang barang operasional.
+3. **Segmented Tab Switcher Terpadu**:
+   * **Tab 1: 📟 Perangkat Serial Number (ONT / Router / Radio)**: Unit aktif yang wajib ditrack per-SN.
+   * **Tab 2: 🧶 Material Kuantitas & Batch Kabel (Dropcore / Patchcord / Aksesoris)**: Material meteran dan kuantitas non-serial.
+4. **Tombol Aksi Cepat per Baris Barang**:
+   * **`[ 🔄 Alihkan / Reassign ]`**: Mengalihkan barang ke teknisi lain atau menariknya kembali ke stok gudang cabang.
+   * **`[ ⚠️ Lapor Rusak / Hilang (BAP) ]`**: Mengubah status barang rusak terkena petir/hilang di lapangan disertai kewajiban upload bukti foto BAP.
+   * **`[ 🔍 Lacak SN ]`**: Membuka audit trail lifecycle unit di rute `/warehouse/traceability`.
+
+---
+
+### 8.2 Wireframe Layout Monitoring Custody (`/warehouse/custody`)
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ [Header] Barang di Tangan Teknisi (Custody Monitoring)                                           │
+│ Subtitle: Pengawasan real-time seluruh perangkat serial dan sisa kabel yang dibawa tim lapangan   │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 🔍 TOOLBAR FILTER & PENCARIAN                                                                     │
+│ ┌──────────────────────────────┬───────────────────────────────┬───────────────────────────────┐ │
+│ │ Filter Teknisi Lapangan      │ Gudang Asal Penyerahan        │ [Cari Nama Barang / SN / Lot] │ │
+│ │ [ 👷 Semua Teknisi Aktif  ▼] │ [ 🏢 Semua Gudang Cabang   ▼] │ [ Ketik pencarian...        ] │ │
+│ └──────────────────────────────┴───────────────────────────────┴───────────────────────────────┘ │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 📊 KARTU REKAPITULASI CUSTODY LAPANGAN                                                           │
+│ ┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────────┐ ┌───────────────────┐ │
+│ │ Total Unit SN Aktif   │ │ Total Dropcore Lapang.│ │ Material Pasif    │ │ Teknisi Bertugas  │ │
+│ │ 24 Unit (ONT/Router)  │ │ 1.850 Meter Kabel     │ │ 18 Batch Aksesori │ │ 6 Orang Teknisi   │ │
+│ └───────────────────────┘ └───────────────────────┘ └───────────────────┘ └───────────────────┘ │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ [Segmented Tab Switcher]:                                                                        │
+│   [ 📟 Tab 1: Perangkat Serial Number (24) ]   [ 🧶 Tab 2: Material / Batch Kabel (18) ]         │
+├──────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ 📋 TABEL TAB 1: PERANGKAT SERIAL NUMBER DI TANGAN TEKNISI (Jika Tab 1 Aktif)                     │
+│ ┌──────────────────┬──────────────────────┬────────────────┬───────────────┬───────────────────┐ │
+│ │ Teknisi Pemegang │ Nama Perangkat / Ktg │ Serial Number  │ Gudang Asal   │ Aksi Cepat        │ │
+│ ├──────────────────┼──────────────────────┼────────────────┼───────────────┼───────────────────┤ │
+│ │ 👷 Rian Pratama  │ ONT Huawei HG8245H5  │ HWTC12345678   │ Cabang Siman  │ [⋮ Aksi Cepat ▼]  │ │
+│ │ (Tim Pasang Baru)│ Kategori: ONT        │ (Tautan Lacak) │ 05 Sep, 09:15 │ • 🔄 Alihkan Cust │ │
+│ │                  │                      │                │ Ref: ISS-0042 │ • ⚠️ Lapor BAP/Rsk│ │
+│ ├──────────────────┼──────────────────────┼────────────────┼───────────────┼───────────────────┤ │
+│ │ 👷 Budi Santoso  │ ONT ZTE F609 V3      │ ZTEG88991122   │ Cabang Bbdn   │ [⋮ Aksi Cepat ▼]  │ │
+│ │ (Tim Maintenance)│ Kategori: ONT        │ (Tautan Lacak) │ 04 Sep, 14:00 │ • 🔄 Alihkan Cust │ │
+│ │                  │                      │                │ Ref: ISS-0038 │ • ⚠️ Lapor BAP/Rsk│ │
+│ └──────────────────┴──────────────────────┴────────────────┴───────────────┴───────────────────┘ │
+│                                                                                                  │
+│ 📋 TABEL TAB 2: MATERIAL & BATCH KABEL DROPCORE (Jika Tab 2 Aktif)                               │
+│ ┌──────────────────┬──────────────────────┬────────────────┬───────────────┬───────────────────┐ │
+│ │ Teknisi Pemegang │ Nama Material        │ No. Lot / Drum │ Sisa di Bawa  │ Aksi Cepat        │ │
+│ ├──────────────────┼──────────────────────┼────────────────┼───────────────┼───────────────────┤ │
+│ │ 👷 Rian Pratama  │ Dropcore 1 Core 1000M│ LOT-2026-001   │ 350 Meter     │ [⋮ Aksi Cepat ▼]  │ │
+│ │ (Cabang Siman)   │ Kategori: Kabel      │ Drum A-12      │ Sisa rol aktif│ • 🔄 Kembalikan Gdg│ │
+│ │                  │                      │                │               │ • ⚠️ Koreksi BAP  │ │
+│ ├──────────────────┼──────────────────────┼────────────────┼───────────────┼───────────────────┤ │
+│ │ 👷 Doni Setiawan │ Patchcord SC-UPC 3M  │ Non-Lot        │ 8 Pcs         │ [⋮ Aksi Cepat ▼]  │ │
+│ │ (Cabang Babadan) │ Kategori: Aksesoris  │ Kemasan pack   │ Pack utuh     │ • 🔄 Alihkan Tek  │ │
+│ └──────────────────┴──────────────────────┴────────────────┴───────────────┴───────────────────┘ │
+│                                                                                                  │
+│ [Pagination] Menampilkan data custody aktif                               Halaman 1 dari 2 < 1 2 >│
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 8.3 Alur Pengalihan Custody (Reassign Flow)
+Ketika seorang teknisi **cuti, rotasi cabang, atau resign**:
+1. Admin Gudang membuka menu **`[ 🔄 Alihkan Custody ]`** pada baris barang terkait.
+2. Muncul form pilihan:
+   * **Opsi A: Kembalikan ke Gudang Cabang (*Return to Warehouse*)** ➔ Barang masuk kembali ke saldo fisik gudang cabang (`RETURN`).
+   * **Opsi B: Alihkan ke Teknisi Pengganti (*Transfer Custody to Another Technician*)** ➔ Tanggung jawab berpindah langsung ke teknisi baru (`TRANSFER_CUSTODY`).
+3. Sistem secara otomatis mencatat nama admin yang mengeksekusi ke dalam buku besar `inventory_transactions` sehingga jejak audit tetap transparan dan akuntabel.
+
+---
+
+### 8.4 Alur Pelaporan Kerugian di Lapangan (BAP Loss & Damage)
+Jika barang yang dibawa teknisi **tersambar petir saat instalasi, terjatuh rusak, atau hilang**:
+1. Admin Gudang mengklik tombol **`[ ⚠️ Lapor BAP / Rusak ]`**.
+2. Form mewajibkan:
+   * Pilihan Status: `DAMAGED` (rusak), `LOST` (hilang), atau `SCRAPPED` (tidak dapat diperbaiki).
+   * Input alasan & kronologi kejadian.
+   * **Wajib Upload Bukti Foto Fisik / Surat BAP Lapangan**.
+3. Status Serial Number otomatis berubah menjadi `DAMAGED`/`LOST` dan saldo custody teknisi terpotong dengan aman tanpa merusak saldo gudang utama.

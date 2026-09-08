@@ -7,11 +7,12 @@
 
 <x-warehouse.header active="stock-requests" title="Permintaan Stok Cabang" subtitle="Antrean permintaan barang dari Gudang Cabang — sinyal aktif biar Pusat gak perlu nunggu notice sendiri lewat badge Stok Rendah." />
 
-<div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 mb-6 shadow-xs">
+<div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 mb-6 shadow-xs">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <form method="GET" action="{{ route('warehouse.stock-requests.index') }}" class="flex items-center gap-2">
-            <select name="status" onchange="this.form.submit()" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+            <select name="status" onchange="this.form.submit()" class="px-3 py-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
                 <option value="pending" {{ $statusFilter === 'pending' ? 'selected' : '' }}>Menunggu Diproses</option>
+                <option value="partial" {{ $statusFilter === 'partial' ? 'selected' : '' }}>Sebagian Dipenuhi</option>
                 <option value="fulfilled" {{ $statusFilter === 'fulfilled' ? 'selected' : '' }}>Sudah Dipenuhi</option>
                 <option value="rejected" {{ $statusFilter === 'rejected' ? 'selected' : '' }}>Ditolak</option>
                 <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Dibatalkan</option>
@@ -20,7 +21,7 @@
         </form>
 
         @if(auth()->user()->hasPermission('warehouse_stock_request.create'))
-        <a href="{{ route('warehouse.stock-requests.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors">
+        <a href="{{ route('warehouse.stock-requests.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             <span>Ajukan Permintaan</span>
         </a>
@@ -28,14 +29,14 @@
     </div>
 </div>
 
-<div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+<div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
     @if($requests->isEmpty())
     <div class="p-16 text-center">
         <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">Gak ada permintaan stok di sini</h4>
         <p class="text-xs text-slate-400 mt-1">Coba ganti filter status.</p>
     </div>
     @else
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto scroll-smooth">
         <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead class="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
@@ -55,11 +56,20 @@
                     <td class="px-6 py-3.5 text-sm text-slate-500 dark:text-slate-400">{{ $req->requestedBy->name }}</td>
                     <td class="px-6 py-3.5 text-xs text-slate-500 dark:text-slate-400">
                         {{ $req->items->take(2)->map(fn ($i) => $i->item->name)->implode(', ') }}{{ $req->items->count() > 2 ? ' +'.($req->items->count() - 2).' lainnya' : '' }}
+                        @if($req->status->value === 'partial')
+                        @php $doneCount = $req->items->filter(fn ($i) => $i->isFullyFulfilled())->count(); @endphp
+                        {{-- Hitung JUMLAH BARIS, bukan sum qty lintas item — satuan beda-beda
+                             (meter/unit/pcs) gak bisa dijumlah jadi satu angka. --}}
+                        <div class="mt-0.5 font-mono text-[10px] text-sky-600 dark:text-sky-400">
+                            {{ $doneCount }} / {{ $req->items->count() }} baris terkirim penuh
+                        </div>
+                        @endif
                     </td>
                     <td class="px-6 py-3.5">
                         @php
                             $badge = match($req->status->value) {
                                 'pending' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+                                'partial' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
                                 'fulfilled' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
                                 'rejected' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
                                 default => 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600',

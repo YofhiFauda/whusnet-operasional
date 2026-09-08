@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Warehouse;
 
 use App\Enums\InventoryTransactionType;
+use App\Enums\SerialStatus;
+use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventoryBalance;
+use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 /**
@@ -49,11 +54,29 @@ class WarehouseStockController extends Controller
 
         $popIds = $pops->pluck('id');
 
+        // Indikator Mode + gating Quick Action Bar (rancangan-layout.md §3.3-A)
+        // — MURNI informasional/kemudahan link, BUKAN cara baru buat pilih
+        // scope (scope tetap 100% dari EffectiveAccessService, gak ada
+        // dropdown yang mengubah apa yang di-query).
+        $hasAllAccess = $access->hasAllPopAccess($user);
+        $canActAsPusat = $hasAllAccess || $pops->contains('type', 'pusat');
+        $canActAsCabang = $hasAllAccess || $pops->contains('type', 'cabang');
+        $lockedSinglePop = ! $hasAllAccess && $pops->count() === 1 ? $pops->first() : null;
+        $modeLabel = match (true) {
+            $hasAllAccess => 'Semua Gudang (Nasional)',
+            $lockedSinglePop !== null => $lockedSinglePop->name.' ('.strtoupper($lockedSinglePop->type).')',
+            default => $pops->count().' Gudang Terjangkau',
+        };
+
         $popFilter = $request->integer('pop_id') ?: null;
         $search = trim((string) $request->query('search', ''));
         $lowStockOnly = $request->boolean('low_stock_only');
+        $trackingFilter = $request->query('tracking_type');
+        $trackingFilter = in_array($trackingFilter, array_column(TrackingType::cases(), 'value'), true) ? $trackingFilter : null;
 
-        $balances = InventoryBalance::query()
+        // Barang QUANTITY/BATCH — saldo asli dari `inventory_balances`
+        // (ditulis InventoryReceiveService::receiveQuantity() dkk).
+        $quantityBalances = InventoryBalance::query()
             ->whereIn('pop_id', $popIds) // scope dulu, baru filter user — pop_id di luar scope otomatis gak match
             ->when($popFilter, fn ($q) => $q->where('pop_id', $popFilter))
             ->where('qty', '>', 0)
@@ -64,11 +87,97 @@ class WarehouseStockController extends Controller
                 });
             })
             ->when($lowStockOnly, fn ($q) => $q->lowStock())
+            // Jenis Tracking difilter lewat relasi item (kolomnya di
+            // `items.tracking_type`, bukan di `inventory_balances`).
+            ->when($trackingFilter, function ($q) use ($trackingFilter) {
+                $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('tracking_type', $trackingFilter));
+            })
             ->with(['item.category', 'pop'])
-            ->orderBy('pop_id')
-            ->orderBy('item_id')
-            ->paginate(25)
-            ->withQueryString();
+            ->get();
+
+        // Barang SERIALIZED (modem/ONT via SN) — 2026-09-07, laporan user
+        // "modem input by SN gak masuk Kelola Stok". `receiveSerialized()`
+        // CUMA nulis ke `inventory_serials`, gak pernah nyentuh
+        // `inventory_balances` sama sekali — jadi item serialized SELALU
+        // absen dari tabel di atas, padahal view-nya udah py logic render
+        // badge SN (kolomnya nunggu data yang gak pernah dateng). Di sini
+        // dihitung count(*) AVAILABLE per gudang+item lalu dibungkus jadi
+        // instance InventoryBalance SINTETIS (gak disimpan — cuma dipakai
+        // biar Blade & `isLowStock()` kepake apa adanya, gak perlu view
+        // baru/logic bercabang).
+        $serializedBalances = collect();
+        if ($trackingFilter === null || $trackingFilter === TrackingType::SERIALIZED->value) {
+            $serialGroups = InventorySerial::query()
+                ->whereIn('current_pop_id', $popIds)
+                ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
+                ->where('status', SerialStatus::AVAILABLE->value)
+                ->when($search !== '', function ($q) use ($search) {
+                    $q->whereHas('item', function ($itemQuery) use ($search) {
+                        $itemQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+                })
+                ->selectRaw('current_pop_id as pop_id, item_id, COUNT(*) as qty')
+                ->groupBy('current_pop_id', 'item_id')
+                ->get();
+
+            if ($serialGroups->isNotEmpty()) {
+                $itemsById = Item::with('category')->whereIn('id', $serialGroups->pluck('item_id')->unique())->get()->keyBy('id');
+                $popsById = $pops->keyBy('id');
+
+                // Threshold (minimum_stock) buat item serialized DISIMPAN di
+                // `inventory_balances` juga (lot_no='', qty tetap 0 — cuma
+                // wadah angka ambang, lihat storeThreshold()) — ambil di
+                // sini biar badge "Stok Rendah" tetap kepake buat serialized.
+                $thresholds = InventoryBalance::query()
+                    ->whereIn('pop_id', $serialGroups->pluck('pop_id')->unique())
+                    ->whereIn('item_id', $serialGroups->pluck('item_id')->unique())
+                    ->where('lot_no', '')
+                    ->get(['pop_id', 'item_id', 'minimum_stock', 'maximum_stock'])
+                    ->keyBy(fn ($row) => $row->pop_id.'-'.$row->item_id);
+
+                $serializedBalances = $serialGroups->map(function ($group) use ($itemsById, $popsById, $thresholds) {
+                    $key = $group->pop_id.'-'.$group->item_id;
+                    $threshold = $thresholds->get($key);
+
+                    $balance = new InventoryBalance([
+                        'pop_id' => $group->pop_id,
+                        'item_id' => $group->item_id,
+                        'lot_no' => '',
+                        'qty' => $group->qty,
+                        'minimum_stock' => $threshold?->minimum_stock,
+                        'maximum_stock' => $threshold?->maximum_stock,
+                    ]);
+                    $balance->setRelation('item', $itemsById->get($group->item_id));
+                    $balance->setRelation('pop', $popsById->get($group->pop_id));
+
+                    return $balance;
+                });
+
+                if ($lowStockOnly) {
+                    $serializedBalances = $serializedBalances->filter(fn ($b) => $b->isLowStock())->values();
+                }
+            }
+        }
+
+        // Gabung dua sumber jadi SATU list — ini yang bikin item serialized
+        // AKHIRNYA muncul di Kelola Stok. Paginasi di-handle manual di PHP
+        // (bukan DB::paginate() lagi) karena datanya sekarang gabungan 2
+        // query beda tabel — wajar buat skala jumlah SKU gudang ISP lokal
+        // (puluhan-ratusan per gudang, bukan jutaan baris).
+        $merged = $quantityBalances->concat($serializedBalances)
+            ->sortBy([['pop_id', 'asc'], ['item_id', 'asc']])
+            ->values();
+
+        $perPage = 25;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $balances = new LengthAwarePaginator(
+            $merged->slice(($page - 1) * $perPage, $perPage)->values(),
+            $merged->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         // "Opname terakhir per item per gudang" (Fase 2 P1, gap #3 —
         // kontrol-anti-manipulasi.md §5). Query dibatasi ke kombinasi
@@ -95,7 +204,42 @@ class WarehouseStockController extends Controller
             }
         }
 
-        return view('warehouse.stock.index', compact('pops', 'balances', 'popFilter', 'search', 'lowStockOnly', 'lastOpnameByKey'));
+        return view('warehouse.stock.index', compact(
+            'pops', 'balances', 'popFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey',
+            'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel'
+        ));
+    }
+
+    /**
+     * Daftar SN AVAILABLE buat 1 kombinasi gudang+item (dipanggil AJAX dari
+     * badge "SERIAL NUMBER" di baris Kelola Stok — sebelumnya kolom Qty
+     * Tersedia cuma nunjuk ANGKA agregat, gak ada cara lihat SN mana aja
+     * konkretnya tanpa buka Traceability satu-satu).
+     *
+     * Discope sama pola `AuthorizesWarehousePop` — pop_id di luar scope
+     * ditolak keras (beda dari index() yang cuma "gak match apa-apa"),
+     * karena endpoint ini nembak 1 gudang spesifik atas permintaan eksplisit
+     * klien, bukan filter list yang aman diam-diam dikosongkan.
+     */
+    public function serials(Request $request, EffectiveAccessService $access): JsonResponse
+    {
+        $validated = $request->validate([
+            'pop_id' => 'required|integer|exists:pops,id',
+            'item_id' => 'required|integer|exists:items,id',
+        ]);
+
+        $pop = Pop::findOrFail($validated['pop_id']);
+        $this->assertPopInScope($pop, auth()->user(), $access);
+
+        $serials = InventorySerial::query()
+            ->where('current_pop_id', $pop->id)
+            ->where('item_id', $validated['item_id'])
+            ->where('status', SerialStatus::AVAILABLE->value)
+            ->orderBy('serial_number')
+            ->limit(200) // pengaman tampilan — bukan pagination, cukup buat quick-look
+            ->pluck('serial_number');
+
+        return response()->json(['serials' => $serials]);
     }
 
     /**

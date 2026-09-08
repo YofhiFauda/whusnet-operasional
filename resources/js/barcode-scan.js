@@ -7,7 +7,7 @@
  *    modem/ONT/router/perangkat aktif lain, bukan QR pelanggan.
  * 2. CONTINUOUS, bukan sekali baca lalu pindah halaman — satu sesi kamera
  *    dipakai buat scan BANYAK SN berturut-turut (terutama tab Batch),
- *    kamera baru berhenti kalau staf klik "Tutup Kamera" atau pindah
+ *    kamera baru berhenti kalau staf klik "Berhenti Scan" atau pindah
  *    halaman.
  * 3. BISA lebih dari satu blok scanner aktif di satu halaman (tab Single
  *    Assign & Batch Assign masing-masing punya bloknya sendiri) — makanya
@@ -635,7 +635,7 @@ document.querySelectorAll('[data-barcode-scanner]').forEach((wrapper) => {
     toggleBtn.addEventListener('click', () => {
         active = !active;
         viewfinder.hidden = !active;
-        toggleLabel.textContent = active ? 'Tutup Kamera' : 'Buka Kamera';
+        toggleLabel.textContent = active ? 'Berhenti Scan' : 'Mulai Scan';
         toggleBtn.className = active ? toggleBtn.dataset.classActive : toggleBtn.dataset.classInactive;
 
         if (active) {

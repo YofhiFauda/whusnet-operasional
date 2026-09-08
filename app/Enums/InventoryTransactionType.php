@@ -15,7 +15,7 @@ namespace App\Enums;
  */
 enum InventoryTransactionType: string
 {
-    /** Barang masuk dari supplier ke Gudang Pusat. */
+    /** Barang masuk dari distributor ke Gudang Pusat. */
     case RECEIVE = 'receive';
 
     /** Gudang ↔ Gudang (Pusat→Cabang). Mengubah `inventory_balances` DUA gudang. */

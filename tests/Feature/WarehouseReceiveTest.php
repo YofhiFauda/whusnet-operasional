@@ -156,6 +156,47 @@ class WarehouseReceiveTest extends TestCase
         $this->assertEquals(1, InventorySerial::where('serial_number', 'WR-EXISTING-001')->count());
     }
 
+    /**
+     * 2026-09-07 — laporan user "input SN pertama oke, SN kedua gak bisa".
+     * Akar masalahnya: seluruh baris (termasuk baris VALID) ilang begitu
+     * batch di-rollback gara-gara 1 baris lain gagal (SN dobel/udah
+     * kedaftar) — `back()->withInput()` udah bener ngirim data lama balik
+     * ke session, tapi `<x-inventory-line-rows>` gak pernah bacanya. Test
+     * ini nge-lock kontrak level HTTP (`withInput()` beneran ngebawa SEMUA
+     * baris) — bagian Blade/Alpine baca `old()`-nya sendiri gak bisa dites
+     * PHPUnit (gak ada JS test runner di repo ini), tapi kontrak backend-nya
+     * WAJIB tetap bener biar rehydrate di sisi Blade ada bahan buat dibaca.
+     */
+    #[Test]
+    public function gagal_submit_gara2_1_baris_gak_ngilangin_baris_lain_yang_valid(): void
+    {
+        $catAktif = ItemCategory::where('code', 'media_converter')->firstOrFail();
+        $modemBaru = Item::create(['code' => 'WR-KEEP', 'name' => 'Modem WR Keep', 'item_category_id' => $catAktif->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+        $modemDup = Item::create(['code' => 'WR-DUP-3', 'name' => 'Modem WR Dup 3', 'item_category_id' => $catAktif->id, 'unit' => 'unit', 'tracking_type' => 'serialized']);
+
+        InventorySerial::create([
+            'item_id' => $modemDup->id,
+            'serial_number' => 'WR-EXISTING-002',
+            'status' => SerialStatus::AVAILABLE->value,
+            'current_pop_id' => $this->pusat->id,
+        ]);
+
+        $store = $this->actingAs($this->owner)->post(route('warehouse.receive.store'), [
+            'pop_id' => $this->pusat->id,
+            'lines' => [
+                ['item_id' => $modemBaru->id, 'serial_numbers' => 'WR-KEEP-001', 'unit_price' => 250000],
+                ['item_id' => $modemDup->id, 'serial_numbers' => 'WR-EXISTING-002', 'unit_price' => 300000],
+            ],
+        ]);
+
+        $store->assertSessionHas('error');
+        $store->assertSessionHasInput('lines.0.item_id', (string) $modemBaru->id);
+        $store->assertSessionHasInput('lines.0.serial_numbers', 'WR-KEEP-001');
+        $store->assertSessionHasInput('lines.1.item_id', (string) $modemDup->id);
+        // Batch di-rollback total — SN valid di baris 0 gak boleh ke-simpan.
+        $this->assertEquals(0, InventorySerial::where('serial_number', 'WR-KEEP-001')->count());
+    }
+
     #[Test]
     public function unit_price_kosong_ditolak_validasi(): void
     {

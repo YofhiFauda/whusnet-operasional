@@ -18,6 +18,16 @@ namespace App\Enums;
 enum StockRequestStatus: string
 {
     case PENDING = 'pending';
+
+    /**
+     * Sebagian item/qty udah dicatat terkirim (2026-09-07,
+     * `StockRequestService::recordDelivery()`) tapi belum semua — masih
+     * "terbuka" (bisa dikirim susulan atau ditutup manual), TAPI beda dari
+     * PENDING murni: udah gak boleh ditolak/dibatalkan lagi (barang beneran
+     * udah mulai bergerak, lihat `canRejectOrCancel()`).
+     */
+    case PARTIAL = 'partial';
+
     case FULFILLED = 'fulfilled';
     case REJECTED = 'rejected';
     case CANCELLED = 'cancelled';
@@ -26,13 +36,30 @@ enum StockRequestStatus: string
     {
         return match ($this) {
             self::PENDING => 'Menunggu Diproses',
+            self::PARTIAL => 'Sebagian Dipenuhi',
             self::FULFILLED => 'Sudah Dipenuhi',
             self::REJECTED => 'Ditolak',
             self::CANCELLED => 'Dibatalkan',
         };
     }
 
+    /**
+     * Masih bisa diproses lebih lanjut (catat pengiriman / tandai cukup) —
+     * PENDING dan PARTIAL dua-duanya, beda dari `canRejectOrCancel()` yang
+     * cuma PENDING.
+     */
     public function isOpen(): bool
+    {
+        return $this === self::PENDING || $this === self::PARTIAL;
+    }
+
+    /**
+     * Tolak & Batalkan cuma sah selagi BELUM ada barang yang tercatat
+     * terkirim sama sekali — begitu masuk PARTIAL, batalin/nolak tiket jadi
+     * gak masuk akal (fisiknya udah mulai jalan), satu-satunya jalan
+     * penutup tinggal fulfill()/"Tandai Cukup".
+     */
+    public function canRejectOrCancel(): bool
     {
         return $this === self::PENDING;
     }

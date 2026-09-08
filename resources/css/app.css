@@ -1190,3 +1190,43 @@ html {
   }
 }
 
+/* ─────────────────────────────────────────────────────────
+   No Scrollbar Utility — hide scrollbar while keeping scrollable
+   ───────────────────────────────────────────────────────── */
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;            /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Smooth Scrolling & Momentum Touch Utilities
+   ───────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.smooth-scroll-x {
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.smooth-scroll-y {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+

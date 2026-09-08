@@ -5,14 +5,14 @@
 
 @section('content')
 
-<x-warehouse.header active="stock" title="Surat Jalan Transfer #{{ $transfer->reference_number }}" subtitle="Dokumen perpindahan material & perangkat antar gudang POP Whusnet." />
+<x-warehouse.header active="stock" title="Surat Jalan Transfer #{{ $transfer->reference_number }}" subtitle="Dokumen perpindahan material & perangkat antar gudang POP Whusnet." backUrl="{{ route('warehouse.stock.index') }}" />
 
 <div class="space-y-6">
     <!-- Header Status Card -->
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-6 shadow-xs">
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-6 shadow-xs">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="flex items-start sm:items-center gap-3.5">
-                <div class="w-11 h-11 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shadow-xs shrink-0">
+                <div class="w-11 h-11 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shadow-xs shrink-0">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                     </svg>
@@ -54,7 +54,7 @@
     </div>
 
     <!-- Barang Dikirim Card -->
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
             <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Daftar Barang Dikirim</h4>
             @if($transfer->isInTransit() && auth()->user()->hasPermission('warehouse_transfer.receive') && $canReceive)
@@ -105,7 +105,7 @@
             <div class="px-6 pt-5">
                 <x-warehouse.barcode-scanner target="transfer-receive" />
 
-                <div x-show="mismatches.length > 0" x-cloak class="mt-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-xl p-3.5">
+                <div x-show="mismatches.length > 0" x-cloak class="mt-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg p-3.5">
                     <div class="flex items-center justify-between mb-1.5">
                         <p class="text-xs font-bold text-rose-800 dark:text-rose-300">⚠ SN Terscan TIDAK ADA di Daftar Kiriman Ini</p>
                         <button type="button" @click="clearMismatches()" class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer">Tutup</button>
@@ -120,7 +120,7 @@
             </div>
             @endif
 
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto scroll-smooth">
                 <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                     <thead class="bg-slate-50 dark:bg-slate-800/60">
                         <tr>
@@ -145,7 +145,7 @@
                             </td>
                             <td class="px-6 py-4">
                                 @if($line->serial)
-                                <label class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-xl border cursor-pointer transition-colors"
+                                <label class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer transition-colors"
                                        :class="confirmed.includes('{{ $line->serial->serial_number }}') ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700'">
                                     <input type="checkbox" name="confirmed_serial_numbers[]" value="{{ $line->serial->serial_number }}" x-model="confirmed" class="rounded text-emerald-600 focus:ring-emerald-500">
                                     <span x-text="confirmed.includes('{{ $line->serial->serial_number }}') ? 'Cocok & Diterima' : 'Scan / centang buat konfirmasi'"></span>
@@ -153,13 +153,13 @@
                                 @elseif($line->lot_no)
                                 <div class="flex items-center gap-1.5">
                                     <input type="number" step="0.01" min="0" name="confirmed_quantities[{{ $line->item_id }}][{{ $line->lot_no }}]" value="{{ $line->qty }}"
-                                        class="w-32 text-xs font-mono font-bold px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                                        class="w-32 text-xs font-mono font-bold px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                                     <span class="text-xs text-slate-400">{{ $line->item->unit }}</span>
                                 </div>
                                 @else
                                 <div class="flex items-center gap-1.5">
                                     <input type="number" step="0.01" min="0" name="confirmed_quantities[{{ $line->item_id }}]" value="{{ $line->qty }}"
-                                        class="w-32 text-xs font-mono font-bold px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                                        class="w-32 text-xs font-mono font-bold px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                                     <span class="text-xs text-slate-400">{{ $line->item->unit }}</span>
                                 </div>
                                 @endif
@@ -173,14 +173,14 @@
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">
                     Scan tiap unit yang fisik nyampe (otomatis tercentang), atau centang manual kalau gak ada kamera. SN yang gak dicentang dianggap TIDAK diterima. Koreksi jumlah Qty kalau ada selisih.
                 </p>
-                <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                <button type="submit" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                     <span>Konfirmasi Penerimaan Transfer</span>
                 </button>
             </div>
         </form>
         @else
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scroll-smooth">
             <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead class="bg-slate-50 dark:bg-slate-800/60">
                     <tr>
@@ -222,14 +222,14 @@
 
     <!-- Sudah Diterima Card (jika sudah dikonfirmasi) -->
     @if($confirmedLines->isNotEmpty())
-    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+    <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
             <h4 class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                 <span>Barang Telah Diterima di Gudang Cabang</span>
             </h4>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto scroll-smooth">
             <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead class="bg-slate-50 dark:bg-slate-800/60">
                     <tr>

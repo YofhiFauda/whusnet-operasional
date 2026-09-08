@@ -4,7 +4,7 @@
     Scan barcode 1D (linear) via kamera HP/laptop — pelengkap kolom input
     manual di sebelahnya, BUKAN pengganti. Scanner fisik USB/Bluetooth
     (keyboard wedge) tetap ketik langsung ke kolom teks seperti biasa;
-    tombol "Buka Kamera" di sini cuma buat staf yang gak pegang scanner
+    tombol "Mulai Scan" di sini cuma buat staf yang gak pegang scanner
     fisik.
 
     Bingkai pemandu SENGAJA persegi panjang PENDEK (pita tipis, bukan kotak
@@ -33,24 +33,33 @@
     semua vendor), tombol ini jalan keluar manual kalau tebakannya salah.
 --}}
 <div data-barcode-scanner="{{ $target }}" class="border-t border-slate-100 dark:border-slate-700/60 pt-4 mt-4">
+    {{--
+        Label SENGAJA bukan "(Opsional)" lagi (2026-09-07, laporan user:
+        kesan "opsional" bikin staf ngelewatin scan padahal jalur ini yang
+        paling cepet — scanner fisik USB/Bluetooth emang tetap jalan
+        alternatif, tapi framing-nya jangan bikin scan kamera kerasa
+        kelas dua). Konteks di halaman pemanggil (Receive/Transfer/Issue)
+        UDAH nempatin blok ini di paling atas/paling awal alur — cukup
+        benerin framing teks di sini, gak perlu geser posisi lagi.
+    --}}
     <div class="flex items-center justify-between gap-3 mb-1">
-        <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Scan Kamera (Opsional)</span>
+        <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">📷 Scan Kamera</span>
         <button type="button"
                 data-barcode-toggle
-                data-class-inactive="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors cursor-pointer shrink-0"
+                data-class-inactive="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-600 hover:bg-sky-700 transition-colors cursor-pointer shrink-0"
                 data-class-active="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer shrink-0"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors cursor-pointer shrink-0">
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-600 hover:bg-sky-700 transition-colors cursor-pointer shrink-0">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.174C3.244 7.54 2.5 8.352 2.5 9.318v9.132a2.25 2.25 0 002.25 2.25h14.5a2.25 2.25 0 002.25-2.25V9.318c0-.966-.744-1.778-1.552-1.914a48.11 48.11 0 00-1.134-.174 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
             </svg>
-            <span data-barcode-toggle-label>Buka Kamera</span>
+            <span data-barcode-toggle-label>Mulai Scan</span>
         </button>
     </div>
     <p class="text-[10px] text-slate-400 mb-2.5">Scanner fisik USB/Bluetooth tetap bisa ketik langsung ke kolom di atas — tombol ini cuma buat scan pakai kamera HP/laptop.</p>
 
     <div data-barcode-viewfinder hidden>
-        <div data-barcode-frame class="relative w-full bg-black rounded-2xl overflow-hidden shadow-lg" style="aspect-ratio: 16 / 9;">
+        <div data-barcode-frame class="relative w-full bg-black rounded-lg overflow-hidden shadow-lg border border-slate-700" style="aspect-ratio: 16 / 9;">
             <video data-barcode-video autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover"></video>
 
             {{-- "Ganti Lensa" — hidden default, dimunculin JS kalau HP-nya
@@ -74,11 +83,11 @@
                 <div data-mask-right class="absolute bg-black/55 backdrop-blur-[2px]"></div>
 
                 <div data-barcode-window class="absolute">
-                    <span class="absolute -top-0.5 -left-0.5 w-5 h-5 sm:w-6 sm:h-6 border-t-[3px] border-l-[3px] border-emerald-400 rounded-tl-md"></span>
-                    <span class="absolute -bottom-0.5 -left-0.5 w-5 h-5 sm:w-6 sm:h-6 border-b-[3px] border-l-[3px] border-emerald-400 rounded-bl-md"></span>
-                    <span class="absolute -top-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 border-t-[3px] border-r-[3px] border-emerald-400 rounded-tr-md"></span>
-                    <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 border-b-[3px] border-r-[3px] border-emerald-400 rounded-br-md"></span>
-                    <span class="barcode-scanline absolute inset-x-0 h-0.5 bg-emerald-400 rounded-full shadow-[0_0_6px_1px_rgba(52,211,153,0.7)]"></span>
+                    <span class="absolute -top-0.5 -left-0.5 w-5 h-5 sm:w-6 sm:h-6 border-t-[3px] border-l-[3px] border-sky-400 rounded-tl-sm"></span>
+                    <span class="absolute -bottom-0.5 -left-0.5 w-5 h-5 sm:w-6 sm:h-6 border-b-[3px] border-l-[3px] border-sky-400 rounded-bl-sm"></span>
+                    <span class="absolute -top-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 border-t-[3px] border-r-[3px] border-sky-400 rounded-tr-sm"></span>
+                    <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 border-b-[3px] border-r-[3px] border-sky-400 rounded-br-sm"></span>
+                    <span class="barcode-scanline absolute inset-x-0 h-0.5 bg-sky-400 rounded-full shadow-[0_0_6px_1px_rgba(56,189,248,0.7)]"></span>
                 </div>
             </div>
 

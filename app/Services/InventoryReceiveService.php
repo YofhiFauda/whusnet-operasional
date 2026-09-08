@@ -15,9 +15,9 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * RECEIVE — barang masuk dari supplier ke Gudang Pusat. SATU-SATUNYA titik
+ * RECEIVE — barang masuk dari distributor ke Gudang Pusat. SATU-SATUNYA titik
  * masuk barang baru ke sistem (Cabang gak pernah RECEIVE langsung dari
- * supplier, cuma lewat Transfer — lihat InventoryTransferService).
+ * distributor, cuma lewat Transfer — lihat InventoryTransferService).
  *
  * Harga (`unit_price_snapshot`) WAJIB diisi di sini — ini titik "last-cost"
  * yang nanti dibaca ulang `InventoryIssueService` buat nyalin harga ke custody
@@ -105,11 +105,9 @@ class InventoryReceiveService
         // maupun beneran udah pernah ke-input sebelumnya) ngelempar
         // `UniqueConstraintViolationException` MENTAH ke user — 500 blank,
         // bukan pesan yang bisa ditindaklanjuti (laporan user, 2026-09-04).
-        // Endpoint scan (`storeScanned`) udah divalidasi di controller
-        // (Rule::unique + distinct), tapi form manual multi-baris textarea
-        // (`store()`/`normalizeLines()`) gak lewat validasi terstruktur
-        // sama — guard di sini nutup dua-duanya sekaligus di SATU tempat
-        // (Service, bukan diulang tiap controller pemanggil).
+        // Form manual multi-baris textarea (`store()`/`normalizeLines()`)
+        // gak lewat validasi terstruktur — guard di sini nutupnya di
+        // Service (bukan diulang tiap controller pemanggil).
         $this->assertSerialNumbersUsable($serialNumbers);
 
         return DB::transaction(function () use ($pusat, $item, $serialNumbers, $unitPrice, $actor, $notes, $referenceNumber) {

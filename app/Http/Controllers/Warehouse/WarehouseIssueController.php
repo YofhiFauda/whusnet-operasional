@@ -51,6 +51,7 @@ class WarehouseIssueController extends Controller
         // muncul, admin gudang yang menilai kewajaran pas milih.
         $technicians = User::query()
             ->whereHas('role', fn ($q) => $q->whereIn('code', ['teknisi', 'fop']))
+            ->with('role')
             ->orderBy('name')
             ->get();
 

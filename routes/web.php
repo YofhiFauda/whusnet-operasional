@@ -67,6 +67,7 @@ use App\Http\Controllers\Warehouse\WarehouseIssueController;
 use App\Http\Controllers\Warehouse\WarehouseReassignController;
 use App\Http\Controllers\Warehouse\WarehouseReceiveController;
 use App\Http\Controllers\Warehouse\WarehouseReportController;
+use App\Http\Controllers\Warehouse\WarehouseScanController;
 use App\Http\Controllers\Warehouse\WarehouseStockController;
 use App\Http\Controllers\Warehouse\WarehouseStockRequestController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
@@ -595,6 +596,16 @@ Route::middleware('auth')->group(function () {
         // Receive/Transfer/Issue/Adjustment, reuse permission warehouse.view
         // (cuma VIEW, sama kayak Dashboard) — lihat docblock WarehouseStockController.
         Route::get('/warehouse/stock', [WarehouseStockController::class, 'index'])->name('warehouse.stock.index');
+        // Daftar SN per gudang+item (2026-09-07) — dipanggil AJAX dari badge
+        // "SERIAL NUMBER" di Kelola Stok, pola sama `available-stock` endpoint
+        // Transfer/Issue tapi cuma buat 1 kombinasi pop+item (bukan seluruh
+        // gudang), reuse permission warehouse.view (masih cuma VIEW).
+        Route::get('/warehouse/stock/serials', [WarehouseStockController::class, 'serials'])->name('warehouse.stock.serials');
+        // Scan Barang (2026-09-07, mode "scan-first") — lookup status SN
+        // dulu, baru nawarin aksi yang relevan. Cuma VIEW + JSON lookup, gak
+        // nulis apa pun ke DB, reuse permission warehouse.view.
+        Route::get('/warehouse/scan', [WarehouseScanController::class, 'index'])->name('warehouse.scan.index');
+        Route::get('/warehouse/scan/lookup', [WarehouseScanController::class, 'lookup'])->name('warehouse.scan.lookup');
         // Riwayat Mutasi (koreksi IA, 2026-09-03) — satu-satunya cara balik
         // ke Transfer/Issue/Receive show() sebelumnya cuma lewat redirect
         // pas create/konfirmasi; begitu ditinggal, dokumennya "hilang" gak
@@ -614,12 +625,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:warehouse_transfer.create')->group(function () {
         Route::get('/warehouse/receive/create', [WarehouseReceiveController::class, 'create'])->name('warehouse.receive.create');
         Route::post('/warehouse/receive', [WarehouseReceiveController::class, 'store'])->name('warehouse.receive.store');
-        // Barang Masuk via Scan SN (Lacak Barang/SN — tab Single/Batch
-        // Assign) — SATU aksi backend yang sama buat dua-duanya (single
-        // scan-per-scan atau tempel banyak SN sekaligus), bedanya cuma cara
-        // daftar SN itu kekumpul di sisi klien. Lihat docblock
-        // `WarehouseReceiveController::storeScanned()`.
-        Route::post('/warehouse/receive/scan', [WarehouseReceiveController::class, 'storeScanned'])->name('warehouse.receive.store-scanned');
     });
 
     Route::middleware('permission:warehouse_transfer.create')->group(function () {
@@ -693,6 +698,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/warehouse/stock-requests/{stockRequest}', [WarehouseStockRequestController::class, 'show'])->name('warehouse.stock-requests.show');
     });
     Route::middleware('permission:warehouse_stock_request.approve')->group(function () {
+        // Catat Pengiriman (2026-09-07) — reuse permission approve, aktor
+        // sama yang boleh fulfill/reject.
+        Route::post('/warehouse/stock-requests/{stockRequest}/deliver', [WarehouseStockRequestController::class, 'deliver'])->name('warehouse.stock-requests.deliver');
         Route::post('/warehouse/stock-requests/{stockRequest}/fulfill', [WarehouseStockRequestController::class, 'fulfill'])->name('warehouse.stock-requests.fulfill');
     });
     Route::middleware('permission:warehouse_stock_request.reject')->group(function () {

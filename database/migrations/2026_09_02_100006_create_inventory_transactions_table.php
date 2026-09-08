@@ -19,7 +19,7 @@ return new class extends Migration
      * Kolom `from_*`/`to_*` semua NULLABLE karena artinya beda per `type`
      * (App\Enums\InventoryTransactionType) — cuma kombinasi yang relevan yang
      * keisi:
-     *   RECEIVE            : to_pop_id saja (dari supplier, entitas eksternal — gak dicatat).
+     *   RECEIVE            : to_pop_id saja (dari distributor, entitas eksternal — gak dicatat).
      *   TRANSFER (dispatch) : from_pop_id saja, inventory_transfer_id keisi.
      *   TRANSFER (confirm)  : to_pop_id saja, inventory_transfer_id keisi (baris KEDUA,
      *                         independen dari baris dispatch — dua baris per transfer).

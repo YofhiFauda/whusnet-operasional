@@ -2,14 +2,9 @@
 
 namespace App\Http\Controllers\Warehouse;
 
-use App\Enums\EquipmentClass;
-use App\Enums\TrackingType;
 use App\Http\Controllers\Controller;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
-use App\Models\Item;
-use App\Models\ItemCategory;
-use App\Models\Pop;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use Illuminate\Http\Request;
@@ -64,38 +59,7 @@ class WarehouseTraceabilityController extends Controller
             }
         }
 
-        // Data buat tab "Scan Barang Masuk" — logic assign SEKARANG beneran
-        // jalan (POST ke WarehouseReceiveController::storeScanned(), lihat
-        // routes/web.php). Kategori & item difilter equipment_class=AKTIF —
-        // SEMUA perangkat aktif (modem/ONT, router, OLT module, AP Wireless,
-        // SFP Transceiver, dst), bukan cuma modem. Pasif gak relevan buat
-        // alur scan SN (gak wajib SN).
-        $categories = ItemCategory::active()
-            ->where('equipment_class', EquipmentClass::AKTIF)
-            ->ordered()
-            ->get();
-
-        $items = Item::active()
-            ->where('tracking_type', TrackingType::SERIALIZED)
-            ->whereHas('category', fn ($q) => $q->where('equipment_class', EquipmentClass::AKTIF))
-            ->with('category')
-            ->orderBy('name')
-            ->get();
-
-        // Gudang tujuan = Gudang PUSAT SAJA — beda dari keputusan awal
-        // (pusat+cabang), dikoreksi begitu logic assign disambungkan ke
-        // `InventoryReceiveService`: tab ini SECARA BISNIS adalah RECEIVE
-        // (barang baru pertama kali masuk sistem), dan `assertPusat()` di
-        // service itu MENOLAK Cabang — "Cabang terima barang lewat
-        // Transfer" (dari Pusat, bukan dari supplier langsung). Pola query
-        // sama persis `WarehouseReceiveController::create()`.
-        $pusatPops = Pop::query()
-            ->where('type', 'pusat')
-            ->when(! $access->hasAllPopAccess(auth()->user()), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds(auth()->user())))
-            ->orderBy('name')
-            ->get();
-
-        return view('warehouse.traceability.index', compact('serialNumber', 'serial', 'ledger', 'notFound', 'categories', 'items', 'pusatPops'));
+        return view('warehouse.traceability.index', compact('serialNumber', 'serial', 'ledger', 'notFound'));
     }
 
     private function isInScope(InventorySerial $serial, EffectiveAccessService $access, User $user): bool

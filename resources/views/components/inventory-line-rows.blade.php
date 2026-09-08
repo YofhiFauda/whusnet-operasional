@@ -17,6 +17,11 @@
     Kategori `<select>` MURNI filter sisi klien — gak py `name`, gak ikut
     ke-submit, cuma `item_id` yang beneran dikirim ke server (sama kayak
     sebelumnya, gak ada perubahan kontrak backend).
+
+    Rehydrate `old($name)` (2026-09-07) — begitu submit gagal (mis. SN
+    dobel), SEMUA baris yang tadi diisi staf dibalikin, bukan reset ke 1
+    baris kosong. Lihat komentar `init()` di script bawah buat alasan
+    lengkap kenapa ini krusial.
 --}}
 
 @props(['name' => 'lines', 'items' => [], 'withPrice' => false])
@@ -39,7 +44,7 @@
         ->values();
 @endphp
 
-<div x-data="inventoryLineRows(@js($itemOptions), @js($categoryOptions), '{{ $name }}')" @pick-serial.window="onPickSerial($event.detail)" @pick-qty.window="onPickQty($event.detail)" class="space-y-3">
+<div x-data="inventoryLineRows(@js($itemOptions), @js($categoryOptions), '{{ $name }}', @js(old($name, [])))" @pick-serial.window="onPickSerial($event.detail)" @pick-qty.window="onPickQty($event.detail)" class="space-y-3">
     <template x-if="rows.length === 0">
         <div class="p-6 text-center border-2 border-dashed border-slate-200 dark:border-slate-700/80 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30">
             <svg class="w-8 h-8 mx-auto text-slate-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -160,16 +165,63 @@
 @once
 @push('scripts')
 <script>
-function inventoryLineRows(itemOptions, categoryOptions, fieldName) {
+function inventoryLineRows(itemOptions, categoryOptions, fieldName, oldRows) {
     return {
         itemOptions: itemOptions,
         categoryOptions: categoryOptions,
         fieldName: fieldName,
         rows: [],
 
+        // Urutan prioritas init: (1) `old($name)` — form ini BARU AJA gagal
+        // submit (mis. SN dobel/udah kedaftar), Laravel `back()->withInput()`
+        // ngebalikin SEMUA baris yang tadi diisi. SEBELUM ini komponen gak
+        // pernah baca old() sama sekali — form selalu reset ke 1 baris
+        // kosong pas validasi gagal, jadi baris yang UDAH BENER (termasuk SN
+        // pertama yang valid) ikut ilang, staf ngerasa "SN kedua gak bisa"
+        // padahal sebenernya seluruh form-nya kereset (2026-09-07, laporan
+        // user). (2) prefill query string dari shortcut row-action Kelola
+        // Stok/Scan Barang — cuma jalan kalau (1) kosong (fresh page load,
+        // bukan reload abis gagal). (3) 1 baris kosong biasa.
         init() {
-            if (this.rows.length === 0) {
-                this.addRow();
+            if (this.rows.length > 0) {
+                return;
+            }
+
+            if (oldRows && Object.keys(oldRows).length > 0) {
+                Object.values(oldRows).forEach((old, i) => {
+                    this.rows.push({
+                        item_id: old.item_id || '',
+                        category_id: '',
+                        tracking_type: '',
+                        unit: '',
+                        qty: old.qty || old.qty_requested || '',
+                        lot_no: old.lot_no || '',
+                        serial_numbers: old.serial_numbers || '',
+                        unit_price: old.unit_price || '',
+                    });
+                    this.onItemChange(i);
+                });
+
+                return;
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const itemId = params.get('item_id');
+
+            this.addRow();
+
+            if (itemId) {
+                this.rows[0].item_id = itemId;
+                this.rows[0].lot_no = params.get('lot_no') || '';
+                this.onItemChange(0);
+
+                // `serial` (dari Scan Barang, 2026-09-07) — SN yang UDAH
+                // dipilih dari hasil lookup langsung masuk textarea SN,
+                // staf gak perlu scan ulang di halaman ini.
+                const serial = params.get('serial');
+                if (serial && this.rows[0].tracking_type === 'serialized') {
+                    this.rows[0].serial_numbers = serial;
+                }
             }
         },
 

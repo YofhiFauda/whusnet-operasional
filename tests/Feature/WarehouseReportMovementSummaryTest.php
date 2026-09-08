@@ -87,7 +87,7 @@ class WarehouseReportMovementSummaryTest extends TestCase
 
         $this->assertEquals(40.0, $cabangRow['transfer_in']);
         $this->assertEquals(10.0, $cabangRow['issue']);
-        $this->assertEquals(0.0, $cabangRow['receive'], 'Cabang gak pernah RECEIVE langsung dari supplier');
+        $this->assertEquals(0.0, $cabangRow['receive'], 'Cabang gak pernah RECEIVE langsung dari distributor');
     }
 
     #[Test]

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'stock_request_id',
     'item_id',
     'qty_requested',
+    'qty_fulfilled',
     'lot_no',
 ])]
 class StockRequestItem extends Model
@@ -18,6 +19,7 @@ class StockRequestItem extends Model
     {
         return [
             'qty_requested' => 'decimal:2',
+            'qty_fulfilled' => 'decimal:2',
         ];
     }
 
@@ -29,5 +31,19 @@ class StockRequestItem extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    /**
+     * Sisa yang belum tercatat terkirim — dipakai buat clamp input qty di
+     * form "Catat Pengiriman" (gak boleh nyatet lebih dari yang diminta).
+     */
+    public function remaining(): float
+    {
+        return max(0.0, (float) $this->qty_requested - (float) $this->qty_fulfilled);
+    }
+
+    public function isFullyFulfilled(): bool
+    {
+        return $this->remaining() <= 0.0;
     }
 }

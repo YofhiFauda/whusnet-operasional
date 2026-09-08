@@ -8,61 +8,20 @@
 <x-warehouse.header active="traceability" />
 
 {{--
-    Redesign (2026-09-04): satu halaman, tiga tab — "Lacak SN" (existing,
-    dipertahankan apa adanya) + dua tab BARU buat scan SN barang masuk
-    (Single Assign & Batch Assign per kategori Perangkat Aktif — modem/ONT,
-    router, OLT module, AP Wireless, SFP, dst).
-
-    Submit "Simpan & Assign" DUA-DUANYA POST ke rute yang SAMA
-    (`warehouse.receive.store-scanned`) — lihat docblock
-    `WarehouseReceiveController::storeScanned()`: Single & Batch itu
-    identik dari sisi data (satu Gudang Pusat + satu model barang + daftar
-    SN + satu harga satuan), bedanya cuma cara daftar SN-nya kekumpul di
-    klien. Redirect PRG ke halaman Bon Penerimaan (`warehouse.receive.show`)
-    yang SAMA dipakai form manual — bukan halaman hasil terpisah.
+    2026-09-07: dua tab scan RECEIVE ("Single Assign" & "Batch Assign") yang
+    dulu numpang di sini DIPINDAH ke Barang Masuk (`warehouse.receive.create`,
+    mode "Scan Cepat") — secara bisnis emang RECEIVE, bukan bagian Lacak
+    Barang/SN. 2026-09-08: mode "Scan Cepat" itu DIHAPUS TOTAL dari Receive
+    (UI + route `warehouse.receive.store-scanned` + controller). Halaman ini
+    balik jadi murni pencarian riwayat SN, gak perlu tab switcher lagi.
 --}}
-<div x-data="{ tab: @js(request()->query('tab', 'lacak')) }" class="space-y-5">
-
-    <!-- Tab Switcher (Mobile-Optimized Horizontal Scroll / Pills) -->
-    <div class="w-full sm:w-fit flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/70 rounded-2xl p-1.5 overflow-x-auto no-scrollbar scroll-smooth">
-        <button type="button" @click="tab = 'lacak'"
-                :class="tab === 'lacak' ? 'bg-white dark:bg-slate-700 text-sky-700 dark:text-sky-300 shadow-xs ring-1 ring-black/5 dark:ring-white/5 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/40 font-medium'"
-                class="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs transition-all whitespace-nowrap cursor-pointer shrink-0 min-h-[40px]">
-            <svg class="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
-            </svg>
-            <span>Lacak SN</span>
-        </button>
-
-        <button type="button" @click="tab = 'single'"
-                :class="tab === 'single' ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-xs ring-1 ring-black/5 dark:ring-white/5 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/40 font-medium'"
-                class="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs transition-all whitespace-nowrap cursor-pointer shrink-0 min-h-[40px]">
-            <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-            </svg>
-            <span class="hidden sm:inline">Scan Masuk — Single Assign</span>
-            <span class="sm:hidden">Single Assign</span>
-        </button>
-
-        <button type="button" @click="tab = 'batch'"
-                :class="tab === 'batch' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs ring-1 ring-black/5 dark:ring-white/5 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/40 font-medium'"
-                class="inline-flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs transition-all whitespace-nowrap cursor-pointer shrink-0 min-h-[40px]">
-            <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM13.5 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5z"/>
-            </svg>
-            <span class="hidden sm:inline">Scan Masuk — Batch Kategori</span>
-            <span class="sm:hidden">Batch Assign</span>
-        </button>
-    </div>
-
-    <!-- ================= TAB 1: LACAK SN ================= -->
-    <div x-show="tab === 'lacak'" x-cloak class="space-y-6">
+<div class="space-y-6">
 
         <!-- Search Hero Panel -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs">
             <div class="max-w-3xl">
                 <div class="flex items-start gap-3">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-800/60 mt-0.5">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-800/60 mt-0.5">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                         </svg>
@@ -87,7 +46,7 @@
                                    value="{{ $serialNumber }}"
                                    placeholder="Ketik / scan barcode SN (mis. ZTE0001, HG8245H)..."
                                    autofocus
-                                   class="w-full pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-mono font-semibold border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all min-h-[44px]">
+                                   class="w-full pl-10 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm font-mono font-semibold border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all min-h-[44px]">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/></svg>
@@ -96,7 +55,7 @@
 
                         <div class="flex items-center gap-2">
                             <button type="submit"
-                                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs shadow-sky-600/20 transition-all hover:scale-[1.01] active:scale-[0.98] cursor-pointer min-h-[44px]">
+                                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-xs shadow-sky-600/20 transition-all hover:scale-[1.01] active:scale-[0.98] cursor-pointer min-h-[44px]">
                                 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                                 </svg>
@@ -105,7 +64,7 @@
 
                             @if($serialNumber !== '')
                             <a href="{{ route('warehouse.traceability.index') }}"
-                               class="inline-flex items-center justify-center p-2.5 sm:px-3 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors min-h-[44px]"
+                               class="inline-flex items-center justify-center p-2.5 sm:px-3 sm:py-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors min-h-[44px]"
                                title="Reset Pencarian">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -120,8 +79,8 @@
 
         <!-- State Not Found -->
         @if($notFound)
-        <div class="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 rounded-2xl p-6 sm:p-8 text-center shadow-xs">
-            <div class="w-12 h-12 mx-auto mb-3.5 rounded-2xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+        <div class="bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 rounded-lg p-6 sm:p-8 text-center shadow-xs">
+            <div class="w-12 h-12 mx-auto mb-3.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
@@ -174,13 +133,13 @@
         @endphp
 
         <!-- Current Location & Device Status Card -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4"
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-4 sm:p-6 shadow-xs space-y-4"
              x-data="{ copied: false }">
 
             <!-- Device Summary Banner -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
                 <div class="flex items-start gap-3.5">
-                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl {{ $statusConfig['icon_bg'] }} text-white flex items-center justify-center shadow-md shadow-slate-900/10 shrink-0">
+                    <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-lg {{ $statusConfig['icon_bg'] }} text-white flex items-center justify-center shadow-md shadow-slate-900/10 shrink-0">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
                         </svg>
@@ -217,7 +176,7 @@
                 </div>
 
                 <!-- Location / Responsibility Context Box -->
-                <div class="bg-slate-50/80 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700/60 rounded-xl p-3 text-xs w-full md:w-auto">
+                <div class="bg-slate-50/80 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700/60 rounded-lg p-3 text-xs w-full md:w-auto">
                     <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                         Lokasi / Penanggung Jawab Terkini
                     </span>
@@ -260,19 +219,19 @@
 
             <!-- Quick Info Specs Grid (Mobile-Friendly 2x2 cards) -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3.5 pt-1 text-xs">
-                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Kategori Barang</span>
                     <span class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5 block truncate">{{ $serial->item->category?->name ?? '-' }}</span>
                 </div>
-                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Gudang Asal Masuk</span>
                     <span class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5 block truncate">{{ $serial->issuedFromPop->name ?? '-' }}</span>
                 </div>
-                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Didaftarkan</span>
                     <span class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5 block">{{ $serial->created_at->translatedFormat('d M Y H:i') }}</span>
                 </div>
-                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div class="bg-slate-50/70 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <span class="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Mutasi Ledger</span>
                     <span class="font-bold text-sky-600 dark:text-sky-400 font-mono mt-0.5 block">{{ $ledger->count() }} Peristiwa</span>
                 </div>
@@ -280,10 +239,10 @@
         </div>
 
         <!-- Interactive Connected Timeline (Audit Trail) -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
             <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shrink-0">
+                    <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-100 dark:border-sky-800/60 shrink-0">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -307,7 +266,7 @@
                         </div>
 
                         <!-- Timeline Content Box -->
-                        <div class="bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 rounded-xl p-3.5 sm:p-4 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-900/70 hover:shadow-xs">
+                        <div class="bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 rounded-lg p-3.5 sm:p-4 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-900/70 hover:shadow-xs">
                             @php
                                 $eventLabel = match(true) {
                                     $event->type->value === 'transfer' && $event->from_pop_id !== null => 'Transfer Dikirim (Pusat)',
@@ -387,436 +346,5 @@
         @endif
 
     </div>
-    {{-- /TAB 1: LACAK SN --}}
-
-    <!-- ================= TAB 2: SCAN MASUK — SINGLE ASSIGN ================= -->
-    <div x-show="tab === 'single'" x-cloak
-         x-data="{
-            popId: '',
-            categoryId: '',
-            itemId: '',
-            itemNames: @js($items->pluck('name', 'id')),
-            unitPrice: '',
-            snInput: '',
-            scanned: [],
-            add(sn = null) {
-                // `sn` diisi kalau dipanggil dari hasil scan kamera
-                // (`barcode-detected`) — beda dari input manual, TIDAK
-                // nyentuh `snInput` biar teksnya gak ke-timpa kalau staf
-                // lagi ngetik SN lain barengan kamera masih nyala.
-                const value = (sn ?? this.snInput).trim();
-                if (value === '') return;
-                if (!this.itemId) {
-                    window.Toast?.warning('Pilih Barang Dulu', 'Pilih model barang sebelum scan/isi SN.');
-                    return;
-                }
-                if (this.scanned.some(row => row.sn.toLowerCase() === value.toLowerCase())) {
-                    window.Toast?.info('SN Sudah Ada', `'${value}' sudah ada di daftar.`, 2000);
-                    if (sn === null) this.snInput = '';
-                    return;
-                }
-                // Cek prefix vendor SN (heuristik ONT/GPON, lihat docblock
-                // `detectSnVendorMismatch` di barcode-scan.js) — SOFT
-                // WARNING doang, SN tetap masuk daftar biar gak nge-block
-                // kasus yang heuristiknya emang gak berlaku.
-                const vendorMismatch = window.detectSnVendorMismatch?.(value, this.itemNames[this.itemId] || '');
-                if (vendorMismatch) {
-                    window.Toast?.warning('Cek Lagi Barangnya', `SN '${value}' kelihatannya ${vendorMismatch} — Barang yang dipilih beda merek. Yakin ini barangnya?`, 5000);
-                }
-                this.scanned.unshift({ sn: value });
-                window.Toast?.success('SN Terinput', `'${value}' berhasil masuk daftar.`, 2000);
-                if (sn === null) this.snInput = '';
-            },
-            remove(index) { this.scanned.splice(index, 1); },
-            clearAll() { this.scanned = []; }
-         }"
-         @barcode-detected.window="$event.detail.target === 'single' && add($event.detail.code)"
-         class="space-y-6">
-
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs">
-            <div class="max-w-3xl">
-                <div class="flex items-start gap-3">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-800/60 mt-0.5">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
-                            Scan SN Barang Masuk — Satu per Satu (Single Assign)
-                        </h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                            Pilih gudang penerima dan satu model barang, lalu scan/ketik SN satu-satu. Cocok untuk penerimaan campuran beberapa model sekaligus.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left: Setup + Scan Input -->
-            <div class="lg:col-span-1 space-y-4">
-                <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Gudang Penerima</label>
-                        <select x-model="popId" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-h-[44px]">
-                            <option value="">-- Pilih Gudang --</option>
-                            @foreach($pusatPops as $pop)
-                            <option value="{{ $pop->id }}">{{ $pop->name }}</option>
-                            @endforeach
-                        </select>
-                        <p class="text-[10px] text-slate-400 mt-1">Barang masuk cuma tercatat di Gudang Pusat — distribusi ke Cabang lewat Transfer terpisah.</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori Perangkat Aktif</label>
-                        <select x-model="categoryId" @change="itemId = ''" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-h-[44px]">
-                            <option value="">-- Pilih Kategori --</option>
-                            @foreach($categories as $category)
-                            <option value="{{ $category->id }}">{{ $category->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Model Barang</label>
-                        <select x-model="itemId" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-h-[44px]">
-                            <option value="">-- Pilih Barang --</option>
-                            @foreach($items as $item)
-                            <option value="{{ $item->id }}" x-show="categoryId === '' || categoryId == {{ $item->item_category_id }}" data-category="{{ $item->item_category_id }}">{{ $item->name }} ({{ $item->code }})</option>
-                            @endforeach
-                        </select>
-                        <p class="text-[10px] text-slate-400 mt-1">Terfilter otomatis sesuai kategori yang dipilih.</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Harga Beli Satuan (Rp)</label>
-                        <input type="number" x-model.number="unitPrice" min="1" step="1" placeholder="Contoh: 350000"
-                               class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-h-[44px]">
-                        <p class="text-[10px] text-slate-400 mt-1">Berlaku sama utk semua SN di daftar ini — acuan harga custody teknisi nanti (last-cost).</p>
-                    </div>
-
-                    <div class="border-t border-slate-100 dark:border-slate-700/60 pt-4">
-                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Scan / Ketik SN</label>
-                        <div class="relative">
-                            <input type="text" x-model="snInput" @keydown.enter.prevent="add()" :disabled="!itemId"
-                                   placeholder="Arahkan scanner atau ketik barcode..."
-                                   class="w-full pl-9 pr-3 py-2.5 sm:py-3 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 bg-slate-50/50 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/></svg>
-                            </div>
-                        </div>
-                        <button type="button" @click="add()" :disabled="!itemId"
-                                class="mt-2.5 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed dark:disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer min-h-[44px]">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                            </svg>
-                            <span>Tambah ke Daftar</span>
-                        </button>
-                        <p class="text-[10px] text-slate-400 mt-1.5" x-show="!itemId">Pilih model barang dulu sebelum scan.</p>
-
-                        <x-warehouse.barcode-scanner target="single" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: Scanned List -->
-            <div class="lg:col-span-2">
-                <form action="{{ route('warehouse.receive.store-scanned') }}" method="POST"
-                      class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs">
-                    @csrf
-                    <input type="hidden" name="pop_id" :value="popId">
-                    <input type="hidden" name="item_id" :value="itemId">
-                    <input type="hidden" name="unit_price" :value="unitPrice">
-                    <template x-for="row in scanned" :key="row.sn">
-                        <input type="hidden" name="serial_numbers[]" :value="row.sn">
-                    </template>
-
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Daftar SN Siap Assign</h4>
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                                  x-text="scanned.length + ' unit'"></span>
-                            <button type="button" @click="clearAll()" x-show="scanned.length > 0" class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer">Kosongkan</button>
-                        </div>
-                    </div>
-
-                    <div x-show="scanned.length === 0" class="p-8 sm:p-12 text-center">
-                        <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-700/60 text-slate-400 flex items-center justify-center">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/></svg>
-                        </div>
-                        <p class="text-xs text-slate-400">Belum ada SN yang di-scan.</p>
-                        <p class="text-[11px] text-slate-400/80 mt-0.5">Tembak scanner atau ketik nomor seri di form sebelah kiri.</p>
-                    </div>
-
-                    <div x-show="scanned.length > 0" class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[28rem] overflow-y-auto">
-                        <template x-for="(row, index) in scanned" :key="row.sn">
-                            <div class="px-4 sm:px-6 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="w-6 h-6 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-                                        </svg>
-                                    </span>
-                                    <span class="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 break-all" x-text="row.sn"></span>
-                                </div>
-                                <button type="button" @click="remove(index)" class="p-1.5 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer shrink-0" title="Hapus dari daftar">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div class="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-end gap-2">
-                        <button type="submit" :disabled="!popId || !itemId || !unitPrice || scanned.length === 0"
-                                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all disabled:cursor-not-allowed cursor-pointer min-h-[44px]">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <span>Simpan &amp; Assign ke Gudang</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {{-- /TAB 2: SCAN MASUK SINGLE --}}
-
-    <!-- ================= TAB 3: SCAN MASUK — BATCH PER KATEGORI ================= -->
-    <div x-show="tab === 'batch'" x-cloak
-         x-data="{
-            popId: '',
-            categoryId: '',
-            itemId: '',
-            itemNames: @js($items->pluck('name', 'id')),
-            unitPrice: '',
-            bulkInput: '',
-            scanned: [],
-            // Dipakai `process()` (tempel/scanner-fisik banyak baris
-            // sekaligus) MAUPUN listener `barcode-detected` dari kamera
-            // (satu kode per event) — satu jalur dedupe, gak ada dua logic
-            // yang bisa menyimpang.
-            // Balikin status ('added'/'duplicate'/'empty') — dipakai
-            // `process()` buat toast RINGKASAN (bukan per-baris, bisa
-            // puluhan baris sekali tempel) dan `onBarcodeScan()` buat toast
-            // PER-SCAN (satu-satu, gak spam).
-            pushCode(sn) {
-                const value = sn.trim();
-                if (value === '') return 'empty';
-                if (this.scanned.some(row => row.sn.toLowerCase() === value.toLowerCase())) return 'duplicate';
-                this.scanned.push({ sn: value });
-                return 'added';
-            },
-            process() {
-                if (!this.itemId) {
-                    window.Toast?.warning('Pilih Barang Dulu', 'Pilih model barang sebelum memproses daftar SN.');
-                    return;
-                }
-                const lines = this.bulkInput.split('\n').map(s => s.trim()).filter(s => s !== '');
-                let added = 0, duplicate = 0;
-                lines.forEach(sn => {
-                    const status = this.pushCode(sn);
-                    if (status === 'added') added++;
-                    else if (status === 'duplicate') duplicate++;
-                });
-                this.bulkInput = '';
-                if (added > 0 || duplicate > 0) {
-                    window.Toast?.success('Batch Diproses', `${added} SN baru ditambahkan` + (duplicate > 0 ? `, ${duplicate} duplikat dilewati.` : '.'));
-                }
-            },
-            onBarcodeScan(code) {
-                if (!this.itemId) {
-                    window.Toast?.warning('Pilih Barang Dulu', 'Pilih model barang sebelum scan.');
-                    return;
-                }
-                // Vendor mismatch cuma dicek di jalur SCAN KAMERA per-unit
-                // ini (bukan `pushCode()` generik yang juga dipacked
-                // `process()` tempel-banyak-baris) — batch tempel biasanya
-                // dari daftar SN valid yang udah dicatat sebelumnya, bukan
-                // rawan "kepegang unit fisik yang salah" kayak scan
-                // langsung. Lihat docblock `detectSnVendorMismatch`.
-                const vendorMismatch = window.detectSnVendorMismatch?.(code, this.itemNames[this.itemId] || '');
-                if (vendorMismatch) {
-                    window.Toast?.warning('Cek Lagi Barangnya', `SN '${code}' kelihatannya ${vendorMismatch} — Barang yang dipilih beda merek. Yakin ini barangnya?`, 5000);
-                }
-                const status = this.pushCode(code);
-                if (status === 'added') {
-                    window.Toast?.success('SN Terinput', `'${code}' berhasil masuk daftar batch.`, 2000);
-                } else if (status === 'duplicate') {
-                    window.Toast?.info('SN Sudah Ada', `'${code}' sudah ada di daftar.`, 2000);
-                }
-            },
-            remove(index) { this.scanned.splice(index, 1); },
-            clearAll() { this.scanned = []; }
-         }"
-         @barcode-detected.window="$event.detail.target === 'batch' && onBarcodeScan($event.detail.code)"
-         class="space-y-6">
-
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs">
-            <div class="max-w-3xl">
-                <div class="flex items-start gap-3">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-800/60 mt-0.5">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
-                            Scan SN Barang Masuk — Batch per Kategori
-                        </h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                            Buat penerimaan satu model perangkat aktif (modem/ONT, router, AP Wireless, SFP, dst) dalam jumlah besar sekaligus — tembak scanner beruntun atau tempel daftar SN.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Step 1: Setup -->
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs">
-            <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-3.5">
-                1. Tentukan Kategori &amp; Model
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Gudang Penerima</label>
-                    <select x-model="popId" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]">
-                        <option value="">-- Pilih Gudang --</option>
-                        @foreach($pusatPops as $pop)
-                        <option value="{{ $pop->id }}">{{ $pop->name }}</option>
-                        @endforeach
-                    </select>
-                    <p class="text-[10px] text-slate-400 mt-1">Cuma Gudang Pusat — Cabang lewat Transfer.</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori Perangkat Aktif</label>
-                    <select x-model="categoryId" @change="itemId = ''" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]">
-                        <option value="">-- Pilih Kategori --</option>
-                        @foreach($categories as $category)
-                        <option value="{{ $category->id }}">{{ $category->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Model Barang (semua SN batch ini)</label>
-                    <select x-model="itemId" class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]">
-                        <option value="">-- Pilih Barang --</option>
-                        @foreach($items as $item)
-                        <option value="{{ $item->id }}" x-show="categoryId === '' || categoryId == {{ $item->item_category_id }}" data-category="{{ $item->item_category_id }}">{{ $item->name }} ({{ $item->code }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Harga Beli Satuan (Rp)</label>
-                    <input type="number" x-model.number="unitPrice" min="1" step="1" placeholder="Contoh: 350000"
-                           class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]">
-                    <p class="text-[10px] text-slate-400 mt-1">Berlaku sama utk semua SN batch ini.</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Step 2: Bulk Scan Input -->
-            <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between">
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                            2. Scan / Tempel Daftar SN
-                        </h4>
-                        <span class="text-[11px] font-mono text-slate-400"
-                              x-text="(bulkInput.split('\n').filter(s => s.trim() !== '').length) + ' baris terdeteksi'"></span>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mb-3">
-                        Satu SN per baris. Scanner otomatis Enter tiap tembakan — arahkan ke kotak ini lalu tembak beruntun.
-                    </p>
-                    <textarea x-model="bulkInput" :disabled="!itemId" rows="8" placeholder="ZTE00001&#10;ZTE00002&#10;ZTE00003&#10;..."
-                              class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 bg-slate-50/50 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed leading-relaxed"></textarea>
-                </div>
-
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60">
-                    <p class="text-[10px] text-slate-400" x-show="!itemId">Pilih model barang dulu sebelum memproses.</p>
-                    <button type="button" @click="process()" :disabled="!itemId"
-                            class="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed dark:disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer min-h-[44px]">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                        </svg>
-                        <span>Proses ke Daftar Batch</span>
-                    </button>
-                </div>
-
-                <x-warehouse.barcode-scanner target="batch" />
-            </div>
-
-            <!-- Step 3: Batch Preview List -->
-            <form action="{{ route('warehouse.receive.store-scanned') }}" method="POST"
-                  class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between">
-                @csrf
-                <input type="hidden" name="pop_id" :value="popId">
-                <input type="hidden" name="item_id" :value="itemId">
-                <input type="hidden" name="unit_price" :value="unitPrice">
-                <template x-for="row in scanned" :key="row.sn">
-                    <input type="hidden" name="serial_numbers[]" :value="row.sn">
-                </template>
-
-                <div>
-                    <div class="px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">3. Preview Batch</h4>
-                        <div class="flex items-center gap-2">
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800"
-                                  x-text="scanned.length + ' unit'"></span>
-                            <button type="button" @click="clearAll()" x-show="scanned.length > 0" class="text-[11px] font-semibold text-rose-500 hover:text-rose-600 cursor-pointer">Kosongkan</button>
-                        </div>
-                    </div>
-
-                    <div x-show="scanned.length === 0" class="p-8 sm:p-12 text-center">
-                        <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-700/60 text-slate-400 flex items-center justify-center">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/>
-                            </svg>
-                        </div>
-                        <p class="text-xs text-slate-400">Belum ada SN diproses ke batch.</p>
-                        <p class="text-[11px] text-slate-400/80 mt-0.5">Tempel daftar SN di kolom sebelah lalu klik 'Proses ke Daftar Batch'.</p>
-                    </div>
-
-                    <div x-show="scanned.length > 0" class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-[20rem] overflow-y-auto">
-                        <template x-for="(row, index) in scanned" :key="row.sn">
-                            <div class="px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span class="text-[10px] font-mono text-slate-400 w-5" x-text="index + 1"></span>
-                                    <span class="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 break-all" x-text="row.sn"></span>
-                                </div>
-                                <button type="button" @click="remove(index)" class="p-1 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer shrink-0" title="Hapus">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="px-4 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30">
-                    <button type="submit" :disabled="!popId || !itemId || !unitPrice || scanned.length === 0"
-                            class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all disabled:cursor-not-allowed cursor-pointer min-h-[44px]">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <span>Simpan &amp; Assign Batch ke Gudang</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {{-- /TAB 3: SCAN MASUK BATCH --}}
-
-</div>
-
-{{-- Entry Vite terpisah (getUserMedia + BarcodeDetector) — lihat
-     resources/js/barcode-scan.js kenapa gak digabung app.js. --}}
-@vite(['resources/js/barcode-scan.js'])
 
 @endsection

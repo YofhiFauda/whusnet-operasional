@@ -91,6 +91,32 @@ class WarehouseStockRequestController extends Controller
         return view('warehouse.stock-requests.show', compact('stockRequest'));
     }
 
+    /**
+     * "Catat Pengiriman" (2026-09-07) — dipanggil admin Pusat SETELAH bikin
+     * Transfer sungguhan di layar lain, buat sinkronin progress tiket ini.
+     * Qty per baris di-clamp ke sisa di `StockRequestService::recordDelivery()`,
+     * di sini cuma validasi bentuk request-nya.
+     */
+    public function deliver(Request $request, StockRequest $stockRequest, StockRequestService $service, EffectiveAccessService $access): RedirectResponse
+    {
+        $this->assertPopIdInScope($stockRequest->cabang_pop_id, auth()->user(), $access);
+
+        $validated = $request->validate([
+            'quantities' => 'required|array',
+            'quantities.*' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $service->recordDelivery($stockRequest, $validated['quantities'], auth()->user(), $validated['notes'] ?? null);
+        } catch (InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('warehouse.stock-requests.show', $stockRequest)
+            ->with('success', 'Pengiriman tercatat.');
+    }
+
     public function fulfill(Request $request, StockRequest $stockRequest, StockRequestService $service, EffectiveAccessService $access): RedirectResponse
     {
         $this->assertPopIdInScope($stockRequest->cabang_pop_id, auth()->user(), $access);

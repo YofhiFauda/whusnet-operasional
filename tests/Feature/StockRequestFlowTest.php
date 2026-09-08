@@ -90,7 +90,7 @@ class StockRequestFlowTest extends TestCase
         $stockRequest = StockRequest::firstOrFail();
         $response->assertRedirect(route('warehouse.stock-requests.show', $stockRequest));
 
-        $this->assertStringStartsWith('REQ-', $stockRequest->reference_number);
+        $this->assertStringStartsWith('PST-', $stockRequest->reference_number);
         $this->assertEquals($this->cabangA->id, $stockRequest->cabang_pop_id);
         $this->assertEquals(StockRequestStatus::PENDING, $stockRequest->status);
         $this->assertEquals($popAdminA->id, $stockRequest->requested_by);
@@ -210,6 +210,92 @@ class StockRequestFlowTest extends TestCase
         $response = $this->actingAs($this->owner)->post(route('warehouse.stock-requests.fulfill', $stockRequest));
 
         $response->assertSessionHas('error');
+        $stockRequest->refresh();
+        $this->assertEquals(StockRequestStatus::FULFILLED, $stockRequest->status);
+    }
+
+    #[Test]
+    public function admin_pusat_catat_pengiriman_sebagian_jadi_partial(): void
+    {
+        $popAdminA = $this->makePopAdmin($this->cabangA);
+        $stockRequest = app(StockRequestService::class)->create($this->cabangA, [['item_id' => $this->kabel->id, 'qty_requested' => 100]], $popAdminA);
+        $itemLine = $stockRequest->items->first();
+
+        $response = $this->actingAs($this->owner)->post(route('warehouse.stock-requests.deliver', $stockRequest), [
+            'quantities' => [$itemLine->id => 40],
+            'notes' => 'Transfer TRF-xxx 40m dulu',
+        ]);
+
+        $response->assertRedirect(route('warehouse.stock-requests.show', $stockRequest));
+        $stockRequest->refresh()->load('items');
+        $this->assertEquals(StockRequestStatus::PARTIAL, $stockRequest->status);
+        $this->assertEquals(40, (float) $stockRequest->items->first()->qty_fulfilled);
+        $this->assertEquals($this->owner->id, $stockRequest->decided_by);
+    }
+
+    #[Test]
+    public function catat_pengiriman_penuh_otomatis_jadi_fulfilled(): void
+    {
+        $popAdminA = $this->makePopAdmin($this->cabangA);
+        $stockRequest = app(StockRequestService::class)->create($this->cabangA, [['item_id' => $this->kabel->id, 'qty_requested' => 100]], $popAdminA);
+        $itemLine = $stockRequest->items->first();
+
+        $this->actingAs($this->owner)->post(route('warehouse.stock-requests.deliver', $stockRequest), [
+            'quantities' => [$itemLine->id => 100],
+        ]);
+
+        $stockRequest->refresh()->load('items');
+        $this->assertEquals(StockRequestStatus::FULFILLED, $stockRequest->status);
+        $this->assertEquals(100, (float) $stockRequest->items->first()->qty_fulfilled);
+    }
+
+    #[Test]
+    public function qty_pengiriman_di_clamp_gak_boleh_lewat_sisa_diminta(): void
+    {
+        $popAdminA = $this->makePopAdmin($this->cabangA);
+        $stockRequest = app(StockRequestService::class)->create($this->cabangA, [['item_id' => $this->kabel->id, 'qty_requested' => 100]], $popAdminA);
+        $itemLine = $stockRequest->items->first();
+
+        $this->actingAs($this->owner)->post(route('warehouse.stock-requests.deliver', $stockRequest), [
+            'quantities' => [$itemLine->id => 999], // lebih dari qty_requested
+        ]);
+
+        $stockRequest->refresh()->load('items');
+        $this->assertEquals(100, (float) $stockRequest->items->first()->qty_fulfilled); // di-clamp, bukan 999
+        $this->assertEquals(StockRequestStatus::FULFILLED, $stockRequest->status);
+    }
+
+    #[Test]
+    public function permintaan_partial_gak_bisa_ditolak_atau_dibatalkan_lagi(): void
+    {
+        $popAdminA = $this->makePopAdmin($this->cabangA);
+        $stockRequest = app(StockRequestService::class)->create($this->cabangA, [['item_id' => $this->kabel->id, 'qty_requested' => 100]], $popAdminA);
+        $itemLine = $stockRequest->items->first();
+        app(StockRequestService::class)->recordDelivery($stockRequest, [$itemLine->id => 40], $this->owner);
+
+        $rejectResponse = $this->actingAs($this->owner)->post(route('warehouse.stock-requests.reject', $stockRequest), [
+            'reason' => 'coba tolak walau udah partial',
+        ]);
+        $rejectResponse->assertSessionHas('error');
+
+        $cancelResponse = $this->actingAs($popAdminA)->post(route('warehouse.stock-requests.cancel', $stockRequest));
+        $cancelResponse->assertSessionHas('error');
+
+        $stockRequest->refresh();
+        $this->assertEquals(StockRequestStatus::PARTIAL, $stockRequest->status);
+    }
+
+    #[Test]
+    public function partial_masih_bisa_ditandai_cukup_selesai(): void
+    {
+        $popAdminA = $this->makePopAdmin($this->cabangA);
+        $stockRequest = app(StockRequestService::class)->create($this->cabangA, [['item_id' => $this->kabel->id, 'qty_requested' => 100]], $popAdminA);
+        $itemLine = $stockRequest->items->first();
+        app(StockRequestService::class)->recordDelivery($stockRequest, [$itemLine->id => 40], $this->owner);
+
+        $response = $this->actingAs($this->owner)->post(route('warehouse.stock-requests.fulfill', $stockRequest));
+
+        $response->assertRedirect(route('warehouse.stock-requests.show', $stockRequest));
         $stockRequest->refresh();
         $this->assertEquals(StockRequestStatus::FULFILLED, $stockRequest->status);
     }
